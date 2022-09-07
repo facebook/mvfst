@@ -175,6 +175,12 @@ class QuicServerTransportTestBase : public virtual testing::Test {
              << (server->getConn().serverConnectionId
                      ? server->getConn().serverConnectionId->hex()
                      : " (n/a)");
+    SetUpChild();
+  }
+
+  virtual void SetUpChild() {}
+
+  void startTransport() {
     server->accept();
     setupConnection();
     EXPECT_TRUE(server->idleTimeout().isScheduled());
@@ -182,10 +188,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     EXPECT_EQ(
         *server->getConn().clientConnectionId,
         server->getConn().peerConnectionIds[0].connId);
-    SetUpChild();
   }
-
-  virtual void SetUpChild() {}
 
   void destroyTransport() {
     server = nullptr;
@@ -595,6 +598,14 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   std::shared_ptr<FizzServerQuicHandshakeContext> fizzServerContext;
   PacketNum clientNextInitialPacketNum{0}, clientNextHandshakePacketNum{0},
       clientNextAppDataPacketNum{0};
+};
+
+class QuicServerTransportAfterStartTestBase
+    : public QuicServerTransportTestBase {
+ public:
+  void SetUpChild() override {
+    startTransport();
+  }
 };
 
 } // namespace quic::test

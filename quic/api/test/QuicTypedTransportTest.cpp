@@ -27,7 +27,7 @@ namespace {
 
 using TransportTypes = testing::Types<
     quic::test::QuicClientTransportAfterStartTestBase,
-    quic::test::QuicServerTransportTestBase>;
+    quic::test::QuicServerTransportAfterStartTestBase>;
 
 class TransportTypeNames {
  public:
@@ -121,7 +121,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -145,7 +145,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -169,7 +169,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -193,7 +193,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -217,7 +217,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -241,7 +241,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -265,7 +265,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -328,7 +328,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayEqual) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -390,7 +390,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayGreater) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -453,7 +453,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
                       QuicClientTransportAfterStartTestBase>) {
     } else if constexpr (std::is_same_v<
                              TypeParam,
-                             QuicServerTransportTestBase>) {
+                             QuicServerTransportAfterStartTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_LE(0ms, tInfo.maybeLrtt.value());
       EXPECT_GE(500ms, tInfo.maybeLrtt.value());
@@ -993,7 +993,9 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
                 testing::Field(
                     &quic::AckEvent::ackedPackets,
                     testing::SizeIs(expectedNumAckedPackets)))));
-      } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
+      } else if constexpr (std::is_same_v<
+                               T,
+                               QuicServerTransportAfterStartTestBase>) {
         return testing::Property(
             &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
             testing::ElementsAre(testing::AllOf(
@@ -1067,7 +1069,9 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
                     testing::Eq(packetReceiveTime),
                     testing::Ge(TimePoint::clock::now()))),
             testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
-      } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
+      } else if constexpr (std::is_same_v<
+                               T,
+                               QuicServerTransportAfterStartTestBase>) {
         return testing::AllOf(
             testing::Field(
                 &Obj::packetReceiveTime, testing::Eq(packetReceiveTime)),

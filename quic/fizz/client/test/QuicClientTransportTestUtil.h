@@ -456,6 +456,55 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   virtual void SetUpChild() {}
 
+  void startTransport() {
+    client->addNewPeerAddress(serverAddr);
+    client->setHostname(hostname_);
+    ON_CALL(*sock, write(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([&](const folly::SocketAddress&,
+                                const std::unique_ptr<folly::IOBuf>& buf) {
+              socketWrites.push_back(buf->clone());
+              return buf->computeChainDataLength();
+            }));
+    ON_CALL(*sock, address()).WillByDefault(testing::ReturnRef(serverAddr));
+
+    setupCryptoLayer();
+    start();
+    client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
+        std::numeric_limits<uint32_t>::max());
+    client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
+        std::numeric_limits<uint32_t>::max());
+  }
+
+  void destroyTransport() {
+    client->unbindConnection();
+    client = nullptr;
+  }
+
+  QuicTransportBase* getTransport() {
+    return client->getTransport();
+  }
+
+  std::shared_ptr<TestingQuicClientTransport> getTestTransport() {
+    return client;
+  }
+
+  const QuicClientConnectionState& getConn() const {
+    return client->getConn();
+  }
+
+  QuicClientConnectionState& getNonConstConn() {
+    return client->getNonConstConn();
+  }
+
+  MockConnectionSetupCallback& getConnSetupCallback() {
+    return clientConnSetupCallback;
+  }
+
+  MockConnectionCallback& getConnCallback() {
+    return clientConnCallback;
+  }
+
   virtual void setupCryptoLayer() {
     // Fake that the handshake has already occured and fix the keys.
     mockClientHandshake = new FakeOneRttHandshakeLayer(
@@ -514,35 +563,6 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     EXPECT_TRUE(
         client->getConn().readCodec->getStatelessResetToken().has_value());
     EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
-  }
-
-  void destroyTransport() {
-    client->unbindConnection();
-    client = nullptr;
-  }
-
-  QuicTransportBase* getTransport() {
-    return client->getTransport();
-  }
-
-  std::shared_ptr<TestingQuicClientTransport> getTestTransport() {
-    return client;
-  }
-
-  const QuicClientConnectionState& getConn() const {
-    return client->getConn();
-  }
-
-  QuicClientConnectionState& getNonConstConn() {
-    return client->getNonConstConn();
-  }
-
-  MockConnectionSetupCallback& getConnSetupCallback() {
-    return clientConnSetupCallback;
-  }
-
-  MockConnectionCallback& getConnCallback() {
-    return clientConnCallback;
   }
 
   void setConnectionIds() {
@@ -899,33 +919,15 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   folly::Optional<ConnectionId> serverChosenConnId;
   QuicVersion version{QuicVersion::QUIC_V1};
   std::shared_ptr<testing::NiceMock<MockQuicStats>> quicStats_;
+  std::string hostname_{"TestHost"};
 };
 
 class QuicClientTransportAfterStartTestBase
     : public QuicClientTransportTestBase {
  public:
   void SetUpChild() override {
-    client->addNewPeerAddress(serverAddr);
-    client->setHostname(hostname_);
-    ON_CALL(*sock, write(testing::_, testing::_))
-        .WillByDefault(
-            testing::Invoke([&](const folly::SocketAddress&,
-                                const std::unique_ptr<folly::IOBuf>& buf) {
-              socketWrites.push_back(buf->clone());
-              return buf->computeChainDataLength();
-            }));
-    ON_CALL(*sock, address()).WillByDefault(testing::ReturnRef(serverAddr));
-
-    setupCryptoLayer();
-    start();
-    client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
-    client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
+    startTransport();
   }
-
- protected:
-  std::string hostname_{"TestHost"};
 };
 
 } // namespace quic::test
