@@ -478,12 +478,12 @@ void updateAckState(
     bool pkHasRetransmittableData,
     bool pkHasCryptoData,
     TimePoint receivedTime) {
-  bool outOfOrder = updateLargestReceivedPacketNum(
+  uint64_t distance = updateLargestReceivedPacketNum(
       getAckState(conn, pnSpace), packetNum, receivedTime);
   updateAckSendStateOnRecvPacket(
       conn,
       getAckState(conn, pnSpace),
-      outOfOrder,
+      distance,
       pkHasRetransmittableData,
       pkHasCryptoData);
 }

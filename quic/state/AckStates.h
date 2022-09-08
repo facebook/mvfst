@@ -32,7 +32,7 @@ struct AckState {
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
   AckBlocks acks;
-  bool ignoreReorder{false};
+  uint64_t reorderThreshold{0};
   folly::Optional<uint64_t> tolerance;
   folly::Optional<uint64_t> ackFrequencySequenceNumber;
   // Flag indicating that if we need to send ack immediately. This will be set

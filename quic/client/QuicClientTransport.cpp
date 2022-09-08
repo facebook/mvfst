@@ -369,9 +369,9 @@ void QuicClientTransport::processPacketData(
         "Invalid connection id", TransportErrorCode::PROTOCOL_VIOLATION);
   }
   auto& ackState = getAckState(*conn_, pnSpace);
-  bool outOfOrder =
+  uint64_t distanceFromExpectedPacketNum =
       updateLargestReceivedPacketNum(ackState, packetNum, receiveTimePoint);
-  if (outOfOrder) {
+  if (distanceFromExpectedPacketNum > 0) {
     QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
   }
 
@@ -778,7 +778,7 @@ void QuicClientTransport::processPacketData(
   updateAckSendStateOnRecvPacket(
       *conn_,
       ackState,
-      outOfOrder,
+      distanceFromExpectedPacketNum,
       pktHasRetransmittableData,
       pktHasCryptoData);
   if (encryptionLevel == EncryptionLevel::Handshake &&

@@ -1034,9 +1034,9 @@ void onServerReadDataFromOpen(
     }
 
     auto& ackState = getAckState(conn, packetNumberSpace);
-    bool outOfOrder = updateLargestReceivedPacketNum(
+    uint64_t distanceFromExpectedPacketNum = updateLargestReceivedPacketNum(
         ackState, packetNum, readData.networkData.receiveTimePoint);
-    if (outOfOrder) {
+    if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }
     DCHECK(hasReceivedPackets(conn));
@@ -1374,7 +1374,7 @@ void onServerReadDataFromOpen(
     updateAckSendStateOnRecvPacket(
         conn,
         ackState,
-        outOfOrder,
+        distanceFromExpectedPacketNum,
         pktHasRetransmittableData,
         pktHasCryptoData,
         packetNumberSpace == PacketNumberSpace::Initial);

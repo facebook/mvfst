@@ -303,8 +303,7 @@ bool updateSimpleFrameOnPacketReceived(
             std::chrono::microseconds(std::max<uint64_t>(
                 conn.transportSettings.minAckDelay->count(),
                 ackFrequencyFrame->updateMaxAckDelay));
-        conn.lossState.reorderingThreshold =
-            ackFrequencyFrame->reorderThreshold;
+        ackState.reorderThreshold = ackFrequencyFrame->reorderThreshold;
       }
       return true;
     }

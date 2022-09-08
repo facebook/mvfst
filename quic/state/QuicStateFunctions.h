@@ -16,7 +16,7 @@ namespace quic {
 void updateAckSendStateOnRecvPacket(
     QuicConnectionStateBase& conn,
     AckState& ackState,
-    bool pktOutOfOrder,
+    uint64_t distanceFromExpectedPacketNum,
     bool pktHasRetransmittableData,
     bool pktHasCryptoData,
     bool initPktNumSpace = false);
@@ -55,11 +55,11 @@ void increaseNextPacketNum(
     PacketNumberSpace pnSpace) noexcept;
 
 /**
- * Update largestReceivedPacketNum in ackState with packetNum. Return if the
- * current packetNum is received out of order.
+ * Update largestReceivedPacketNum in ackState with packetNum. Return the
+ * distance from the next packet number we expect to receive.
  */
 template <typename ClockType = quic::Clock>
-bool updateLargestReceivedPacketNum(
+uint64_t updateLargestReceivedPacketNum(
     AckState& ackState,
     PacketNum packetNum,
     TimePoint receivedTime) {
@@ -74,7 +74,12 @@ bool updateLargestReceivedPacketNum(
     ackState.largestRecvdPacketTime = receivedTime;
   }
   static_assert(ClockType::is_steady, "Needs steady clock");
-  return expectedNextPacket && expectedNextPacket != packetNum;
+  if (expectedNextPacket) {
+    return (packetNum > expectedNextPacket) ? packetNum - expectedNextPacket
+                                            : expectedNextPacket - packetNum;
+  } else {
+    return 0;
+  }
 }
 
 std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(

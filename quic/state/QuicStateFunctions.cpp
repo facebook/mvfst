@@ -101,7 +101,7 @@ void updateRtt(
 void updateAckSendStateOnRecvPacket(
     QuicConnectionStateBase& conn,
     AckState& ackState,
-    bool pktOutOfOrder,
+    uint64_t distanceFromExpectedPacketNum,
     bool pktHasRetransmittableData,
     bool pktHasCryptoData,
     bool initPktNumSpace) {
@@ -117,14 +117,13 @@ void updateAckSendStateOnRecvPacket(
           : conn.transportSettings.rxPacketsBeforeAckBeforeInit;
     }
   }
-  if (ackState.ignoreReorder) {
-    pktOutOfOrder = false;
-  }
+  bool exceedsReorderThreshold =
+      distanceFromExpectedPacketNum > ackState.reorderThreshold;
   if (pktHasRetransmittableData) {
     bool skipCryptoAck = conn.transportSettings.skipAckOnlyInitial &&
         conn.nodeType == QuicNodeType::Server && initPktNumSpace;
 
-    if ((pktHasCryptoData && !skipCryptoAck) || pktOutOfOrder ||
+    if ((pktHasCryptoData && !skipCryptoAck) || exceedsReorderThreshold ||
         ++ackState.numRxPacketsRecvd + ackState.numNonRxPacketsRecvd >=
             thresh) {
       VLOG(10) << conn
