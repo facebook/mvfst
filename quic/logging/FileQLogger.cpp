@@ -27,6 +27,23 @@ void FileQLogger::setScid(folly::Optional<ConnectionId> connID) {
   }
 }
 
+std::string FileQLogger::getOutputPath() const {
+  auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
+
+  // Check if a qlog environment variable has been set
+  if(const char* qlogDir = std::getenv("QLOGDIR")) {
+    // QLOGDIR sets a general directory path in which qlog files should be placed.
+    // it is up to the implementation to choose an appropriate naming scheme.
+    return folly::to<std::string>(qlogDir, "/", (dcid.value()).hex(), extension);
+  } else if(const char* qlogFile = std::getenv("QLOGFILE")) {
+    // QLOGFILE indicates a full path to where an individual qlog file should be stored.
+    // This path MUST include the full file extension
+    return qlogFile;
+  } else {
+    return folly::to<std::string>(path_, "/", (dcid.value()).hex(), extension);
+  }
+}
+
 void FileQLogger::setupStream() {
   // create the output file
   if (!dcid.hasValue()) {
@@ -34,9 +51,10 @@ void FileQLogger::setupStream() {
     return;
   }
   endLine_ = prettyJson_ ? "\n" : "";
-  auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
-  std::string outputPath =
-      folly::to<std::string>(path_, "/", (dcid.value()).hex(), extension);
+
+  // get the full output path
+  std::string outputPath = getOutputPath();
+  
   try {
     writer_ = std::make_unique<folly::AsyncFileWriter>(outputPath);
   } catch (const std::system_error& err) {
@@ -413,6 +431,8 @@ folly::dynamic FileQLogger::toDynamicBase() const {
   dynamicObj[kQLogVersionField] = kQLogVersion;
   dynamicObj[kQLogTitleField] = kQLogTitle;
   dynamicObj[kQLogDescriptionField] = kQLogDescription;
+  dynamicObj[kQLogFormatField] = kQLogDefaultFormat;
+  dynamicObj[kQLogFormatField] = kQLogDefaultFormat;
 
   dynamicObj["traces"] = folly::dynamic::array();
   folly::dynamic dynamicTrace = folly::dynamic::object;
@@ -432,12 +452,11 @@ folly::dynamic FileQLogger::toDynamicBase() const {
   commonFieldsObj["dcid"] = dcidStr;
   commonFieldsObj["scid"] = scidStr;
   commonFieldsObj["protocol_type"] = protocolType;
+  commonFieldsObj["time_format"] = "relative";
+  
   dynamicTrace["common_fields"] = std::move(commonFieldsObj);
-
   dynamicTrace["events"] = folly::dynamic::array();
-  dynamicTrace["event_fields"] =
-      folly::dynamic::array("relative_time", "category", "event", "data");
-
+  
   dynamicObj["traces"].push_back(dynamicTrace);
 
   return dynamicObj;
@@ -507,9 +526,7 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
     LOG(ERROR) << "Error: No dcid found";
     return;
   }
-  auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
-  std::string outputPath =
-      folly::to<std::string>(path, "/", (dcid.value()).hex(), extension);
+  std::string outputPath = getOutputPath();
 
   std::ofstream fileObj(outputPath);
   if (fileObj) {
