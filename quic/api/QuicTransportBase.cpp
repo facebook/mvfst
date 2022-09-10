@@ -145,20 +145,10 @@ const folly::SocketAddress& QuicTransportBase::getLocalAddress() const {
 QuicTransportBase::~QuicTransportBase() {
   resetConnectionCallbacks();
 
-  closeImpl(
-      QuicError(
-          QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
-          std::string("Closing from base destructor")),
-      false);
-  // If a drainTimeout is already scheduled, then closeNow above
-  // won't do anything. We have to manually clean up the socket. Timeout will be
-  // canceled by timer's destructor.
-  if (socket_) {
-    auto sock = std::move(socket_);
-    socket_ = nullptr;
-    sock->pauseRead();
-    sock->close();
-  }
+  // closeImpl and closeUdpSocket should have been triggered by destructor of
+  // derived class to ensure that observers are properly notified
+  DCHECK_NE(CloseState::OPEN, closeState_);
+  DCHECK(!socket_.get()); // should be no socket
 }
 
 bool QuicTransportBase::good() const {
@@ -247,9 +237,11 @@ void QuicTransportBase::closeImpl(
   }
 
   if (getSocketObserverContainer()) {
+    SocketObserverInterface::CloseStartedEvent event;
+    event.maybeCloseReason = errorCode;
     getSocketObserverContainer()->invokeInterfaceMethodAllObservers(
-        [errorCode](auto observer, auto observed) {
-          observer->close(observed, errorCode);
+        [&event](auto observer, auto observed) {
+          observer->closeStarted(observed, event);
         });
   }
 
@@ -437,6 +429,23 @@ void QuicTransportBase::closeImpl(
   }
 }
 
+void QuicTransportBase::closeUdpSocket() {
+  if (!socket_) {
+    return;
+  }
+  if (getSocketObserverContainer()) {
+    SocketObserverInterface::ClosingEvent event; // empty for now
+    getSocketObserverContainer()->invokeInterfaceMethodAllObservers(
+        [&event](auto observer, auto observed) {
+          observer->closing(observed, event);
+        });
+  }
+  auto sock = std::move(socket_);
+  socket_ = nullptr;
+  sock->pauseRead();
+  sock->close();
+}
+
 bool QuicTransportBase::processCancelCode(const QuicError& cancelCode) {
   bool noError = false;
   switch (cancelCode.code.type()) {
@@ -494,12 +503,7 @@ void QuicTransportBase::processConnectionCallbacks(
 }
 
 void QuicTransportBase::drainTimeoutExpired() noexcept {
-  if (socket_) {
-    auto sock = std::move(socket_);
-    socket_ = nullptr;
-    sock->pauseRead();
-    sock->close();
-  }
+  closeUdpSocket();
   unbindConnection();
 }
 

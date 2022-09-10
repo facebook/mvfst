@@ -44,6 +44,38 @@ class SocketObserverInterface {
   };
   virtual ~SocketObserverInterface() = default;
 
+  /**
+   * Event structures.
+   */
+
+  struct CloseStartedEvent {
+    // Error code provided when close() or closeNow() called.
+    //
+    // The presence of an error code does NOT indicate that a "problem" caused
+    // the socket to close, since an error code can be an application timeout.
+    folly::Optional<QuicError> maybeCloseReason;
+
+    // Default equality comparator available in C++20.
+    //
+    // mvfst currently supports C++17 onwards. However, we can enable this for
+    // unit tests and other code that we expect to run in C++20.
+#if FOLLY_CPLUSPLUS >= 202002L
+    friend auto operator<=>(
+        const CloseStartedEvent&,
+        const CloseStartedEvent&) = default;
+#endif
+  };
+
+  struct ClosingEvent {
+    // Default equality comparator available in C++20.
+    //
+    // mvfst currently supports C++17 onwards. However, we can enable this for
+    // unit tests and other code that we expect to run in C++20.
+#if FOLLY_CPLUSPLUS >= 202002L
+    friend auto operator<=>(const ClosingEvent&, const ClosingEvent&) = default;
+#endif
+  };
+
   struct WriteEvent {
     [[nodiscard]] const std::deque<OutstandingPacket>& getOutstandingPackets()
         const {
@@ -408,19 +440,38 @@ class SocketObserverInterface {
   using StreamCloseEvent = StreamEvent;
 
   /**
-   * close() will be invoked when the socket is being closed.
-   *
-   * If the callback handler does not unsubscribe itself upon being called,
-   * then it may be called multiple times (e.g., by a call to close() by
-   * the application, and then again when closeNow() is called on
-   * destruction).
-   *
-   * @param socket      Socket being closed.
-   * @param errorOpt    Error information, if connection closed due to error.
+   * Events.
    */
-  virtual void close(
+
+  /**
+   * closeStarted() is invoked when socket close begins.
+   *
+   * The socket may stay open for some time after this event to drain.
+   *
+   * @param socket   Socket being closed.
+   * @param event    CloseStartedEvent with details.
+   */
+  virtual void closeStarted(
       QuicSocket* /* socket */,
-      const folly::Optional<QuicError>& /* errorOpt */) noexcept {}
+      const CloseStartedEvent& /* event */) noexcept {}
+
+  /**
+   * closing() is invoked right before the transport is unbound from UDP socket.
+   *
+   * closeStarted() should have been invoked prior to this event as this event
+   * marks the completion of the socket being closed and the last opportunity
+   * to capture state from the socket.
+   *
+   * Called immediately BEFORE the transport is unbound from the UDP socket to
+   * be consistent with TCP sockets, for which the closing() event would mark
+   * the last opportunity to get information (such as TCP_INFO) from the socket.
+   *
+   * @param socket   Socket being closed.
+   * @param event    ClosingEvent with details.
+   */
+  virtual void closing(
+      QuicSocket* /* socket */,
+      const ClosingEvent& /* event */) noexcept {}
 
   /**
    * evbAttach() will be invoked when a new event base is attached to this

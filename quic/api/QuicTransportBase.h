@@ -738,6 +738,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       folly::Optional<QuicError> error,
       bool drainConnection = true,
       bool sendCloseImmediately = true);
+  void closeUdpSocket();
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
       bool resume);

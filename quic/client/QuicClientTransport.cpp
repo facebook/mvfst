@@ -103,7 +103,9 @@ QuicClientTransport::~QuicClientTransport() {
       QuicError(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from client destructor")),
-      false);
+      false /* drainConnection */);
+  // closeImpl may have been called earlier with drain = true, so force close.
+  closeUdpSocket();
 
   if (clientConn_->happyEyeballsState.secondSocket) {
     auto sock = std::move(clientConn_->happyEyeballsState.secondSocket);

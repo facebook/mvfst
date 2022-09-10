@@ -26,8 +26,8 @@ using namespace testing;
 namespace {
 
 using TransportTypes = testing::Types<
-    quic::test::QuicClientTransportAfterStartTestBase,
-    quic::test::QuicServerTransportAfterStartTestBase>;
+    quic::test::QuicClientTransportTestBase,
+    quic::test::QuicServerTransportTestBase>;
 
 class TransportTypeNames {
  public:
@@ -51,14 +51,30 @@ template <typename T>
 class QuicTypedTransportTest : public virtual testing::Test,
                                public QuicTypedTransportTestBase<T> {
  public:
+  ~QuicTypedTransportTest() override = default;
   void SetUp() override {
     // trigger setup of the underlying transport
     QuicTypedTransportTestBase<T>::SetUp();
   }
 };
 
+template <typename T>
+class QuicTypedTransportAfterStartTest : public QuicTypedTransportTest<T> {
+ public:
+  ~QuicTypedTransportAfterStartTest() override = default;
+  void SetUp() override {
+    QuicTypedTransportTest<T>::SetUp();
+    QuicTypedTransportTestBase<T>::startTransport();
+  }
+};
+
 TYPED_TEST_SUITE(
-    QuicTypedTransportTest,
+    QuicTypedTransportAfterStartTest,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
+TYPED_TEST_SUITE(
+    QuicTypedTransportAfterStartTest,
     ::TransportTypes,
     ::TransportTypeNames);
 
@@ -67,7 +83,7 @@ TYPED_TEST_SUITE(
  *
  * Currently tests mrtt, mrttNoAckDelay, lrttRaw, lrttRawAckDelay
  */
-TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
+TYPED_TEST(QuicTypedTransportAfterStartTest, TransportInfoRttSignals) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -116,12 +132,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 31ms;
     const auto expectedMinRttNoAckDelay = 26ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -140,12 +154,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 30ms;
     const auto expectedMinRttNoAckDelay = 26ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -164,12 +176,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 30ms;
     const auto expectedMinRttNoAckDelay = 22ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -188,12 +198,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 30ms;
     const auto expectedMinRttNoAckDelay = 22ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -212,12 +220,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 25ms;
     const auto expectedMinRttNoAckDelay = 22ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -236,12 +242,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 25ms;
     const auto expectedMinRttNoAckDelay = 21ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -260,12 +264,10 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 
     const auto expectedMinRtt = 20ms;
     const auto expectedMinRttNoAckDelay = 20ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -282,7 +284,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
 /**
  * Test case where the ACK delay is equal to the RTT sample.
  */
-TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayEqual) {
+TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayEqual) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -323,12 +325,10 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayEqual) {
 
     const auto expectedMinRtt = 25ms;
     const auto expectedMinRttNoAckDelay = 0ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -345,7 +345,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayEqual) {
 /**
  * Test case where the ACK delay is greater than the RTT sample.
  */
-TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayGreater) {
+TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -385,12 +385,10 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayGreater) {
     sendAndAckPacket(rtt, ackDelay);
 
     const auto expectedMinRtt = 25ms;
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
@@ -410,7 +408,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayGreater) {
  * In this case, we should fallback to using system clock timestamp, and thus
  * should end up with a non-zero RTT.
  */
-TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
+TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleZeroTime) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -448,12 +446,10 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
     const auto rtt = 0ms;
     const auto ackDelay = 0ms;
     sendAndAckPacket(rtt, ackDelay);
-    if constexpr (std::is_same_v<
-                      TypeParam,
-                      QuicClientTransportAfterStartTestBase>) {
-    } else if constexpr (std::is_same_v<
+    if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    } else if constexpr (std::is_base_of_v<
                              TypeParam,
-                             QuicServerTransportAfterStartTestBase>) {
+                             QuicServerTransportTestBase>) {
       const auto tInfo = this->getTransport()->getTransportInfo();
       EXPECT_LE(0ms, tInfo.maybeLrtt.value());
       EXPECT_GE(500ms, tInfo.maybeLrtt.value());
@@ -471,7 +467,9 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
 /**
  * Verify vector used to store ACK events has no capacity if no pkts in flight.
  */
-TYPED_TEST(QuicTypedTransportTest, AckEventsNoAllocatedSpaceWhenNoOutstanding) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    AckEventsNoAllocatedSpaceWhenNoOutstanding) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
 
@@ -503,7 +501,7 @@ TYPED_TEST(QuicTypedTransportTest, AckEventsNoAllocatedSpaceWhenNoOutstanding) {
  * Two packets to give opportunity for packets in flight.
  */
 TYPED_TEST(
-    QuicTypedTransportTest,
+    QuicTypedTransportAfterStartTest,
     AckEventsNoAllocatedSpaceWhenNoOutstandingTwoInFlight) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -560,7 +558,7 @@ TYPED_TEST(
  * Two packets ACKed in reverse to give opportunity for packets in flight.
  */
 TYPED_TEST(
-    QuicTypedTransportTest,
+    QuicTypedTransportAfterStartTest,
     AckEventsNoAllocatedSpaceWhenNoOutstandingTwoInFlightReverse) {
   // prevent packets from being marked as lost
   this->getNonConstConn().lossState.reorderingThreshold = 10;
@@ -620,7 +618,9 @@ TYPED_TEST(
 /**
  * Verify PacketProcessor callbacks when sending a packet and its ack
  */
-TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendSingleDataPacketWithAck) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorSendSingleDataPacketWithAck) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
@@ -674,7 +674,9 @@ TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendSingleDataPacketWithAck) {
  * Verify PacketProcessor callbacks when sending two data packets and receiving
  * one ack
  */
-TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendTwoDataPacketsWithAck) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorSendTwoDataPacketsWithAck) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
@@ -734,7 +736,9 @@ TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendTwoDataPacketsWithAck) {
   this->destroyTransport();
 }
 
-TYPED_TEST(QuicTypedTransportTest, StreamAckedIntervalsDeliveryCallbacks) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StreamAckedIntervalsDeliveryCallbacks) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
 
@@ -788,7 +792,7 @@ TYPED_TEST(QuicTypedTransportTest, StreamAckedIntervalsDeliveryCallbacks) {
 }
 
 TYPED_TEST(
-    QuicTypedTransportTest,
+    QuicTypedTransportAfterStartTest,
     StreamAckedIntervalsDeliveryCallbacksFinOnly) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -819,7 +823,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTest,
+    QuicTypedTransportAfterStartTest,
     StreamAckedIntervalsDeliveryCallbacksSingleByteNoFin) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -851,240 +855,233 @@ TYPED_TEST(
 }
 
 template <typename T>
+struct AckEventMatcherBuilder {
+  using Builder = AckEventMatcherBuilder;
+  Builder&& setExpectedAckedIntervals(
+      std::vector<
+          typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
+          expectedAckedIntervals) {
+    maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
+    return std::move(*this);
+  }
+  Builder&& setExpectedAckedIntervals(
+      std::vector<folly::Optional<
+          typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
+          expectedAckedIntervalsOpt) {
+    std::vector<
+        typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
+        expectedAckedIntervals;
+    for (const auto& maybeInterval : expectedAckedIntervalsOpt) {
+      CHECK(maybeInterval.has_value());
+      expectedAckedIntervals.push_back(maybeInterval.value());
+    }
+    maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
+    return std::move(*this);
+  }
+  Builder&& setExpectedNumAckedPackets(const uint64_t expectedNumAckedPackets) {
+    maybeExpectedNumAckedPackets = expectedNumAckedPackets;
+    return std::move(*this);
+  }
+  Builder&& setAckTime(TimePoint ackTime) {
+    maybeAckTime = ackTime;
+    return std::move(*this);
+  }
+  Builder&& setAckDelay(std::chrono::microseconds ackDelay) {
+    maybeAckDelay = ackDelay;
+    return std::move(*this);
+  }
+  Builder&& setLargestAckedPacket(quic::PacketNum largestAckedPacketIn) {
+    maybeLargestAckedPacket = largestAckedPacketIn;
+    return std::move(*this);
+  }
+  Builder&& setLargestNewlyAckedPacket(
+      quic::PacketNum largestNewlyAckedPacketIn) {
+    maybeLargestNewlyAckedPacket = largestNewlyAckedPacketIn;
+    return std::move(*this);
+  }
+  Builder&& setRtt(const folly::Optional<std::chrono::microseconds>& rttIn) {
+    maybeRtt = rttIn;
+    CHECK(!noRtt);
+    return std::move(*this);
+  }
+  Builder&& setRttNoAckDelay(
+      const folly::Optional<std::chrono::microseconds>& rttNoAckDelayIn) {
+    maybeRttNoAckDelay = rttNoAckDelayIn;
+    CHECK(!noRtt);
+    CHECK(!noRttWithNoAckDelay);
+    return std::move(*this);
+  }
+  Builder&& setNoRtt() {
+    noRtt = true;
+    CHECK(!maybeRtt);
+    CHECK(!maybeRttNoAckDelay);
+    return std::move(*this);
+  }
+  Builder&& setNoRttWithNoAckDelay() {
+    noRttWithNoAckDelay = true;
+    CHECK(!maybeRttNoAckDelay);
+    return std::move(*this);
+  }
+  auto build() && {
+    CHECK(
+        noRtt ||
+        (maybeRtt.has_value() &&
+         (noRttWithNoAckDelay || maybeRttNoAckDelay.has_value())));
+
+    CHECK(maybeExpectedAckedIntervals.has_value());
+    const auto& expectedAckedIntervals = *maybeExpectedAckedIntervals;
+    CHECK_LT(0, expectedAckedIntervals.size());
+
+    CHECK(maybeExpectedNumAckedPackets.has_value());
+    const auto& expectedNumAckedPackets = *maybeExpectedNumAckedPackets;
+
+    CHECK(maybeAckTime.has_value());
+    const auto& ackTime = *maybeAckTime;
+
+    CHECK(maybeAckDelay.has_value());
+    const auto& ackDelay = *maybeAckDelay;
+
+    CHECK(maybeLargestAckedPacket.has_value());
+    const auto& largestAckedPacket = *maybeLargestAckedPacket;
+
+    CHECK(maybeLargestNewlyAckedPacket.has_value());
+    const auto& largestNewlyAckedPacket = *maybeLargestNewlyAckedPacket;
+
+    // sanity check expectedNumAckedPackets and expectedAckedIntervals
+    // reduces potential of error in test design
+    {
+      uint64_t expectedNumAckedPacketsFromIntervals = 0;
+      std::vector<
+          typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
+          processedExpectedAckedIntervals;
+
+      for (const auto& interval : expectedAckedIntervals) {
+        CHECK_LE(interval.start, interval.end);
+        CHECK_LE(0, interval.end);
+        expectedNumAckedPacketsFromIntervals +=
+            interval.end - interval.start + 1;
+
+        // should not overlap with existing intervals
+        for (const auto& processedInterval : processedExpectedAckedIntervals) {
+          CHECK(
+              processedInterval.end < interval.start ||
+              processedInterval.start < interval.end);
+        }
+
+        processedExpectedAckedIntervals.push_back(interval);
+      }
+      CHECK_EQ(expectedNumAckedPacketsFromIntervals, expectedNumAckedPackets);
+    }
+
+    if constexpr (std::is_base_of_v<T, QuicClientTransportTestBase>) {
+      return testing::Property(
+          &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
+          testing::ElementsAre(testing::AllOf(
+              // ack time, adjusted ack time, RTT not supported for client now
+              testing::Field(&quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
+              testing::Field(
+                  &quic::AckEvent::largestAckedPacket,
+                  testing::Eq(largestAckedPacket)),
+              testing::Field(
+                  &quic::AckEvent::largestNewlyAckedPacket,
+                  testing::Eq(largestNewlyAckedPacket)),
+              testing::Field(
+                  &quic::AckEvent::ackedPackets,
+                  testing::SizeIs(expectedNumAckedPackets)))));
+    } else if constexpr (std::is_base_of_v<T, QuicServerTransportTestBase>) {
+      return testing::Property(
+          &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
+          testing::ElementsAre(testing::AllOf(
+              testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
+              testing::Field(
+                  &quic::AckEvent::adjustedAckTime,
+                  testing::Eq(ackTime - ackDelay)),
+              testing::Field(&quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
+              testing::Field(
+                  &quic::AckEvent::largestAckedPacket,
+                  testing::Eq(largestAckedPacket)),
+              testing::Field(
+                  &quic::AckEvent::largestNewlyAckedPacket,
+                  testing::Eq(largestNewlyAckedPacket)),
+              testing::Field(
+                  &quic::AckEvent::ackedPackets,
+                  testing::SizeIs(expectedNumAckedPackets)),
+              testing::Field(&quic::AckEvent::rttSample, testing::Eq(maybeRtt)),
+              testing::Field(
+                  &quic::AckEvent::rttSampleNoAckDelay,
+                  testing::Eq(maybeRttNoAckDelay)))));
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+  explicit AckEventMatcherBuilder() = default;
+
+  folly::Optional<std::vector<
+      typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
+      maybeExpectedAckedIntervals;
+  folly::Optional<uint64_t> maybeExpectedNumAckedPackets;
+  folly::Optional<TimePoint> maybeAckTime;
+  folly::Optional<std::chrono::microseconds> maybeAckDelay;
+  folly::Optional<quic::PacketNum> maybeLargestAckedPacket;
+  folly::Optional<quic::PacketNum> maybeLargestNewlyAckedPacket;
+  folly::Optional<std::chrono::microseconds> maybeRtt;
+  folly::Optional<std::chrono::microseconds> maybeRttNoAckDelay;
+  bool noRtt{false};
+  bool noRttWithNoAckDelay{false};
+};
+
+template <typename T>
+struct ReceivedPacketMatcherBuilder {
+  using Builder = ReceivedPacketMatcherBuilder;
+  using Obj =
+      quic::SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket;
+  Builder&& setExpectedPacketReceiveTime(
+      const TimePoint expectedPacketReceiveTime) {
+    maybeExpectedPacketReceiveTime = expectedPacketReceiveTime;
+    return std::move(*this);
+  }
+  Builder&& setExpectedPacketNumBytes(const uint64_t expectedPacketNumBytes) {
+    maybeExpectedPacketNumBytes = expectedPacketNumBytes;
+    return std::move(*this);
+  }
+  auto build() && {
+    CHECK(maybeExpectedPacketReceiveTime.has_value());
+    const auto& packetReceiveTime = *maybeExpectedPacketReceiveTime;
+
+    CHECK(maybeExpectedPacketNumBytes.has_value());
+    const auto& packetNumBytes = *maybeExpectedPacketNumBytes;
+
+    if constexpr (std::is_base_of_v<T, QuicClientTransportTestBase>) {
+      return testing::AllOf(
+          // client does not currently support socket RX timestamps, so we
+          // expect ts >= now() at time of matcher build
+          testing::Field(
+              &Obj::packetReceiveTime,
+              testing::AnyOf(
+                  testing::Eq(packetReceiveTime),
+                  testing::Ge(TimePoint::clock::now()))),
+          testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
+    } else if constexpr (std::is_base_of_v<T, QuicServerTransportTestBase>) {
+      return testing::AllOf(
+          testing::Field(
+              &Obj::packetReceiveTime, testing::Eq(packetReceiveTime)),
+          testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+  explicit ReceivedPacketMatcherBuilder() = default;
+
+  folly::Optional<TimePoint> maybeExpectedPacketReceiveTime;
+  folly::Optional<uint64_t> maybeExpectedPacketNumBytes;
+};
+
+template <typename T>
 class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
  public:
   void SetUp() override {
     QuicTypedTransportTest<T>::SetUp();
   }
-
-  struct AckEventMatcherBuilder {
-    using Builder = AckEventMatcherBuilder;
-    Builder&& setExpectedAckedIntervals(
-        std::vector<
-            typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
-            expectedAckedIntervals) {
-      maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
-      return std::move(*this);
-    }
-    Builder&& setExpectedAckedIntervals(
-        std::vector<folly::Optional<
-            typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
-            expectedAckedIntervalsOpt) {
-      std::vector<
-          typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
-          expectedAckedIntervals;
-      for (const auto& maybeInterval : expectedAckedIntervalsOpt) {
-        CHECK(maybeInterval.has_value());
-        expectedAckedIntervals.push_back(maybeInterval.value());
-      }
-      maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
-      return std::move(*this);
-    }
-    Builder&& setExpectedNumAckedPackets(
-        const uint64_t expectedNumAckedPackets) {
-      maybeExpectedNumAckedPackets = expectedNumAckedPackets;
-      return std::move(*this);
-    }
-    Builder&& setAckTime(TimePoint ackTime) {
-      maybeAckTime = ackTime;
-      return std::move(*this);
-    }
-    Builder&& setAckDelay(std::chrono::microseconds ackDelay) {
-      maybeAckDelay = ackDelay;
-      return std::move(*this);
-    }
-    Builder&& setLargestAckedPacket(quic::PacketNum largestAckedPacketIn) {
-      maybeLargestAckedPacket = largestAckedPacketIn;
-      return std::move(*this);
-    }
-    Builder&& setLargestNewlyAckedPacket(
-        quic::PacketNum largestNewlyAckedPacketIn) {
-      maybeLargestNewlyAckedPacket = largestNewlyAckedPacketIn;
-      return std::move(*this);
-    }
-    Builder&& setRtt(const folly::Optional<std::chrono::microseconds>& rttIn) {
-      maybeRtt = rttIn;
-      CHECK(!noRtt);
-      return std::move(*this);
-    }
-    Builder&& setRttNoAckDelay(
-        const folly::Optional<std::chrono::microseconds>& rttNoAckDelayIn) {
-      maybeRttNoAckDelay = rttNoAckDelayIn;
-      CHECK(!noRtt);
-      CHECK(!noRttWithNoAckDelay);
-      return std::move(*this);
-    }
-    Builder&& setNoRtt() {
-      noRtt = true;
-      CHECK(!maybeRtt);
-      CHECK(!maybeRttNoAckDelay);
-      return std::move(*this);
-    }
-    Builder&& setNoRttWithNoAckDelay() {
-      noRttWithNoAckDelay = true;
-      CHECK(!maybeRttNoAckDelay);
-      return std::move(*this);
-    }
-    auto build() && {
-      CHECK(
-          noRtt ||
-          (maybeRtt.has_value() &&
-           (noRttWithNoAckDelay || maybeRttNoAckDelay.has_value())));
-
-      CHECK(maybeExpectedAckedIntervals.has_value());
-      const auto& expectedAckedIntervals = *maybeExpectedAckedIntervals;
-      CHECK_LT(0, expectedAckedIntervals.size());
-
-      CHECK(maybeExpectedNumAckedPackets.has_value());
-      const auto& expectedNumAckedPackets = *maybeExpectedNumAckedPackets;
-
-      CHECK(maybeAckTime.has_value());
-      const auto& ackTime = *maybeAckTime;
-
-      CHECK(maybeAckDelay.has_value());
-      const auto& ackDelay = *maybeAckDelay;
-
-      CHECK(maybeLargestAckedPacket.has_value());
-      const auto& largestAckedPacket = *maybeLargestAckedPacket;
-
-      CHECK(maybeLargestNewlyAckedPacket.has_value());
-      const auto& largestNewlyAckedPacket = *maybeLargestNewlyAckedPacket;
-
-      // sanity check expectedNumAckedPackets and expectedAckedIntervals
-      // reduces potential of error in test design
-      {
-        uint64_t expectedNumAckedPacketsFromIntervals = 0;
-        std::vector<
-            typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
-            processedExpectedAckedIntervals;
-
-        for (const auto& interval : expectedAckedIntervals) {
-          CHECK_LE(interval.start, interval.end);
-          CHECK_LE(0, interval.end);
-          expectedNumAckedPacketsFromIntervals +=
-              interval.end - interval.start + 1;
-
-          // should not overlap with existing intervals
-          for (const auto& processedInterval :
-               processedExpectedAckedIntervals) {
-            CHECK(
-                processedInterval.end < interval.start ||
-                processedInterval.start < interval.end);
-          }
-
-          processedExpectedAckedIntervals.push_back(interval);
-        }
-        CHECK_EQ(expectedNumAckedPacketsFromIntervals, expectedNumAckedPackets);
-      }
-
-      if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
-        return testing::Property(
-            &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
-            testing::ElementsAre(testing::AllOf(
-                // ack time, adjusted ack time, RTT not supported for client now
-                testing::Field(
-                    &quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
-                testing::Field(
-                    &quic::AckEvent::largestAckedPacket,
-                    testing::Eq(largestAckedPacket)),
-                testing::Field(
-                    &quic::AckEvent::largestNewlyAckedPacket,
-                    testing::Eq(largestNewlyAckedPacket)),
-                testing::Field(
-                    &quic::AckEvent::ackedPackets,
-                    testing::SizeIs(expectedNumAckedPackets)))));
-      } else if constexpr (std::is_same_v<
-                               T,
-                               QuicServerTransportAfterStartTestBase>) {
-        return testing::Property(
-            &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
-            testing::ElementsAre(testing::AllOf(
-                testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
-                testing::Field(
-                    &quic::AckEvent::adjustedAckTime,
-                    testing::Eq(ackTime - ackDelay)),
-                testing::Field(
-                    &quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
-                testing::Field(
-                    &quic::AckEvent::largestAckedPacket,
-                    testing::Eq(largestAckedPacket)),
-                testing::Field(
-                    &quic::AckEvent::largestNewlyAckedPacket,
-                    testing::Eq(largestNewlyAckedPacket)),
-                testing::Field(
-                    &quic::AckEvent::ackedPackets,
-                    testing::SizeIs(expectedNumAckedPackets)),
-                testing::Field(
-                    &quic::AckEvent::rttSample, testing::Eq(maybeRtt)),
-                testing::Field(
-                    &quic::AckEvent::rttSampleNoAckDelay,
-                    testing::Eq(maybeRttNoAckDelay)))));
-      } else {
-        FAIL(); // unhandled typed test
-      }
-    }
-    explicit AckEventMatcherBuilder() = default;
-
-    folly::Optional<std::vector<
-        typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
-        maybeExpectedAckedIntervals;
-    folly::Optional<uint64_t> maybeExpectedNumAckedPackets;
-    folly::Optional<TimePoint> maybeAckTime;
-    folly::Optional<std::chrono::microseconds> maybeAckDelay;
-    folly::Optional<quic::PacketNum> maybeLargestAckedPacket;
-    folly::Optional<quic::PacketNum> maybeLargestNewlyAckedPacket;
-    folly::Optional<std::chrono::microseconds> maybeRtt;
-    folly::Optional<std::chrono::microseconds> maybeRttNoAckDelay;
-    bool noRtt{false};
-    bool noRttWithNoAckDelay{false};
-  };
-
-  struct ReceivedPacketMatcherBuilder {
-    using Builder = ReceivedPacketMatcherBuilder;
-    using Obj =
-        quic::SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket;
-    Builder&& setExpectedPacketReceiveTime(
-        const TimePoint expectedPacketReceiveTime) {
-      maybeExpectedPacketReceiveTime = expectedPacketReceiveTime;
-      return std::move(*this);
-    }
-    Builder&& setExpectedPacketNumBytes(const uint64_t expectedPacketNumBytes) {
-      maybeExpectedPacketNumBytes = expectedPacketNumBytes;
-      return std::move(*this);
-    }
-    auto build() && {
-      CHECK(maybeExpectedPacketReceiveTime.has_value());
-      const auto& packetReceiveTime = *maybeExpectedPacketReceiveTime;
-
-      CHECK(maybeExpectedPacketNumBytes.has_value());
-      const auto& packetNumBytes = *maybeExpectedPacketNumBytes;
-
-      if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
-        return testing::AllOf(
-            // client does not currently support socket RX timestamps, so we
-            // expect ts >= now() at time of matcher build
-            testing::Field(
-                &Obj::packetReceiveTime,
-                testing::AnyOf(
-                    testing::Eq(packetReceiveTime),
-                    testing::Ge(TimePoint::clock::now()))),
-            testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
-      } else if constexpr (std::is_same_v<
-                               T,
-                               QuicServerTransportAfterStartTestBase>) {
-        return testing::AllOf(
-            testing::Field(
-                &Obj::packetReceiveTime, testing::Eq(packetReceiveTime)),
-            testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
-      } else {
-        FAIL(); // unhandled typed test
-      }
-    }
-    explicit ReceivedPacketMatcherBuilder() = default;
-
-    folly::Optional<TimePoint> maybeExpectedPacketReceiveTime;
-    folly::Optional<uint64_t> maybeExpectedPacketNumBytes;
-  };
 
   auto getStreamEventMatcherOpt(
       const StreamId streamId,
@@ -1103,12 +1100,31 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
   }
 };
 
+template <typename T>
+class QuicTypedTransportAfterStartTestForObservers
+    : public QuicTypedTransportTestForObservers<T> {
+ public:
+  ~QuicTypedTransportAfterStartTestForObservers() override = default;
+  void SetUp() override {
+    QuicTypedTransportTestForObservers<T>::SetUp();
+    QuicTypedTransportTestForObservers<T>::startTransport();
+  }
+};
+
 TYPED_TEST_SUITE(
     QuicTypedTransportTestForObservers,
     ::TransportTypes,
     ::TransportTypeNames);
 
+TYPED_TEST_SUITE(
+    QuicTypedTransportAfterStartTestForObservers,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
 TYPED_TEST(QuicTypedTransportTestForObservers, AttachThenDetach) {
+  this->startTransport();
+
+  InSequence s;
   auto transport = this->getTransport();
   auto observer = std::make_unique<StrictMock<MockObserver>>();
 
@@ -1129,8 +1145,16 @@ TYPED_TEST(QuicTypedTransportTestForObservers, AttachThenDetach) {
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    CloseNoErrorThenDestroyTransport) {
+    CloseNoDrainNoErrorThenDestroyTransport) {
   auto transport = this->getTransport();
+  {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.shouldDrain = false;
+    transport->setTransportSettings(transportSettings);
+  }
+  this->startTransport();
+
+  InSequence s;
   auto observer = std::make_unique<StrictMock<MockObserver>>();
 
   EXPECT_CALL(*observer, attached(transport));
@@ -1141,10 +1165,19 @@ TYPED_TEST(
       GenericApplicationErrorCode::NO_ERROR,
       toString(GenericApplicationErrorCode::NO_ERROR));
   EXPECT_CALL(
-      *observer, close(transport, folly::Optional<QuicError>(defaultError)));
+      *observer,
+      closeStarted(
+          transport,
+          AllOf(
+              // should not be equal to an empty event
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = folly::none}),
+              // should be equal to a populated event with default error
+              testing::Eq(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = defaultError}))));
+  EXPECT_CALL(*observer, closing(transport, _));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(observer.get());
-  InSequence s;
   EXPECT_CALL(*observer, destroyed(transport, IsNull()));
   this->destroyTransport();
   Mock::VerifyAndClearExpectations(observer.get());
@@ -1152,47 +1185,19 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    CloseWithErrorThenDestroyTransport) {
+    CloseNoErrorDrainEnabled_DrainThenDestroyTransport) {
   auto transport = this->getTransport();
+  {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.shouldDrain = true;
+    transport->setTransportSettings(transportSettings);
+  }
+  this->startTransport();
+
+  InSequence s;
   auto observer = std::make_unique<StrictMock<MockObserver>>();
 
   EXPECT_CALL(*observer, attached(transport));
-  transport->addObserver(observer.get());
-  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
-
-  const auto testError = QuicError(
-      QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
-      std::string("testError"));
-  EXPECT_CALL(
-      *observer, close(transport, folly::Optional<QuicError>(testError)));
-  transport->close(testError);
-  Mock::VerifyAndClearExpectations(observer.get());
-  InSequence s;
-  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
-  this->destroyTransport();
-  Mock::VerifyAndClearExpectations(observer.get());
-}
-
-TYPED_TEST(QuicTypedTransportTestForObservers, LegacyAttachThenDetach) {
-  auto transport = this->getTransport();
-  auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
-
-  EXPECT_CALL(*observer, observerAttach(transport));
-  transport->addObserver(observer.get());
-  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
-  EXPECT_CALL(*observer, observerDetach(transport));
-  EXPECT_TRUE(transport->removeObserver(observer.get()));
-  Mock::VerifyAndClearExpectations(observer.get());
-  EXPECT_THAT(transport->getObservers(), IsEmpty());
-}
-
-TYPED_TEST(
-    QuicTypedTransportTestForObservers,
-    LegacyCloseNoErrorThenDestroyTransport) {
-  auto transport = this->getTransport();
-  auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
-
-  EXPECT_CALL(*observer, observerAttach(transport));
   transport->addObserver(observer.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
@@ -1200,39 +1205,157 @@ TYPED_TEST(
       GenericApplicationErrorCode::NO_ERROR,
       toString(GenericApplicationErrorCode::NO_ERROR));
   EXPECT_CALL(
-      *observer, close(transport, folly::Optional<QuicError>(defaultError)));
+      *observer,
+      closeStarted(
+          transport,
+          AllOf(
+              // should not be equal to an empty event
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = folly::none}),
+              // should be equal to a populated event with default error
+              testing::Eq(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = defaultError}))));
   transport->close(folly::none);
+
+  // wait for the drain
+  EXPECT_CALL(*observer, closing(transport, _));
+  transport->getEventBase()->timer().scheduleTimeoutFn(
+      [&] { transport->getEventBase()->terminateLoopSoon(); },
+      folly::chrono::ceil<std::chrono::milliseconds>(
+          1ms + kDrainFactor * calculatePTO(this->getConn())));
+  transport->getEventBase()->loop();
   Mock::VerifyAndClearExpectations(observer.get());
-  InSequence s;
-  EXPECT_CALL(*observer, destroy(transport));
+
+  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
   this->destroyTransport();
-  Mock::VerifyAndClearExpectations(observer.get());
 }
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    LegacyCloseWithErrorThenDestroyTransport) {
+    CloseNoErrorDrainEnabled_DestroyTransport) {
   auto transport = this->getTransport();
-  auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
+  {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.shouldDrain = true;
+    transport->setTransportSettings(transportSettings);
+  }
+  this->startTransport();
 
-  EXPECT_CALL(*observer, observerAttach(transport));
+  InSequence s;
+  auto observer = std::make_unique<StrictMock<MockObserver>>();
+
+  EXPECT_CALL(*observer, attached(transport));
   transport->addObserver(observer.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
-  const auto testError = QuicError(
+  const QuicError defaultError = QuicError(
+      GenericApplicationErrorCode::NO_ERROR,
+      toString(GenericApplicationErrorCode::NO_ERROR));
+  EXPECT_CALL(
+      *observer,
+      closeStarted(
+          transport,
+          AllOf(
+              // should not be equal to an empty event
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = folly::none}),
+              // should be equal to a populated event with default error
+              testing::Eq(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = defaultError}))));
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // destroy transport without waiting for drain
+  EXPECT_CALL(*observer, closing(transport, _));
+  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    CloseWithErrorDrainDisabled_DestroyTransport) {
+  auto transport = this->getTransport();
+  {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.shouldDrain = false;
+    transport->setTransportSettings(transportSettings);
+  }
+  this->startTransport();
+
+  InSequence s;
+  auto observer = std::make_unique<StrictMock<MockObserver>>();
+
+  EXPECT_CALL(*observer, attached(transport));
+  transport->addObserver(observer.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
+
+  const QuicError testError = QuicError(
       QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
       std::string("testError"));
   EXPECT_CALL(
-      *observer, close(transport, folly::Optional<QuicError>(testError)));
+      *observer,
+      closeStarted(
+          transport,
+          AllOf(
+              // should not be equal to an empty event
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = folly::none}),
+              // should be equal to a populated event with default error
+              testing::Eq(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = testError}))));
+  EXPECT_CALL(*observer, closing(transport, _));
   transport->close(testError);
   Mock::VerifyAndClearExpectations(observer.get());
-  InSequence s;
-  EXPECT_CALL(*observer, destroy(transport));
+
+  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
   this->destroyTransport();
-  Mock::VerifyAndClearExpectations(observer.get());
 }
 
-TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    CloseWithErrorDrainEnabled_DestroyTransport) {
+  auto transport = this->getTransport();
+  {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.shouldDrain = true;
+    transport->setTransportSettings(transportSettings);
+  }
+  this->startTransport();
+
+  InSequence s;
+  auto observer = std::make_unique<StrictMock<MockObserver>>();
+
+  EXPECT_CALL(*observer, attached(transport));
+  transport->addObserver(observer.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
+
+  const QuicError testError = QuicError(
+      QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
+      std::string("testError"));
+
+  // because of the error, we won't wait for the drain despite it being enabled.
+  EXPECT_CALL(
+      *observer,
+      closeStarted(
+          transport,
+          AllOf(
+              // should not be equal to an empty event
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = folly::none}),
+              // should be equal to a populated event with default error
+              testing::Eq(SocketObserverInterface::CloseStartedEvent{
+                  .maybeCloseReason = testError}))));
+  EXPECT_CALL(*observer, closing(transport, _));
+  transport->close(testError);
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    StreamEventsLocalOpenedStream) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
   auto transport = this->getTransport();
@@ -1301,7 +1424,7 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsLocalOpenedStreamImmediateEofLocal) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1364,7 +1487,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsLocalOpenedStreamImmediateEofLocalRemote) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1423,7 +1546,9 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
-TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    StreamEventsPeerOpenedStream) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1487,7 +1612,7 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEofRemote) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1548,7 +1673,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEofLocalRemote) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1603,7 +1728,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRst) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1682,7 +1807,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRstBytesInFlight) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1759,7 +1884,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEorStopSendingTriggersRstBytesInFlight) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
@@ -1832,7 +1957,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     WriteEventsOutstandingPacketSent) {
   InSequence s;
 
@@ -2007,7 +2132,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     WriteEventsOutstandingPacketSentWroteMoreThanCwnd) {
   InSequence s;
 
@@ -2150,7 +2275,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     WriteEventsOutstandingPacketsSentCwndLimited) {
   InSequence s;
 
@@ -2388,7 +2513,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     WriteEventsOutstandingPacketSentNoCongestionController) {
   InSequence s;
 
@@ -2501,7 +2626,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsOutstandingPacketSentThenAckedNoAckDelay) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -2542,7 +2667,7 @@ TYPED_TEST(
   const auto ackRecvTime = sentTime + 27ms;
   const auto ackDelay = 0us;
   const auto matcher =
-      typename TestFixture::AckEventMatcherBuilder()
+      AckEventMatcherBuilder<TypeParam>()
           .setExpectedAckedIntervals({maybeWrittenPackets})
           .setExpectedNumAckedPackets(1)
           .setAckTime(ackRecvTime)
@@ -2574,7 +2699,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithAckDelay) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -2615,7 +2740,7 @@ TYPED_TEST(
   const auto ackRecvTime = sentTime + 50ms;
   const auto ackDelay = 5ms;
   const auto matcher =
-      typename TestFixture::AckEventMatcherBuilder()
+      AckEventMatcherBuilder<TypeParam>()
           .setExpectedAckedIntervals({maybeWrittenPackets})
           .setExpectedNumAckedPackets(1)
           .setAckTime(ackRecvTime)
@@ -2647,7 +2772,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithAckDelayEqRtt) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -2688,7 +2813,7 @@ TYPED_TEST(
   const auto ackRecvTime = sentTime + 50ms;
   const auto ackDelay = ackRecvTime - sentTime; // ack delay == RTT!
   const auto matcher =
-      typename TestFixture::AckEventMatcherBuilder()
+      AckEventMatcherBuilder<TypeParam>()
           .setExpectedAckedIntervals({maybeWrittenPackets})
           .setExpectedNumAckedPackets(1)
           .setAckTime(ackRecvTime)
@@ -2744,7 +2869,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithTooLargeAckDelay) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -2785,7 +2910,7 @@ TYPED_TEST(
   const auto ackRecvTime = sentTime + 50ms;
   const auto ackDelay = ackRecvTime + 1ms - sentTime; // ack delay >> RTT!
   const auto matcher =
-      typename TestFixture::AckEventMatcherBuilder()
+      AckEventMatcherBuilder<TypeParam>()
           .setExpectedAckedIntervals({maybeWrittenPackets})
           .setExpectedNumAckedPackets(1)
           .setAckTime(ackRecvTime)
@@ -2839,7 +2964,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenAllAckedAtOnce) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -2890,7 +3015,7 @@ TYPED_TEST(
   const auto ackRecvTime = sentTime + 27ms;
   const auto ackDelay = 5ms;
   const auto matcher =
-      typename TestFixture::AckEventMatcherBuilder()
+      AckEventMatcherBuilder<TypeParam>()
           .setExpectedAckedIntervals(
               {maybeWrittenPackets1,
                maybeWrittenPackets2,
@@ -2925,7 +3050,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsThreeOutstandingPacketsSentAndAckedSequentially) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -2961,7 +3086,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 27ms;
     const auto ackDelay = 5ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3001,7 +3126,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 443ms;
     const auto ackDelay = 7ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3042,7 +3167,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 62ms;
     const auto ackDelay = 3ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3077,7 +3202,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenAckedSequentially) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -3129,7 +3254,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 122ms;
     const auto ackDelay = 3ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets1})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3166,7 +3291,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 62ms;
     const auto ackDelay = 1ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets2})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3203,7 +3328,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 82ms;
     const auto ackDelay = 20ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets3})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3238,7 +3363,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenFirstLastAckedSequentiallyThenSecondAcked) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -3297,7 +3422,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 20ms;
     const auto ackDelay = 5ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets1})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3334,7 +3459,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 11ms;
     const auto ackDelay = 4ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets1})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3372,7 +3497,7 @@ TYPED_TEST(
     const auto ackRecvTime = maybeWrittenPackets3->sentTime + 11ms;
     const auto ackDelay = 2ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets1})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3403,7 +3528,7 @@ TYPED_TEST(
 }
 
 TYPED_TEST(
-    QuicTypedTransportTestForObservers,
+    QuicTypedTransportAfterStartTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenFirstLastAckedAtOnceThenSecondAcked) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
@@ -3462,7 +3587,7 @@ TYPED_TEST(
     const auto ackRecvTime = sentTime + 20ms;
     const auto ackDelay = 5ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals(
                 {maybeWrittenPackets1, maybeWrittenPackets3})
             .setExpectedNumAckedPackets(2)
@@ -3501,7 +3626,7 @@ TYPED_TEST(
     const auto ackRecvTime = maybeWrittenPackets3->sentTime + 11ms;
     const auto ackDelay = 2ms;
     const auto matcher =
-        typename TestFixture::AckEventMatcherBuilder()
+        AckEventMatcherBuilder<TypeParam>()
             .setExpectedAckedIntervals({maybeWrittenPackets1})
             .setExpectedNumAckedPackets(1)
             .setAckTime(ackRecvTime)
@@ -3531,7 +3656,9 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
-TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsSingle) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    PacketsReceivedEventsSingle) {
   using Event = quic::SocketObserverInterface::PacketsReceivedEvent;
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::packetsReceivedEvents);
@@ -3568,11 +3695,10 @@ TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsSingle) {
         testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
         testing::Field(
             &Event::receivedPackets,
-            testing::ElementsAre(
-                typename TestFixture::ReceivedPacketMatcherBuilder()
-                    .setExpectedPacketReceiveTime(pkt1RecvTime)
-                    .setExpectedPacketNumBytes(pkt1NumBytes)
-                    .build())));
+            testing::ElementsAre(ReceivedPacketMatcherBuilder<TypeParam>()
+                                     .setExpectedPacketReceiveTime(pkt1RecvTime)
+                                     .setExpectedPacketNumBytes(pkt1NumBytes)
+                                     .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
@@ -3595,11 +3721,10 @@ TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsSingle) {
         testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
         testing::Field(
             &Event::receivedPackets,
-            testing::ElementsAre(
-                typename TestFixture::ReceivedPacketMatcherBuilder()
-                    .setExpectedPacketReceiveTime(pkt2RecvTime)
-                    .setExpectedPacketNumBytes(pkt2NumBytes)
-                    .build())));
+            testing::ElementsAre(ReceivedPacketMatcherBuilder<TypeParam>()
+                                     .setExpectedPacketReceiveTime(pkt2RecvTime)
+                                     .setExpectedPacketNumBytes(pkt2NumBytes)
+                                     .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
@@ -3610,12 +3735,12 @@ TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsSingle) {
   this->destroyTransport();
 }
 
-TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsMulti) {
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    PacketsReceivedEventsMulti) {
   // skip for client transport tests for now as supporting test foundation
   // does not properly support batch delivery
-  if constexpr (std::is_same_v<
-                    TypeParam,
-                    QuicClientTransportAfterStartTestBase>) {
+  if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
     return;
   }
 
@@ -3667,12 +3792,12 @@ TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsMulti) {
             &Event::receivedPackets,
             testing::ElementsAre(
                 // pkt1
-                typename TestFixture::ReceivedPacketMatcherBuilder()
+                ReceivedPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch1RecvTime)
                     .setExpectedPacketNumBytes(pkt1NumBytes)
                     .build(),
                 // pkt2
-                typename TestFixture::ReceivedPacketMatcherBuilder()
+                ReceivedPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch1RecvTime)
                     .setExpectedPacketNumBytes(pkt2NumBytes)
                     .build())));
@@ -3710,12 +3835,12 @@ TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsMulti) {
             &Event::receivedPackets,
             testing::ElementsAre(
                 // pkt1
-                typename TestFixture::ReceivedPacketMatcherBuilder()
+                ReceivedPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch2RecvTime)
                     .setExpectedPacketNumBytes(pkt3NumBytes)
                     .build(),
                 // pkt2
-                typename TestFixture::ReceivedPacketMatcherBuilder()
+                ReceivedPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch2RecvTime)
                     .setExpectedPacketNumBytes(pkt4NumBytes)
                     .build())));

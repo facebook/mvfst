@@ -300,9 +300,10 @@ class MockObserver : public QuicSocket::ManagedObserver {
       (noexcept));
   MOCK_METHOD(
       (void),
-      close,
-      (QuicSocket*, const folly::Optional<QuicError>&),
+      closeStarted,
+      (QuicSocket*, const CloseStartedEvent&),
       (noexcept));
+  MOCK_METHOD((void), closing, (QuicSocket*, const ClosingEvent&), (noexcept));
 };
 
 class MockLegacyObserver : public LegacyObserver {
@@ -311,13 +312,14 @@ class MockLegacyObserver : public LegacyObserver {
   MOCK_METHOD((void), observerAttach, (QuicSocket*), (noexcept));
   MOCK_METHOD((void), observerDetach, (QuicSocket*), (noexcept));
   MOCK_METHOD((void), destroy, (QuicSocket*), (noexcept));
-  MOCK_METHOD((void), evbAttach, (QuicSocket*, folly::EventBase*), (noexcept));
-  MOCK_METHOD((void), evbDetach, (QuicSocket*, folly::EventBase*), (noexcept));
   MOCK_METHOD(
       (void),
-      close,
-      (QuicSocket*, const folly::Optional<QuicError>&),
+      closeStarted,
+      (QuicSocket*, const CloseStartedEvent&),
       (noexcept));
+  MOCK_METHOD((void), closing, (QuicSocket*, const ClosingEvent&), (noexcept));
+  MOCK_METHOD((void), evbAttach, (QuicSocket*, folly::EventBase*), (noexcept));
+  MOCK_METHOD((void), evbDetach, (QuicSocket*, folly::EventBase*), (noexcept));
   MOCK_METHOD(
       (void),
       startWritingFromAppLimited,

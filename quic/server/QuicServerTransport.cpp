@@ -79,7 +79,9 @@ QuicServerTransport::~QuicServerTransport() {
       QuicError(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from server destructor")),
-      false);
+      false /* drainConnection */);
+  // closeImpl may have been called earlier with drain = true, so force close.
+  closeUdpSocket();
 }
 
 QuicServerTransport::Ptr QuicServerTransport::make(

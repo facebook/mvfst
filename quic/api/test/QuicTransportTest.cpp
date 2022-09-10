@@ -405,9 +405,12 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithNoWritableBytes) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
-  EXPECT_CALL(*cb3, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb3, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
+  EXPECT_CALL(*cb3, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   EXPECT_CALL(*cb3, destroy(transport_.get()));
@@ -451,9 +454,12 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
-  EXPECT_CALL(*cb3, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb3, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
+  EXPECT_CALL(*cb3, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   EXPECT_CALL(*cb3, destroy(transport_.get()));
@@ -499,9 +505,12 @@ TEST_F(QuicTransportTest, ObserverAppLimited) {
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
   Mock::VerifyAndClearExpectations(cb3.get());
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
-  EXPECT_CALL(*cb3, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb3, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
+  EXPECT_CALL(*cb3, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   EXPECT_CALL(*cb3, destroy(transport_.get()));
@@ -885,7 +894,10 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   loopForWrites();
 
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
-    EXPECT_CALL(observer, close(transport_.get(), _));
+    EXPECT_CALL(observer, closeStarted(transport_.get(), _));
+  }));
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
+    EXPECT_CALL(observer, closing(transport_.get(), _));
   }));
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
@@ -1097,7 +1109,10 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
   }
 
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
-    EXPECT_CALL(observer, close(transport_.get(), _));
+    EXPECT_CALL(observer, closeStarted(transport_.get(), _));
+  }));
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
+    EXPECT_CALL(observer, closing(transport_.get(), _));
   }));
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
@@ -1378,7 +1393,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
   }
 
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
-    EXPECT_CALL(observer, close(transport_.get(), _));
+    EXPECT_CALL(observer, closeStarted(transport_.get(), _));
+  }));
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
+    EXPECT_CALL(observer, closing(transport_.get(), _));
   }));
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
@@ -1422,8 +1440,10 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
       SocketAddress("::1", 10000),
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   transport_ = nullptr;
@@ -1464,8 +1484,10 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
       SocketAddress("::1", 10000),
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   transport_ = nullptr;
@@ -1506,8 +1528,10 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
       SocketAddress("::1", 10000),
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   transport_ = nullptr;
@@ -1547,8 +1571,10 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
       SocketAddress("::1", 10000),
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 
-  EXPECT_CALL(*cb1, close(transport_.get(), _));
-  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
+  EXPECT_CALL(*cb1, closing(transport_.get(), _));
+  EXPECT_CALL(*cb2, closing(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   transport_ = nullptr;

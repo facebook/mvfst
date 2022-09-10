@@ -247,11 +247,14 @@ class TestQuicTransport
   ~TestQuicTransport() override {
     resetConnectionCallbacks();
     // we need to call close in the derived class.
+    resetConnectionCallbacks();
     closeImpl(
         QuicError(
             QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
             std::string("shutdown")),
-        false);
+        false /* drainConnection */);
+    // closeImpl may have been called earlier with drain = true, so force close.
+    closeUdpSocket();
   }
 
   std::chrono::milliseconds getLossTimeoutRemainingTime() const {
@@ -3703,7 +3706,8 @@ TEST_P(QuicTransportImplTestBase, ObserverDestroy) {
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
   InSequence s;
-  EXPECT_CALL(*cb, close(transport.get(), _));
+  EXPECT_CALL(*cb, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cb, closing(transport.get(), _));
   EXPECT_CALL(*cb, destroy(transport.get()));
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3732,7 +3736,8 @@ TEST_P(QuicTransportImplTestBase, ObserverSharedPtrDestroy) {
   transport->addObserver(cb);
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
   InSequence s;
-  EXPECT_CALL(*cb, close(transport.get(), _));
+  EXPECT_CALL(*cb, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cb, closing(transport.get(), _));
   EXPECT_CALL(*cb, destroy(transport.get()));
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3752,7 +3757,8 @@ TEST_P(QuicTransportImplTestBase, ObserverSharedPtrReleasedDestroy) {
   EXPECT_FALSE(dc.destroyed()); // should still exist
 
   InSequence s;
-  EXPECT_CALL(*cbRaw, close(transport.get(), _));
+  EXPECT_CALL(*cbRaw, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cbRaw, closing(transport.get(), _));
   EXPECT_CALL(*cbRaw, destroy(transport.get()));
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3762,44 +3768,6 @@ TEST_P(QuicTransportImplTestBase, ObserverSharedPtrRemoveMissing) {
   auto cb = std::make_shared<StrictMock<MockLegacyObserver>>();
   EXPECT_FALSE(transport->removeObserver(cb.get()));
   EXPECT_THAT(transport->getObservers(), IsEmpty());
-}
-
-TEST_P(QuicTransportImplTestBase, ObserverCloseNoErrorThenDestroy) {
-  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
-  EXPECT_CALL(*cb, observerAttach(transport.get()));
-  transport->addObserver(cb.get());
-  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
-
-  const QuicError defaultError = QuicError(
-      GenericApplicationErrorCode::NO_ERROR,
-      toString(GenericApplicationErrorCode::NO_ERROR));
-  EXPECT_CALL(
-      *cb, close(transport.get(), folly::Optional<QuicError>(defaultError)));
-  transport->close(folly::none);
-  Mock::VerifyAndClearExpectations(cb.get());
-  InSequence s;
-  EXPECT_CALL(*cb, destroy(transport.get()));
-  transport = nullptr;
-  Mock::VerifyAndClearExpectations(cb.get());
-}
-
-TEST_P(QuicTransportImplTestBase, ObserverCloseWithErrorThenDestroy) {
-  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
-  EXPECT_CALL(*cb, observerAttach(transport.get()));
-  transport->addObserver(cb.get());
-  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
-
-  const auto testError = QuicError(
-      QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
-      std::string("testError"));
-  EXPECT_CALL(
-      *cb, close(transport.get(), folly::Optional<QuicError>(testError)));
-  transport->close(testError);
-  Mock::VerifyAndClearExpectations(cb.get());
-  InSequence s;
-  EXPECT_CALL(*cb, destroy(transport.get()));
-  transport = nullptr;
-  Mock::VerifyAndClearExpectations(cb.get());
 }
 
 TEST_P(QuicTransportImplTestBase, ObserverDetachImmediately) {
@@ -3815,12 +3783,20 @@ TEST_P(QuicTransportImplTestBase, ObserverDetachImmediately) {
 }
 
 TEST_P(QuicTransportImplTestBase, ObserverDetachAfterClose) {
+  // disable draining to ensure closing() event occurs immediately after close()
+  {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.shouldDrain = false;
+    transport->setTransportSettings(transportSettings);
+  }
+
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
 
-  EXPECT_CALL(*cb, close(transport.get(), _));
+  EXPECT_CALL(*cb, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cb, closing(transport.get(), _));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(cb.get());
 
@@ -3830,14 +3806,33 @@ TEST_P(QuicTransportImplTestBase, ObserverDetachAfterClose) {
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
-TEST_F(QuicTransportImplTest, ObserverDetachOnCloseDuringDestroy) {
+TEST_F(QuicTransportImplTest, ObserverDetachOnCloseStartedDuringDestroy) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
 
   InSequence s;
-  EXPECT_CALL(*cb, close(transport.get(), _))
+
+  EXPECT_CALL(*cb, closeStarted(transport.get(), _))
+      .WillOnce(Invoke([&cb](auto callbackTransport, auto /* errorOpt */) {
+        EXPECT_TRUE(callbackTransport->removeObserver(cb.get()));
+      }));
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicTransportImplTest, ObserverDetachOnClosingDuringDestroy) {
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addObserver(cb.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
+
+  InSequence s;
+
+  EXPECT_CALL(*cb, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cb, closing(transport.get(), _))
       .WillOnce(Invoke([&cb](auto callbackTransport, auto /* errorOpt */) {
         EXPECT_TRUE(callbackTransport->removeObserver(cb.get()));
       }));
@@ -3938,8 +3933,10 @@ TEST_P(QuicTransportImplTestBase, ObserverMultipleAttachDestroy) {
       transport->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
 
   InSequence s;
-  EXPECT_CALL(*cb1, close(transport.get(), _));
-  EXPECT_CALL(*cb2, close(transport.get(), _));
+  EXPECT_CALL(*cb1, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cb2, closeStarted(transport.get(), _));
+  EXPECT_CALL(*cb1, closing(transport.get(), _));
+  EXPECT_CALL(*cb2, closing(transport.get(), _));
   EXPECT_CALL(*cb1, destroy(transport.get()));
   EXPECT_CALL(*cb2, destroy(transport.get()));
   transport = nullptr;
