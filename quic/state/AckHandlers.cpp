@@ -388,7 +388,7 @@ AckEvent processAckFrame(
         const bool retransmission = ([&outstandingPacket, &ackedFrame]() {
           // in some cases (some unit tests), stream details are not available
           // in these cases, we assume it is not a retransmission
-          if (const auto maybeStreamDetails = folly::get_optional(
+          if (const auto* maybeStreamDetails = folly::get_ptr(
                   outstandingPacket.metadata.detailsPerStream,
                   ackedFrame.streamId)) {
             const auto& maybeFirstNewStreamByteOffset =
