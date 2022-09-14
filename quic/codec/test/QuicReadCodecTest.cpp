@@ -361,8 +361,8 @@ TEST_F(QuicReadCodecTest, BadResetFirstTwoBits) {
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
@@ -408,8 +408,8 @@ TEST_F(QuicReadCodecTest, RandomizedShortHeaderLeadsToReset) {
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
@@ -452,8 +452,8 @@ TEST_F(QuicReadCodecTest, StatelessResetTokenMismatch) {
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
@@ -490,8 +490,8 @@ TEST_F(QuicReadCodecTest, StatelessResetTokenMismatch) {
 TEST_F(QuicReadCodecTest, NoOneRttCipherNoReset) {
   auto connId = getTestConnectionId();
   auto aead = std::make_unique<MockAead>();
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
@@ -527,8 +527,8 @@ TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
@@ -565,8 +565,8 @@ TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
   auto connId = getTestConnectionId();
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
@@ -605,8 +605,8 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
-  StatelessResetToken tok(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  StatelessResetToken tok = {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
       connId,
