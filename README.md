@@ -92,7 +92,19 @@ By default `getdeps.py` will build the tests for mvfst. You can use it to run th
 
     python3 ./build/fbcode_builder/getdeps.py test mvfst --install-prefix=$(pwd)/_build
 
-### Method 2 \[Deprecated]: Using build.sh script
+### Method 2 \[Recommended]: Using vcpkg
+
+You can build and install mvfst using [vcpkg](https://github.com/Microsoft/vcpkg/) dependency manager:
+
+    git clone https://github.com/Microsoft/vcpkg.git
+	cd vcpkg
+    ./bootstrap-vcpkg.sh  #./bootstrap-vcpkg.bat for Windows
+    ./vcpkg integrate install
+    ./vcpkg install mvfst
+
+The mvfst port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg repository.
+
+### Method 3 \[Deprecated]: Using build.sh script
 
 This method can be used on Ubuntu 18+ and macOS.
 
