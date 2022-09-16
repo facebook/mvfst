@@ -3672,11 +3672,21 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream->writable()) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+    // Only allow resetting it back to nullptr once set.
+    if (stream->dsrSender && sender != nullptr) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
     if (stream->dsrSender != nullptr) {
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      // If any of these aren't true then we are abandoning stream data.
+      CHECK_EQ(stream->writeBufMeta.length, 0);
+      CHECK_EQ(stream->lossBufMetas.size(), 0);
+      CHECK_EQ(stream->retransmissionBufMetas.size(), 0);
+      stream->dsrSender->release();
+      stream->dsrSender = nullptr;
+      return folly::unit;
+    }
+    if (!stream->writable()) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
     stream->dsrSender = std::move(sender);
     // Always set adaptive reordering when using DSR for now since it ends up
