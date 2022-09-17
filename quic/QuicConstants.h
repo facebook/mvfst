@@ -430,12 +430,12 @@ constexpr std::chrono::microseconds kDelayIncreaseUpperBound(16ms);
 constexpr std::chrono::microseconds kDelayIncreaseLowerBound(4ms);
 
 /* Cubic */
-// Default cwnd reduction factor:
-constexpr double kDefaultCubicReductionFactor = 0.7;
 // Time elapsed scaling factor
 constexpr double kTimeScalingFactor = 0.4;
 // Default emulated connection numbers for each real connection
 constexpr uint8_t kDefaultEmulatedConnection = 2;
+// Default cwnd reduction factor:
+constexpr float kDefaultCubicReductionFactor = 0.7f;
 // Default W_max reduction factor when loss happens before Cwnd gets back to
 // previous W_max:
 constexpr float kDefaultLastMaxReductionFactor = 0.85f;
