@@ -60,24 +60,36 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
         "Exceeded max PTO", LocalErrorCode::CONNECTION_ABANDONED);
   }
 
-  // The number of probes we can probably send is the current packetCount,
-  // which is to say the number of "fresh" packets in the outstanding packet
-  // list + any active previous cloned packet.
+  // We should avoid sending pointless PTOs if we don't have packets in the loss
+  // buffer or enough outstanding packets to send.
   auto& packetCount = conn.outstandings.packetCount;
   auto& numProbePackets = conn.pendingEvents.numProbePackets;
   // Zero it out so we don't try to send probes for spaces without a cipher.
   numProbePackets = {};
   if (conn.initialWriteCipher) {
-    numProbePackets[PacketNumberSpace::Initial] = std::min<uint8_t>(
-        packetCount[PacketNumberSpace::Initial], kPacketToSendForPTO);
+    numProbePackets[PacketNumberSpace::Initial] = kPacketToSendForPTO;
+    if (conn.cryptoState->initialStream.lossBuffer.empty() &&
+        packetCount[PacketNumberSpace::Initial] < kPacketToSendForPTO) {
+      numProbePackets[PacketNumberSpace::Initial] =
+          packetCount[PacketNumberSpace::Initial];
+    }
   }
   if (conn.handshakeWriteCipher) {
-    numProbePackets[PacketNumberSpace::Handshake] = std::min<uint8_t>(
-        packetCount[PacketNumberSpace::Handshake], kPacketToSendForPTO);
+    numProbePackets[PacketNumberSpace::Handshake] = kPacketToSendForPTO;
+    if (conn.cryptoState->handshakeStream.lossBuffer.empty() &&
+        packetCount[PacketNumberSpace::Handshake] < kPacketToSendForPTO) {
+      numProbePackets[PacketNumberSpace::Handshake] =
+          packetCount[PacketNumberSpace::Handshake];
+    }
   }
   if (conn.oneRttWriteCipher) {
-    numProbePackets[PacketNumberSpace::AppData] = std::min<uint8_t>(
-        packetCount[PacketNumberSpace::AppData], kPacketToSendForPTO);
+    numProbePackets[PacketNumberSpace::AppData] = kPacketToSendForPTO;
+    if (conn.cryptoState->oneRttStream.lossBuffer.empty() &&
+        !conn.streamManager->hasLoss() &&
+        packetCount[PacketNumberSpace::AppData] < kPacketToSendForPTO) {
+      numProbePackets[PacketNumberSpace::AppData] =
+          packetCount[PacketNumberSpace::AppData];
+    }
   }
 }
 

@@ -1400,6 +1400,123 @@ TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
   EXPECT_EQ(0, conn->lossState.rtxCount);
 }
 
+TEST_F(QuicLossFunctionsTest, PTOWithLostInitialData) {
+  // Verify that lost initial data will trigger PTOs even if there are no other
+  // outstanding packets.
+  // The other packet number spaces have no outstanding data or losses so they
+  // will have 0 probe packets.
+
+  auto conn = createConn();
+
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteCipher = createNoOpAead();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+
+  auto buf = buildRandomInputData(20);
+  StreamBuffer initialData(std::move(buf), 0);
+  conn->cryptoState->initialStream.lossBuffer.push_back(std::move(initialData));
+
+  ASSERT_TRUE(conn->outstandings.packets.empty())
+      << "There should be no outstanding packets";
+  onPTOAlarm(*conn);
+
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial],
+      kPacketToSendForPTO);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake], 0);
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData], 0);
+}
+
+TEST_F(QuicLossFunctionsTest, PTOWithLostHandshakeData) {
+  // Verify that lost handshake data will trigger PTOs even if there are no
+  // other outstanding packets.
+  // The other packet number spaces have no outstanding data or losses so they
+  // will have 0 probe packets.
+  auto conn = createConn();
+
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteCipher = createNoOpAead();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+
+  auto buf = buildRandomInputData(20);
+  StreamBuffer handshakeData(std::move(buf), 0);
+  conn->cryptoState->handshakeStream.lossBuffer.push_back(
+      std::move(handshakeData));
+
+  ASSERT_TRUE(conn->outstandings.packets.empty())
+      << "There should be no outstanding packets";
+  onPTOAlarm(*conn);
+
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial], 0);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake],
+      kPacketToSendForPTO);
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData], 0);
+}
+
+TEST_F(QuicLossFunctionsTest, PTOWithLostAppData) {
+  // Verify that lost app data will trigger PTOs even if there are no other
+  // outstanding packets.
+  // The other packet number spaces have no outstanding data or losses so they
+  // will have 0 probe packets.
+  auto conn = createConn();
+
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteCipher = createNoOpAead();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+
+  auto buf = buildRandomInputData(20);
+  StreamBuffer appData(std::move(buf), 0);
+  conn->cryptoState->oneRttStream.lossBuffer.push_back(std::move(appData));
+
+  ASSERT_TRUE(conn->outstandings.packets.empty())
+      << "There should be no outstanding packets";
+  onPTOAlarm(*conn);
+
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial], 0);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake], 0);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData],
+      kPacketToSendForPTO);
+}
+
+TEST_F(QuicLossFunctionsTest, PTOAvoidPointless) {
+  // If there is no lost data and the outstanding data is less than the
+  // kPacketToSendForPTO packets, send only the available outstanding count.
+  auto conn = createConn();
+
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher();
+
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+
+  conn->oneRttWriteCipher = createNoOpAead();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+
+  conn->outstandings.packetCount[PacketNumberSpace::Initial] = 1;
+  conn->outstandings.packetCount[PacketNumberSpace::Handshake] = 1;
+  conn->outstandings.packetCount[PacketNumberSpace::AppData] = 1;
+
+  onPTOAlarm(*conn);
+
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial], 1);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake], 1);
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData], 1);
+}
+
 TEST_F(QuicLossFunctionsTest, EmptyOutstandingNoTimeout) {
   auto conn = createConn();
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
