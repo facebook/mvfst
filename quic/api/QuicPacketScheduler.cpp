@@ -308,7 +308,7 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
         longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
     if (initialPacket) {
       // This is the initial packet, we need to fill er up.
-      while (wrapper.remainingSpaceInPkt() > 0) {
+      while (builder.remainingSpaceInPkt() > 0) {
         writeFrame(PaddingFrame(), builder);
       }
     }

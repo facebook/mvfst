@@ -227,7 +227,7 @@ TEST_F(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, PaddingUpToWrapperSize) {
+TEST_F(QuicPacketSchedulerTest, InitialPaddingDoesNotUseWrapper) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -258,7 +258,7 @@ TEST_F(QuicPacketSchedulerTest, PaddingUpToWrapperSize) {
       std::move(builder), conn.udpSendPacketLen - cipherOverhead);
   auto packetLength = result.packet->header->computeChainDataLength() +
       result.packet->body->computeChainDataLength();
-  EXPECT_EQ(conn.udpSendPacketLen - cipherOverhead, packetLength);
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
