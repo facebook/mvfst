@@ -63,6 +63,17 @@ class SocketObserverInterface {
     friend auto operator<=>(
         const CloseStartedEvent&,
         const CloseStartedEvent&) = default;
+#elif _WIN32
+    friend auto operator!=(
+        const CloseStartedEvent& right,
+        const CloseStartedEvent& left) {
+      return right.maybeCloseReason != left.maybeCloseReason;
+    }
+    friend auto operator==(
+        const CloseStartedEvent& right,
+        const CloseStartedEvent& left) {
+      return right.maybeCloseReason == left.maybeCloseReason;
+    }
 #endif
   };
 

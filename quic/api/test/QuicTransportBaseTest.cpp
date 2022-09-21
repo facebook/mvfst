@@ -627,8 +627,8 @@ INSTANTIATE_TEST_SUITE_P(
     QuicTransportImplTestBase,
     QuicTransportImplTestBase,
     ::testing::Values(
-        DelayedStreamNotifsTestParam{.notifyOnNewStreamsExplicitly = false},
-        DelayedStreamNotifsTestParam{.notifyOnNewStreamsExplicitly = true}));
+        DelayedStreamNotifsTestParam{false},
+        DelayedStreamNotifsTestParam{true}));
 
 TEST_P(QuicTransportImplTestBase, AckTimeoutExpiredWillResetTimeoutFlag) {
   transport->invokeAckTimeout();
@@ -1662,14 +1662,10 @@ TEST_P(QuicTransportImplTestBase, ByteEventCallbacksManagementSingleStream) {
   auto stream = transport->createBidirectionalStream().value();
   uint64_t offset1 = 10, offset2 = 20;
 
-  ByteEvent txEvent1 = {
-      .id = stream, .offset = offset1, .type = ByteEvent::Type::TX};
-  ByteEvent txEvent2 = {
-      .id = stream, .offset = offset2, .type = ByteEvent::Type::TX};
-  ByteEvent ackEvent1 = {
-      .id = stream, .offset = offset1, .type = ByteEvent::Type::ACK};
-  ByteEvent ackEvent2 = {
-      .id = stream, .offset = offset2, .type = ByteEvent::Type::ACK};
+  ByteEvent txEvent1 = ByteEvent{stream, offset1, ByteEvent::Type::TX};
+  ByteEvent txEvent2 = ByteEvent{stream, offset2, ByteEvent::Type::TX};
+  ByteEvent ackEvent1 = ByteEvent{stream, offset1, ByteEvent::Type::ACK};
+  ByteEvent ackEvent2 = ByteEvent{stream, offset2, ByteEvent::Type::ACK};
 
   // Register 2 TX and 2 ACK events for the same stream at 2 different offsets
   transport->registerTxCallback(
@@ -1750,14 +1746,10 @@ TEST_P(
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  ByteEvent txEvent1 = {
-      .id = stream1, .offset = 10, .type = ByteEvent::Type::TX};
-  ByteEvent txEvent2 = {
-      .id = stream2, .offset = 20, .type = ByteEvent::Type::TX};
-  ByteEvent ackEvent1 = {
-      .id = stream1, .offset = 10, .type = ByteEvent::Type::ACK};
-  ByteEvent ackEvent2 = {
-      .id = stream2, .offset = 20, .type = ByteEvent::Type::ACK};
+  ByteEvent txEvent1 = ByteEvent{stream1, 10, ByteEvent::Type::TX};
+  ByteEvent txEvent2 = ByteEvent{stream2, 20, ByteEvent::Type::TX};
+  ByteEvent ackEvent1 = ByteEvent{stream1, 10, ByteEvent::Type::ACK};
+  ByteEvent ackEvent2 = ByteEvent{stream2, 20, ByteEvent::Type::ACK};
 
   EXPECT_THAT(byteEventCallback.getByteEventTracker(), IsEmpty());
   // Register 2 TX and 2 ACK events for 2 separate streams.
@@ -4130,8 +4122,7 @@ class QuicTransportImplTestWithGroups : public QuicTransportImplTestBase {};
 INSTANTIATE_TEST_SUITE_P(
     QuicTransportImplTestWithGroups,
     QuicTransportImplTestWithGroups,
-    ::testing::Values(DelayedStreamNotifsTestParam{
-        .notifyOnNewStreamsExplicitly = true}));
+    ::testing::Values(DelayedStreamNotifsTestParam{true}));
 
 TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
   auto transportSettings = transport->getTransportSettings();

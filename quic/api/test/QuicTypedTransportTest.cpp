@@ -1170,11 +1170,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = folly::none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{folly::none}),
               // should be equal to a populated event with default error
-              testing::Eq(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = defaultError}))));
+              testing::Eq(
+                  SocketObserverInterface::CloseStartedEvent{defaultError}))));
   EXPECT_CALL(*observer, closing(transport, _));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(observer.get());
@@ -1210,11 +1210,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = folly::none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{folly::none}),
               // should be equal to a populated event with default error
-              testing::Eq(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = defaultError}))));
+              testing::Eq(
+                  SocketObserverInterface::CloseStartedEvent{defaultError}))));
   transport->close(folly::none);
 
   // wait for the drain
@@ -1257,11 +1257,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = folly::none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{folly::none}),
               // should be equal to a populated event with default error
-              testing::Eq(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = defaultError}))));
+              testing::Eq(
+                  SocketObserverInterface::CloseStartedEvent{defaultError}))));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(observer.get());
 
@@ -1298,11 +1298,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = folly::none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{folly::none}),
               // should be equal to a populated event with default error
-              testing::Eq(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = testError}))));
+              testing::Eq(
+                  SocketObserverInterface::CloseStartedEvent{testError}))));
   EXPECT_CALL(*observer, closing(transport, _));
   transport->close(testError);
   Mock::VerifyAndClearExpectations(observer.get());
@@ -1340,11 +1340,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = folly::none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{folly::none}),
               // should be equal to a populated event with default error
-              testing::Eq(SocketObserverInterface::CloseStartedEvent{
-                  .maybeCloseReason = testError}))));
+              testing::Eq(
+                  SocketObserverInterface::CloseStartedEvent{testError}))));
   EXPECT_CALL(*observer, closing(transport, _));
   transport->close(testError);
   Mock::VerifyAndClearExpectations(observer.get());
@@ -2056,7 +2056,8 @@ TYPED_TEST(
             testing::Gt(strLength)));
     EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2067,7 +2068,8 @@ TYPED_TEST(
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
     EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2095,7 +2097,8 @@ TYPED_TEST(
 
     EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
     EXPECT_CALL(*obs2, appRateLimited(transport, appRateLimitedMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2105,7 +2108,8 @@ TYPED_TEST(
               event.maybeWritableBytes);
         });
     EXPECT_CALL(*obs3, appRateLimited(transport, appRateLimitedMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2233,7 +2237,8 @@ TYPED_TEST(
             testing::AllOf(testing::Gt(bufLength), testing::Gt(cwndInBytes))));
     EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2244,7 +2249,8 @@ TYPED_TEST(
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
     EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2377,7 +2383,8 @@ TYPED_TEST(
             testing::Ge(cwndInBytes))); // full CWND written
     EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2388,7 +2395,8 @@ TYPED_TEST(
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
     EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2444,7 +2452,8 @@ TYPED_TEST(
             testing::Lt(cwndInBytes)));
     EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2455,7 +2464,8 @@ TYPED_TEST(
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
     EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2482,7 +2492,8 @@ TYPED_TEST(
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
     EXPECT_CALL(*obs2, appRateLimited(transport, appRateLimitedMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
@@ -2492,7 +2503,8 @@ TYPED_TEST(
               event.maybeWritableBytes);
         });
     EXPECT_CALL(*obs3, appRateLimited(transport, appRateLimitedMatcher))
-        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
+                   cwndInBytes = cwndInBytes](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;

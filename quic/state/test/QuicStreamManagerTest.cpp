@@ -21,8 +21,8 @@ namespace quic {
 namespace test {
 
 struct StreamManagerTestParam {
-  bool notifyOnNewStreamsExplicitly;
-  bool isUnidirectional;
+  bool notifyOnNewStreamsExplicitly{false};
+  bool isUnidirectional{false};
 };
 
 class QuicStreamManagerTest
@@ -707,8 +707,8 @@ INSTANTIATE_TEST_SUITE_P(
     QuicStreamManagerTest,
     QuicStreamManagerTest,
     ::testing::Values(
-        StreamManagerTestParam{.notifyOnNewStreamsExplicitly = false},
-        StreamManagerTestParam{.notifyOnNewStreamsExplicitly = true}));
+        StreamManagerTestParam{false},
+        StreamManagerTestParam{true}));
 
 class QuicStreamManagerGroupsTest : public QuicStreamManagerTest {
  public:
@@ -874,12 +874,8 @@ INSTANTIATE_TEST_SUITE_P(
     QuicStreamManagerGroupsTest,
     QuicStreamManagerGroupsTest,
     ::testing::Values(
-        StreamManagerTestParam{
-            .notifyOnNewStreamsExplicitly = true,
-            .isUnidirectional = false},
-        StreamManagerTestParam{
-            .notifyOnNewStreamsExplicitly = true,
-            .isUnidirectional = true}));
+        StreamManagerTestParam{true, false},
+        StreamManagerTestParam{true, true}));
 
 } // namespace test
 } // namespace quic

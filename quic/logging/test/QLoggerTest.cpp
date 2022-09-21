@@ -1422,6 +1422,7 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   EXPECT_EQ((bool)getline(file, s), false);
 }
 
+#ifndef _WIN32
 TEST_F(QLoggerTest, CompressedStream) {
   folly::dynamic expected = folly::parseJson(expectedJsonStr1);
 
@@ -1509,6 +1510,7 @@ TEST_F(QLoggerTest, CompressedNonStream) {
   EXPECT_EQ(expected["summary"], parsed["summary"]);
   EXPECT_EQ(expected["traces"], parsed["traces"]);
 }
+#endif
 
 TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
   auto headerIn =
