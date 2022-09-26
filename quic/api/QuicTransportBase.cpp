@@ -3678,9 +3678,9 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
     }
     if (stream->dsrSender != nullptr) {
       // If any of these aren't true then we are abandoning stream data.
-      CHECK_EQ(stream->writeBufMeta.length, 0);
-      CHECK_EQ(stream->lossBufMetas.size(), 0);
-      CHECK_EQ(stream->retransmissionBufMetas.size(), 0);
+      CHECK_EQ(stream->writeBufMeta.length, 0) << stream;
+      CHECK_EQ(stream->lossBufMetas.size(), 0) << stream;
+      CHECK_EQ(stream->retransmissionBufMetas.size(), 0) << stream;
       stream->dsrSender->release();
       stream->dsrSender = nullptr;
       return folly::unit;
