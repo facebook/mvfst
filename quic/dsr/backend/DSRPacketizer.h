@@ -180,7 +180,7 @@ struct RequestGroup {
   ConnectionId scid;
   folly::SocketAddress clientAddress;
   const CipherPair* cipherPair{nullptr};
-  SmallVec<PacketizationRequest, 64, uint32_t> requests;
+  SmallVec<PacketizationRequest, 64> requests;
 };
 
 BufQuicBatchResult writePacketsGroup(

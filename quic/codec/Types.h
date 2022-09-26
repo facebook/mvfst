@@ -46,7 +46,7 @@ constexpr auto kMaxPacketNumEncodingSize = 4;
 constexpr auto kNumInitialAckBlocksPerFrame = 32;
 
 template <class T>
-using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame, uint16_t>;
+using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame>;
 using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
 
 struct PaddingFrame {
@@ -172,7 +172,7 @@ struct ReadAckFrame {
   bool implicit{false};
   // Should have at least 1 block.
   // These are ordered in descending order by start packet.
-  using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame, uint16_t>;
+  using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame>;
   Vec ackBlocks;
 
   bool operator==(const ReadAckFrame& /*rhs*/) const {
@@ -1080,7 +1080,7 @@ struct RetryPacket {
  * include 0-RTT, 1-RTT Phase 0 and 1-RTT Phase 1 packets.
  */
 struct RegularQuicPacket : public RegularPacket {
-  using Vec = SmallVec<QuicFrame, 4, uint16_t>;
+  using Vec = SmallVec<QuicFrame, 4>;
   Vec frames;
 
   explicit RegularQuicPacket(PacketHeader&& headerIn)

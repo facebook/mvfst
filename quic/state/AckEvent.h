@@ -184,8 +184,7 @@ struct AckEvent {
       // definition for DupAckedStreamIntervalSet
       // we expect this to be rare, any thus only allocate a single position
       template <class T>
-      using DupAckedStreamIntervalSetVec =
-          SmallVec<T, 1 /* stack size */, uint16_t>;
+      using DupAckedStreamIntervalSetVec = SmallVec<T, 1 /* stack size */>;
       using DupAckedStreamIntervals =
           IntervalSet<uint64_t, 1, DupAckedStreamIntervalSetVec>;
 
