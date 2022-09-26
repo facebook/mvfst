@@ -90,10 +90,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
     adjustedAlarmDuration = folly::chrono::ceil<std::chrono::milliseconds>(
         lastSentPacketTime + alarmDuration - now);
   } else {
-    auto lastSentPacketNum =
-        conn.outstandings.packets.back().packet.header.getPacketSequenceNum();
     VLOG(10) << __func__ << " alarm already due method=" << *alarmMethod
-             << " lastSentPacketNum=" << lastSentPacketNum
              << " lastSentPacketTime="
              << lastSentPacketTime.time_since_epoch().count()
              << " now=" << now.time_since_epoch().count()
