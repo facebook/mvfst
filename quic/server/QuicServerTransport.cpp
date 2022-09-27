@@ -1031,9 +1031,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        auto server_conn = serverTransport->serverConn_;
-        server_conn->transportSettings.removeFromLossBufferOnSpurious =
-            static_cast<bool>(val);
+        // Temporarily disabled while we investigate some related bugs.
         VLOG(3) << "REMOVE_FROM_LOSS_BUFFER KnobParam received: "
                 << static_cast<bool>(val);
       });
