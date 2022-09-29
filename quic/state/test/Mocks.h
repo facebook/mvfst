@@ -24,6 +24,7 @@ class MockCongestionController : public CongestionController {
       (const AckEvent* FOLLY_NULLABLE, const LossEvent* FOLLY_NULLABLE));
   MOCK_METHOD(uint64_t, getWritableBytes, (), (const));
   MOCK_METHOD(uint64_t, getCongestionWindow, (), (const));
+  MOCK_METHOD(folly::Optional<Bandwidth>, getBandwidth, (), (const));
   MOCK_METHOD(void, onSpuriousLoss, ());
   MOCK_METHOD(CongestionControlType, type, (), (const));
   MOCK_METHOD(void, setAppIdle, (bool, TimePoint));

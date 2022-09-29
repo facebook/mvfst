@@ -809,5 +809,18 @@ TEST_F(BbrTest, BackgroundMode) {
   EXPECT_FALSE(bbr.isInBackgroundMode());
 }
 
+TEST_F(BbrTest, GetBandwidthSample) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController bbr(conn);
+  EXPECT_FALSE(bbr.getBandwidth());
+  auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
+  Bandwidth testBandwidth(300, 20us);
+  EXPECT_CALL(*mockBandwidthSampler, getBandwidth())
+      .WillRepeatedly(Return(testBandwidth));
+  bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
+  EXPECT_TRUE(bbr.getBandwidth());
+  EXPECT_EQ(testBandwidth, bbr.getBandwidth().value());
+}
+
 } // namespace test
 } // namespace quic

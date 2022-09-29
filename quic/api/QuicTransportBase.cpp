@@ -568,12 +568,14 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   CongestionControlType congestionControlType = CongestionControlType::None;
   uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
   uint64_t congestionWindow = std::numeric_limits<uint64_t>::max();
+  folly::Optional<CongestionController::State> maybeCCState = folly::none;
   uint64_t burstSize = 0;
   std::chrono::microseconds pacingInterval = 0ms;
   if (conn_->congestionController) {
     congestionControlType = conn_->congestionController->type();
     writableBytes = conn_->congestionController->getWritableBytes();
     congestionWindow = conn_->congestionController->getCongestionWindow();
+    maybeCCState = conn_->congestionController->getState();
     if (isConnectionPaced(*conn_)) {
       burstSize = conn_->pacer->getCachedWriteBatchSize();
       pacingInterval = conn_->pacer->getTimeUntilNextWrite();
@@ -626,6 +628,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
       conn_->ackStates.appDataAckState.largestAckedByPeer;
   transportInfo.largestPacketSent = conn_->lossState.largestSent;
   transportInfo.usedZeroRtt = conn_->usedZeroRtt;
+  transportInfo.maybeCCState = maybeCCState;
   return transportInfo;
 }
 

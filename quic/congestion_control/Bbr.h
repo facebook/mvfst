@@ -136,6 +136,10 @@ class BbrCongestionController : public CongestionController {
   uint64_t getWritableBytes() const noexcept override;
 
   uint64_t getCongestionWindow() const noexcept override;
+
+  [[nodiscard]] folly::Optional<Bandwidth> getBandwidth()
+      const noexcept override;
+
   CongestionControlType type() const noexcept override;
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;

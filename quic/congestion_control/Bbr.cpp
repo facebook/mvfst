@@ -647,6 +647,14 @@ uint64_t BbrCongestionController::getCongestionWindow() const noexcept {
   return cwnd_;
 }
 
+folly::Optional<Bandwidth> BbrCongestionController::getBandwidth()
+    const noexcept {
+  if (bandwidthSampler_) {
+    return bandwidthSampler_->getBandwidth();
+  }
+  return folly::none;
+}
+
 void BbrCongestionController::detectBottleneckBandwidth(bool appLimitedSample) {
   if (btlbwFound_) {
     return;

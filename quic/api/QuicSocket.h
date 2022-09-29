@@ -14,6 +14,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
+#include <quic/congestion_control/Bandwidth.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/QuicConnectionStats.h>
@@ -229,6 +230,8 @@ class QuicSocket {
     folly::Optional<PacketNum> largestPacketAckedByPeer;
     folly::Optional<PacketNum> largestPacketSent;
     bool usedZeroRtt;
+    // State from congestion control module, if one is installed.
+    folly::Optional<CongestionController::State> maybeCCState;
   };
 
   /**

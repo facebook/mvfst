@@ -1767,6 +1767,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
   const auto ackTime = getSentTime(9) + 10ms;
   const auto writableBytes = 10;
   const auto congestionWindow = 20;
+
   auto checkAck = [&](auto ack) {
     EXPECT_EQ(ackTime, ack.ackTime);
     EXPECT_EQ(ackTime - ackFrame.ackDelay, ack.adjustedAckTime);
@@ -1823,6 +1824,8 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(folly::none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled out
@@ -1895,6 +1898,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
   const auto ackTime = getSentTime(9) + 10ms;
   const auto writableBytes = 10;
   const auto congestionWindow = 20;
+
   auto checkAck = [&](auto ack) {
     EXPECT_EQ(ackTime, ack.ackTime);
     EXPECT_EQ(ackTime - ackFrame.ackDelay, ack.adjustedAckTime);
@@ -1950,6 +1954,8 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(folly::none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled out
@@ -2135,6 +2141,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
   const auto ackTime = getSentTime(9) + propDelay; // do not include ack delay
   const auto writableBytes = 10;
   const auto congestionWindow = 20;
+
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {
@@ -2167,6 +2174,8 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(folly::none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
@@ -2237,6 +2246,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
   const auto ackTime = getSentTime(9) + propDelay; // subtracting propDelay = 0
   const auto writableBytes = 10;
   const auto congestionWindow = 20;
+
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {
@@ -2267,6 +2277,8 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(folly::none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
@@ -2349,6 +2361,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     const auto ackTime = getSentTime(9) + propDelay + ackFrame.ackDelay;
     const auto writableBytes = 10;
     const auto congestionWindow = 20;
+
     EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
         .Times(1)
         .WillOnce(Invoke([&](auto ack, auto /* loss */) {
@@ -2394,6 +2407,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawCongestionController, getBandwidth())
+        .WillOnce(Return(folly::none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -2418,6 +2433,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     const auto ackTime = getSentTime(9) + propDelay + ackFrame.ackDelay + 1ms;
     const auto writableBytes = 10;
     const auto congestionWindow = 20;
+
     EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
         .Times(1)
         .WillOnce(Invoke([&](auto ack, auto /* loss */) {
@@ -2447,6 +2463,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawCongestionController, getBandwidth())
+        .WillOnce(Return(folly::none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -2470,6 +2488,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     const auto ackTime = getSentTime(9) + propDelay + ackFrame.ackDelay + 2ms;
     const auto writableBytes = 10;
     const auto congestionWindow = 20;
+
     EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
         .Times(1)
         .WillOnce(Invoke([&](auto ack, auto /* loss */) {
@@ -2500,6 +2519,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawCongestionController, getBandwidth())
+        .WillOnce(Return(folly::none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -2575,6 +2596,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
     const auto ackTime = getSentTime(3) + propDelay + ackFrame.ackDelay;
     const auto writableBytes = 10;
     const auto congestionWindow = 20;
+
     EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
         .Times(1)
         .WillOnce(Invoke([&](auto ack, auto loss) {
@@ -2619,6 +2641,8 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawCongestionController, getBandwidth())
+        .WillOnce(Return(folly::none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -2711,6 +2735,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
   const auto ackTime = getSentTime(9) + propDelay;
   const auto writableBytes = 10;
   const auto congestionWindow = 20;
+
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {
@@ -2738,6 +2763,8 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(folly::none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(

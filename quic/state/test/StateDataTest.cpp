@@ -31,23 +31,62 @@ TEST_F(StateDataTest, CongestionControllerState) {
       .WillOnce(Return(1000));
   EXPECT_CALL(*mockCongestionController, getWritableBytes())
       .WillOnce(Return(2000));
+  EXPECT_CALL(*mockCongestionController, getBandwidth())
+      .WillOnce(Return(folly::none));
   EXPECT_THAT(
       mockCongestionController->getState(),
       testing::AllOf(
           testing::Field(
               &CongestionController::State::congestionWindowBytes, 1000),
-          testing::Field(&CongestionController::State::writableBytes, 2000)));
-
-  EXPECT_CALL(*mockCongestionController, getCongestionWindow())
-      .WillOnce(Return(3000));
-  EXPECT_CALL(*mockCongestionController, getWritableBytes())
-      .WillOnce(Return(4000));
-  EXPECT_THAT(
-      mockCongestionController->getState(),
-      testing::AllOf(
+          testing::Field(&CongestionController::State::writableBytes, 2000),
           testing::Field(
-              &CongestionController::State::congestionWindowBytes, 3000),
-          testing::Field(&CongestionController::State::writableBytes, 4000)));
+              &CongestionController::State::maybeBandwidthBitsPerSec,
+              folly::none)));
+  {
+    Bandwidth testBandwidth(
+        300 /* bytes delivered */, 20us /* time interval */);
+    EXPECT_CALL(*mockCongestionController, getCongestionWindow())
+        .WillOnce(Return(3000));
+    EXPECT_CALL(*mockCongestionController, getWritableBytes())
+        .WillOnce(Return(4000));
+    EXPECT_CALL(*mockCongestionController, getBandwidth())
+        .WillOnce(Return(testBandwidth));
+
+    EXPECT_THAT(
+        mockCongestionController->getState(),
+        testing::AllOf(
+            testing::Field(
+                &CongestionController::State::congestionWindowBytes, 3000),
+            testing::Field(&CongestionController::State::writableBytes, 4000),
+            testing::Field(
+                &CongestionController::State::maybeBandwidthBitsPerSec,
+                testBandwidth.normalize())));
+  }
+  // Ensure we populate BandwdithBitsPerSec only if the underlying
+  // Bandwidth calculations were in Bytes (and not Packets)
+  {
+    Bandwidth testBandwidth(
+        300 /* bytes delivered */,
+        20us /* time interval */,
+        Bandwidth::UnitType::PACKETS);
+
+    EXPECT_CALL(*mockCongestionController, getCongestionWindow())
+        .WillOnce(Return(3000));
+    EXPECT_CALL(*mockCongestionController, getWritableBytes())
+        .WillOnce(Return(4000));
+    EXPECT_CALL(*mockCongestionController, getBandwidth())
+        .WillOnce(Return(testBandwidth));
+
+    EXPECT_THAT(
+        mockCongestionController->getState(),
+        testing::AllOf(
+            testing::Field(
+                &CongestionController::State::congestionWindowBytes, 3000),
+            testing::Field(&CongestionController::State::writableBytes, 4000),
+            testing::Field(
+                &CongestionController::State::maybeBandwidthBitsPerSec,
+                folly::none)));
+  }
 }
 
 TEST_F(StateDataTest, EmptyLossEvent) {

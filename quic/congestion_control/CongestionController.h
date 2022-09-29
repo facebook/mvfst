@@ -8,8 +8,10 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
+#include <quic/congestion_control/Bandwidth.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/PacketEvent.h>
+#include <sys/types.h>
 
 namespace quic {
 
@@ -42,6 +44,7 @@ struct CongestionController {
   struct State {
     uint64_t writableBytes{0};
     uint64_t congestionWindowBytes{0};
+    folly::Optional<uint64_t> maybeBandwidthBitsPerSec{folly::none};
   };
 
   // Helper struct to group multiple lost packets into one event
@@ -108,6 +111,15 @@ struct CongestionController {
   FOLLY_NODISCARD virtual uint64_t getCongestionWindow() const = 0;
 
   /**
+   * Return the congestion controller's bandwidth estimate, if available.
+   *
+   * Unit is bits-per-second (bps).
+   */
+  FOLLY_NODISCARD virtual folly::Optional<Bandwidth> getBandwidth() const {
+    return folly::none;
+  }
+
+  /**
    * Notify congestion controller that the connection has become idle or active
    * in the sense that there are active non-control streams.
    * idle: true if the connection has become app-idle, false if the
@@ -156,6 +168,14 @@ struct CongestionController {
     State state;
     state.congestionWindowBytes = getCongestionWindow();
     state.writableBytes = getWritableBytes();
+
+    // Add latest Bandwidth sampler, if available.
+    if (auto maybeBandwidth = getBandwidth()) {
+      auto bandwidth = maybeBandwidth.value();
+      if (bandwidth.unitType == Bandwidth::UnitType::BYTES) {
+        state.maybeBandwidthBitsPerSec = bandwidth.normalize();
+      }
+    }
     return state;
   }
 
