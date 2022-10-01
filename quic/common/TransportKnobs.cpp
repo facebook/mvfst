@@ -57,6 +57,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             case TransportKnobParamId::CC_ALGORITHM_KNOB:
             case TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB:
             case TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB:
+            case TransportKnobParamId::ACK_FREQUENCY_POLICY:
             case TransportKnobParamId::NO_OP:
               break;
             default:
@@ -167,6 +168,8 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             // No further processing needed. Ignore this knob parameter.
             VLOG(4) << "Skipping over noop transport knob";
             continue;
+          } else if (paramId == TransportKnobParamId::ACK_FREQUENCY_POLICY) {
+            knobParams.push_back({paramId, val.asString()});
           } else {
             LOG(ERROR)
                 << "string param type is not valid for this knob with id= "

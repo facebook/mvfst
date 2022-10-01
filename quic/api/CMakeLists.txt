@@ -12,7 +12,6 @@ add_library(
   QuicStreamAsyncTransport.cpp
   QuicTransportBase.cpp
   QuicTransportFunctions.cpp
-  QuicAckFrequencyFunctions.cpp
 )
 
 target_include_directories(

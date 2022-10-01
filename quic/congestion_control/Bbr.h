@@ -12,6 +12,7 @@
 #include <quic/congestion_control/third_party/windowed_filter.h>
 #include <quic/state/StateData.h>
 #include <quic/state/TransportSettings.h>
+#include <chrono>
 
 namespace quic {
 
@@ -306,6 +307,10 @@ class BbrCongestionController : public CongestionController {
   bool appLimitedSinceProbeRtt_{false};
   // The connection was very inactive and we are leaving that.
   bool exitingQuiescene_{false};
+
+  // The last max ACK delay requested, so we don't end up sending
+  // them too frequently.
+  folly::Optional<std::chrono::milliseconds> lastMaxAckDelay_;
 
   friend std::ostream& operator<<(
       std::ostream& os,

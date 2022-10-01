@@ -37,6 +37,19 @@ struct BbrConfig {
    * haven't reached the drain target.
    */
   bool drainToTarget{false};
+
+  // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
+  // The first controls how many ack eliciting packets have to be received
+  // to trigger an ACK.
+  // The second controls how often, in terms of min RTT, the peer should ACK.
+  // The third controls the reordering threshold they should use when
+  // delaying an ACK.
+  struct AckFrequencyConfig {
+    uint64_t ackElicitingThreshold{kDefaultRxPacketsBeforeAckAfterInit};
+    uint64_t reorderingThreshold{kReorderingThreshold};
+    uint32_t minRttDivisor{2};
+  };
+  folly::Optional<AckFrequencyConfig> ackFrequencyConfig;
 };
 
 struct CcpConfig {

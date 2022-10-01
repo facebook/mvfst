@@ -52,6 +52,10 @@ TEST_F(BbrTest, InitWithCwndAndRtt) {
 
 TEST_F(BbrTest, Recovery) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  // Also test the ACK_FREQUENCY
+  conn.peerMinAckDelay = 5ms;
+  conn.transportSettings.bbrConfig.ackFrequencyConfig.emplace(
+      BbrConfig::AckFrequencyConfig{10, 3, 2});
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
@@ -132,6 +136,12 @@ TEST_F(BbrTest, Recovery) {
   // This will exit Recovery
   bbr.onPacketAckOrLoss(ack3, folly::none);
   EXPECT_FALSE(bbr.inRecovery());
+  // Only one update should have been issued.
+  ASSERT_EQ(conn.pendingEvents.frames.size(), 1);
+  AckFrequencyFrame expectedFrame{0, 10, 5000, 3};
+  auto ackFrequencyFrame =
+      conn.pendingEvents.frames.front().asAckFrequencyFrame();
+  EXPECT_EQ(expectedFrame, *ackFrequencyFrame);
 }
 
 TEST_F(BbrTest, StartupCwnd) {

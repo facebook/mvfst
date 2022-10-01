@@ -26,6 +26,10 @@ void requestPeerAckFrequencyChange(
     std::chrono::microseconds maxAckDelay,
     uint64_t reorderThreshold);
 
+std::chrono::microseconds clampMaxAckDelay(
+    const QuicConnectionStateBase& conn,
+    std::chrono::microseconds maxAckDelay);
+
 /**
  * Send an IMMEDIATE_ACK frame to request the peer to send an ACK immediately
  */

@@ -4794,6 +4794,67 @@ TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
         uint64_t{0}}});
 }
 
+TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        uint64_t{1}}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "blah,blah,blah"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "1,1,"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "1,1,1"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "10,3,1"}});
+  ASSERT_TRUE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  EXPECT_EQ(
+      server->getTransportSettings()
+          .bbrConfig.ackFrequencyConfig->ackElicitingThreshold,
+      10);
+  EXPECT_EQ(
+      server->getTransportSettings()
+          .bbrConfig.ackFrequencyConfig->reorderingThreshold,
+      3);
+  EXPECT_EQ(
+      server->getTransportSettings()
+          .bbrConfig.ackFrequencyConfig->minRttDivisor,
+      1);
+  server->getNonConstConn()
+      .transportSettings.bbrConfig.ackFrequencyConfig.reset();
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "10,3,-1"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "10,-1,1"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "-1,3,1"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "10,3,0"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "10,1,1"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        "1,3,1"}});
+  EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
+}
+
 TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();

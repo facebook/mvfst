@@ -5,6 +5,7 @@
 
 add_library(
   mvfst_state_machine
+  QuicAckFrequencyFunctions.cpp
   QuicStreamManager.cpp
   QuicStreamUtilities.cpp
   StateData.cpp

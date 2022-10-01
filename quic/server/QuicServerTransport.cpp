@@ -1035,6 +1035,44 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "REMOVE_FROM_LOSS_BUFFER KnobParam received: "
                 << static_cast<bool>(val);
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<std::string>(value);
+        BbrConfig::AckFrequencyConfig ackFrequencyConfig;
+        bool parseSuccess = false;
+        try {
+          parseSuccess = folly::split(
+              ",",
+              val,
+              ackFrequencyConfig.ackElicitingThreshold,
+              ackFrequencyConfig.reorderingThreshold,
+              ackFrequencyConfig.minRttDivisor);
+          // Sanity check the values.
+          parseSuccess = parseSuccess &&
+              ackFrequencyConfig.ackElicitingThreshold > 1 &&
+              ackFrequencyConfig.reorderingThreshold > 1 &&
+              ackFrequencyConfig.minRttDivisor > 0;
+        } catch (std::exception&) {
+          parseSuccess = false;
+        }
+        if (parseSuccess) {
+          VLOG(3) << fmt::format(
+              "ACK_FREQUENCY_POLICY KnobParam received, "
+              "ackElicitingThreshold={}, "
+              "reorderingThreshold={}, "
+              "minRttDivisor={}",
+              ackFrequencyConfig.ackElicitingThreshold,
+              ackFrequencyConfig.reorderingThreshold,
+              ackFrequencyConfig.minRttDivisor);
+          serverTransport->conn_->transportSettings.bbrConfig
+              .ackFrequencyConfig = ackFrequencyConfig;
+        } else {
+          LOG_EVERY_N(ERROR, 1000)
+              << "Received invalid KnobParam for ACK_FREQUENCY_POLICY: " << val;
+        }
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

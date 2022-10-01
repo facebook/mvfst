@@ -12,6 +12,8 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/state/QuicAckFrequencyFunctions.h>
+#include <chrono>
 
 using namespace std::chrono_literals;
 
@@ -260,6 +262,21 @@ void BbrCongestionController::onPacketAcked(
     handleAckInProbeRtt(newRoundTrip, ack.ackTime);
   }
 
+  const auto& ackFrequencyConfig =
+      conn_.transportSettings.bbrConfig.ackFrequencyConfig;
+  if (newRoundTrip && canSendAckControlFrames(conn_) && ackFrequencyConfig) {
+    auto updatedMaxAckDelay =
+        std::chrono::duration_cast<std::chrono::milliseconds>(clampMaxAckDelay(
+            conn_, minRtt() / ackFrequencyConfig->minRttDivisor));
+    if (!lastMaxAckDelay_ || lastMaxAckDelay_.value() != updatedMaxAckDelay) {
+      requestPeerAckFrequencyChange(
+          conn_,
+          ackFrequencyConfig->ackElicitingThreshold,
+          updatedMaxAckDelay,
+          ackFrequencyConfig->reorderingThreshold);
+      lastMaxAckDelay_ = updatedMaxAckDelay;
+    }
+  }
   updateCwnd(ack.ackedBytes, excessiveBytes);
   updatePacing();
 }

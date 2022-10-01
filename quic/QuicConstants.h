@@ -154,7 +154,9 @@ BETTER_ENUM(
     // Remove from loss buffer on spurious loss
     REMOVE_FROM_LOSS_BUFFER = 0x8888,
     // Knob for setting max pacing rate, with sequence number
-    MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999)
+    MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999,
+    // Control ACK_FREQUENCY policy
+    ACK_FREQUENCY_POLICY = 0x10000)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
