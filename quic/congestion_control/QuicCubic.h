@@ -103,7 +103,10 @@ class Cubic : public CongestionController {
 
   void getStats(CongestionControllerStats& stats) const override;
 
-  void handoff(uint64_t newCwnd, uint64_t newInflight) noexcept;
+  void handoff(
+      uint64_t newCwnd,
+      uint64_t ssthresh = INIT_SSTHRESH,
+      TimePoint lastReductionTime = Clock::now()) noexcept;
 
   CongestionControlType type() const noexcept override;
 

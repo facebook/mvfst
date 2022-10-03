@@ -229,7 +229,7 @@ void CCP::fallback() {
   inFallback_ = true;
   // This just starts the fallback alg where we left off so it doesn't need to
   // restart all connections at init cwnd again.
-  fallbackCC_.handoff(cwndBytes_, conn_.lossState.inflightBytes);
+  fallbackCC_.handoff(cwndBytes_);
 }
 
 void CCP::restoreAfterFallback() {

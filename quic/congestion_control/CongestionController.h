@@ -29,6 +29,7 @@ struct CopaStats {
 struct CubicStats {
   uint8_t state;
   uint64_t ssthresh;
+  uint64_t lastLossTimeMs;
 };
 
 union CongestionControllerStats {

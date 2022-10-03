@@ -49,11 +49,17 @@ uint64_t Cubic::getWritableBytes() const noexcept {
       : 0;
 }
 
-void Cubic::handoff(uint64_t newCwnd, uint64_t newInflight) noexcept {
+void Cubic::handoff(
+    uint64_t newCwnd,
+    uint64_t newSsthresh,
+    TimePoint lastReductionTime) noexcept {
   cwndBytes_ = newCwnd;
-  // inflightBytes_ = newInflight;
-  conn_.lossState.inflightBytes = newInflight;
-  state_ = CubicStates::Steady;
+  ssthresh_ = newSsthresh;
+  if (cwndBytes_ >= ssthresh_) {
+    state_ = CubicStates::Steady;
+    steadyState_.lastMaxCwndBytes = cwndBytes_;
+    steadyState_.lastReductionTime = lastReductionTime;
+  }
 }
 
 uint64_t Cubic::getCongestionWindow() const noexcept {
@@ -661,6 +667,12 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
 void Cubic::getStats(CongestionControllerStats& stats) const {
   stats.cubicStats.state = static_cast<uint8_t>(state_);
   stats.cubicStats.ssthresh = ssthresh_;
+  if (steadyState_.lastReductionTime) {
+    stats.cubicStats.lastLossTimeMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            steadyState_.lastReductionTime.value().time_since_epoch())
+            .count();
+  }
 }
 
 folly::StringPiece cubicStateToString(CubicStates state) {
