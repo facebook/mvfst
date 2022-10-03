@@ -15,7 +15,6 @@
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 #include <numeric>
-#include <set>
 
 namespace quic {
 namespace detail {
@@ -858,7 +857,7 @@ class QuicStreamManager {
    * Consume the new peer stream groups using the parameter vector.
    */
   auto consumeNewPeerStreamGroups() {
-    std::set<StreamGroupId> result;
+    decltype(newPeerStreamGroups_) result;
     result.swap(newPeerStreamGroups_);
     return result;
   }
@@ -1114,7 +1113,7 @@ class QuicStreamManager {
   std::vector<StreamId> newGroupedPeerStreams_;
 
   // Recently opened peer stream groups.
-  std::set<StreamGroupId> newPeerStreamGroups_;
+  folly::F14FastSet<StreamGroupId> newPeerStreamGroups_;
 
   // Peer group ids seen.
   folly::F14FastSet<StreamGroupId> peerStreamGroupsSeen_;
