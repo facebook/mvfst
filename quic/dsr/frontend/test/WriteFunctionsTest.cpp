@@ -170,4 +170,33 @@ TEST_F(WriteFunctionsTest, LossAndFreshTwoInstructionsInTwoPackets) {
   EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 }
 
+TEST_F(
+    WriteFunctionsTest,
+    LossAndFreshTwoInstructionsInTwoPacketsNoFlowControl) {
+  prepareFlowControlAndStreamLimit();
+  auto streamId = prepareOneStream(1000);
+  auto stream = conn_.streamManager->findStream(streamId);
+  auto bufMetaStartingOffset = stream->writeBufMeta.offset;
+  // Move part of the BufMetas to lossBufMetas
+  auto split = stream->writeBufMeta.split(500);
+  stream->lossBufMetas.push_back(split);
+  conn_.streamManager->updateLossStreams(*stream);
+  // Zero out conn flow control.
+  conn_.flowControlState.sumCurWriteOffset =
+      conn_.flowControlState.peerAdvertisedMaxOffset;
+  size_t packetLimit = 10;
+  // Should only write lost data
+  EXPECT_EQ(
+      1,
+      writePacketizationRequest(
+          conn_, getTestConnectionId(), packetLimit, *aead_));
+  EXPECT_EQ(1, countInstructions(streamId));
+  ASSERT_EQ(1, conn_.outstandings.packets.size());
+  auto& packet1 = conn_.outstandings.packets.front().packet;
+  EXPECT_EQ(1, packet1.frames.size());
+  WriteStreamFrame expectedFirstFrame(
+      streamId, bufMetaStartingOffset, 500, false, true);
+  EXPECT_EQ(expectedFirstFrame, *packet1.frames[0].asWriteStreamFrame());
+}
+
 } // namespace quic::test

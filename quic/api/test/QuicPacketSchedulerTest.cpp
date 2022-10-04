@@ -1844,6 +1844,53 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
 }
 
+TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 1000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
+
+  auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto dsrStream = conn.streamManager->createNextBidirectionalStream().value();
+  auto stream = conn.streamManager->findStream(streamId);
+  auto data = buildRandomInputData(1000);
+  writeDataToQuicStream(*stream, std::move(data), true);
+  WriteBufferMeta bufMeta{};
+  bufMeta.offset = 0;
+  bufMeta.length = 100;
+  bufMeta.eof = false;
+  dsrStream->insertIntoLossBufMeta(bufMeta);
+  conn.streamManager->updateWritableStreams(*stream);
+  conn.streamManager->updateWritableStreams(*dsrStream);
+  conn.streamManager->updateLossStreams(*dsrStream);
+
+  StreamFrameScheduler scheduler(conn);
+  EXPECT_TRUE(scheduler.hasPendingData());
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder1.encodePacketHeader();
+  scheduler.writeStreams(builder1);
+  auto packet1 = std::move(builder1).buildPacket().packet;
+  updateConnection(
+      conn, folly::none, packet1, Clock::now(), 1000, 0, false /* isDSR */);
+  EXPECT_EQ(1, packet1.frames.size());
+  auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(streamId, writeStreamFrame1.streamId);
+  EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
+  EXPECT_EQ(0, stream->writeBuffer.chainLength());
+  EXPECT_EQ(1, stream->retransmissionBuffer.size());
+  EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
+
+  EXPECT_FALSE(scheduler.hasPendingData());
+}
+
 TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

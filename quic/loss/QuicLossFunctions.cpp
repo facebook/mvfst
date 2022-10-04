@@ -161,7 +161,7 @@ void markPacketLoss(
           stream->retransmissionBufMetas.erase(retxBufMetaItr);
         }
         conn.streamManager->updateWritableStreams(*stream);
-        conn.streamManager->addLoss(stream->id);
+        conn.streamManager->updateLossStreams(*stream);
         break;
       }
       case QuicWriteFrame::Type::WriteCryptoFrame: {

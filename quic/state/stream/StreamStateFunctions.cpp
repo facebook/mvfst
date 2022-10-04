@@ -27,7 +27,7 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
-  stream.conn.streamManager->removeLoss(stream.id);
+  stream.conn.streamManager->updateLossStreams(stream);
 }
 
 void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {

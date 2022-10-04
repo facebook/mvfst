@@ -127,6 +127,7 @@ class QuicStreamManager {
     windowUpdates_ = std::move(other.windowUpdates_);
     flowControlUpdated_ = std::move(other.flowControlUpdated_);
     lossStreams_ = std::move(other.lossStreams_);
+    lossDSRStreams_ = std::move(other.lossDSRStreams_);
     readableStreams_ = std::move(other.readableStreams_);
     peekableStreams_ = std::move(other.peekableStreams_);
     writableStreams_ = std::move(other.writableStreams_);
@@ -358,14 +359,28 @@ class QuicStreamManager {
     }
   }
 
+  // Considers _any_ type of stream data being lost.
   FOLLY_NODISCARD bool hasLoss() const {
+    return !lossStreams_.empty() || !lossDSRStreams_.empty();
+  }
+
+  // Considers non-DSR data being lost.
+  FOLLY_NODISCARD bool hasNonDSRLoss() const {
     return !lossStreams_.empty();
   }
 
-  void removeLoss(StreamId id) {
-    lossStreams_.erase(id);
+  // Considers non-DSR data being lost.
+  FOLLY_NODISCARD bool hasDSRLoss() const {
+    return !lossDSRStreams_.empty();
   }
 
+  // Should only used directly by tests.
+  void removeLoss(StreamId id) {
+    lossStreams_.erase(id);
+    lossDSRStreams_.erase(id);
+  }
+
+  // Should only used directly by tests.
   void addLoss(StreamId id) {
     lossStreams_.insert(id);
   }
@@ -374,7 +389,12 @@ class QuicStreamManager {
     if (!stream.hasLoss()) {
       removeLoss(stream.id);
     } else {
-      addLoss(stream.id);
+      if (!stream.lossBuffer.empty()) {
+        lossStreams_.emplace(stream.id);
+      }
+      if (!stream.lossBufMetas.empty()) {
+        lossDSRStreams_.emplace(stream.id);
+      }
     }
   }
 
@@ -1136,6 +1156,9 @@ class QuicStreamManager {
 
   // Streams that have bytes in loss buffer
   folly::F14FastSet<StreamId> lossStreams_;
+
+  // DSR Streams that have bytes in loss buff meta
+  folly::F14FastSet<StreamId> lossDSRStreams_;
 
   // Set of streams that have pending reads
   folly::F14FastSet<StreamId> readableStreams_;

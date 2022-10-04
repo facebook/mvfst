@@ -512,7 +512,7 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
 } // namespace quic
 
 bool StreamFrameScheduler::hasPendingData() const {
-  return conn_.streamManager->hasLoss() ||
+  return conn_.streamManager->hasNonDSRLoss() ||
       (conn_.streamManager->hasNonDSRWritable() &&
        getSendConnFlowControlBytesWire(conn_) > 0);
 }

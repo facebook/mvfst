@@ -18,8 +18,9 @@ DSRStreamFrameScheduler::DSRStreamFrameScheduler(
     : conn_(conn) {}
 
 bool DSRStreamFrameScheduler::hasPendingData() const {
-  return conn_.streamManager->hasDSRWritable() &&
-      getSendConnFlowControlBytesWire(conn_) > 0;
+  return conn_.streamManager->hasDSRLoss() ||
+      (conn_.streamManager->hasDSRWritable() &&
+       getSendConnFlowControlBytesWire(conn_) > 0);
 }
 
 /**
