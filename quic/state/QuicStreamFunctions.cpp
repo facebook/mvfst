@@ -33,9 +33,12 @@ void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
   if (data) {
     len = data->computeChainDataLength();
   }
-  // Once data is written to writeBufMeta, no more data can be written to
-  // writeBuffer. Write only an EOF is fine.
-  CHECK(neverWrittenBufMeta || len == 0);
+  // Disallow writing any data or EOF when there's buf meta data already.
+  CHECK(neverWrittenBufMeta);
+  // Also disallow writing an EOF at the end of real data when there's going
+  // to be buf meta data in the future.
+  LOG_IF(FATAL, eof && stream.dsrSender)
+      << "Trying to write eof on normal data for DSR stream: " << &stream;
   if (len > 0) {
     // We call this before updating the writeBuffer because we only want to
     // write a blocked frame first time the stream becomes blocked
