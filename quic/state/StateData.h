@@ -749,6 +749,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Sequence number to use for the next ACK_FREQUENCY frame
   uint64_t nextAckFrequencyFrameSequenceNumber{0};
+
+  // GSO supported on conn.
+  folly::Optional<bool> gsoSupported;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

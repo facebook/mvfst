@@ -253,13 +253,13 @@ using BatchWriterPtr = std::unique_ptr<BatchWriter, BatchWriterDeleter>;
 class BatchWriterFactory {
  public:
   static BatchWriterPtr makeBatchWriter(
-      folly::AsyncUDPSocket& sock,
       const quic::QuicBatchingMode& batchingMode,
       uint32_t batchSize,
       bool useThreadLocal,
       const std::chrono::microseconds& threadLocalDelay,
       DataPathType dataPathType,
-      QuicConnectionStateBase& conn);
+      QuicConnectionStateBase& conn,
+      bool gsoSupported);
 };
 
 } // namespace quic

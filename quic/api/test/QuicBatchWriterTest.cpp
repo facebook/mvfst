@@ -30,6 +30,7 @@ struct QuicBatchWriterTest : public ::testing::Test,
 
  protected:
   QuicServerConnectionState conn_;
+  bool gsoSupported_{false};
 };
 
 TEST_P(QuicBatchWriterTest, TestBatchingNone) {
@@ -40,13 +41,13 @@ TEST_P(QuicBatchWriterTest, TestBatchingNone) {
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_NONE,
       kBatchNum,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest('A', kStrLen);
 
@@ -69,20 +70,21 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
   folly::AsyncUDPSocket sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  gsoSupported_ = sock.getGSO() >= 0;
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest(kStrLen, 'A');
   // if GSO is not available, just test we've got a regular
   // batch writer
-  if (sock.getGSO() < 0) {
+  if (!gsoSupported_) {
     CHECK(batchWriter->empty());
     CHECK_EQ(batchWriter->size(), 0);
     auto buf = folly::IOBuf::copyBuffer(strTest);
@@ -98,19 +100,20 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   folly::AsyncUDPSocket sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  gsoSupported_ = sock.getGSO() >= 0;
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest;
   // only if GSO is available
-  if (sock.getGSO() >= 0) {
+  if (gsoSupported_) {
     // run multiple loops
     for (size_t i = 0; i < kNumLoops; i++) {
       // batch kStrLen, kStrLenLT
@@ -139,19 +142,20 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   folly::AsyncUDPSocket sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  gsoSupported_ = sock.getGSO() >= 0;
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest;
   // only if GSO is available
-  if (sock.getGSO() >= 0) {
+  if (gsoSupported_) {
     // run multiple loops
     for (size_t i = 0; i < kNumLoops; i++) {
       // try to batch kStrLen, kStrLenGT
@@ -175,20 +179,21 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   folly::AsyncUDPSocket sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  gsoSupported_ = sock.getGSO() >= 0;
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       kBatchNum,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest(kStrLen, 'A');
   // if GSO is not available, just test we've got a regular
   // batch writer
-  if (sock.getGSO() >= 0) {
+  if (gsoSupported_) {
     // run multiple loops
     for (size_t i = 0; i < kNumLoops; i++) {
       // try to batch up to kBatchNum
@@ -222,13 +227,13 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsg) {
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG,
       kBatchNum,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest(kStrLen, 'A');
 
@@ -262,20 +267,21 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   folly::AsyncUDPSocket sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  gsoSupported_ = sock.getGSO() >= 0;
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
       kBatchNum,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest(kStrLen, 'A');
   // if GSO is not available, just test we've got a regular
   // batch writer
-  if (sock.getGSO() >= 0) {
+  if (gsoSupported_) {
     // run multiple loops
     for (size_t i = 0; i < kNumLoops; i++) {
       // try to batch up to kBatchNum
@@ -307,20 +313,21 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   folly::AsyncUDPSocket sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  gsoSupported_ = sock.getGSO() >= 0;
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
       3 * kBatchNum,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   std::string strTest(kStrLen, 'A');
   // if GSO is not available, just test we've got a regular
   // batch writer
-  if (sock.getGSO() >= 0) {
+  if (gsoSupported_) {
     // run multiple loops
     for (size_t i = 0; i < kNumLoops; i++) {
       // try to batch up to kBatchNum
@@ -355,19 +362,19 @@ TEST_P(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
   folly::test::MockAsyncUDPSocket sock(&evb);
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   EXPECT_FALSE(batchWriter->needsFlush(1000));
 
@@ -382,19 +389,19 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendLimit) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
   folly::test::MockAsyncUDPSocket sock(&evb);
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   EXPECT_FALSE(batchWriter->needsFlush(1000));
 
@@ -417,19 +424,19 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
   folly::test::MockAsyncUDPSocket sock(&evb);
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   EXPECT_FALSE(batchWriter->needsFlush(1000));
 
@@ -456,15 +463,15 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   ASSERT_FALSE(batchWriter->needsFlush(1000));
 
@@ -505,15 +512,15 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   CHECK(batchWriter);
   ASSERT_FALSE(batchWriter->needsFlush(1000));
 
@@ -545,15 +552,15 @@ TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   for (size_t i = 0; i < 5; i++) {
     auto buf = bufAccessor->obtain();
     buf->append(700);
@@ -587,7 +594,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
   folly::test::MockAsyncUDPSocket sock(&evb);
-  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+  gsoSupported_ = true;
 
   uint32_t batchSize = 20;
   auto bufAccessor =
@@ -595,13 +602,13 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   conn_.bufAccessor = bufAccessor.get();
   conn_.udpSendPacketLen = 1000;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
-      sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
       useThreadLocal,
       quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
-      conn_);
+      conn_,
+      gsoSupported_);
   auto buf = bufAccessor->obtain();
   folly::IOBuf* rawBuf = buf.get();
   bufAccessor->release(std::move(buf));

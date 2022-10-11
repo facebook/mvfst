@@ -1386,14 +1386,27 @@ WriteQuicDataResult writeConnectionDataToSocket(
            << " writing data using scheduler=" << scheduler.name() << " "
            << connection;
 
+  if (!connection.gsoSupported.hasValue()) {
+    connection.gsoSupported = sock.getGSO() >= 0;
+    if (!*connection.gsoSupported &&
+        (connection.transportSettings.dataPathType ==
+         DataPathType::ContinuousMemory)) {
+      // Change data path type to DataPathType::ChainedMemory.
+      // Continuous memory data path is only supported with working GSO.
+      LOG(ERROR) << "Switching data path to ChainedMemory as "
+                 << "GSO is not supported on the socket";
+      connection.transportSettings.dataPathType = DataPathType::ChainedMemory;
+    }
+  }
+
   auto batchWriter = BatchWriterFactory::makeBatchWriter(
-      sock,
       connection.transportSettings.batchingMode,
       connection.transportSettings.maxBatchSize,
       connection.transportSettings.useThreadLocalBatching,
       connection.transportSettings.threadLocalDelay,
       connection.transportSettings.dataPathType,
-      connection);
+      connection,
+      *connection.gsoSupported);
 
   auto happyEyeballsState = connection.nodeType == QuicNodeType::Server
       ? nullptr

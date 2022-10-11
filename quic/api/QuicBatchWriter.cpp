@@ -516,17 +516,17 @@ void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
 
 // BatchWriterFactory
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
-    folly::AsyncUDPSocket& sock,
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
     bool useThreadLocal,
     const std::chrono::microseconds& threadLocalDelay,
     DataPathType dataPathType,
-    QuicConnectionStateBase& conn) {
+    QuicConnectionStateBase& conn,
+    bool gsoSupported) {
 #if USE_THREAD_LOCAL_BATCH_WRITER
   if (useThreadLocal &&
       (batchingMode == quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO) &&
-      sock.getGSO() >= 0) {
+      gsoSupported) {
     BatchWriterPtr ret(
         ThreadLocalBatchWriterCache::getThreadLocalInstance().getCachedWriter(
             batchingMode, threadLocalDelay));
@@ -545,7 +545,7 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
       return BatchWriterPtr(new SinglePacketBatchWriter());
     case quic::QuicBatchingMode::BATCHING_MODE_GSO: {
-      if (sock.getGSO() >= 0) {
+      if (gsoSupported) {
         if (dataPathType == DataPathType::ChainedMemory) {
           return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
         }
@@ -557,7 +557,7 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
       return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
     case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {
-      if (sock.getGSO() >= 0) {
+      if (gsoSupported) {
         return BatchWriterPtr(new SendmmsgGSOPacketBatchWriter(batchSize));
       }
 
