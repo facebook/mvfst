@@ -4343,6 +4343,36 @@ TEST_F(QuicTransportTest, ScheduleAckTimeout) {
   EXPECT_NEAR(transport_->getAckTimeout()->getTimeRemaining().count(), 25, 5);
 }
 
+TEST_F(QuicTransportTest, ScheduleAckTimeoutSRTTFactor) {
+  transport_->getConnectionState().lossState.srtt = 50ms;
+  EXPECT_FALSE(transport_->getAckTimeout()->isScheduled());
+  transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
+  transport_->onNetworkData(
+      SocketAddress("::1", 10003),
+      NetworkData(
+          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isScheduled());
+  EXPECT_NEAR(
+      transport_->getAckTimeout()->getTimeRemaining().count(), 50 / 4, 2);
+}
+
+TEST_F(QuicTransportTest, ScheduleAckTimeoutAckFreq) {
+  transport_->getConnectionState().lossState.srtt = 50ms;
+  transport_->getConnectionState().transportSettings.minAckDelay = 1ms;
+  transport_->getConnectionState()
+      .ackStates.appDataAckState.ackFrequencySequenceNumber = 1;
+  transport_->getConnectionState().ackStates.maxAckDelay = 50ms / 3;
+  EXPECT_FALSE(transport_->getAckTimeout()->isScheduled());
+  transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
+  transport_->onNetworkData(
+      SocketAddress("::1", 10003),
+      NetworkData(
+          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isScheduled());
+  EXPECT_NEAR(
+      transport_->getAckTimeout()->getTimeRemaining().count(), 50 / 3, 2);
+}
+
 TEST_F(QuicTransportTest, ScheduleAckTimeoutFromMaxAckDelay) {
   // Make srtt large so we will use maxAckDelay
   transport_->getConnectionState().lossState.srtt = 25000000us;
