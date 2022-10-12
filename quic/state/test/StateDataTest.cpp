@@ -60,7 +60,7 @@ TEST_F(StateDataTest, CongestionControllerState) {
             testing::Field(&CongestionController::State::writableBytes, 4000),
             testing::Field(
                 &CongestionController::State::maybeBandwidthBitsPerSec,
-                testBandwidth.normalize())));
+                testBandwidth.normalize() * 8)));
   }
   // Ensure we populate BandwdithBitsPerSec only if the underlying
   // Bandwidth calculations were in Bytes (and not Packets)

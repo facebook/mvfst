@@ -174,7 +174,7 @@ struct CongestionController {
     if (auto maybeBandwidth = getBandwidth()) {
       auto bandwidth = maybeBandwidth.value();
       if (bandwidth.unitType == Bandwidth::UnitType::BYTES) {
-        state.maybeBandwidthBitsPerSec = bandwidth.normalize();
+        state.maybeBandwidthBitsPerSec = bandwidth.normalize() * 8;
       }
     }
     return state;
