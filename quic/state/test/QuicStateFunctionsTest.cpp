@@ -342,10 +342,8 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsCrypto) {
 TEST_P(
     UpdateAckStateTest,
     UpdateAckSendStateOnRecvPacketsInitCryptoExperimental) {
-  // EXPERIMENTAL – Crypto always leads to immediate ack unless init packet
-  // space.
+  // Crypto data leads to immediate ack unless init packet space.
   QuicConnectionStateBase conn(QuicNodeType::Server);
-  conn.transportSettings.skipAckOnlyInitial = true;
 
   bool isInitPktNumSpace = GetParam() == PacketNumberSpace::Initial;
 

@@ -3644,10 +3644,6 @@ TEST_F(
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSkipAckOnlyCryptoInitial) {
-  auto transportSettings = server->getTransportSettings();
-  transportSettings.skipAckOnlyInitial = true;
-  server->setTransportSettings(transportSettings);
-
   // start at some random packet number that isn't zero
   clientNextInitialPacketNum = folly::Random::rand32(1, 100);
 
