@@ -11,8 +11,6 @@ add_library(
   mvfst_test_utils STATIC
   TestPacketBuilders.cpp
   TestUtils.cpp
-  AeadTestUtil.cpp
-  CryptoTestUtil.cpp
 )
 
 target_include_directories(
