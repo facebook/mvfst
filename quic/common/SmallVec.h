@@ -11,7 +11,7 @@
 
 namespace quic {
 
-#if !FOLLY_MOBILE
+#if !FOLLY_MOBILE || _WIN32
 template <
     class T,
     std::size_t N,
