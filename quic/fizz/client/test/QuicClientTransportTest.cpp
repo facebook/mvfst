@@ -5127,8 +5127,13 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
 
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
 
-  // All the data is marked lost.
+  // Zero-rtt data is not immediately marked lost.
+  EXPECT_TRUE(zeroRttPacketsOutstanding());
+
+  // The PTO should trigger marking all the zero-rtt data as lost.
+  onPTOAlarm(client->getNonConstConn());
   EXPECT_FALSE(zeroRttPacketsOutstanding());
+
   // Transport parameters did not change since zero rtt was accepted.
   // Except for max packet size.
   verifyTransportParameters(

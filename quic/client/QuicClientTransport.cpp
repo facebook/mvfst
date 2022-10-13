@@ -820,11 +820,6 @@ void QuicClientTransport::onReadData(
   // in onTransportReady, if the write fails, QuicSocket can be closed
   // and connSetupCallback_ is set nullptr.
   if (connSetupCallback_ && !replaySafeNotified_ && conn_->oneRttWriteCipher) {
-    // If there is 0RTT data still outstanding, opportunistically retransmit
-    // it rather than waiting for the loss recovery.
-    if (conn_->transportSettings.earlyRetransmit0Rtt) {
-      markZeroRttPacketsLost(*conn_, markPacketLoss);
-    }
     replaySafeNotified_ = true;
     // We don't need this any more. Also unset it so that we don't allow random
     // middleboxes to shutdown our connection once we have crypto keys.

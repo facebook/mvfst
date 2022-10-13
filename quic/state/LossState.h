@@ -114,5 +114,7 @@ struct LossState {
   uint32_t totalPTOCount{0};
   // Current method by which the loss detection alarm is set.
   AlarmMethod currentAlarmMethod{AlarmMethod::EarlyRetransmitOrReordering};
+  // Whether early retransmission of 0-rtt packets has been attempted
+  bool attemptedEarlyRetransmit0Rtt{false};
 };
 } // namespace quic

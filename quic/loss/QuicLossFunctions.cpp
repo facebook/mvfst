@@ -60,6 +60,14 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
         "Exceeded max PTO", LocalErrorCode::CONNECTION_ABANDONED);
   }
 
+  // The first PTO after the oneRttWriteCipher is available is an opportunity to
+  // retransmit unacknowledged 0-rtt data. It may be done only once.
+  if (conn.transportSettings.earlyRetransmit0Rtt &&
+      !conn.lossState.attemptedEarlyRetransmit0Rtt && conn.oneRttWriteCipher) {
+    conn.lossState.attemptedEarlyRetransmit0Rtt = true;
+    markZeroRttPacketsLost(conn, markPacketLoss);
+  }
+
   // We should avoid sending pointless PTOs if we don't have packets in the loss
   // buffer or enough outstanding packets to send.
   auto& packetCount = conn.outstandings.packetCount;
