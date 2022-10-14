@@ -166,6 +166,10 @@ class TestQuicTransport
     notifyAppRateLimited();
   }
 
+  void invokeHandleKnobCallbacks() {
+    handleKnobCallbacks();
+  }
+
   void setTransportReadyNotified(bool transportReadyNotified) {
     transportReadyNotified_ = transportReadyNotified;
   }
