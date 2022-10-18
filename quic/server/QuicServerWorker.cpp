@@ -1016,7 +1016,7 @@ folly::Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(
  * (e.g. 1 day for new tokens and 5 min for retry tokens) to determine
  * validity.
  */
-bool checkTokenAge(uint64_t tokenIssuedMs, uint64_t kTokenValidMs) {
+static bool checkTokenAge(uint64_t tokenIssuedMs, uint64_t kTokenValidMs) {
   uint64_t nowInMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();

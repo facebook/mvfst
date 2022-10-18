@@ -110,7 +110,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
   return std::move(builder).build();
 }
 
-std::shared_ptr<fizz::SelfCert> readCert() {
+static std::shared_ptr<fizz::SelfCert> readCert() {
   auto certificate = fizz::test::getCert(fizz::test::kP256Certificate);
   auto privKey = fizz::test::getPrivateKey(fizz::test::kP256Key);
   std::vector<folly::ssl::X509UniquePtr> certs;

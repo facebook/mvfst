@@ -681,7 +681,7 @@ void onServerReadData(
   }
 }
 
-void handleCipherUnavailable(
+static void handleCipherUnavailable(
     CipherUnavailable* originalData,
     QuicServerConnectionState& conn,
     size_t packetSize,
