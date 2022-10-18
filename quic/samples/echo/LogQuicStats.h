@@ -62,7 +62,7 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
   }
 
   void onPacketDropped(PacketDropReason reason) override {
-    VLOG(2) << prefix_ << "onPacketDropped reason=" << toString(reason);
+    VLOG(2) << prefix_ << "onPacketDropped reason=" << reason._to_string();
   }
 
   void onPacketForwarded() override {

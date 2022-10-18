@@ -28,7 +28,6 @@ namespace quic {
 using namespace std::chrono_literals;
 
 namespace {
-using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 constexpr size_t kConnIdEncodingRetryLimit = 16;
 
 bool maybeNATRebinding(
@@ -599,8 +598,7 @@ void onConnectionMigration(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
           0,
-          QuicTransportStatsCallback::toString(
-              PacketDropReason::PEER_ADDRESS_CHANGE));
+          PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
     }
     QUIC_STATS(
         conn.statsCallback,
@@ -775,8 +773,8 @@ void onServerReadDataFromOpen(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             0,
-            QuicTransportStatsCallback::toString(
-                PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL));
+            PacketDropReason(PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL)
+                ._to_string());
       }
       QUIC_STATS(
           conn.statsCallback,
@@ -790,8 +788,7 @@ void onServerReadDataFromOpen(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             0,
-            QuicTransportStatsCallback::toString(
-                PacketDropReason::INVALID_PACKET_VN));
+            PacketDropReason(PacketDropReason::INVALID_PACKET_VN)._to_string());
       }
       QUIC_STATS(
           conn.statsCallback,
@@ -809,8 +806,8 @@ void onServerReadDataFromOpen(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             0,
-            QuicTransportStatsCallback::toString(
-                PacketDropReason::INITIAL_CONNID_SMALL));
+            PacketDropReason(PacketDropReason::INITIAL_CONNID_SMALL)
+                ._to_string());
       }
       QUIC_STATS(
           conn.statsCallback,
@@ -945,8 +942,8 @@ void onServerReadDataFromOpen(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             packetSize,
-            QuicTransportStatsCallback::toString(
-                PacketDropReason::PROTOCOL_VIOLATION));
+            PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)
+                ._to_string());
       }
       QUIC_STATS(
           conn.statsCallback,
@@ -985,8 +982,8 @@ void onServerReadDataFromOpen(
           if (conn.qLogger) {
             conn.qLogger->addPacketDrop(
                 packetSize,
-                QuicTransportStatsCallback::toString(
-                    PacketDropReason::PROTOCOL_VIOLATION));
+                PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)
+                    ._to_string());
           }
           throw QuicTransportException(
               "Invalid frame", TransportErrorCode::PROTOCOL_VIOLATION);
@@ -1017,8 +1014,8 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(
               packetSize,
-              QuicTransportStatsCallback::toString(
-                  PacketDropReason::PEER_ADDRESS_CHANGE));
+              PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)
+                  ._to_string());
         }
         QUIC_STATS(
             conn.statsCallback,
@@ -1335,8 +1332,8 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(
               packetSize,
-              QuicTransportStatsCallback::toString(
-                  PacketDropReason::PEER_ADDRESS_CHANGE));
+              PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)
+                  ._to_string());
         }
         QUIC_STATS(
             conn.statsCallback,
@@ -1359,14 +1356,13 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(
               packetSize,
-              QuicTransportStatsCallback::toString(
-                  PacketDropReason::TRANSPORT_PARAMETER_ERROR));
+              PacketDropReason(PacketDropReason::TRANSPORT_PARAMETER_ERROR)
+                  ._to_string());
         }
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
-            QuicTransportStatsCallback::PacketDropReason::
-                TRANSPORT_PARAMETER_ERROR);
+            PacketDropReason::TRANSPORT_PARAMETER_ERROR);
         throw;
       }
     }
@@ -1406,8 +1402,7 @@ void onServerReadDataFromClosed(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
           packetSize,
-          QuicTransportStatsCallback::toString(
-              PacketDropReason::SERVER_STATE_CLOSED));
+          PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
     }
     QUIC_STATS(
         conn.statsCallback,
@@ -1421,8 +1416,7 @@ void onServerReadDataFromClosed(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
           packetSize,
-          QuicTransportStatsCallback::toString(
-              PacketDropReason::SERVER_STATE_CLOSED));
+          PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
     }
     QUIC_STATS(
         conn.statsCallback,
@@ -1495,8 +1489,7 @@ void onServerReadDataFromClosed(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
           packetSize,
-          QuicTransportStatsCallback::toString(
-              PacketDropReason::PROTOCOL_VIOLATION));
+          PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
     }
     QUIC_STATS(
         conn.statsCallback,

@@ -38,7 +38,6 @@ namespace test {
 namespace {
 std::vector<uint8_t> kInitialDstConnIdVecForRetryTest =
     {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
-using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 } // namespace
 
 MATCHER_P(BufMatches, buf, "") {
@@ -2636,9 +2635,7 @@ TEST_F(QuicClientTransportAfterStartTest, ShortHeaderPacketWithNoFrames) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(
-      event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PROTOCOL_VIOLATION));
+      event->dropReason, (+PacketDropReason::PROTOCOL_VIOLATION)._to_string());
 }
 
 TEST_F(
@@ -2764,8 +2761,7 @@ TEST_F(
 }
 
 TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
-  expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason::PARSE_ERROR_CLIENT);
+  expectQuicStatsPacketDrop(PacketDropReason::PARSE_ERROR_CLIENT);
   uint8_t connIdSize = GetParam();
 
   client->getNonConstConn().clientConnectionId =
@@ -3386,8 +3382,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
 }
 
 TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
-  expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason::CLIENT_STATE_CLOSED);
+  expectQuicStatsPacketDrop(PacketDropReason::CLIENT_STATE_CLOSED);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   StreamId streamId = client->createBidirectionalStream().value();
@@ -3486,8 +3481,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
-  expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason::CLIENT_STATE_CLOSED);
+  expectQuicStatsPacketDrop(PacketDropReason::CLIENT_STATE_CLOSED);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(*sock, close());
@@ -5469,8 +5463,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::Values(0, 8));
 
 TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
-  expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason::PARSE_ERROR_CLIENT);
+  expectQuicStatsPacketDrop(PacketDropReason::PARSE_ERROR_CLIENT);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   auto params = mockClientHandshake->getServerTransportParams();

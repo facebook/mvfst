@@ -31,8 +31,6 @@ namespace fsp = folly::portability::sockets;
 
 namespace quic {
 
-using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
-
 QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> socket,
@@ -289,8 +287,7 @@ void QuicClientTransport::processPacketData(
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(
           packetSize,
-          QuicTransportStatsCallback::toString(
-              PacketDropReason::PROTOCOL_VIOLATION));
+          PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
     }
     throw QuicTransportException(
         "Packet has no frames", TransportErrorCode::PROTOCOL_VIOLATION);

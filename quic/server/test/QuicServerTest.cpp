@@ -38,9 +38,6 @@ const folly::SocketAddress kClientAddr2("1.2.3.5", 1235);
 const folly::SocketAddress kClientAddr3("1.2.3.6", 1236);
 
 namespace quic {
-namespace {
-using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
-} // namespace
 namespace test {
 
 MATCHER_P(NetworkDataMatches, networkData, "") {
@@ -206,7 +203,7 @@ class QuicServerWorkerTest : public Test {
       Buf packet,
       ConnectionId connId,
       ShortHeader shortHeader,
-      QuicTransportStatsCallback::PacketDropReason dropReason);
+      PacketDropReason dropReason);
 
   std::string testSendRetry(
       ConnectionId& srcConnId,
@@ -339,7 +336,7 @@ void QuicServerWorkerTest::testSendReset(
     Buf packet,
     ConnectionId,
     ShortHeader shortHeader,
-    QuicTransportStatsCallback::PacketDropReason dropReason) {
+    PacketDropReason dropReason) {
   EXPECT_CALL(*quicStats_, onPacketDropped(dropReason)).Times(1);
   // should write reset packet
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
@@ -524,7 +521,7 @@ TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
       std::move(data),
       getTestConnectionId(hostId_ + 1),
       std::move(shortHeaderConnId),
-      QuicTransportStatsCallback::PacketDropReason::ROUTING_ERROR_WRONG_HOST);
+      PacketDropReason::ROUTING_ERROR_WRONG_HOST);
 }
 
 TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
@@ -539,7 +536,7 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
       std::move(data),
       getTestConnectionId(hostId_),
       std::move(shortHeaderConnId),
-      QuicTransportStatsCallback::PacketDropReason::CANNOT_FORWARD_DATA);
+      PacketDropReason::CANNOT_FORWARD_DATA);
 }
 
 TEST_F(QuicServerWorkerTest, RateLimit) {
@@ -1188,7 +1185,9 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
 TEST_F(QuicServerWorkerTest, QuicShedTest) {
   auto connId = getTestConnectionId(hostId_);
   EXPECT_CALL(
-      *quicStats_, onPacketDropped(PacketDropReason::CANNOT_MAKE_TRANSPORT));
+      *quicStats_,
+      onPacketDropped(
+          PacketDropReason(PacketDropReason::CANNOT_MAKE_TRANSPORT)));
   folly::Optional<VersionNegotiationPacket> versionPacket;
   EXPECT_CALL(*socketPtr_, write(_, _))
       .WillOnce(Invoke([&](const SocketAddress&,
@@ -1212,7 +1211,9 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_SRC_PORT));
+  EXPECT_CALL(
+      *quicStats_,
+      onPacketDropped(PacketDropReason(PacketDropReason::INVALID_SRC_PORT)));
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -2314,7 +2315,9 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
         version);
     // Simulate receiving a packet before the worker shutdown.
 
-    EXPECT_CALL(*stats, onPacketDropped(PacketDropReason::SERVER_SHUTDOWN));
+    EXPECT_CALL(
+        *stats,
+        onPacketDropped(PacketDropReason(PacketDropReason::SERVER_SHUTDOWN)));
     NetworkData networkData(folly::IOBuf::copyBuffer("wat"), Clock::now());
     RoutingData routingData(
         HeaderForm::Long,
@@ -2344,7 +2347,9 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   auto transport =
       createNewTransport(evbThread.getEventBase(), *client, serverAddr);
   EXPECT_CALL(*transport, setTransportStatsCallback(nullptr));
-  EXPECT_CALL(*stats, onPacketDropped(PacketDropReason::SERVER_SHUTDOWN))
+  EXPECT_CALL(
+      *stats,
+      onPacketDropped(PacketDropReason(PacketDropReason::SERVER_SHUTDOWN)))
       .Times(0);
   auto clientConnId = getTestConnectionId(clientHostId_);
   auto serverConnId =

@@ -653,7 +653,6 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   enum ProcessId processId_ { ProcessId::ZERO };
   TakeoverPacketHandler takeoverPktHandler_;
   bool packetForwardingEnabled_{false};
-  using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
   TimerHighRes::SharedPtr pacingTimer_;
 
   // Used to override certain transport parameters, given the client address

@@ -26,7 +26,6 @@ namespace test {
 
 namespace {
 using ByteEvent = QuicTransportBase::ByteEvent;
-using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 auto constexpr kTestMaxPacingRate = std::numeric_limits<uint64_t>::max();
 } // namespace
 
@@ -387,8 +386,7 @@ TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
   EXPECT_EQ(event->packetSize, 29);
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PEER_ADDRESS_CHANGE));
+      PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
@@ -1522,8 +1520,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
   EXPECT_EQ(event->packetSize, 29);
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::SERVER_STATE_CLOSED));
+      PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
 }
 
 TEST_F(QuicServerTransportTest, CloseTransportWontUnbound) {
@@ -1756,8 +1753,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFrames) {
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PROTOCOL_VIOLATION));
+      PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
 }
 
 TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
@@ -1808,8 +1804,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PROTOCOL_VIOLATION));
+      PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
 }
 
 class QuicServerTransportAllowMigrationTest
@@ -1885,8 +1880,7 @@ TEST_P(
   EXPECT_EQ(event->packetSize, 29);
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PEER_ADDRESS_CHANGE));
+      PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
 }
 
 TEST_P(
@@ -2238,8 +2232,7 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
   EXPECT_EQ(event->packetSize, 0);
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PEER_ADDRESS_CHANGE));
+      PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, RetiringConnIdIssuesNewIds) {
@@ -3427,8 +3420,7 @@ TEST_F(
   EXPECT_EQ(event->packetSize, 44);
   EXPECT_EQ(
       event->dropReason,
-      QuicTransportStatsCallback::toString(
-          PacketDropReason::PEER_ADDRESS_CHANGE));
+      PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
 }
 
 TEST_F(

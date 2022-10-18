@@ -419,7 +419,7 @@ void QuicServer::routeDataToWorker(
       QUIC_STATS(
           workerPtr_->getTransportStatsCallback(),
           onPacketDropped,
-          QuicTransportStatsCallback::PacketDropReason::WORKER_NOT_INITIALIZED);
+          PacketDropReason::WORKER_NOT_INITIALIZED);
     }
     return;
   }
@@ -430,7 +430,7 @@ void QuicServer::routeDataToWorker(
       QUIC_STATS(
           workerPtr_->getTransportStatsCallback(),
           onPacketDropped,
-          QuicTransportStatsCallback::PacketDropReason::SERVER_SHUTDOWN);
+          PacketDropReason::SERVER_SHUTDOWN);
     }
     return;
   }

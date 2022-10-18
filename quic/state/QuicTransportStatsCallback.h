@@ -27,51 +27,6 @@ namespace quic {
  */
 class QuicTransportStatsCallback {
  public:
-  enum class PacketDropReason : uint8_t {
-    NONE,
-    CONNECTION_NOT_FOUND,
-    DECRYPTION_ERROR,
-    INVALID_PACKET_SIZE,
-    INVALID_PACKET_SIZE_INITIAL,
-    INVALID_PACKET_VERSION,
-    INVALID_PACKET_INITIAL_BYTE,
-    INVALID_PACKET_CID,
-    INVALID_PACKET_VN,
-    PARSE_ERROR_SHORT_HEADER,
-    PARSE_ERROR_LONG_HEADER,
-    PARSE_ERROR_LONG_HEADER_INITIAL,
-    PARSE_ERROR_EXCEPTION,
-    PARSE_ERROR_BAD_DCID,
-    PARSE_ERROR_DCID,
-    PARSE_ERROR_PACKET_BUFFERED,
-    PARSE_ERROR_CLIENT,
-    CIPHER_UNAVAILABLE,
-    UNEXPECTED_RETRY,
-    UNEXPECTED_RESET,
-    UNEXPECTED_NOTHING,
-    UNEXPECTED_PROTECTION_LEVEL,
-    EMPTY_DATA,
-    MAX_BUFFERED,
-    BUFFER_UNAVAILABLE,
-    PEER_ADDRESS_CHANGE,
-    PROTOCOL_VIOLATION,
-    ROUTING_ERROR_WRONG_HOST,
-    SERVER_STATE_CLOSED,
-    TRANSPORT_PARAMETER_ERROR,
-    WORKER_NOT_INITIALIZED,
-    SERVER_SHUTDOWN,
-    INITIAL_CONNID_SMALL,
-    CANNOT_MAKE_TRANSPORT,
-    UDP_TRUNCATED,
-    CLIENT_STATE_CLOSED,
-    CLIENT_SHUTDOWN,
-    INVALID_SRC_PORT,
-    UNKNOWN_CID_VERSION,
-    CANNOT_FORWARD_DATA,
-    // NOTE: MAX should always be at the end
-    MAX
-  };
-
   enum class SocketErrorType : uint8_t {
     AGAIN,
     INVAL,
@@ -105,7 +60,7 @@ class QuicTransportStatsCallback {
 
   virtual void onPersistentCongestion() = 0;
 
-  virtual void onPacketDropped(PacketDropReason reason) = 0;
+  virtual void onPacketDropped(quic::PacketDropReason reason) = 0;
 
   virtual void onPacketForwarded() = 0;
 
@@ -200,93 +155,6 @@ class QuicTransportStatsCallback {
   virtual void onShortHeaderPadding(size_t padSize) = 0;
 
   virtual void onPacerTimerLagged() = 0;
-
-  static const char* toString(PacketDropReason reason) {
-    switch (reason) {
-      case PacketDropReason::NONE:
-        return "NONE";
-      case PacketDropReason::CONNECTION_NOT_FOUND:
-        return "CONNECTION_NOT_FOUND";
-      case PacketDropReason::DECRYPTION_ERROR:
-        return "DECRYPTION_ERROR";
-      case PacketDropReason::INVALID_PACKET_SIZE:
-        return "INVALID_PACKET_SIZE";
-      case PacketDropReason::INVALID_PACKET_SIZE_INITIAL:
-        return "INVALID_PACKET_SIZE_INITIAL";
-      case PacketDropReason::INVALID_PACKET_VERSION:
-        return "INVALID_PACKET_VERSION";
-      case PacketDropReason::INVALID_PACKET_INITIAL_BYTE:
-        return "INVALID_PACKET_INITIAL_BYTE";
-      case PacketDropReason::INVALID_PACKET_CID:
-        return "INVALID_PACKET_CID";
-      case PacketDropReason::INVALID_PACKET_VN:
-        return "INVALID_PACKET_VN";
-      case PacketDropReason::PARSE_ERROR_SHORT_HEADER:
-        return "PARSE_ERROR_SHORT_HEADER";
-      case PacketDropReason::PARSE_ERROR_LONG_HEADER:
-        return "PARSE_ERROR_LONG_HEADER";
-      case PacketDropReason::PARSE_ERROR_EXCEPTION:
-        return "PARSE_ERROR_EXCEPTION";
-      case PacketDropReason::PARSE_ERROR_BAD_DCID:
-        return "PARSE_ERROR_BAD_DCID";
-      case PacketDropReason::PARSE_ERROR_DCID:
-        return "PARSE_ERROR_DCID";
-      case PacketDropReason::PARSE_ERROR_PACKET_BUFFERED:
-        return "PARSE_ERROR_PACKET_BUFFERED";
-      case PacketDropReason::PARSE_ERROR_CLIENT:
-        return "PARSE_ERROR_CLIENT";
-      case PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL:
-        return "PARSE_ERROR_LONG_HEADER_INITIAL";
-      case PacketDropReason::CIPHER_UNAVAILABLE:
-        return "CIPHER_UNAVAILABLE";
-      case PacketDropReason::UNEXPECTED_RETRY:
-        return "UNEXPECTED_RETRY";
-      case PacketDropReason::UNEXPECTED_RESET:
-        return "UNEXPECTED_RESET";
-      case PacketDropReason::UNEXPECTED_NOTHING:
-        return "UNEXPECTED_NOTHING";
-      case PacketDropReason::UNEXPECTED_PROTECTION_LEVEL:
-        return "UNEXPECTED_PROTECTION_LEVEL";
-      case PacketDropReason::EMPTY_DATA:
-        return "EMPTY_DATA";
-      case PacketDropReason::MAX_BUFFERED:
-        return "MAX_BUFFERED";
-      case PacketDropReason::BUFFER_UNAVAILABLE:
-        return "BUFFER_UNAVAILABLE";
-      case PacketDropReason::PEER_ADDRESS_CHANGE:
-        return "PEER_ADDRESS_CHANGE";
-      case PacketDropReason::PROTOCOL_VIOLATION:
-        return "PROTOCOL_VIOLATION";
-      case PacketDropReason::ROUTING_ERROR_WRONG_HOST:
-        return "ROUTING_ERROR_WRONG_HOST";
-      case PacketDropReason::SERVER_STATE_CLOSED:
-        return "SERVER_STATE_CLOSED";
-      case PacketDropReason::TRANSPORT_PARAMETER_ERROR:
-        return "TRANSPORT_PARAMETER_ERROR";
-      case PacketDropReason::WORKER_NOT_INITIALIZED:
-        return "WORKER_NOT_INITIALIZED";
-      case PacketDropReason::SERVER_SHUTDOWN:
-        return "SERVER_SHUTDOWN";
-      case PacketDropReason::INITIAL_CONNID_SMALL:
-        return "INITIAL_CONNID_SMALL";
-      case PacketDropReason::CANNOT_MAKE_TRANSPORT:
-        return "CANNOT_MAKE_TRANSPORT";
-      case PacketDropReason::UDP_TRUNCATED:
-        return "UDP_TRUNCATED";
-      case PacketDropReason::CLIENT_STATE_CLOSED:
-        return "CLIENT_STATE_CLOSED";
-      case PacketDropReason::CLIENT_SHUTDOWN:
-        return "CLIENT_SHUTDOWN";
-      case PacketDropReason::INVALID_SRC_PORT:
-        return "INVALID_SRC_PORT";
-      case PacketDropReason::UNKNOWN_CID_VERSION:
-        return "UNKNOWN_CID_VERSION";
-      case PacketDropReason::CANNOT_FORWARD_DATA:
-        return "CANNOT_FORWARD_DATA";
-      case PacketDropReason::MAX:
-        return "MAX";
-    }
-  }
 
   static const char* toString(SocketErrorType errorType) {
     switch (errorType) {

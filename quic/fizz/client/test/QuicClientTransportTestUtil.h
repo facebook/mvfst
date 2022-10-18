@@ -886,14 +886,12 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     return *client->getConn().readCodec->getInitialHeaderCipher();
   }
 
-  void expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason expectedReason) {
+  void expectQuicStatsPacketDrop(PacketDropReason expectedReason) {
     auto quicStats = std::make_shared<testing::NiceMock<MockQuicStats>>();
     EXPECT_CALL(*quicStats, onPacketDropped(testing::_))
-        .WillOnce(testing::Invoke(
-            [=](QuicTransportStatsCallback::PacketDropReason reason) {
-              EXPECT_EQ(expectedReason, reason);
-            }));
+        .WillOnce(testing::Invoke([=](PacketDropReason reason) {
+          EXPECT_EQ(expectedReason, reason);
+        }));
     client->setTransportStatsCallback(quicStats);
   }
 
