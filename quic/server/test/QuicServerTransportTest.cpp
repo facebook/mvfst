@@ -4805,11 +4805,11 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "1,1,1"}});
+        "1,1,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,3,1"}});
+        "10,3,1,1"}});
   ASSERT_TRUE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   EXPECT_EQ(
       server->getTransportSettings()
@@ -4823,31 +4823,35 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
       server->getTransportSettings()
           .bbrConfig.ackFrequencyConfig->minRttDivisor,
       1);
+  EXPECT_EQ(
+      server->getTransportSettings()
+          .bbrConfig.ackFrequencyConfig->useSmallThresholdDuringStartup,
+      true);
   server->getNonConstConn()
       .transportSettings.bbrConfig.ackFrequencyConfig.reset();
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,3,-1"}});
+        "10,3,-1,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,-1,1"}});
+        "10,-1,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "-1,3,1"}});
+        "-1,3,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,3,0"}});
+        "10,3,0,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,1,1"}});
+        "10,1,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "1,3,1"}});
+        "1,3,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().bbrConfig.ackFrequencyConfig);
 }
 

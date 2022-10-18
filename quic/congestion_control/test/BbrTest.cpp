@@ -138,7 +138,7 @@ TEST_F(BbrTest, Recovery) {
   EXPECT_FALSE(bbr.inRecovery());
   // Only one update should have been issued.
   ASSERT_EQ(conn.pendingEvents.frames.size(), 1);
-  AckFrequencyFrame expectedFrame{0, 10, 5000, 3};
+  AckFrequencyFrame expectedFrame{0, 2, 5000, 3};
   auto ackFrequencyFrame =
       conn.pendingEvents.frames.front().asAckFrequencyFrame();
   EXPECT_EQ(expectedFrame, *ackFrequencyFrame);

@@ -48,6 +48,8 @@ struct BbrConfig {
     uint64_t ackElicitingThreshold{kDefaultRxPacketsBeforeAckAfterInit};
     uint64_t reorderingThreshold{kReorderingThreshold};
     uint32_t minRttDivisor{2};
+    // Threshold to use early in the connection.
+    bool useSmallThresholdDuringStartup{false};
   };
   folly::Optional<AckFrequencyConfig> ackFrequencyConfig;
 };

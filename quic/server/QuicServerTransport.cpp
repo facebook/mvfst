@@ -1048,7 +1048,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               val,
               ackFrequencyConfig.ackElicitingThreshold,
               ackFrequencyConfig.reorderingThreshold,
-              ackFrequencyConfig.minRttDivisor);
+              ackFrequencyConfig.minRttDivisor,
+              ackFrequencyConfig.useSmallThresholdDuringStartup);
           // Sanity check the values.
           parseSuccess = parseSuccess &&
               ackFrequencyConfig.ackElicitingThreshold > 1 &&
@@ -1063,9 +1064,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               "ackElicitingThreshold={}, "
               "reorderingThreshold={}, "
               "minRttDivisor={}",
+              "useSmallThresholdDuringStartup={}",
               ackFrequencyConfig.ackElicitingThreshold,
               ackFrequencyConfig.reorderingThreshold,
-              ackFrequencyConfig.minRttDivisor);
+              ackFrequencyConfig.minRttDivisor,
+              ackFrequencyConfig.useSmallThresholdDuringStartup);
           serverTransport->conn_->transportSettings.bbrConfig
               .ackFrequencyConfig = ackFrequencyConfig;
           serverTransport->conn_->transportSettings.autoAdaptiveForDsr = false;

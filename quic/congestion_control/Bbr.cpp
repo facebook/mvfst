@@ -268,13 +268,27 @@ void BbrCongestionController::onPacketAcked(
     auto updatedMaxAckDelay =
         std::chrono::duration_cast<std::chrono::milliseconds>(clampMaxAckDelay(
             conn_, minRtt() / ackFrequencyConfig->minRttDivisor));
-    if (!lastMaxAckDelay_ || lastMaxAckDelay_.value() != updatedMaxAckDelay) {
+    // If we are either in STARTUP or haven't sent enough packets, based on
+    // config.
+    bool shouldUseInitThreshold =
+        (ackFrequencyConfig->useSmallThresholdDuringStartup &&
+         state_ == BbrState::Startup) ||
+        (!ackFrequencyConfig->useSmallThresholdDuringStartup &&
+         (conn_.lossState.totalAckElicitingPacketsSent <=
+          conn_.transportSettings.rxPacketsBeforeAckInitThreshold));
+    // Default to 2 as the init threshold, which has been shown to be
+    // a good choice empirically.
+    uint32_t ackThreshold =
+        shouldUseInitThreshold ? 2 : ackFrequencyConfig->ackElicitingThreshold;
+    if ((!lastMaxAckDelay_ || lastMaxAckDelay_.value() != updatedMaxAckDelay) ||
+        (!lastAckThreshold_ || lastAckThreshold_.value() != ackThreshold)) {
       requestPeerAckFrequencyChange(
           conn_,
-          ackFrequencyConfig->ackElicitingThreshold,
+          ackThreshold,
           updatedMaxAckDelay,
           ackFrequencyConfig->reorderingThreshold);
       lastMaxAckDelay_ = updatedMaxAckDelay;
+      lastAckThreshold_ = ackThreshold;
     }
   }
   updateCwnd(ack.ackedBytes, excessiveBytes);

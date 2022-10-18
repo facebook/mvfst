@@ -311,6 +311,7 @@ class BbrCongestionController : public CongestionController {
   // The last max ACK delay requested, so we don't end up sending
   // them too frequently.
   folly::Optional<std::chrono::milliseconds> lastMaxAckDelay_;
+  folly::Optional<uint32_t> lastAckThreshold_;
 
   friend std::ostream& operator<<(
       std::ostream& os,
