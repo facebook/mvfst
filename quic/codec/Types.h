@@ -17,7 +17,7 @@
 #include <quic/codec/QuicInteger.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/IntervalSet.h>
-#include <quic/common/SmallVec.h>
+#include <quic/common/SmallCollections.h>
 #include <quic/common/Variant.h>
 
 /**

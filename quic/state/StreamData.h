@@ -10,7 +10,7 @@
 #include <folly/container/F14Map.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
-#include <quic/common/SmallVec.h>
+#include <quic/common/SmallCollections.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/state/QuicPriorityQueue.h>
 

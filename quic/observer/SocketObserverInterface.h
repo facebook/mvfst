@@ -8,7 +8,7 @@
 #pragma once
 
 #include <quic/QuicException.h>
-#include <quic/common/SmallVec.h>
+#include <quic/common/SmallCollections.h>
 #include <quic/d6d/Types.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
