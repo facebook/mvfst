@@ -34,7 +34,11 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
   if (!frame.len) { // may be FIN only
     return;
   }
-  auto [it, inserted] = try_emplace(frame.streamId);
+  auto [it, inserted] = emplace(
+      std::piecewise_construct,
+      std::make_tuple(frame.streamId),
+      std::make_tuple());
+
   auto& outstandingPacketStreamDetails = it->second;
   outstandingPacketStreamDetails.dupAckedStreamIntervals.insert(
       frame.offset, frame.offset + frame.len - 1);
@@ -43,7 +47,9 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
 void AckEvent::AckPacket::DetailsPerStream::recordDeliveryOffsetUpdate(
     StreamId streamId,
     uint64_t newOffset) {
-  auto [it, inserted] = try_emplace(streamId);
+  auto [it, inserted] = emplace(
+      std::piecewise_construct, std::make_tuple(streamId), std::make_tuple());
+
   auto& outstandingPacketStreamDetails = it->second;
   CHECK(
       !outstandingPacketStreamDetails.maybeNewDeliveryOffset.has_value() ||

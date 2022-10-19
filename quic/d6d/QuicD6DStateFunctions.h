@@ -6,6 +6,7 @@
  */
 
 #pragma once
+#include <quic/state/OutstandingPacket.h>
 #include <quic/state/StateData.h>
 
 namespace quic {

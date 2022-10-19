@@ -8,8 +8,8 @@
 #pragma once
 
 #include <folly/Optional.h>
-#include <folly/container/F14Map.h>
 #include <quic/codec/Types.h>
+#include <quic/common/SmallCollections.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/state/OutstandingPacket.h>
 
@@ -195,8 +195,8 @@ struct AckEvent {
     };
 
     // Structure with information about each stream with frames in ACKed packet
-    class DetailsPerStream
-        : private folly::F14FastMap<StreamId, StreamDetails> {
+    using MapType = InlineMap<StreamId, StreamDetails, 5>;
+    class DetailsPerStream : private MapType {
      public:
       /**
        * Record that a frame contained in ACKed packet was marked as delivered.
@@ -256,7 +256,7 @@ struct AckEvent {
       void recordDeliveryOffsetUpdate(StreamId streamId, uint64_t newOffset);
 
       [[nodiscard]] auto at(StreamId id) const {
-        return folly::F14FastMap<StreamId, StreamDetails>::at(id);
+        return MapType::at(id);
       }
 
       [[nodiscard]] auto begin() const {
@@ -267,14 +267,14 @@ struct AckEvent {
         return cend();
       }
 
-      using folly::F14FastMap<StreamId, StreamDetails>::cbegin;
-      using folly::F14FastMap<StreamId, StreamDetails>::cend;
-      using folly::F14FastMap<StreamId, StreamDetails>::const_iterator;
-      using folly::F14FastMap<StreamId, StreamDetails>::empty;
-      using folly::F14FastMap<StreamId, StreamDetails>::find;
-      using folly::F14FastMap<StreamId, StreamDetails>::mapped_type;
-      using folly::F14FastMap<StreamId, StreamDetails>::size;
-      using folly::F14FastMap<StreamId, StreamDetails>::value_type;
+      using MapType::cbegin;
+      using MapType::cend;
+      using MapType::const_iterator;
+      using MapType::empty;
+      using MapType::find;
+      using MapType::mapped_type;
+      using MapType::size;
+      using MapType::value_type;
     };
 
     // Details for each active stream that was impacted by an ACKed frame

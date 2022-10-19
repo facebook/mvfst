@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/container/F14Map.h>
 #include <quic/codec/Types.h>
 #include <quic/state/LossState.h>
 #include <quic/state/PacketEvent.h>
@@ -56,7 +55,8 @@ struct OutstandingPacketMetadata {
     folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
   };
 
-  class DetailsPerStream : private folly::F14ValueMap<StreamId, StreamDetails> {
+  using MapType = InlineMap<StreamId, StreamDetails, 5>;
+  class DetailsPerStream : private MapType {
    public:
     void addFrame(const WriteStreamFrame& frame, const bool newData) {
       auto ret = emplace(
@@ -86,25 +86,19 @@ struct OutstandingPacketMetadata {
     }
 
     [[nodiscard]] auto at(StreamId id) const {
-      return folly::F14ValueMap<StreamId, StreamDetails>::at(id);
+      return MapType::at(id);
     }
 
-    [[nodiscard]] auto begin() const {
-      return cbegin();
-    }
-
-    [[nodiscard]] auto end() const {
-      return cend();
-    }
-
-    using folly::F14ValueMap<StreamId, StreamDetails>::cbegin;
-    using folly::F14ValueMap<StreamId, StreamDetails>::cend;
-    using folly::F14ValueMap<StreamId, StreamDetails>::const_iterator;
-    using folly::F14ValueMap<StreamId, StreamDetails>::empty;
-    using folly::F14ValueMap<StreamId, StreamDetails>::find;
-    using folly::F14ValueMap<StreamId, StreamDetails>::mapped_type;
-    using folly::F14ValueMap<StreamId, StreamDetails>::size;
-    using folly::F14ValueMap<StreamId, StreamDetails>::value_type;
+    using MapType::begin;
+    using MapType::cbegin;
+    using MapType::cend;
+    using MapType::const_iterator;
+    using MapType::empty;
+    using MapType::end;
+    using MapType::find;
+    using MapType::mapped_type;
+    using MapType::size;
+    using MapType::value_type;
   };
 
   // Details about each stream with frames in this packet
