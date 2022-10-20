@@ -271,10 +271,11 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   if (distIfMoveBack <= distIfMoveFront) {
     auto prev =
         CircularDequeIterator<T>(this, end_ == 0 ? lastGoodIndex : end_ - 1);
-    allocateWithValueFrom(prev, end());
-    reverseMoveOrCopy(pos, end() - 1, end());
+    auto wrappedEnd = end_ == capacity_ ? end() + 1 : end();
+    allocateWithValueFrom(prev, wrappedEnd);
+    reverseMoveOrCopy(pos, wrappedEnd - 1, wrappedEnd);
     storage_[index] = T(std::forward<Args>(args)...);
-    end_ = (end() + 1).index_;
+    end_ = (wrappedEnd + 1).index_;
   } else {
     auto destIndex = begin_ == 0 ? lastGoodIndex : begin_ - 1;
     auto destIter = CircularDequeIterator<T>(this, destIndex);
@@ -355,7 +356,6 @@ template <typename T>
 typename CircularDeque<T>::iterator CircularDeque<T>::erase(
     typename CircularDeque<T>::const_iterator first,
     typename CircularDeque<T>::const_iterator last) {
-  DCHECK_NE(first.index_, capacity_);
   if (first == last) {
     return CircularDequeIterator<T>(this, last.index_);
   }

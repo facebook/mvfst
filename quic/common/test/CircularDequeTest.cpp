@@ -188,6 +188,31 @@ TEST(CircularDequeTest, PushBackPopFrontCycle) {
   }
 }
 
+TEST(CircularDequeTest, PushBackEraseFrontCycle) {
+  CircularDeque<int> cd;
+  cd.push_back(1);
+  ASSERT_EQ(cd.max_size(), kInitCapacity);
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), 2);
+    cd.erase(cd.begin(), cd.begin() + 1);
+    ASSERT_EQ(cd.size(), 1);
+  }
+}
+
+TEST(CircularDequeTest, PushBackEraseMiddleCycle) {
+  CircularDeque<int> cd;
+  cd.push_back(1);
+  cd.push_back(1);
+  ASSERT_EQ(cd.max_size(), kInitCapacity);
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), 3);
+    cd.erase(cd.begin() + 1, cd.begin() + 2);
+    ASSERT_EQ(cd.size(), 2);
+  }
+}
+
 TEST(CircularDequeTest, PushFrontPopBackCycle) {
   CircularDeque<int> cd;
   for (size_t i = 0; i < kInitCapacity * 2; i++) {
@@ -196,6 +221,18 @@ TEST(CircularDequeTest, PushFrontPopBackCycle) {
     cd.pop_back();
     ASSERT_EQ(cd.size(), 0);
     ASSERT_TRUE(cd.empty());
+  }
+}
+
+TEST(CircularDequeTest, PushFrontEraseBackCycle) {
+  CircularDeque<int> cd;
+  cd.push_back(1);
+  ASSERT_EQ(cd.max_size(), kInitCapacity);
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), 2);
+    cd.erase(cd.end() - 1, cd.end());
+    ASSERT_EQ(cd.size(), 1);
   }
 }
 
@@ -218,6 +255,61 @@ TEST(CircularDequeTest, PushFrontPopFrontCycle) {
     cd.pop_back();
     ASSERT_EQ(cd.size(), 0);
     ASSERT_TRUE(cd.empty());
+  }
+}
+
+TEST(CircularDequeTest, EmplaceWrapEnd) {
+  CircularDeque<int> cd;
+  // {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+  // begin_ 0
+  // end_ 10
+  for (size_t i = 0; i < kInitCapacity; i++) {
+    cd.push_back(i);
+  }
+  cd.pop_front();
+  // {1, 2, 3, 4, 5, 6, 7, 8, 9}
+  // begin_ 1
+  // end_ 10
+  cd.push_back(kInitCapacity);
+  // {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+  // begin_ 1
+  // end_ 11
+  cd.pop_front();
+  // {2, 3, 4, 5, 6, 7, 8, 9, 10}
+  // begin_ 2
+  // end_ 11
+  cd.insert(cd.end() - 1, -1);
+  EXPECT_EQ(cd.size(), kInitCapacity);
+  EXPECT_EQ(*(cd.end() - 2), -1);
+  EXPECT_EQ(*(cd.end() - 1), kInitCapacity);
+  EXPECT_EQ(*cd.begin(), 2);
+}
+
+TEST(CircularDequeTest, MaxCapacityCycleRight) {
+  CircularDeque<int> cd;
+  for (size_t i = 0; i < kInitCapacity - 1; i++) {
+    cd.push_back(i);
+  }
+  ASSERT_EQ(cd.max_size(), kInitCapacity);
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), kInitCapacity);
+    cd.pop_front();
+    ASSERT_EQ(cd.size(), kInitCapacity - 1);
+  }
+}
+
+TEST(CircularDequeTest, MaxCapacityCycleLeft) {
+  CircularDeque<int> cd;
+  for (size_t i = 0; i < kInitCapacity - 1; i++) {
+    cd.push_front(i);
+  }
+  ASSERT_EQ(cd.max_size(), kInitCapacity);
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_front(1);
+    ASSERT_EQ(cd.size(), kInitCapacity);
+    cd.pop_back();
+    ASSERT_EQ(cd.size(), kInitCapacity - 1);
   }
 }
 
