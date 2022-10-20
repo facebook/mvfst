@@ -330,6 +330,9 @@ void CircularDeque<T>::pop_front() {
   // This if branch is actually faster than operator% on the machine I tested.
   if (++begin_ == capacity_) {
     begin_ = 0;
+    if (end_ == capacity_) {
+      end_ = begin_;
+    }
   }
 }
 

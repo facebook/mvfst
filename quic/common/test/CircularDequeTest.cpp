@@ -177,6 +177,50 @@ TEST(CircularDequeTest, PushPopEmplaceAccessErase) {
   EXPECT_NE(0, cd.max_size());
 }
 
+TEST(CircularDequeTest, PushBackPopFrontCycle) {
+  CircularDeque<int> cd;
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), 1);
+    cd.pop_front();
+    ASSERT_EQ(cd.size(), 0);
+    ASSERT_TRUE(cd.empty());
+  }
+}
+
+TEST(CircularDequeTest, PushFrontPopBackCycle) {
+  CircularDeque<int> cd;
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_front(1);
+    ASSERT_EQ(cd.size(), 1);
+    cd.pop_back();
+    ASSERT_EQ(cd.size(), 0);
+    ASSERT_TRUE(cd.empty());
+  }
+}
+
+TEST(CircularDequeTest, PushBackPopBackCycle) {
+  CircularDeque<int> cd;
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), 1);
+    cd.pop_back();
+    ASSERT_EQ(cd.size(), 0);
+    ASSERT_TRUE(cd.empty());
+  }
+}
+
+TEST(CircularDequeTest, PushFrontPopFrontCycle) {
+  CircularDeque<int> cd;
+  for (size_t i = 0; i < kInitCapacity * 2; i++) {
+    cd.push_back(1);
+    ASSERT_EQ(cd.size(), 1);
+    cd.pop_back();
+    ASSERT_EQ(cd.size(), 0);
+    ASSERT_TRUE(cd.empty());
+  }
+}
+
 TEST(CircularDequeTest, WrappedDequeAccess) {
   CircularDeque<int> cd = {1, 2, 3, 4, 5, 6, 7};
   cd.push_front(0);
