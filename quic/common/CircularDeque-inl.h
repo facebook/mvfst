@@ -13,8 +13,13 @@
 
 namespace quic {
 
-constexpr size_t kInitCapacity = 500;
-constexpr size_t kResizeFactor = 2;
+constexpr size_t kInitCapacity = 10;
+constexpr size_t kGrowthNumerator = 3;
+constexpr size_t kGrowthDenominator = 2;
+
+inline size_t growCapacity(size_t currentCapacity) {
+  return (currentCapacity * kGrowthNumerator) / kGrowthDenominator;
+}
 
 template <typename T>
 CircularDeque<T>::CircularDeque(std::initializer_list<T> init) {
@@ -207,7 +212,7 @@ template <class... Args>
 typename CircularDeque<T>::reference CircularDeque<T>::emplace_front(
     Args&&... args) {
   if (needSpace()) {
-    resize(capacity_ == 0 ? kInitCapacity : capacity_ * kResizeFactor);
+    resize(capacity_ == 0 ? kInitCapacity : growCapacity(capacity_));
   }
   if (begin_ == 0) {
     DCHECK_NE(end_, capacity_ - 1);
@@ -226,7 +231,7 @@ template <class... Args>
 typename CircularDeque<T>::reference CircularDeque<T>::emplace_back(
     Args&&... args) {
   if (needSpace()) {
-    resize(capacity_ == 0 ? kInitCapacity : capacity_ * kResizeFactor);
+    resize(capacity_ == 0 ? kInitCapacity : growCapacity(capacity_));
   }
   DCHECK_GT(capacity_, 0);
   if (end_ == capacity_) {
@@ -260,7 +265,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   // Similar to erase(), emplace() in the middle is expensive
   auto dist = std::distance(begin(), pos);
   if (needSpace()) {
-    resize(capacity_ * kResizeFactor);
+    resize(growCapacity(capacity_));
     // After resize, pos is invalid. We need to find the new pos.
     pos = begin() + dist;
     index = pos.index_;
