@@ -229,7 +229,7 @@ class QuicSocket {
     uint32_t totalPTOCount{0};
     folly::Optional<PacketNum> largestPacketAckedByPeer;
     folly::Optional<PacketNum> largestPacketSent;
-    bool usedZeroRtt;
+    bool usedZeroRtt{false};
     // State from congestion control module, if one is installed.
     folly::Optional<CongestionController::State> maybeCCState;
   };
