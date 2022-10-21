@@ -110,6 +110,10 @@ class Cubic : public CongestionController {
 
   CongestionControlType type() const noexcept override;
 
+  void setExperimental(bool experimental) override {
+    experimental_ = experimental;
+  }
+
  protected:
   CubicStates state_{CubicStates::Hystart};
 
@@ -196,6 +200,7 @@ class Cubic : public CongestionController {
   HystartState hystartState_;
   SteadyState steadyState_;
   RecoveryState recoveryState_;
+  bool experimental_{false};
 };
 
 folly::StringPiece cubicStateToString(CubicStates state);

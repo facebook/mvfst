@@ -449,7 +449,9 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
                        ? "cwnd > ssthresh"
                        : "found exit point");
       hystartState_.inRttRound = false;
-      ssthresh_ = cwndBytes_;
+      if (!experimental_) {
+        ssthresh_ = cwndBytes_;
+      }
       /* Now we exit slow start, reset currSampledRtt to be maximal value so
        * that next time we go back to slow start, we won't be using a very old
        * sampled RTT as the lastSampledRtt:
@@ -607,7 +609,16 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     }
   }
   uint64_t newCwnd = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
-
+  if (experimental_ && newCwnd < ssthresh_) {
+    auto delta = ack.ackedBytes / 10;
+    if (newCwnd < cwndBytes_ + delta) {
+      newCwnd = boundedCwnd(
+          cwndBytes_ + delta,
+          conn_.udpSendPacketLen,
+          conn_.transportSettings.maxCwndInMss,
+          conn_.transportSettings.minCwndInMss);
+    }
+  }
   if (newCwnd < cwndBytes_) {
     VLOG(10) << "Cubic steady state calculates a smaller cwnd than last round"
              << ", new cnwd = " << newCwnd << ", current cwnd = " << cwndBytes_;
@@ -645,8 +656,8 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
 
     // We do a Cubic cwnd pre-calculation here so that all Ack events from
     // this point on in the Steady state will only increase cwnd. We can check
-    // this invariant in the Steady handler easily with this extra calculation.
-    // Note that we don't to the tcpFriendly calculation here.
+    // this invariant in the Steady handler easily with this extra
+    // calculation. Note that we don't to the tcpFriendly calculation here.
     // lastMaxCwndBytes and lastReductionTime are only cleared when Hystart
     // transits to Steady. For state machine to be in FastRecovery, a Loss
     // should have happened, and set values to them.
