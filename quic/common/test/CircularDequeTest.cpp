@@ -5,9 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/Random.h>
 #include <gtest/gtest.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/test/TestUtils.h>
+#include <memory>
 #include <numeric>
 #include <utility>
 
@@ -260,6 +262,9 @@ TEST(CircularDequeTest, PushFrontPopFrontCycle) {
 
 TEST(CircularDequeTest, EmplaceWrapEnd) {
   CircularDeque<int> cd;
+  cd.resize(1);
+  cd.clear();
+  LOG(ERROR) << "max: " << cd.max_size();
   // {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
   // begin_ 0
   // end_ 10
@@ -283,6 +288,147 @@ TEST(CircularDequeTest, EmplaceWrapEnd) {
   EXPECT_EQ(*(cd.end() - 2), -1);
   EXPECT_EQ(*(cd.end() - 1), kInitCapacity);
   EXPECT_EQ(*cd.begin(), 2);
+}
+
+TEST(CircularDequeTest, EmplaceLots) {
+  CircularDeque<int*> cd;
+  cd.resize(1);
+  cd.clear();
+  cd.emplace_back(new int(1));
+
+  cd.emplace(cd.begin() + 1, new int(2));
+  cd.emplace(cd.begin() + 2, new int(3));
+  cd.emplace(cd.begin() + 3, new int(4));
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  cd.emplace(cd.begin() + 2, new int(5));
+  cd.emplace(cd.begin() + 3, new int(6));
+  cd.emplace(cd.begin() + 2, new int(7));
+  cd.emplace(cd.begin() + 3, new int(8));
+  delete cd.front();
+  cd.pop_front();
+  cd.emplace(cd.begin() + 3, new int(9));
+  cd.emplace(cd.end() - 2, new int(10));
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  delete cd.front();
+  cd.pop_front();
+  EXPECT_TRUE(cd.empty());
+}
+
+template <class ContainerOfPtr, typename T>
+static void insertSorted(ContainerOfPtr& cont, T* val) {
+  auto insertionItr = std::lower_bound(
+      cont.begin(), cont.end(), val, [](const T* a, const T* b) {
+        return *a < *b;
+      });
+  cont.insert(insertionItr, val);
+}
+
+static void
+insertBoth(CircularDeque<int64_t*>& cd, std::deque<int64_t*>& d, int64_t val) {
+  insertSorted<decltype(cd), decltype(val)>(cd, new int64_t(val));
+  insertSorted<decltype(d), decltype(val)>(d, new int64_t(val));
+}
+
+TEST(CircularDequeTest, RandSortedEmplacesStress) {
+  std::deque<int64_t*> d;
+  CircularDeque<int64_t*> cd;
+  cd.resize(1);
+  cd.clear();
+  int numOps = 200000;
+
+  ASSERT_TRUE(cd.empty());
+  ASSERT_TRUE(d.empty());
+  while (numOps-- > 0) {
+    ASSERT_EQ(cd.size(), d.size());
+    // 1/3 of the time, do a removal.
+    if (folly::Random::oneIn(3) && !cd.empty()) {
+      int64_t* v1{};
+      int64_t* v2{};
+      SCOPE_EXIT {
+        delete v1;
+        delete v2;
+      };
+      int64_t dice = folly::Random::rand64(0, 3);
+      if (dice == 0) {
+        v1 = cd.front();
+        v2 = d.front();
+        ASSERT_NE(v1, nullptr);
+        ASSERT_NE(v2, nullptr);
+        ASSERT_EQ(*v1, *v2);
+        cd.pop_front();
+        d.pop_front();
+      } else if (dice == 1) {
+        v1 = cd.back();
+        v2 = d.back();
+        ASSERT_NE(v1, nullptr);
+        ASSERT_NE(v2, nullptr);
+        ASSERT_EQ(*v1, *v2);
+        cd.pop_back();
+        d.pop_back();
+      } else {
+        size_t randIdx = folly::Random::rand64(0, cd.size());
+        auto itr1 = cd.begin() + randIdx;
+        auto itr2 = d.begin() + randIdx;
+        v1 = *itr1;
+        v2 = *itr2;
+        ASSERT_NE(v1, nullptr);
+        ASSERT_NE(v2, nullptr);
+        ASSERT_EQ(*v1, *v2);
+        cd.erase(itr1);
+        d.erase(itr2);
+      }
+    } else {
+      insertBoth(cd, d, folly::Random::rand64());
+    }
+    // Every one in a while clear out the whole thing.
+    if (folly::Random::oneIn(1000)) {
+      ASSERT_EQ(cd.size(), d.size());
+      auto itr1 = cd.begin();
+      auto itr2 = d.begin();
+      while (itr1 != cd.end()) {
+        auto v1 = *itr1;
+        auto v2 = *itr2;
+        ASSERT_NE(v1, nullptr);
+        ASSERT_NE(v2, nullptr);
+        ASSERT_EQ(*v1, *v2);
+        itr1 = cd.erase(itr1);
+        itr2 = d.erase(itr2);
+        delete v1;
+        delete v2;
+      }
+    }
+  }
+  // Clean up and verify the remainder.
+  ASSERT_EQ(cd.size(), d.size());
+  auto itr1 = cd.begin();
+  auto itr2 = d.begin();
+  while (itr1 != cd.end()) {
+    auto v1 = *itr1;
+    auto v2 = *itr2;
+    ASSERT_NE(v1, nullptr);
+    ASSERT_NE(v2, nullptr);
+    ASSERT_EQ(*v1, *v2);
+    itr1 = cd.erase(itr1);
+    itr2 = d.erase(itr2);
+    delete v1;
+    delete v2;
+  }
+  ASSERT_TRUE(cd.empty());
+  ASSERT_TRUE(d.empty());
 }
 
 TEST(CircularDequeTest, MaxCapacityCycleRight) {

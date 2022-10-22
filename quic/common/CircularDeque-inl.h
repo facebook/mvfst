@@ -278,7 +278,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
         CircularDequeIterator<T>(this, end_ == 0 ? lastGoodIndex : end_ - 1);
     auto wrappedEnd = end_ == capacity_ ? end() + 1 : end();
     allocateWithValueFrom(prev, wrappedEnd);
-    reverseMoveOrCopy(pos, wrappedEnd - 1, wrappedEnd);
+    reverseMoveOrCopy(pos, end() - 1, end());
     storage_[index] = T(std::forward<Args>(args)...);
     end_ = (wrappedEnd + 1).index_;
   } else {
