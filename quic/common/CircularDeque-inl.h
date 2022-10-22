@@ -30,7 +30,7 @@ template <typename T>
 CircularDeque<T>& CircularDeque<T>::operator=(std::initializer_list<T> ilist) {
   clear();
   if (ilist.size() > max_size()) {
-    resize(ilist.size());
+    resize(std::max(ilist.size(), kInitCapacity));
   }
   std::uninitialized_copy(ilist.begin(), ilist.end(), storage_);
   end_ = ilist.size();
