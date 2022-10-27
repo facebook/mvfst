@@ -321,6 +321,7 @@ struct TransportSettings {
   // Both peers must support stream groups; negotiated during handshake.
   // 0 means stream groups are disabled.
   uint64_t maxStreamGroupsAdvertized{0};
+  bool experimentalPacer{false};
 };
 
 } // namespace quic
