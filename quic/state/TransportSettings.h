@@ -300,7 +300,6 @@ struct TransportSettings {
   // Whether to use adaptive loss thresholds for reodering and timeout
   bool useAdaptiveLossReorderingThresholds{false};
   bool useAdaptiveLossTimeThresholds{false};
-  bool autoAdaptiveForDsr{true};
   // Whether to automatically increase receive conn flow control. The
   // determination is based on the frequency we are sending flow control
   // updates. If there has been less than 2SRTTs between flow control updates

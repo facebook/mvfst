@@ -1071,7 +1071,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               ackFrequencyConfig.useSmallThresholdDuringStartup);
           serverTransport->conn_->transportSettings.bbrConfig
               .ackFrequencyConfig = ackFrequencyConfig;
-          serverTransport->conn_->transportSettings.autoAdaptiveForDsr = false;
         } else {
           LOG_EVERY_N(ERROR, 1000)
               << "Received invalid KnobParam for ACK_FREQUENCY_POLICY: " << val;

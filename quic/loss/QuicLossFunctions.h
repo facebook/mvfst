@@ -195,10 +195,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
 template <class LossVisitor>
 folly::Optional<CongestionController::LossEvent> detectLossPackets(
     QuicConnectionStateBase& conn,
-    folly::Optional<PacketNum> largestAcked,
+    const folly::Optional<PacketNum> largestAcked,
     const LossVisitor& lossVisitor,
-    TimePoint lossTime,
-    PacketNumberSpace pnSpace) {
+    const TimePoint lossTime,
+    const PacketNumberSpace pnSpace,
+    const CongestionController::AckEvent* ackEvent = nullptr) {
   getLossTime(conn, pnSpace).reset();
   std::chrono::microseconds rttSample =
       std::max(conn.lossState.srtt, conn.lossState.lrtt);
@@ -219,6 +220,23 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   bool shouldSetTimer = false;
+
+  // Loop over all ACKed packets and collect the largest ACKed packet per DSR
+  // stream. This facilitates only considering the reordering threshold per DSR
+  // sender, which avoids the problem of "natural" reordering caused by
+  // multiple DSR senders.
+  InlineMap<StreamId, PacketNum, 20> largestDsrAcked;
+  if (ackEvent) {
+    for (const auto& ackPacket : ackEvent->ackedPackets) {
+      for (auto& [stream, details] : ackPacket.detailsPerStream) {
+        if (details.dsrStream) {
+          largestDsrAcked[stream] = std::max(
+              folly::get_default(largestDsrAcked, stream, ackPacket.packetNum),
+              ackPacket.packetNum);
+        }
+      }
+    }
+  }
   while (iter != conn.outstandings.packets.end()) {
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
@@ -230,9 +248,28 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       iter++;
       continue;
     }
+    auto largestAckedForComparison = largestAcked.value();
+
+    // Check if this packet is a DSR packet, which can be identified by having
+    // a single WriteStreamFrame with fromBufMeta == true. If it is a DSR
+    // packet, we only want to consider the largest ACKed for that DSR stream
+    // when checking against the reordering thershold.
+    auto maybeStreamFrame = pkt.packet.frames.empty()
+        ? nullptr
+        : pkt.packet.frames.front().asWriteStreamFrame();
+    if (maybeStreamFrame && maybeStreamFrame->fromBufMeta) {
+      CHECK(pkt.isDSRPacket);
+      // The max here is to ensure that we don't use a largest ACKed that is
+      // smaller than an outstanding packet number.
+      largestAckedForComparison = std::max(
+          folly::get_default(
+              largestDsrAcked, maybeStreamFrame->streamId, currentPacketNum),
+          currentPacketNum);
+    }
+
     bool lostByTimeout = (lossTime - pkt.metadata.time) > delayUntilLost;
-    bool lostByReorder =
-        (*largestAcked - currentPacketNum) > conn.lossState.reorderingThreshold;
+    const auto reorderDistance = largestAckedForComparison - currentPacketNum;
+    bool lostByReorder = reorderDistance > conn.lossState.reorderingThreshold;
 
     if (!(lostByTimeout || lostByReorder)) {
       // We can exit early here because if packet N doesn't meet the
@@ -256,7 +293,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
               conn.transportSettings.timeReorderingThreshDivisor / rttSample;
         }
         if (lostByReorder) {
-          pkt.lossReorderDistance = *largestAcked - currentPacketNum;
+          pkt.lossReorderDistance = reorderDistance;
         }
         ++conn.d6d.meta.totalLostProbes;
         if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
@@ -305,7 +342,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     if (lostByReorder) {
       conn.lossState.totalPacketsMarkedLostByReorderingThreshold++;
-      iter->lossReorderDistance = *largestAcked - currentPacketNum;
+      iter->lossReorderDistance = reorderDistance;
     }
     conn.outstandings.declaredLostCount++;
     iter->declaredLost = true;
@@ -430,7 +467,8 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       getAckState(conn, pnSpace).largestAckedByPeer,
       lossVisitor,
       ack.ackTime,
-      pnSpace);
+      pnSpace,
+      &ack);
   conn.pendingEvents.setLossDetectionAlarm =
       conn.outstandings.numOutstanding() > 0;
   VLOG(10) << __func__ << " largestAckedInPacket="

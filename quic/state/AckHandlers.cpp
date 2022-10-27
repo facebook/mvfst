@@ -351,8 +351,9 @@ AckEvent processAckFrame(
         const uint64_t ackIntervalSetVersion;
         const folly::Optional<uint64_t> maybeLargestDeliverableOffset;
       };
+      QuicStreamState* maybeAckedStreamState = nullptr;
       const auto maybePreAckVisitorState =
-          [&conn](
+          [&conn, &maybeAckedStreamState](
               const auto& packetFrame) -> folly::Optional<PreAckVisitorState> {
         // check if it's a WriteStreamFrame being ACKed
         if (packetFrame.type() != QuicWriteFrame::Type::WriteStreamFrame) {
@@ -361,16 +362,16 @@ AckEvent processAckFrame(
 
         // check if the stream is alive (could be ACK for dead stream)
         const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
-        if (!conn.streamManager->streamExists(ackedFrame.streamId)) {
+        maybeAckedStreamState =
+            conn.streamManager->findStream(ackedFrame.streamId);
+        if (!maybeAckedStreamState) {
           return folly::none;
         }
-        auto ackedStream =
-            CHECK_NOTNULL(conn.streamManager->getStream(ackedFrame.streamId));
 
         // stream is alive and frame is WriteStreamFrame
         return PreAckVisitorState{
-            getAckIntervalSetVersion(*ackedStream),
-            getLargestDeliverableOffset(*ackedStream)};
+            getAckIntervalSetVersion(*maybeAckedStreamState),
+            getLargestDeliverableOffset(*maybeAckedStreamState)};
       }(packetFrame);
 
       // run the ACK visitor
@@ -380,8 +381,6 @@ AckEvent processAckFrame(
       if (maybePreAckVisitorState.has_value()) {
         const auto& preAckVisitorState = maybePreAckVisitorState.value();
         const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
-        auto ackedStream =
-            CHECK_NOTNULL(conn.streamManager->getStream(ackedFrame.streamId));
 
         // determine if this frame was a retransmission
         const bool retransmission = ([&outstandingPacket, &ackedFrame]() {
@@ -400,14 +399,15 @@ AckEvent processAckFrame(
         })();
 
         // check for change in ACK IntervalSet version
+        CHECK(maybeAckedStreamState);
         if (preAckVisitorState.ackIntervalSetVersion !=
-            getAckIntervalSetVersion(*ackedStream)) {
+            getAckIntervalSetVersion(*maybeAckedStreamState)) {
           // we were able to fill in a hole in the ACK interval
           detailsPerStream.recordFrameDelivered(ackedFrame, retransmission);
 
           // check for change in delivery offset
           const auto maybeLargestDeliverableOffset =
-              getLargestDeliverableOffset(*ackedStream);
+              getLargestDeliverableOffset(*maybeAckedStreamState);
           if (preAckVisitorState.maybeLargestDeliverableOffset !=
               maybeLargestDeliverableOffset) {
             CHECK(maybeLargestDeliverableOffset.has_value());
@@ -423,7 +423,7 @@ AckEvent processAckFrame(
           // should be no change in delivery offset
           DCHECK(
               preAckVisitorState.maybeLargestDeliverableOffset ==
-              getLargestDeliverableOffset(*CHECK_NOTNULL(ackedStream)));
+              getLargestDeliverableOffset(*maybeAckedStreamState));
         }
       }
     }

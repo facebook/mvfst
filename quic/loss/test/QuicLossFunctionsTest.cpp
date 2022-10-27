@@ -2711,6 +2711,237 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 }
 
+TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
+  std::vector<PacketNum> lostPacket;
+  auto conn = createConn();
+
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
+      .WillRepeatedly(Return());
+
+  auto testingLossMarkFunc = [&lostPacket](auto& /*conn*/, auto& packet, bool) {
+    auto packetNum = packet.header.getPacketSequenceNum();
+    lostPacket.push_back(packetNum);
+  };
+  for (int i = 0; i < 6; ++i) {
+    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  }
+  // Add some DSR frames
+  for (auto& op : conn->outstandings.packets) {
+    op.packet.frames.emplace_back(WriteStreamFrame{0, 10, 100, false, true});
+    op.isDSRPacket = true;
+    conn->outstandings.dsrCount++;
+  }
+  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  // Assume some packets are already acked
+  for (auto iter =
+           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
+       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
+       iter++) {
+    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
+  }
+  auto firstAppDataOpIter =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  conn->outstandings.packets.erase(
+      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
+  // Ack for packet 9 arrives
+  auto ack = AckEvent::Builder()
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(9)
+                 .setIsImplicitAck(false)
+                 .setAckTime(Clock::now())
+                 .setAdjustedAckTime(Clock::now())
+                 .setAckDelay(0us)
+                 .build();
+  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+  detailsPerStream.recordFrameDelivered(
+      WriteStreamFrame{0, 10, 100, false, true}, false);
+  ack.ackedPackets.emplace_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(9)
+          .setDetailsPerStream(std::move(detailsPerStream))
+          .setOutstandingPacketMetadata(std::move(
+              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                  ->metadata))
+          .build());
+
+  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+      *conn,
+      9,
+      testingLossMarkFunc,
+      TimePoint(90ms),
+      PacketNumberSpace::AppData,
+      &ack);
+  EXPECT_EQ(2, lossEvent->largestLostPacketNum.value());
+  EXPECT_EQ(TimePoint(90ms), lossEvent->lossTime);
+  // Packet 1,2 should be marked as loss
+  EXPECT_EQ(lostPacket.size(), 2);
+  EXPECT_EQ(lostPacket.front(), 1);
+  EXPECT_EQ(lostPacket.back(), 2);
+
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+
+  // Packet 6 should remain in packet as the delta is less than threshold
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(conn->outstandings.packets.size(), 1 + numDeclaredLost);
+  auto first = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  auto packetNum = first->packet.header.getPacketSequenceNum();
+  EXPECT_EQ(packetNum, 6);
+}
+
+TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
+  std::vector<PacketNum> lostPacket;
+  auto conn = createConn();
+
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
+      .WillRepeatedly(Return());
+
+  auto testingLossMarkFunc = [&lostPacket](auto& /*conn*/, auto& packet, bool) {
+    auto packetNum = packet.header.getPacketSequenceNum();
+    lostPacket.push_back(packetNum);
+  };
+  for (int i = 0; i < 6; ++i) {
+    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  }
+  // Add some DSR frames
+  for (auto& op : conn->outstandings.packets) {
+    op.packet.frames.emplace_back(WriteStreamFrame{0, 10, 100, false, true});
+    op.isDSRPacket = true;
+    conn->outstandings.dsrCount++;
+  }
+  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  // Assume some packets are already acked
+  for (auto iter =
+           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
+       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
+       iter++) {
+    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
+  }
+  auto firstAppDataOpIter =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  conn->outstandings.packets.erase(
+      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
+  // Ack for packet 9 arrives
+  auto ack = AckEvent::Builder()
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(9)
+                 .setIsImplicitAck(false)
+                 .setAckTime(Clock::now())
+                 .setAdjustedAckTime(Clock::now())
+                 .setAckDelay(0us)
+                 .build();
+  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+  detailsPerStream.recordFrameDelivered(
+      WriteStreamFrame{0, 10, 100, false, true}, false);
+  ack.ackedPackets.emplace_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(0)
+          .setDetailsPerStream(std::move(detailsPerStream))
+          .setOutstandingPacketMetadata(std::move(
+              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                  ->metadata))
+          .build());
+
+  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+      *conn,
+      9,
+      testingLossMarkFunc,
+      TimePoint(90ms),
+      PacketNumberSpace::AppData,
+      &ack);
+  EXPECT_FALSE(lossEvent.has_value());
+
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(numDeclaredLost, 0);
+}
+
+TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
+  std::vector<PacketNum> lostPacket;
+  auto conn = createConn();
+
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
+      .WillRepeatedly(Return());
+
+  auto testingLossMarkFunc = [&lostPacket](auto& /*conn*/, auto& packet, bool) {
+    auto packetNum = packet.header.getPacketSequenceNum();
+    lostPacket.push_back(packetNum);
+  };
+  for (int i = 0; i < 6; ++i) {
+    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  }
+  // Add some DSR frames
+  for (auto& op : conn->outstandings.packets) {
+    op.packet.frames.emplace_back(WriteStreamFrame{0, 10, 100, false, true});
+    op.isDSRPacket = true;
+    conn->outstandings.dsrCount++;
+  }
+  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  // Assume some packets are already acked
+  for (auto iter =
+           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
+       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
+       iter++) {
+    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
+  }
+  auto firstAppDataOpIter =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  conn->outstandings.packets.erase(
+      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
+  // Ack for packet 9 arrives
+  auto ack = AckEvent::Builder()
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(9)
+                 .setIsImplicitAck(false)
+                 .setAckTime(Clock::now())
+                 .setAdjustedAckTime(Clock::now())
+                 .setAckDelay(0us)
+                 .build();
+  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+  // Ack a different stream.
+  detailsPerStream.recordFrameDelivered(
+      WriteStreamFrame{4, 10, 100, false, true}, false);
+  ack.ackedPackets.emplace_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(9)
+          .setDetailsPerStream(std::move(detailsPerStream))
+          .setOutstandingPacketMetadata(std::move(
+              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                  ->metadata))
+          .build());
+
+  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+      *conn,
+      9,
+      testingLossMarkFunc,
+      TimePoint(90ms),
+      PacketNumberSpace::AppData,
+      &ack);
+  EXPECT_FALSE(lossEvent.has_value());
+
+  EXPECT_EQ(3, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(0, numDeclaredLost);
+  EXPECT_EQ(conn->outstandings.packets.size(), 3);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicLossFunctionsTests,
     QuicLossFunctionsTest,
