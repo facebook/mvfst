@@ -36,17 +36,17 @@ DEFINE_uint64(
     block_size,
     4096,
     "Amount of data written to stream each iteration");
-DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
+DEFINE_uint64(writes_per_loop, 40, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 1024 * 1024, "Flow control window size");
 DEFINE_bool(autotune_window, true, "Automatically increase the receive window");
-DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/ccp/none");
+DEFINE_string(congestion, "cubic", "newreno/cubic/bbr/ccp/none");
 DEFINE_string(ccp_config, "", "Additional args to pass to ccp");
 DEFINE_bool(pacing, false, "Enable pacing");
 DEFINE_uint64(
     max_pacing_rate,
     std::numeric_limits<uint64_t>::max(),
     "Max pacing rate to use in bytes per second");
-DEFINE_bool(gso, false, "Enable GSO writes to the socket");
+DEFINE_bool(gso, true, "Enable GSO writes to the socket");
 DEFINE_uint32(
     client_transport_timer_resolution_ms,
     1,
@@ -72,11 +72,9 @@ DEFINE_string(
     "none/time/rtt/ack: Pacing observer bucket type: per 3ms, per rtt or per ack");
 DEFINE_uint32(
     max_receive_packet_size,
-    std::max(
-        quic::kDefaultV4UDPSendPacketLen,
-        quic::kDefaultV6UDPSendPacketLen),
+    quic::kDefaultMaxUDPPayload,
     "Maximum packet size to advertise to the peer.");
-DEFINE_bool(use_inplace_write, false, "Data path type");
+DEFINE_bool(use_inplace_write, true, "Data path type");
 DEFINE_double(latency_factor, 0.5, "Latency factor (delta) for Copa");
 DEFINE_uint32(
     num_server_worker,
@@ -505,7 +503,7 @@ class TPerfServer {
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);
     quic::TransportSettings settings;
-    if (useInplaceWrite) {
+    if (useInplaceWrite && gso) {
       settings.dataPathType = DataPathType::ContinuousMemory;
     } else {
       settings.dataPathType = DataPathType::ChainedMemory;
@@ -519,7 +517,7 @@ class TPerfServer {
     }
     if (gso) {
       settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
-      settings.maxBatchSize = 16;
+      settings.maxBatchSize = writesPerLoop;
     }
     settings.maxRecvPacketSize = maxReceivePacketSize;
     settings.canIgnorePathMTU = !FLAGS_d6d_enabled;
@@ -728,7 +726,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     settings.connectUDP = true;
     settings.shouldRecvBatch = true;
     settings.shouldUseRecvmmsgForBatchRecv = true;
-    settings.maxRecvBatchSize = 32;
+    settings.maxRecvBatchSize = 64;
+    settings.numGROBuffers_ = 64;
     settings.defaultCongestionController = congestionControlType_;
     if (congestionControlType_ == quic::CongestionControlType::BBR ||
         congestionControlType_ == CongestionControlType::BBRTesting) {
