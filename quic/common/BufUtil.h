@@ -51,6 +51,10 @@ class BufQueue {
     return std::move(chain_);
   }
 
+  Buf clone() const {
+    return chain_ ? chain_->clone() : nullptr;
+  }
+
   const folly::IOBuf* front() const {
     return chain_.get();
   }
