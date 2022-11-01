@@ -678,6 +678,7 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
 void Cubic::getStats(CongestionControllerStats& stats) const {
   stats.cubicStats.state = static_cast<uint8_t>(state_);
   stats.cubicStats.ssthresh = ssthresh_;
+  stats.cubicStats.lastLossTimeMs = 0;
   if (steadyState_.lastReductionTime) {
     stats.cubicStats.lastLossTimeMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(
