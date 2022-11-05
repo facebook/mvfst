@@ -19,6 +19,7 @@
 #include <quic/state/DatagramHandlers.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
+#include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/test/Mocks.h>
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
@@ -664,6 +665,49 @@ TEST_P(QuicTransportImplTestBase, IdleTimeoutStreamMaessage) {
         EXPECT_EQ("Idle timeout, num non control streams: 2", error.message);
       }));
   transport->invokeIdleTimeout();
+}
+
+TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
+  // create bidi stream
+  auto streamID = transport->createBidirectionalStream().value();
+  auto* stream = CHECK_NOTNULL(transport->getStream(streamID));
+
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
+
+  // suppose we rx a reset from peer which closes our ingress SM
+  receiveRstStreamSMHandler(
+      *stream,
+      RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0));
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
+
+  // send stop sending to peer should no-op
+  transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR);
+  EXPECT_EQ(transport->transportConn->pendingEvents.frames.size(), 0);
+
+  // now test ingress uni-directional stream
+  auto& streamManager = *transport->transportConn->streamManager;
+  auto nextPeerUniStream =
+      streamManager.nextAcceptablePeerUnidirectionalStreamId();
+  EXPECT_TRUE(nextPeerUniStream.has_value());
+  stream = streamManager.getStream(*nextPeerUniStream);
+  EXPECT_EQ(stream->sendState, StreamSendState::Invalid);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
+
+  // suppose we rx a reset from peer which closes our ingress SM
+  receiveRstStreamSMHandler(
+      *stream,
+      RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0));
+  EXPECT_EQ(stream->sendState, StreamSendState::Invalid);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
+  EXPECT_TRUE(stream->inTerminalStates());
+
+  // send stop sending to peer should no-op
+  transport->stopSending(stream->id, GenericApplicationErrorCode::NO_ERROR);
+  EXPECT_EQ(transport->transportConn->pendingEvents.frames.size(), 0);
+
+  transport.reset();
 }
 
 TEST_P(QuicTransportImplTestBase, WriteAckPacketUnsetsLooper) {

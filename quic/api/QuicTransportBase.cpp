@@ -806,6 +806,13 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::stopSending(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
+  auto* stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  if (stream->recvState == StreamRecvState::Closed) {
+    // skip STOP_SENDING if ingress is already closed
+    return folly::unit;
+  }
+
+  // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
   return folly::unit;
