@@ -22,6 +22,7 @@ namespace samples {
 class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
  public:
   ~EchoServerTransportFactory() override {
+    draining_ = true;
     while (!echoHandlers_.empty()) {
       auto& handler = echoHandlers_.back();
       handler->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait(
@@ -45,6 +46,9 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
     CHECK_EQ(evb, sock->getEventBase());
+    if (draining_) {
+      return nullptr;
+    }
     auto echoHandler = std::make_unique<EchoHandler>(evb, useDatagrams_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx);
@@ -53,10 +57,10 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     return transport;
   }
 
+ private:
   bool useDatagrams_;
   std::vector<std::unique_ptr<EchoHandler>> echoHandlers_;
-
- private:
+  bool draining_{false};
 };
 
 class EchoServer {
@@ -86,6 +90,10 @@ class EchoServer {
       settingsCopy.maxStreamGroupsAdvertized = 1024;
     }
     server_->setTransportSettings(std::move(settingsCopy));
+  }
+
+  ~EchoServer() {
+    server_->shutdown();
   }
 
   void start() {
