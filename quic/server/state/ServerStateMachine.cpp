@@ -594,7 +594,8 @@ void onConnectionMigration(
     QuicServerConnectionState& conn,
     const folly::SocketAddress& newPeerAddress,
     bool isIntentional) {
-  if (conn.migrationState.numMigrations >= kMaxNumMigrationsAllowed) {
+  if (conn.migrationState.numMigrations >=
+      conn.transportSettings.maxNumMigrationsAllowed) {
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
           0,

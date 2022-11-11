@@ -2209,7 +2209,9 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  for (size_t i = 0; i < kMaxNumMigrationsAllowed; ++i) {
+  uint16_t maxNumMigrationsAllowed =
+      server->getConn().transportSettings.maxNumMigrationsAllowed;
+  for (uint16_t i = 0; i < maxNumMigrationsAllowed; ++i) {
     folly::SocketAddress newPeer("100.101.102.103", 23456 + i);
     deliverData(packetData->clone(), false, &newPeer);
   }
