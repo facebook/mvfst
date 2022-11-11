@@ -1072,8 +1072,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           serverTransport->conn_->transportSettings.bbrConfig
               .ackFrequencyConfig = ackFrequencyConfig;
         } else {
-          LOG_EVERY_N(ERROR, 1000)
-              << "Received invalid KnobParam for ACK_FREQUENCY_POLICY: " << val;
+          auto errMsg = fmt::format(
+              "Received invalid KnobParam for ACK_FREQUENCY_POLICY: {}", val);
+          VLOG(3) << errMsg;
+          throw std::runtime_error(errMsg);
         }
       });
 }

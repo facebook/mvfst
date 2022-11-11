@@ -300,17 +300,13 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   // Include previous packets back.
   packetBuf->prepend(prevSize);
   connection.bufAccessor->release(std::move(packetBuf));
-#if !FOLLY_MOBILE && \
-    !defined(_MSC_VER) // The second condition should be removed once we
-                       // transition to folly XLOG.
   bool isD6DProbe = pnSpace == PacketNumberSpace::AppData &&
       connection.d6d.lastProbe.hasValue() &&
       connection.d6d.lastProbe->packetNum == packetNum;
   if (!isD6DProbe && encodedSize > connection.udpSendPacketLen) {
-    LOG_EVERY_N(ERROR, 5000)
-        << "Quic sending pkt larger than limit, encodedSize=" << encodedSize;
+    VLOG(3) << "Quic sending pkt larger than limit, encodedSize="
+            << encodedSize;
   }
-#endif
   // TODO: I think we should add an API that doesn't need a buffer.
   bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
   // update stats and connection
@@ -384,15 +380,10 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
       headerCipher);
   auto encodedSize = packetBuf->computeChainDataLength();
   auto encodedBodySize = encodedSize - headerLen;
-#if !FOLLY_MOBILE && \
-    !defined(_MSC_VER) // The second condition should be removed once we
-  // transition to folly XLOG.
   if (encodedSize > connection.udpSendPacketLen) {
-    LOG_EVERY_N(ERROR, 5000)
-        << "Quic sending pkt larger than limit, encodedSize=" << encodedSize
-        << " encodedBodySize=" << encodedBodySize;
+    VLOG(3) << "Quic sending pkt larger than limit, encodedSize=" << encodedSize
+            << " encodedBodySize=" << encodedBodySize;
   }
-#endif
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
   if (ret) {
     // update stats and connection
