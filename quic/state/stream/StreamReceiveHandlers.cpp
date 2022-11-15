@@ -57,10 +57,8 @@ void receiveReadStreamFrameSMHandler(
     }
     case StreamRecvState::Closed: {
       CHECK(!isSendingStream(stream.conn.nodeType, stream.id));
-      VLOG_IF(10, frame.fin) << "Closed: Received data with fin"
-                             << " stream=" << stream.id << " " << stream.conn;
-      appendDataToReadBuffer(
-          stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
+      VLOG(10) << "Closed: Received discarding data stream=" << stream.id
+               << " fin=" << frame.fin << " " << stream.conn;
       break;
     }
     case StreamRecvState::Invalid: {

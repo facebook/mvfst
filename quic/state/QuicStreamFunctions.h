@@ -162,4 +162,7 @@ void processCryptoStreamAck(
     uint64_t offset,
     uint64_t len);
 
+// Drops ingress when sending STOP_SENDING to peer
+void processTxStopSending(QuicStreamState& stream);
+
 } // namespace quic

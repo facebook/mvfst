@@ -495,4 +495,16 @@ void processCryptoStreamAck(
   }
   cryptoStream.retransmissionBuffer.erase(ackedBuffer);
 }
+
+void processTxStopSending(QuicStreamState& stream) {
+  // no longer interested in ingress
+  auto id = stream.id;
+  auto& streamManager = stream.conn.streamManager;
+  stream.recvState = StreamRecvState::Closed;
+  stream.readBuffer.clear();
+  streamManager->readableStreams().erase(id);
+  if (stream.inTerminalStates()) {
+    streamManager->addClosed(id);
+  }
+}
 } // namespace quic

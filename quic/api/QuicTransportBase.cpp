@@ -812,6 +812,9 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::stopSending(
     return folly::unit;
   }
 
+  if (conn_->transportSettings.dropIngressOnStopSending) {
+    processTxStopSending(*stream);
+  }
   // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
