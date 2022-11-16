@@ -9,6 +9,7 @@
 
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicPacketRebuilder.h>
+#include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -74,7 +75,12 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
+  WriteAckState writeAckState = {.acks = ackBlocks};
+  //   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
+  AckFrameMetaData ackMeta = {
+      .ackState = writeAckState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
@@ -401,7 +407,11 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
+  WriteAckState writeAckState = {.acks = ackBlocks};
+  AckFrameMetaData ackMeta = {
+      .ackState = writeAckState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);

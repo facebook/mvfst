@@ -4086,7 +4086,12 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedAckData) {
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   builder.encodePacketHeader();
   DCHECK(builder.canBuildPacket());
-  AckFrameMetaData ackData(acks, 0us, 0);
+  // AckFrameMetaData ackData(acks, 0us, 0);
+  WriteAckState writeAckState = {.acks = acks};
+  AckFrameMetaData ackData = {
+      .ackState = writeAckState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
   writeAckFrame(ackData, builder);
   auto packet = packetToBufCleartext(
       std::move(builder).buildPacket(),

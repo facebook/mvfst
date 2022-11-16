@@ -228,9 +228,38 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
              ? std::chrono::duration_cast<std::chrono::microseconds>(
                    ackingTime - receivedTime)
              : 0us);
-    AckFrameMetaData meta(ackState_.acks, ackDelay, ackDelayExponent);
+
+    AckFrameMetaData meta = {
+        ackState_, /* ackState*/
+        ackDelay, /* ackDelay */
+        static_cast<uint8_t>(ackDelayExponent), /* ackDelayExponent */
+        conn_.connectionTime, /* connect timestamp */
+        folly::none, /* recvTimestampsConfig */
+        folly::none /* maxAckReceiveTimestampsToSend */};
+
+    folly::Optional<AckFrameWriteResult> ackWriteResult;
+
+    uint64_t peerRequestedTimestampsCount =
+        conn_.maybePeerAckReceiveTimestampsConfig.has_value()
+        ? conn_.maybePeerAckReceiveTimestampsConfig.value()
+              .maxReceiveTimestampsPerAck
+        : 0;
+
     // Write the AckFrame ignoring the result. This is best-effort.
-    writeAckFrame(meta, builder_);
+    bool isAckReceiveTimestampsSupported =
+        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
+        conn_.maybePeerAckReceiveTimestampsConfig;
+
+    if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
+      writeAckFrame(meta, builder_, FrameType::ACK);
+    } else {
+      meta.recvTimestampsConfig =
+          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+              .value();
+      meta.maxAckReceiveTimestampsToSend = peerRequestedTimestampsCount;
+      writeAckFrameWithReceivedTimestamps(
+          meta, builder_, FrameType::ACK_RECEIVE_TIMESTAMPS);
+    }
   }
   // We shouldn't clone if:
   // (1) we only end up cloning only acks, ping, or paddings.

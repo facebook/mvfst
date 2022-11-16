@@ -646,7 +646,11 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
+  WriteAckState writeAckState = {.acks = ackBlocks};
+  AckFrameMetaData ackMeta = {
+      .ackState = writeAckState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
 
   // Write those framses with a regular builder
   writeFrame(connCloseFrame, regularBuilder);

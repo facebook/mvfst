@@ -11,6 +11,7 @@
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/d6d/Types.h>
 #include <chrono>
+#include <cstdint>
 
 namespace quic {
 
@@ -131,6 +132,11 @@ struct DatagramConfig {
   bool sendDropOldDataFirst{false};
   uint32_t readBufSize{kDefaultMaxDatagramsBuffered};
   uint32_t writeBufSize{kDefaultMaxDatagramsBuffered};
+};
+
+struct AckReceiveTimestampsConfig {
+  uint64_t max_receive_timestamps_per_ack{kMaxReceivedPktsTimestampsStored};
+  uint64_t receive_timestamps_exponent{kDefaultReceiveTimestampsExponent};
 };
 
 // JSON-serialized transport knobs
@@ -325,6 +331,19 @@ struct TransportSettings {
   bool experimentalPacer{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
+
+  // Local configuration for ACK receive timestamps.
+  //
+  // Determines the ACK receive timestamp configuration sent to peer,
+  // which in turn determines the maximum number of timestamps and
+  // timestamp resolution included in ACK messages sent by the peer
+  // if the peer supports ACK receive timestamps.
+  //
+  // If structure is not initialized, ACK receive timestamps are
+  // not requested from peer regardless of whether the peer
+  // supports them.
+  folly::Optional<AckReceiveTimestampsConfig>
+      maybeAckReceiveTimestampsConfigSentToPeer;
 };
 
 } // namespace quic

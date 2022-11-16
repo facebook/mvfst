@@ -225,6 +225,15 @@ void processClientInitialParams(
       static_cast<TransportParameterId>(kStreamGroupsEnabledCustomParamId),
       clientParams.parameters);
 
+  auto isAckReceiveTimestampsEnabled = getIntegerParameter(
+      TransportParameterId::ack_receive_timestamps_enabled,
+      clientParams.parameters);
+  auto maxReceiveTimestampsPerAck = getIntegerParameter(
+      TransportParameterId::max_receive_timestamps_per_ack,
+      clientParams.parameters);
+  auto receiveTimestampsExponent = getIntegerParameter(
+      TransportParameterId::receive_timestamps_exponent,
+      clientParams.parameters);
   if (conn.version == QuicVersion::QUIC_DRAFT ||
       conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS) {
@@ -396,6 +405,19 @@ void processClientInitialParams(
 
   if (peerMaxStreamGroupsAdvertized) {
     conn.peerMaxStreamGroupsAdvertized = *peerMaxStreamGroupsAdvertized;
+  }
+  if (isAckReceiveTimestampsEnabled.has_value() &&
+      isAckReceiveTimestampsEnabled.value() == 1) {
+    if (maxReceiveTimestampsPerAck.has_value() &&
+        receiveTimestampsExponent.has_value()) {
+      conn.maybePeerAckReceiveTimestampsConfig.assign(
+          {std::min(
+               static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
+               kMaxReceivedPktsTimestampsStored),
+           std::max(
+               static_cast<uint8_t>(receiveTimestampsExponent.value()),
+               static_cast<uint8_t>(0))});
+    }
   }
 }
 
@@ -762,10 +784,10 @@ void onServerReadDataFromOpen(
       readData.networkData.data->computeChainDataLength() == 0) {
     return;
   }
-
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
     firstPacketFromPeer = true;
+
     folly::io::Cursor cursor(readData.networkData.data.get());
     auto initialByte = cursor.readBE<uint8_t>();
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
@@ -857,8 +879,10 @@ void onServerReadDataFromOpen(
       conn.qLogger->setScid(conn.serverConnectionId);
       conn.qLogger->setDcid(initialDestinationConnectionId);
     }
-    conn.readCodec->setCodecParameters(
-        CodecParameters(conn.peerAckDelayExponent, version));
+    conn.readCodec->setCodecParameters(CodecParameters(
+        conn.peerAckDelayExponent,
+        version,
+        conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer));
     conn.initialWriteCipher = cryptoFactory.getServerInitialCipher(
         initialDestinationConnectionId, version);
 
@@ -1607,6 +1631,34 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     }
   }
 
+  auto ackReceiveTimestampsEnabled =
+      std::make_unique<CustomIntegralTransportParameter>(
+          static_cast<uint64_t>(
+              TransportParameterId::ack_receive_timestamps_enabled),
+          conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                  .has_value()
+              ? 1
+              : 0);
+  customTransportParams.push_back(ackReceiveTimestampsEnabled->encode());
+  if (conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+          .has_value()) {
+    auto maxReceiveTimestampsPerAck =
+        std::make_unique<CustomIntegralTransportParameter>(
+            static_cast<uint64_t>(
+                TransportParameterId::max_receive_timestamps_per_ack),
+            conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                .value()
+                .max_receive_timestamps_per_ack);
+    customTransportParams.push_back(maxReceiveTimestampsPerAck->encode());
+    auto receiveTimestampsExponent =
+        std::make_unique<CustomIntegralTransportParameter>(
+            static_cast<uint64_t>(
+                TransportParameterId::receive_timestamps_exponent),
+            conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                .value()
+                .receive_timestamps_exponent);
+    customTransportParams.push_back(receiveTimestampsExponent->encode());
+  }
   return customTransportParams;
 }
 } // namespace quic

@@ -131,10 +131,13 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
     builder.accountForCipherOverhead(maybeAead.value()->getCipherOverhead());
   }
   DCHECK(builder.canBuildPacket());
-  AckFrameMetaData ackData(
-      *CHECK_NOTNULL(maybeAckBlocks.get_pointer()),
-      *CHECK_NOTNULL(maybeAckDelay.get_pointer()),
-      CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent);
+  WriteAckState ackState;
+  ackState.acks = *CHECK_NOTNULL(maybeAckBlocks.get_pointer());
+  AckFrameMetaData ackData = {
+      .ackState = ackState,
+      .ackDelay = *CHECK_NOTNULL(maybeAckDelay.get_pointer()),
+      .ackDelayExponent = static_cast<uint8_t>(
+          CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent)};
   writeAckFrame(ackData, builder);
   return std::move(builder).buildPacket();
 }

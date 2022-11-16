@@ -11,12 +11,19 @@
 #include <folly/io/Cursor.h>
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/Decode.h>
+#include <quic/codec/QuicInteger.h>
 #include <quic/codec/Types.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/CircularDeque.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/state/TransportSettings.h>
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
 
 using namespace quic;
 using namespace quic::test;
@@ -26,11 +33,24 @@ ShortHeader buildTestShortHeader() {
   return ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01);
 }
 
-QuicFrame parseQuicFrame(BufQueue& queue) {
+QuicFrame parseQuicFrame(
+    BufQueue& queue,
+    bool isAckReceiveTimestampsSupported = false) {
+  folly::Optional<AckReceiveTimestampsConfig> receiveTimeStampsConfig =
+      folly::none;
+  if (isAckReceiveTimestampsSupported) {
+    receiveTimeStampsConfig.assign(
+        {.max_receive_timestamps_per_ack = 5,
+         .receive_timestamps_exponent = 3});
+  }
+
   return quic::parseFrame(
       queue,
       buildTestShortHeader(),
-      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+      CodecParameters(
+          kDefaultAckDelayExponent,
+          QuicVersion::MVFST,
+          receiveTimeStampsConfig));
 }
 
 namespace quic {
@@ -117,8 +137,150 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
         pktBuilder.remaining_ -= quicInteger.getSize();
       }));
 }
+using PacketsReceivedTimestampsDeque = CircularDeque<RecvdPacketInfo>;
+const auto kDefaultTimestampsDelta = 10us;
+const AckReceiveTimestampsConfig defaultAckReceiveTimestmpsConfig = {
+    .receive_timestamps_exponent = kDefaultReceiveTimestampsExponent};
+PacketsReceivedTimestampsDeque populateReceiveTimestamps(
+    const AckBlocks& ackBlocks,
+    TimePoint connTime,
+    uint64_t maxTimeStamps = kMaxReceivedPktsTimestampsStored) {
+  PacketsReceivedTimestampsDeque pktsReceivedTimestamps;
 
-class QuicWriteCodecTest : public Test {};
+  uint64_t countTimestamps = 0;
+  for (auto it = ackBlocks.crbegin(); it != ackBlocks.crend(); it++) {
+    countTimestamps += (it->end - it->start + 1);
+  }
+  auto lastPacketDelta = (countTimestamps * kDefaultTimestampsDelta);
+
+  for (auto it = ackBlocks.crbegin(); it != ackBlocks.crend(); it++) {
+    for (auto i = it->end; i >= it->start; i--) {
+      if (pktsReceivedTimestamps.size() < maxTimeStamps) {
+        RecvdPacketInfo rpi;
+        rpi.pktNum = i;
+        auto diff = std::chrono::microseconds(
+            lastPacketDelta -= kDefaultTimestampsDelta);
+        if ((connTime + diff) > connTime) {
+          rpi.timeStamp = connTime + diff;
+        } else {
+          rpi.timeStamp = connTime;
+        }
+        pktsReceivedTimestamps.emplace_front(rpi);
+      } else {
+        break;
+      }
+    }
+  }
+  return pktsReceivedTimestamps;
+}
+
+size_t computeBytesForAckReceivedTimestamps(
+    AckFrameMetaData ackFrameMetadata,
+    AckFrameWriteResult ackFrameWriteResult,
+    FrameType frameType) {
+  if (frameType != FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    return 0;
+  }
+
+  size_t numRanges = ackFrameWriteResult.timestampRangesWritten;
+  TimePoint connTime = ackFrameMetadata.connTime;
+  auto lastPktNum =
+      ackFrameMetadata.ackState.lastRecvdPacketInfo.value().pktNum;
+  std::chrono::duration lastTimeStampDelta =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ackFrameMetadata.ackState.lastRecvdPacketInfo.value().timeStamp -
+          connTime);
+
+  // When FrameType == ACK_RECEIVE_TIMESTAMPS, the minimum additional
+  // information that is sent to the peer is:
+  // 1. last received packet's timestamp delta,
+  // 2. last received packet's number,
+  // 3. count of timestamp ranges
+  size_t sizeConsumed =
+      1 + // Additional space for ACK_RECEIVE_TIMESTAMPS packet type
+      getQuicIntegerSizeThrows(
+          lastTimeStampDelta
+              .count()) + // latest received packet timestamp delta
+      getQuicIntegerSizeThrows(lastPktNum) + // latest received packet number
+      getQuicIntegerSizeThrows(
+          numRanges); // count of ack_receive_timestamp ranges
+
+  if (numRanges > 0) {
+    sizeConsumed +=
+        computeSizeUsedByRecvdTimestamps(ackFrameWriteResult.writeAckFrame);
+  }
+  return sizeConsumed;
+}
+
+WriteAckState createTestWriteAckState(
+    FrameType frameType,
+    const TimePoint& connTime,
+    AckBlocks& ackBlocks,
+    uint64_t countTimestampsToStore = kMaxReceivedPktsTimestampsStored) {
+  WriteAckState ackState = {.acks = ackBlocks};
+  ackState.acks = ackBlocks;
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    ackState.recvdPacketInfos =
+        populateReceiveTimestamps(ackBlocks, connTime, countTimestampsToStore);
+    ackState.lastRecvdPacketInfo.assign({
+        ackState.recvdPacketInfos.back().pktNum,
+        ackState.recvdPacketInfos.back().timeStamp,
+    });
+  }
+  return ackState;
+}
+
+void assertsOnDecodedReceiveTimestamps(
+    const AckFrameMetaData& ackFrameMetaData,
+    const WriteAckFrame& writeAckFrame,
+    const ReadAckFrame& readAckFrame,
+    uint64_t expectedTimestampRangesCount,
+    uint64_t expectedTimestampsCount) {
+  EXPECT_TRUE(readAckFrame.maybeLatestRecvdPacketNum.has_value());
+  EXPECT_TRUE(readAckFrame.maybeLatestRecvdPacketTime.has_value());
+  EXPECT_EQ(
+      readAckFrame.maybeLatestRecvdPacketNum.value(),
+      ackFrameMetaData.ackState.lastRecvdPacketInfo.value().pktNum);
+  EXPECT_EQ(
+      readAckFrame.maybeLatestRecvdPacketTime.value(),
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ackFrameMetaData.ackState.lastRecvdPacketInfo.value().timeStamp -
+          ackFrameMetaData.connTime));
+  EXPECT_EQ(
+      readAckFrame.recvdPacketsTimestampRanges.size(),
+      expectedTimestampRangesCount);
+  auto timeStamps = 0;
+  for (auto range : readAckFrame.recvdPacketsTimestampRanges) {
+    timeStamps += range.timestamp_delta_count;
+  }
+  EXPECT_EQ(timeStamps, expectedTimestampsCount);
+  EXPECT_EQ(
+      readAckFrame.recvdPacketsTimestampRanges.size(),
+      writeAckFrame.recvdPacketsTimestampRanges.size());
+  // (XXX: sj77, clean this up)
+  for (uint64_t i = 0; i < readAckFrame.recvdPacketsTimestampRanges.size();
+       ++i) {
+    EXPECT_EQ(
+        readAckFrame.recvdPacketsTimestampRanges[i].gap,
+        writeAckFrame.recvdPacketsTimestampRanges[i].gap);
+    EXPECT_EQ(
+        readAckFrame.recvdPacketsTimestampRanges[i].timestamp_delta_count,
+        writeAckFrame.recvdPacketsTimestampRanges[i].timestamp_delta_count);
+    for (uint64_t j = 0;
+         j < readAckFrame.recvdPacketsTimestampRanges[i].timestamp_delta_count;
+         j++) {
+      EXPECT_EQ(
+          readAckFrame.recvdPacketsTimestampRanges[i].deltas[j],
+          writeAckFrame.recvdPacketsTimestampRanges[i].deltas[j] *
+              pow(2,
+                  ackFrameMetaData.recvTimestampsConfig.value()
+                      .receive_timestamps_exponent));
+    }
+  }
+}
+
+// class QuicWriteCodecTest : public Test {};
+class QuicWriteCodecTest : public TestWithParam<FrameType> {};
 
 TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   MockQuicPacketBuilder pktBuilder;
@@ -715,7 +877,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeLengthHintFalse) {
   EXPECT_LT(*dataLen, 1200);
 }
 
-TEST_F(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {
+TEST_P(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
 
@@ -723,14 +885,26 @@ TEST_F(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {
   // Can't use max directly, because it will exceed interval set's
   // representation.
   AckBlocks ackBlocks = {{max - 10, max - 10}, {1, 1}};
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig};
+
   EXPECT_THROW(
-      writeAckFrame(
-          AckFrameMetaData(ackBlocks, 0us, kDefaultAckDelayExponent),
-          pktBuilder),
+      ((frameType == FrameType::ACK)
+           ? writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+           : writeAckFrameWithReceivedTimestamps(
+                 ackFrameMetaData, pktBuilder, frameType)),
       QuicTransportException);
 }
 
-TEST_F(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
+TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
 
@@ -741,12 +915,57 @@ TEST_F(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
   // total 11 bytes
   PacketNum largest = (uint64_t)1 << 55;
   AckBlocks ackBlocks = {{1, largest}};
-  AckFrameMetaData ackMetadata(ackBlocks, 0us, kDefaultAckDelayExponent);
+  auto frameType = GetParam();
 
-  auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
+  TimePoint connTime = Clock::now();
 
-  EXPECT_EQ(19, ackFrameWriteResult.bytesWritten);
-  EXPECT_EQ(kDefaultUDPSendPacketLen - 19, pktBuilder.remainingSpaceInPkt());
+  WriteAckState ackState = {.acks = ackBlocks};
+  ackState.acks = ackBlocks;
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    auto lastPacketDelta =
+        (kMaxReceivedPktsTimestampsStored * kDefaultTimestampsDelta);
+    PacketsReceivedTimestampsDeque pktsReceivedTimestamps;
+
+    for (auto it = ackBlocks.crbegin(); it != ackBlocks.crend(); it++) {
+      for (auto i = it->end; i >= it->start; i--) {
+        if (pktsReceivedTimestamps.size() < kMaxReceivedPktsTimestampsStored) {
+          RecvdPacketInfo rpi;
+          rpi.pktNum = i;
+          auto diff = std::chrono::microseconds(
+              lastPacketDelta -= kDefaultTimestampsDelta);
+          rpi.timeStamp = connTime + diff;
+          pktsReceivedTimestamps.emplace_front(rpi);
+        } else {
+          break;
+        }
+      }
+    }
+    ackState.recvdPacketInfos = pktsReceivedTimestamps;
+    ackState.lastRecvdPacketInfo.assign({
+        ackState.recvdPacketInfos.back().pktNum,
+        ackState.recvdPacketInfos.back().timeStamp,
+    });
+  }
+
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+
+  EXPECT_EQ(19 + addlBytesConsumed, ackFrameWriteResult.bytesWritten);
+  EXPECT_EQ(
+      kDefaultUDPSendPacketLen - 19 - addlBytesConsumed,
+      pktBuilder.remainingSpaceInPkt());
+
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
@@ -755,9 +974,26 @@ TEST_F(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
 
   EXPECT_EQ(ackFrame.ackBlocks.back().start, 1);
   EXPECT_EQ(largest, ackFrame.ackBlocks.back().end);
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    auto wireBuf = std::move(builtOut.second);
+    BufQueue queue;
+    queue.append(wireBuf->clone());
+    QuicFrame decodedFrame =
+        parseQuicFrame(queue, frameType == FrameType::ACK_RECEIVE_TIMESTAMPS);
+    auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+    // Single contingious ack blocks, default received timestamps stored.
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        1 /* timestamp ranges count */,
+        kMaxReceivedPktsTimestampsStored /* timestamps count */);
+  }
 }
 
-TEST_F(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
+TEST_P(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 4;
   setupCommonExpects(pktBuilder);
@@ -769,32 +1005,58 @@ TEST_F(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
   // 1 byte for first ack block length, then 2 bytes for each pair => 5 bytes
   // total 15 bytes
   AckBlocks ackBlocks = {{1000, 1000}, {500, 700}, {100, 200}};
-  // 4 btyes are just not enough for anything
-  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig};
 
-  auto result = writeAckFrame(ackMetadata, pktBuilder);
+  auto result = (frameType == FrameType::ACK)
+      ? writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
   EXPECT_FALSE(result.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 4);
 }
 
-TEST_F(QuicWriteCodecTest, WriteSimpleAckFrame) {
+TEST_P(QuicWriteCodecTest, WriteSimpleAckFrame) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   auto ackDelay = 111us;
   AckBlocks ackBlocks = {{501, 1000}, {101, 400}};
-  AckFrameMetaData meta(ackBlocks, ackDelay, kDefaultAckDelayExponent);
-
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = ackDelay,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
   // 1 type byte,
   // 2 bytes for largest acked, 1 bytes for ack delay => 3 bytes
   // 1 byte for ack block count
   // There is 1 gap => each represented by 2 bytes => 2 bytes
   // 2 byte for first ack block length, then 2 bytes for the next len => 4 bytes
   // total 11 bytes
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+  EXPECT_EQ(11 + addlBytesConsumed, ackFrameWriteResult.bytesWritten);
+  EXPECT_EQ(
+      kDefaultUDPSendPacketLen - 11 - addlBytesConsumed,
+      pktBuilder.remainingSpaceInPkt());
 
-  auto result = *writeAckFrame(meta, pktBuilder);
-
-  EXPECT_EQ(11, result.bytesWritten);
-  EXPECT_EQ(kDefaultUDPSendPacketLen - 11, pktBuilder.remainingSpaceInPkt());
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
@@ -805,11 +1067,11 @@ TEST_F(QuicWriteCodecTest, WriteSimpleAckFrame) {
   iter++;
   EXPECT_EQ(iter->start, 501);
   EXPECT_EQ(iter->end, 1000);
-
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame decodedFrame = parseQuicFrame(queue);
+  QuicFrame decodedFrame =
+      parseQuicFrame(queue, frameType == FrameType::ACK_RECEIVE_TIMESTAMPS);
   auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
   EXPECT_EQ(decodedAckFrame.largestAcked, 1000);
   EXPECT_EQ(
@@ -820,29 +1082,55 @@ TEST_F(QuicWriteCodecTest, WriteSimpleAckFrame) {
   EXPECT_EQ(decodedAckFrame.ackBlocks[0].endPacket, 1000);
   EXPECT_EQ(decodedAckFrame.ackBlocks[1].startPacket, 101);
   EXPECT_EQ(decodedAckFrame.ackBlocks[1].endPacket, 400);
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    // Multiple ack blocks, however received timestamps storage limit limit
+    // achieved by the within the latest ack block
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        1 /* timestamp ranges count */,
+        kMaxReceivedPktsTimestampsStored /* timestamps count */);
+  }
 }
 
-TEST_F(QuicWriteCodecTest, WriteAckFrameWillSaveAckDelay) {
+TEST_P(QuicWriteCodecTest, WriteAckFrameWillSaveAckDelay) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   auto ackDelay = 111us;
   AckBlocks ackBlocks = {{501, 1000}, {101, 400}};
-  AckFrameMetaData meta(ackBlocks, ackDelay, kDefaultAckDelayExponent);
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = ackDelay,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
 
-  writeAckFrame(meta, pktBuilder);
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackDelay, ackFrame.ackDelay);
 }
 
-TEST_F(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
-  // Tests that if we restrict the size to be exactly the size required for a 1
-  // byte num blocks size, if the num blocks requires 2 bytes (practically this
-  // will never happen), then we won't write the additional blocks.
+TEST_P(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
+  // Tests that if we restrict the size to be exactly the size required
+  // for a byte num blocks size, if the num blocks requires 2 bytes
+  // practically will never happen), then we won't write the additional
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 134;
   setupCommonExpects(pktBuilder);
+  auto frameType = GetParam();
 
   // 1 type byte,
   // 2 byte for largest acked, 1 bytes for ack delay => 3 bytes
@@ -861,31 +1149,91 @@ TEST_F(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
     currentEnd -= blockLength + gap;
   }
   ackBlocks.insert({largest, largest});
-  AckFrameMetaData ackMetadata(ackBlocks, 0us, kDefaultAckDelayExponent);
-
-  auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
-
-  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 132);
-  EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
+  // 1 type byte,
+  // 2 bytes for largest acked, 1 bytes for ack delay => 3 bytes
+  // 1 byte for ack block count
+  // There is 1 gap => each represented by 2 bytes => 2 bytes
+  // 2 byte for first ack block length, then 2 bytes for the next len => 4 bytes
+  // total 11 bytes
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(regularPacket.frames.size(), 1);
-  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
-  EXPECT_EQ(ackFrame.ackBlocks.size(), 64);
 
-  EXPECT_EQ(ackFrame.ackBlocks.back().start, 746);
-  EXPECT_EQ(ackFrame.ackBlocks.back().end, 748);
+  if (frameType == FrameType::ACK) {
+    EXPECT_EQ(ackFrameWriteResult.bytesWritten, 132);
+    EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
+    EXPECT_EQ(regularPacket.frames.size(), 1);
+    WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
+    EXPECT_EQ(ackFrame.ackBlocks.size(), 64);
+
+    EXPECT_EQ(ackFrame.ackBlocks.back().start, 746);
+    EXPECT_EQ(ackFrame.ackBlocks.back().end, 748);
+  } else if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    EXPECT_EQ(ackFrameWriteResult.bytesWritten, 128 + addlBytesConsumed);
+    EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
+    EXPECT_EQ(regularPacket.frames.size(), 1);
+    WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
+    EXPECT_EQ(ackFrame.ackBlocks.size(), 62);
+
+    EXPECT_EQ(ackFrame.ackBlocks.back().start, 754);
+    EXPECT_EQ(ackFrame.ackBlocks.back().end, 756);
+
+    auto wireBuf = std::move(builtOut.second);
+    BufQueue queue;
+    queue.append(wireBuf->clone());
+    QuicFrame decodedFrame =
+        parseQuicFrame(queue, frameType == FrameType::ACK_RECEIVE_TIMESTAMPS);
+    auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+    // Multiple ack blocks, however no space remaining to send received
+    // timestamps
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        0 /* timestamp ranges count */,
+        0 /* timestamps count */);
+  }
 }
 
-TEST_F(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
+TEST_P(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
 
   AckBlocks ackBlocks{{1000, 1000}};
   uint8_t ackDelayExponent = 6;
-  AckFrameMetaData ackMetadata(ackBlocks, 1240us, ackDelayExponent);
+  auto frameType = GetParam();
 
-  writeAckFrame(ackMetadata, pktBuilder);
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 1240us,
+      .ackDelayExponent = static_cast<uint8_t>(ackDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
+
+  (frameType == FrameType::ACK)
+      ? writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
@@ -897,18 +1245,31 @@ TEST_F(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
   auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
-      computeExpectedDelay(ackMetadata.ackDelay, ackDelayExponent));
+      computeExpectedDelay(ackFrameMetaData.ackDelay, ackDelayExponent));
 }
 
-TEST_F(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
+TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
 
   AckBlocks ackBlocks{{1000, 1000}};
   uint8_t ackDelayExponent = 6;
-  AckFrameMetaData ackMetadata(ackBlocks, 1240us, ackDelayExponent);
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 1240us,
+      .ackDelayExponent = static_cast<uint8_t>(ackDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
 
-  writeAckFrame(ackMetadata, pktBuilder);
+  (frameType == FrameType::ACK)
+      ? writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
   auto builtOut = std::move(pktBuilder).buildLongHeaderPacket();
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
@@ -921,11 +1282,11 @@ TEST_F(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
   auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
-      (uint64_t(ackMetadata.ackDelay.count()) >> ackDelayExponent)
+      (uint64_t(ackFrameMetaData.ackDelay.count()) >> ackDelayExponent)
           << kDefaultAckDelayExponent);
 }
 
-TEST_F(QuicWriteCodecTest, OnlyAckLargestPacket) {
+TEST_P(QuicWriteCodecTest, OnlyAckLargestPacket) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
 
@@ -935,13 +1296,33 @@ TEST_F(QuicWriteCodecTest, OnlyAckLargestPacket) {
   // 1 byte for first ack block length
   // total 7 bytes
   AckBlocks ackBlocks{{1000, 1000}};
-  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
 
   // No AckBlock is added to the metadata. There will still be one block
   // generated as the first block to cover largestAcked => 2 bytes
-  auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
-  EXPECT_EQ(7, ackFrameWriteResult.bytesWritten);
-  EXPECT_EQ(kDefaultUDPSendPacketLen - 7, pktBuilder.remainingSpaceInPkt());
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 555us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
+
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+
+  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 7 + addlBytesConsumed);
+  EXPECT_EQ(
+      kDefaultUDPSendPacketLen - 7 - addlBytesConsumed,
+      pktBuilder.remainingSpaceInPkt());
+
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
@@ -960,16 +1341,27 @@ TEST_F(QuicWriteCodecTest, OnlyAckLargestPacket) {
   EXPECT_EQ(decodedAckFrame.largestAcked, 1000);
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
-      computeExpectedDelay(ackMetadata.ackDelay, kDefaultAckDelayExponent));
+      computeExpectedDelay(
+          ackFrameMetaData.ackDelay, kDefaultAckDelayExponent));
   EXPECT_EQ(decodedAckFrame.ackBlocks.size(), 1);
   EXPECT_EQ(decodedAckFrame.ackBlocks[0].startPacket, 1000);
   EXPECT_EQ(decodedAckFrame.ackBlocks[0].endPacket, 1000);
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    // Single packet received and acked
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        1 /* timestamp ranges count */,
+        1 /* timestamps count */);
+  }
 }
 
-TEST_F(QuicWriteCodecTest, WriteSomeAckBlocks) {
+TEST_P(QuicWriteCodecTest, WriteSomeAckBlocks) {
   // Too many ack blocks passed in, we can only write some of them
   MockQuicPacketBuilder pktBuilder;
-  pktBuilder.remaining_ = 36;
   setupCommonExpects(pktBuilder);
 
   // 1 type byte,
@@ -978,26 +1370,50 @@ TEST_F(QuicWriteCodecTest, WriteSomeAckBlocks) {
   // 1 byte for first ack block length
   // each additional ack block 1 byte gap + 1 byte length => 2 bytes
   // total 7 bytes
-  AckBlocks testAckBlocks;
+  AckBlocks ackBlocks;
   PacketNum currentEnd = 1000;
   auto blockLength = 5;
   auto gap = 10;
   for (int i = 0; i < 30; i++) {
-    testAckBlocks.insert({currentEnd - blockLength + 1, currentEnd});
+    ackBlocks.insert({currentEnd - blockLength + 1, currentEnd});
     currentEnd -= blockLength + gap;
   }
-  testAckBlocks.insert({1000, 1000});
+  ackBlocks.insert({1000, 1000});
 
-  AckFrameMetaData ackMetadata(testAckBlocks, 555ms, kDefaultAckDelayExponent);
-  auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
+  auto frameType = GetParam();
 
-  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 35);
+  if (frameType == FrameType::ACK) {
+    pktBuilder.remaining_ = 36;
+  } else {
+    pktBuilder.remaining_ = 42;
+  }
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 555us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
+
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+
+  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 35 + addlBytesConsumed);
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 1);
+
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
   WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
-  EXPECT_EQ(ackFrame.ackBlocks.size(), 14);
+
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 15);
 
   // Verify the on wire bytes via decoder:
   // (Awkwardly, this assumes the decoder is correct)
@@ -1009,11 +1425,23 @@ TEST_F(QuicWriteCodecTest, WriteSomeAckBlocks) {
   EXPECT_EQ(decodedAckFrame.largestAcked, 1000);
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
-      computeExpectedDelay(ackMetadata.ackDelay, kDefaultAckDelayExponent));
-  EXPECT_EQ(decodedAckFrame.ackBlocks.size(), 14);
+      computeExpectedDelay(
+          ackFrameMetaData.ackDelay, kDefaultAckDelayExponent));
+
+  EXPECT_EQ(decodedAckFrame.ackBlocks.size(), 15);
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        0 /* timestamp ranges count */,
+        0 /* timestamps count */);
+  }
 }
 
-TEST_F(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
+TEST_P(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 6;
   setupCommonExpects(pktBuilder);
@@ -1023,14 +1451,36 @@ TEST_F(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
   // 1 byte for num ack blocks
   // 1 byte for first ack block length
   AckBlocks ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
-  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
-  auto ackFrameWriteResult = writeAckFrame(ackMetadata, pktBuilder);
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 555us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
+
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
   EXPECT_FALSE(ackFrameWriteResult.has_value());
 }
 
-TEST_F(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
+TEST_P(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
   MockQuicPacketBuilder pktBuilder;
-  pktBuilder.remaining_ = 10;
+  auto frameType = GetParam();
+
+  if (frameType == FrameType::ACK) {
+    pktBuilder.remaining_ = 10;
+
+  } else if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    pktBuilder.remaining_ = 16;
+  }
+
   setupCommonExpects(pktBuilder);
 
   // 1 type byte,
@@ -1038,11 +1488,27 @@ TEST_F(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
   // 1 byte for num ack blocks
   // 1 byte for first ack block length
   AckBlocks ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
-  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
-  auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 555us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = kMaxReceivedPktsTimestampsStored};
 
-  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 7);
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+
+  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 7 + addlBytesConsumed);
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 3);
+
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   WriteAckFrame& ackFrame = *builtOut.first.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 1);
@@ -1057,10 +1523,179 @@ TEST_F(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
   EXPECT_EQ(decodedAckFrame.largestAcked, 1000);
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
-      computeExpectedDelay(ackMetadata.ackDelay, kDefaultAckDelayExponent));
+      computeExpectedDelay(
+          ackFrameMetaData.ackDelay, kDefaultAckDelayExponent));
   EXPECT_EQ(decodedAckFrame.ackBlocks.size(), 1);
   EXPECT_EQ(decodedAckFrame.ackBlocks[0].startPacket, 1000);
   EXPECT_EQ(decodedAckFrame.ackBlocks[0].endPacket, 1000);
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    // No space left for ack blocks, and hence none for received timestamps
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        0 /* timestamp ranges count */,
+        0 /* timestamps count */);
+  }
+}
+
+TEST_P(QuicWriteCodecTest, WriteAckFrameWithMultipleTimestampRanges) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+  auto ackDelay = 111us;
+  AckBlocks ackBlocks = {{501, 520}, {471, 490}, {431, 460}};
+  // 1 type byte,
+  // 2 bytes for largest acked, 1 bytes for ack delay => 3 bytes
+  // 1 byte for ack block count
+  // There is 1 gap => each represented by 2 bytes => 2 bytes
+  // 2 byte for first ack block length, then 2 bytes for the next len => 4
+  // bytes
+  // total 11 bytes
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks, 50);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = ackDelay,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = 50};
+
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+
+  EXPECT_EQ(ackFrameWriteResult.bytesWritten, 10 + addlBytesConsumed);
+  EXPECT_EQ(
+      kDefaultUDPSendPacketLen - 10 - addlBytesConsumed,
+      pktBuilder.remainingSpaceInPkt());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 3);
+  auto iter = ackFrame.ackBlocks.crbegin();
+  EXPECT_EQ(iter->start, 431);
+  EXPECT_EQ(iter->end, 460);
+  iter++;
+  EXPECT_EQ(iter->start, 471);
+  EXPECT_EQ(iter->end, 490);
+
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame =
+      parseQuicFrame(queue, frameType == FrameType::ACK_RECEIVE_TIMESTAMPS);
+  auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+  EXPECT_EQ(decodedAckFrame.largestAcked, 520);
+  EXPECT_EQ(
+      decodedAckFrame.ackDelay.count(),
+      computeExpectedDelay(ackDelay, kDefaultAckDelayExponent));
+  EXPECT_EQ(decodedAckFrame.ackBlocks.size(), 3);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[0].startPacket, 501);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[0].endPacket, 520);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[1].startPacket, 471);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[1].endPacket, 490);
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    // Multiple ack blocks, and received timestamps up to the configured
+    // allowed received timestamps
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        3 /* timestamp ranges count */,
+        50 /* timestamps count */);
+  }
+}
+
+TEST_P(
+    QuicWriteCodecTest,
+    WriteAckFrameWithMultipleTimestampRangesPartiallySent) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+  auto ackDelay = 111us;
+  AckBlocks ackBlocks = {{501, 520}, {471, 490}, {431, 460}};
+  // 1 type byte,
+  // 2 bytes for largest acked, 1 bytes for ack delay => 3 bytes
+  // 1 byte for ack block count
+  // There is 1 gap => each represented by 2 bytes => 2 bytes
+  // 2 byte for first ack block length, then 2 bytes for the next len => 4
+  // bytes
+  // total 11 bytes
+  auto frameType = GetParam();
+  TimePoint connTime = Clock::now();
+  WriteAckState ackState =
+      createTestWriteAckState(frameType, connTime, ackBlocks, 100);
+  AckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = ackDelay,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .recvTimestampsConfig = defaultAckReceiveTimestmpsConfig,
+      .maxAckReceiveTimestampsToSend = 100};
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    pktBuilder.remaining_ = 80;
+  }
+  auto ackFrameWriteResult = (frameType == FrameType::ACK)
+      ? *writeAckFrame(ackFrameMetaData, pktBuilder, frameType)
+      : *writeAckFrameWithReceivedTimestamps(
+            ackFrameMetaData, pktBuilder, frameType);
+  auto addlBytesConsumed = computeBytesForAckReceivedTimestamps(
+      ackFrameMetaData, ackFrameWriteResult, frameType);
+
+  if (frameType == FrameType::ACK) {
+    EXPECT_EQ(10, ackFrameWriteResult.bytesWritten);
+    EXPECT_EQ(kDefaultUDPSendPacketLen - 10, pktBuilder.remainingSpaceInPkt());
+  } else {
+    EXPECT_EQ(10 + addlBytesConsumed, ackFrameWriteResult.bytesWritten);
+    EXPECT_EQ(80 - (10 + addlBytesConsumed), pktBuilder.remainingSpaceInPkt());
+  }
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 3);
+  auto iter = ackFrame.ackBlocks.crbegin();
+  EXPECT_EQ(iter->start, 431);
+  EXPECT_EQ(iter->end, 460);
+  iter++;
+  EXPECT_EQ(iter->start, 471);
+  EXPECT_EQ(iter->end, 490);
+
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame =
+      parseQuicFrame(queue, frameType == FrameType::ACK_RECEIVE_TIMESTAMPS);
+  auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+  EXPECT_EQ(decodedAckFrame.largestAcked, 520);
+  EXPECT_EQ(
+      decodedAckFrame.ackDelay.count(),
+      computeExpectedDelay(ackDelay, kDefaultAckDelayExponent));
+  EXPECT_EQ(decodedAckFrame.ackBlocks.size(), 3);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[0].startPacket, 501);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[0].endPacket, 520);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[1].startPacket, 471);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[1].endPacket, 490);
+
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    // Multiple ack blocks, and received timestamps up to the space available
+    assertsOnDecodedReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrameWriteResult.writeAckFrame,
+
+        decodedAckFrame,
+        3 /* timestamp ranges count */,
+        57 /* timestamps count */);
+  }
 }
 
 TEST_F(QuicWriteCodecTest, WriteMaxStreamData) {
@@ -1723,5 +2358,9 @@ TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
   EXPECT_EQ(decodedFrame->reorderThreshold, frame.reorderThreshold);
 }
 
+INSTANTIATE_TEST_SUITE_P(
+    QuicWriteCodecTests,
+    QuicWriteCodecTest,
+    Values(FrameType::ACK, FrameType::ACK_RECEIVE_TIMESTAMPS));
 } // namespace test
 } // namespace quic

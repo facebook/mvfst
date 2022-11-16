@@ -8,8 +8,10 @@
 #pragma once
 
 #include <folly/io/Cursor.h>
+#include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/Types.h>
+#include <quic/state/TransportSettings.h>
 
 namespace quic {
 
@@ -21,13 +23,23 @@ struct CodecParameters {
   // This must not be set to zero.
   uint8_t peerAckDelayExponent{kDefaultAckDelayExponent};
   QuicVersion version{QuicVersion::MVFST};
+  folly::Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig =
+      folly::none;
 
   CodecParameters() = default;
+
+  CodecParameters(
+      uint8_t peerAckDelayExponentIn,
+      QuicVersion versionIn,
+      folly::Optional<AckReceiveTimestampsConfig>
+          maybeAckReceiveTimestampsConfigIn)
+      : peerAckDelayExponent(peerAckDelayExponentIn),
+        version(versionIn),
+        maybeAckReceiveTimestampsConfig(maybeAckReceiveTimestampsConfigIn) {}
 
   CodecParameters(uint8_t peerAckDelayExponentIn, QuicVersion versionIn)
       : peerAckDelayExponent(peerAckDelayExponentIn), version(versionIn) {}
 };
-
 struct ParsedLongHeaderInvariant {
   uint8_t initialByte;
   LongHeaderInvariant invariant;
@@ -117,7 +129,14 @@ PathResponseFrame decodePathResponseFrame(folly::io::Cursor& cursor);
 ReadAckFrame decodeAckFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
-    const CodecParameters& params);
+    const CodecParameters& params,
+    FrameType frameType = FrameType::ACK);
+
+ReadAckFrame decodeAckFrameWithReceivedTimestamps(
+    folly::io::Cursor& cursor,
+    const PacketHeader& header,
+    const CodecParameters& params,
+    FrameType frameType);
 
 ReadAckFrame decodeAckFrameWithECN(
     folly::io::Cursor& cursor,
@@ -143,8 +162,8 @@ DatagramFrame decodeDatagramFrame(BufQueue& queue, bool hasLen);
 /**
  * Parse the Invariant fields in Long Header.
  *
- * cursor: points to the byte just past initialByte. After parsing, cursor will
- *         be moved to the byte right after Source Connection ID.
+ * cursor: points to the byte just past initialByte. After parsing, cursor
+ * will be moved to the byte right after Source Connection ID.
  */
 folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
 parseLongHeaderInvariant(uint8_t initalByte, folly::io::Cursor& cursor);
@@ -213,4 +232,9 @@ folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     uint8_t initialByte,
     folly::io::Cursor& cursor,
     size_t dstConnIdSize = kDefaultConnectionIdSize);
+
+uint64_t computeAdjustedDelay(
+    FrameType frameType,
+    uint8_t exponentToUse,
+    folly::Optional<std::pair<uint64_t, size_t>> delay);
 } // namespace quic

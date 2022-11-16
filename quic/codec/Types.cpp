@@ -446,6 +446,8 @@ std::string toString(FrameType frame) {
     case FrameType::GROUP_STREAM_OFF_LEN:
     case FrameType::GROUP_STREAM_OFF_LEN_FIN:
       return "GROUP_STREAM";
+    case FrameType::ACK_RECEIVE_TIMESTAMPS:
+      return "ACK_RECEIVE_TIMESTAMPS";
   }
   LOG(WARNING) << "toString has unhandled frame type";
   return "UNKNOWN";

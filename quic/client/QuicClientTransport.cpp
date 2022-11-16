@@ -90,7 +90,9 @@ QuicClientTransport::QuicClientTransport(
   }
 
   conn_->readCodec->setCodecParameters(CodecParameters(
-      conn_->peerAckDelayExponent, conn_->originalVersion.value()));
+      conn_->peerAckDelayExponent,
+      conn_->originalVersion.value(),
+      conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer));
 
   VLOG(10) << "client created " << *conn_;
 }
@@ -1016,7 +1018,6 @@ void QuicClientTransport::startCryptoHandshake() {
   setD6DProbeTimeoutTransportParameter();
   setSupportedExtensionTransportParameters();
   maybeEnableStreamGroups();
-
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
       conn_->transportSettings.advertisedInitialConnectionWindowSize,
@@ -1734,6 +1735,35 @@ void QuicClientTransport::setSupportedExtensionTransportParameters() {
                 TransportParameterId::max_datagram_frame_size),
             conn_->datagramState.maxReadFrameSize);
     customTransportParameters_.push_back(maxDatagramFrameSize->encode());
+  }
+
+  auto ackReceiveTimestampsEnabled =
+      std::make_unique<CustomIntegralTransportParameter>(
+          static_cast<uint64_t>(
+              TransportParameterId::ack_receive_timestamps_enabled),
+          conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                  .has_value()
+              ? 1
+              : 0);
+  customTransportParameters_.push_back(ackReceiveTimestampsEnabled->encode());
+  if (conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+          .has_value()) {
+    auto maxReceiveTimestampsPerAck =
+        std::make_unique<CustomIntegralTransportParameter>(
+            static_cast<uint64_t>(
+                TransportParameterId::max_receive_timestamps_per_ack),
+            conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                .value()
+                .max_receive_timestamps_per_ack);
+    customTransportParameters_.push_back(maxReceiveTimestampsPerAck->encode());
+    auto receiveTimestampsExponent =
+        std::make_unique<CustomIntegralTransportParameter>(
+            static_cast<uint64_t>(
+                TransportParameterId::receive_timestamps_exponent),
+            conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                .value()
+                .receive_timestamps_exponent);
+    customTransportParameters_.push_back(receiveTimestampsExponent->encode());
   }
 }
 

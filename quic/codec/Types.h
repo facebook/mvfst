@@ -153,6 +153,14 @@ struct AckBlock {
       : startPacket(start), endPacket(end) {}
 };
 
+struct RecvdPacketsTimestampsRange {
+  uint64_t gap;
+  uint64_t timestamp_delta_count;
+  std::vector<uint64_t> deltas;
+};
+
+using RecvdPacketsTimestampsRangeVec = std::vector<RecvdPacketsTimestampsRange>;
+
 /**
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -182,7 +190,10 @@ struct ReadAckFrame {
   // These are ordered in descending order by start packet.
   using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame>;
   Vec ackBlocks;
-
+  FrameType frameType = FrameType::ACK;
+  folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
+  folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
+  RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   bool operator==(const ReadAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;
@@ -197,7 +208,10 @@ struct WriteAckFrame {
   AckBlockVec ackBlocks;
   // Delay in sending ack from time that packet was received.
   std::chrono::microseconds ackDelay{0us};
-
+  FrameType frameType = FrameType::ACK;
+  folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
+  folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
+  RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   bool operator==(const WriteAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;

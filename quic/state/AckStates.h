@@ -8,8 +8,8 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
+#include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
-#include <quic/common/CircularDeque.h>
 #include <quic/common/IntervalSet.h>
 
 #include <folly/Random.h>
@@ -17,7 +17,7 @@
 namespace quic {
 
 // Ack and PacketNumber states. This is per-packet number space.
-struct AckState {
+struct AckState : WriteAckState {
   // Largest ack that has been written to a packet
   folly::Optional<PacketNum> largestAckScheduled;
   // Count of outstanding packets received with only non-retransmittable data.
@@ -26,26 +26,12 @@ struct AckState {
   folly::Optional<TimePoint> largestRecvdPacketTime;
   // Largest received packet numbers on the connection.
   folly::Optional<PacketNum> largestRecvdPacketNum;
-  // Receive timestamp and packet number for the largest received packet.
-  //
-  // Updated whenever we receive a packet with a larger packet number
-  // than all previously received packets in the packet number space
-  // tracked by this AckState.
-  folly::Optional<RecvdPacketInfo> largestRecvdPacketInfo;
-  // Receive timestamp and packet number for the last received packet.
-  //
-  // Will be different from the value stored in largestRecvdPacketInfo
-  // if the last packet was received out of order and thus had a packet
-  // number less than that of a previously received packet in the packet
-  // number space tracked by this AckState.
-  folly::Optional<RecvdPacketInfo> lastRecvdPacketInfo;
   // Latest packet number acked by peer
   folly::Optional<PacketNum> largestAckedByPeer;
   // Largest received packet number at the time we sent our last close message.
   folly::Optional<PacketNum> largestReceivedAtLastCloseSent;
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
-  AckBlocks acks;
   uint64_t reorderThreshold{0};
   folly::Optional<uint64_t> tolerance;
   folly::Optional<uint64_t> ackFrequencySequenceNumber;
@@ -61,17 +47,6 @@ struct AckState {
   folly::Optional<TimePoint> latestRecvdPacketTime;
   // Packet number of the latest packet
   folly::Optional<PacketNum> latestReceivedPacketNum;
-  // Packet number and timestamp of recently received packets.
-  //
-  // The maximum number of packets stored in pktsReceivedTimestamps is
-  // controlled by kMaxReceivedPktsTimestampsStored.
-  //
-  // The packet number of entries in the deque is guarenteed to increase
-  // monotonically because an entry is only added for a received packet
-  // if the packet number is greater than the packet number of the last
-  // element in the deque (e.g., entries are not added for packets that
-  // arrive out of order relative to previously received packets).
-  CircularDeque<RecvdPacketInfo> recvdPacketInfos;
 };
 
 struct AckStates {

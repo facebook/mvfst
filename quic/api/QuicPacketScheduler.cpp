@@ -5,8 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/QuicConstants.h>
 #include <quic/api/QuicPacketScheduler.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <cstdint>
 
 namespace {
 using namespace quic;
@@ -589,8 +591,39 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
            ? std::chrono::duration_cast<std::chrono::microseconds>(
                  ackingTime - receivedTime)
            : 0us);
-  AckFrameMetaData meta(ackState_.acks, ackDelay, ackDelayExponentToUse);
-  auto ackWriteResult = writeAckFrame(meta, builder);
+
+  AckFrameMetaData meta = {
+      ackState_, /* ackState*/
+      ackDelay, /* ackDelay */
+      static_cast<uint8_t>(ackDelayExponentToUse), /* ackDelayExponent */
+      conn_.connectionTime, /* connect timestamp */
+      folly::none, /* recvTimestampsConfig */
+      folly::none /* maxAckReceiveTimestampsToSend */};
+
+  folly::Optional<AckFrameWriteResult> ackWriteResult;
+
+  bool isAckReceiveTimestampsSupported =
+      conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
+      conn_.maybePeerAckReceiveTimestampsConfig;
+
+  uint64_t peerRequestedTimestampsCount =
+      conn_.maybePeerAckReceiveTimestampsConfig.has_value()
+      ? conn_.maybePeerAckReceiveTimestampsConfig.value()
+            .maxReceiveTimestampsPerAck
+      : 0;
+
+  // If ack_receive_timestamps are not enabled on *either* end-points OR
+  // the peer requests 0 timestamps, we fall-back to using FrameType::ACK
+  if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
+    ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK);
+  } else {
+    meta.recvTimestampsConfig =
+        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+            .value();
+    meta.maxAckReceiveTimestampsToSend = peerRequestedTimestampsCount;
+    ackWriteResult = writeAckFrameWithReceivedTimestamps(
+        meta, builder, FrameType::ACK_RECEIVE_TIMESTAMPS);
+  }
   if (!ackWriteResult) {
     return folly::none;
   }

@@ -10,7 +10,9 @@
 #include <quic/loss/QuicLossFunctions.h>
 
 #include <folly/io/async/AsyncSocketException.h>
+#include <quic/QuicConstants.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
+#include <quic/codec/Decode.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
@@ -54,7 +56,9 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   newConn->readCodec->setClientConnectionId(*conn->clientConnectionId);
   newConn->readCodec->setCodecParameters(CodecParameters(
-      conn->peerAckDelayExponent, conn->originalVersion.value()));
+      conn->peerAckDelayExponent,
+      conn->originalVersion.value(),
+      conn->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer));
   newConn->earlyDataAppParamsValidator =
       std::move(conn->earlyDataAppParamsValidator);
   newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);
@@ -134,6 +138,15 @@ void processServerInitialParams(
   auto minAckDelay = getIntegerParameter(
       TransportParameterId::min_ack_delay, serverParams.parameters);
 
+  auto isAckReceiveTimestampsEnabled = getIntegerParameter(
+      TransportParameterId::ack_receive_timestamps_enabled,
+      serverParams.parameters);
+  auto maxReceiveTimestampsPerAck = getIntegerParameter(
+      TransportParameterId::max_receive_timestamps_per_ack,
+      serverParams.parameters);
+  auto receiveTimestampsExponent = getIntegerParameter(
+      TransportParameterId::receive_timestamps_exponent,
+      serverParams.parameters);
   if (conn.version == QuicVersion::QUIC_DRAFT ||
       conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS) {
@@ -224,7 +237,7 @@ void processServerInitialParams(
         : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
     handleStreamWindowUpdate(s, windowSize, packetNum);
   });
-  if (maxDatagramFrameSize.hasValue()) {
+  if (maxDatagramFrameSize.has_value()) {
     if (maxDatagramFrameSize.value() > 0 &&
         maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
       throw QuicTransportException(
@@ -236,6 +249,20 @@ void processServerInitialParams(
 
   if (peerMaxStreamGroupsAdvertized) {
     conn.peerMaxStreamGroupsAdvertized = *peerMaxStreamGroupsAdvertized;
+  }
+
+  if (isAckReceiveTimestampsEnabled.has_value() &&
+      isAckReceiveTimestampsEnabled.value() == 1) {
+    if (maxReceiveTimestampsPerAck.has_value() &&
+        receiveTimestampsExponent.has_value()) {
+      conn.maybePeerAckReceiveTimestampsConfig.assign(
+          {std::min(
+               static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
+               kMaxReceivedPktsTimestampsStored),
+           std::max(
+               static_cast<uint8_t>(receiveTimestampsExponent.value()),
+               static_cast<uint8_t>(0))});
+    }
   }
 }
 

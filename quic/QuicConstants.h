@@ -10,6 +10,7 @@
 #include <folly/Range.h>
 #include <folly/String.h>
 #include <quic/common/third-party/enum.h>
+#include <sys/types.h>
 #include <chrono>
 #include <cstdint>
 #include <ostream>
@@ -251,6 +252,7 @@ enum class FrameType : uint64_t {
   GROUP_STREAM_OFF_FIN = 0x37,
   GROUP_STREAM_OFF_LEN = 0x38,
   GROUP_STREAM_OFF_LEN_FIN = 0x39,
+  ACK_RECEIVE_TIMESTAMPS = 0xB0
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {
@@ -723,5 +725,6 @@ constexpr uint16_t kStreamGroupsEnabledCustomParamId = 0xFF99;
 
 // Maximum packet receive timestamps stored.
 constexpr uint8_t kMaxReceivedPktsTimestampsStored = 5;
+constexpr uint8_t kDefaultReceiveTimestampsExponent = 3;
 
 } // namespace quic

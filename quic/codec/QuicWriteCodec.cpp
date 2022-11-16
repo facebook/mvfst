@@ -12,6 +12,8 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
+#include <cstdint>
+#include <sstream>
 
 namespace {
 
@@ -265,22 +267,131 @@ static size_t fillFrameWithAckBlocks(
   return numAdditionalAckBlocks;
 }
 
-folly::Optional<AckFrameWriteResult> writeAckFrame(
+size_t computeSizeUsedByRecvdTimestamps(WriteAckFrame& ackFrame) {
+  size_t usedSize = 0;
+  for (auto& recvdPacketsTimestampRanges :
+       ackFrame.recvdPacketsTimestampRanges) {
+    usedSize += getQuicIntegerSizeThrows(recvdPacketsTimestampRanges.gap);
+    usedSize += getQuicIntegerSizeThrows(
+        recvdPacketsTimestampRanges.timestamp_delta_count);
+    for (auto& timestampDelta : recvdPacketsTimestampRanges.deltas) {
+      usedSize += getQuicIntegerSizeThrows(timestampDelta);
+    }
+  }
+  return usedSize;
+}
+
+static size_t fillPacketReceiveTimestamps(
     const quic::AckFrameMetaData& ackFrameMetaData,
-    PacketBuilderInterface& builder) {
-  if (ackFrameMetaData.ackBlocks.empty()) {
+    WriteAckFrame& ackFrame,
+    uint64_t largestAckedPacketNum,
+    uint64_t spaceLeft,
+    uint64_t receiveTimestampsExponent) {
+  if (ackFrameMetaData.ackState.recvdPacketInfos.size() == 0) {
+    return 0;
+  }
+  auto recvdPacketInfos = ackFrameMetaData.ackState.recvdPacketInfos;
+  // Insert all received packet timestamps into an interval set, to identify
+  // continguous ranges
+
+  DCHECK(ackFrameMetaData.maxAckReceiveTimestampsToSend.has_value());
+  auto maxRecvTimestampsToSend =
+      ackFrameMetaData.maxAckReceiveTimestampsToSend.value();
+  uint64_t pktsAdded = 0;
+  IntervalSet<PacketNum> receivedPktNumsIntervalSet;
+  for (auto& recvdPkt : recvdPacketInfos) {
+    // Add up to the peer requested max ack receive timestamps;
+    if (pktsAdded == maxRecvTimestampsToSend) {
+      break;
+    }
+    receivedPktNumsIntervalSet.insert(recvdPkt.pktNum);
+    pktsAdded++;
+  }
+  auto prevPktNum = largestAckedPacketNum;
+  auto timestampIt = recvdPacketInfos.crbegin();
+  size_t cumUsedSpace = 0;
+  // We start from the latest timestamp intervals
+  bool outOfSpace = false;
+  for (auto timestampIntervalsIt = receivedPktNumsIntervalSet.crbegin();
+       timestampIntervalsIt != receivedPktNumsIntervalSet.crend();
+       timestampIntervalsIt++) {
+    RecvdPacketsTimestampsRange nextTimestampRange;
+    size_t nextTimestampRangeUsedSpace = 0;
+    // Compute pktNum gap for each time-stamp range
+    if (ackFrame.recvdPacketsTimestampRanges.empty()) {
+      nextTimestampRange.gap = prevPktNum - timestampIntervalsIt->end;
+    } else {
+      nextTimestampRange.gap = prevPktNum - 2 - timestampIntervalsIt->end;
+    }
+    // Intialize spaced used by the next candidate time-stamp range
+    nextTimestampRangeUsedSpace +=
+        getQuicIntegerSizeThrows(nextTimestampRange.gap);
+
+    while (timestampIt != recvdPacketInfos.crend() &&
+           timestampIt->pktNum >= timestampIntervalsIt->start &&
+           timestampIt->pktNum <= timestampIntervalsIt->end) {
+      std::chrono::microseconds deltaDuration;
+      if (timestampIt == recvdPacketInfos.crbegin()) {
+        deltaDuration = (timestampIt->timeStamp > ackFrameMetaData.connTime)
+            ? std::chrono::duration_cast<std::chrono::microseconds>(
+                  timestampIt->timeStamp - ackFrameMetaData.connTime)
+            : 0us;
+      } else {
+        deltaDuration = std::chrono::duration_cast<std::chrono::microseconds>(
+            (timestampIt - 1)->timeStamp - timestampIt->timeStamp);
+      }
+      auto delta = deltaDuration.count() >> receiveTimestampsExponent;
+      // Check if adding a new time-stamp delta from the current time-stamp
+      // interval Will allow us to run out of space. Since adding a new delta
+      // impacts cumulative counts of deltas these are not already incorporated
+      // into nextTimestampRangeUsedSpace.
+      if (spaceLeft <
+          (cumUsedSpace + nextTimestampRangeUsedSpace +
+           getQuicIntegerSizeThrows(delta) +
+           getQuicIntegerSizeThrows(nextTimestampRange.deltas.size() + 1) +
+           getQuicIntegerSizeThrows(
+               ackFrame.recvdPacketsTimestampRanges.size() + 1))) {
+        outOfSpace = true;
+        break;
+      }
+      nextTimestampRange.deltas.push_back(delta);
+      nextTimestampRangeUsedSpace += getQuicIntegerSizeThrows(delta);
+      timestampIt++;
+    }
+    if (nextTimestampRange.deltas.size() > 0) {
+      nextTimestampRange.timestamp_delta_count =
+          nextTimestampRange.deltas.size();
+      cumUsedSpace += nextTimestampRangeUsedSpace +
+          getQuicIntegerSizeThrows(nextTimestampRange.deltas.size());
+      ackFrame.recvdPacketsTimestampRanges.push_back(nextTimestampRange);
+      prevPktNum = timestampIntervalsIt->start;
+      DCHECK(cumUsedSpace <= spaceLeft);
+    }
+    if (outOfSpace) {
+      break;
+    }
+  }
+  DCHECK(cumUsedSpace == computeSizeUsedByRecvdTimestamps(ackFrame));
+  return ackFrame.recvdPacketsTimestampRanges.size();
+}
+
+folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
+    const quic::AckFrameMetaData& ackFrameMetaData,
+    PacketBuilderInterface& builder,
+    FrameType frameType) {
+  if (ackFrameMetaData.ackState.acks.empty()) {
     return folly::none;
   }
+  const WriteAckState& ackState = ackFrameMetaData.ackState;
   // The last block must be the largest block.
-  auto largestAckedPacket = ackFrameMetaData.ackBlocks.back().end;
+  auto largestAckedPacket = ackState.acks.back().end;
   // ackBlocks are already an interval set so each value is naturally
   // non-overlapping.
-  auto firstAckBlockLength =
-      largestAckedPacket - ackFrameMetaData.ackBlocks.back().start;
+  auto firstAckBlockLength = largestAckedPacket - ackState.acks.back().start;
 
   WriteAckFrame ackFrame;
+  ackFrame.frameType = frameType;
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
-  uint64_t beginningSpace = spaceLeft;
   ackFrame.ackBlocks.reserve(spaceLeft / 4);
 
   // We could technically split the range if the size of the representation of
@@ -297,18 +408,42 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
 
   // Required fields are Type, LargestAcked, AckDelay, AckBlockCount,
   // firstAckBlockLength
-  QuicInteger encodedintFrameType(static_cast<uint8_t>(FrameType::ACK));
+  QuicInteger encodedintFrameType(static_cast<uint8_t>(frameType));
   auto headerSize = encodedintFrameType.getSize() +
       largestAckedPacketInt.getSize() + ackDelayInt.getSize() +
       minAdditionalAckBlockCount.getSize() + firstAckBlockLengthInt.getSize();
-  if (spaceLeft < headerSize) {
+
+  size_t minAdditionalAckReceiveTimestampsFieldsSize = 0;
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    // Compute minimum size requirements for 3 fields that must be sent
+    // in every ACK_RECEIVE_TIMESTAMPS frame
+    uint64_t countTimestampRanges = 0;
+    uint64_t maybeLastPktNum = 0;
+    std::chrono::microseconds maybeLastPktTsDelta = 0us;
+    if (ackState.lastRecvdPacketInfo)
+      maybeLastPktNum = ackState.lastRecvdPacketInfo.value().pktNum;
+
+    maybeLastPktTsDelta =
+        (ackState.lastRecvdPacketInfo.value().timeStamp >
+                 ackFrameMetaData.connTime
+             ? std::chrono::duration_cast<std::chrono::microseconds>(
+                   ackState.lastRecvdPacketInfo.value().timeStamp -
+                   ackFrameMetaData.connTime)
+             : 0us);
+
+    minAdditionalAckReceiveTimestampsFieldsSize =
+        getQuicIntegerSize(countTimestampRanges).value_or(0) +
+        getQuicIntegerSize(maybeLastPktNum).value_or(0) +
+        getQuicIntegerSize(maybeLastPktTsDelta.count()).value_or(0);
+  }
+  if (spaceLeft < (headerSize + minAdditionalAckReceiveTimestampsFieldsSize)) {
     return folly::none;
   }
-  spaceLeft -= headerSize;
+  spaceLeft -= (headerSize + minAdditionalAckReceiveTimestampsFieldsSize);
 
-  ackFrame.ackBlocks.push_back(ackFrameMetaData.ackBlocks.back());
+  ackFrame.ackBlocks.push_back(ackState.acks.back());
   auto numAdditionalAckBlocks =
-      fillFrameWithAckBlocks(ackFrameMetaData.ackBlocks, ackFrame, spaceLeft);
+      fillFrameWithAckBlocks(ackState.acks, ackFrame, spaceLeft);
 
   QuicInteger numAdditionalAckBlocksInt(numAdditionalAckBlocks);
   builder.write(encodedintFrameType);
@@ -317,7 +452,7 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
   builder.write(numAdditionalAckBlocksInt);
   builder.write(firstAckBlockLengthInt);
 
-  PacketNum currentSeqNum = ackFrameMetaData.ackBlocks.back().start;
+  PacketNum currentSeqNum = ackState.acks.back().start;
   for (auto it = ackFrame.ackBlocks.cbegin() + 1;
        it != ackFrame.ackBlocks.cend();
        ++it) {
@@ -331,10 +466,108 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
     currentSeqNum = it->start;
   }
   ackFrame.ackDelay = ackFrameMetaData.ackDelay;
-  builder.appendFrame(std::move(ackFrame));
-  return AckFrameWriteResult(
+  return ackFrame;
+}
+
+folly::Optional<AckFrameWriteResult> writeAckFrame(
+    const quic::AckFrameMetaData& ackFrameMetaData,
+    PacketBuilderInterface& builder,
+    FrameType frameType) {
+  uint64_t beginningSpace = builder.remainingSpaceInPkt();
+  auto maybeWriteAckFrame =
+      writeAckFrameToPacketBuilder(ackFrameMetaData, builder, frameType);
+
+  if (maybeWriteAckFrame.has_value()) {
+    builder.appendFrame(std::move(maybeWriteAckFrame.value()));
+    return AckFrameWriteResult(
+        beginningSpace - builder.remainingSpaceInPkt(),
+        maybeWriteAckFrame.value(),
+        maybeWriteAckFrame.value().ackBlocks.size());
+  } else {
+    return folly::none;
+  }
+}
+
+folly::Optional<AckFrameWriteResult> writeAckFrameWithReceivedTimestamps(
+    const quic::AckFrameMetaData& ackFrameMetaData,
+    PacketBuilderInterface& builder,
+    FrameType frameType) {
+  auto beginningSpace = builder.remainingSpaceInPkt();
+  auto maybeAckFrame =
+      writeAckFrameToPacketBuilder(ackFrameMetaData, builder, frameType);
+  if (!maybeAckFrame.has_value()) {
+    return folly::none;
+  }
+  auto ackFrame = maybeAckFrame.value();
+  const WriteAckState& ackState = ackFrameMetaData.ackState;
+  uint64_t spaceLeft = builder.remainingSpaceInPkt();
+  uint64_t lastPktNum = 0;
+  std::chrono::microseconds lastPktTsDelta = 0us;
+  if (ackState.lastRecvdPacketInfo) {
+    lastPktNum = ackState.lastRecvdPacketInfo.value().pktNum;
+    lastPktTsDelta =
+        (ackState.lastRecvdPacketInfo.value().timeStamp >
+                 ackFrameMetaData.connTime
+             ? std::chrono::duration_cast<std::chrono::microseconds>(
+                   ackState.lastRecvdPacketInfo.value().timeStamp -
+                   ackFrameMetaData.connTime)
+             : 0us);
+  }
+  QuicInteger lastRecvdPacketNumInt(lastPktNum);
+  builder.write(lastRecvdPacketNumInt);
+  ackFrame.maybeLatestRecvdPacketNum = lastRecvdPacketNumInt.getValue();
+  QuicInteger lastRecvdPacketTimeInt(lastPktTsDelta.count());
+  builder.write(lastRecvdPacketTimeInt);
+  ackFrame.maybeLatestRecvdPacketTime =
+      std::chrono::microseconds(lastRecvdPacketTimeInt.getValue());
+
+  size_t countTimestampRanges = 0;
+  size_t countTimestamps = 0;
+  spaceLeft = builder.remainingSpaceInPkt();
+  if (spaceLeft > 0) {
+    auto largestAckedPacket = ackState.acks.back().end;
+    uint8_t receiveTimestampsExponentToUse =
+        ackFrameMetaData.recvTimestampsConfig.has_value()
+        ? ackFrameMetaData.recvTimestampsConfig.value()
+              .receive_timestamps_exponent
+        : kDefaultReceiveTimestampsExponent;
+    countTimestampRanges = fillPacketReceiveTimestamps(
+        ackFrameMetaData,
+        ackFrame,
+        largestAckedPacket,
+        spaceLeft,
+        receiveTimestampsExponentToUse);
+    if (countTimestampRanges > 0) {
+      QuicInteger timeStampRangeCountInt(
+          ackFrame.recvdPacketsTimestampRanges.size());
+      builder.write(timeStampRangeCountInt);
+      for (auto& recvdPacketsTimestampRanges :
+           ackFrame.recvdPacketsTimestampRanges) {
+        QuicInteger gapInt(recvdPacketsTimestampRanges.gap);
+        QuicInteger timestampDeltaCountInt(
+            recvdPacketsTimestampRanges.timestamp_delta_count);
+        builder.write(gapInt);
+        builder.write(timestampDeltaCountInt);
+        for (auto& timestamp : recvdPacketsTimestampRanges.deltas) {
+          QuicInteger deltaInt(timestamp);
+          builder.write(deltaInt);
+          countTimestamps++;
+        }
+      }
+    } else {
+      QuicInteger timeStampRangeCountInt(0);
+      builder.write(timeStampRangeCountInt);
+    }
+  }
+  auto ackFrameWriteResult = AckFrameWriteResult(
       beginningSpace - builder.remainingSpaceInPkt(),
-      1 + numAdditionalAckBlocks);
+      ackFrame,
+      ackFrame.ackBlocks.size(),
+      countTimestampRanges,
+      countTimestamps);
+
+  builder.appendFrame(std::move(ackFrame));
+  return ackFrameWriteResult;
 }
 
 size_t writeSimpleFrame(
