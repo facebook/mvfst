@@ -1228,7 +1228,7 @@ void QuicClientTransport::recvMsg(
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
     Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
-    struct iovec vec {};
+    struct iovec vec;
     vec.iov_base = readBuffer->writableData();
     vec.iov_len = readBufferSize;
 
@@ -1348,10 +1348,6 @@ void QuicClientTransport::recvMmsg(
     folly::Optional<folly::SocketAddress>& server,
     size_t& totalData) {
   auto& msgs = recvmmsgStorage_.msgs;
-  auto& addrs = recvmmsgStorage_.addrs;
-  auto& readBuffers = recvmmsgStorage_.readBuffers;
-  auto& iovecs = recvmmsgStorage_.iovecs;
-  auto& freeBufs = recvmmsgStorage_.freeBufs;
   int flags = 0;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   bool useGRO = sock.getGRO() > 0;
@@ -1366,28 +1362,25 @@ void QuicClientTransport::recvMmsg(
     flags |= MSG_TRUNC;
   }
 #endif
-
   for (uint16_t i = 0; i < numPackets; ++i) {
-    Buf readBuffer;
-    if (freeBufs.empty()) {
-      readBuffer = folly::IOBuf::createCombined(readBufferSize);
-    } else {
-      readBuffer = std::move(freeBufs.back());
-      DCHECK(readBuffer != nullptr);
-      freeBufs.pop_back();
-    }
-    iovecs[i].iov_base = readBuffer->writableData();
-    iovecs[i].iov_len = readBufferSize;
-    readBuffers[i] = std::move(readBuffer);
-
-    auto* rawAddr = reinterpret_cast<sockaddr*>(&addrs[i]);
-    rawAddr->sa_family = socket_->address().getFamily();
-
+    auto& addr = recvmmsgStorage_.impl_[i].addr;
+    auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
+    auto& iovec = recvmmsgStorage_.impl_[i].iovec;
     struct msghdr* msg = &msgs[i].msg_hdr;
+
+    if (!readBuffer) {
+      readBuffer = folly::IOBuf::createCombined(readBufferSize);
+      iovec.iov_base = readBuffer->writableData();
+      iovec.iov_len = readBufferSize;
+      msg->msg_iov = &iovec;
+      msg->msg_iovlen = 1;
+    }
+    CHECK(readBuffer != nullptr);
+
+    auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
+    rawAddr->sa_family = socket_->address().getFamily();
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
-    msg->msg_iov = &iovecs[i];
-    msg->msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO || useTS) {
       ::memset(controlVec[i].data(), 0, controlVec[i].size());
@@ -1421,18 +1414,21 @@ void QuicClientTransport::recvMmsg(
   CHECK_LE(numMsgsRecvd, numPackets);
   // Need to save our position so we can recycle the unused buffers.
   uint16_t i;
-  for (i = 0; i < numMsgsRecvd; ++i) {
-    size_t bytesRead = msgs[i].msg_len;
+  for (i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
+    auto& addr = recvmmsgStorage_.impl_[i].addr;
+    auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
+    auto& msg = msgs[i];
+
+    size_t bytesRead = msg.msg_len;
     if (bytesRead == 0) {
-      // Empty datagram, this is probably garbage matching our tuple, we should
-      // ignore such datagrams.
-      freeBufs.emplace_back(std::move(readBuffers[i]));
+      // Empty datagram, this is probably garbage matching our tuple, we
+      // should ignore such datagrams.
       continue;
     }
     folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO || useTS) {
-      folly::AsyncUDPSocket::fromMsg(params, msgs[i].msg_hdr);
+      folly::AsyncUDPSocket::fromMsg(params, msg.msg_hdr);
 
       // truncated
       if (bytesRead > readBufferSize) {
@@ -1446,13 +1442,13 @@ void QuicClientTransport::recvMmsg(
     totalData += bytesRead;
 
     if (!server) {
-      server = folly::SocketAddress();
-      auto* rawAddr = reinterpret_cast<sockaddr*>(&addrs[i]);
+      server.emplace(folly::SocketAddress());
+      auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
       server->setFromSockaddr(rawAddr, kAddrLen);
     }
 
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
-    readBuffers[i]->append(bytesRead);
+    readBuffer->append(bytesRead);
     if (params.gro > 0) {
       size_t len = bytesRead;
       size_t remaining = len;
@@ -1462,7 +1458,7 @@ void QuicClientTransport::recvMmsg(
       networkData.packets.reserve(totalNumPackets);
       while (remaining) {
         if (static_cast<int>(remaining) > params.gro) {
-          auto tmp = readBuffers[i]->cloneOne();
+          auto tmp = readBuffer->cloneOne();
           // start at offset
           tmp->trimStart(offset);
           // the actual len is len - offset now
@@ -1476,21 +1472,17 @@ void QuicClientTransport::recvMmsg(
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
-          readBuffers[i]->trimStart(offset);
-          DCHECK_EQ(readBuffers[i]->length(), remaining);
+          readBuffer->trimStart(offset);
+          DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.packets.emplace_back(std::move(readBuffers[i]));
+          networkData.packets.emplace_back(std::move(readBuffer));
         }
       }
     } else {
-      networkData.packets.emplace_back(std::move(readBuffers[i]));
+      networkData.packets.emplace_back(std::move(readBuffer));
     }
 
     trackDatagramReceived(bytesRead);
-  }
-  for (; i < numPackets; i++) {
-    freeBufs.emplace_back(std::move(readBuffers[i]));
-    DCHECK(freeBufs.back() != nullptr);
   }
 }
 
@@ -1863,10 +1855,7 @@ void QuicClientTransport::maybeEnableStreamGroups() {
 void QuicClientTransport::RecvmmsgStorage::resize(size_t numPackets) {
   if (msgs.size() != numPackets) {
     msgs.resize(numPackets);
-    addrs.resize(numPackets);
-    readBuffers.resize(numPackets);
-    iovecs.resize(numPackets);
-    freeBufs.reserve(numPackets);
+    impl_.resize(numPackets);
   }
 }
 

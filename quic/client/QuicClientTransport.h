@@ -236,15 +236,16 @@ class QuicClientTransport
 
  private:
   struct RecvmmsgStorage {
+    struct impl_ {
+      struct sockaddr_storage addr;
+      struct iovec iovec;
+      // Buffers we pass to recvmmsg.
+      Buf readBuffer;
+    };
+
     // Storage for the recvmmsg system call.
     std::vector<struct mmsghdr> msgs;
-    std::vector<struct sockaddr_storage> addrs;
-    std::vector<struct iovec> iovecs;
-    // Buffers we pass to recvmmsg.
-    std::vector<Buf> readBuffers;
-    // Free buffers which were not used in previous iterations.
-    std::vector<Buf> freeBufs;
-
+    std::vector<struct impl_> impl_;
     void resize(size_t numPackets);
   };
 
