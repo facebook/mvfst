@@ -9,10 +9,20 @@
 
 #include <folly/portability/GMock.h>
 #include <quic/QuicConstants.h>
+#include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
 namespace test {
+
+class MockCongestionControllerFactory : public CongestionControllerFactory {
+ public:
+  MOCK_METHOD(
+      std::unique_ptr<CongestionController>,
+      makeCongestionController,
+      (QuicConnectionStateBase&, CongestionControlType));
+};
+
 class MockCongestionController : public CongestionController {
  public:
   ~MockCongestionController() override {}
