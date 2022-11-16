@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 #include <quic/state/OutstandingPacket.h>
 
+#include <quic/codec/Types.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -16,6 +17,9 @@
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
+#include <chrono>
+#include <cstdint>
+#include <deque>
 
 using namespace testing;
 
@@ -71,60 +75,60 @@ TEST_P(UpdateLargestReceivedPacketNumTest, FirstPacketNotOutOfOrder) {
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNew) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  getAckState(conn, GetParam()).largestReceivedPacketNum = 100;
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 100;
   auto currentLargestReceived =
-      *getAckState(conn, GetParam()).largestReceivedPacketNum;
+      *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived + 1;
   auto distance = updateLargestReceivedPacketNum(
       getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 0);
   EXPECT_GT(
-      *getAckState(conn, GetParam()).largestReceivedPacketNum,
+      *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
 }
 
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNewWithGap) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  getAckState(conn, GetParam()).largestReceivedPacketNum = 100;
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 100;
   auto currentLargestReceived =
-      *getAckState(conn, GetParam()).largestReceivedPacketNum;
+      *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived + 3;
   auto distance = updateLargestReceivedPacketNum(
       getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 2); // newReceived is 2 after the expected pkt num
   EXPECT_GT(
-      *getAckState(conn, GetParam()).largestReceivedPacketNum,
+      *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
 }
 
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveOld) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  getAckState(conn, GetParam()).largestReceivedPacketNum = 100;
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 100;
   auto currentLargestReceived =
-      *getAckState(conn, GetParam()).largestReceivedPacketNum;
+      *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived - 1;
   auto distance = updateLargestReceivedPacketNum(
       getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 2); // newReceived is 2 before the expected pkt num
   EXPECT_EQ(
-      *getAckState(conn, GetParam()).largestReceivedPacketNum,
+      *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
 }
 
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveOldWithGap) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  getAckState(conn, GetParam()).largestReceivedPacketNum = 100;
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 100;
   auto currentLargestReceived =
-      *getAckState(conn, GetParam()).largestReceivedPacketNum;
+      *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived - 5;
   auto distance = updateLargestReceivedPacketNum(
       getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 6); // newReceived is 6 before the expected pkt num
   EXPECT_EQ(
-      *getAckState(conn, GetParam()).largestReceivedPacketNum,
+      *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
 }
 
@@ -135,6 +139,78 @@ INSTANTIATE_TEST_SUITE_P(
         PacketNumberSpace::Initial,
         PacketNumberSpace::Handshake,
         PacketNumberSpace::AppData));
+
+class UpdateReceivedPacketTimestampsTest
+    : public TestWithParam<PacketNumberSpace> {};
+
+TEST_P(UpdateReceivedPacketTimestampsTest, TestUpdatePktReceiveTimestamps) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+
+  PacketNum nextPacketNum = 0;
+  TimePoint latestTimeStamp = Clock::now();
+  conn.ackStates = AckStates(nextPacketNum);
+  for (int i = 0; i < kMaxReceivedPktsTimestampsStored + 2; i++) {
+    updateAckState(
+        conn,
+        PacketNumberSpace::AppData,
+        nextPacketNum++,
+        true /* pktHasRetransmattableData */,
+        false /* pktHasCryptoData */,
+        latestTimeStamp);
+    latestTimeStamp += 1ms;
+  }
+  auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
+  EXPECT_EQ(ackState.recvdPacketInfos.size(), kMaxReceivedPktsTimestampsStored);
+  // First 2 packets (0, 1) should be popped.
+  EXPECT_EQ(ackState.recvdPacketInfos.front().pktNum, 2);
+  EXPECT_TRUE(ackState.largestRecvdPacketNum.has_value());
+  EXPECT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+
+  EXPECT_EQ(
+      ackState.largestRecvdPacketNum.value(),
+      kMaxReceivedPktsTimestampsStored + 1);
+  EXPECT_EQ(
+      ackState.lastRecvdPacketInfo.value().pktNum,
+      kMaxReceivedPktsTimestampsStored + 1);
+}
+
+TEST_P(
+    UpdateReceivedPacketTimestampsTest,
+    TestUpdateOutOfOrderPktReceiveTimestamps) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+
+  std::vector<PacketNum> receivedPkts = {0, 2, 3, 1, 4, 6, 5};
+  conn.ackStates = AckStates(receivedPkts.front());
+  auto recvdTs = Clock::now();
+  for (auto pktNum : receivedPkts) {
+    updateAckState(
+        conn,
+        PacketNumberSpace::AppData,
+        pktNum,
+        true /* pktHasRetransmattableData */,
+        false /* pktHasCryptoData */,
+        recvdTs);
+  }
+  // Packets 1 and 5 are out of order and will not be stored.
+  auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
+  std::deque<RecvdPacketInfo> expectedPktsInfo = {
+      {0, recvdTs}, {2, recvdTs}, {3, recvdTs}, {4, recvdTs}, {6, recvdTs}};
+  EXPECT_EQ(expectedPktsInfo.size(), ackState.recvdPacketInfos.size());
+  for (unsigned long i = 0; i < expectedPktsInfo.size(); i++) {
+    EXPECT_EQ(expectedPktsInfo[i].pktNum, ackState.recvdPacketInfos[i].pktNum);
+    EXPECT_EQ(
+        expectedPktsInfo[i].timeStamp, ackState.recvdPacketInfos[i].timeStamp);
+  }
+  EXPECT_EQ(ackState.lastRecvdPacketInfo.value().pktNum, 5);
+  EXPECT_EQ(ackState.lastRecvdPacketInfo.value().timeStamp, recvdTs);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    UpdateReceivedPacketTimestampsTests,
+    UpdateReceivedPacketTimestampsTest,
+    Values(PacketNumberSpace::AppData));
 
 class UpdateAckStateTest : public TestWithParam<PacketNumberSpace> {};
 
@@ -246,7 +322,7 @@ TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequency) {
     updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
   }
   ASSERT_EQ(
-      ackState.largestReceivedPacketNum.value(),
+      ackState.largestRecvdPacketNum.value(),
       conn.transportSettings.rxPacketsBeforeAckInitThreshold);
   ackState.needsToSendAckImmediately = false;
   conn.pendingEvents.scheduleAckTimeout = false;
@@ -270,7 +346,7 @@ TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequencyFromTolerance) {
       FizzServerQuicHandshakeContext::Builder().build());
   PacketNum nextPacketNum = 1;
   auto& ackState = getAckState(conn, GetParam());
-  ackState.largestReceivedPacketNum = nextPacketNum - 1;
+  ackState.largestRecvdPacketNum = nextPacketNum - 1;
   ackState.tolerance = 2;
   for (; nextPacketNum <= 10; nextPacketNum++) {
     updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
@@ -1088,9 +1164,9 @@ TEST_F(QuicStateFunctionsTest, UpdateLargestReceivePacketsAtLatCloseSent) {
   EXPECT_FALSE(conn.ackStates.initialAckState.largestReceivedAtLastCloseSent);
   EXPECT_FALSE(conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent);
   EXPECT_FALSE(conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent);
-  conn.ackStates.initialAckState.largestReceivedPacketNum = 123;
-  conn.ackStates.handshakeAckState.largestReceivedPacketNum = 654;
-  conn.ackStates.appDataAckState.largestReceivedPacketNum = 789;
+  conn.ackStates.initialAckState.largestRecvdPacketNum = 123;
+  conn.ackStates.handshakeAckState.largestRecvdPacketNum = 654;
+  conn.ackStates.appDataAckState.largestRecvdPacketNum = 789;
   updateLargestReceivedPacketsAtLastCloseSent(conn);
   EXPECT_EQ(
       123, *conn.ackStates.initialAckState.largestReceivedAtLastCloseSent);
@@ -1103,7 +1179,7 @@ TEST_F(QuicStateFunctionsTest, UpdateLargestReceivePacketsAtLatCloseSent) {
 TEST_P(QuicStateFunctionsTest, HasReceivedPackets) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   EXPECT_FALSE(hasReceivedPackets(conn));
-  getAckState(conn, GetParam()).largestReceivedPacketNum = 123;
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 123;
   EXPECT_TRUE(hasReceivedPackets(conn));
 }
 
@@ -1117,7 +1193,7 @@ TEST_P(QuicStateFunctionsTest, HasReceivedPacketsAtLastCloseSent) {
 TEST_P(QuicStateFunctionsTest, HasNotReceivedNewPacketsSinceLastClose) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(conn));
-  getAckState(conn, GetParam()).largestReceivedPacketNum = 1;
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 1;
   EXPECT_FALSE(hasNotReceivedNewPacketsSinceLastCloseSent(conn));
   getAckState(conn, GetParam()).largestReceivedAtLastCloseSent = 1;
   EXPECT_TRUE(hasReceivedPacketsAtLastCloseSent(conn));

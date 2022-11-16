@@ -111,7 +111,7 @@ void updateAckSendStateOnRecvPacket(
     if (ackState.tolerance.hasValue()) {
       thresh = ackState.tolerance.value();
     } else {
-      thresh = ackState.largestReceivedPacketNum.value_or(0) >
+      thresh = ackState.largestRecvdPacketNum.value_or(0) >
               conn.transportSettings.rxPacketsBeforeAckInitThreshold
           ? conn.transportSettings.rxPacketsBeforeAckAfterInit
           : conn.transportSettings.rxPacketsBeforeAckBeforeInit;
@@ -290,37 +290,37 @@ bool hasNotReceivedNewPacketsSinceLastCloseSent(
   DCHECK(
       !conn.ackStates.initialAckState.largestReceivedAtLastCloseSent ||
       *conn.ackStates.initialAckState.largestReceivedAtLastCloseSent <=
-          *conn.ackStates.initialAckState.largestReceivedPacketNum);
+          *conn.ackStates.initialAckState.largestRecvdPacketNum);
   DCHECK(
       !conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent ||
       *conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent <=
-          *conn.ackStates.handshakeAckState.largestReceivedPacketNum);
+          *conn.ackStates.handshakeAckState.largestRecvdPacketNum);
   DCHECK(
       !conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent ||
       *conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent <=
-          *conn.ackStates.appDataAckState.largestReceivedPacketNum);
+          *conn.ackStates.appDataAckState.largestRecvdPacketNum);
   return conn.ackStates.initialAckState.largestReceivedAtLastCloseSent ==
-      conn.ackStates.initialAckState.largestReceivedPacketNum &&
+      conn.ackStates.initialAckState.largestRecvdPacketNum &&
       conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent ==
-      conn.ackStates.handshakeAckState.largestReceivedPacketNum &&
+      conn.ackStates.handshakeAckState.largestRecvdPacketNum &&
       conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent ==
-      conn.ackStates.appDataAckState.largestReceivedPacketNum;
+      conn.ackStates.appDataAckState.largestRecvdPacketNum;
 }
 
 void updateLargestReceivedPacketsAtLastCloseSent(
     QuicConnectionStateBase& conn) noexcept {
   conn.ackStates.initialAckState.largestReceivedAtLastCloseSent =
-      conn.ackStates.initialAckState.largestReceivedPacketNum;
+      conn.ackStates.initialAckState.largestRecvdPacketNum;
   conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent =
-      conn.ackStates.handshakeAckState.largestReceivedPacketNum;
+      conn.ackStates.handshakeAckState.largestRecvdPacketNum;
   conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent =
-      conn.ackStates.appDataAckState.largestReceivedPacketNum;
+      conn.ackStates.appDataAckState.largestRecvdPacketNum;
 }
 
 bool hasReceivedPackets(const QuicConnectionStateBase& conn) noexcept {
-  return conn.ackStates.initialAckState.largestReceivedPacketNum ||
-      conn.ackStates.handshakeAckState.largestReceivedPacketNum ||
-      conn.ackStates.appDataAckState.largestReceivedPacketNum;
+  return conn.ackStates.initialAckState.largestRecvdPacketNum ||
+      conn.ackStates.handshakeAckState.largestRecvdPacketNum ||
+      conn.ackStates.appDataAckState.largestRecvdPacketNum;
 }
 
 folly::Optional<TimePoint>& getLossTime(

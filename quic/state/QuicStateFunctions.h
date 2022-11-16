@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/QuicConstants.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/state/StateData.h>
@@ -64,16 +65,27 @@ uint64_t updateLargestReceivedPacketNum(
     PacketNum packetNum,
     TimePoint receivedTime) {
   PacketNum expectedNextPacket = 0;
-  if (ackState.largestReceivedPacketNum) {
-    expectedNextPacket = *ackState.largestReceivedPacketNum + 1;
+  if (ackState.largestRecvdPacketNum) {
+    expectedNextPacket = *ackState.largestRecvdPacketNum + 1;
   }
-  ackState.largestReceivedPacketNum = std::max<PacketNum>(
-      ackState.largestReceivedPacketNum.value_or(packetNum), packetNum);
+  ackState.largestRecvdPacketNum = std::max<PacketNum>(
+      ackState.largestRecvdPacketNum.value_or(packetNum), packetNum);
   ackState.acks.insert(packetNum);
-  if (ackState.largestReceivedPacketNum == packetNum) {
+  if (ackState.largestRecvdPacketNum == packetNum) {
     ackState.largestRecvdPacketTime = receivedTime;
   }
   static_assert(ClockType::is_steady, "Needs steady clock");
+
+  ackState.lastRecvdPacketInfo.assign({packetNum, receivedTime});
+
+  if (packetNum >= expectedNextPacket) {
+    if (ackState.recvdPacketInfos.size() == kMaxReceivedPktsTimestampsStored) {
+      ackState.recvdPacketInfos.pop_front();
+    }
+    ackState.recvdPacketInfos.emplace_back(
+        RecvdPacketInfo{packetNum, receivedTime});
+  }
+
   if (expectedNextPacket) {
     return (packetNum > expectedNextPacket) ? packetNum - expectedNextPacket
                                             : expectedNextPacket - packetNum;

@@ -1318,7 +1318,7 @@ void onServerReadDataFromOpen(
     if (conn.peerAddress != readData.peer) {
       // TODO use new conn id, make sure the other endpoint has new conn id
       if (isNonProbingPacket) {
-        if (packetNum == ackState.largestReceivedPacketNum) {
+        if (packetNum == ackState.largestRecvdPacketNum) {
           ShortHeader* shortHeader = regularPacket.header.asShort();
           bool intentionalMigration = false;
           if (shortHeader &&
@@ -1531,10 +1531,10 @@ void onServerReadDataFromClosed(
 
   // We only need to set the largest received packet number in order to
   // determine whether or not we need to send a new close.
-  auto& largestReceivedPacketNum =
-      getAckState(conn, pnSpace).largestReceivedPacketNum;
-  largestReceivedPacketNum = std::max<PacketNum>(
-      largestReceivedPacketNum.value_or(packetNum), packetNum);
+  auto& largestRecvdPacketNum =
+      getAckState(conn, pnSpace).largestRecvdPacketNum;
+  largestRecvdPacketNum =
+      std::max<PacketNum>(largestRecvdPacketNum.value_or(packetNum), packetNum);
 }
 
 void onServerClose(QuicServerConnectionState& conn) {

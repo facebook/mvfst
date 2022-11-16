@@ -49,6 +49,14 @@ template <class T>
 using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame>;
 using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
 
+/**
+ * Info stored on receipt of a packet for use in subsequent ACK.
+ */
+struct RecvdPacketInfo {
+  PacketNum pktNum;
+  TimePoint timeStamp;
+};
+
 struct PaddingFrame {
   bool operator==(const PaddingFrame& /*rhs*/) const {
     return true;

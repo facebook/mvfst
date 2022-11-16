@@ -185,25 +185,25 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   }
 
   PacketNum expectedNextPacketNum = 0;
-  folly::Optional<PacketNum> largestReceivedPacketNum;
+  folly::Optional<PacketNum> largestRecvdPacketNum;
   switch (longHeaderTypeToProtectionType(type)) {
     case ProtectionType::Initial:
-      largestReceivedPacketNum =
-          ackStates.initialAckState.largestReceivedPacketNum;
+      largestRecvdPacketNum = ackStates.initialAckState.largestRecvdPacketNum;
+
       break;
     case ProtectionType::Handshake:
-      largestReceivedPacketNum =
-          ackStates.handshakeAckState.largestReceivedPacketNum;
+      largestRecvdPacketNum = ackStates.handshakeAckState.largestRecvdPacketNum;
+
       break;
     case ProtectionType::ZeroRtt:
-      largestReceivedPacketNum =
-          ackStates.appDataAckState.largestReceivedPacketNum;
+      largestRecvdPacketNum = ackStates.appDataAckState.largestRecvdPacketNum;
+
       break;
     default:
       folly::assume_unreachable();
   }
-  if (largestReceivedPacketNum) {
-    expectedNextPacketNum = 1 + *largestReceivedPacketNum;
+  if (largestRecvdPacketNum) {
+    expectedNextPacketNum = 1 + *largestRecvdPacketNum;
   }
   folly::MutableByteRange initialByteRange(
       currentPacketData->writableData(), 1);
@@ -259,8 +259,8 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
   // TODO: allow other connid lengths from the state.
   size_t packetNumberOffset = 1 + dstConnIdSize;
   PacketNum expectedNextPacketNum =
-      ackStates.appDataAckState.largestReceivedPacketNum
-      ? (1 + *ackStates.appDataAckState.largestReceivedPacketNum)
+      ackStates.appDataAckState.largestRecvdPacketNum
+      ? (1 + *ackStates.appDataAckState.largestRecvdPacketNum)
       : 0;
   size_t sampleOffset = packetNumberOffset + kMaxPacketNumEncodingSize;
   Sample sample;

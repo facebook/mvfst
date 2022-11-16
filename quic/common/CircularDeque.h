@@ -65,7 +65,7 @@ struct CircularDeque {
 
   ~CircularDeque() {
     if (capacity_ == 0) {
-      DCHECK_EQ(storage_, nullptr);
+      DCHECK(!storage_);
       return;
     }
     clear();

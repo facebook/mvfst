@@ -5722,9 +5722,9 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
-  auto largestReceivedPacketNum =
+  auto largestRecvdPacketNum =
       getAckState(client->getConn(), PacketNumberSpace::Handshake)
-          .largestReceivedPacketNum;
+          .largestRecvdPacketNum;
   auto packet = createCryptoPacket(
       *serverChosenConnId,
       *originalConnId,
@@ -5738,8 +5738,8 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
   deliverData(serverAddr, packet.header->coalesce());
   EXPECT_EQ(
       getAckState(client->getConn(), PacketNumberSpace::Handshake)
-          .largestReceivedPacketNum,
-      largestReceivedPacketNum);
+          .largestRecvdPacketNum,
+      largestRecvdPacketNum);
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::DatagramReceived, qLogger);

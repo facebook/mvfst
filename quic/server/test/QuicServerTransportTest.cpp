@@ -493,7 +493,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
   serverWrites.clear();
 
   auto currLargestReceivedPacketNum =
-      server->getConn().ackStates.appDataAckState.largestReceivedPacketNum;
+      server->getConn().ackStates.appDataAckState.largestRecvdPacketNum;
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
 
   ShortHeader header2(
@@ -517,7 +517,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       *makeClientEncryptedCodec(),
       QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_GT(
-      server->getConn().ackStates.appDataAckState.largestReceivedPacketNum,
+      server->getConn().ackStates.appDataAckState.largestRecvdPacketNum,
       currLargestReceivedPacketNum);
 
   // Deliver the same bad data again
@@ -526,7 +526,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
   EXPECT_LT(
       server->getConn()
           .ackStates.appDataAckState.largestReceivedAtLastCloseSent,
-      server->getConn().ackStates.appDataAckState.largestReceivedPacketNum);
+      server->getConn().ackStates.appDataAckState.largestRecvdPacketNum);
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
@@ -575,11 +575,11 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
   serverWrites.clear();
 
-  // largestReceivedPacketNum won't be accurate because we will throw
+  // largestRecvdPacketNum won't be accurate because we will throw
   // before updating the ack state.
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   EXPECT_EQ(
-      server->getConn().ackStates.appDataAckState.largestReceivedPacketNum,
+      server->getConn().ackStates.appDataAckState.largestRecvdPacketNum,
       packetNum);
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
