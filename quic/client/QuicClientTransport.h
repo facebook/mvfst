@@ -207,7 +207,7 @@ class QuicClientTransport
   void recvMmsg(
       folly::AsyncUDPSocket& sock,
       uint64_t readBufferSize,
-      int numPackets,
+      uint16_t numPackets,
       NetworkData& networkData,
       folly::Optional<folly::SocketAddress>& server,
       size_t& totalData);
@@ -235,6 +235,19 @@ class QuicClientTransport
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
  private:
+  struct RecvmmsgStorage {
+    // Storage for the recvmmsg system call.
+    std::vector<struct mmsghdr> msgs;
+    std::vector<struct sockaddr_storage> addrs;
+    std::vector<struct iovec> iovecs;
+    // Buffers we pass to recvmmsg.
+    std::vector<Buf> readBuffers;
+    // Free buffers which were not used in previous iterations.
+    std::vector<Buf> freeBufs;
+
+    void resize(size_t numPackets);
+  };
+
   void setD6DBasePMTUTransportParameter();
   void setD6DRaiseTimeoutTransportParameter();
   void setD6DProbeTimeoutTransportParameter();

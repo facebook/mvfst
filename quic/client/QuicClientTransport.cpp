@@ -29,6 +29,10 @@
 
 namespace fsp = folly::portability::sockets;
 
+namespace {
+constexpr socklen_t kAddrLen = sizeof(sockaddr_storage);
+} // namespace
+
 namespace quic {
 
 QuicClientTransport::QuicClientTransport(
@@ -1230,7 +1234,6 @@ void QuicClientTransport::recvMsg(
 
     sockaddr* rawAddr{nullptr};
     struct sockaddr_storage addrStorage {};
-    socklen_t addrLen{sizeof(addrStorage)};
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
       rawAddr->sa_family = sock.address().getFamily();
@@ -1240,7 +1243,7 @@ void QuicClientTransport::recvMsg(
     folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
     struct msghdr msg {};
     msg.msg_name = rawAddr;
-    msg.msg_namelen = size_t(addrLen);
+    msg.msg_namelen = kAddrLen;
     msg.msg_iov = &vec;
     msg.msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
@@ -1297,7 +1300,7 @@ void QuicClientTransport::recvMsg(
     totalData += bytesRead;
     if (!server) {
       server = folly::SocketAddress();
-      server->setFromSockaddr(rawAddr, addrLen);
+      server->setFromSockaddr(rawAddr, kAddrLen);
     }
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
     readBuffer->append(bytesRead);
@@ -1340,12 +1343,10 @@ void QuicClientTransport::recvMsg(
 void QuicClientTransport::recvMmsg(
     folly::AsyncUDPSocket& sock,
     uint64_t readBufferSize,
-    int numPackets,
+    uint16_t numPackets,
     NetworkData& networkData,
     folly::Optional<folly::SocketAddress>& server,
     size_t& totalData) {
-  const size_t addrLen = sizeof(struct sockaddr_storage);
-
   auto& msgs = recvmmsgStorage_.msgs;
   auto& addrs = recvmmsgStorage_.addrs;
   auto& readBuffers = recvmmsgStorage_.readBuffers;
@@ -1366,7 +1367,7 @@ void QuicClientTransport::recvMmsg(
   }
 #endif
 
-  for (int i = 0; i < numPackets; ++i) {
+  for (uint16_t i = 0; i < numPackets; ++i) {
     Buf readBuffer;
     if (freeBufs.empty()) {
       readBuffer = folly::IOBuf::createCombined(readBufferSize);
@@ -1384,7 +1385,7 @@ void QuicClientTransport::recvMmsg(
 
     struct msghdr* msg = &msgs[i].msg_hdr;
     msg->msg_name = rawAddr;
-    msg->msg_namelen = addrLen;
+    msg->msg_namelen = kAddrLen;
     msg->msg_iov = &iovecs[i];
     msg->msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
@@ -1419,7 +1420,7 @@ void QuicClientTransport::recvMmsg(
 
   CHECK_LE(numMsgsRecvd, numPackets);
   // Need to save our position so we can recycle the unused buffers.
-  int i;
+  uint16_t i;
   for (i = 0; i < numMsgsRecvd; ++i) {
     size_t bytesRead = msgs[i].msg_len;
     if (bytesRead == 0) {
@@ -1447,7 +1448,7 @@ void QuicClientTransport::recvMmsg(
     if (!server) {
       server = folly::SocketAddress();
       auto* rawAddr = reinterpret_cast<sockaddr*>(&addrs[i]);
-      server->setFromSockaddr(rawAddr, addrLen);
+      server->setFromSockaddr(rawAddr, kAddrLen);
     }
 
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
@@ -1498,7 +1499,7 @@ void QuicClientTransport::onNotifyDataAvailable(
   DCHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize =
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
-  const int numPackets = conn_->transportSettings.maxRecvBatchSize;
+  const uint16_t numPackets = conn_->transportSettings.maxRecvBatchSize;
 
   NetworkData networkData;
   networkData.packets.reserve(numPackets);
@@ -1856,6 +1857,16 @@ void QuicClientTransport::maybeEnableStreamGroups() {
   if (!setCustomTransportParameter(
           std::move(streamGroupsEnabledParam), customTransportParameters_)) {
     LOG(ERROR) << "failed to set stream groups enabled transport parameter";
+  }
+}
+
+void QuicClientTransport::RecvmmsgStorage::resize(size_t numPackets) {
+  if (msgs.size() != numPackets) {
+    msgs.resize(numPackets);
+    addrs.resize(numPackets);
+    readBuffers.resize(numPackets);
+    iovecs.resize(numPackets);
+    freeBufs.reserve(numPackets);
   }
 }
 

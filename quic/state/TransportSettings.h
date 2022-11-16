@@ -258,7 +258,7 @@ struct TransportSettings {
   uint64_t selfActiveConnectionIdLimit{kDefaultActiveConnectionIdLimit};
   // Maximum size of the batch that should be used when receiving packets from
   // the kernel in one event loop.
-  size_t maxRecvBatchSize{5};
+  uint16_t maxRecvBatchSize{5};
   // Whether or not we should recv data in a batch.
   bool shouldRecvBatch{false};
   // Whether or not use recvmmsg when shouldRecvBatch is true.
