@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/Synchronized.h>
 #include <glog/logging.h>
 
 #include <quic/common/test/TestUtils.h>
@@ -23,16 +24,18 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
  public:
   ~EchoServerTransportFactory() override {
     draining_ = true;
-    while (!echoHandlers_.empty()) {
-      auto& handler = echoHandlers_.back();
-      handler->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait(
-          [this] {
-            // The evb should be performing a sequential consistency atomic
-            // operation already, so we can bank on that to make sure the writes
-            // propagate to all threads.
-            echoHandlers_.pop_back();
-          });
-    }
+    echoHandlers_.withWLock([](auto& echoHandlers) {
+      while (!echoHandlers.empty()) {
+        auto& handler = echoHandlers.back();
+        handler->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait(
+            [&] {
+              // The evb should be performing a sequential consistency atomic
+              // operation already, so we can bank on that to make sure the
+              // writes propagate to all threads.
+              echoHandlers.pop_back();
+            });
+      }
+    });
   }
 
   explicit EchoServerTransportFactory(bool useDatagrams = false)
@@ -53,13 +56,15 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx);
     echoHandler->setQuicSocket(transport);
-    echoHandlers_.push_back(std::move(echoHandler));
+    echoHandlers_.withWLock([&](auto& echoHandlers) {
+      echoHandlers.push_back(std::move(echoHandler));
+    });
     return transport;
   }
 
  private:
   bool useDatagrams_;
-  std::vector<std::unique_ptr<EchoHandler>> echoHandlers_;
+  folly::Synchronized<std::vector<std::unique_ptr<EchoHandler>>> echoHandlers_;
   bool draining_{false};
 };
 
