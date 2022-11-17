@@ -2967,11 +2967,10 @@ void QuicTransportBase::cancelAllAppCallbacks(const QuicError& err) noexcept {
     connWriteCallback_ = nullptr;
     connWriteCallback->onConnectionWriteError(err);
   }
-  auto it = pendingWriteCallbacks_.begin();
-  while (it != pendingWriteCallbacks_.end()) {
-    auto wcb = it->second;
-    wcb->onStreamWriteError(it->first, err);
-    it = pendingWriteCallbacks_.erase(it);
+  auto pendingWriteCallbacksCopy = pendingWriteCallbacks_;
+  for (auto& wcb : pendingWriteCallbacksCopy) {
+    pendingWriteCallbacks_.erase(wcb.first);
+    wcb.second->onStreamWriteError(wcb.first, err);
   }
 }
 
@@ -3239,7 +3238,7 @@ void QuicTransportBase::writeSocketData() {
           conn_->congestionController->getWritableBytes()) {
         conn_->congestionController->setAppLimited();
         // notify via connection call and any observer callbacks
-        if (transportReadyNotified_) {
+        if (transportReadyNotified_ && connCallback_) {
           connCallback_->onAppRateLimited();
         }
         notifyAppRateLimited();
