@@ -212,13 +212,33 @@ folly::dynamic RetireConnectionIdFrameLog::toDynamic() const {
 folly::dynamic ReadAckFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   folly::dynamic ackRangeDynamic = folly::dynamic::array();
+  folly::dynamic recvdPacketsTimestampRangesDynamic = folly::dynamic::array();
 
   for (const auto& b : ackBlocks) {
     ackRangeDynamic.push_back(
         folly::dynamic::array(b.startPacket, b.endPacket));
   }
   d["acked_ranges"] = ackRangeDynamic;
-  d["frame_type"] = toQlogString(FrameType::ACK);
+  d["frame_type"] = toQlogString(frameType);
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    if (maybeLatestRecvdPacketTime.has_value()) {
+      d["latest_recvd_packet_time"] =
+          maybeLatestRecvdPacketTime.value().count();
+    }
+    if (maybeLatestRecvdPacketNum.has_value()) {
+      d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
+    }
+    for (auto it = recvdPacketsTimestampRanges.cbegin();
+         it != recvdPacketsTimestampRanges.cend();
+         ++it) {
+      recvdPacketsTimestampRangesDynamic.push_back(folly::dynamic::array(
+          it->gap,
+          it->timestamp_delta_count,
+          it->deltas.front(),
+          it->deltas.back()));
+    }
+    d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
+  }
   d["ack_delay"] = ackDelay.count();
   return d;
 }
@@ -226,12 +246,32 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
 folly::dynamic WriteAckFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   folly::dynamic ackRangeDynamic = folly::dynamic::array();
+  folly::dynamic recvdPacketsTimestampRangesDynamic = folly::dynamic::array();
 
   for (auto it = ackBlocks.cbegin(); it != ackBlocks.cend(); ++it) {
     ackRangeDynamic.push_back(folly::dynamic::array(it->start, it->end));
   }
   d["acked_ranges"] = ackRangeDynamic;
-  d["frame_type"] = toQlogString(FrameType::ACK);
+  d["frame_type"] = toQlogString(frameType);
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    if (maybeLatestRecvdPacketTime.has_value()) {
+      d["latest_recvd_packet_time"] =
+          maybeLatestRecvdPacketTime.value().count();
+    }
+    if (maybeLatestRecvdPacketNum.has_value()) {
+      d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
+    }
+    for (auto it = recvdPacketsTimestampRanges.cbegin();
+         it != recvdPacketsTimestampRanges.cend();
+         ++it) {
+      recvdPacketsTimestampRangesDynamic.push_back(folly::dynamic::array(
+          it->gap,
+          it->timestamp_delta_count,
+          it->deltas.front(),
+          it->deltas.back()));
+    }
+    d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
+  }
   d["ack_delay"] = ackDelay.count();
   return d;
 }

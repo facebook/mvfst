@@ -721,6 +721,82 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
   EXPECT_EQ(expected, gotEvents);
 }
 
+TEST_F(QLoggerTest, AddingAckReceiveTimestampFrame) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+           [
+             "0",
+             "transport",
+             "packet_sent",
+             {
+               "frames": [
+                 {
+                   "ack_delay": 111,
+                   "acked_ranges": [
+                     [
+                       300,
+                       400
+                     ],
+                     [
+                       100,
+                       200
+                     ]
+                   ],
+                   "frame_type": "ack_receive_timestamps",
+                   "latest_recvd_packet_num": 400,
+                   "latest_recvd_packet_time": 100000,
+                   "timestamp_ranges": [
+                    [
+                      1,
+                      1,
+                      1,
+                      1
+                    ]
+                  ]
+                 },
+                 {
+                   "fin": true,
+                   "frame_type": "stream",
+                   "stream_id": "10",
+                   "length": 0,
+                   "offset": 0
+                 }
+               ],
+               "header": {
+                 "packet_number": 100,
+                 "packet_size": 10
+               },
+               "packet_type": "initial"
+             }
+           ]
+  ])");
+
+  FileQLogger q(VantagePoint::Client);
+  RegularQuicWritePacket packet =
+      createNewPacket(100, PacketNumberSpace::Initial);
+
+  WriteAckFrame ackFrame;
+  ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS;
+  ackFrame.ackDelay = 111us;
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.ackBlocks.emplace_back(100, 200);
+  ackFrame.maybeLatestRecvdPacketNum = 400;
+  ackFrame.maybeLatestRecvdPacketTime = 100ms;
+  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange = {
+      .gap = 1, .timestamp_delta_count = 1, .deltas = {1}};
+  ackFrame.recvdPacketsTimestampRanges = {recvdPacketsTimestampsRange};
+  WriteStreamFrame streamFrame(streamId, offset, len, fin);
+
+  packet.frames.emplace_back(std::move(ackFrame));
+  packet.frames.emplace_back(std::move(streamFrame));
+
+  q.addPacket(packet, 10);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
 TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"([[
@@ -1613,6 +1689,152 @@ TEST_F(QLoggerTest, PrettyDatagram) {
   DatagramFrame frame(len, std::move(buf));
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = folly::fs::temp_directory_path().string();
+
+  auto* q = new FileQLogger(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      true /* prettyJson */,
+      true /* streaming */);
+
+  folly::Random::DefaultGenerator rng;
+  rng.seed(
+      std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+  q->setDcid(ConnectionId(std::vector<uint8_t>{
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+  }));
+  q->addPacket(regularQuicPacket, 10);
+  EXPECT_EQ(q->logs.size(), 0);
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+  delete q;
+
+  std::ifstream file(outputPath, std::ifstream::in);
+  std::string str(
+      (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  folly::dynamic parsed = folly::parseJson(str);
+
+  parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  parsed["traces"][0]["common_fields"]["dcid"] = "0101";
+
+  EXPECT_EQ(expected, parsed);
+}
+
+TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
+  folly::dynamic expected = folly::parseJson(
+      R"({
+   "description": "Converted from file",
+   "qlog_version": "draft-00",
+   "title": "mvfst qlog",
+   "traces": [
+     {
+       "common_fields": {
+         "dcid": "0101",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
+       "configuration": {
+         "time_offset": 0,
+         "time_units": "us"
+       },
+       "description": "Generated qlog from connection",
+       "event_fields": [
+         "relative_time",
+         "category",
+         "event",
+         "data"
+       ],
+       "events": [
+         [
+           "31",
+           "transport",
+           "packet_received",
+           {
+             "frames": [
+               {
+                 "fin": true,
+                 "frame_type": "stream",
+                 "stream_id": "10",
+                 "length": 0,
+                 "offset": 0
+               },
+               {
+                   "ack_delay": 111,
+                   "acked_ranges": [
+                     [
+                       300,
+                       400
+                     ],
+                     [
+                       100,
+                       200
+                     ]
+                   ],
+                   "frame_type": "ack_receive_timestamps",
+                   "latest_recvd_packet_num": 400,
+                   "latest_recvd_packet_time": 100000,
+                   "timestamp_ranges": [
+                    [
+                      1,
+                      1,
+                      1,
+                      1
+                    ]
+                  ]
+                }
+             ],
+             "header": {
+               "packet_number": 1,
+               "packet_size": 10
+             },
+             "packet_type": "1RTT"
+           }
+         ]
+       ],
+       "title": "mvfst qlog from single connection",
+       "vantage_point": {
+         "name": "server",
+         "type": "server"
+       }
+     }
+   ],
+   "summary": {
+     "max_duration": 0,
+     "total_event_count": 1,
+     "trace_count": 1
+   }
+ })");
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+
+  ReadAckFrame ackFrame;
+  ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS;
+  ackFrame.ackDelay = 111us;
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.ackBlocks.emplace_back(100, 200);
+  ackFrame.maybeLatestRecvdPacketNum = 400;
+  ackFrame.maybeLatestRecvdPacketTime = 100ms;
+  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange = {
+      .gap = 1, .timestamp_delta_count = 1, .deltas = {1}};
+  ackFrame.recvdPacketsTimestampRanges = {recvdPacketsTimestampsRange};
+
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  regularQuicPacket.frames.emplace_back(std::move(ackFrame));
   auto dir = folly::fs::temp_directory_path().string();
 
   auto* q = new FileQLogger(
