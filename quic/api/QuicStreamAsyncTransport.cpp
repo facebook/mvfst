@@ -43,9 +43,10 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
   id_ = id;
 
   // TODO: handle timeout for assigning stream id
-
-  sock_->setReadCallback(*id_, this);
-  handleRead();
+  if (readCb_) {
+    sock_->setReadCallback(*id_, this);
+    handleRead();
+  }
 
   if (!writeCallbacks_.empty()) {
     // adjust offsets of buffered writes
@@ -67,8 +68,7 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
 
 void QuicStreamAsyncTransport::destroy() {
   if (state_ != CloseState::CLOSED) {
-    state_ = CloseState::CLOSED;
-    sock_->closeNow(folly::none);
+    closeNow();
   }
   // Then call DelayedDestruction::destroy() to take care of
   // whether or not we need immediate or delayed destruction
@@ -207,12 +207,15 @@ void QuicStreamAsyncTransport::close() {
     readEOF_ = EOFState::QUEUED;
     handleRead();
   }
-  sock_->closeGracefully();
 }
 
 void QuicStreamAsyncTransport::closeNow() {
   folly::AsyncSocketException ex(
       folly::AsyncSocketException::UNKNOWN, "Quic closeNow");
+  if (id_) {
+    sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
+    shutdownWriteNow();
+  }
   closeNowImpl(std::move(ex));
 }
 
@@ -240,13 +243,11 @@ void QuicStreamAsyncTransport::shutdownWriteNow() {
     // writes already shutdown
     return;
   }
-  if (writeBuf_.empty()) {
-    shutdownWrite();
-  } else {
-    if (id_) {
-      sock_->resetStream(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
-      VLOG(4) << "Reset stream from shutdownWriteNow";
-    }
+  shutdownWrite();
+  send(0);
+  if (id_ && writeEOF_ != EOFState::DELIVERED) {
+    sock_->resetStream(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
+    VLOG(4) << "Reset stream from shutdownWriteNow";
   }
 }
 
@@ -453,7 +454,8 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   }
 
   uint64_t sentOffset = *streamWriteOffset + toSend;
-  bool writeEOF = (writeEOF_ == EOFState::QUEUED);
+  bool writeEOF =
+      (writeEOF_ == EOFState::QUEUED && writeBuf_.chainLength() == toSend);
   auto res = sock_->writeChain(
       *id_,
       writeBuf_.split(toSend),
@@ -531,7 +533,6 @@ void QuicStreamAsyncTransport::closeNowImpl(folly::AsyncSocketException&& ex) {
     sock_->unregisterStreamWriteCallback(*id_);
     id_.reset();
   }
-  sock_->closeNow(folly::none);
   failWrites(*ex_);
 }
 
