@@ -534,16 +534,10 @@ bool StreamFrameScheduler::writeStreamFrame(
   uint64_t flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(stream), connWritableBytes);
   uint64_t bufferLen = stream.writeBuffer.chainLength();
-  // We can't write FIN directly from here if writeBufMeta has pending bytes to
-  // send.
+  // We should never write a FIN from the non-DSR scheduler for a DSR stream.
   bool canWriteFin = stream.finalWriteOffset.has_value() &&
-      bufferLen <= flowControlLen && stream.writeBufMeta.length == 0;
+      bufferLen <= flowControlLen && stream.writeBufMeta.offset == 0;
   auto writeOffset = stream.currentWriteOffset;
-  if (canWriteFin && stream.writeBuffer.empty()) {
-    // If we are writing FIN only from here, do not use currentWriteOffset in
-    // case some bufMeta has been sent before.
-    writeOffset = stream.finalWriteOffset.value();
-  }
   auto dataLen = writeStreamFrameHeader(
       builder,
       stream.id,
