@@ -23,7 +23,7 @@ SimulatedTBF::SimulatedTBF(
       maybeMaxDebtQueueSizeBytes_(debtQueueSize),
       zeroTime_(0) {}
 
-SimulatedTBF::SimulatedTBF(const SimulatedTBFParams& params)
+SimulatedTBF::SimulatedTBF(const Config& params)
     : SimulatedTBF(
           params.rateBytesPerSecond,
           params.burstSizeBytes,

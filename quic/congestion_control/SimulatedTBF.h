@@ -24,12 +24,6 @@ struct SimulatedTBFTokenBucketPolicyNoAlignNonConcurrent {
 
 class SimulatedTBF : private folly::BasicDynamicTokenBucket<
                          SimulatedTBFTokenBucketPolicyNoAlignNonConcurrent> {
-  struct SimulatedTBFParams {
-    double rateBytesPerSecond;
-    double burstSizeBytes;
-    folly::Optional<double> maxDebtQueueSizeBytes;
-  };
-
   struct TimeInterval {
     TimePoint start;
     TimePoint end;
@@ -50,12 +44,18 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   };
 
  public:
+  struct Config {
+    double rateBytesPerSecond{0};
+    double burstSizeBytes{0};
+    folly::Optional<double> maxDebtQueueSizeBytes;
+  };
+
   explicit SimulatedTBF(double rate, double burst);
   explicit SimulatedTBF(
       double rate,
       double burst,
       folly::Optional<double> debtQueueSize);
-  explicit SimulatedTBF(const SimulatedTBFParams& params);
+  explicit SimulatedTBF(const Config& params);
 
   /**
    * Models sending of specified number of bytes at the specified time. If the
@@ -115,9 +115,9 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   [[nodiscard]] folly::Optional<double> getMaxDebtQueueSizeBytes() const;
 
  private:
-  const double rateBytesPerSecond_;
-  const double burstSizeBytes_;
-  const folly::Optional<double> maybeMaxDebtQueueSizeBytes_;
+  double rateBytesPerSecond_;
+  double burstSizeBytes_;
+  folly::Optional<double> maybeMaxDebtQueueSizeBytes_;
   double zeroTime_{0};
 
   std::deque<TimeInterval> emptyBucketTimeIntervals_;
