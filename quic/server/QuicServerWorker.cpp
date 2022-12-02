@@ -793,6 +793,9 @@ void QuicServerWorker::dispatchPacketData(
           if (statsCallback_) {
             trans->setTransportStatsCallback(statsCallback_.get());
           }
+          if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
+            transportSettings_.initCwndInMss = 20;
+          }
           auto overridenTransportSettings = transportSettingsOverrideFn_
               ? transportSettingsOverrideFn_(
                     transportSettings_, client.getIPAddress())
