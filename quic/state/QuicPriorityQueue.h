@@ -16,6 +16,7 @@
 namespace quic {
 
 constexpr uint8_t kDefaultPriorityLevels = kDefaultMaxPriority + 1;
+constexpr uint8_t kDefaultPriorityLevelsSize = 2 * kDefaultPriorityLevels;
 
 /**
  * Priority is expressed as a level [0,7] and an incremental flag.
@@ -49,17 +50,17 @@ struct PriorityQueue {
   };
   std::vector<Level> levels;
 
-  PriorityQueue() {
-    levels.resize(kDefaultPriorityLevels * 2);
+  PriorityQueue() : levels(kDefaultPriorityLevelsSize) {
     for (size_t index = 1; index < levels.size(); index += 2) {
       levels[index].incremental = true;
     }
   }
 
-  static size_t priority2index(Priority pri, size_t max) {
-    auto index = pri.level * 2 + uint8_t(pri.incremental);
-    DCHECK_LT(index, max) << "Logic error: level=" << pri.level
-                          << " incremental=" << pri.incremental;
+  static uint8_t priority2index(Priority pri) {
+    uint8_t index = pri.level * 2 + uint8_t(pri.incremental);
+    DCHECK_LT(index, kDefaultPriorityLevelsSize)
+        << "Logic error: level=" << pri.level
+        << " incremental=" << pri.incremental;
     return index;
   }
 
@@ -70,51 +71,36 @@ struct PriorityQueue {
    * the input.
    */
   void updateIfExist(StreamId id, Priority priority = kDefaultPriority) {
-    auto iter = writableStreams.find(id);
-    if (iter == writableStreams.end()) {
-      return;
+    auto iter = writableStreamsToLevel_.find(id);
+    if (iter != writableStreamsToLevel_.end()) {
+      updateExistingStreamPriority(iter, priority);
     }
-    auto index = priority2index(priority, levels.size());
-    if (iter->second == index) {
-      // no need to update
-      return;
-    }
-    eraseFromLevel(iter->second, iter->first);
-    iter->second = index;
-    auto res = levels[index].streams.insert(id);
-    DCHECK(res.second) << "PriorityQueue inconsistentent: stream=" << id
-                       << " already at level=" << index;
   }
 
   void insertOrUpdate(StreamId id, Priority pri = kDefaultPriority) {
-    auto it = writableStreams.find(id);
-    auto index = priority2index(pri, levels.size());
-    if (it != writableStreams.end()) {
-      if (it->second == index) {
-        // No op, this stream is already inserted at the correct priority level
-        return;
-      }
-      VLOG(4) << "Updating priority of stream=" << id << " from " << it->second
-              << " to " << index;
-      // Meh, too hard.  Just erase it and start over.
-      eraseFromLevel(it->second, it->first);
-      it->second = index;
+    auto it = writableStreamsToLevel_.find(id);
+    auto index = priority2index(pri);
+    if (it != writableStreamsToLevel_.end()) {
+      updateExistingStreamPriority(it, pri);
     } else {
-      writableStreams.emplace(id, index);
+      writableStreamsToLevel_.emplace(id, index);
+      auto res = levels[index].streams.insert(id);
+      DCHECK(res.second) << "PriorityQueue inconsistent: stream=" << id
+                         << " already at level=" << index;
     }
-    auto res = levels[index].streams.insert(id);
-    DCHECK(res.second) << "PriorityQueue inconsistentent: stream=" << id
-                       << " already at level=" << index;
   }
 
   void erase(StreamId id) {
-    auto it = find(id);
-    erase(it);
+    auto it = writableStreamsToLevel_.find(id);
+    if (it != writableStreamsToLevel_.end()) {
+      eraseFromLevel(it->second, it->first);
+      writableStreamsToLevel_.erase(it);
+    }
   }
 
   // Only used for testing
   void clear() {
-    writableStreams.clear();
+    writableStreamsToLevel_.clear();
     for (auto& level : levels) {
       level.streams.clear();
       level.next = level.streams.end();
@@ -122,17 +108,17 @@ struct PriorityQueue {
   }
 
   FOLLY_NODISCARD size_t count(StreamId id) const {
-    return writableStreams.count(id);
+    return writableStreamsToLevel_.count(id);
   }
 
   FOLLY_NODISCARD bool empty() const {
-    return writableStreams.empty();
+    return writableStreamsToLevel_.empty();
   }
 
   // Testing helper to override scheduling state
   void setNextScheduledStream(StreamId id) {
-    auto it = writableStreams.find(id);
-    CHECK(it != writableStreams.end());
+    auto it = writableStreamsToLevel_.find(id);
+    CHECK(it != writableStreamsToLevel_.end());
     auto& level = levels[it->second];
     auto streamIt = level.streams.find(id);
     CHECK(streamIt != level.streams.end());
@@ -142,7 +128,7 @@ struct PriorityQueue {
   // Only used for testing
   FOLLY_NODISCARD StreamId
   getNextScheduledStream(Priority pri = kDefaultPriority) const {
-    auto& level = levels[priority2index(pri, levels.size())];
+    auto& level = levels[priority2index(pri)];
     if (level.next == level.streams.end()) {
       CHECK(!level.streams.empty());
       return *level.streams.begin();
@@ -151,35 +137,38 @@ struct PriorityQueue {
   }
 
  private:
-  folly::F14FastMap<StreamId, size_t> writableStreams;
-  using WSIterator = decltype(writableStreams)::iterator;
+  folly::F14FastMap<StreamId, uint8_t> writableStreamsToLevel_;
+  using WSIterator = decltype(writableStreamsToLevel_)::iterator;
 
-  WSIterator find(StreamId id) {
-    return writableStreams.find(id);
-  }
-
-  void eraseFromLevel(size_t levelIndex, StreamId id) {
+  void eraseFromLevel(uint8_t levelIndex, StreamId id) {
     auto& level = levels[levelIndex];
     auto streamIt = level.streams.find(id);
-    if (streamIt != level.streams.end()) {
-      if (streamIt == level.next) {
-        level.next = level.streams.erase(streamIt);
-      } else {
-        level.streams.erase(streamIt);
-      }
-    } else {
+    if (streamIt == level.streams.end()) {
       LOG(DFATAL) << "Stream=" << levelIndex
                   << " not found in PriorityQueue level=" << id;
+      return;
+    }
+    if (streamIt == level.next) {
+      level.next = level.streams.erase(streamIt);
+    } else {
+      level.streams.erase(streamIt);
     }
   }
 
-  // Helper function to erase an iter from writableStream and its corresponding
-  // item from levels.
-  void erase(WSIterator it) {
-    if (it != writableStreams.end()) {
-      eraseFromLevel(it->second, it->first);
-      writableStreams.erase(it);
+  void updateExistingStreamPriority(WSIterator it, Priority pri) {
+    CHECK(it != writableStreamsToLevel_.end());
+    auto index = priority2index(pri);
+    if (it->second == index) {
+      // same priority, doesn't need changing
+      return;
     }
+    VLOG(4) << "Updating priority of stream=" << it->first << " from "
+            << it->second << " to " << index;
+    eraseFromLevel(it->second, it->first);
+    it->second = index;
+    auto res = levels[index].streams.insert(it->first);
+    DCHECK(res.second) << "PriorityQueue inconsistent: stream=" << it->first
+                       << " already at level=" << index;
   }
 };
 
