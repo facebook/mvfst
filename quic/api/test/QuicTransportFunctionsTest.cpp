@@ -1520,6 +1520,102 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
           ->lastAckedPacketInfo->totalBytesAcked);
 }
 
+TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithAppLimitedStats) {
+  auto conn = createConn();
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true);
+  WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
+  packet.packet.frames.push_back(std::move(writeStreamFrame));
+
+  // connections should start off being app limited
+  EXPECT_TRUE(conn->appLimitedTracker.isAppLimited());
+
+  // mark ourselves as not app limited, verify that total app limited time > 0,
+  // verify that successive calls to getTotalAppLimitedTime yield same value
+  conn->appLimitedTracker.setNotAppLimited();
+  EXPECT_LT(0us, conn->appLimitedTracker.getTotalAppLimitedTime());
+  EXPECT_EQ(
+      conn->appLimitedTracker.getTotalAppLimitedTime(),
+      conn->appLimitedTracker.getTotalAppLimitedTime());
+
+  // record the packet as having been sent
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      555,
+      500,
+      false /* isDSRPacket */);
+
+  // should have the current app limited time recorded in metadata
+  EXPECT_EQ(
+      conn->appLimitedTracker.getTotalAppLimitedTime(),
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.totalAppLimitedTimeUsecs);
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    TestUpdateConnectionWithAppLimitedStats_MultipleTransitions) {
+  auto conn = createConn();
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true);
+  WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
+  packet.packet.frames.push_back(std::move(writeStreamFrame));
+
+  // connections should start off being app limited
+  EXPECT_TRUE(conn->appLimitedTracker.isAppLimited());
+  {
+    // successive calls should yield different measurements
+    const auto time1 = conn->appLimitedTracker.getTotalAppLimitedTime();
+    std::this_thread::sleep_for(10ms);
+    const auto time2 = conn->appLimitedTracker.getTotalAppLimitedTime();
+    EXPECT_NE(time1, time2);
+  }
+
+  // mark ourselves as not app limited, verify that total app limited time > 0,
+  // verify that successive calls to getTotalAppLimitedTime yield same value
+  conn->appLimitedTracker.setNotAppLimited();
+  EXPECT_LT(0us, conn->appLimitedTracker.getTotalAppLimitedTime());
+  EXPECT_EQ(
+      conn->appLimitedTracker.getTotalAppLimitedTime(),
+      conn->appLimitedTracker.getTotalAppLimitedTime());
+  const auto appLimitedTime1 = conn->appLimitedTracker.getTotalAppLimitedTime();
+
+  // become app limited for at least 10ms, then repeat the above
+  conn->appLimitedTracker.setAppLimited();
+  std::this_thread::sleep_for(10ms);
+  conn->appLimitedTracker.setNotAppLimited();
+  EXPECT_LE(
+      appLimitedTime1 + 10ms, conn->appLimitedTracker.getTotalAppLimitedTime());
+  EXPECT_EQ(
+      conn->appLimitedTracker.getTotalAppLimitedTime(),
+      conn->appLimitedTracker.getTotalAppLimitedTime());
+
+  // record the packet as having been sent
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      555,
+      500,
+      false /* isDSRPacket */);
+
+  // should have the current app limited time recorded in metadata
+  EXPECT_EQ(
+      conn->appLimitedTracker.getTotalAppLimitedTime(),
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.totalAppLimitedTimeUsecs);
+}
+
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);

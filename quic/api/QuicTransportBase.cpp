@@ -3160,9 +3160,10 @@ void QuicTransportBase::writeSocketData() {
         conn_->outstandings.numOutstanding();
 
     // if we're starting to write from app limited, notify observers
-    if (conn_->waitingForAppData && conn_->congestionController) {
+    if (conn_->appLimitedTracker.isAppLimited() &&
+        conn_->congestionController) {
+      conn_->appLimitedTracker.setNotAppLimited();
       notifyStartWritingFromAppRateLimited();
-      conn_->waitingForAppData = false;
     }
     writeData();
     if (closeState_ != CloseState::CLOSED) {
@@ -3241,8 +3242,8 @@ void QuicTransportBase::writeSocketData() {
         if (transportReadyNotified_ && connCallback_) {
           connCallback_->onAppRateLimited();
         }
+        conn_->appLimitedTracker.setAppLimited();
         notifyAppRateLimited();
-        conn_->waitingForAppData = true;
       }
     }
   }

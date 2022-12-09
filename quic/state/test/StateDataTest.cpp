@@ -89,6 +89,49 @@ TEST_F(StateDataTest, CongestionControllerState) {
   }
 }
 
+TEST_F(StateDataTest, AppLimitedTracker) {
+  AppLimitedTracker tracker;
+
+  // initialized to app limited
+  EXPECT_TRUE(tracker.isAppLimited());
+
+  // if app limited, getTotalAppLimitedTime includes current app limited time
+  {
+    const auto totalAppLimitedTime1 = tracker.getTotalAppLimitedTime();
+    std::this_thread::sleep_for(10ms);
+    const auto totalAppLimitedTime2 = tracker.getTotalAppLimitedTime();
+
+    EXPECT_LE(totalAppLimitedTime1, totalAppLimitedTime2);
+    EXPECT_GE(totalAppLimitedTime2, totalAppLimitedTime1 + 10ms);
+  }
+
+  // when we become non-app limited, we properly track time spent app limited
+  {
+    const auto totalAppLimitedTime1 = tracker.getTotalAppLimitedTime();
+    tracker.setNotAppLimited();
+    EXPECT_LE(totalAppLimitedTime1, tracker.getTotalAppLimitedTime());
+  }
+
+  // if we become app limited again, total time is >= existing time
+  {
+    const auto totalAppLimitedTime1 = tracker.getTotalAppLimitedTime();
+    tracker.setAppLimited();
+    EXPECT_LE(totalAppLimitedTime1, tracker.getTotalAppLimitedTime());
+    std::this_thread::sleep_for(10ms);
+
+    const auto totalAppLimitedTime2 = tracker.getTotalAppLimitedTime();
+    EXPECT_LE(totalAppLimitedTime1, totalAppLimitedTime2);
+    EXPECT_GE(totalAppLimitedTime2, totalAppLimitedTime1 + 10ms);
+  }
+
+  // when we become non-app limited, we properly track time spent app limited
+  {
+    const auto totalAppLimitedTime1 = tracker.getTotalAppLimitedTime();
+    tracker.setNotAppLimited();
+    EXPECT_LE(totalAppLimitedTime1, tracker.getTotalAppLimitedTime());
+  }
+}
+
 TEST_F(StateDataTest, EmptyLossEvent) {
   CongestionController::LossEvent loss;
   EXPECT_EQ(0, loss.lostBytes);

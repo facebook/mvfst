@@ -736,6 +736,163 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
+/**
+ * Verify app limited time tracking and annotation.
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
+  // ACK outstanding packets so that we can switch out the congestion control
+  this->ackAllOutstandingPackets();
+  EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
+
+  // install StaticCwndCongestionController
+  const auto cwndInBytes = 7000;
+  this->getNonConstConn().congestionController =
+      std::make_unique<StaticCwndCongestionController>(
+          StaticCwndCongestionController::CwndInBytes(cwndInBytes));
+
+  // install PacketProcessor
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+
+  // write 1700 bytes to stream to generate two packets back to back
+  // both packets should have the same app limited time
+  auto firstPacketTotalAppLimitedTimeUsecs = 0us;
+  {
+    EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
+        .Times(2)
+        .WillOnce(Invoke([&](auto outstandingPacket) {
+          EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
+          EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
+          EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
+          EXPECT_NE(0us, outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+          firstPacketTotalAppLimitedTimeUsecs =
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs;
+        }))
+        .WillOnce(Invoke([&](auto outstandingPacket) {
+          EXPECT_EQ(5, outstandingPacket.metadata.totalPacketsSent);
+          EXPECT_EQ(2, outstandingPacket.metadata.packetsInflight);
+          EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
+          EXPECT_EQ(
+              firstPacketTotalAppLimitedTimeUsecs,
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+        }));
+
+    const auto bufLength = 1700;
+    auto buf = buildRandomInputData(bufLength);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets1 = this->loopForWrites();
+
+    // should have sent two packets
+    ASSERT_TRUE(maybeWrittenPackets1.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets1->end;
+    EXPECT_EQ(2, lastPacketNum - firstPacketNum + 1);
+  }
+
+  // now we're going to be application limited for 10ms (or more)
+  std::this_thread::sleep_for(10ms);
+
+  // write 10000 bytes to stream to generate multiple packets back to back
+  // not all will be sent at once because our CWND is only 7000 bytes, and we
+  // already used 1700 bytes+ in previous send
+  //
+  // when (eventually) sent, all packets should have
+  //   - the same app limited time
+  //   - app limited time >= 10ms + firstPacketTotalAppLimitedTimeUsecs
+  auto thirdPacketTotalAppLimitedTimeUsecs = 0us;
+  {
+    EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
+        .Times(4)
+        .WillOnce(Invoke([&](auto outstandingPacket) {
+          EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
+          EXPECT_LE(
+              firstPacketTotalAppLimitedTimeUsecs + 10ms,
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+          thirdPacketTotalAppLimitedTimeUsecs =
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs;
+        }))
+        .WillRepeatedly(Invoke([&](auto outstandingPacket) {
+          EXPECT_EQ(
+              thirdPacketTotalAppLimitedTimeUsecs,
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+        }));
+
+    const auto bufLength = 10000;
+    auto buf = buildRandomInputData(bufLength);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent five packets
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(4, lastPacketNum - firstPacketNum + 1);
+  }
+
+  // deliver an ACK for all of the outstanding packets
+  this->ackAllOutstandingPackets();
+
+  // finish sending the rest of the packets
+  // they should have the same app limited time as packet #3
+  {
+    EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
+        .Times(3)
+        .WillRepeatedly(Invoke([&](auto outstandingPacket) {
+          EXPECT_EQ(
+              thirdPacketTotalAppLimitedTimeUsecs,
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+        }));
+
+    const auto maybeWrittenPackets = this->loopForWrites();
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(3, lastPacketNum - firstPacketNum + 1);
+  }
+
+  // deliver an ACK for all of the outstanding packets
+  this->ackAllOutstandingPackets();
+
+  // now we're going to be application limited again for 10ms (or more)
+  std::this_thread::sleep_for(10ms);
+
+  // finally, write 1700 bytes again, and verify we see a new app limited time
+  {
+    auto penultimatePacketTotalAppLimitedTimeUsecs = 0us;
+    EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
+        .Times(2)
+        .WillOnce(Invoke([&](auto outstandingPacket) {
+          EXPECT_LE(
+              thirdPacketTotalAppLimitedTimeUsecs + 10ms,
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+          penultimatePacketTotalAppLimitedTimeUsecs =
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs;
+        }))
+        .WillOnce(Invoke([&](auto outstandingPacket) {
+          EXPECT_EQ(
+              penultimatePacketTotalAppLimitedTimeUsecs,
+              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+        }));
+
+    const auto bufLength = 1700;
+    auto buf = buildRandomInputData(bufLength);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets1 = this->loopForWrites();
+
+    // should have sent two packets
+    ASSERT_TRUE(maybeWrittenPackets1.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets1->end;
+    EXPECT_EQ(2, lastPacketNum - firstPacketNum + 1);
+  }
+
+  this->destroyTransport();
+}
+
 TYPED_TEST(
     QuicTypedTransportAfterStartTest,
     StreamAckedIntervalsDeliveryCallbacks) {

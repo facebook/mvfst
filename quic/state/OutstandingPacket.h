@@ -10,6 +10,7 @@
 #include <quic/codec/Types.h>
 #include <quic/state/LossState.h>
 #include <quic/state/PacketEvent.h>
+#include <chrono>
 
 namespace quic {
 
@@ -104,6 +105,10 @@ struct OutstandingPacketMetadata {
   // Details about each stream with frames in this packet
   DetailsPerStream detailsPerStream;
 
+  // Total time spent app limited on this connection including when this packet
+  // was sent.
+  std::chrono::microseconds totalAppLimitedTimeUsecs{0};
+
   OutstandingPacketMetadata(
       TimePoint timeIn,
       uint32_t encodedSizeIn,
@@ -116,7 +121,8 @@ struct OutstandingPacketMetadata {
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      DetailsPerStream detailsPerStream)
+      DetailsPerStream detailsPerStream,
+      std::chrono::microseconds totalAppLimitedTimeUsecsIn = 0us)
       : time(timeIn),
         encodedSize(encodedSizeIn),
         encodedBodySize(encodedBodySizeIn),
@@ -129,7 +135,8 @@ struct OutstandingPacketMetadata {
         totalPacketsSent(lossStateIn.totalPacketsSent),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
         writeCount(writeCount),
-        detailsPerStream(std::move(detailsPerStream)) {}
+        detailsPerStream(std::move(detailsPerStream)),
+        totalAppLimitedTimeUsecs(totalAppLimitedTimeUsecsIn) {}
 };
 
 // Data structure to represent outstanding retransmittable packets
@@ -206,7 +213,8 @@ struct OutstandingPacket {
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      Metadata::DetailsPerStream detailsPerStream)
+      Metadata::DetailsPerStream detailsPerStream,
+      std::chrono::microseconds totalAppLimitedTimeUsecs = 0us)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -220,7 +228,8 @@ struct OutstandingPacket {
             packetsInflightIn,
             lossStateIn,
             writeCount,
-            std::move(detailsPerStream))) {}
+            std::move(detailsPerStream),
+            totalAppLimitedTimeUsecs)) {}
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
@@ -235,7 +244,8 @@ struct OutstandingPacket {
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      Metadata::DetailsPerStream detailsPerStream)
+      Metadata::DetailsPerStream detailsPerStream,
+      std::chrono::microseconds totalAppLimitedTimeUsecs = 0us)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -249,6 +259,7 @@ struct OutstandingPacket {
             packetsInflightIn,
             lossStateIn,
             writeCount,
-            std::move(detailsPerStream))) {}
+            std::move(detailsPerStream),
+            totalAppLimitedTimeUsecs)) {}
 };
 } // namespace quic

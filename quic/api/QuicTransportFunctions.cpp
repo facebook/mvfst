@@ -884,7 +884,8 @@ void updateConnection(
       conn.outstandings.numOutstanding() + 1,
       conn.lossState,
       conn.writeCount,
-      std::move(detailsPerStream));
+      std::move(detailsPerStream),
+      conn.appLimitedTracker.getTotalAppLimitedTime());
 
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;

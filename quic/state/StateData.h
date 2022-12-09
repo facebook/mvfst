@@ -142,6 +142,65 @@ struct OutstandingsInfo {
   }
 };
 
+class AppLimitedTracker {
+ public:
+  using Clock = std::chrono::steady_clock;
+
+  /**
+   * Mark the connection as application limited.
+   */
+  void setAppLimited() {
+    DCHECK(!isAppLimited_);
+    isAppLimited_ = true;
+    appLimitedStartTime_ = Clock::now();
+  }
+
+  /**
+   * Mark the connection as not being application limited.
+   */
+  void setNotAppLimited() {
+    DCHECK(isAppLimited_);
+    isAppLimited_ = false;
+    totalAppLimitedTime_ +=
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            Clock::now() - appLimitedStartTime_);
+  }
+
+  /**
+   * Returns whether the connection has been marked as appplication limited.
+   */
+  bool isAppLimited() {
+    return isAppLimited_;
+  }
+
+  /**
+   * Returns total time connection has spent application limited.
+   *
+   * If connection is currently application limited, the time in the current
+   * application limited period is included.
+   */
+  std::chrono::microseconds getTotalAppLimitedTime() {
+    if (isAppLimited_) {
+      return std::chrono::duration_cast<std::chrono::microseconds>(
+                 Clock::now() - appLimitedStartTime_) +
+          totalAppLimitedTime_;
+    }
+    return totalAppLimitedTime_;
+  }
+
+ private:
+  // Total time spent application limited, excluding now.
+  std::chrono::microseconds totalAppLimitedTime_{0us};
+
+  // Whether we're currently application limited.
+  // Initialize to true since all connections start off application limited.
+  bool isAppLimited_{true};
+
+  // When we last became application limited.
+  // Initialize to now() since all connections start off application limited.
+  Clock::time_point appLimitedStartTime_{Clock::now()};
+};
+
 struct Pacer {
   virtual ~Pacer() = default;
 
@@ -689,10 +748,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // For example, we may not want to pace a connection that's still handshaking.
   bool canBePaced{false};
 
-  // Flag indicating whether the socket is currently waiting for the app to
-  // write data. All new sockets start off in this state where they wait for the
-  // application to pump data to the socket.
-  bool waitingForAppData{true};
+  // Tracking of application limited time.
+  AppLimitedTracker appLimitedTracker;
 
   // Monotonically increasing counter that is incremented each time there is a
   // write on this socket (writeSocketData() is called), This is used to
