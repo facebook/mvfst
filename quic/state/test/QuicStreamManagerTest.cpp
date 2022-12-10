@@ -13,6 +13,7 @@
 #include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
+#include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -207,6 +208,45 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   stream->recvState = StreamRecvState::Closed;
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.isAppIdle());
+}
+
+TEST_P(QuicStreamManagerTest, PeerMaxBidiStreamsLimitSaturated) {
+  MockQuicStats mockStats;
+  conn.statsCallback = &mockStats;
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.advertisedInitialMaxStreamsBidi = 10;
+  conn.transportSettings.advertisedInitialMaxStreamsUni = 10;
+  manager.refreshTransportSettings(conn.transportSettings);
+  manager.setStreamLimitWindowingFraction(1);
+
+  // peer saturating all bidi streams should invoke callback
+  EXPECT_CALL(mockStats, onPeerMaxBidiStreamsLimitSaturated).Times(1);
+  for (int i = 0; i < 10; i++) {
+    manager.getStream(i * detail::kStreamIncrement);
+    manager.getStream(2 + i * detail::kStreamIncrement);
+  }
+
+  // close all opened streams will send peer max streams credit
+  for (int i = 0; i < 10; i++) {
+    auto stream = manager.getStream(i * detail::kStreamIncrement);
+    stream->sendState = StreamSendState::Closed;
+    stream->recvState = StreamRecvState::Closed;
+    manager.removeClosedStream(stream->id);
+    stream = manager.getStream(2 + i * detail::kStreamIncrement);
+    stream->sendState = StreamSendState::Closed;
+    stream->recvState = StreamRecvState::Closed;
+    manager.removeClosedStream(stream->id);
+  }
+
+  auto update = manager.remoteBidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(update);
+  EXPECT_EQ(update.value(), 20);
+  EXPECT_FALSE(manager.remoteBidirectionalStreamLimitUpdate());
+
+  update = manager.remoteUnidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(update);
+  EXPECT_EQ(update.value(), 20);
+  EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
 }
 
 TEST_P(QuicStreamManagerTest, StreamLimitWindowedUpdate) {

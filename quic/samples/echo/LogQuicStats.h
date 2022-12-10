@@ -22,235 +22,234 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
   ~LogQuicStats() override = default;
 
   void onPacketReceived() override {
-    VLOG(2) << prefix_ << "onPacketReceived";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onDuplicatedPacketReceived() override {
-    VLOG(2) << prefix_ << "onDuplicatedPacketReceived";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onOutOfOrderPacketReceived() override {
-    VLOG(2) << prefix_ << "onOutOfOrderPacketReceived";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onPacketProcessed() override {
-    VLOG(2) << prefix_ << "onPacketProcessed";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onPacketSent() override {
-    VLOG(2) << prefix_ << "onPacketSent";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onDSRPacketSent(size_t pktSize) override {
-    VLOG(2) << prefix_ << "onDSRPacketSent size=" << pktSize;
+    VLOG(2) << prefix_ << __func__ << " size=" << pktSize;
   }
 
   void onPacketRetransmission() override {
-    VLOG(2) << prefix_ << "onPacketRetransmission";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onPacketLoss() override {
-    VLOG(2) << prefix_ << "onPacketLoss";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onPacketSpuriousLoss() override {
-    VLOG(2) << prefix_ << "onPacketSpuriousLoss";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onPersistentCongestion() override {
-    VLOG(2) << prefix_ << "onPersistentCongestion";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onPacketDropped(PacketDropReason reason) override {
-    VLOG(2) << prefix_ << "onPacketDropped reason=" << reason._to_string();
+    VLOG(2) << prefix_ << __func__ << " reason=" << reason._to_string();
   }
 
   void onPacketForwarded() override {
-    VLOG(2) << prefix_ << "onPacketForwarded";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onForwardedPacketReceived() override {
-    VLOG(2) << prefix_ << "onForwardedPacketReceived";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onForwardedPacketProcessed() override {
-    VLOG(2) << prefix_ << "onForwardedPacketProcessed";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onClientInitialReceived(QuicVersion version) override {
-    VLOG(2) << prefix_
-            << "onClientInitialReceived, version: " << quic::toString(version);
+    VLOG(2) << prefix_ << __func__ << " version: " << quic::toString(version);
   }
 
   void onConnectionRateLimited() override {
-    VLOG(2) << prefix_ << "onConnectionRateLimited";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onConnectionWritableBytesLimited() override {
-    VLOG(2) << prefix_ << "onConnectionWritableBytesLimited";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onNewTokenReceived() override {
-    VLOG(2) << prefix_ << "onNewTokenReceived";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onNewTokenIssued() override {
-    VLOG(2) << prefix_ << "onNewTokenIssued";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onTokenDecryptFailure() override {
-    VLOG(2) << prefix_ << "onTokenDecryptFailure";
+    VLOG(2) << prefix_ << __func__;
   }
 
   // connection level metrics:
   void onNewConnection() override {
-    VLOG(2) << prefix_ << "onNewConnection";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onConnectionClose(
       folly::Optional<QuicErrorCode> code = folly::none) override {
-    VLOG(2) << prefix_ << "onConnectionClose reason="
+    VLOG(2) << prefix_ << __func__ << " reason="
             << quic::toString(code.value_or(LocalErrorCode::NO_ERROR));
   }
 
   void onConnectionCloseZeroBytesWritten() override {
-    VLOG(2) << prefix_ << "onConnectionCloseZeroBytesWritten";
+    VLOG(2) << prefix_ << __func__;
   }
 
   // stream level metrics
   void onNewQuicStream() override {
-    VLOG(2) << prefix_ << "onNewQuicStream";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onQuicStreamClosed() override {
-    VLOG(2) << prefix_ << "onQuicStreamClosed";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onQuicStreamReset(QuicErrorCode code) override {
-    VLOG(2) << prefix_ << "onQuicStreamReset reason=" << quic::toString(code);
+    VLOG(2) << prefix_ << __func__ << " reason=" << quic::toString(code);
   }
 
   // flow control / congestion control / loss recovery related metrics
   void onConnFlowControlUpdate() override {
-    VLOG(2) << prefix_ << "onConnFlowControlUpdate";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onConnFlowControlBlocked() override {
-    VLOG(2) << prefix_ << "onConnFlowControlBlocked";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onStatelessReset() override {
-    VLOG(2) << prefix_ << "onStatelessReset";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onStreamFlowControlUpdate() override {
-    VLOG(2) << prefix_ << "onStreamFlowControlUpdate";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onStreamFlowControlBlocked() override {
-    VLOG(2) << prefix_ << "onStreamFlowControlBlocked";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onCwndBlocked() override {
-    VLOG(2) << prefix_ << "onCwndBlocked";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onNewCongestionController(CongestionControlType type) override {
-    VLOG(2) << prefix_ << "onNewCongestionController type="
-            << congestionControlTypeToString(type);
+    VLOG(2) << prefix_ << __func__
+            << " type=" << congestionControlTypeToString(type);
   }
 
   // Probe timeout counter (aka loss timeout counter)
   void onPTO() override {
-    VLOG(2) << prefix_ << "onPTO";
+    VLOG(2) << prefix_ << __func__;
   }
 
   // metrics to track bytes read from / written to wire
   void onRead(size_t bufSize) override {
-    VLOG(2) << prefix_ << "onRead size=" << bufSize;
+    VLOG(2) << prefix_ << __func__ << " size=" << bufSize;
   }
 
   void onWrite(size_t bufSize) override {
-    VLOG(2) << prefix_ << "onWrite size=" << bufSize;
+    VLOG(2) << prefix_ << __func__ << " size=" << bufSize;
   }
 
   void onUDPSocketWriteError(SocketErrorType errorType) override {
-    VLOG(2) << prefix_
-            << "onUDPSocketWriteError errorType=" << toString(errorType);
+    VLOG(2) << prefix_ << __func__ << " errorType=" << toString(errorType);
   }
 
   void onConnectionD6DStarted() override {
-    VLOG(2) << prefix_ << "onConnectionD6DStarted";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onConnectionPMTURaised() override {
-    VLOG(2) << prefix_ << "onConnectionPMTURaised";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onConnectionPMTUBlackholeDetected() override {
-    VLOG(2) << prefix_ << "onConnectionPMTUBlackholeDetected";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onConnectionPMTUUpperBoundDetected() override {
-    VLOG(2) << prefix_ << "onConnectionPMTUUpperBoundDetected";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onTransportKnobApplied(TransportKnobParamId knobType) override {
-    VLOG(2) << prefix_
-            << "onTransportKnobApplied knobType=" << knobType._to_string();
+    VLOG(2) << prefix_ << __func__ << " knobType=" << knobType._to_string();
   }
 
   void onTransportKnobError(TransportKnobParamId knobType) override {
-    VLOG(2) << prefix_
-            << "onTransportKnboError knobType=" << knobType._to_string();
+    VLOG(2) << prefix_ << __func__ << " knobType=" << knobType._to_string();
   }
 
   void onTransportKnobOutOfOrder(TransportKnobParamId knobType) override {
-    VLOG(2) << prefix_
-            << "onTransportKnobOutOfOrder knobType=" << knobType._to_string();
+    VLOG(2) << prefix_ << __func__ << " knobType=" << knobType._to_string();
   }
 
   void onServerUnfinishedHandshake() override {
-    VLOG(2) << prefix_ << "onServerUnfinishedHandshake";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onZeroRttBuffered() override {
-    VLOG(2) << prefix_ << "onZeroRttBuffered";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onZeroRttBufferedPruned() override {
-    VLOG(2) << prefix_ << "onZeroRttBufferedPruned";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onZeroRttAccepted() override {
-    VLOG(2) << prefix_ << "onZeroRttAccepted";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onZeroRttRejected() override {
-    VLOG(2) << prefix_ << "onZeroRttRejected";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onDatagramRead(size_t datagramSize) override {
-    VLOG(2) << prefix_ << "onDatagramRead size=" << datagramSize;
+    VLOG(2) << prefix_ << __func__ << " size=" << datagramSize;
   }
 
   void onDatagramWrite(size_t datagramSize) override {
-    VLOG(2) << prefix_ << "onDatagramWrite size=" << datagramSize;
+    VLOG(2) << prefix_ << __func__ << " size=" << datagramSize;
   }
 
   void onDatagramDroppedOnWrite() override {
-    VLOG(2) << prefix_ << "onDatagramDroppedOnWrite";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onDatagramDroppedOnRead() override {
-    VLOG(2) << prefix_ << "onDatagramDroppedOnRead";
+    VLOG(2) << prefix_ << __func__;
   }
 
   void onShortHeaderPadding(size_t padSize) override {
-    VLOG(2) << prefix_ << "onShortHeaderPadding size=" << padSize;
+    VLOG(2) << prefix_ << __func__ << " size=" << padSize;
   }
 
   void onPacerTimerLagged() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
+  void onPeerMaxBidiStreamsLimitSaturated() override {
     VLOG(2) << prefix_ << __func__;
   }
 

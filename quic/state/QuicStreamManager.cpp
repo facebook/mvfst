@@ -472,6 +472,11 @@ QuicStreamState* FOLLY_NULLABLE QuicStreamManager::getOrCreatePeerStream(
       maxStreamId,
       (transportSettings_->notifyOnNewStreamsExplicitly ? nullptr
                                                         : newPeerStreams));
+  if (isBidirectionalStream(streamId) &&
+      nextAcceptableStreamId == maxStreamId) {
+    // peer has reached stream limit
+    QUIC_STATS(conn_.statsCallback, onPeerMaxBidiStreamsLimitSaturated);
+  }
 
   if (openedResult == LocalErrorCode::CREATING_EXISTING_STREAM) {
     // Stream could be closed here.
