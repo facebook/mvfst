@@ -176,6 +176,28 @@ TEST(BufQueue, TrimStartAtMost) {
   checkConsistency(queue);
 }
 
+TEST(BufQueue, CloneBufNull) {
+  BufQueue queue;
+  auto buf = queue.clone();
+  EXPECT_EQ(nullptr, buf);
+}
+
+TEST(BufQueue, CloneBuf) {
+  std::string s("Hello, World");
+  BufQueue queue;
+  queue.append(IOBuf::copyBuffer(s.data(), s.length()));
+  auto buf = queue.clone();
+  const IOBuf* chain = queue.front();
+  EXPECT_EQ(s.length(), chain->computeChainDataLength());
+  EXPECT_EQ(s.length(), buf->computeChainDataLength());
+  EXPECT_EQ(0, memcmp(chain->data(), buf->data(), s.length()));
+  queue.append(IOBuf::copyBuffer(s.data(), s.length()));
+  EXPECT_EQ(2 * s.length(), chain->computeChainDataLength());
+  EXPECT_EQ(s.length(), buf->computeChainDataLength());
+  buf = queue.clone();
+  EXPECT_EQ(2 * s.length(), buf->computeChainDataLength());
+}
+
 TEST(BufAppender, TestPushAlreadyFits) {
   std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(10);
   BufAppender appender(data.get(), 10);
