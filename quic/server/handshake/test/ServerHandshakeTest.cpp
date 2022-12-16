@@ -492,8 +492,8 @@ class ServerHandshakeWriteNSTTest : public ServerHandshakeTest {
     serverCtx->setTicketCipher(ticketCipher_);
     cache_ = std::make_shared<fizz::client::BasicPskCache>();
     clientCtx->setPskCache(cache_);
-    clientCtx->setSupportedAlpns({"h1q-fb"});
-    serverCtx->setSupportedAlpns({"h1q-fb", "hq"});
+    clientCtx->setSupportedAlpns({"h3"});
+    serverCtx->setSupportedAlpns({"h3", "hq"});
   }
 
  protected:
@@ -537,7 +537,7 @@ class ServerHandshakePskTest : public ServerHandshakeTest {
     psk.cipher = fizz::CipherSuite::TLS_AES_128_GCM_SHA256;
     psk.group = fizz::NamedGroup::x25519;
     psk.serverCert = std::make_shared<fizz::test::MockCert>();
-    psk.alpn = std::string("h1q-fb");
+    psk.alpn = std::string("h3");
     psk.ticketAgeAdd = 1;
     psk.ticketIssueTime = std::chrono::system_clock::time_point();
     psk.ticketExpirationTime =
@@ -552,8 +552,8 @@ class ServerHandshakePskTest : public ServerHandshakeTest {
     ticketCipher = makeTicketCipher();
     serverCtx->setTicketCipher(ticketCipher);
     clientCtx->setPskCache(cache);
-    clientCtx->setSupportedAlpns({"h1q-fb"});
-    serverCtx->setSupportedAlpns({"h1q-fb", "hq"});
+    clientCtx->setSupportedAlpns({"h3"});
+    serverCtx->setSupportedAlpns({"h3", "hq"});
   }
 
   virtual std::shared_ptr<fizz::server::TicketCipher> makeTicketCipher() = 0;
@@ -577,8 +577,8 @@ class ServerHandshakeHRRTest : public ServerHandshakePskTest {
     clientCtx->setDefaultShares({fizz::NamedGroup::secp256r1});
     serverCtx->setSupportedGroups({fizz::NamedGroup::x25519});
     serverCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
-    clientCtx->setSupportedAlpns({"h1q-fb"});
-    serverCtx->setSupportedAlpns({"h1q-fb", "hq"});
+    clientCtx->setSupportedAlpns({"h3"});
+    serverCtx->setSupportedAlpns({"h3", "hq"});
     ServerHandshakePskTest::setupClientAndServerContext();
   }
 
@@ -604,7 +604,7 @@ TEST_F(ServerHandshakeHRRTest, TestHRR) {
   serverClientRound();
   clientServerRound();
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Established);
-  EXPECT_EQ(handshake->getApplicationProtocol(), "h1q-fb");
+  EXPECT_EQ(handshake->getApplicationProtocol(), "h3");
   expectOneRttCipher(true);
 }
 
@@ -624,7 +624,7 @@ TEST_F(ServerHandshakeHRRTest, TestAsyncHRR) {
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Handshake);
   clientServerRound();
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Established);
-  EXPECT_EQ(handshake->getApplicationProtocol(), "h1q-fb");
+  EXPECT_EQ(handshake->getApplicationProtocol(), "h3");
   expectOneRttCipher(true);
 }
 
@@ -793,8 +793,8 @@ class ServerHandshakeZeroRttDefaultAppTokenValidatorTest
 
     clientCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
     serverCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
-    clientCtx->setSupportedAlpns({"h1q-fb"});
-    serverCtx->setSupportedAlpns({"h1q-fb", "hq"});
+    clientCtx->setSupportedAlpns({"h3"});
+    serverCtx->setSupportedAlpns({"h3", "hq"});
     ServerHandshakePskTest::setupClientAndServerContext();
   }
 

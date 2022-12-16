@@ -63,7 +63,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     // Fizz is the hostname for the server cert.
     hostname = "Fizz";
     serverCtx = test::createServerCtx();
-    serverCtx->setSupportedAlpns({"h1q-fb", "hq"});
+    serverCtx->setSupportedAlpns({"h3", "hq"});
     server_ = createServer(ProcessId::ZERO);
     serverAddr = server_->getAddress();
     ON_CALL(clientConnSetupCallback, onTransportReady())
@@ -80,7 +80,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
 
   std::shared_ptr<fizz::client::FizzClientContext> createClientContext() {
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
-    clientCtx->setSupportedAlpns({"h1q-fb"});
+    clientCtx->setSupportedAlpns({"h3"});
     clientCtx->setClock(std::make_shared<NiceMock<fizz::test::MockClock>>());
     return clientCtx;
   }
@@ -368,7 +368,7 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
 
 TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    ASSERT_EQ(client->getAppProtocol(), "h3");
     client->close(folly::none);
     eventbase_.terminateLoopSoon();
   }));
@@ -473,7 +473,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
-  folly::Optional<std::string> alpn = std::string("h1q-fb");
+  folly::Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
       [&](const folly::Optional<std::string>& alpnToValidate, const Buf&) {
@@ -498,7 +498,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    ASSERT_EQ(client->getAppProtocol(), "h3");
     CHECK(client->getConn().zeroRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -550,7 +550,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
       std::make_shared<DefaultCongestionControllerFactory>());
   client->setCongestionControl(CongestionControlType::NewReno);
 
-  folly::Optional<std::string> alpn = std::string("h1q-fb");
+  folly::Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
       [&](const folly::Optional<std::string>& alpnToValidate, const Buf&) {
@@ -575,7 +575,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    ASSERT_EQ(client->getAppProtocol(), "h3");
     CHECK(client->getConn().zeroRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -714,7 +714,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   client->serverInitialParamsSet() = false;
 
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    ASSERT_EQ(client->getAppProtocol(), "h3");
     CHECK(client->getConn().zeroRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));

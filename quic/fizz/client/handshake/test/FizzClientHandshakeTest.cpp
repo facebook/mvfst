@@ -481,10 +481,10 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   void setupClientAndServerContext() override {
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
-    clientCtx->setSupportedAlpns({"h1q-fb", "hq"});
+    clientCtx->setSupportedAlpns({"h3", "hq"});
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
-    serverCtx->setSupportedAlpns({"h1q-fb"});
+    serverCtx->setSupportedAlpns({"h3"});
     serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupCtxWithTestCert(*serverCtx);
     psk = setupZeroRttOnClientCtx(*clientCtx, hostname);
@@ -536,7 +536,7 @@ TEST_F(ClientHandshakeZeroRttTest, TestZeroRttSuccess) {
   clientServerRound();
   handshake->handshakeConfirmed();
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Established);
-  EXPECT_EQ(handshake->getApplicationProtocol(), "h1q-fb");
+  EXPECT_EQ(handshake->getApplicationProtocol(), "h3");
 }
 
 class ClientHandshakeZeroRttReject : public ClientHandshakeZeroRttTest {
