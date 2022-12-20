@@ -129,8 +129,14 @@ TEST(IntervalSet, insertWithMultipleMerge) {
   set.insert(4, 9);
   auto itr = set.cbegin();
   EXPECT_EQ(*itr, Interval<int>(1, 2));
+  EXPECT_TRUE(set.contains(1, 2));
   EXPECT_EQ(*++itr, Interval<int>(4, 12));
+  EXPECT_TRUE(set.contains(4, 12));
+  EXPECT_TRUE(set.contains(5, 11));
+  EXPECT_FALSE(set.contains(5, 14));
   EXPECT_EQ(*++itr, Interval<int>(14, 15));
+  EXPECT_TRUE(set.contains(14, 15));
+  EXPECT_FALSE(set.contains(14, 16));
   EXPECT_TRUE(++itr == set.cend());
 }
 
@@ -143,7 +149,10 @@ TEST(IntervalSet, insertWithMergeAtEdge) {
   set.insert(3, 3);
   auto interval = set.front();
   EXPECT_EQ(interval, Interval<int>(1, 7));
+  EXPECT_TRUE(set.contains(2, 7));
+  EXPECT_FALSE(set.contains(1, 8));
   set.pop_back();
+  EXPECT_FALSE(set.contains(2, 7));
   EXPECT_TRUE(set.empty());
 }
 
@@ -176,6 +185,9 @@ TEST(IntervalSet, withdrawBeforeFront) {
   EXPECT_EQ(1, set.size());
   auto interval = set.front();
   EXPECT_EQ(interval, Interval<int>(4, 5));
+  EXPECT_FALSE(set.contains(1, 2));
+  EXPECT_TRUE(set.contains(4, 5));
+  EXPECT_FALSE(set.contains(3, 5));
 }
 
 TEST(IntervalSet, withdrawAfterBack) {
@@ -185,6 +197,7 @@ TEST(IntervalSet, withdrawAfterBack) {
   EXPECT_EQ(1, set.size());
   auto interval = set.front();
   EXPECT_EQ(interval, Interval<int>(1, 2));
+  EXPECT_TRUE(set.contains(1, 2));
 }
 
 TEST(IntervalSet, withdrawMiddleNoIntersection) {
@@ -196,6 +209,10 @@ TEST(IntervalSet, withdrawMiddleNoIntersection) {
   auto itr = set.cbegin();
   EXPECT_EQ(*itr, Interval<int>(1, 2));
   EXPECT_EQ(*++itr, Interval<int>(7, 8));
+  EXPECT_FALSE(set.contains(1, 7));
+  EXPECT_TRUE(set.contains(1, 2));
+  EXPECT_TRUE(set.contains(7, 8));
+  EXPECT_FALSE(set.contains(7, 9));
 }
 
 TEST(IntervalSet, withdrawMiddleLeftIntersection1) {
@@ -207,6 +224,10 @@ TEST(IntervalSet, withdrawMiddleLeftIntersection1) {
   auto itr = set.cbegin();
   EXPECT_EQ(*itr, Interval<int>(1, 2));
   EXPECT_EQ(*++itr, Interval<int>(7, 8));
+  EXPECT_FALSE(set.contains(1, 7));
+  EXPECT_TRUE(set.contains(1, 2));
+  EXPECT_TRUE(set.contains(7, 8));
+  EXPECT_FALSE(set.contains(7, 9));
 }
 
 TEST(IntervalSet, withdrawMiddleLeftIntersection2) {
@@ -217,6 +238,9 @@ TEST(IntervalSet, withdrawMiddleLeftIntersection2) {
   EXPECT_EQ(1, set.size());
   auto itr = set.cbegin();
   EXPECT_EQ(*itr, Interval<int>(7, 8));
+  EXPECT_FALSE(set.contains(1, 7));
+  EXPECT_TRUE(set.contains(7, 8));
+  EXPECT_FALSE(set.contains(7, 9));
 }
 
 TEST(IntervalSet, withdrawMiddleRightIntersection1) {

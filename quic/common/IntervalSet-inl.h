@@ -78,6 +78,20 @@ void IntervalSet<T, Unit, Container>::withdraw(
 }
 
 template <typename T, T Unit, template <typename... I> class Container>
+bool IntervalSet<T, Unit, Container>::contains(const T& start, const T& end) {
+  for (auto itr = container_type::begin(); itr != container_type::end();
+       itr++) {
+    if (start >= itr->start && end <= itr->end) {
+      return true;
+    }
+    if (start < itr->end) {
+      return false;
+    }
+  }
+  return false;
+}
+
+template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(const T& startIt, const T& endIt) {
   if (startIt > endIt) {
     throw std::invalid_argument("Trying to insert invalid interval");
