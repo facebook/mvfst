@@ -112,12 +112,12 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   auto packet = std::move(builder).buildPacket();
 
   // Clear out the existing acks to make sure that we are the cause of the acks.
-  server->getNonConstConn().ackStates.initialAckState.acks.clear();
-  server->getNonConstConn().ackStates.initialAckState.largestRecvdPacketTime =
+  server->getNonConstConn().ackStates.initialAckState->acks.clear();
+  server->getNonConstConn().ackStates.initialAckState->largestRecvdPacketTime =
       folly::none;
-  server->getNonConstConn().ackStates.handshakeAckState.acks.clear();
-  server->getNonConstConn().ackStates.handshakeAckState.largestRecvdPacketTime =
-      folly::none;
+  server->getNonConstConn().ackStates.handshakeAckState->acks.clear();
+  server->getNonConstConn()
+      .ackStates.handshakeAckState->largestRecvdPacketTime = folly::none;
   server->getNonConstConn().ackStates.appDataAckState.acks.clear();
   server->getNonConstConn().ackStates.appDataAckState.largestRecvdPacketTime =
       folly::none;
@@ -3056,9 +3056,9 @@ TEST_F(QuicServerTransportTest, ImmediateAckProtocolViolation) {
   ASSERT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
   // Verify that none of the ack states have changed
   EXPECT_FALSE(
-      server->getConn().ackStates.initialAckState.needsToSendAckImmediately);
+      server->getConn().ackStates.initialAckState->needsToSendAckImmediately);
   EXPECT_FALSE(
-      server->getConn().ackStates.handshakeAckState.needsToSendAckImmediately);
+      server->getConn().ackStates.handshakeAckState->needsToSendAckImmediately);
   EXPECT_FALSE(
       server->getConn().ackStates.appDataAckState.needsToSendAckImmediately);
 }

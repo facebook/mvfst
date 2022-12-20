@@ -44,6 +44,10 @@ const AckState& getAckState(
     const QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept;
 
+const AckState* getAckStatePtr(
+    const QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace) noexcept;
+
 AckStateVersion currentAckStateVersion(
     const QuicConnectionStateBase& conn) noexcept;
 

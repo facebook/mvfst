@@ -114,14 +114,14 @@ auto buildEmptyPacket(
           LongHeader::Types::Initial,
           *conn.clientConnectionId,
           *conn.serverConnectionId,
-          conn.ackStates.initialAckState.nextPacketNum,
+          conn.ackStates.initialAckState->nextPacketNum,
           *conn.version);
     } else if (pnSpace == PacketNumberSpace::Handshake) {
       header = LongHeader(
           LongHeader::Types::Handshake,
           *conn.clientConnectionId,
           *conn.serverConnectionId,
-          conn.ackStates.handshakeAckState.nextPacketNum,
+          conn.ackStates.handshakeAckState->nextPacketNum,
           *conn.version);
     } else if (pnSpace == PacketNumberSpace::AppData) {
       header = LongHeader(
@@ -249,9 +249,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   packet.packet.frames.push_back(std::move(writeStreamFrame2));
 
   auto currentNextInitialPacketNum =
-      conn->ackStates.initialAckState.nextPacketNum;
+      conn->ackStates.initialAckState->nextPacketNum;
   auto currentNextHandshakePacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+      conn->ackStates.handshakeAckState->nextPacketNum;
   auto currentNextAppDataPacketNum =
       conn->ackStates.appDataAckState.nextPacketNum;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
@@ -268,10 +268,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       false /* isDSRPacket */);
 
   EXPECT_EQ(
-      conn->ackStates.initialAckState.nextPacketNum,
+      conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum);
   EXPECT_GT(
-      conn->ackStates.handshakeAckState.nextPacketNum,
+      conn->ackStates.handshakeAckState->nextPacketNum,
       currentNextHandshakePacketNum);
   EXPECT_EQ(
       conn->ackStates.appDataAckState.nextPacketNum,
@@ -313,9 +313,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   packet2.packet.frames.push_back(std::move(writeStreamFrame5));
 
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  currentNextInitialPacketNum = conn->ackStates.initialAckState.nextPacketNum;
+  currentNextInitialPacketNum = conn->ackStates.initialAckState->nextPacketNum;
   currentNextHandshakePacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+      conn->ackStates.handshakeAckState->nextPacketNum;
   currentNextAppDataPacketNum = conn->ackStates.appDataAckState.nextPacketNum;
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
@@ -329,10 +329,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       getEncodedBodySize(packet2),
       false /* isDSRPacket */);
   EXPECT_EQ(
-      conn->ackStates.initialAckState.nextPacketNum,
+      conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum);
   EXPECT_GT(
-      conn->ackStates.handshakeAckState.nextPacketNum,
+      conn->ackStates.handshakeAckState->nextPacketNum,
       currentNextHandshakePacketNum);
   EXPECT_EQ(
       conn->ackStates.appDataAckState.nextPacketNum,
@@ -430,9 +430,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
 
   // mimic send, call updateConnection
   auto currentNextInitialPacketNum =
-      conn->ackStates.initialAckState.nextPacketNum;
+      conn->ackStates.initialAckState->nextPacketNum;
   auto currentNextHandshakePacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+      conn->ackStates.handshakeAckState->nextPacketNum;
   auto currentNextAppDataPacketNum =
       conn->ackStates.appDataAckState.nextPacketNum;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
@@ -450,10 +450,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
 
   // appData packet number should increase
   EXPECT_EQ(
-      conn->ackStates.initialAckState.nextPacketNum,
+      conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum); // no change
   EXPECT_EQ(
-      conn->ackStates.handshakeAckState.nextPacketNum,
+      conn->ackStates.handshakeAckState->nextPacketNum,
       currentNextHandshakePacketNum); // no change
   EXPECT_GT(
       conn->ackStates.appDataAckState.nextPacketNum,
@@ -494,9 +494,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
 
   // mimic send, call updateConnection
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  currentNextInitialPacketNum = conn->ackStates.initialAckState.nextPacketNum;
+  currentNextInitialPacketNum = conn->ackStates.initialAckState->nextPacketNum;
   currentNextHandshakePacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+      conn->ackStates.handshakeAckState->nextPacketNum;
   currentNextAppDataPacketNum = conn->ackStates.appDataAckState.nextPacketNum;
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
@@ -510,10 +510,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       getEncodedBodySize(packet2),
       false /* isDSRPacket */);
   EXPECT_EQ(
-      conn->ackStates.initialAckState.nextPacketNum,
+      conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum); // no change
   EXPECT_EQ(
-      conn->ackStates.handshakeAckState.nextPacketNum,
+      conn->ackStates.handshakeAckState->nextPacketNum,
       currentNextHandshakePacketNum); // no change
   EXPECT_GT(
       conn->ackStates.appDataAckState.nextPacketNum,
@@ -598,9 +598,9 @@ TEST_F(
 
   // mimic send, call updateConnection
   auto currentNextInitialPacketNum =
-      conn->ackStates.initialAckState.nextPacketNum;
+      conn->ackStates.initialAckState->nextPacketNum;
   auto currentNextHandshakePacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+      conn->ackStates.handshakeAckState->nextPacketNum;
   auto currentNextAppDataPacketNum =
       conn->ackStates.appDataAckState.nextPacketNum;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
@@ -618,10 +618,10 @@ TEST_F(
 
   // appData packet number should increase
   EXPECT_EQ(
-      conn->ackStates.initialAckState.nextPacketNum,
+      conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum); // no change
   EXPECT_EQ(
-      conn->ackStates.handshakeAckState.nextPacketNum,
+      conn->ackStates.handshakeAckState->nextPacketNum,
       currentNextHandshakePacketNum); // no change
   EXPECT_GT(
       conn->ackStates.appDataAckState.nextPacketNum,
@@ -683,9 +683,9 @@ TEST_F(
 
   // mimic send, call updateConnection
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  currentNextInitialPacketNum = conn->ackStates.initialAckState.nextPacketNum;
+  currentNextInitialPacketNum = conn->ackStates.initialAckState->nextPacketNum;
   currentNextHandshakePacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+      conn->ackStates.handshakeAckState->nextPacketNum;
   currentNextAppDataPacketNum = conn->ackStates.appDataAckState.nextPacketNum;
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
@@ -699,10 +699,10 @@ TEST_F(
       getEncodedBodySize(packet2),
       false /* isDSRPacket */);
   EXPECT_EQ(
-      conn->ackStates.initialAckState.nextPacketNum,
+      conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum); // no change
   EXPECT_EQ(
-      conn->ackStates.handshakeAckState.nextPacketNum,
+      conn->ackStates.handshakeAckState->nextPacketNum,
       currentNextHandshakePacketNum); // no change
   EXPECT_GT(
       conn->ackStates.appDataAckState.nextPacketNum,
@@ -782,8 +782,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNeedsAppDataPNSpace) {
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
-  conn->ackStates.initialAckState.nextPacketNum = 0;
-  conn->ackStates.handshakeAckState.nextPacketNum = 1;
+  conn->ackStates.initialAckState->nextPacketNum = 0;
+  conn->ackStates.handshakeAckState->nextPacketNum = 1;
   conn->ackStates.appDataAckState.nextPacketNum = 2;
   auto initialPacket = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
   auto handshakePacket = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
@@ -967,7 +967,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
   // buildEmptyPacket() builds a Handshake packet, we use handshakeAckState to
   // verify.
   auto currentPendingLargestAckScheduled =
-      conn->ackStates.handshakeAckState.largestAckScheduled;
+      conn->ackStates.handshakeAckState->largestAckScheduled;
   updateConnection(
       *conn,
       folly::none,
@@ -991,7 +991,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
 
   EXPECT_EQ(
       currentPendingLargestAckScheduled,
-      conn->ackStates.handshakeAckState.largestAckScheduled);
+      conn->ackStates.handshakeAckState->largestAckScheduled);
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
@@ -2970,11 +2970,11 @@ TEST_F(QuicTransportFunctionsTest, NothingWritten) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(18));
 
-  addAckStatesWithCurrentTimestamps(conn->ackStates.initialAckState, 0, 1000);
+  addAckStatesWithCurrentTimestamps(*conn->ackStates.initialAckState, 0, 1000);
   addAckStatesWithCurrentTimestamps(
-      conn->ackStates.initialAckState, 1500, 2000);
+      *conn->ackStates.initialAckState, 1500, 2000);
   addAckStatesWithCurrentTimestamps(
-      conn->ackStates.initialAckState, 2500, 3000);
+      *conn->ackStates.initialAckState, 2500, 3000);
   auto res = writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -3155,7 +3155,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   conn.clientConnectionId = getTestConnectionId();
   // writeCryptoDataProbesToSocketForTest writes Initial LongHeader, thus it
   // writes at Initial level.
-  auto currentPacketSeqNum = conn.ackStates.initialAckState.nextPacketNum;
+  auto currentPacketSeqNum = conn.ackStates.initialAckState->nextPacketNum;
   // Replace real congestionController with MockCongestionController:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -3184,7 +3184,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
       }));
   writeCryptoDataProbesToSocketForTest(
       *rawSocket, conn, 1, *aead, *headerCipher, getVersion(conn));
-  EXPECT_LT(currentPacketSeqNum, conn.ackStates.initialAckState.nextPacketNum);
+  EXPECT_LT(currentPacketSeqNum, conn.ackStates.initialAckState->nextPacketNum);
   EXPECT_FALSE(conn.outstandings.packets.empty());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
   EXPECT_GT(cryptoStream->currentWriteOffset, currentStreamWriteOffset);
@@ -3202,7 +3202,7 @@ TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
   conn.clientConnectionId = getTestConnectionId();
   // writeCryptoDataProbesToSocketForTest writes Initial LongHeader, thus it
   // writes at Initial level.
-  auto currentPacketSeqNum = conn.ackStates.initialAckState.nextPacketNum;
+  auto currentPacketSeqNum = conn.ackStates.initialAckState->nextPacketNum;
   // Replace real congestionController with MockCongestionController:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -3232,7 +3232,7 @@ TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
       *rawSocket, conn, probesToSend, *aead, *headerCipher, getVersion(conn));
 
   EXPECT_EQ(conn.numProbesWritableBytesLimited, 1);
-  EXPECT_LT(currentPacketSeqNum, conn.ackStates.initialAckState.nextPacketNum);
+  EXPECT_LT(currentPacketSeqNum, conn.ackStates.initialAckState->nextPacketNum);
   EXPECT_FALSE(conn.outstandings.packets.empty());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
   EXPECT_GT(cryptoStream->currentWriteOffset, currentStreamWriteOffset);
@@ -3643,8 +3643,8 @@ TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteCipherAndAckStateMatch) {
   conn->ackStates.appDataAckState.needsToSendAckImmediately = true;
   conn->ackStates.appDataAckState.acks.insert(0, 100);
   EXPECT_FALSE(hasAckDataToWrite(*conn));
-  conn->ackStates.initialAckState.needsToSendAckImmediately = true;
-  conn->ackStates.initialAckState.acks.insert(0, 100);
+  conn->ackStates.initialAckState->needsToSendAckImmediately = true;
+  conn->ackStates.initialAckState->acks.insert(0, 100);
   EXPECT_TRUE(hasAckDataToWrite(*conn));
 }
 
@@ -3661,15 +3661,15 @@ TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteNoImmediateAcks) {
 TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteNoAcksScheduled) {
   auto conn = createConn();
   conn->oneRttWriteCipher = test::createNoOpAead();
-  conn->ackStates.initialAckState.needsToSendAckImmediately = true;
+  conn->ackStates.initialAckState->needsToSendAckImmediately = true;
   EXPECT_FALSE(hasAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, HasAckDataToWrite) {
   auto conn = createConn();
   conn->oneRttWriteCipher = test::createNoOpAead();
-  conn->ackStates.initialAckState.needsToSendAckImmediately = true;
-  conn->ackStates.initialAckState.acks.insert(0);
+  conn->ackStates.initialAckState->needsToSendAckImmediately = true;
+  conn->ackStates.initialAckState->acks.insert(0);
   EXPECT_TRUE(hasAckDataToWrite(*conn));
 }
 
@@ -3679,9 +3679,9 @@ TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteMismatch) {
   // should not send.
   auto conn = createConn();
   EXPECT_FALSE(hasAckDataToWrite(*conn));
-  conn->ackStates.initialAckState.needsToSendAckImmediately = true;
+  conn->ackStates.initialAckState->needsToSendAckImmediately = true;
   EXPECT_FALSE(hasAckDataToWrite(*conn));
-  conn->ackStates.handshakeAckState.acks.insert(0, 10);
+  conn->ackStates.handshakeAckState->acks.insert(0, 10);
   conn->handshakeWriteCipher = test::createNoOpAead();
   EXPECT_FALSE(hasAckDataToWrite(*conn));
 }

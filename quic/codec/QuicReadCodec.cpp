@@ -188,11 +188,12 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   folly::Optional<PacketNum> largestRecvdPacketNum;
   switch (longHeaderTypeToProtectionType(type)) {
     case ProtectionType::Initial:
-      largestRecvdPacketNum = ackStates.initialAckState.largestRecvdPacketNum;
+      largestRecvdPacketNum = ackStates.initialAckState->largestRecvdPacketNum;
 
       break;
     case ProtectionType::Handshake:
-      largestRecvdPacketNum = ackStates.handshakeAckState.largestRecvdPacketNum;
+      largestRecvdPacketNum =
+          ackStates.handshakeAckState->largestRecvdPacketNum;
 
       break;
     case ProtectionType::ZeroRtt:

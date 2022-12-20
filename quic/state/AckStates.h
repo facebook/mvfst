@@ -51,17 +51,19 @@ struct AckState : WriteAckState {
 
 struct AckStates {
   explicit AckStates(PacketNum startingNum) {
-    initialAckState.nextPacketNum = startingNum;
-    handshakeAckState.nextPacketNum = startingNum;
+    initialAckState = std::make_unique<AckState>();
+    handshakeAckState = std::make_unique<AckState>();
+    initialAckState->nextPacketNum = startingNum;
+    handshakeAckState->nextPacketNum = startingNum;
     appDataAckState.nextPacketNum = startingNum;
   }
 
   AckStates() : AckStates(folly::Random::secureRand32(kMaxInitialPacketNum)) {}
 
   // AckState for acks to peer packets in Initial packet number space.
-  AckState initialAckState;
+  std::unique_ptr<AckState> initialAckState{};
   // AckState for acks to peer packets in Handshake packet number space.
-  AckState handshakeAckState;
+  std::unique_ptr<AckState> handshakeAckState{};
   // AckState for acks to peer packets in AppData packet number space.
   AckState appDataAckState;
   std::chrono::microseconds maxAckDelay{kMaxAckTimeout};

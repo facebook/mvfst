@@ -808,6 +808,8 @@ struct AckStateVersion {
       uint64_t handshakeVersion,
       uint64_t appDataVersion);
 
+  AckStateVersion() = default;
+
   bool operator==(const AckStateVersion& other) const;
   bool operator!=(const AckStateVersion& other) const;
 };

@@ -199,9 +199,9 @@ AckState& getAckState(
     PacketNumberSpace pnSpace) noexcept {
   switch (pnSpace) {
     case PacketNumberSpace::Initial:
-      return conn.ackStates.initialAckState;
+      return *CHECK_NOTNULL(conn.ackStates.initialAckState.get());
     case PacketNumberSpace::Handshake:
-      return conn.ackStates.handshakeAckState;
+      return *CHECK_NOTNULL(conn.ackStates.handshakeAckState.get());
     case PacketNumberSpace::AppData:
       return conn.ackStates.appDataAckState;
   }
@@ -213,21 +213,43 @@ const AckState& getAckState(
     PacketNumberSpace pnSpace) noexcept {
   switch (pnSpace) {
     case PacketNumberSpace::Initial:
-      return conn.ackStates.initialAckState;
+      return *CHECK_NOTNULL(conn.ackStates.initialAckState.get());
     case PacketNumberSpace::Handshake:
-      return conn.ackStates.handshakeAckState;
+      return *CHECK_NOTNULL(conn.ackStates.handshakeAckState.get());
     case PacketNumberSpace::AppData:
       return conn.ackStates.appDataAckState;
   }
   folly::assume_unreachable();
 }
 
+const AckState* getAckStatePtr(
+    const QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace) noexcept {
+  switch (pnSpace) {
+    case PacketNumberSpace::Initial:
+      return conn.ackStates.initialAckState.get();
+    case PacketNumberSpace::Handshake:
+      return conn.ackStates.handshakeAckState.get();
+    case PacketNumberSpace::AppData:
+      return &conn.ackStates.appDataAckState;
+  }
+  folly::assume_unreachable();
+}
+
 AckStateVersion currentAckStateVersion(
     const QuicConnectionStateBase& conn) noexcept {
-  return AckStateVersion(
-      conn.ackStates.initialAckState.acks.insertVersion(),
-      conn.ackStates.handshakeAckState.acks.insertVersion(),
-      conn.ackStates.appDataAckState.acks.insertVersion());
+  AckStateVersion ret;
+  if (conn.ackStates.initialAckState) {
+    ret.initialAckStateVersion =
+        conn.ackStates.initialAckState->acks.insertVersion();
+  }
+  if (conn.ackStates.handshakeAckState) {
+    ret.handshakeAckStateVersion =
+        conn.ackStates.handshakeAckState->acks.insertVersion();
+  }
+  ret.appDataAckStateVersion =
+      conn.ackStates.appDataAckState.acks.insertVersion();
+  return ret;
 }
 
 PacketNum getNextPacketNum(
@@ -280,47 +302,57 @@ std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(
 
 bool hasReceivedPacketsAtLastCloseSent(
     const QuicConnectionStateBase& conn) noexcept {
-  return conn.ackStates.initialAckState.largestReceivedAtLastCloseSent ||
-      conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent ||
-      conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent;
+  const auto* initialAckState = conn.ackStates.initialAckState.get();
+  const auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
+  const auto& appDataAckState = conn.ackStates.appDataAckState;
+  return (initialAckState && initialAckState->largestReceivedAtLastCloseSent) ||
+      (handshakeAckState &&
+       handshakeAckState->largestReceivedAtLastCloseSent) ||
+      appDataAckState.largestReceivedAtLastCloseSent;
 }
 
 bool hasNotReceivedNewPacketsSinceLastCloseSent(
     const QuicConnectionStateBase& conn) noexcept {
-  DCHECK(
-      !conn.ackStates.initialAckState.largestReceivedAtLastCloseSent ||
-      *conn.ackStates.initialAckState.largestReceivedAtLastCloseSent <=
-          *conn.ackStates.initialAckState.largestRecvdPacketNum);
-  DCHECK(
-      !conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent ||
-      *conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent <=
-          *conn.ackStates.handshakeAckState.largestRecvdPacketNum);
-  DCHECK(
-      !conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent ||
-      *conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent <=
-          *conn.ackStates.appDataAckState.largestRecvdPacketNum);
-  return conn.ackStates.initialAckState.largestReceivedAtLastCloseSent ==
-      conn.ackStates.initialAckState.largestRecvdPacketNum &&
-      conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent ==
-      conn.ackStates.handshakeAckState.largestRecvdPacketNum &&
-      conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent ==
-      conn.ackStates.appDataAckState.largestRecvdPacketNum;
+  const auto* initialAckState = conn.ackStates.initialAckState.get();
+  const auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
+  const auto& appDataAckState = conn.ackStates.appDataAckState;
+
+  return (initialAckState ? initialAckState->largestReceivedAtLastCloseSent ==
+                  initialAckState->largestRecvdPacketNum
+                          : true) &&
+      (handshakeAckState ? handshakeAckState->largestReceivedAtLastCloseSent ==
+               handshakeAckState->largestRecvdPacketNum
+                         : true) &&
+      appDataAckState.largestReceivedAtLastCloseSent ==
+      appDataAckState.largestRecvdPacketNum;
 }
 
 void updateLargestReceivedPacketsAtLastCloseSent(
     QuicConnectionStateBase& conn) noexcept {
-  conn.ackStates.initialAckState.largestReceivedAtLastCloseSent =
-      conn.ackStates.initialAckState.largestRecvdPacketNum;
-  conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent =
-      conn.ackStates.handshakeAckState.largestRecvdPacketNum;
-  conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent =
+  auto* initialAckState = conn.ackStates.initialAckState.get();
+  auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
+  auto& appDataAckState = conn.ackStates.appDataAckState;
+
+  if (initialAckState) {
+    initialAckState->largestReceivedAtLastCloseSent =
+        conn.ackStates.initialAckState->largestRecvdPacketNum;
+  }
+  if (handshakeAckState) {
+    handshakeAckState->largestReceivedAtLastCloseSent =
+        handshakeAckState->largestRecvdPacketNum;
+  }
+  appDataAckState.largestReceivedAtLastCloseSent =
       conn.ackStates.appDataAckState.largestRecvdPacketNum;
 }
 
 bool hasReceivedPackets(const QuicConnectionStateBase& conn) noexcept {
-  return conn.ackStates.initialAckState.largestRecvdPacketNum ||
-      conn.ackStates.handshakeAckState.largestRecvdPacketNum ||
-      conn.ackStates.appDataAckState.largestRecvdPacketNum;
+  const auto* initialAckState = conn.ackStates.initialAckState.get();
+  const auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
+  const auto& appDataAckState = conn.ackStates.appDataAckState;
+
+  return (initialAckState ? initialAckState->largestRecvdPacketNum : true) ||
+      (handshakeAckState ? handshakeAckState->largestRecvdPacketNum : true) ||
+      appDataAckState.largestRecvdPacketNum;
 }
 
 folly::Optional<TimePoint>& getLossTime(

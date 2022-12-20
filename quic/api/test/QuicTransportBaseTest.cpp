@@ -841,7 +841,7 @@ TEST_P(QuicTransportImplTestBase, WriteAckPacketUnsetsLooper) {
       pktHasCryptoData,
       Clock::now());
   ASSERT_TRUE(transport->transportConn->ackStates.initialAckState
-                  .needsToSendAckImmediately);
+                  ->needsToSendAckImmediately);
   // Trigger the loop callback. This will trigger writes and we assume this will
   // write the acks since we have nothing else to write.
   transport->writeLooper()->runLoopCallback();

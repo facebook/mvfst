@@ -273,9 +273,7 @@ void QuicServerTransport::writeData() {
         conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
     if ((numProbePackets && initialCryptoStream.retransmissionBuffer.size() &&
          conn_->outstandings.packetCount[PacketNumberSpace::Initial]) ||
-        initialScheduler.hasData() ||
-        (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
-         hasAcksToSchedule(conn_->ackStates.initialAckState))) {
+        initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
       CHECK(conn_->initialWriteCipher);
       CHECK(conn_->initialHeaderCipher);
 
@@ -306,9 +304,7 @@ void QuicServerTransport::writeData() {
     if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
          handshakeCryptoStream.retransmissionBuffer.size() &&
          numProbePackets) ||
-        handshakeScheduler.hasData() ||
-        (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
-         hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
+        handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
       CHECK(conn_->handshakeWriteCipher);
       CHECK(conn_->handshakeWriteHeaderCipher);
       auto res = writeCryptoAndAckDataToSocket(

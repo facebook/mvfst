@@ -175,7 +175,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   FrameScheduler cryptoOnlyScheduler =
       std::move(
           FrameScheduler::Builder(
@@ -207,10 +207,10 @@ TEST_F(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.handshakeAckState.largestAckedByPeer.value_or(0));
-  conn.ackStates.initialAckState.largestRecvdPacketTime = Clock::now();
-  conn.ackStates.initialAckState.needsToSendAckImmediately = true;
-  conn.ackStates.initialAckState.acks.insert(10);
+      conn.ackStates.handshakeAckState->largestAckedByPeer.value_or(0));
+  conn.ackStates.initialAckState->largestRecvdPacketTime = Clock::now();
+  conn.ackStates.initialAckState->needsToSendAckImmediately = true;
+  conn.ackStates.initialAckState->acks.insert(10);
   FrameScheduler acksOnlyScheduler =
       std::move(
           FrameScheduler::Builder(
@@ -241,10 +241,10 @@ TEST_F(QuicPacketSchedulerTest, InitialPaddingDoesNotUseWrapper) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.handshakeAckState.largestAckedByPeer.value_or(0));
-  conn.ackStates.initialAckState.largestRecvdPacketTime = Clock::now();
-  conn.ackStates.initialAckState.needsToSendAckImmediately = true;
-  conn.ackStates.initialAckState.acks.insert(10);
+      conn.ackStates.handshakeAckState->largestAckedByPeer.value_or(0));
+  conn.ackStates.initialAckState->largestRecvdPacketTime = Clock::now();
+  conn.ackStates.initialAckState->needsToSendAckImmediately = true;
+  conn.ackStates.initialAckState->acks.insert(10);
   FrameScheduler acksOnlyScheduler =
       std::move(
           FrameScheduler::Builder(
@@ -275,7 +275,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   RegularQuicPacketBuilder builder1(
       conn.udpSendPacketLen,
       std::move(longHeader1),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   FrameScheduler scheduler =
       std::move(
           FrameScheduler::Builder(
@@ -308,7 +308,7 @@ TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   RegularQuicPacketBuilder builder1(
       conn.udpSendPacketLen,
       std::move(longHeader1),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   FrameScheduler scheduler =
       std::move(
           FrameScheduler::Builder(
@@ -336,7 +336,7 @@ TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   RegularQuicPacketBuilder builder2(
       conn.udpSendPacketLen,
       std::move(longHeader2),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo again"));
   auto result2 = scheduler.scheduleFramesForPacket(
@@ -359,7 +359,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   FrameScheduler scheduler =
       std::move(
           FrameScheduler::Builder(
@@ -391,7 +391,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.handshakeAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.handshakeAckState->largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   PacketBuilderWrapper builderWrapper(builder, 13);
   CryptoStreamScheduler scheduler(
@@ -419,8 +419,8 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   RegularQuicPacketBuilder builder(
       25,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(
-          conn.ackStates.initialAckState.nextPacketNum));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(
+          conn.ackStates.initialAckState->nextPacketNum));
   FrameScheduler cryptoOnlyScheduler =
       std::move(
           FrameScheduler::Builder(
@@ -712,7 +712,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
@@ -767,8 +767,8 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
       WriteCryptoFrame(0, 4));
 
   // Make it look like we received some acks from the peer.
-  conn.ackStates.handshakeAckState.acks.insert(10);
-  conn.ackStates.handshakeAckState.largestRecvdPacketTime = Clock::now();
+  conn.ackStates.handshakeAckState->acks.insert(10);
+  conn.ackStates.handshakeAckState->largestRecvdPacketTime = Clock::now();
 
   // Create cloning scheduler.
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
@@ -1184,19 +1184,19 @@ class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};
 TEST_F(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.initialAckState));
-  EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.handshakeAckState));
+  EXPECT_FALSE(hasAcksToSchedule(*conn.ackStates.initialAckState));
+  EXPECT_FALSE(hasAcksToSchedule(*conn.ackStates.handshakeAckState));
   EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.appDataAckState));
 
-  conn.ackStates.initialAckState.acks.insert(0, 100);
-  EXPECT_TRUE(hasAcksToSchedule(conn.ackStates.initialAckState));
+  conn.ackStates.initialAckState->acks.insert(0, 100);
+  EXPECT_TRUE(hasAcksToSchedule(*conn.ackStates.initialAckState));
 
-  conn.ackStates.handshakeAckState.acks.insert(0, 100);
-  conn.ackStates.handshakeAckState.largestAckScheduled = 200;
-  EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.handshakeAckState));
+  conn.ackStates.handshakeAckState->acks.insert(0, 100);
+  conn.ackStates.handshakeAckState->largestAckScheduled = 200;
+  EXPECT_FALSE(hasAcksToSchedule(*conn.ackStates.handshakeAckState));
 
-  conn.ackStates.handshakeAckState.largestAckScheduled = folly::none;
-  EXPECT_TRUE(hasAcksToSchedule(conn.ackStates.handshakeAckState));
+  conn.ackStates.handshakeAckState->largestAckScheduled = folly::none;
+  EXPECT_TRUE(hasAcksToSchedule(*conn.ackStates.handshakeAckState));
 }
 
 TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
@@ -1212,30 +1212,30 @@ TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
   EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
   EXPECT_FALSE(appDataAckScheduler.hasPendingAcks());
 
-  conn.ackStates.initialAckState.acks.insert(0, 100);
+  conn.ackStates.initialAckState->acks.insert(0, 100);
   EXPECT_TRUE(initialAckScheduler.hasPendingAcks());
 
-  conn.ackStates.handshakeAckState.acks.insert(0, 100);
-  conn.ackStates.handshakeAckState.largestAckScheduled = 200;
+  conn.ackStates.handshakeAckState->acks.insert(0, 100);
+  conn.ackStates.handshakeAckState->largestAckScheduled = 200;
   EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
 
-  conn.ackStates.handshakeAckState.largestAckScheduled = folly::none;
+  conn.ackStates.handshakeAckState->largestAckScheduled = folly::none;
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
 TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.initialAckState));
-  EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.handshakeAckState));
+  EXPECT_EQ(folly::none, largestAckToSend(*conn.ackStates.initialAckState));
+  EXPECT_EQ(folly::none, largestAckToSend(*conn.ackStates.handshakeAckState));
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.appDataAckState));
 
-  conn.ackStates.initialAckState.acks.insert(0, 50);
-  conn.ackStates.handshakeAckState.acks.insert(0, 50);
-  conn.ackStates.handshakeAckState.acks.insert(75, 150);
+  conn.ackStates.initialAckState->acks.insert(0, 50);
+  conn.ackStates.handshakeAckState->acks.insert(0, 50);
+  conn.ackStates.handshakeAckState->acks.insert(75, 150);
 
-  EXPECT_EQ(50, *largestAckToSend(conn.ackStates.initialAckState));
-  EXPECT_EQ(150, *largestAckToSend(conn.ackStates.handshakeAckState));
+  EXPECT_EQ(50, *largestAckToSend(*conn.ackStates.initialAckState));
+  EXPECT_EQ(150, *largestAckToSend(*conn.ackStates.handshakeAckState));
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.appDataAckState));
 }
 
@@ -1253,18 +1253,18 @@ TEST_F(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
   EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
   EXPECT_FALSE(appDataAckScheduler.hasPendingAcks());
 
-  conn.ackStates.initialAckState.needsToSendAckImmediately = true;
-  conn.ackStates.handshakeAckState.needsToSendAckImmediately = true;
+  conn.ackStates.initialAckState->needsToSendAckImmediately = true;
+  conn.ackStates.handshakeAckState->needsToSendAckImmediately = true;
   conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
 
-  conn.ackStates.initialAckState.acks.insert(0, 100);
+  conn.ackStates.initialAckState->acks.insert(0, 100);
   EXPECT_TRUE(initialAckScheduler.hasPendingAcks());
 
-  conn.ackStates.handshakeAckState.acks.insert(0, 100);
-  conn.ackStates.handshakeAckState.largestAckScheduled = 200;
+  conn.ackStates.handshakeAckState->acks.insert(0, 100);
+  conn.ackStates.handshakeAckState->largestAckScheduled = 200;
   EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
 
-  conn.ackStates.handshakeAckState.largestAckScheduled = folly::none;
+  conn.ackStates.handshakeAckState->largestAckScheduled = folly::none;
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
@@ -2380,7 +2380,7 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerOnRequest) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
 
   FrameScheduler immediateAckOnlyScheduler =
       std::move(
@@ -2416,7 +2416,7 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
 
   FrameScheduler immediateAckOnlyScheduler =
       std::move(

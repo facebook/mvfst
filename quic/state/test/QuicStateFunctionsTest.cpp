@@ -1161,17 +1161,18 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
 
 TEST_F(QuicStateFunctionsTest, UpdateLargestReceivePacketsAtLatCloseSent) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  EXPECT_FALSE(conn.ackStates.initialAckState.largestReceivedAtLastCloseSent);
-  EXPECT_FALSE(conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent);
+  EXPECT_FALSE(conn.ackStates.initialAckState->largestReceivedAtLastCloseSent);
+  EXPECT_FALSE(
+      conn.ackStates.handshakeAckState->largestReceivedAtLastCloseSent);
   EXPECT_FALSE(conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent);
-  conn.ackStates.initialAckState.largestRecvdPacketNum = 123;
-  conn.ackStates.handshakeAckState.largestRecvdPacketNum = 654;
+  conn.ackStates.initialAckState->largestRecvdPacketNum = 123;
+  conn.ackStates.handshakeAckState->largestRecvdPacketNum = 654;
   conn.ackStates.appDataAckState.largestRecvdPacketNum = 789;
   updateLargestReceivedPacketsAtLastCloseSent(conn);
   EXPECT_EQ(
-      123, *conn.ackStates.initialAckState.largestReceivedAtLastCloseSent);
+      123, *conn.ackStates.initialAckState->largestReceivedAtLastCloseSent);
   EXPECT_EQ(
-      654, *conn.ackStates.handshakeAckState.largestReceivedAtLastCloseSent);
+      654, *conn.ackStates.handshakeAckState->largestReceivedAtLastCloseSent);
   EXPECT_EQ(
       789, *conn.ackStates.appDataAckState.largestReceivedAtLastCloseSent);
 }

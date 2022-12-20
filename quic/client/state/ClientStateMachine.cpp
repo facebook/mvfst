@@ -39,10 +39,10 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       conn->originalDestinationConnectionId;
   // TODO: don't carry server connection id over to the new connection.
   newConn->serverConnectionId = conn->serverConnectionId;
-  newConn->ackStates.initialAckState.nextPacketNum =
-      conn->ackStates.initialAckState.nextPacketNum;
-  newConn->ackStates.handshakeAckState.nextPacketNum =
-      conn->ackStates.handshakeAckState.nextPacketNum;
+  newConn->ackStates.initialAckState->nextPacketNum =
+      conn->ackStates.initialAckState->nextPacketNum;
+  newConn->ackStates.handshakeAckState->nextPacketNum =
+      conn->ackStates.handshakeAckState->nextPacketNum;
   newConn->ackStates.appDataAckState.nextPacketNum =
       conn->ackStates.appDataAckState.nextPacketNum;
   newConn->version = conn->version;

@@ -101,8 +101,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
         FizzServerQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
-    conn->ackStates.initialAckState.nextPacketNum = 1;
-    conn->ackStates.handshakeAckState.nextPacketNum = 1;
+    conn->ackStates.initialAckState->nextPacketNum = 1;
+    conn->ackStates.handshakeAckState->nextPacketNum = 1;
     conn->ackStates.appDataAckState.nextPacketNum = 1;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;
@@ -134,8 +134,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
         FizzClientQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
-    conn->ackStates.initialAckState.nextPacketNum = 1;
-    conn->ackStates.handshakeAckState.nextPacketNum = 1;
+    conn->ackStates.initialAckState->nextPacketNum = 1;
+    conn->ackStates.handshakeAckState->nextPacketNum = 1;
     conn->ackStates.appDataAckState.nextPacketNum = 1;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;
@@ -198,7 +198,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           LongHeader::Types::Initial,
           *conn.clientConnectionId,
           *conn.serverConnectionId,
-          conn.ackStates.initialAckState.nextPacketNum,
+          conn.ackStates.initialAckState->nextPacketNum,
           *conn.version);
       isHandshake = true;
       break;
@@ -207,7 +207,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           LongHeader::Types::Handshake,
           *conn.clientConnectionId,
           *conn.serverConnectionId,
-          conn.ackStates.handshakeAckState.nextPacketNum,
+          conn.ackStates.handshakeAckState->nextPacketNum,
           *conn.version);
       isHandshake = true;
       break;
@@ -736,7 +736,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   writeDataToQuicStream(*stream1, buf->clone(), true);
   writeDataToQuicStream(*stream2, buf->clone(), true);
 
-  auto packetSeqNum = conn->ackStates.handshakeAckState.nextPacketNum;
+  auto packetSeqNum = conn->ackStates.handshakeAckState->nextPacketNum;
   LongHeader header(
       LongHeader::Types::Handshake,
       *conn->clientConnectionId,
@@ -1026,7 +1026,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
       LongHeader::Types::Handshake,
       *conn->clientConnectionId,
       *conn->serverConnectionId,
-      conn->ackStates.handshakeAckState.nextPacketNum++,
+      conn->ackStates.handshakeAckState->nextPacketNum++,
       conn->version.value());
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();

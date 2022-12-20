@@ -634,8 +634,12 @@ void QuicClientTransport::processPacketData(
               FrameType::IMMEDIATE_ACK);
         }
         // Send an ACK from any packet number space.
-        conn_->ackStates.initialAckState.needsToSendAckImmediately = true;
-        conn_->ackStates.handshakeAckState.needsToSendAckImmediately = true;
+        if (conn_->ackStates.initialAckState) {
+          conn_->ackStates.initialAckState->needsToSendAckImmediately = true;
+        }
+        if (conn_->ackStates.handshakeAckState) {
+          conn_->ackStates.handshakeAckState->needsToSendAckImmediately = true;
+        }
         conn_->ackStates.appDataAckState.needsToSendAckImmediately = true;
         break;
       }
@@ -908,9 +912,7 @@ void QuicClientTransport::writeData() {
     if ((initialCryptoStream.retransmissionBuffer.size() &&
          conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
          numProbePackets) ||
-        initialScheduler.hasData() ||
-        (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
-         hasAcksToSchedule(conn_->ackStates.initialAckState))) {
+        initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
       CHECK(conn_->initialHeaderCipher);
       std::string& token = clientConn_->retryToken.empty()
           ? clientConn_->newToken
@@ -941,9 +943,7 @@ void QuicClientTransport::writeData() {
     if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
          handshakeCryptoStream.retransmissionBuffer.size() &&
          numProbePackets) ||
-        handshakeScheduler.hasData() ||
-        (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
-         hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
+        handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
       CHECK(conn_->handshakeWriteHeaderCipher);
       packetLimit -= writeCryptoAndAckDataToSocket(
                          *socket_,

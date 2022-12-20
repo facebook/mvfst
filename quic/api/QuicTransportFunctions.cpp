@@ -49,9 +49,15 @@ std::string largestAckScheduledToString(
     const quic::QuicConnectionStateBase& conn) noexcept {
   return folly::to<std::string>(
       "[",
-      optionalToString(conn.ackStates.initialAckState.largestAckScheduled),
+      optionalToString(
+          conn.ackStates.initialAckState
+              ? conn.ackStates.initialAckState->largestAckScheduled
+              : folly::none),
       ",",
-      optionalToString(conn.ackStates.handshakeAckState.largestAckScheduled),
+      optionalToString(
+          conn.ackStates.handshakeAckState
+              ? conn.ackStates.handshakeAckState->largestAckScheduled
+              : folly::none),
       ",",
       optionalToString(conn.ackStates.appDataAckState.largestAckScheduled),
       "]");
@@ -61,33 +67,18 @@ std::string largestAckToSendToString(
     const quic::QuicConnectionStateBase& conn) noexcept {
   return folly::to<std::string>(
       "[",
-      optionalToString(largestAckToSend(conn.ackStates.initialAckState)),
+      optionalToString(
+          conn.ackStates.initialAckState
+              ? largestAckToSend(*conn.ackStates.initialAckState)
+              : folly::none),
       ",",
-      optionalToString(largestAckToSend(conn.ackStates.handshakeAckState)),
+      optionalToString(
+          conn.ackStates.handshakeAckState
+              ? largestAckToSend(*conn.ackStates.handshakeAckState)
+              : folly::none),
       ",",
       optionalToString(largestAckToSend(conn.ackStates.appDataAckState)),
       "]");
-}
-
-bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn) {
-  return (
-      conn.initialWriteCipher &&
-      hasAcksToSchedule(conn.ackStates.initialAckState) &&
-      conn.ackStates.initialAckState.needsToSendAckImmediately);
-}
-
-bool toWriteHandshakeAcks(const quic::QuicConnectionStateBase& conn) {
-  return (
-      conn.handshakeWriteCipher &&
-      hasAcksToSchedule(conn.ackStates.handshakeAckState) &&
-      conn.ackStates.handshakeAckState.needsToSendAckImmediately);
-}
-
-bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
-  return (
-      conn.oneRttWriteCipher &&
-      hasAcksToSchedule(conn.ackStates.appDataAckState) &&
-      conn.ackStates.appDataAckState.needsToSendAckImmediately);
 }
 
 using namespace quic;
@@ -1796,11 +1787,13 @@ void handshakeConfirmed(QuicConnectionStateBase& conn) {
   conn.readCodec->setInitialReadCipher(nullptr);
   conn.readCodec->setInitialHeaderCipher(nullptr);
   implicitAckCryptoStream(conn, EncryptionLevel::Initial);
+  conn.ackStates.initialAckState.reset();
   conn.handshakeWriteCipher.reset();
   conn.handshakeWriteHeaderCipher.reset();
   conn.readCodec->setHandshakeReadCipher(nullptr);
   conn.readCodec->setHandshakeHeaderCipher(nullptr);
   implicitAckCryptoStream(conn, EncryptionLevel::Handshake);
+  conn.ackStates.handshakeAckState.reset();
 }
 
 bool hasInitialOrHandshakeCiphers(QuicConnectionStateBase& conn) {
@@ -1837,6 +1830,27 @@ bool setCustomTransportParameter(
 
   customTransportParameters.push_back(customParam->encode());
   return true;
+}
+
+bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn) {
+  return (
+      conn.initialWriteCipher && conn.ackStates.initialAckState &&
+      hasAcksToSchedule(*conn.ackStates.initialAckState) &&
+      conn.ackStates.initialAckState->needsToSendAckImmediately);
+}
+
+bool toWriteHandshakeAcks(const quic::QuicConnectionStateBase& conn) {
+  return (
+      conn.handshakeWriteCipher && conn.ackStates.handshakeAckState &&
+      hasAcksToSchedule(*conn.ackStates.handshakeAckState) &&
+      conn.ackStates.handshakeAckState->needsToSendAckImmediately);
+}
+
+bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
+  return (
+      conn.oneRttWriteCipher &&
+      hasAcksToSchedule(conn.ackStates.appDataAckState) &&
+      conn.ackStates.appDataAckState.needsToSendAckImmediately);
 }
 
 } // namespace quic

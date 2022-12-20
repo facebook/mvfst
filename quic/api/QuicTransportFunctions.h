@@ -344,4 +344,8 @@ bool setCustomTransportParameter(
     std::unique_ptr<CustomTransportParameter> customParam,
     std::vector<TransportParameter>& customTransportParameters);
 
+bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn);
+bool toWriteHandshakeAcks(const quic::QuicConnectionStateBase& conn);
+bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn);
+
 } // namespace quic

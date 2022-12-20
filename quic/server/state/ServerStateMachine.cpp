@@ -1320,8 +1320,12 @@ void onServerReadDataFromOpen(
                 FrameType::IMMEDIATE_ACK);
           }
           // Send an ACK from any packet number space.
-          conn.ackStates.initialAckState.needsToSendAckImmediately = true;
-          conn.ackStates.handshakeAckState.needsToSendAckImmediately = true;
+          if (conn.ackStates.initialAckState) {
+            conn.ackStates.initialAckState->needsToSendAckImmediately = true;
+          }
+          if (conn.ackStates.handshakeAckState) {
+            conn.ackStates.handshakeAckState->needsToSendAckImmediately = true;
+          }
           conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
           break;
         }

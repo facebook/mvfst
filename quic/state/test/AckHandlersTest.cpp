@@ -1164,17 +1164,17 @@ TEST_P(AckHandlersTest, PurgeAcks) {
   WriteAckFrame ackFrame;
   ackFrame.ackBlocks.emplace_back(900, 1000);
   ackFrame.ackBlocks.emplace_back(500, 700);
-  conn.ackStates.initialAckState.acks.insert(900, 1200);
-  conn.ackStates.initialAckState.acks.insert(500, 800);
+  conn.ackStates.initialAckState->acks.insert(900, 1200);
+  conn.ackStates.initialAckState->acks.insert(500, 800);
   auto expectedTime = Clock::now();
-  conn.ackStates.initialAckState.largestRecvdPacketTime = expectedTime;
-  commonAckVisitorForAckFrame(conn.ackStates.initialAckState, ackFrame);
+  conn.ackStates.initialAckState->largestRecvdPacketTime = expectedTime;
+  commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
   // We should have purged old packets in ack state
-  EXPECT_EQ(conn.ackStates.initialAckState.acks.size(), 1);
-  EXPECT_EQ(conn.ackStates.initialAckState.acks.front().start, 1001);
-  EXPECT_EQ(conn.ackStates.initialAckState.acks.front().end, 1200);
+  EXPECT_EQ(conn.ackStates.initialAckState->acks.size(), 1);
+  EXPECT_EQ(conn.ackStates.initialAckState->acks.front().start, 1001);
+  EXPECT_EQ(conn.ackStates.initialAckState->acks.front().end, 1200);
   EXPECT_EQ(
-      expectedTime, *conn.ackStates.initialAckState.largestRecvdPacketTime);
+      expectedTime, *conn.ackStates.initialAckState->largestRecvdPacketTime);
 }
 
 TEST_P(AckHandlersTest, NoSkipAckVisitor) {
@@ -1590,9 +1590,9 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   conn.lossState.lrtt = 150ms;
   // Packet 2 has been sent and acked:
   if (GetParam() == PacketNumberSpace::Initial) {
-    conn.ackStates.initialAckState.largestAckedByPeer = 2;
+    conn.ackStates.initialAckState->largestAckedByPeer = 2;
   } else if (GetParam() == PacketNumberSpace::Handshake) {
-    conn.ackStates.handshakeAckState.largestAckedByPeer = 2;
+    conn.ackStates.handshakeAckState->largestAckedByPeer = 2;
   } else {
     conn.ackStates.appDataAckState.largestAckedByPeer = 2;
   }
@@ -3171,14 +3171,14 @@ class AckEventForAppDataTest : public Test {
             LongHeader::Types::Initial,
             *conn_->clientConnectionId,
             *conn_->serverConnectionId,
-            conn_->ackStates.initialAckState.nextPacketNum,
+            conn_->ackStates.initialAckState->nextPacketNum,
             *conn_->version);
       } else if (pnSpace == PacketNumberSpace::Handshake) {
         header = LongHeader(
             LongHeader::Types::Handshake,
             *conn_->clientConnectionId,
             *conn_->serverConnectionId,
-            conn_->ackStates.handshakeAckState.nextPacketNum,
+            conn_->ackStates.handshakeAckState->nextPacketNum,
             *conn_->version);
       } else if (pnSpace == PacketNumberSpace::AppData) {
         header = LongHeader(

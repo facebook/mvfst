@@ -35,8 +35,8 @@ std::unique_ptr<QuicServerConnectionState> createConn() {
       FizzServerQuicHandshakeContext::Builder().build());
   conn->clientConnectionId = getTestConnectionId();
   conn->version = QuicVersion::MVFST;
-  conn->ackStates.initialAckState.nextPacketNum = 1;
-  conn->ackStates.handshakeAckState.nextPacketNum = 1;
+  conn->ackStates.initialAckState->nextPacketNum = 1;
+  conn->ackStates.handshakeAckState->nextPacketNum = 1;
   conn->ackStates.appDataAckState.nextPacketNum = 1;
   conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
       kDefaultStreamWindowSize;

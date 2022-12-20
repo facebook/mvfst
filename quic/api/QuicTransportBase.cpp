@@ -385,8 +385,12 @@ void QuicTransportBase::closeImpl(
   conn_->pendingEvents = QuicConnectionStateBase::PendingEvents();
   conn_->streamManager->clearActionable();
   conn_->streamManager->clearWritable();
-  conn_->ackStates.initialAckState.acks.clear();
-  conn_->ackStates.handshakeAckState.acks.clear();
+  if (conn_->ackStates.initialAckState) {
+    conn_->ackStates.initialAckState->acks.clear();
+  }
+  if (conn_->ackStates.handshakeAckState) {
+    conn_->ackStates.handshakeAckState->acks.clear();
+  }
   conn_->ackStates.appDataAckState.acks.clear();
 
   if (transportReadyNotified_) {
