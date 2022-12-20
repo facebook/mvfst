@@ -366,4 +366,38 @@ uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn) {
   return maximumIdsToIssue;
 }
 
+uint64_t updateLargestReceivedPacketNum(
+    AckState& ackState,
+    PacketNum packetNum,
+    TimePoint receivedTime) {
+  PacketNum expectedNextPacket = 0;
+  if (ackState.largestRecvdPacketNum) {
+    expectedNextPacket = *ackState.largestRecvdPacketNum + 1;
+  }
+  ackState.largestRecvdPacketNum = std::max<PacketNum>(
+      ackState.largestRecvdPacketNum.value_or(packetNum), packetNum);
+  ackState.acks.insert(packetNum);
+  if (ackState.largestRecvdPacketNum == packetNum) {
+    ackState.largestRecvdPacketTime = receivedTime;
+  }
+  static_assert(Clock::is_steady, "Needs steady clock");
+
+  ackState.lastRecvdPacketInfo.assign({packetNum, receivedTime});
+
+  if (packetNum >= expectedNextPacket) {
+    if (ackState.recvdPacketInfos.size() == kMaxReceivedPktsTimestampsStored) {
+      ackState.recvdPacketInfos.pop_front();
+    }
+    ackState.recvdPacketInfos.emplace_back(
+        RecvdPacketInfo{packetNum, receivedTime});
+  }
+
+  if (expectedNextPacket) {
+    return (packetNum > expectedNextPacket) ? packetNum - expectedNextPacket
+                                            : expectedNextPacket - packetNum;
+  } else {
+    return 0;
+  }
+}
+
 } // namespace quic
