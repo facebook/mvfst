@@ -18,8 +18,7 @@ namespace quic {
 StatelessResetGenerator::StatelessResetGenerator(
     StatelessResetSecret secret,
     const std::string& addressStr)
-    : secret_(std::move(secret)),
-      addressStr_(std::move(addressStr)),
+    : addressStr_(std::move(addressStr)),
       hkdf_(fizz::HkdfImpl::create<fizz::Sha256>()) {
   extractedSecret_ = hkdf_.extract(kSalt, folly::range(secret));
 }

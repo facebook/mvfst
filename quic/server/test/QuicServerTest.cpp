@@ -560,7 +560,6 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   EXPECT_CALL(*testTransport1, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(kClientAddr));
   auto connId1 = getTestConnectionId(hostId_);
-  PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   RoutingData routingData(
       HeaderForm::Long, true, false, true, connId1, connId1);
@@ -597,7 +596,6 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr2));
   ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
-  num = 1;
   version = QuicVersion::MVFST;
   RoutingData routingData2(
       HeaderForm::Long, true, false, true, connId2, connId2);
@@ -619,7 +617,6 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   auto mockSock3 =
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
   ConnectionId connId3({8, 4, 5, 6, 7, 8, 9, 10});
-  num = 1;
   version = QuicVersion::MVFST;
   RoutingData routingData3(
       HeaderForm::Long, true, false, true, connId3, connId3);

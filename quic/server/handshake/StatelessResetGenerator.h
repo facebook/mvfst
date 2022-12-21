@@ -40,7 +40,6 @@ class StatelessResetGenerator {
   StatelessResetToken generateToken(const ConnectionId& connId) const;
 
  private:
-  StatelessResetSecret secret_;
   std::string addressStr_;
   fizz::HkdfImpl hkdf_;
   std::vector<uint8_t> extractedSecret_;
