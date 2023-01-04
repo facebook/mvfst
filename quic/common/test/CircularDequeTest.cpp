@@ -663,10 +663,8 @@ TEST(CircularDequeTest, Iterators) {
   EXPECT_EQ(5, std::distance(iter, cd.end()));
   EXPECT_EQ(-5, std::distance(cd.end(), iter));
 
-  size_t loopCounter = 0;
   std::vector<int> collector;
   for (auto val : cd) {
-    ++loopCounter;
     collector.push_back(val);
   }
   EXPECT_EQ(collector, expected);
