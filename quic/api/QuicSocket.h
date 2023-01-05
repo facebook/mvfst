@@ -183,6 +183,8 @@ class QuicSocket {
    * Information about the transport, similar to what TCP has.
    */
   struct TransportInfo {
+    // Time when the connection started.
+    TimePoint connectionTime;
     std::chrono::microseconds srtt{0us};
     std::chrono::microseconds rttvar{0us};
     std::chrono::microseconds lrtt{0us};

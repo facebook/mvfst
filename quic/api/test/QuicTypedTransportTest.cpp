@@ -58,6 +58,32 @@ class QuicTypedTransportTest : public virtual testing::Test,
   }
 };
 
+TYPED_TEST_SUITE(
+    QuicTypedTransportTest,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
+/**
+ * Verify that connection start time is properly stored in TransportInfo.
+ */
+TYPED_TEST(QuicTypedTransportTest, TransportInfoConnectionTime) {
+  TestFixture::startTransport();
+  const auto afterStartTs = std::chrono::steady_clock::now();
+  EXPECT_LE(
+      std::chrono::steady_clock::time_point().time_since_epoch().count(),
+      this->getTransport()
+          ->getTransportInfo()
+          .connectionTime.time_since_epoch()
+          .count());
+  EXPECT_GE(
+      afterStartTs.time_since_epoch().count(),
+      this->getTransport()
+          ->getTransportInfo()
+          .connectionTime.time_since_epoch()
+          .count());
+  this->destroyTransport();
+}
+
 template <typename T>
 class QuicTypedTransportAfterStartTest : public QuicTypedTransportTest<T> {
  public:
@@ -67,11 +93,6 @@ class QuicTypedTransportAfterStartTest : public QuicTypedTransportTest<T> {
     QuicTypedTransportTestBase<T>::startTransport();
   }
 };
-
-TYPED_TEST_SUITE(
-    QuicTypedTransportAfterStartTest,
-    ::TransportTypes,
-    ::TransportTypeNames);
 
 TYPED_TEST_SUITE(
     QuicTypedTransportAfterStartTest,

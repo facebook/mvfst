@@ -411,6 +411,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   std::unique_ptr<Aead> handshakeWriteCipher;
 
   // Time at which the connection started.
+  // TODO(bschlinker): For clients, this should be set when connect starts.
   TimePoint connectionTime;
 
   // The received active_connection_id_limit transport parameter from the peer.

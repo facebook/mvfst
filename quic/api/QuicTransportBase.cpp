@@ -586,6 +586,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
     }
   }
   TransportInfo transportInfo;
+  transportInfo.connectionTime = conn_->connectionTime;
   transportInfo.srtt = conn_->lossState.srtt;
   transportInfo.rttvar = conn_->lossState.rttvar;
   transportInfo.lrtt = conn_->lossState.lrtt;
