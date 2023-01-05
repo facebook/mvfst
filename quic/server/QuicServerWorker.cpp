@@ -793,29 +793,24 @@ void QuicServerWorker::dispatchPacketData(
           if (statsCallback_) {
             trans->setTransportStatsCallback(statsCallback_.get());
           }
-          if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
-            transportSettings_.initCwndInMss = 20;
-          }
-          auto overridenTransportSettings = transportSettingsOverrideFn_
+          auto transportSettings = transportSettingsOverrideFn_
               ? transportSettingsOverrideFn_(
                     transportSettings_, client.getIPAddress())
-              : folly::none;
-
-          if (overridenTransportSettings) {
-            if (overridenTransportSettings->dataPathType !=
-                transportSettings_.dataPathType) {
-              // It's too complex to support that.
-              LOG(ERROR)
-                  << "Overriding DataPathType isn't supported. Requested datapath="
-                  << (overridenTransportSettings->dataPathType ==
-                              DataPathType::ContinuousMemory
-                          ? "ContinuousMemory"
-                          : "ChainedMemory");
-            }
-            trans->setTransportSettings(*overridenTransportSettings);
-          } else {
-            trans->setTransportSettings(transportSettings_);
+                    .value_or(transportSettings_)
+              : transportSettings_;
+          LOG_IF(
+              ERROR,
+              transportSettings.dataPathType != transportSettings_.dataPathType)
+              << "Overriding DataPathType isn't supported. Requested datapath="
+              << (transportSettings.dataPathType ==
+                          DataPathType::ContinuousMemory
+                      ? "ContinuousMemory"
+                      : "ChainedMemory");
+          // TODO T132636939: remove after experimenting w/ higher init cwnd.
+          if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
+            transportSettings.initCwndInMss = 20;
           }
+          trans->setTransportSettings(transportSettings);
           trans->setConnectionIdAlgo(connIdAlgo_.get());
           trans->setServerConnectionIdRejector(this);
           if (routingData.sourceConnId) {
