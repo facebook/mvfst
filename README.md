@@ -58,7 +58,7 @@ If on Linux or MacOS (with homebrew installed) you can install system dependenci
     git clone https://github.com/facebookincubator/mvfst.git
     # Install dependencies
     cd mvfst
-    sudo ./build/fbcode_builder/getdeps.py install-system-deps --recursive --install-prefix=$(pwd)/_build
+    sudo ./build/fbcode_builder/getdeps.py install-system-deps --recursive --install-prefix=$(pwd)/_build mvfst
 
 
 If you'd like to see the packages before installing them:
