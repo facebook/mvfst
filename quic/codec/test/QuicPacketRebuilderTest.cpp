@@ -75,9 +75,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  WriteAckState writeAckState = {.acks = ackBlocks};
-  //   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
-  AckFrameMetaData ackMeta = {
+  WriteAckFrameState writeAckState = {.acks = ackBlocks};
+  //   WriteAckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
+  WriteAckFrameMetaData ackMeta = {
       .ackState = writeAckState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
@@ -407,8 +407,8 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  WriteAckState writeAckState = {.acks = ackBlocks};
-  AckFrameMetaData ackMeta = {
+  WriteAckFrameState writeAckState = {.acks = ackBlocks};
+  WriteAckFrameMetaData ackMeta = {
       .ackState = writeAckState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};

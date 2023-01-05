@@ -229,7 +229,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
                    ackingTime - receivedTime)
              : 0us);
 
-    AckFrameMetaData meta = {
+    WriteAckFrameMetaData meta = {
         ackState_, /* ackState*/
         ackDelay, /* ackDelay */
         static_cast<uint8_t>(ackDelayExponent), /* ackDelayExponent */
@@ -237,7 +237,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         folly::none, /* recvTimestampsConfig */
         folly::none /* maxAckReceiveTimestampsToSend */};
 
-    folly::Optional<AckFrameWriteResult> ackWriteResult;
+    folly::Optional<WriteAckFrameResult> ackWriteResult;
 
     uint64_t peerRequestedTimestampsCount =
         conn_.maybePeerAckReceiveTimestampsConfig.has_value()

@@ -7,17 +7,15 @@
 
 #pragma once
 
+#include <folly/Random.h>
 #include <quic/QuicConstants.h>
-#include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/common/IntervalSet.h>
-
-#include <folly/Random.h>
 
 namespace quic {
 
 // Ack and PacketNumber states. This is per-packet number space.
-struct AckState : WriteAckState {
+struct AckState : WriteAckFrameState {
   // Largest ack that has been written to a packet
   folly::Optional<PacketNum> largestAckScheduled;
   // Count of outstanding packets received with only non-retransmittable data.

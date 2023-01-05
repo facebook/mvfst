@@ -131,9 +131,9 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
     builder.accountForCipherOverhead(maybeAead.value()->getCipherOverhead());
   }
   DCHECK(builder.canBuildPacket());
-  WriteAckState ackState;
+  WriteAckFrameState ackState;
   ackState.acks = *CHECK_NOTNULL(maybeAckBlocks.get_pointer());
-  AckFrameMetaData ackData = {
+  WriteAckFrameMetaData ackData = {
       .ackState = ackState,
       .ackDelay = *CHECK_NOTNULL(maybeAckDelay.get_pointer()),
       .ackDelayExponent = static_cast<uint8_t>(

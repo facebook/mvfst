@@ -646,8 +646,8 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  WriteAckState writeAckState = {.acks = ackBlocks};
-  AckFrameMetaData ackMeta = {
+  WriteAckFrameState writeAckState = {.acks = ackBlocks};
+  WriteAckFrameMetaData ackMeta = {
       .ackState = writeAckState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};

@@ -282,7 +282,7 @@ size_t computeSizeUsedByRecvdTimestamps(WriteAckFrame& ackFrame) {
 }
 
 static size_t fillPacketReceiveTimestamps(
-    const quic::AckFrameMetaData& ackFrameMetaData,
+    const quic::WriteAckFrameMetaData& ackFrameMetaData,
     WriteAckFrame& ackFrame,
     uint64_t largestAckedPacketNum,
     uint64_t spaceLeft,
@@ -376,13 +376,13 @@ static size_t fillPacketReceiveTimestamps(
 }
 
 folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
-    const quic::AckFrameMetaData& ackFrameMetaData,
+    const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType) {
   if (ackFrameMetaData.ackState.acks.empty()) {
     return folly::none;
   }
-  const WriteAckState& ackState = ackFrameMetaData.ackState;
+  const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
   // The last block must be the largest block.
   auto largestAckedPacket = ackState.acks.back().end;
   // ackBlocks are already an interval set so each value is naturally
@@ -469,8 +469,8 @@ folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
   return ackFrame;
 }
 
-folly::Optional<AckFrameWriteResult> writeAckFrame(
-    const quic::AckFrameMetaData& ackFrameMetaData,
+folly::Optional<WriteAckFrameResult> writeAckFrame(
+    const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType) {
   uint64_t beginningSpace = builder.remainingSpaceInPkt();
@@ -479,7 +479,7 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
 
   if (maybeWriteAckFrame.has_value()) {
     builder.appendFrame(std::move(maybeWriteAckFrame.value()));
-    return AckFrameWriteResult(
+    return WriteAckFrameResult(
         beginningSpace - builder.remainingSpaceInPkt(),
         maybeWriteAckFrame.value(),
         maybeWriteAckFrame.value().ackBlocks.size());
@@ -488,8 +488,8 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
   }
 }
 
-folly::Optional<AckFrameWriteResult> writeAckFrameWithReceivedTimestamps(
-    const quic::AckFrameMetaData& ackFrameMetaData,
+folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
+    const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType) {
   auto beginningSpace = builder.remainingSpaceInPkt();
@@ -499,7 +499,7 @@ folly::Optional<AckFrameWriteResult> writeAckFrameWithReceivedTimestamps(
     return folly::none;
   }
   auto ackFrame = maybeAckFrame.value();
-  const WriteAckState& ackState = ackFrameMetaData.ackState;
+  const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
   uint64_t lastPktNum = 0;
   std::chrono::microseconds lastPktTsDelta = 0us;
@@ -559,7 +559,7 @@ folly::Optional<AckFrameWriteResult> writeAckFrameWithReceivedTimestamps(
       builder.write(timeStampRangeCountInt);
     }
   }
-  auto ackFrameWriteResult = AckFrameWriteResult(
+  auto ackFrameWriteResult = WriteAckFrameResult(
       beginningSpace - builder.remainingSpaceInPkt(),
       ackFrame,
       ackFrame.ackBlocks.size(),

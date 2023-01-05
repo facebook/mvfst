@@ -175,8 +175,8 @@ PacketsReceivedTimestampsDeque populateReceiveTimestamps(
 }
 
 size_t computeBytesForAckReceivedTimestamps(
-    AckFrameMetaData ackFrameMetadata,
-    AckFrameWriteResult ackFrameWriteResult,
+    const WriteAckFrameMetaData& ackFrameMetadata,
+    WriteAckFrameResult ackFrameWriteResult,
     FrameType frameType) {
   if (frameType != FrameType::ACK_RECEIVE_TIMESTAMPS) {
     return 0;
@@ -212,12 +212,12 @@ size_t computeBytesForAckReceivedTimestamps(
   return sizeConsumed;
 }
 
-WriteAckState createTestWriteAckState(
+WriteAckFrameState createTestWriteAckState(
     FrameType frameType,
     const TimePoint& connTime,
     AckBlocks& ackBlocks,
     uint64_t countTimestampsToStore = kMaxReceivedPktsTimestampsStored) {
-  WriteAckState ackState = {.acks = ackBlocks};
+  WriteAckFrameState ackState = {.acks = ackBlocks};
   ackState.acks = ackBlocks;
   if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     ackState.recvdPacketInfos =
@@ -231,7 +231,7 @@ WriteAckState createTestWriteAckState(
 }
 
 void assertsOnDecodedReceiveTimestamps(
-    const AckFrameMetaData& ackFrameMetaData,
+    const WriteAckFrameMetaData& ackFrameMetaData,
     const WriteAckFrame& writeAckFrame,
     const ReadAckFrame& readAckFrame,
     uint64_t expectedTimestampRangesCount,
@@ -887,9 +887,9 @@ TEST_P(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {
   AckBlocks ackBlocks = {{max - 10, max - 10}, {1, 1}};
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -919,7 +919,7 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
 
   TimePoint connTime = Clock::now();
 
-  WriteAckState ackState = {.acks = ackBlocks};
+  WriteAckFrameState ackState = {.acks = ackBlocks};
   ackState.acks = ackBlocks;
   if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     auto lastPacketDelta =
@@ -947,7 +947,7 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
     });
   }
 
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1007,9 +1007,9 @@ TEST_P(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
   AckBlocks ackBlocks = {{1000, 1000}, {500, 700}, {100, 200}};
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1031,9 +1031,9 @@ TEST_P(QuicWriteCodecTest, WriteSimpleAckFrame) {
   AckBlocks ackBlocks = {{501, 1000}, {101, 400}};
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = ackDelay,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1103,9 +1103,9 @@ TEST_P(QuicWriteCodecTest, WriteAckFrameWillSaveAckDelay) {
   AckBlocks ackBlocks = {{501, 1000}, {101, 400}};
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = ackDelay,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1150,9 +1150,9 @@ TEST_P(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
   }
   ackBlocks.insert({largest, largest});
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1220,9 +1220,9 @@ TEST_P(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
   auto frameType = GetParam();
 
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 1240us,
       .ackDelayExponent = static_cast<uint8_t>(ackDelayExponent),
@@ -1256,9 +1256,9 @@ TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
   uint8_t ackDelayExponent = 6;
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 1240us,
       .ackDelayExponent = static_cast<uint8_t>(ackDelayExponent),
@@ -1301,9 +1301,9 @@ TEST_P(QuicWriteCodecTest, OnlyAckLargestPacket) {
   // generated as the first block to cover largestAcked => 2 bytes
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 555us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1388,9 +1388,9 @@ TEST_P(QuicWriteCodecTest, WriteSomeAckBlocks) {
     pktBuilder.remaining_ = 42;
   }
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 555us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1453,9 +1453,9 @@ TEST_P(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
   AckBlocks ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 555us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1489,9 +1489,9 @@ TEST_P(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
   // 1 byte for first ack block length
   AckBlocks ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = 555us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1555,9 +1555,9 @@ TEST_P(QuicWriteCodecTest, WriteAckFrameWithMultipleTimestampRanges) {
   // total 11 bytes
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks, 50);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = ackDelay,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
@@ -1632,9 +1632,9 @@ TEST_P(
   // total 11 bytes
   auto frameType = GetParam();
   TimePoint connTime = Clock::now();
-  WriteAckState ackState =
+  WriteAckFrameState ackState =
       createTestWriteAckState(frameType, connTime, ackBlocks, 100);
-  AckFrameMetaData ackFrameMetaData = {
+  WriteAckFrameMetaData ackFrameMetaData = {
       .ackState = ackState,
       .ackDelay = ackDelay,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),

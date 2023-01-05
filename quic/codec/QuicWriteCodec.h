@@ -19,75 +19,6 @@
 
 namespace quic {
 
-// Ack and PacketNumber states. This is per-packet number space.
-struct WriteAckState {
-  AckBlocks acks;
-
-  // Receive timestamp and packet number for the largest received packet.
-  //
-  // Updated whenever we receive a packet with a larger packet number
-  // than all previously received packets in the packet number space
-  // tracked by this AckState.
-  folly::Optional<RecvdPacketInfo> largestRecvdPacketInfo;
-  // Receive timestamp and packet number for the last received packet.
-  //
-  // Will be different from the value stored in largestRecvdPacketInfo
-  // if the last packet was received out of order and thus had a packet
-  // number less than that of a previously received packet in the packet
-  // number space tracked by this AckState.
-  folly::Optional<RecvdPacketInfo> lastRecvdPacketInfo;
-
-  // Packet number and timestamp of recently received packets.
-  //
-  // The maximum number of packets stored in pktsReceivedTimestamps is
-  // controlled by kMaxReceivedPktsTimestampsStored.
-  //
-  // The packet number of entries in the deque is guarenteed to increase
-  // monotonically because an entry is only added for a received packet
-  // if the packet number is greater than the packet number of the last
-  // element in the deque (e.g., entries are not added for packets that
-  // arrive out of order relative to previously received packets).
-  CircularDeque<RecvdPacketInfo> recvdPacketInfos;
-};
-
-struct AckFrameMetaData {
-  // ACK state.
-  const WriteAckState& ackState;
-
-  // Delay in sending ack from time that packet was received.
-  std::chrono::microseconds ackDelay;
-  // The ack delay exponent to use.
-  uint8_t ackDelayExponent;
-
-  // Receive timestamps basis
-  TimePoint connTime;
-
-  folly::Optional<AckReceiveTimestampsConfig> recvTimestampsConfig =
-      folly::none;
-
-  folly::Optional<uint64_t> maxAckReceiveTimestampsToSend = folly::none;
-};
-
-struct AckFrameWriteResult {
-  uint64_t bytesWritten;
-  WriteAckFrame writeAckFrame;
-  // This includes the first ack block
-  size_t ackBlocksWritten;
-  size_t timestampRangesWritten;
-  size_t timestampsWritten;
-  AckFrameWriteResult(
-      uint64_t bytesWrittenIn,
-      WriteAckFrame writeAckFrameIn,
-      size_t ackBlocksWrittenIn,
-      size_t timestampRangesWrittenIn = 0,
-      size_t timestampsWrittenIn = 0)
-      : bytesWritten(bytesWrittenIn),
-        writeAckFrame(writeAckFrameIn),
-        ackBlocksWritten(ackBlocksWrittenIn),
-        timestampRangesWritten(timestampRangesWrittenIn),
-        timestampsWritten(timestampsWrittenIn) {}
-};
-
 /**
  * Write a simple QuicFrame into builder
  *
@@ -178,12 +109,12 @@ folly::Optional<WriteCryptoFrame> writeCryptoFrame(
  * of the packet sequence numbers. Exception will be thrown if they are not
  * sorted.
  *
- * Return: A AckFrameWriteResult to indicate how many bytes and ack blocks are
+ * Return: A WriteAckFrameResult to indicate how many bytes and ack blocks are
  * written to the appender. Returns an empty optional if an ack block could not
  * be written.
  */
-folly::Optional<AckFrameWriteResult> writeAckFrame(
-    const AckFrameMetaData& ackFrameMetaData,
+folly::Optional<WriteAckFrameResult> writeAckFrame(
+    const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType = FrameType::ACK);
 
@@ -192,13 +123,13 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
  */
 size_t computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 
-folly::Optional<AckFrameWriteResult> writeAckFrameWithReceivedTimestamps(
-    const AckFrameMetaData& ackFrameMetaData,
+folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
+    const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType = FrameType::ACK_RECEIVE_TIMESTAMPS);
 
 folly::Optional<quic::WriteAckFrame> writeAckFrameToPacketBuilder(
-    const quic::AckFrameMetaData& ackFrameMetaData,
+    const WriteAckFrameMetaData& ackFrameMetaData,
     quic::PacketBuilderInterface& builder,
     quic::FrameType frameType);
 

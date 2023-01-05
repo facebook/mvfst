@@ -13,12 +13,15 @@
 #include <folly/io/Cursor.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/codec/PacketNumber.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicInteger.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/CircularDeque.h>
 #include <quic/common/IntervalSet.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/common/Variant.h>
+#include <quic/state/TransportSettings.h>
 
 /**
  * This details the types of objects that can be serialized or deserialized
@@ -29,7 +32,6 @@ namespace quic {
 
 using StreamId = uint64_t;
 using StreamGroupId = uint64_t;
-using PacketNum = uint64_t;
 
 enum class PacketNumberSpace : uint8_t {
   Initial,
@@ -216,6 +218,74 @@ struct WriteAckFrame {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;
   }
+};
+
+struct WriteAckFrameState {
+  AckBlocks acks;
+
+  // Receive timestamp and packet number for the largest received packet.
+  //
+  // Updated whenever we receive a packet with a larger packet number
+  // than all previously received packets in the packet number space
+  // tracked by this AckState.
+  folly::Optional<RecvdPacketInfo> largestRecvdPacketInfo;
+  // Receive timestamp and packet number for the last received packet.
+  //
+  // Will be different from the value stored in largestRecvdPacketInfo
+  // if the last packet was received out of order and thus had a packet
+  // number less than that of a previously received packet in the packet
+  // number space tracked by this AckState.
+  folly::Optional<RecvdPacketInfo> lastRecvdPacketInfo;
+
+  // Packet number and timestamp of recently received packets.
+  //
+  // The maximum number of packets stored in pktsReceivedTimestamps is
+  // controlled by kMaxReceivedPktsTimestampsStored.
+  //
+  // The packet number of entries in the deque is guarenteed to increase
+  // monotonically because an entry is only added for a received packet
+  // if the packet number is greater than the packet number of the last
+  // element in the deque (e.g., entries are not added for packets that
+  // arrive out of order relative to previously received packets).
+  CircularDeque<RecvdPacketInfo> recvdPacketInfos;
+};
+
+struct WriteAckFrameMetaData {
+  // ACK state.
+  const WriteAckFrameState& ackState;
+
+  // Delay in sending ack from time that packet was received.
+  std::chrono::microseconds ackDelay;
+  // The ack delay exponent to use.
+  uint8_t ackDelayExponent;
+
+  // Receive timestamps basis
+  TimePoint connTime;
+
+  folly::Optional<AckReceiveTimestampsConfig> recvTimestampsConfig =
+      folly::none;
+
+  folly::Optional<uint64_t> maxAckReceiveTimestampsToSend = folly::none;
+};
+
+struct WriteAckFrameResult {
+  uint64_t bytesWritten;
+  WriteAckFrame writeAckFrame;
+  // This includes the first ack block
+  size_t ackBlocksWritten;
+  size_t timestampRangesWritten;
+  size_t timestampsWritten;
+  WriteAckFrameResult(
+      uint64_t bytesWrittenIn,
+      WriteAckFrame writeAckFrameIn,
+      size_t ackBlocksWrittenIn,
+      size_t timestampRangesWrittenIn = 0,
+      size_t timestampsWrittenIn = 0)
+      : bytesWritten(bytesWrittenIn),
+        writeAckFrame(std::move(writeAckFrameIn)),
+        ackBlocksWritten(ackBlocksWrittenIn),
+        timestampRangesWritten(timestampRangesWrittenIn),
+        timestampsWritten(timestampsWrittenIn) {}
 };
 
 struct RstStreamFrame {

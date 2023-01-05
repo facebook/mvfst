@@ -7,9 +7,12 @@
 
 #pragma once
 
-#include <quic/codec/Types.h>
+#include <cstddef>
+#include <cstdint>
 
 namespace quic {
+
+using PacketNum = uint64_t;
 
 /**
  * Returns a decoded packet number by using the expectedNextPacketNum to
