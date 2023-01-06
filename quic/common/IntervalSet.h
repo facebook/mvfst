@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <exception>
+#include <limits>
 #include <queue>
 #include <stdexcept>
 

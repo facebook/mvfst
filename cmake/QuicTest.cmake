@@ -59,7 +59,6 @@ function(quic_add_test)
     ${QUIC_TEST_TARGET} PRIVATE
     ${_QUIC_BASE_COMPILE_OPTIONS}
     "-Wno-sign-compare"
-    "-Wno-inconsistent-missing-override"
   )
 
   gtest_add_tests(TARGET ${QUIC_TEST_TARGET}
