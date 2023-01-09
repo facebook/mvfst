@@ -34,3 +34,10 @@ target_link_libraries(
   ${GFLAGS_LIBRARIES}
   ${LIBGMOCK_LIBRARIES}
 )
+
+install(
+  TARGETS tperf
+  EXPORT mvfst-exports
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_DIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_DIR}
+)
