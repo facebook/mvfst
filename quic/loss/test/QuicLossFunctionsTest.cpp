@@ -872,13 +872,11 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
 
   auto& packet1 =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
-  auto packetNum = packet1.header.getPacketSequenceNum();
   markPacketLoss(*conn, packet1, false);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 2);
   EXPECT_EQ(stream1->lossBuffer.size(), 1);
   auto& packet3 =
       getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
-  packetNum = packet3.header.getPacketSequenceNum();
   markPacketLoss(*conn, packet3, false);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
   EXPECT_EQ(stream1->lossBuffer.size(), 2);
