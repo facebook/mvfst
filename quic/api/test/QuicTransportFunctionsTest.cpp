@@ -1002,9 +1002,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  auto packetEncodedSize =
-      packet.header ? packet.header->computeChainDataLength() : 0;
-  packetEncodedSize += packet.body ? packet.body->computeChainDataLength() : 0;
 
   WriteAckFrame ackFrame;
   ackFrame.ackBlocks.emplace_back(0, 100);
@@ -1019,10 +1016,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       false /* isDSRPacket */);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  packetEncodedSize =
-      nonHandshake.header ? nonHandshake.header->computeChainDataLength() : 0;
-  packetEncodedSize +=
-      nonHandshake.body ? nonHandshake.body->computeChainDataLength() : 0;
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream1, nullptr, true);
 
@@ -1060,9 +1053,6 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  auto packetEncodedSize =
-      packet.header ? packet.header->computeChainDataLength() : 0;
-  packetEncodedSize += packet.body ? packet.body->computeChainDataLength() : 0;
 
   WriteAckFrame ackFrame;
   ackFrame.ackBlocks.emplace_back(0, 100);
@@ -1302,9 +1292,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
 
   // Packet with CryptoFrame in AppData pn space
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData, true);
-  auto packetEncodedSize =
-      packet.header ? packet.header->computeChainDataLength() : 0;
-  packetEncodedSize += packet.body ? packet.body->computeChainDataLength() : 0;
 
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   updateConnection(
@@ -1320,10 +1307,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  packetEncodedSize =
-      nonHandshake.header ? nonHandshake.header->computeChainDataLength() : 0;
-  packetEncodedSize +=
-      nonHandshake.body ? nonHandshake.body->computeChainDataLength() : 0;
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream1, nullptr, true);
 
