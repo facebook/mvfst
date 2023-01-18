@@ -733,7 +733,6 @@ TYPED_TEST(
       std::vector<
           folly::Optional<typename TestFixture::NewOutstandingPacketInterval>>{
           maybeWrittenPackets1, maybeWrittenPackets2}));
-
   this->destroyTransport();
 }
 
@@ -938,7 +937,6 @@ TYPED_TEST(
       std::vector<
           folly::Optional<typename TestFixture::NewOutstandingPacketInterval>>{
           maybeWrittenPackets1, maybeWrittenPackets2}));
-
   auto stream = this->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_TRUE(stream);
   EXPECT_FALSE(stream->ackedIntervals.empty());
@@ -1512,7 +1510,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsLocalOpenedStream) {
+    StreamEventsLocalOpenedBiStream) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
   auto transport = this->getTransport();
@@ -1582,7 +1580,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsLocalOpenedStreamImmediateEofLocal) {
+    StreamEventsLocalOpenedBiStreamImmediateEofLocal) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1645,7 +1643,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsLocalOpenedStreamImmediateEofLocalRemote) {
+    StreamEventsLocalOpenedBiStreamImmediateEofLocalRemote) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1705,7 +1703,149 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsPeerOpenedStream) {
+    StreamEventsLocalOpenedUniStreamRstSentThenAcked) {
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
+
+  // create a new stream locally
+  const auto expectedStreamId = this->getNextLocalUnidirectionalStreamId();
+  {
+    const auto matcher = this->getStreamEventMatcherOpt(
+        expectedStreamId,
+        StreamInitiator::Local,
+        StreamDirectionality::Unidirectional);
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
+  }
+  const auto streamId = this->createUnidirectionalStream();
+  EXPECT_EQ(expectedStreamId, streamId);
+
+  // send some stream data, see a packet be written
+  this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello1"), false /* eof */);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
+
+  // local writes a reset
+  const auto result = this->getTransport()->resetStream(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
+  ASSERT_FALSE(result.hasError());
+  const auto maybeWrittenPackets2 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
+  // //
+  // this->deliverPacket(this->buildPeerPacketWithStopSendingFrame(streamId));
+  const auto maybeRstPacketNum =
+      this->template getFirstOutstandingPacketWithFrame<
+          QuicWriteFrame::Type::RstStreamFrame>();
+  ASSERT_TRUE(maybeRstPacketNum.has_value());
+
+  // deliver ACK for the data sent in first write
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1));
+
+  // deliver ACK for the reset packet sent by local
+  // stream should close on arrival of ACK
+  {
+    const auto matcher = this->getStreamEventMatcherOpt(
+        streamId, StreamInitiator::Local, StreamDirectionality::Unidirectional);
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
+  }
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2));
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    StreamEventsLocalOpenedUniStreamRstSentThenAckedBytesInFlight) {
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
+
+  // create a new stream locally
+  const auto expectedStreamId = this->getNextLocalUnidirectionalStreamId();
+  {
+    const auto matcher = this->getStreamEventMatcherOpt(
+        expectedStreamId,
+        StreamInitiator::Local,
+        StreamDirectionality::Unidirectional);
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
+  }
+  const auto streamId = this->createUnidirectionalStream();
+  EXPECT_EQ(expectedStreamId, streamId);
+
+  // send some stream data, see a packet be written
+  this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello1"), false /* eof */);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
+
+  // local writes a reset
+  const auto result = this->getTransport()->resetStream(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
+  ASSERT_FALSE(result.hasError());
+  const auto maybeWrittenPackets2 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
+  // //
+  // this->deliverPacket(this->buildPeerPacketWithStopSendingFrame(streamId));
+  const auto maybeRstPacketNum =
+      this->template getFirstOutstandingPacketWithFrame<
+          QuicWriteFrame::Type::RstStreamFrame>();
+  ASSERT_TRUE(maybeRstPacketNum.has_value());
+
+  // deliver ACK for the reset packet sent by local
+  // stream should close on arrival of ACK
+  {
+    const auto matcher = this->getStreamEventMatcherOpt(
+        streamId, StreamInitiator::Local, StreamDirectionality::Unidirectional);
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
+  }
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2));
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    StreamEventsPeerOpenedBiStream) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1770,7 +1910,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsPeerOpenedStreamImmediateEofRemote) {
+    StreamEventsPeerOpenedBiStreamImmediateEofRemote) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1831,7 +1971,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsPeerOpenedStreamImmediateEofLocalRemote) {
+    StreamEventsPeerOpenedBiStreamImmediateEofLocalRemote) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1886,7 +2026,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRst) {
+    StreamEventsPeerOpenedBiStreamStopSendingPlusRstTriggersRst) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -1965,7 +2105,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRstBytesInFlight) {
+    StreamEventsPeerOpenedBiStreamStopSendingPlusRstTriggersRstBytesInFlight) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -2042,7 +2182,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
-    StreamEventsPeerOpenedStreamImmediateEorStopSendingTriggersRstBytesInFlight) {
+    StreamEventsPeerOpenedBiStreamImmediateEorStopSendingTriggersRstBytesInFlight) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
@@ -2109,6 +2249,167 @@ TYPED_TEST(
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPacket(maybeRstPacketNum.value()));
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    StreamEventsAckEventsPeerOpenedBiStreamImmediateEorStopSendingTriggersRstBytesInFlightPartiallyAckedAfterRstSent) {
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
+
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
+
+  // get stream ID for peer
+  const auto streamId = this->getNextPeerBidirectionalStreamId();
+
+  // deliver a packet with stream data from the remote
+  {
+    const auto matcher = this->getStreamEventMatcherOpt(
+        streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
+  }
+  this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
+      streamId, IOBuf::copyBuffer("hello1")));
+
+  // local sends some stream data, see a packet be written
+  this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
+
+  // local sends some more stream data, see another packet be written
+  this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
+  const auto maybeWrittenPackets2 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
+
+  // deliver stop sending frame, trigger reset locally on receipt of frame
+  // give opportunity for packets to be sent
+  EXPECT_FALSE(this->template getFirstOutstandingPacketWithFrame<
+                       QuicWriteFrame::Type::RstStreamFrame>()
+                   .has_value());
+  EXPECT_CALL(
+      this->getConnCallback(),
+      onStopSending(streamId, GenericApplicationErrorCode::UNKNOWN))
+      .WillRepeatedly(Invoke([this](const auto& streamId, const auto& error) {
+        const auto result = this->getTransport()->resetStream(streamId, error);
+        EXPECT_FALSE(result.hasError());
+      }));
+  this->deliverPacketNoWrites(
+      this->buildPeerPacketWithStopSendingFrame(streamId));
+  const auto maybeWrittenPackets3 = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets3));
+  const auto maybeRstPacketNum =
+      this->template getFirstOutstandingPacketWithFrame<
+          QuicWriteFrame::Type::RstStreamFrame>();
+  ASSERT_TRUE(maybeRstPacketNum.has_value());
+
+  // deliver ACK for first packet
+  // despite reset being sent, observer should still be notified of ACK
+  {
+    ASSERT_TRUE(maybeWrittenPackets1.has_value());
+    const auto& writtenPackets1 = maybeWrittenPackets1.value();
+    const auto sentTime = writtenPackets1.sentTime;
+    const auto ackRecvTime = sentTime + 27ms;
+    const auto ackDelay = 0us;
+    const auto matcher =
+        AckEventMatcherBuilder<TypeParam>()
+            .setExpectedAckedIntervals(
+                std::vector<typename TestFixture::NewOutstandingPacketInterval>{
+                    writtenPackets1})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(writtenPackets1.end)
+            .setLargestNewlyAckedPacket(writtenPackets1.end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
+    EXPECT_CALL(*obs1, acksProcessed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, acksProcessed(transport, matcher));
+    EXPECT_CALL(*obs3, acksProcessed(transport, matcher));
+
+    const quic::AckBlocks ackBlocks = {
+        {writtenPackets1.start, writtenPackets1.end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
+  }
+
+  // deliver ACK for rst packet, then stream should close
+  {
+    ASSERT_TRUE(maybeWrittenPackets3.has_value());
+    const auto& writtenPackets3 = maybeWrittenPackets3.value();
+    const auto sentTime = writtenPackets3.sentTime;
+    const auto ackRecvTime = sentTime + 27ms;
+    const auto ackDelay = 0us;
+    const auto ackEventMatcher =
+        AckEventMatcherBuilder<TypeParam>()
+            .setExpectedAckedIntervals(
+                std::vector<typename TestFixture::NewOutstandingPacketInterval>{
+                    writtenPackets3})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(writtenPackets3.end)
+            .setLargestNewlyAckedPacket(writtenPackets3.end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
+    EXPECT_CALL(*obs1, acksProcessed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, acksProcessed(transport, ackEventMatcher));
+    EXPECT_CALL(*obs3, acksProcessed(transport, ackEventMatcher));
+
+    const auto streamEventMatcher = this->getStreamEventMatcherOpt(
+        streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, streamEventMatcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, streamEventMatcher));
+
+    const quic::AckBlocks ackBlocks = {
+        {writtenPackets3.start, writtenPackets3.end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
+  }
 
   this->destroyTransport();
 }

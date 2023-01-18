@@ -577,6 +577,16 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Have local (self) create a new unidirectional stream.
+   */
+  StreamId createUnidirectionalStream() {
+    const auto expectedStreamId =
+        this->getTransport()->createUnidirectionalStream();
+    CHECK(expectedStreamId.hasValue());
+    return expectedStreamId.value();
+  }
+
+  /**
    * Have local (self) create a new bidirectional stream.
    */
   StreamId createBidirectionalStream() {
