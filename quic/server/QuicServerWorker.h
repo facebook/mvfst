@@ -621,7 +621,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       folly::small_vector<
           NetworkData,
           kDefaultMaxBufferedPackets,
-          folly::small_vector_policy::policy_in_situ_only<true>>,
+          folly::small_vector_policy::NoHeap>,
       ConnectionIdHash>
       pending0RttData_{20};
 

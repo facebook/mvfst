@@ -13,10 +13,20 @@
 namespace quic {
 
 #if !FOLLY_MOBILE || _WIN32
-template <class T, std::size_t N, class... Policy>
-using SmallVec = folly::small_vector<T, N, Policy...>;
+template <
+    class T,
+    std::size_t N,
+    class PolicyA = void,
+    class PolicyB = void,
+    class PolicyC = void>
+using SmallVec = folly::small_vector<T, N, PolicyA, PolicyB, PolicyC>;
 #else
-template <class T, std::size_t N, class... Policy>
+template <
+    class T,
+    std::size_t N,
+    class PolicyA = void,
+    class PolicyB = void,
+    class PolicyC = void>
 using SmallVec = std::vector<T>;
 #endif
 
