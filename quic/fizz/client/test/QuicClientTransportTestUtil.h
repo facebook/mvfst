@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#pragma once
+
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/api/QuicTransportBase.h>

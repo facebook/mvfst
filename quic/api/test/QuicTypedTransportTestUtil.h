@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#pragma once
+
 #include <quic/api/QuicTransportBase.h>
 #include <quic/common/test/TestPacketBuilders.h>
 #include <quic/common/test/TestUtils.h>
