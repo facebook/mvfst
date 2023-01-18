@@ -404,17 +404,6 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      quic::PacketNum intervalStart,
-      quic::PacketNum intervalEnd,
-      std::chrono::microseconds ackDelay = 0us) {
-    quic::AckBlocks acks = {{intervalStart, intervalEnd}};
-    return buildAckPacketForSentAppDataPackets(acks, ackDelay);
-  }
-
-  /**
-   * Build a packet with ACK frame for previously sent AppData packets.
-   */
-  quic::Buf buildAckPacketForSentAppDataPackets(
       const std::vector<quic::PacketNum>& packetNums,
       std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks;
@@ -424,21 +413,29 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     return buildAckPacketForSentAppDataPackets(acks, ackDelay);
   }
 
-  /**
-   * Build a packet from peer with ACK frame for previously AppData packets.
-   */
   template <class T0, class... Ts>
-  quic::Buf buildAckPacketForSentAppDataPackets(
-      T0&& first,
-      Ts&&... args,
-      std::chrono::microseconds ackDelay = 0us) {
+  using are_same = std::conjunction<std::is_same<T0, Ts>...>;
+
+  /**
+   * Build a packet with ACK frame for previously sent AppData packets.
+   */
+  template <
+      class T0,
+      class... Ts,
+      class = std::enable_if_t<
+          std::is_same<
+              std::remove_const_t<std::remove_reference_t<T0>>,
+              quic::PacketNum>::value,
+          void>,
+      class = std::enable_if_t<are_same<T0, Ts...>::value, void>>
+  quic::Buf buildAckPacketForSentAppDataPackets(T0&& first, Ts&&... args) {
     std::vector<quic::PacketNum> packetNums{
         std::forward<T0>(first), std::forward<Ts>(args)...};
-    return buildAckPacketForSentAppDataPackets(packetNums, ackDelay);
+    return buildAckPacketForSentAppDataPackets(packetNums);
   }
 
   /**
-   * Returns a first outstanding packet with containing frame of type T.
+   * Returns the first outstanding packet with containing frame of type T.
    */
   template <QuicWriteFrame::Type Type>
   folly::Optional<quic::PacketNum> getFirstOutstandingPacketWithFrame() {

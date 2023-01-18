@@ -501,13 +501,11 @@ TYPED_TEST(
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets.has_value());
-  quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
-  quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
-  EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets));
 
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets),
       std::chrono::steady_clock::time_point());
 
   // should be no space (capacity) for ACK events
@@ -534,11 +532,7 @@ TYPED_TEST(
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
-  {
-    quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
-    quic::PacketNum lastPacketNum = maybeWrittenPackets1->end;
-    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
-  }
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
 
   // write some more bytes into the same stream
   this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
@@ -546,16 +540,11 @@ TYPED_TEST(
 
   // should have sent another packet
   ASSERT_TRUE(maybeWrittenPackets2.has_value());
-  {
-    quic::PacketNum firstPacketNum = maybeWrittenPackets2->start;
-    quic::PacketNum lastPacketNum = maybeWrittenPackets2->end;
-    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
-  }
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
 
   // deliver an ACK for the first packet
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(
-          maybeWrittenPackets1->start, maybeWrittenPackets1->end),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1),
       std::chrono::steady_clock::time_point());
 
   // should be space allocated for ACK events
@@ -563,8 +552,7 @@ TYPED_TEST(
 
   // deliver an ACK for the second packet
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(
-          maybeWrittenPackets2->start, maybeWrittenPackets2->end),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2),
       std::chrono::steady_clock::time_point());
 
   // should be no space (capacity) for ACK events
@@ -597,11 +585,7 @@ TYPED_TEST(
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
-  {
-    quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
-    quic::PacketNum lastPacketNum = maybeWrittenPackets1->end;
-    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
-  }
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
 
   // write some more bytes into the same stream
   this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
@@ -609,16 +593,11 @@ TYPED_TEST(
 
   // should have sent another packet
   ASSERT_TRUE(maybeWrittenPackets2.has_value());
-  {
-    quic::PacketNum firstPacketNum = maybeWrittenPackets2->start;
-    quic::PacketNum lastPacketNum = maybeWrittenPackets2->end;
-    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
-  }
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
 
   // deliver an ACK for the second packet
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(
-          maybeWrittenPackets2->start, maybeWrittenPackets2->end),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2),
       std::chrono::steady_clock::time_point());
 
   // should be space allocated for ACK events
@@ -626,8 +605,7 @@ TYPED_TEST(
 
   // deliver an ACK for the first packet
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(
-          maybeWrittenPackets1->start, maybeWrittenPackets1->end),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1),
       std::chrono::steady_clock::time_point());
 
   // should be no space (capacity) for ACK events
@@ -664,9 +642,8 @@ TYPED_TEST(
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets.has_value());
-  quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets));
   quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
-  EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
 
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_))
       .Times(1)
@@ -686,14 +663,15 @@ TYPED_TEST(
 
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets),
       std::chrono::steady_clock::time_point());
   this->destroyTransport();
 }
 
 /**
- * Verify PacketProcessor callbacks when sending two data packets and receiving
- * one ack
+ * Verify PacketProcessor send and ACK callbacks.
+ *
+ * Send two packets and receive one ACK.
  */
 TYPED_TEST(
     QuicTypedTransportAfterStartTest,
@@ -751,9 +729,11 @@ TYPED_TEST(
       }));
 
   // deliver an ACK for all of the outstanding packets
-  this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
-      std::chrono::steady_clock::time_point());
+  this->deliverPacket(this->buildAckPacketForSentAppDataPackets(
+      std::vector<
+          folly::Optional<typename TestFixture::NewOutstandingPacketInterval>>{
+          maybeWrittenPackets1, maybeWrittenPackets2}));
+
   this->destroyTransport();
 }
 
@@ -954,9 +934,11 @@ TYPED_TEST(
       .Times(0);
 
   // deliver an ACK for all of the outstanding packets
-  this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
-      std::chrono::steady_clock::time_point());
+  this->deliverPacket(this->buildAckPacketForSentAppDataPackets(
+      std::vector<
+          folly::Optional<typename TestFixture::NewOutstandingPacketInterval>>{
+          maybeWrittenPackets1, maybeWrittenPackets2}));
+
   auto stream = this->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_TRUE(stream);
   EXPECT_FALSE(stream->ackedIntervals.empty());
@@ -982,15 +964,13 @@ TYPED_TEST(
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
-  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
   MockDeliveryCallback cb;
   this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
   EXPECT_CALL(cb, onDeliveryAck(streamId, 0, _));
 
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, firstPacketNum),
-      std::chrono::steady_clock::time_point());
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1));
   auto stream = this->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_TRUE(stream);
   EXPECT_FALSE(stream->ackedIntervals.empty());
@@ -1014,14 +994,13 @@ TYPED_TEST(
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
-  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
   MockDeliveryCallback cb;
   this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
   EXPECT_CALL(cb, onDeliveryAck(streamId, 0, _));
 
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, firstPacketNum),
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1),
       std::chrono::steady_clock::time_point());
   auto stream = this->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_TRUE(stream);
