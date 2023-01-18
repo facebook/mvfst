@@ -198,7 +198,8 @@ TEST_P(
   if (GetParam().peerMaxGroupsIn > 0) {
     auto streamGroupsEnabledParam =
         std::make_unique<CustomIntegralTransportParameter>(
-            kStreamGroupsEnabledCustomParamId, GetParam().peerMaxGroupsIn);
+            static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
+            GetParam().peerMaxGroupsIn);
     CHECK(setCustomTransportParameter(
         std::move(streamGroupsEnabledParam), transportParams));
   }

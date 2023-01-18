@@ -35,7 +35,8 @@ enum class TransportParameterId : uint64_t {
   min_ack_delay = 0xff02de1a,
   ack_receive_timestamps_enabled = 0xff0a001,
   max_receive_timestamps_per_ack = 0xff0a002,
-  receive_timestamps_exponent = 0xff0a003
+  receive_timestamps_exponent = 0xff0a003,
+  stream_groups_enabled = 0x0000ff99
 };
 
 struct TransportParameter {

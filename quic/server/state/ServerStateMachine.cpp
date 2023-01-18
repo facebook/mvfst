@@ -223,7 +223,8 @@ void processClientInitialParams(
   auto maxDatagramFrameSize = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, clientParams.parameters);
   auto peerMaxStreamGroupsAdvertized = getIntegerParameter(
-      static_cast<TransportParameterId>(kStreamGroupsEnabledCustomParamId),
+      static_cast<TransportParameterId>(
+          TransportParameterId::stream_groups_enabled),
       clientParams.parameters);
 
   auto isAckReceiveTimestampsEnabled = getIntegerParameter(
@@ -1627,7 +1628,7 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
   if (conn.transportSettings.maxStreamGroupsAdvertized > 0) {
     auto streamGroupsEnabledParam =
         std::make_unique<CustomIntegralTransportParameter>(
-            kStreamGroupsEnabledCustomParamId,
+            static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
             conn.transportSettings.maxStreamGroupsAdvertized);
 
     if (!setCustomTransportParameter(

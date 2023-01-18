@@ -724,9 +724,6 @@ constexpr uint8_t kDefaultMaxPriority = 7;
 
 constexpr size_t kShortHeaderPaddingModulo = 32;
 
-// Custom transport param enabling stream groups support.
-constexpr uint16_t kStreamGroupsEnabledCustomParamId = 0xFF99;
-
 // Maximum packet receive timestamps stored.
 constexpr uint8_t kMaxReceivedPktsTimestampsStored = 5;
 constexpr uint8_t kDefaultReceiveTimestampsExponent = 3;

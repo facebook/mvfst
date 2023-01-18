@@ -133,7 +133,8 @@ void processServerInitialParams(
   auto maxDatagramFrameSize = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, serverParams.parameters);
   auto peerMaxStreamGroupsAdvertized = getIntegerParameter(
-      static_cast<TransportParameterId>(kStreamGroupsEnabledCustomParamId),
+      static_cast<TransportParameterId>(
+          TransportParameterId::stream_groups_enabled),
       serverParams.parameters);
   auto minAckDelay = getIntegerParameter(
       TransportParameterId::min_ack_delay, serverParams.parameters);

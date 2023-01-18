@@ -1873,7 +1873,7 @@ void QuicClientTransport::maybeEnableStreamGroups() {
 
   auto streamGroupsEnabledParam =
       std::make_unique<CustomIntegralTransportParameter>(
-          kStreamGroupsEnabledCustomParamId,
+          static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
           conn_->transportSettings.maxStreamGroupsAdvertized);
 
   if (!setCustomTransportParameter(
