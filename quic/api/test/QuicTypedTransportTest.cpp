@@ -2315,6 +2315,274 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportAfterStartTestForObservers,
+    WriteEventsOutstandingPacketSentInvokeForEach) {
+  struct InvokedOutstandingPacketFields {
+    PacketNumberSpace pnSpace{PacketNumberSpace::Initial};
+    PacketNum packetNum{0};
+  };
+  InSequence s;
+
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::packetsWrittenEvents);
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(obs1.get()));
+
+  // open stream that we will write to
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+
+  // first write of a single packet worth of data
+  {
+    // capture invoked packets
+    std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
+    EXPECT_CALL(*obs1, packetsWritten(_, _))
+        .WillOnce([&outstandingPacketsDuringInvoke](
+                      const auto& /* socket */, const auto& event) {
+          event.invokeForEachNewOutstandingPacketOrdered(
+              [&outstandingPacketsDuringInvoke](
+                  const OutstandingPacket& outstandingPacket) {
+                outstandingPacketsDuringInvoke.emplace_back(
+                    InvokedOutstandingPacketFields{
+                        outstandingPacket.packet.header.getPacketNumberSpace(),
+                        outstandingPacket.packet.header
+                            .getPacketSequenceNum()});
+              });
+        });
+
+    // open a stream and write string
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent one packet
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+    EXPECT_THAT(
+        outstandingPacketsDuringInvoke,
+        ::testing::ElementsAre(::testing::AllOf(
+            ::testing::Field(
+                &InvokedOutstandingPacketFields::pnSpace,
+                PacketNumberSpace::AppData),
+            ::testing::Field(
+                &InvokedOutstandingPacketFields::packetNum, firstPacketNum))));
+  }
+
+  // second write of a single packet worth of data
+  {
+    // capture invoked packets
+    std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
+    EXPECT_CALL(*obs1, packetsWritten(_, _))
+        .WillOnce([&outstandingPacketsDuringInvoke](
+                      const auto& /* socket */, const auto& event) {
+          event.invokeForEachNewOutstandingPacketOrdered(
+              [&outstandingPacketsDuringInvoke](
+                  const OutstandingPacket& outstandingPacket) {
+                outstandingPacketsDuringInvoke.emplace_back(
+                    InvokedOutstandingPacketFields{
+                        outstandingPacket.packet.header.getPacketNumberSpace(),
+                        outstandingPacket.packet.header
+                            .getPacketSequenceNum()});
+              });
+        });
+
+    // open a stream and write string
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("goodbye"), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent one packet
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+    EXPECT_THAT(
+        outstandingPacketsDuringInvoke,
+        ::testing::ElementsAre(::testing::AllOf(
+            ::testing::Field(
+                &InvokedOutstandingPacketFields::pnSpace,
+                PacketNumberSpace::AppData),
+            ::testing::Field(
+                &InvokedOutstandingPacketFields::packetNum, firstPacketNum))));
+  }
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    WriteEventsOutstandingMultiplePacketsSentInvokeForEach) {
+  struct InvokedOutstandingPacketFields {
+    PacketNumberSpace pnSpace{PacketNumberSpace::Initial};
+    PacketNum packetNum{0};
+  };
+  InSequence s;
+
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::packetsWrittenEvents);
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(obs1.get()));
+
+  // open stream that we will write to
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+
+  // first write of two packets worth of data
+  {
+    // capture invoked packets
+    std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
+    EXPECT_CALL(*obs1, packetsWritten(_, _))
+        .WillOnce([&outstandingPacketsDuringInvoke](
+                      const auto& /* socket */, const auto& event) {
+          event.invokeForEachNewOutstandingPacketOrdered(
+              [&outstandingPacketsDuringInvoke](
+                  const OutstandingPacket& outstandingPacket) {
+                outstandingPacketsDuringInvoke.emplace_back(
+                    InvokedOutstandingPacketFields{
+                        outstandingPacket.packet.header.getPacketNumberSpace(),
+                        outstandingPacket.packet.header
+                            .getPacketSequenceNum()});
+              });
+        });
+
+    // open a stream and write string
+    auto buf = buildRandomInputData(2000 /* bufLength */);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent two packets
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(2, lastPacketNum - firstPacketNum + 1);
+
+    EXPECT_THAT(
+        outstandingPacketsDuringInvoke,
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    firstPacketNum)),
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    lastPacketNum))));
+  }
+
+  // second write of a single packet worth of data
+  {
+    // capture invoked packets
+    std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
+    EXPECT_CALL(*obs1, packetsWritten(_, _))
+        .WillOnce([&outstandingPacketsDuringInvoke](
+                      const auto& /* socket */, const auto& event) {
+          event.invokeForEachNewOutstandingPacketOrdered(
+              [&outstandingPacketsDuringInvoke](
+                  const OutstandingPacket& outstandingPacket) {
+                outstandingPacketsDuringInvoke.emplace_back(
+                    InvokedOutstandingPacketFields{
+                        outstandingPacket.packet.header.getPacketNumberSpace(),
+                        outstandingPacket.packet.header
+                            .getPacketSequenceNum()});
+              });
+        });
+
+    // open a stream and write string
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("goodbye"), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent one packet
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+    EXPECT_THAT(
+        outstandingPacketsDuringInvoke,
+        ::testing::ElementsAre(::testing::AllOf(
+            ::testing::Field(
+                &InvokedOutstandingPacketFields::pnSpace,
+                PacketNumberSpace::AppData),
+            ::testing::Field(
+                &InvokedOutstandingPacketFields::packetNum, firstPacketNum))));
+  }
+
+  // third write of three packets worth of data
+  {
+    // capture invoked packets
+    std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
+    EXPECT_CALL(*obs1, packetsWritten(_, _))
+        .WillOnce([&outstandingPacketsDuringInvoke](
+                      const auto& /* socket */, const auto& event) {
+          event.invokeForEachNewOutstandingPacketOrdered(
+              [&outstandingPacketsDuringInvoke](
+                  const OutstandingPacket& outstandingPacket) {
+                outstandingPacketsDuringInvoke.emplace_back(
+                    InvokedOutstandingPacketFields{
+                        outstandingPacket.packet.header.getPacketNumberSpace(),
+                        outstandingPacket.packet.header
+                            .getPacketSequenceNum()});
+              });
+        });
+
+    // open a stream and write string
+    auto buf = buildRandomInputData(3000 /* bufLength */);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent three packets
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(3, lastPacketNum - firstPacketNum + 1);
+
+    EXPECT_THAT(
+        outstandingPacketsDuringInvoke,
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    firstPacketNum)),
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    firstPacketNum + 1)),
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    lastPacketNum))));
+  }
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
     WriteEventsOutstandingPacketSentWroteMoreThanCwnd) {
   InSequence s;
 

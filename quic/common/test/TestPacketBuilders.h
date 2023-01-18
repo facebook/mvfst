@@ -47,4 +47,46 @@ struct AckPacketBuilder : public AckPacketBuilderFields {
   explicit AckPacketBuilder() = default;
 };
 
+struct OutstandingPacketBuilderFields {
+  folly::Optional<RegularQuicWritePacket> maybePacket;
+  folly::Optional<TimePoint> maybeTime;
+  folly::Optional<uint32_t> maybeEncodedSize;
+  folly::Optional<uint32_t> maybeEncodedBodySize;
+  folly::Optional<bool> maybeIsHandshake;
+  folly::Optional<bool> maybeIsD6DProbe;
+  folly::Optional<uint64_t> maybeTotalBytesSent;
+  folly::Optional<uint64_t> maybeTotalBodyBytesSent;
+  folly::Optional<uint64_t> maybeInflightBytes;
+  folly::Optional<uint64_t> maybePacketsInflight;
+  folly::Optional<std::reference_wrapper<const LossState>> maybeLossState;
+  folly::Optional<uint64_t> maybeWriteCount;
+  folly::Optional<OutstandingPacket::Metadata::DetailsPerStream>
+      maybeDetailsPerStream;
+  folly::Optional<std::chrono::microseconds> maybeTotalAppLimitedTimeUsecs;
+  explicit OutstandingPacketBuilderFields() = default;
+};
+
+struct OutstandingPacketBuilder : public OutstandingPacketBuilderFields {
+  using Builder = OutstandingPacketBuilder;
+  Builder&& setPacket(const RegularQuicWritePacket&);
+  Builder&& setTime(const TimePoint& timeIn);
+  Builder&& setEncodedSize(const uint32_t& encodedSizeIn);
+  Builder&& setEncodedBodySize(const uint32_t& encodedBodySizeIn);
+  Builder&& setIsHandshake(const bool& isHandshakeIn);
+  Builder&& setIsD6DProbe(const bool& isD6DProbeIn);
+  Builder&& setTotalBytesSent(const uint64_t& totalBytesSentIn);
+  Builder&& setTotalBodyBytesSent(const uint64_t& totalBodyBytesSentIn);
+  Builder&& setInflightBytes(const uint64_t& inflightBytesIn);
+  Builder&& setPacketsInflight(const uint64_t& packetsInflightIn);
+  Builder&& setLossState(
+      const std::reference_wrapper<const LossState>& lossStateIn);
+  Builder&& setWriteCount(const uint64_t& writeCountIn);
+  Builder&& setDetailsPerStream(
+      const OutstandingPacket::Metadata::DetailsPerStream& detailsPerStreamIn);
+  Builder&& setTotalAppLimitedTimeUsecs(
+      const std::chrono::microseconds& totalAppLimitedTimeUsecsIn);
+  OutstandingPacket build() &&;
+  explicit OutstandingPacketBuilder() = default;
+};
+
 } // namespace quic::test

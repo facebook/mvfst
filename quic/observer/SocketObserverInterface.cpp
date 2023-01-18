@@ -118,6 +118,108 @@ SocketObserverInterface::AppLimitedEvent::AppLimitedEvent(
     SocketObserverInterface::AppLimitedEvent::BuilderFields&& builderFields)
     : WriteEvent(builderFields) {}
 
+void SocketObserverInterface::PacketsWrittenEvent::
+    invokeForEachNewOutstandingPacketOrdered(
+        const std::function<void(const OutstandingPacket&)>& fn) const {
+  DCHECK_GE(outstandingPackets.size(), numAckElicitingPacketsWritten);
+  if (numAckElicitingPacketsWritten == 0) {
+    return; // nothing to do
+  }
+
+  // The packets in the OutstandingPackets deque are sorted by their sequence
+  // nunber in their packet number space. As a result, the N packets at the end
+  // of the deque may not be the N most recently sent OutstandingPacketss.
+  // Furthermore, adjacent OutstandingPackets may have the same sequence
+  // number because they belong to different packet number spaces. Because
+  // packets in the deque are sorted only by sequence number, the ith packet
+  // in the deque may have actually been sent after the i+1th packet.
+  //
+  // However, the deque will typically only contain AppData packets, and thus
+  // we can expect that the last N elements in the deque will typically be the
+  // N most recently sent OutstandingPackets. We use this to avoid needing to
+  // scan the queue when the following is true:
+  //
+  //    (1) If the writeCount of the OutstandingPacket N packets from the end of
+  //        the deque has a writeCount equal to that reported by this event, and
+  //    (2) If when scanning from the OutstandingPacket N packets from the end
+  //        of the deque to the end of the deque, the numAckElicitingPacketsSent
+  //        recorded for each OutstandingPacket is one larger than that of the
+  //        previous OutstandingPacket, and writeCount recorded is equal to the
+  //        writeCount reported by this event.
+  //
+  // If the above is true, then the N OutstandingPackets from the end of the
+  // deque were all sent during this write operation, and they are already
+  // ordered such that packet i was sent before packet i+1.
+  {
+    const auto startIt = outstandingPackets.end() -
+        static_cast<int64_t>(numAckElicitingPacketsWritten);
+    bool needFullWalk = false;
+    folly::Optional<uint64_t> maybePrevNumAckElicitingPacketsSent;
+
+    for (auto it = startIt; it != outstandingPackets.end(); it++) {
+      if (writeCount != it->metadata.writeCount) {
+        needFullWalk = true;
+        break;
+      }
+
+      if (!maybePrevNumAckElicitingPacketsSent) {
+        maybePrevNumAckElicitingPacketsSent =
+            it->metadata.totalAckElicitingPacketsSent;
+        continue;
+      }
+
+      CHECK_NE(
+          maybePrevNumAckElicitingPacketsSent.value(),
+          it->metadata.totalAckElicitingPacketsSent);
+      if (maybePrevNumAckElicitingPacketsSent.value() >
+          it->metadata.totalAckElicitingPacketsSent) {
+        needFullWalk = true;
+        break;
+      }
+    }
+
+    if (!needFullWalk) {
+      for (auto it = startIt; it != outstandingPackets.end(); it++) {
+        fn(*it);
+      }
+      return; // we're done here
+    }
+  }
+
+  // It looks like a full walk is needed.
+  //
+  // From the front of the deque, find OutstandingPackets with the writeCount
+  // reported by this event and insert references to them into a vector.
+  std::vector<std::reference_wrapper<const OutstandingPacket>>
+      newOutstandingPackets;
+  newOutstandingPackets.reserve(numAckElicitingPacketsWritten);
+  for (const auto& packet : outstandingPackets) {
+    if (packet.metadata.writeCount == writeCount) {
+      newOutstandingPackets.emplace_back(packet);
+    }
+  }
+  DCHECK_EQ(numAckElicitingPacketsWritten, newOutstandingPackets.size());
+
+  // Now sort that vector by totalAckElicitingPacketsSent.
+  std::sort(
+      std::begin(newOutstandingPackets),
+      std::end(newOutstandingPackets),
+      [](const auto& pkt1, const auto& pkt2) {
+        const auto& pkt1TotalAckElicitingPacketsSent =
+            pkt1.get().metadata.totalAckElicitingPacketsSent;
+        const auto& pkt2TotalAckElicitingPacketsSent =
+            pkt2.get().metadata.totalAckElicitingPacketsSent;
+        return pkt1TotalAckElicitingPacketsSent <
+            pkt2TotalAckElicitingPacketsSent;
+      });
+  DCHECK_EQ(numAckElicitingPacketsWritten, newOutstandingPackets.size());
+
+  // Play the sorted list
+  for (const auto& packet : newOutstandingPackets) {
+    fn(packet);
+  }
+}
+
 SocketObserverInterface::PacketsWrittenEvent::Builder&&
 SocketObserverInterface::PacketsWrittenEvent::Builder::setOutstandingPackets(
     const std::deque<OutstandingPacket>& outstandingPacketsIn) {

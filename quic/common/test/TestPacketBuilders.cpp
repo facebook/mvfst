@@ -142,4 +142,107 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   return std::move(builder).buildPacket();
 }
 
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setPacket(
+    const RegularQuicWritePacket& packetIn) {
+  maybePacket = packetIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setTime(
+    const TimePoint& timeIn) {
+  maybeTime = timeIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setEncodedSize(
+    const uint32_t& encodedSizeIn) {
+  maybeEncodedSize = encodedSizeIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setEncodedBodySize(
+    const uint32_t& encodedBodySizeIn) {
+  maybeEncodedBodySize = encodedBodySizeIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setIsHandshake(
+    const bool& isHandshakeIn) {
+  maybeIsHandshake = isHandshakeIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setIsD6DProbe(
+    const bool& isD6DProbeIn) {
+  maybeIsD6DProbe = isD6DProbeIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setTotalBytesSent(
+    const uint64_t& totalBytesSentIn) {
+  maybeTotalBytesSent = totalBytesSentIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setTotalBodyBytesSent(
+    const uint64_t& totalBodyBytesSentIn) {
+  maybeTotalBodyBytesSent = totalBodyBytesSentIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setInflightBytes(
+    const uint64_t& inflightBytesIn) {
+  maybeInflightBytes = inflightBytesIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setPacketsInflight(
+    const uint64_t& packetsInflightIn) {
+  maybePacketsInflight = packetsInflightIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setLossState(
+    const std::reference_wrapper<const LossState>& lossStateIn) {
+  maybeLossState = lossStateIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setWriteCount(
+    const uint64_t& writeCountIn) {
+  maybeWriteCount = writeCountIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setDetailsPerStream(
+    const OutstandingPacket::Metadata::DetailsPerStream& detailsPerStreamIn) {
+  maybeDetailsPerStream = detailsPerStreamIn;
+  return std::move(*this);
+}
+
+OutstandingPacketBuilder&&
+OutstandingPacketBuilder::setTotalAppLimitedTimeUsecs(
+    const std::chrono::microseconds& totalAppLimitedTimeUsecsIn) {
+  maybeTotalAppLimitedTimeUsecs = totalAppLimitedTimeUsecsIn;
+  return std::move(*this);
+}
+
+OutstandingPacket OutstandingPacketBuilder::build() && {
+  return OutstandingPacket{
+      *CHECK_NOTNULL(maybePacket.get_pointer()),
+      *CHECK_NOTNULL(maybeTime.get_pointer()),
+      *CHECK_NOTNULL(maybeEncodedSize.get_pointer()),
+      *CHECK_NOTNULL(maybeEncodedBodySize.get_pointer()),
+      *CHECK_NOTNULL(maybeIsHandshake.get_pointer()),
+      *CHECK_NOTNULL(maybeIsD6DProbe.get_pointer()),
+      *CHECK_NOTNULL(maybeTotalBytesSent.get_pointer()),
+      *CHECK_NOTNULL(maybeTotalBodyBytesSent.get_pointer()),
+      *CHECK_NOTNULL(maybeInflightBytes.get_pointer()),
+      *CHECK_NOTNULL(maybePacketsInflight.get_pointer()),
+      CHECK_NOTNULL(maybeLossState.get_pointer())->get(),
+      *CHECK_NOTNULL(maybeWriteCount.get_pointer()),
+      *CHECK_NOTNULL(maybeDetailsPerStream.get_pointer()),
+      *CHECK_NOTNULL(maybeTotalAppLimitedTimeUsecs.get_pointer())};
+}
+
 } // namespace quic::test

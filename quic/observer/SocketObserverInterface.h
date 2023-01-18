@@ -173,6 +173,12 @@ class SocketObserverInterface {
   };
 
   struct PacketsWrittenEvent : public WriteEvent {
+    /**
+     * For each new OutstandingPacket (ACK eliciting packet), invoke function.
+     */
+    void invokeForEachNewOutstandingPacketOrdered(
+        const std::function<void(const OutstandingPacket&)>& fn) const;
+
     // Number of packets just written, including ACK eliciting packets.
     const uint64_t numPacketsWritten;
 
