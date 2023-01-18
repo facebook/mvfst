@@ -1094,6 +1094,9 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 
+  folly::SocketAddress v4Address("0.0.0.0", 0);
+  client->addNewPeerAddress(v4Address);
+
   auto newSocket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
       eventbase_.get());
   auto newSocketPtr = newSocket.get();

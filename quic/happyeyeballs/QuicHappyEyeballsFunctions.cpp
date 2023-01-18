@@ -131,25 +131,30 @@ void happyEyeballsSetUpSocket(
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
     folly::AsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
-  auto sockFamily = localAddress.has_value() ? localAddress->getFamily()
-                                             : peerAddress.getFamily();
-
-  applySocketOptions(
-      socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::PRE_BIND);
+  auto sockFamily = localAddress.value_or(peerAddress).getFamily();
   socket.setReuseAddr(false);
+  auto initSockAndApplyOpts = [&]() {
+    socket.init(sockFamily);
+    applySocketOptions(
+        socket,
+        options,
+        sockFamily,
+        folly::SocketOptionKey::ApplyPos::PRE_BIND);
+  };
 
   if (localAddress.has_value()) {
+    initSockAndApplyOpts();
     socket.bind(*localAddress);
   }
   if (transportSettings.connectUDP) {
+    initSockAndApplyOpts();
     socket.connect(peerAddress);
   }
   if (!socket.isBound()) {
-    if (peerAddress.getFamily() == AF_INET) {
-      socket.bind(folly::SocketAddress("0.0.0.0", 0));
-    } else {
-      socket.bind(folly::SocketAddress("::", 0));
-    }
+    auto addr = folly::SocketAddress(
+        peerAddress.getFamily() == AF_INET ? "0.0.0.0" : "::", 0);
+    initSockAndApplyOpts();
+    socket.bind(addr);
   }
   applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
