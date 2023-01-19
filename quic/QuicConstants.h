@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/Range.h>
 #include <folly/String.h>
 #include <quic/common/third-party/enum.h>
 #include <sys/types.h>
