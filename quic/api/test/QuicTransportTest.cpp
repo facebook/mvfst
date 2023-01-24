@@ -4458,7 +4458,7 @@ TEST_F(QuicTransportTest, PacedWriteNoDataToWrite) {
       WriteDataReason::NO_WRITE,
       shouldWriteData(transport_->getConnectionState()));
   EXPECT_CALL(*socket_, write(_, _)).Times(0);
-  transport_->pacedWrite(true);
+  transport_->pacedWrite();
 }
 
 TEST_F(QuicTransportTest, PacingWillBurstFirst) {
@@ -4481,7 +4481,7 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
   EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
-  transport_->pacedWrite(true);
+  transport_->pacedWrite();
 }
 
 TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
@@ -4515,7 +4515,7 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   ASSERT_NE(WriteDataReason::NO_WRITE, shouldWriteData(conn));
   EXPECT_TRUE(transport_->isPacingScheduled());
   EXPECT_CALL(*socket_, write(_, _)).Times(0);
-  transport_->pacedWrite(true);
+  transport_->pacedWrite();
 }
 
 TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
@@ -4540,7 +4540,7 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
       .WillRepeatedly(Return(1));
   // This will write out everything. After that because there is no new data,
   // FunctionLooper won't schedule a pacing timeout.
-  transport_->pacedWrite(true);
+  transport_->pacedWrite();
 
   ASSERT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
   EXPECT_FALSE(transport_->isPacingScheduled());

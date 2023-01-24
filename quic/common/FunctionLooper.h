@@ -35,7 +35,7 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
 
   explicit FunctionLooper(
       folly::EventBase* evb,
-      folly::Function<void(bool)>&& func,
+      folly::Function<void()>&& func,
       LooperType type);
 
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
@@ -84,11 +84,11 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
 
  private:
   ~FunctionLooper() override = default;
-  void commonLoopBody(bool fromTimer) noexcept;
-  bool schedulePacingTimeout(bool fromTimer) noexcept;
+  void commonLoopBody() noexcept;
+  bool schedulePacingTimeout() noexcept;
 
   folly::EventBase* evb_;
-  folly::Function<void(bool)> func_;
+  folly::Function<void()> func_;
   folly::Optional<folly::Function<std::chrono::microseconds()>> pacingFunc_;
   TimerHighRes::SharedPtr pacingTimer_;
   bool running_{false};

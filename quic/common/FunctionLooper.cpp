@@ -14,7 +14,7 @@ using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
     folly::EventBase* evb,
-    folly::Function<void(bool)>&& func,
+    folly::Function<void()>&& func,
     LooperType type)
     : evb_(evb), func_(std::move(func)), type_(type) {}
 
@@ -32,26 +32,26 @@ void FunctionLooper::setPacingFunction(
   pacingFunc_ = std::move(pacingFunc);
 }
 
-void FunctionLooper::commonLoopBody(bool fromTimer) noexcept {
+void FunctionLooper::commonLoopBody() noexcept {
   inLoopBody_ = true;
   SCOPE_EXIT {
     inLoopBody_ = false;
   };
   auto hasBeenRunning = running_;
-  func_(fromTimer);
+  func_();
   // callback could cause us to stop ourselves.
   // Someone could have also called run() in the callback.
-  VLOG(10) << __func__ << ": " << type_ << " fromTimer=" << fromTimer
-           << " hasBeenRunning=" << hasBeenRunning << " running_=" << running_;
+  VLOG(10) << __func__ << ": " << type_ << " hasBeenRunning=" << hasBeenRunning
+           << " running_=" << running_;
   if (!running_) {
     return;
   }
-  if (!schedulePacingTimeout(fromTimer)) {
+  if (!schedulePacingTimeout()) {
     evb_->runInLoop(this);
   }
 }
 
-bool FunctionLooper::schedulePacingTimeout(bool /* fromTimer */) noexcept {
+bool FunctionLooper::schedulePacingTimeout() noexcept {
   if (pacingFunc_ && pacingTimer_ && !isScheduled()) {
     auto nextPacingTime = (*pacingFunc_)();
     if (nextPacingTime != 0us) {
@@ -64,7 +64,7 @@ bool FunctionLooper::schedulePacingTimeout(bool /* fromTimer */) noexcept {
 
 void FunctionLooper::runLoopCallback() noexcept {
   folly::DelayedDestruction::DestructorGuard dg(this);
-  commonLoopBody(false);
+  commonLoopBody();
 }
 
 void FunctionLooper::run(bool thisIteration) noexcept {
@@ -112,7 +112,7 @@ void FunctionLooper::detachEventBase() {
 
 void FunctionLooper::timeoutExpired() noexcept {
   folly::DelayedDestruction::DestructorGuard dg(this);
-  commonLoopBody(true);
+  commonLoopBody();
 }
 
 void FunctionLooper::callbackCanceled() noexcept {

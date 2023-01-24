@@ -45,15 +45,15 @@ QuicTransportBase::QuicTransportBase(
       d6dTxTimeout_(this),
       readLooper_(new FunctionLooper(
           evb,
-          [this](bool /* ignored */) { invokeReadDataAndCallbacks(); },
+          [this]() { invokeReadDataAndCallbacks(); },
           LooperType::ReadLooper)),
       peekLooper_(new FunctionLooper(
           evb,
-          [this](bool /* ignored */) { invokePeekDataAndCallbacks(); },
+          [this]() { invokePeekDataAndCallbacks(); },
           LooperType::PeekLooper)),
       writeLooper_(new FunctionLooper(
           evb,
-          [this](bool fromTimer) { pacedWriteDataToSocket(fromTimer); },
+          [this]() { pacedWriteDataToSocket(); },
           LooperType::WriteLooper)) {
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
@@ -2668,7 +2668,7 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
     // probe to be scheduled
     scheduleD6DRaiseTimeout();
     scheduleD6DTxTimeout();
-    pacedWriteDataToSocket(false);
+    pacedWriteDataToSocket();
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
@@ -2695,7 +2695,7 @@ void QuicTransportBase::ackTimeoutExpired() noexcept {
   VLOG(10) << __func__ << " " << *this;
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   updateAckStateOnAckTimeout(*conn_);
-  pacedWriteDataToSocket(false);
+  pacedWriteDataToSocket();
 }
 
 void QuicTransportBase::pingTimeoutExpired() noexcept {
@@ -3570,7 +3570,7 @@ void QuicTransportBase::runOnEvbAsync(
       true);
 }
 
-void QuicTransportBase::pacedWriteDataToSocket(bool /* fromTimer */) {
+void QuicTransportBase::pacedWriteDataToSocket() {
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
 
   if (!isConnectionPaced(*conn_)) {

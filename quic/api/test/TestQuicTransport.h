@@ -59,8 +59,8 @@ class TestQuicTransport
     QuicTransportBase::updateWriteLooper(thisIteration);
   }
 
-  void pacedWrite(bool fromTimer) {
-    pacedWriteDataToSocket(fromTimer);
+  void pacedWrite() {
+    pacedWriteDataToSocket();
   }
 
   bool isPacingScheduled() {

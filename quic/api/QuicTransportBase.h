@@ -784,13 +784,13 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   /**
    * Paced write data to socket when connection is paced.
    *
-   * Whether connection is based will be decided by TransportSettings and
+   * Whether connection is paced will be decided by TransportSettings and
    * congection controller. When the connection is paced, this function writes
    * out a burst size of packets and let the writeLooper schedule a callback to
    * write another burst after a pacing interval if there are more data to
-   * write. When the connection isn't paced, this function do a normal write.
+   * write. When the connection isn't paced, this function does a normal write.
    */
-  void pacedWriteDataToSocket(bool fromTimer);
+  void pacedWriteDataToSocket();
 
   uint64_t maxWritableOnStream(const QuicStreamState&) const;
   uint64_t maxWritableOnConn() const;
