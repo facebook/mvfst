@@ -132,7 +132,7 @@ void processServerInitialParams(
       serverParams.parameters);
   auto maxDatagramFrameSize = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, serverParams.parameters);
-  auto peerMaxStreamGroupsAdvertized = getIntegerParameter(
+  auto peerAdvertisedMaxStreamGroups = getIntegerParameter(
       static_cast<TransportParameterId>(
           TransportParameterId::stream_groups_enabled),
       serverParams.parameters);
@@ -248,8 +248,8 @@ void processServerInitialParams(
     conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
   }
 
-  if (peerMaxStreamGroupsAdvertized) {
-    conn.peerMaxStreamGroupsAdvertized = *peerMaxStreamGroupsAdvertized;
+  if (peerAdvertisedMaxStreamGroups) {
+    conn.peerAdvertisedMaxStreamGroups = *peerAdvertisedMaxStreamGroups;
   }
 
   if (isAckReceiveTimestampsEnabled.has_value() &&

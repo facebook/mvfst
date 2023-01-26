@@ -219,7 +219,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       settings.disableMigration = !enableMigration_;
       if (enableStreamGroups_) {
         settings.notifyOnNewStreamsExplicitly = true;
-        settings.maxStreamGroupsAdvertized = kNumTestStreamGroups;
+        settings.advertisedMaxStreamGroups = kNumTestStreamGroups;
       }
       quicClient_->setTransportSettings(settings);
 

@@ -208,7 +208,7 @@ TEST_P(
   processServerInitialParams(clientConn, serverTransportParams, 0);
 
   EXPECT_EQ(
-      clientConn.peerMaxStreamGroupsAdvertized,
+      clientConn.peerAdvertisedMaxStreamGroups,
       GetParam().expectedTransportSettingVal);
 }
 

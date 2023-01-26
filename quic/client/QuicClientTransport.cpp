@@ -1867,14 +1867,14 @@ void QuicClientTransport::maybeSendTransportKnobs() {
 }
 
 void QuicClientTransport::maybeEnableStreamGroups() {
-  if (conn_->transportSettings.maxStreamGroupsAdvertized == 0) {
+  if (conn_->transportSettings.advertisedMaxStreamGroups == 0) {
     return;
   }
 
   auto streamGroupsEnabledParam =
       std::make_unique<CustomIntegralTransportParameter>(
           static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-          conn_->transportSettings.maxStreamGroupsAdvertized);
+          conn_->transportSettings.advertisedMaxStreamGroups);
 
   if (!setCustomTransportParameter(
           std::move(streamGroupsEnabledParam), customTransportParameters_)) {

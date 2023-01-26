@@ -780,8 +780,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   DatagramState datagramState;
 
-  // Peer max stream groups advertized.
-  folly::Optional<uint64_t> peerMaxStreamGroupsAdvertized;
+  // Peer max stream groups advertised.
+  folly::Optional<uint64_t> peerAdvertisedMaxStreamGroups;
 
   // Sequence number to use for the next ACK_FREQUENCY frame
   uint64_t nextAckFrequencyFrameSequenceNumber{0};

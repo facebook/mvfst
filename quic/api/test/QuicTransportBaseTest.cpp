@@ -4285,7 +4285,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
   auto transportSettings = transport->getTransportSettings();
-  transportSettings.maxStreamGroupsAdvertized = 16;
+  transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
   transport->getConnectionState().streamManager->refreshTransportSettings(
       transportSettings);
@@ -4335,7 +4335,7 @@ TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
 
 TEST_P(QuicTransportImplTestWithGroups, ReadErrorCallbackWithGroups) {
   auto transportSettings = transport->getTransportSettings();
-  transportSettings.maxStreamGroupsAdvertized = 16;
+  transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
   transport->getConnectionState().streamManager->refreshTransportSettings(
       transportSettings);
@@ -4364,7 +4364,7 @@ TEST_P(
     QuicTransportImplTestWithGroups,
     ReadCallbackWithGroupsCancellCallbacks) {
   auto transportSettings = transport->getTransportSettings();
-  transportSettings.maxStreamGroupsAdvertized = 16;
+  transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
   transport->getConnectionState().streamManager->refreshTransportSettings(
       transportSettings);
@@ -4400,7 +4400,7 @@ TEST_P(
 
 TEST_P(QuicTransportImplTestWithGroups, onNewStreamsAndGroupsCallbacks) {
   auto transportSettings = transport->getTransportSettings();
-  transportSettings.maxStreamGroupsAdvertized = 16;
+  transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
   transport->getConnectionState().streamManager->refreshTransportSettings(
       transportSettings);

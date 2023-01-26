@@ -222,7 +222,7 @@ void processClientInitialParams(
       TransportParameterId::max_ack_delay, clientParams.parameters);
   auto maxDatagramFrameSize = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, clientParams.parameters);
-  auto peerMaxStreamGroupsAdvertized = getIntegerParameter(
+  auto peerAdvertisedMaxStreamGroups = getIntegerParameter(
       static_cast<TransportParameterId>(
           TransportParameterId::stream_groups_enabled),
       clientParams.parameters);
@@ -405,8 +405,8 @@ void processClientInitialParams(
     }
   }
 
-  if (peerMaxStreamGroupsAdvertized) {
-    conn.peerMaxStreamGroupsAdvertized = *peerMaxStreamGroupsAdvertized;
+  if (peerAdvertisedMaxStreamGroups) {
+    conn.peerAdvertisedMaxStreamGroups = *peerAdvertisedMaxStreamGroups;
   }
   if (isAckReceiveTimestampsEnabled.has_value() &&
       isAckReceiveTimestampsEnabled.value() == 1) {
@@ -1625,11 +1625,11 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     customTransportParams.push_back(maxDatagramFrameSize->encode());
   }
 
-  if (conn.transportSettings.maxStreamGroupsAdvertized > 0) {
+  if (conn.transportSettings.advertisedMaxStreamGroups > 0) {
     auto streamGroupsEnabledParam =
         std::make_unique<CustomIntegralTransportParameter>(
             static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-            conn.transportSettings.maxStreamGroupsAdvertized);
+            conn.transportSettings.advertisedMaxStreamGroups);
 
     if (!setCustomTransportParameter(
             std::move(streamGroupsEnabledParam), customTransportParams)) {

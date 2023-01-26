@@ -781,7 +781,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamGroupLimits) {
   EXPECT_EQ(getNumGroups(), 0);
 
   // Bump group limits.
-  conn.transportSettings.maxStreamGroupsAdvertized = 1;
+  conn.transportSettings.advertisedMaxStreamGroups = 1;
   manager.refreshTransportSettings(conn.transportSettings);
   groupId = createNextStreamGroup();
   EXPECT_TRUE(groupId.hasValue());
@@ -795,7 +795,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamGroupLimits) {
 
 TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsNoGroup) {
   auto& manager = *conn.streamManager;
-  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  conn.transportSettings.advertisedMaxStreamGroups = 16;
   manager.refreshTransportSettings(conn.transportSettings);
 
   // Should throw because no stream groups exist yet.
@@ -805,7 +805,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsNoGroup) {
 
 TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsWrongNodeType) {
   auto& manager = *conn.streamManager;
-  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  conn.transportSettings.advertisedMaxStreamGroups = 16;
   manager.refreshTransportSettings(conn.transportSettings);
 
   // Should throw because client stream group id is provided.
@@ -815,7 +815,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsWrongNodeType) {
 
 TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsSuccess) {
   auto& manager = *conn.streamManager;
-  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  conn.transportSettings.advertisedMaxStreamGroups = 16;
   manager.refreshTransportSettings(conn.transportSettings);
 
   auto groupId = createNextStreamGroup();
@@ -838,7 +838,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupDisabled) {
 
 TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroup) {
   auto& manager = *conn.streamManager;
-  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  conn.transportSettings.advertisedMaxStreamGroups = 16;
   manager.refreshTransportSettings(conn.transportSettings);
 
   const StreamId peerStreamId = 2;
@@ -850,7 +850,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroup) {
 
 TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupBadGroupId) {
   auto& manager = *conn.streamManager;
-  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  conn.transportSettings.advertisedMaxStreamGroups = 16;
   manager.refreshTransportSettings(conn.transportSettings);
 
   const StreamId peerStreamId = 2;
@@ -862,7 +862,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupBadGroupId) {
 
 TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   auto& manager = *conn.streamManager;
-  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  conn.transportSettings.advertisedMaxStreamGroups = 16;
   manager.refreshTransportSettings(conn.transportSettings);
 
   StreamId peerStreamId = 2;

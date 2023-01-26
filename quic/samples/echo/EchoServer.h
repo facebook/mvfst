@@ -92,7 +92,7 @@ class EchoServer {
     settingsCopy.disableMigration = !enableMigration;
     if (enableStreamGroups) {
       settingsCopy.notifyOnNewStreamsExplicitly = true;
-      settingsCopy.maxStreamGroupsAdvertized = 1024;
+      settingsCopy.advertisedMaxStreamGroups = 1024;
     }
     server_->setTransportSettings(std::move(settingsCopy));
   }

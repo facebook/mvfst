@@ -312,19 +312,19 @@ TEST(ServerStateMachineTest, TestProcessMaxRecvPacketSizeParams) {
   runMaxPacketSizeTestWithFixture(fixture);
 }
 
-struct maxStreamGroupsAdvertizedtestStruct {
+struct advertisedMaxStreamGroupstestStruct {
   uint64_t peerMaxGroupsIn;
   folly::Optional<uint64_t> expectedTransportSettingVal;
 };
 
-class ServerStateMachineMaxStreamGroupsAdvertizedParamTest
+class ServerStateMachineAdvertisedMaxStreamGroupsParamTest
     : public Test,
       public ::testing::WithParamInterface<
-          maxStreamGroupsAdvertizedtestStruct> {};
+          advertisedMaxStreamGroupstestStruct> {};
 
 TEST_P(
-    ServerStateMachineMaxStreamGroupsAdvertizedParamTest,
-    TestMaxStreamGroupsAdvertizedParam) {
+    ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
+    TestAdvertisedMaxStreamGroupsParam) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
@@ -342,16 +342,16 @@ TEST_P(
   processClientInitialParams(serverConn, clientTransportParams);
 
   EXPECT_EQ(
-      serverConn.peerMaxStreamGroupsAdvertized,
+      serverConn.peerAdvertisedMaxStreamGroups,
       GetParam().expectedTransportSettingVal);
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    ServerStateMachineMaxStreamGroupsAdvertizedParamTest,
-    ServerStateMachineMaxStreamGroupsAdvertizedParamTest,
+    ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
+    ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
     ::testing::Values(
-        maxStreamGroupsAdvertizedtestStruct{0, folly::none},
-        maxStreamGroupsAdvertizedtestStruct{16, 16}));
+        advertisedMaxStreamGroupstestStruct{0, folly::none},
+        advertisedMaxStreamGroupstestStruct{16, 16}));
 
 } // namespace test
 } // namespace quic

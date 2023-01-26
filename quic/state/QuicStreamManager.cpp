@@ -382,7 +382,7 @@ QuicStreamManager::createNextStreamGroup(
     StreamGroupId& groupId,
     folly::F14FastSet<StreamGroupId>& streamGroups) {
   auto maxLocalStreamGroupId = std::min(
-      transportSettings_->maxStreamGroupsAdvertized *
+      transportSettings_->advertisedMaxStreamGroups *
           detail::kStreamGroupIncrement,
       detail::kMaxStreamGroupId);
   if (groupId >= maxLocalStreamGroupId) {
@@ -435,7 +435,7 @@ QuicStreamState* FOLLY_NULLABLE QuicStreamManager::getOrCreatePeerStream(
     }
 
     auto maxPeerStreamGroupId = std::min(
-        transportSettings_->maxStreamGroupsAdvertized *
+        transportSettings_->advertisedMaxStreamGroups *
             detail::kStreamGroupIncrement,
         detail::kMaxStreamGroupId);
     if (*streamGroupId >= maxPeerStreamGroupId) {
