@@ -148,6 +148,10 @@ void processServerInitialParams(
   auto receiveTimestampsExponent = getIntegerParameter(
       TransportParameterId::receive_timestamps_exponent,
       serverParams.parameters);
+  auto knobFrameSupported = getIntegerParameter(
+      static_cast<TransportParameterId>(
+          TransportParameterId::knob_frames_supported),
+      serverParams.parameters);
   if (conn.version == QuicVersion::QUIC_DRAFT ||
       conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS) {
@@ -265,6 +269,8 @@ void processServerInitialParams(
                static_cast<uint8_t>(0))});
     }
   }
+
+  conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
 }
 
 void cacheServerInitialParams(

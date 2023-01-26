@@ -1765,6 +1765,12 @@ void QuicClientTransport::setSupportedExtensionTransportParameters() {
                 .receive_timestamps_exponent);
     customTransportParameters_.push_back(receiveTimestampsExponent->encode());
   }
+
+  if (conn_->transportSettings.advertisedKnobFrameSupport) {
+    auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
+        static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
+    customTransportParameters_.push_back(knobFrameSupport->encode());
+  }
 }
 
 void QuicClientTransport::adjustGROBuffers() {

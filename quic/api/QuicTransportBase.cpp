@@ -3387,22 +3387,17 @@ QuicTransportBase::setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) {
     sendSimpleFrame(*conn_, KnobFrame(knobSpace, knobId, std::move(knobBlob)));
     return folly::unit;
   }
-  LOG(ERROR)
-      << "Cannot set Knob Frame. QUIC negotiation not complete or negotiated version is not MVFST";
+  LOG(ERROR) << "Cannot set knob. Peer does not support the knob frame";
   return folly::makeUnexpected(LocalErrorCode::KNOB_FRAME_UNSUPPORTED);
 }
 
 bool QuicTransportBase::isKnobSupported() const {
-  // We determine that the peer supports knob frames by looking at the
-  // negotiated QUIC version.
-  // TODO: This is temporary. Soon, we will add a transport parameter for knob
-  // support and incorporate it into the check, such that if the QUIC version
-  // increases/changes, this method will still continue to work, based on the
-  // transport parameter setting.
-  return (
-      conn_->version &&
-      (*(conn_->version) == QuicVersion::MVFST ||
-       *(conn_->version) == QuicVersion::MVFST_EXPERIMENTAL));
+  // This condition reflects the transition from using the QuicVersion to a
+  // transport parameter.
+  return (conn_->peerAdvertisedKnobFrameSupport) ||
+      (conn_->version &&
+       (*(conn_->version) == QuicVersion::MVFST ||
+        *(conn_->version) == QuicVersion::MVFST_EXPERIMENTAL));
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {

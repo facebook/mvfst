@@ -330,6 +330,7 @@ struct TransportSettings {
   bool experimentalPacer{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
+  bool advertisedKnobFrameSupport{true};
 
   // Local configuration for ACK receive timestamps.
   //

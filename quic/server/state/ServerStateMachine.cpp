@@ -250,6 +250,10 @@ void processClientInitialParams(
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
     }
   }
+  auto knobFrameSupported = getIntegerParameter(
+      static_cast<TransportParameterId>(
+          TransportParameterId::knob_frames_supported),
+      clientParams.parameters);
 
   // validate that we didn't receive original connection ID, stateless
   // reset token, or preferred address.
@@ -421,6 +425,8 @@ void processClientInitialParams(
                static_cast<uint8_t>(0))});
     }
   }
+
+  conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
 }
 
 void updateHandshakeState(QuicServerConnectionState& conn) {
@@ -1665,6 +1671,13 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
                 .receive_timestamps_exponent);
     customTransportParams.push_back(receiveTimestampsExponent->encode());
   }
+
+  if (conn.transportSettings.advertisedKnobFrameSupport) {
+    auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
+        static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
+    customTransportParams.push_back(knobFrameSupport->encode());
+  }
+
   return customTransportParams;
 }
 } // namespace quic

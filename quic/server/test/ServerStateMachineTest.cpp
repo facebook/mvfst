@@ -229,6 +229,55 @@ TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
   EXPECT_EQ(serverConn.datagramState.maxWriteFrameSize, 0);
 }
 
+TEST(ServerStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 1));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_TRUE(serverConn.peerAdvertisedKnobFrameSupport);
+}
+
+TEST(ServerStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 0));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_FALSE(serverConn.peerAdvertisedKnobFrameSupport);
+}
+
+TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamEnabled) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.advertisedKnobFrameSupport = true;
+  auto customTransportParams =
+      quic::setSupportedExtensionTransportParameters(serverConn);
+  auto knobFrameSupportedParam = getIntegerParameter(
+      TransportParameterId::knob_frames_supported, customTransportParams);
+  ASSERT_TRUE(knobFrameSupportedParam.has_value());
+  EXPECT_EQ(knobFrameSupportedParam.value(), 1);
+}
+
+TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.advertisedKnobFrameSupport = false;
+  auto customTransportParams =
+      quic::setSupportedExtensionTransportParameters(serverConn);
+  EXPECT_THAT(
+      customTransportParams,
+      Not(Contains(testing::Field(
+          &TransportParameter::parameter,
+          testing::Eq(TransportParameterId::knob_frames_supported)))));
+}
+
 struct MaxPacketSizeTestUnit {
   uint64_t maxPacketSize;
   bool canIgnorePathMTU;

@@ -795,6 +795,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   };
   folly::Optional<AckReceiveTimestampsConfig>
       maybePeerAckReceiveTimestampsConfig;
+
+  bool peerAdvertisedKnobFrameSupport{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

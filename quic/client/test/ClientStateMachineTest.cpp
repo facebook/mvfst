@@ -179,6 +179,32 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
       kMaxDatagramPacketOverhead + 1);
 }
 
+TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
+      static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
+  transportParams.push_back(knobFrameSupport->encode());
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_TRUE(clientConn.peerAdvertisedKnobFrameSupport);
+}
+
+TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
+      static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 0);
+  transportParams.push_back(knobFrameSupport->encode());
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_FALSE(clientConn.peerAdvertisedKnobFrameSupport);
+}
+
 struct maxStreamGroupsAdvertizedtestStruct {
   uint64_t peerMaxGroupsIn;
   folly::Optional<uint64_t> expectedTransportSettingVal;
