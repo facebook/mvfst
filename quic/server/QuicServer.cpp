@@ -235,7 +235,7 @@ void QuicServer::bindWorkersToSocket(
   boundAddress_ = address;
   auto usingCCP = isUsingCCP();
   if (!usingCCP) {
-    LOG(INFO) << "NOT using CCP";
+    VLOG(2) << "NOT using CCP";
   }
   auto ccpInitFailed = false;
   for (size_t i = 0; i < numWorkers; ++i) {
