@@ -12,10 +12,6 @@
 #include <quic/observer/SocketObserverInterface.h>
 #include <chrono>
 
-using namespace testing;
-using namespace folly;
-using namespace std::chrono_literals;
-
 namespace quic::test {
 class SocketObserverInterfaceTest : public ::testing::Test {
  public:
