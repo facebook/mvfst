@@ -1365,6 +1365,18 @@ WriteQuicDataResult writeConnectionDataToSocket(
     QuicVersion version,
     TimePoint writeLoopBeginTime,
     const std::string& token) {
+  if (connection.loopDetectorCallback) {
+    connection.writeDebugState.schedulerName = scheduler.name().str();
+    connection.writeDebugState.noWriteReason = NoWriteReason::WRITE_OK;
+  }
+
+  if (!scheduler.hasData()) {
+    if (connection.loopDetectorCallback) {
+      connection.writeDebugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
+    }
+    return {0, 0, 0};
+  }
+
   VLOG(10) << nodeToString(connection.nodeType)
            << " writing data using scheduler=" << scheduler.name() << " "
            << connection;
@@ -1402,13 +1414,6 @@ WriteQuicDataResult writeConnectionDataToSocket(
       connection.statsCallback,
       happyEyeballsState);
 
-  if (connection.loopDetectorCallback) {
-    connection.writeDebugState.schedulerName = scheduler.name().str();
-    connection.writeDebugState.noWriteReason = NoWriteReason::WRITE_OK;
-    if (!scheduler.hasData()) {
-      connection.writeDebugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
-    }
-  }
   auto batchSize = connection.transportSettings.batchingMode ==
           QuicBatchingMode::BATCHING_MODE_NONE
       ? connection.transportSettings.writeConnectionDataPacketsLimit
