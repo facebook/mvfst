@@ -502,7 +502,8 @@ constexpr uint64_t kDefaultConnectionWindowSize = 1024 * 1024;
 /* Stream Limits */
 constexpr uint64_t kDefaultMaxStreamsBidirectional = 2048;
 constexpr uint64_t kDefaultMaxStreamsUnidirectional = 2048;
-constexpr uint64_t kMaxStreamId = 1ull << 62;
+constexpr uint64_t kMaxStreamId = (1ull << 62) - 1;
+constexpr uint64_t kInvalidStreamId = kMaxStreamId + 1;
 constexpr uint64_t kMaxMaxStreams = 1ull << 60;
 
 /* Idle timeout parameters */
