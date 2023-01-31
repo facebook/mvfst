@@ -212,10 +212,13 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
   folly::Optional<SocketObserverInterface::LossEvent> observerLossEvent;
-  if (conn.observerContainer &&
-      conn.observerContainer->hasObserversForEvent<
-          SocketObserverInterface::Events::lossEvents>()) {
-    observerLossEvent.emplace(lossTime);
+  {
+    const auto socketObserverContainer = conn.getSocketObserverContainer();
+    if (socketObserverContainer &&
+        socketObserverContainer->hasObserversForEvent<
+            SocketObserverInterface::Events::lossEvents>()) {
+      observerLossEvent.emplace(lossTime);
+    }
   }
   // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
@@ -379,15 +382,18 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   } // while (iter != conn.outstandings.packets.end()) {
 
   // notify observers
-  if (observerLossEvent && observerLossEvent->hasPackets() &&
-      conn.observerContainer &&
-      conn.observerContainer->hasObserversForEvent<
-          SocketObserverInterface::Events::lossEvents>()) {
-    conn.observerContainer
-        ->invokeInterfaceMethod<SocketObserverInterface::Events::lossEvents>(
-            [observerLossEvent](auto observer, auto observed) {
-              observer->packetLossDetected(observed, *observerLossEvent);
-            });
+  {
+    const auto socketObserverContainer = conn.getSocketObserverContainer();
+    if (observerLossEvent && observerLossEvent->hasPackets() &&
+        socketObserverContainer &&
+        socketObserverContainer->hasObserversForEvent<
+            SocketObserverInterface::Events::lossEvents>()) {
+      socketObserverContainer
+          ->invokeInterfaceMethod<SocketObserverInterface::Events::lossEvents>(
+              [observerLossEvent](auto observer, auto observed) {
+                observer->packetLossDetected(observed, *observerLossEvent);
+              });
+    }
   }
 
   auto earliest = getFirstOutstandingPacket(conn, pnSpace);

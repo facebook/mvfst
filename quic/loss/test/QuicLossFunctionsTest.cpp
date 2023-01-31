@@ -86,6 +86,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     quicStats_ = std::make_unique<MockQuicStats>();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     socket_ = std::make_unique<MockQuicSocket>();
+    observerContainer_ =
+        std::make_shared<SocketObserverContainer>(socket_.get());
   }
 
   PacketNum sendPacket(
@@ -124,8 +126,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     conn->serverConnectionId = *connIdAlgo_->encodeConnectionId(params);
     // for canSetLossTimerForAppData()
     conn->oneRttWriteCipher = createNoOpAead();
-    conn->observerContainer =
-        std::make_shared<SocketObserverContainer>(socket_.get());
+    conn->observerContainer = observerContainer_;
     return conn;
   }
 
@@ -164,6 +165,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   std::unique_ptr<MockQuicStats> quicStats_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   std::unique_ptr<MockQuicSocket> socket_;
+  std::shared_ptr<SocketObserverContainer> observerContainer_;
 
   auto getLossPacketMatcher(
       PacketNum packetNum,
@@ -2141,7 +2143,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::lossEvents);
   auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
-  conn->observerContainer->addObserver(obs1.get());
+  CHECK_NOTNULL(conn->getSocketObserverContainer())->addObserver(obs1.get());
 
   // send 7 packets
   PacketNum largestSent = 0;
@@ -2212,7 +2214,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
               false /* lossByReorder */,
               false /* lossByTimeout */)));
 
-  conn->observerContainer->removeObserver(obs1.get());
+  CHECK_NOTNULL(conn->getSocketObserverContainer())->removeObserver(obs1.get());
 }
 
 TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
@@ -2221,7 +2223,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::lossEvents);
   auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
-  conn->observerContainer->addObserver(obs1.get());
+  CHECK_NOTNULL(conn->getSocketObserverContainer())->addObserver(obs1.get());
 
   // send 7 packets
   PacketNum largestSent = 0;
@@ -2315,7 +2317,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
               false /* lossByReorder */,
               true /* lossByTimeout */)));
 
-  conn->observerContainer->removeObserver(obs1.get());
+  CHECK_NOTNULL(conn->getSocketObserverContainer())->removeObserver(obs1.get());
 }
 
 TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
@@ -2324,7 +2326,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::lossEvents);
   auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
-  conn->observerContainer->addObserver(obs1.get());
+  CHECK_NOTNULL(conn->getSocketObserverContainer())->addObserver(obs1.get());
 
   // send 7 packets
   PacketNum largestSent = 0;
@@ -2402,7 +2404,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
               false /* lossByReorder */,
               true /* lossByTimeout */)));
 
-  conn->observerContainer->removeObserver(obs1.get());
+  CHECK_NOTNULL(conn->getSocketObserverContainer())->removeObserver(obs1.get());
 }
 
 TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {

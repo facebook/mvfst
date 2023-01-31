@@ -723,13 +723,20 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   bool retireAndSwitchPeerConnectionIds();
 
   // SocketObserverContainer
-  std::shared_ptr<SocketObserverContainer> observerContainer;
+  //
+  // Stored as a weak_ptr to ensure that delayed destruction of
+  // QuicConnectionStateBase does not prevent the SocketObserverContainer
+  // from being destroyed.
+  std::weak_ptr<SocketObserverContainer> observerContainer;
 
   /**
    * Returns the SocketObserverContainer or nullptr if not available.
    */
   SocketObserverContainer* getSocketObserverContainer() const {
-    return observerContainer.get();
+    if (const auto observerContainerLocked = observerContainer.lock()) {
+      return observerContainerLocked.get();
+    }
+    return nullptr;
   }
 
   // Recent ACK events, for use in processCallbacksAfterNetworkData.

@@ -115,23 +115,29 @@ TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
 
   client_->clientConnectionId = ConnectionId::createRandom(8);
   client_->observerContainer = observerContainer;
-  EXPECT_EQ(1, client_->observerContainer->numObservers());
+  EXPECT_EQ(
+      1,
+      CHECK_NOTNULL(client_->observerContainer.lock().get())->numObservers());
   EXPECT_THAT(
-      client_->observerContainer->findObservers(), UnorderedElementsAre(&obs));
+      CHECK_NOTNULL(client_->observerContainer.lock().get())->findObservers(),
+      UnorderedElementsAre(&obs));
 
   auto newConn = undoAllClientStateForRetry(std::move(client_));
-  EXPECT_EQ(newConn->observerContainer, observerContainer);
-  EXPECT_EQ(1, newConn->observerContainer->numObservers());
+  EXPECT_EQ(newConn->observerContainer.lock(), observerContainer);
+  EXPECT_EQ(
+      1,
+      CHECK_NOTNULL(newConn->observerContainer.lock().get())->numObservers());
   EXPECT_THAT(
-      newConn->observerContainer->findObservers(), UnorderedElementsAre(&obs));
+      CHECK_NOTNULL(newConn->observerContainer.lock().get())->findObservers(),
+      UnorderedElementsAre(&obs));
 }
 
 TEST_F(ClientStateMachineTest, PreserveObserverContainerNullptr) {
   client_->clientConnectionId = ConnectionId::createRandom(8);
-  client_->observerContainer = nullptr;
+  ASSERT_THAT(client_->observerContainer.lock(), IsNull());
 
   auto newConn = undoAllClientStateForRetry(std::move(client_));
-  EXPECT_THAT(newConn->observerContainer, IsNull());
+  EXPECT_THAT(newConn->observerContainer.lock(), IsNull());
 }
 
 TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {

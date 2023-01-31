@@ -62,13 +62,13 @@ QuicClientTransport::QuicClientTransport(
           std::move(socket),
           useConnectionEndWithErrorCallback),
       happyEyeballsConnAttemptDelayTimeout_(this),
-      observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
+      wrappedObserverContainer_(this) {
   DCHECK(handshakeFactory);
   auto tempConn =
       std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
   clientConn_ = tempConn.get();
   conn_.reset(tempConn.release());
-  conn_->observerContainer = observerContainer_;
+  conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
 
   auto srcConnId = connectionIdSize > 0
       ? ConnectionId::createRandom(connectionIdSize)

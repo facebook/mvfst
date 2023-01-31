@@ -54,7 +54,7 @@ QuicServerTransport::QuicServerTransport(
           std::move(sock),
           useConnectionEndWithErrorCallback),
       ctx_(std::move(ctx)),
-      observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
+      wrappedObserverContainer_(this) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder()
           .setFizzServerContext(ctx_)
@@ -63,7 +63,7 @@ QuicServerTransport::QuicServerTransport(
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());
-  conn_->observerContainer = observerContainer_;
+  conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   setConnectionSetupCallback(connSetupCb);
   setConnectionCallback(connStreamsCb);
   registerAllTransportKnobParamHandlers();

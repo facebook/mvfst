@@ -185,7 +185,7 @@ class QuicClientTransport
  protected:
   // From QuicSocket
   SocketObserverContainer* getSocketObserverContainer() const override {
-    return observerContainer_.get();
+    return wrappedObserverContainer_.getPtr();
   }
 
   // From AsyncUDPSocket::ReadCallback
@@ -289,6 +289,6 @@ class QuicClientTransport
   // first, before any other members are destroyed. This ensures that observers
   // can inspect any socket / transport state available through public methods
   // when destruction of the transport begins.
-  const std::shared_ptr<SocketObserverContainer> observerContainer_;
+  const WrappedSocketObserverContainer wrappedObserverContainer_;
 };
 } // namespace quic

@@ -76,10 +76,13 @@ AckEvent processAckFrame(
   folly::Optional<LegacyObserver::SpuriousLossEvent> spuriousLossEvent;
   // Used for debug only.
   const auto originalPacketCount = conn.outstandings.packetCount;
-  if (conn.observerContainer &&
-      conn.observerContainer->hasObserversForEvent<
-          SocketObserverInterface::Events::spuriousLossEvents>()) {
-    spuriousLossEvent.emplace(ackReceiveTime);
+  {
+    const auto socketObserverContainer = conn.getSocketObserverContainer();
+    if (socketObserverContainer &&
+        socketObserverContainer->hasObserversForEvent<
+            SocketObserverInterface::Events::spuriousLossEvents>()) {
+      spuriousLossEvent.emplace(ackReceiveTime);
+    }
   }
   auto ackBlockIt = frame.ackBlocks.cbegin();
   while (ackBlockIt != frame.ackBlocks.cend() &&
@@ -219,18 +222,22 @@ AckEvent processAckFrame(
             ackReceiveTimeOrNow - rPacketIt->metadata.time);
         if (rttSample != rttSample.zero()) {
           // notify observers
-          if (conn.observerContainer &&
-              conn.observerContainer->hasObserversForEvent<
-                  SocketObserverInterface::Events::rttSamples>()) {
-            conn.observerContainer->invokeInterfaceMethod<
-                SocketObserverInterface::Events::rttSamples>(
-                [event = SocketObserverInterface::PacketRTT(
-                     ackReceiveTimeOrNow,
-                     rttSample,
-                     frame.ackDelay,
-                     *rPacketIt)](auto observer, auto observed) {
-                  observer->rttSampleGenerated(observed, event);
-                });
+          {
+            const auto socketObserverContainer =
+                conn.getSocketObserverContainer();
+            if (socketObserverContainer &&
+                socketObserverContainer->hasObserversForEvent<
+                    SocketObserverInterface::Events::rttSamples>()) {
+              socketObserverContainer->invokeInterfaceMethod<
+                  SocketObserverInterface::Events::rttSamples>(
+                  [event = SocketObserverInterface::PacketRTT(
+                       ackReceiveTimeOrNow,
+                       rttSample,
+                       frame.ackDelay,
+                       *rPacketIt)](auto observer, auto observed) {
+                    observer->rttSampleGenerated(observed, event);
+                  });
+            }
           }
 
           // update AckEvent RTTs, which are used by CCA and other processing
@@ -492,14 +499,18 @@ AckEvent processAckFrame(
   }
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
 
-  if (spuriousLossEvent && conn.observerContainer &&
-      conn.observerContainer->hasObserversForEvent<
-          SocketObserverInterface::Events::spuriousLossEvents>()) {
-    conn.observerContainer->invokeInterfaceMethod<
-        SocketObserverInterface::Events::spuriousLossEvents>(
-        [spuriousLossEvent](auto observer, auto observed) {
-          observer->spuriousLossDetected(observed, *spuriousLossEvent);
-        });
+  // notify observers
+  {
+    const auto socketObserverContainer = conn.getSocketObserverContainer();
+    if (spuriousLossEvent && socketObserverContainer &&
+        socketObserverContainer->hasObserversForEvent<
+            SocketObserverInterface::Events::spuriousLossEvents>()) {
+      socketObserverContainer->invokeInterfaceMethod<
+          SocketObserverInterface::Events::spuriousLossEvents>(
+          [spuriousLossEvent](auto observer, auto observed) {
+            observer->spuriousLossDetected(observed, *spuriousLossEvent);
+          });
+    }
   }
 
   return ack;
