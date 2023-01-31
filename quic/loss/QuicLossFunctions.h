@@ -224,8 +224,10 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   // Loop over all ACKed packets and collect the largest ACKed packet per DSR
   // stream. This facilitates only considering the reordering threshold per DSR
   // sender, which avoids the problem of "natural" reordering caused by
-  // multiple DSR senders.
+  // multiple DSR senders. Similarly track the largest non-DSR ACKed, for the
+  // reason but when DSR packets are reordered "before" non-DSR packets.
   InlineMap<StreamId, PacketNum, 20> largestDsrAcked;
+  folly::Optional<PacketNum> largestNonDsrAcked;
   if (ackEvent) {
     for (const auto& ackPacket : ackEvent->ackedPackets) {
       for (auto& [stream, details] : ackPacket.detailsPerStream) {
@@ -233,9 +235,21 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
           largestDsrAcked[stream] = std::max(
               folly::get_default(largestDsrAcked, stream, ackPacket.packetNum),
               ackPacket.packetNum);
+        } else {
+          largestNonDsrAcked =
+              std::max(largestNonDsrAcked.value_or(0), ackPacket.packetNum);
         }
       }
+      // If there are no streams, then it's not a DSR packet.
+      if (ackPacket.detailsPerStream.empty()) {
+        largestNonDsrAcked =
+            std::max(largestNonDsrAcked.value_or(0), ackPacket.packetNum);
+      }
     }
+  }
+  // This covers the case where there's no ackedPackets.
+  if (largestDsrAcked.empty()) {
+    largestNonDsrAcked = largestAcked;
   }
   while (iter != conn.outstandings.packets.end()) {
     auto& pkt = *iter;
@@ -248,24 +262,39 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       iter++;
       continue;
     }
-    auto largestAckedForComparison = largestAcked.value();
 
-    // Check if this packet is a DSR packet, which can be identified by having
-    // a single WriteStreamFrame with fromBufMeta == true. If it is a DSR
-    // packet, we only want to consider the largest ACKed for that DSR stream
-    // when checking against the reordering thershold.
+    // We now have to determine the largest ACKed packet number we should use
+    // for the reordering threshold loss determination.
     auto maybeStreamFrame = pkt.packet.frames.empty()
         ? nullptr
         : pkt.packet.frames.front().asWriteStreamFrame();
-    if (maybeStreamFrame && maybeStreamFrame->fromBufMeta) {
-      CHECK(pkt.isDSRPacket);
-      // The max here is to ensure that we don't use a largest ACKed that is
-      // smaller than an outstanding packet number.
-      largestAckedForComparison = std::max(
-          folly::get_default(
-              largestDsrAcked, maybeStreamFrame->streamId, currentPacketNum),
-          currentPacketNum);
-    }
+    // The max here is taken to ensure that if the largestAcked ends up smaller
+    // than the current packet number, we don't consider it lost.
+    auto largestAckedForComparison = std::max(
+        [&]() -> PacketNum {
+          if (maybeStreamFrame && maybeStreamFrame->fromBufMeta) {
+            // If the packet being considered is a DSR packet, we use the
+            // largest ACKed for that stream. The default value here covers the
+            // case where no DSR packets were ACKed, in which case we should
+            // not declare reorder loss.
+            CHECK(pkt.isDSRPacket);
+            return folly::get_default(
+                largestDsrAcked, maybeStreamFrame->streamId, currentPacketNum);
+          } else {
+            // If the packet being considered is a non-DSR packet, the
+            // straightforward case is to use the largest non-DSR ACKed.
+            // If DSR packets have been ACKed, we need to use the largest
+            // non-DSR ACKed. If there were no non-DSR ACKed, we shouldn't
+            // declare reorder loss.
+            if (largestDsrAcked.empty()) {
+              CHECK(largestNonDsrAcked == largestAcked);
+              return largestNonDsrAcked.value();
+            } else {
+              return largestNonDsrAcked.value_or(currentPacketNum);
+            }
+          }
+        }(),
+        currentPacketNum);
 
     bool lostByTimeout = (lossTime - pkt.metadata.time) > delayUntilLost;
     const auto reorderDistance = largestAckedForComparison - currentPacketNum;
