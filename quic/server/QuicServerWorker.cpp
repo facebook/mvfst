@@ -361,136 +361,106 @@ void QuicServerWorker::handleNetworkData(
     Buf data,
     const TimePoint& packetReceiveTime,
     bool isForwardedData) noexcept {
+  // if packet drop reason is set, invoke stats cb accordingly
+  auto packetDropReason = PacketDropReason::NONE;
+  auto maybeReportPacketDrop = folly::makeGuard([&]() {
+    if (packetDropReason != PacketDropReason::NONE) {
+      QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
+    }
+  });
+
   try {
+    // check error conditions for packet drop & early return
+    folly::io::Cursor cursor(data.get());
     if (shutdown_) {
       VLOG(4) << "Packet received after shutdown, dropping";
-      QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::SERVER_SHUTDOWN);
-      return;
-    }
-
-    if (isBlockListedSrcPort_(client.getPort())) {
+      packetDropReason = PacketDropReason::SERVER_SHUTDOWN;
+    } else if (isBlockListedSrcPort_(client.getPort())) {
       VLOG(4) << "Dropping packet with blocklisted src port: "
               << client.getPort();
-      QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::INVALID_SRC_PORT);
+      packetDropReason = PacketDropReason::INVALID_SRC_PORT;
+    } else if (!callback_) {
+      VLOG(0) << "Worker callback is null.  Dropping packet.";
+      packetDropReason = PacketDropReason::WORKER_NOT_INITIALIZED;
+    } else if (!cursor.canAdvance(sizeof(uint8_t))) {
+      VLOG(4) << "Dropping packet too small";
+      packetDropReason = PacketDropReason::INVALID_PACKET_INITIAL_BYTE;
+    }
+
+    // terminate early
+    if (packetDropReason != PacketDropReason::NONE) {
       return;
     }
 
-    if (!callback_) {
-      VLOG(0) << "Worker callback is null.  Dropping packet.";
-      QUIC_STATS(
-          statsCallback_,
-          onPacketDropped,
-          PacketDropReason::WORKER_NOT_INITIALIZED);
-      return;
-    }
-    folly::io::Cursor cursor(data.get());
-    if (!cursor.canAdvance(sizeof(uint8_t))) {
-      VLOG(4) << "Dropping packet too small";
-      QUIC_STATS(
-          statsCallback_,
-          onPacketDropped,
-          PacketDropReason::INVALID_PACKET_INITIAL_BYTE);
-      return;
-    }
     uint8_t initialByte = cursor.readBE<uint8_t>();
     HeaderForm headerForm = getHeaderForm(initialByte);
-
     if (headerForm == HeaderForm::Short) {
-      folly::Expected<ShortHeaderInvariant, TransportErrorCode>
-          parsedShortHeader = parseShortHeaderInvariants(initialByte, cursor);
-      if (!parsedShortHeader) {
-        if (!tryHandlingAsHealthCheck(client, *data)) {
-          QUIC_STATS(
-              statsCallback_,
-              onPacketDropped,
-              PacketDropReason::PARSE_ERROR_SHORT_HEADER);
-          VLOG(6) << "Failed to parse short header";
-        }
+      if (auto maybeParsedShortHeader =
+              parseShortHeaderInvariants(initialByte, cursor)) {
+        RoutingData routingData(
+            headerForm,
+            false, /* isInitial */
+            false, /* is0Rtt */
+            false, /* isUsingClientConnId */
+            std::move(maybeParsedShortHeader->destinationConnId),
+            folly::none);
+        return forwardNetworkData(
+            client,
+            std::move(routingData),
+            NetworkData(std::move(data), packetReceiveTime),
+            folly::none, /* quicVersion */
+            isForwardedData);
+      }
+    } else if (
+        auto maybeParsedLongHeader =
+            parseLongHeaderInvariant(initialByte, cursor)) {
+      // TODO: check version before looking at type
+      LongHeader::Types longHeaderType = parseLongHeaderType(initialByte);
+      bool isInitial = longHeaderType == LongHeader::Types::Initial;
+      bool is0Rtt = longHeaderType == LongHeader::Types::ZeroRtt;
+      bool isUsingClientConnId = isInitial || is0Rtt;
+      auto& invariant = maybeParsedLongHeader->invariant;
+
+      if (isInitial) {
+        // This stats gets updated even if the client initial will be dropped.
+        QUIC_STATS(statsCallback_, onClientInitialReceived, invariant.version);
+      }
+
+      if (maybeSendVersionNegotiationPacketOrDrop(
+              client, isInitial, invariant, data->computeChainDataLength())) {
+        return;
+      }
+
+      if (!isUsingClientConnId &&
+          invariant.dstConnId.size() < kMinSelfConnectionIdV1Size) {
+        // drop packet if connId is present but is not valid.
+        VLOG(3) << "Dropping packet due to invalid connectionId";
+        packetDropReason = PacketDropReason::INVALID_PACKET_CID;
         return;
       }
       RoutingData routingData(
           headerForm,
-          false, /* isInitial */
-          false, /* is0Rtt */
-          false, /* isUsingClientConnId */
-          std::move(parsedShortHeader->destinationConnId),
-          folly::none);
+          isInitial,
+          is0Rtt,
+          isUsingClientConnId,
+          std::move(invariant.dstConnId),
+          std::move(invariant.srcConnId));
       return forwardNetworkData(
           client,
           std::move(routingData),
           NetworkData(std::move(data), packetReceiveTime),
-          folly::none, /* quicVersion */
+          invariant.version,
           isForwardedData);
     }
 
-    folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
-        parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
-    if (!parsedLongHeader) {
-      if (!tryHandlingAsHealthCheck(client, *data)) {
-        QUIC_STATS(
-            statsCallback_,
-            onPacketDropped,
-            PacketDropReason::PARSE_ERROR_LONG_HEADER);
-        VLOG(6) << "Failed to parse long header";
-      }
-      return;
+    if (!tryHandlingAsHealthCheck(client, *data)) {
+      VLOG(6) << "Failed to parse long header";
+      packetDropReason = PacketDropReason::PARSE_ERROR_LONG_HEADER;
     }
-
-    // TODO: check version before looking at type
-    LongHeader::Types longHeaderType = parseLongHeaderType(initialByte);
-    bool isInitial = longHeaderType == LongHeader::Types::Initial;
-    bool is0Rtt = longHeaderType == LongHeader::Types::ZeroRtt;
-    bool isUsingClientConnId = isInitial || is0Rtt;
-
-    if (isInitial) {
-      // This stats gets updated even if the client initial will be dropped.
-      QUIC_STATS(
-          statsCallback_,
-          onClientInitialReceived,
-          parsedLongHeader->invariant.version);
-    }
-
-    if (maybeSendVersionNegotiationPacketOrDrop(
-            client,
-            isInitial,
-            parsedLongHeader->invariant,
-            data->computeChainDataLength())) {
-      return;
-    }
-
-    if (!isUsingClientConnId &&
-        parsedLongHeader->invariant.dstConnId.size() <
-            kMinSelfConnectionIdV1Size) {
-      // drop packet if connId is present but is not valid.
-      VLOG(3) << "Dropping packet due to invalid connectionId";
-      QUIC_STATS(
-          statsCallback_,
-          onPacketDropped,
-          PacketDropReason::INVALID_PACKET_CID);
-      return;
-    }
-    RoutingData routingData(
-        headerForm,
-        isInitial,
-        is0Rtt,
-        isUsingClientConnId,
-        std::move(parsedLongHeader->invariant.dstConnId),
-        std::move(parsedLongHeader->invariant.srcConnId));
-    return forwardNetworkData(
-        client,
-        std::move(routingData),
-        NetworkData(std::move(data), packetReceiveTime),
-        parsedLongHeader->invariant.version,
-        isForwardedData);
   } catch (const std::exception& ex) {
     // Drop the packet.
-    QUIC_STATS(
-        statsCallback_,
-        onPacketDropped,
-        PacketDropReason::PARSE_ERROR_EXCEPTION);
     VLOG(6) << "Failed to parse packet header " << ex.what();
+    packetDropReason = PacketDropReason::PARSE_ERROR_EXCEPTION;
   }
 }
 
