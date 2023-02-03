@@ -47,7 +47,7 @@ std::atomic_int globalUnfinishedHandshakes{0};
 QuicServerWorker::QuicServerWorker(
     std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
     SetEventCallback ec)
-    : callback_(callback),
+    : callback_(std::move(callback)),
       setEventCallback_(ec),
       takeoverPktHandler_(this),
       observerList_(this) {
@@ -101,11 +101,9 @@ void QuicServerWorker::bind(
   socket_->setDFAndTurnOffPMTU();
   if (transportSettings_.numGROBuffers_ > kDefaultNumGROBuffers) {
     socket_->setGRO(true);
-    auto ret = socket_->getGRO();
-    if (ret > 0) {
-      numGROBuffers_ = (transportSettings_.numGROBuffers_ < kMaxNumGROBuffers)
-          ? transportSettings_.numGROBuffers_
-          : kMaxNumGROBuffers;
+    if (socket_->getGRO() > 0) {
+      numGROBuffers_ = std::min(
+          transportSettings_.numGROBuffers_, (uint32_t)kMaxNumGROBuffers);
     }
   }
   socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
@@ -195,10 +193,10 @@ const folly::SocketAddress& QuicServerWorker::getAddress() const {
 }
 
 void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
-  readBuffer_ = folly::IOBuf::createCombined(
-      transportSettings_.maxRecvPacketSize * numGROBuffers_);
+  auto readBufferSize = transportSettings_.maxRecvPacketSize * numGROBuffers_;
+  readBuffer_ = folly::IOBuf::createCombined(readBufferSize);
   *buf = readBuffer_->writableData();
-  *len = transportSettings_.maxRecvPacketSize * numGROBuffers_;
+  *len = readBufferSize;
 }
 
 // Returns true if we either drop the packet or send a version
@@ -224,8 +222,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
         invariant.dstConnId,
         invariant.srcConnId,
         std::vector<QuicVersion>{QuicVersion::MVFST_INVALID});
-    versionNegotiationPacket =
-        folly::make_optional(std::move(builder).buildPacket());
+    versionNegotiationPacket.emplace(std::move(builder).buildPacket());
   }
   if (!versionNegotiationPacket) {
     bool negotiationNeeded = std::find(
@@ -507,13 +504,12 @@ void QuicServerWorker::recvmsgMultishotCallback(
   }
 }
 
-void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int res) {
-  auto bytesRead = res;
+void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int bytesRead) {
   auto& msg = msgHdr->data_;
   if (bytesRead > 0) {
     OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    if (msgHdr->data_.msg_control) {
+    if (msg.msg_control) {
       folly::AsyncUDPSocket::fromMsg(params, msg);
     }
 #endif
@@ -1475,22 +1471,16 @@ bool QuicServerWorker::AcceptObserverList::remove(AcceptObserver* observer) {
 void QuicServerWorker::getAllConnectionsStats(
     std::vector<QuicConnectionStats>& stats) {
   folly::F14FastMap<QuicServerTransport::Ptr, uint32_t> uniqueConns;
-  for (const auto& conn : connectionIdMap_) {
-    if (!conn.second) {
-      continue;
+  for (const auto& [connId, transport] : connectionIdMap_) {
+    if (transport && transport->getState()) {
+      uniqueConns[transport]++;
     }
-    auto connState =
-        static_cast<const QuicServerConnectionState*>(conn.second->getState());
-    if (!connState) {
-      continue;
-    }
-    uniqueConns[conn.second]++;
   }
   stats.reserve(stats.size() + uniqueConns.size());
-  for (const auto& connEntry : uniqueConns) {
-    QuicConnectionStats connStats = connEntry.first->getConnectionsStats();
+  for (const auto& [transport, count] : uniqueConns) {
+    QuicConnectionStats connStats = transport->getConnectionsStats();
     connStats.workerID = workerId_;
-    connStats.numConnIDs = connEntry.second;
+    connStats.numConnIDs = count;
     stats.emplace_back(connStats);
   }
 }

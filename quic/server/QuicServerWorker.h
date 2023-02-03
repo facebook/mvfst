@@ -66,7 +66,6 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       rawAddr->sa_family =
           reinterpret_cast<QuicServerWorker*>(arg_)->getAddress().getFamily();
       data_.msg_name = rawAddr;
-      ;
       data_.msg_namelen = sizeof(addrStorage_);
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
       if (hasGRO() || hasTimestamping()) {
