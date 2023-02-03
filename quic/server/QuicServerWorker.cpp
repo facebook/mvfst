@@ -40,6 +40,13 @@ extern "C" FOLLY_ATTR_WEAK void mvfst_hook_on_socket_create(int fd);
 static void (*mvfst_hook_on_socket_create)(int fd) = nullptr;
 #endif
 
+namespace {
+bool isValidConnIdLength(const quic::ConnectionId& connId) {
+  return quic::kMinInitialDestinationConnIdLength <= connId.size() &&
+      connId.size() <= quic::kMaxConnectionIdSize;
+}
+} // namespace
+
 namespace quic {
 
 std::atomic_int globalUnfinishedHandshakes{0};
@@ -598,6 +605,116 @@ void QuicServerWorker::setPacingTimer(
   pacingTimer_ = std::move(pacingTimer);
 }
 
+QuicServerTransport::Ptr QuicServerWorker::makeTransport(
+    QuicVersion quicVersion,
+    const folly::SocketAddress& client,
+    const folly::Optional<ConnectionId>& srcConnId,
+    const ConnectionId& dstConnId,
+    bool validNewToken) {
+  // create 'accepting' transport
+  auto* evb = getEventBase();
+  auto sock = makeSocket(evb);
+  auto trans =
+      transportFactory_->make(evb, std::move(sock), client, quicVersion, ctx_);
+  if (trans) {
+    globalUnfinishedHandshakes++;
+    if (transportSettings_.dataPathType == DataPathType::ContinuousMemory &&
+        bufAccessor_) {
+      trans->setBufAccessor(bufAccessor_.get());
+    }
+    trans->setPacingTimer(pacingTimer_);
+    trans->setRoutingCallback(this);
+    trans->setHandshakeFinishedCallback(this);
+    trans->setSupportedVersions(supportedVersions_);
+    trans->setOriginalPeerAddress(client);
+    if (validNewToken) {
+      trans->verifiedClientAddress();
+    }
+#ifdef CCP_ENABLED
+    trans->setCcpDatapath(getCcpReader()->getDatapath());
+#endif
+    trans->setCongestionControllerFactory(ccFactory_);
+    trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
+
+    auto transportSettings = transportSettingsOverrideFn_
+        ? transportSettingsOverrideFn_(
+              transportSettings_, client.getIPAddress())
+              .value_or(transportSettings_)
+        : transportSettings_;
+    LOG_IF(
+        ERROR,
+        transportSettings.dataPathType != transportSettings_.dataPathType)
+        << "Overriding DataPathType isn't supported. Requested datapath="
+        << (transportSettings.dataPathType == DataPathType::ContinuousMemory
+                ? "ContinuousMemory"
+                : "ChainedMemory");
+    // TODO T132636939: remove after experimenting w/ higher init cwnd.
+    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
+      transportSettings.initCwndInMss = 20;
+    }
+    trans->setTransportSettings(transportSettings);
+    trans->setConnectionIdAlgo(connIdAlgo_.get());
+    trans->setServerConnectionIdRejector(this);
+    if (srcConnId) {
+      trans->setClientConnectionId(*srcConnId);
+    }
+    trans->setClientChosenDestConnectionId(dstConnId);
+    // parameters to create server chosen connection id
+    trans->setServerConnectionIdParams(ServerConnectionIdParams(
+        cidVersion_, hostId_, static_cast<uint8_t>(processId_), workerId_));
+    trans->accept();
+    auto result = sourceAddressMap_.emplace(
+        std::make_pair(std::make_pair(client, dstConnId), trans));
+    CHECK(result.second);
+    for (const auto& observer : observerList_.getAll()) {
+      observer->accept(trans.get());
+    }
+  }
+
+  return trans;
+}
+
+PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
+    const ConnectionId& dstConnId,
+    const folly::SocketAddress& client) {
+  // parse dst conn-id to determine if packet was misrouted
+  if (!connIdAlgo_->canParse(dstConnId)) {
+    VLOG(3) << "Dropping packet with bad DCID, routingInfo="
+            << logRoutingInfo(dstConnId);
+    // TODO do we need to reset?
+    return PacketDropReason::PARSE_ERROR_BAD_DCID;
+  }
+
+  auto maybeParsedConnIdParam = connIdAlgo_->parseConnectionId(dstConnId);
+  if (maybeParsedConnIdParam.hasError()) {
+    const auto& ex = maybeParsedConnIdParam.error();
+    VLOG(3) << fmt::format(
+        "Dropping packet due to DCID parsing error={}, errorCode={},"
+        "routingInfo = {} ",
+        ex.what(),
+        ex.errorCode(),
+        logRoutingInfo(dstConnId));
+    // TODO do we need to reset?
+    return PacketDropReason::PARSE_ERROR_DCID;
+  }
+
+  const auto& connIdParams = maybeParsedConnIdParam.value();
+  if (connIdParams.hostId != hostId_) {
+    VLOG(3) << fmt::format(
+        "Dropping packet routed to wrong host, from client={}, routingInfo={},",
+        client.describe(),
+        logRoutingInfo(dstConnId));
+    return PacketDropReason::ROUTING_ERROR_WRONG_HOST;
+  }
+  if (connIdParams.processId == static_cast<uint8_t>(processId_)) {
+    // There's no existing connection for the packet's CID or the client's
+    // addr, and doesn't belong to the old server. Send a Reset.
+    return PacketDropReason::CONNECTION_NOT_FOUND;
+  }
+
+  return PacketDropReason::NONE;
+}
+
 void QuicServerWorker::dispatchPacketData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
@@ -605,220 +722,69 @@ void QuicServerWorker::dispatchPacketData(
     folly::Optional<QuicVersion> quicVersion,
     bool isForwardedData) noexcept {
   DCHECK(socket_);
-  QuicServerTransport::Ptr transport;
-  bool dropPacket = false;
-  auto cit = connectionIdMap_.find(routingData.destinationConnId);
-  if (cit != connectionIdMap_.end()) {
-    transport = cit->second;
-    VLOG(10) << "Found existing connection for CID="
-             << routingData.destinationConnId.hex() << " " << *transport;
-  } else if (routingData.headerForm != HeaderForm::Long) {
-    // Drop the packet if the header form is not long
-    VLOG(3) << fmt::format(
-        "Dropping non-long header packet with no connid match"
-        " headerForm={}, routingInfo={}",
-        static_cast<typename std::underlying_type<HeaderForm>::type>(
-            routingData.headerForm),
-        logRoutingInfo(routingData.destinationConnId));
-    // Try forwarding the packet to the old server (if it is enabled)
-    dropPacket = true;
-  }
+  CHECK(transportFactory_);
 
-  bool cannotMakeTransport = false;
-  if (!dropPacket && !transport) {
-    // For LongHeader packets without existing associated connection, try to
-    // route with destinationConnId chosen by the peer and IP address of the
-    // peer.
-    CHECK(transportFactory_);
-    auto source = std::make_pair(client, routingData.destinationConnId);
-    auto sit = sourceAddressMap_.find(source);
-    if (sit == sourceAddressMap_.end()) {
-      // If it's a 0RTT packet and we have no CID, we probably lost the initial
-      // and want to buffer it for a while.
-      if (routingData.is0Rtt) {
-        auto itr = pending0RttData_.find(routingData.destinationConnId);
-        if (itr == pending0RttData_.end()) {
-          itr =
-              pending0RttData_.insert(routingData.destinationConnId, {}).first;
-        }
-        auto& vec = itr->second;
-        if (vec.size() != vec.max_size()) {
-          vec.emplace_back(std::move(networkData));
-          QUIC_STATS(statsCallback_, onZeroRttBuffered);
-        }
-        return;
-      } else if (!routingData.isInitial) {
-        VLOG(3) << fmt::format(
-            "Dropping packet from client={}, routingInfo={}",
-            client.describe(),
-            logRoutingInfo(routingData.destinationConnId));
-        dropPacket = true;
-      } else {
-        VLOG(4) << fmt::format(
-            "Creating new connection for client={}, routingInfo={}",
-            client.describe(),
-            logRoutingInfo(routingData.destinationConnId));
+  // if set, log drop reason and do *not* attempt to forward packet
+  auto packetDropReason = PacketDropReason::NONE;
+  // if set, *should* attempt to forward packet to another server
+  bool shouldFwdPacket = false;
+  const auto& maybeSrcConnId = routingData.sourceConnId;
+  const auto& dstConnId = routingData.destinationConnId;
+  auto cit = connectionIdMap_.find(dstConnId);
 
-        // This could be a new connection, add it in the map
-        // verify that the initial packet is at least min initial bytes
-        // to avoid amplification attacks. Also check CID sizes.
-        if (routingData.isInitial &&
-            (networkData.totalData < kMinInitialPacketSize ||
-             routingData.destinationConnId.size() <
-                 kMinInitialDestinationConnIdLength ||
-             routingData.destinationConnId.size() > kMaxConnectionIdSize)) {
-          // Don't even attempt to forward the packet, just drop it.
-          VLOG(3) << "Dropping small initial packet from client=" << client;
-          QUIC_STATS(
-              statsCallback_,
-              onPacketDropped,
-              PacketDropReason::INVALID_PACKET_SIZE_INITIAL);
-          return;
-        }
+  // if conditions satisfy, drop packet or fwd to another server
+  auto handlePacketFwdOrDrop = folly::makeGuard([&]() {
+    if (packetDropReason == PacketDropReason::NONE && !shouldFwdPacket) {
+      // nothing to do here, early return
+      return;
+    }
+    // should either be marked as dropped or fwd-ed, can't be both
+    CHECK((packetDropReason != PacketDropReason::NONE) ^ shouldFwdPacket);
 
-        // If there is a token present, decrypt it (could be either a retry
-        // token or a new token)
-        folly::io::Cursor cursor(networkData.packets.front().get());
-        auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
-        bool hasTokenSecret = transportSettings_.retryTokenSecret.hasValue();
+    if (packetDropReason != PacketDropReason::NONE) {
+      QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
+      return;
+    }
 
-        // If the retryTokenSecret is not set, just skip evaluating validity of
-        // token and assume true
-        auto isValidRetryToken = !hasTokenSecret ||
-            (maybeEncryptedToken &&
-             validRetryToken(
-                 *maybeEncryptedToken,
-                 routingData.destinationConnId,
-                 client.getIPAddress()));
+    // send reset packet if packet fwd-ing isn't enabled or packet has
+    // already been fwd-ed
+    if (!packetForwardingEnabled_ || isForwardedData) {
+      packetDropReason = PacketDropReason::CANNOT_FORWARD_DATA;
+      QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
+      sendResetPacket(routingData.headerForm, client, networkData, dstConnId);
+      return;
+    }
 
-        auto isValidNewToken = !hasTokenSecret ||
-            (maybeEncryptedToken &&
-             validNewToken(*maybeEncryptedToken, client.getIPAddress()));
-
-        if (isValidNewToken) {
-          QUIC_STATS(statsCallback_, onNewTokenReceived);
-        } else if (maybeEncryptedToken && !isValidRetryToken) {
-          // Failed to decrypt the token as either a new or retry token
-          QUIC_STATS(statsCallback_, onTokenDecryptFailure);
-        }
-
-        // If rate-limiting is configured and there is no retry token,
-        // send a retry packet back to the client
-        if (!isValidRetryToken &&
-            ((newConnRateLimiter_ &&
-              newConnRateLimiter_->check(networkData.receiveTimePoint)) ||
-             (unfinishedHandshakeLimitFn_.has_value() &&
-              globalUnfinishedHandshakes >=
-                  (*unfinishedHandshakeLimitFn_)()))) {
-          if (hasTokenSecret) {
-            sendRetryPacket(
-                client,
-                routingData.destinationConnId,
-                routingData.sourceConnId.value_or(
-                    ConnectionId(std::vector<uint8_t>())));
-            QUIC_STATS(statsCallback_, onConnectionRateLimited);
-            return;
-          } else {
-            VLOG(4)
-                << "Not sending retry packet since retry token secret is not set";
-          }
-        }
-
-        // Check that we have a proper quic version before creating transport.
-        CHECK(quicVersion.has_value())
-            << "no QUIC version supplied for transport creation";
-
-        // create 'accepting' transport
-        auto sock = makeSocket(getEventBase());
-
-        auto trans = transportFactory_->make(
-            getEventBase(), std::move(sock), client, quicVersion.value(), ctx_);
-        if (!trans) {
-          dropPacket = true;
-          cannotMakeTransport = true;
-        } else {
-          globalUnfinishedHandshakes++;
-          CHECK(trans);
-          if (transportSettings_.dataPathType ==
-                  DataPathType::ContinuousMemory &&
-              bufAccessor_) {
-            trans->setBufAccessor(bufAccessor_.get());
-          }
-          trans->setPacingTimer(pacingTimer_);
-          trans->setRoutingCallback(this);
-          trans->setHandshakeFinishedCallback(this);
-          trans->setSupportedVersions(supportedVersions_);
-          trans->setOriginalPeerAddress(client);
-          if (isValidNewToken) {
-            trans->verifiedClientAddress();
-          }
-#ifdef CCP_ENABLED
-          trans->setCcpDatapath(getCcpReader()->getDatapath());
-#endif
-          trans->setCongestionControllerFactory(ccFactory_);
-          if (statsCallback_) {
-            trans->setTransportStatsCallback(statsCallback_.get());
-          }
-          auto transportSettings = transportSettingsOverrideFn_
-              ? transportSettingsOverrideFn_(
-                    transportSettings_, client.getIPAddress())
-                    .value_or(transportSettings_)
-              : transportSettings_;
-          LOG_IF(
-              ERROR,
-              transportSettings.dataPathType != transportSettings_.dataPathType)
-              << "Overriding DataPathType isn't supported. Requested datapath="
-              << (transportSettings.dataPathType ==
-                          DataPathType::ContinuousMemory
-                      ? "ContinuousMemory"
-                      : "ChainedMemory");
-          // TODO T132636939: remove after experimenting w/ higher init cwnd.
-          if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
-            transportSettings.initCwndInMss = 20;
-          }
-          trans->setTransportSettings(transportSettings);
-          trans->setConnectionIdAlgo(connIdAlgo_.get());
-          trans->setServerConnectionIdRejector(this);
-          if (routingData.sourceConnId) {
-            trans->setClientConnectionId(*routingData.sourceConnId);
-          }
-          trans->setClientChosenDestConnectionId(routingData.destinationConnId);
-          // parameters to create server chosen connection id
-          ServerConnectionIdParams serverConnIdParams(
-              cidVersion_,
-              hostId_,
-              static_cast<uint8_t>(processId_),
-              workerId_);
-          trans->setServerConnectionIdParams(std::move(serverConnIdParams));
-          trans->accept();
-          auto result = sourceAddressMap_.emplace(std::make_pair(
-              std::make_pair(client, routingData.destinationConnId), trans));
-          if (!result.second) {
-            LOG(ERROR) << fmt::format(
-                "Routing entry already exists for client={}, routingInfo={}",
-                client.describe(),
-                logRoutingInfo(routingData.destinationConnId));
-            dropPacket = true;
-          } else {
-            for (const auto& observer : observerList_.getAll()) {
-              observer->accept(trans.get());
-            }
-          }
-          transport = trans;
-        }
+    packetDropReason = isDstConnIdMisrouted(dstConnId, client);
+    if (packetDropReason != PacketDropReason::NONE) {
+      QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
+      if (packetDropReason == PacketDropReason::ROUTING_ERROR_WRONG_HOST ||
+          packetDropReason == PacketDropReason::CONNECTION_NOT_FOUND) {
+        // packet was misrouted, send reset packet
+        sendResetPacket(routingData.headerForm, client, networkData, dstConnId);
       }
     } else {
-      transport = sit->second;
-      VLOG(4) << "Found existing connection for client=" << client << " "
-              << *transport;
+      // Optimistically route to another server if the packet type is not
+      // Initial and if there is not any connection associated with the given
+      // packet
+      VLOG(4) << fmt::format(
+          "Forwarding packet from client={} to another process, routingInfo={}",
+          client.describe(),
+          logRoutingInfo(dstConnId));
+      auto recvTime = networkData.receiveTimePoint;
+      takeoverPktHandler_.forwardPacketToAnotherServer(
+          client, std::move(networkData).moveAllData(), recvTime);
+      QUIC_STATS(statsCallback_, onPacketForwarded);
     }
-  }
-  if (!dropPacket) {
+  });
+
+  // helper fn to handle fwd-ing data to the transport
+  auto fwdNetworkDataToTransport = [&](QuicServerTransport* transport) {
     DCHECK(transport->getEventBase()->isInEventBaseThread());
     transport->onNetworkData(client, std::move(networkData));
-    // If we had pending 0RTT data for this DCID, process it.
+    // process pending 0rtt data for this DCID if present
     if (routingData.isInitial && !pending0RttData_.empty()) {
-      auto itr = pending0RttData_.find(routingData.destinationConnId);
+      auto itr = pending0RttData_.find(dstConnId);
       if (itr != pending0RttData_.end()) {
         for (auto& data : itr->second) {
           transport->onNetworkData(client, std::move(data));
@@ -826,96 +792,128 @@ void QuicServerWorker::dispatchPacketData(
         pending0RttData_.erase(itr);
       }
     }
+  };
+
+  if (cit != connectionIdMap_.end()) {
+    VLOG(10) << "Found existing connection for CID=" << dstConnId.hex() << " "
+             << *cit->second.get();
+    fwdNetworkDataToTransport(cit->second.get());
     return;
   }
-  if (cannotMakeTransport) {
-    // Act as though we received a junk Initial.
-    CHECK(routingData.sourceConnId.has_value());
+
+  if (routingData.headerForm == HeaderForm::Short) {
+    // Drop if short header packet w/ unrecognized dst conn id
+    VLOG(3) << fmt::format(
+        "Dropping short header packet with no connid match routingInfo={}",
+        logRoutingInfo(dstConnId));
+    // try forwarding the packet to the old server (if it is enabled)
+    shouldFwdPacket = true;
+    return;
+  }
+
+  // For LongHeader packets without existing associated connection, try to
+  // route with destinationConnId chosen by the peer and IP address of the
+  // peer.
+  CHECK(routingData.headerForm == HeaderForm::Long);
+  auto sit = sourceAddressMap_.find({client, dstConnId});
+  if (sit != sourceAddressMap_.end()) {
+    VLOG(4) << "Found existing connection for client=" << client << " "
+            << sit->second.get();
+    fwdNetworkDataToTransport(sit->second.get());
+    return;
+  }
+
+  // If it's a 0RTT packet and we have no CID, we probably lost the
+  // initial and want to buffer it for a while.
+  if (routingData.is0Rtt) {
+    // creates vector if it doesn't already exist
+    auto& vec = pending0RttData_.insert(dstConnId, {}).first->second;
+    if (vec.size() < vec.max_size()) {
+      vec.emplace_back(std::move(networkData));
+      QUIC_STATS(statsCallback_, onZeroRttBuffered);
+    }
+    return;
+  }
+
+  // non-initial packet w/o existing connection may have been misrouted.
+  if (!routingData.isInitial) {
+    VLOG(3) << fmt::format(
+        "Dropping packet from client={}, routingInfo={}",
+        client.describe(),
+        logRoutingInfo(dstConnId));
+    // try forwarding the packet to the old server (if it is enabled)
+    shouldFwdPacket = true;
+    return;
+  }
+
+  // check that we have a proper quic version before creating transport
+  CHECK(quicVersion.has_value()) << "no QUIC version to create transport";
+  VLOG(4) << fmt::format(
+      "Creating new connection for client={}, routingInfo={}",
+      client.describe(),
+      logRoutingInfo(dstConnId));
+
+  // This could be a new connection, add it in the map
+  // verify that the initial packet is at least min initial bytes
+  // to avoid amplification attacks. Also check CID sizes.
+  if (networkData.totalData < kMinInitialPacketSize ||
+      !isValidConnIdLength(dstConnId)) {
+    // Don't even attempt to forward the packet, just drop it.
+    VLOG(3) << "Dropping small initial packet from client=" << client;
+    packetDropReason = PacketDropReason::INVALID_PACKET_SIZE_INITIAL;
+    return;
+  }
+
+  // If there is a token present, decrypt it (could be either a retry
+  // token or a new token)
+  folly::io::Cursor cursor(networkData.packets.front().get());
+  auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
+  bool hasTokenSecret = transportSettings_.retryTokenSecret.hasValue();
+
+  // If the retryTokenSecret is not set, just skip evaluating validity of
+  // token and assume true
+  bool isValidRetryToken = !hasTokenSecret ||
+      (maybeEncryptedToken &&
+       validRetryToken(*maybeEncryptedToken, dstConnId, client.getIPAddress()));
+
+  bool isValidNewToken = !hasTokenSecret ||
+      (maybeEncryptedToken &&
+       validNewToken(*maybeEncryptedToken, client.getIPAddress()));
+
+  if (isValidNewToken) {
+    QUIC_STATS(statsCallback_, onNewTokenReceived);
+  } else if (maybeEncryptedToken && !isValidRetryToken) {
+    // Failed to decrypt the token as either a new or retry token
+    QUIC_STATS(statsCallback_, onTokenDecryptFailure);
+  }
+
+  // If rate-limiting is configured and there is no retry token,
+  // send a retry packet back to the client
+  if (!isValidRetryToken &&
+      ((newConnRateLimiter_ &&
+        newConnRateLimiter_->check(networkData.receiveTimePoint)) ||
+       (unfinishedHandshakeLimitFn_.has_value() &&
+        globalUnfinishedHandshakes >= (*unfinishedHandshakeLimitFn_)()))) {
+    QUIC_STATS(statsCallback_, onConnectionRateLimited);
+    sendRetryPacket(
+        client,
+        dstConnId,
+        maybeSrcConnId.value_or(ConnectionId(std::vector<uint8_t>())));
+    return;
+  }
+
+  auto transport = makeTransport(
+      quicVersion.value(), client, maybeSrcConnId, dstConnId, isValidNewToken);
+  if (!transport) {
+    // Act as though we received a junk Initial – don't forward packet.
+    CHECK(maybeSrcConnId.has_value());
     LongHeaderInvariant inv{
-        QuicVersion::MVFST_INVALID,
-        routingData.sourceConnId.value(),
-        routingData.destinationConnId};
-    QUIC_STATS(
-        statsCallback_,
-        onPacketDropped,
-        PacketDropReason::CANNOT_MAKE_TRANSPORT);
+        QuicVersion::MVFST_INVALID, maybeSrcConnId.value(), dstConnId};
+    packetDropReason = PacketDropReason::CANNOT_MAKE_TRANSPORT;
     sendVersionNegotiationPacket(client, inv);
     return;
   }
-  if (!connIdAlgo_->canParse(routingData.destinationConnId)) {
-    VLOG(3) << "Dropping packet with bad DCID, routingInfo="
-            << logRoutingInfo(routingData.destinationConnId);
-    QUIC_STATS(
-        statsCallback_,
-        onPacketDropped,
-        PacketDropReason::PARSE_ERROR_BAD_DCID);
-    // TODO do we need to reset?
-    return;
-  }
-  auto connIdParam =
-      connIdAlgo_->parseConnectionId(routingData.destinationConnId);
-  if (connIdParam.hasError()) {
-    VLOG(3) << fmt::format(
-        "Dropping packet due to DCID parsing error={}, , errorCode={}, routingInfo={}",
-        connIdParam.error().what(),
-        folly::to<std::string>(connIdParam.error().errorCode()),
-        logRoutingInfo(routingData.destinationConnId));
-    QUIC_STATS(
-        statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_DCID);
-    // TODO do we need to reset?
-    return;
-  }
-  if (connIdParam->hostId != hostId_) {
-    VLOG(3) << fmt::format(
-        "Dropping packet routed to wrong host, from client={}, routingInfo={},",
-        client.describe(),
-        logRoutingInfo(routingData.destinationConnId));
-    QUIC_STATS(
-        statsCallback_,
-        onPacketDropped,
-        PacketDropReason::ROUTING_ERROR_WRONG_HOST);
-    return sendResetPacket(
-        routingData.headerForm,
-        client,
-        networkData,
-        routingData.destinationConnId);
-  }
-
-  if (!packetForwardingEnabled_ || isForwardedData) {
-    QUIC_STATS(
-        statsCallback_, onPacketDropped, PacketDropReason::CANNOT_FORWARD_DATA);
-    return sendResetPacket(
-        routingData.headerForm,
-        client,
-        networkData,
-        routingData.destinationConnId);
-  }
-
-  // There's no existing connection for the packet's CID or the client's
-  // addr, and doesn't belong to the old server. Send a Reset.
-  if (connIdParam->processId == static_cast<uint8_t>(processId_)) {
-    QUIC_STATS(
-        statsCallback_,
-        onPacketDropped,
-        PacketDropReason::CONNECTION_NOT_FOUND);
-    return sendResetPacket(
-        routingData.headerForm,
-        client,
-        networkData,
-        routingData.destinationConnId);
-  }
-
-  // Optimistically route to another server
-  // if the packet type is not Initial and if there is not any connection
-  // associated with the given packet
-  VLOG(4) << fmt::format(
-      "Forwarding packet from client={} to another process, routingInfo={}",
-      client.describe(),
-      logRoutingInfo(routingData.destinationConnId));
-  auto recvTime = networkData.receiveTimePoint;
-  takeoverPktHandler_.forwardPacketToAnotherServer(
-      client, std::move(networkData).moveAllData(), recvTime);
-  QUIC_STATS(statsCallback_, onPacketForwarded);
+  fwdNetworkDataToTransport(transport.get());
 }
 
 void QuicServerWorker::sendResetPacket(
@@ -1029,6 +1027,11 @@ void QuicServerWorker::sendRetryPacket(
     const folly::SocketAddress& client,
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
+  if (!transportSettings_.retryTokenSecret.hasValue()) {
+    VLOG(4) << "Not sending retry packet since retry token secret is not set";
+    return;
+  }
+
   // Create the encrypted retry token
   TokenGenerator generator(transportSettings_.retryTokenSecret.value());
 

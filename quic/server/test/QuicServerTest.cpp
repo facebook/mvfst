@@ -511,6 +511,7 @@ void QuicServerWorkerTest::testSendInitialWithRetryToken(
 }
 
 TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
+  worker_->startPacketForwarding(folly::SocketAddress());
   auto data = folly::IOBuf::copyBuffer("data");
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   PacketNum num = 2;
@@ -1315,6 +1316,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   auto mockConnIdAlgo = std::make_unique<MockConnectionIdAlgo>();
   auto rawConnIdAlgo = mockConnIdAlgo.get();
   worker_->setConnectionIdAlgo(std::move(mockConnIdAlgo));
+  worker_->startPacketForwarding(folly::SocketAddress());
 
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;

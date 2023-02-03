@@ -600,6 +600,20 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       folly::Optional<QuicVersion> quicVersion,
       bool isForwardedData = false);
 
+  // Create transport and invoke appropriate setters
+  QuicServerTransport::Ptr makeTransport(
+      QuicVersion quicVersion,
+      const folly::SocketAddress& client,
+      const folly::Optional<ConnectionId>& srcConnId,
+      const ConnectionId& dstConnId,
+      bool validNewToken);
+
+  // Parses the dst conn id to determine if packet was incorrectly routed to
+  // this host/process.
+  PacketDropReason isDstConnIdMisrouted(
+      const ConnectionId& dstConnId,
+      const folly::SocketAddress& client);
+
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
