@@ -1446,44 +1446,30 @@ bool QuicServerWorker::rejectConnectionId(
 }
 
 std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
-  constexpr auto base =
-      "CID={}, cidVersion={}, workerId={}, processId={}, hostId={}, threadId={}, ";
-  if (!connIdAlgo_->canParse(connId)) {
-    return fmt::format(
-        base,
-        connId.hex(),
-        (uint32_t)cidVersion_,
-        (uint32_t)workerId_,
-        (uint32_t)processId_,
-        (uint32_t)hostId_,
-        folly::getCurrentThreadID());
+  std::string base = fmt::format(
+      "CID={}, cidVersion={}, workerId={}, processId={}, hostId={}, threadId={}, ",
+      connId.hex(),
+      (uint32_t)cidVersion_,
+      (uint32_t)workerId_,
+      (uint32_t)processId_,
+      (uint32_t)hostId_,
+      folly::getCurrentThreadID());
+
+  if (connIdAlgo_->canParse(connId)) {
+    auto maybeParsedConnIdParam = connIdAlgo_->parseConnectionId(connId);
+    if (maybeParsedConnIdParam.hasValue()) {
+      const auto& connIdParam = maybeParsedConnIdParam.value();
+      return base +
+          fmt::format(
+                 "cidVersion in packet={}, workerId in packet={}, processId in packet={}, hostId in packet={}, ",
+                 (uint32_t)connIdParam.version,
+                 (uint32_t)connIdParam.workerId,
+                 (uint32_t)connIdParam.processId,
+                 (uint32_t)connIdParam.hostId);
+    }
   }
-  auto connIdParam = connIdAlgo_->parseConnectionId(connId);
-  if (connIdParam.hasError()) {
-    return fmt::format(
-        base,
-        connId.hex(),
-        (uint32_t)cidVersion_,
-        (uint32_t)workerId_,
-        (uint32_t)processId_,
-        (uint32_t)hostId_,
-        folly::getCurrentThreadID());
-  }
-  std::string extended = std::string(base) +
-      "cidVersion in packet={}, workerId in packet={}, processId in packet={}, hostId in packet={}, ";
-  return fmt::vformat(
-      extended,
-      fmt::make_format_args(
-          connId.hex(),
-          (uint32_t)cidVersion_,
-          (uint32_t)workerId_,
-          (uint32_t)processId_,
-          (uint32_t)hostId_,
-          folly::getCurrentThreadID(),
-          (uint32_t)connIdParam->version,
-          (uint32_t)connIdParam->workerId,
-          (uint32_t)connIdParam->processId,
-          (uint32_t)connIdParam->hostId));
+
+  return base;
 }
 
 QuicServerWorker::AcceptObserverList::AcceptObserverList(
