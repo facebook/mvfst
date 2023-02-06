@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/Range.h>
 #include <quic/QuicConstants.h>
 #include <stdexcept>
 #include <string>

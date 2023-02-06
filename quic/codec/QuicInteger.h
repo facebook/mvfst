@@ -7,7 +7,9 @@
 
 #pragma once
 
+#include <folly/Expected.h>
 #include <folly/Optional.h>
+#include <folly/String.h>
 #include <folly/io/Cursor.h>
 #include <folly/lang/Bits.h>
 #include <quic/QuicException.h>

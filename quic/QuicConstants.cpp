@@ -5,11 +5,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <algorithm>
+
+#include <folly/lang/Assume.h>
 #include <quic/QuicConstants.h>
 
 namespace quic {
 
-folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
+std::string_view congestionControlTypeToString(CongestionControlType type) {
   switch (type) {
     case CongestionControlType::Cubic:
       return kCongestionControlCubicStr;
@@ -37,7 +40,7 @@ folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
 }
 
 folly::Optional<CongestionControlType> congestionControlStrToType(
-    folly::StringPiece str) {
+    std::string_view str) {
   if (str == kCongestionControlCubicStr) {
     return quic::CongestionControlType::Cubic;
   } else if (str == kCongestionControlBbrStr) {
@@ -94,7 +97,7 @@ std::vector<QuicVersion> filterSupportedVersions(
   return filteredVersions;
 }
 
-folly::StringPiece writeDataReasonString(WriteDataReason reason) {
+std::string_view writeDataReasonString(WriteDataReason reason) {
   switch (reason) {
     case WriteDataReason::PROBES:
       return "Probes";
@@ -126,7 +129,7 @@ folly::StringPiece writeDataReasonString(WriteDataReason reason) {
   folly::assume_unreachable();
 }
 
-folly::StringPiece writeNoWriteReasonString(NoWriteReason reason) {
+std::string_view writeNoWriteReasonString(NoWriteReason reason) {
   switch (reason) {
     case NoWriteReason::WRITE_OK:
       return "WriteOk";
@@ -142,7 +145,7 @@ folly::StringPiece writeNoWriteReasonString(NoWriteReason reason) {
   folly::assume_unreachable();
 }
 
-folly::StringPiece readNoReadReasonString(NoReadReason reason) {
+std::string_view readNoReadReasonString(NoReadReason reason) {
   switch (reason) {
     case NoReadReason::READ_OK:
       return "ReadOK";

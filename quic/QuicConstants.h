@@ -7,12 +7,14 @@
 
 #pragma once
 
-#include <folly/String.h>
+#include <folly/Optional.h>
 #include <quic/common/third-party/enum.h>
 #include <sys/types.h>
 #include <chrono>
 #include <cstdint>
 #include <ostream>
+#include <string_view>
+#include <vector>
 
 namespace quic {
 
@@ -422,15 +424,15 @@ constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
 constexpr DurationRep kDefaultWriteLimitRttFraction = 25;
 
 // Congestion control:
-constexpr folly::StringPiece kCongestionControlCubicStr = "cubic";
-constexpr folly::StringPiece kCongestionControlBbrStr = "bbr";
-constexpr folly::StringPiece kCongestionControlBbrTestingStr = "bbr_testing";
-constexpr folly::StringPiece kCongestionControlCopaStr = "copa";
-constexpr folly::StringPiece kCongestionControlCopa2Str = "copa2";
-constexpr folly::StringPiece kCongestionControlNewRenoStr = "newreno";
-constexpr folly::StringPiece kCongestionControlCcpStr = "ccp";
-constexpr folly::StringPiece kCongestionControlStaticCwndStr = "staticcwnd";
-constexpr folly::StringPiece kCongestionControlNoneStr = "none";
+constexpr std::string_view kCongestionControlCubicStr = "cubic";
+constexpr std::string_view kCongestionControlBbrStr = "bbr";
+constexpr std::string_view kCongestionControlBbrTestingStr = "bbr_testing";
+constexpr std::string_view kCongestionControlCopaStr = "copa";
+constexpr std::string_view kCongestionControlCopa2Str = "copa2";
+constexpr std::string_view kCongestionControlNewRenoStr = "newreno";
+constexpr std::string_view kCongestionControlCcpStr = "ccp";
+constexpr std::string_view kCongestionControlStaticCwndStr = "staticcwnd";
+constexpr std::string_view kCongestionControlNoneStr = "none";
 
 constexpr DurationRep kPersistentCongestionThreshold = 3;
 enum class CongestionControlType : uint8_t {
@@ -446,9 +448,9 @@ enum class CongestionControlType : uint8_t {
   // NOTE: MAX should always be at the end
   MAX
 };
-folly::StringPiece congestionControlTypeToString(CongestionControlType type);
+std::string_view congestionControlTypeToString(CongestionControlType type);
 folly::Optional<CongestionControlType> congestionControlStrToType(
-    folly::StringPiece str);
+    std::string_view str);
 
 // This is an approximation of a small enough number for cwnd to be blocked.
 constexpr size_t kBlockedSizeBytes = 20;
@@ -631,7 +633,7 @@ enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
   ALWAYS_REJECT = 2,
 };
 
-inline folly::StringPiece nodeToString(QuicNodeType node) {
+inline std::string_view nodeToString(QuicNodeType node) {
   if (node == QuicNodeType::Client) {
     return "Client";
   } else {
@@ -688,9 +690,9 @@ enum class NoReadReason {
   STALE_DATA,
 };
 
-folly::StringPiece writeDataReasonString(WriteDataReason reason);
-folly::StringPiece writeNoWriteReasonString(NoWriteReason reason);
-folly::StringPiece readNoReadReasonString(NoReadReason reason);
+std::string_view writeDataReasonString(WriteDataReason reason);
+std::string_view writeNoWriteReasonString(NoWriteReason reason);
+std::string_view readNoReadReasonString(NoReadReason reason);
 
 /**
  * Filter the versions that are currently supported.
