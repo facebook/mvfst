@@ -1842,6 +1842,7 @@ TEST_P(
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().transportSettings.disableMigration = false;
 
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   // Add additional peer id so PathResponse completes.
   server->getNonConstConn().peerConnectionIds.emplace_back(
       ConnectionId({1, 2, 3, 4}), 1);
@@ -1911,6 +1912,7 @@ TEST_P(
 
   // Receive first packet later from a different address
   folly::SocketAddress newPeer("100.101.102.103", 23456);
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(firstPacket), true, &newPeer);
 
   // No migration for reordered packet
@@ -1938,6 +1940,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   auto mrtt = server->getConn().lossState.mrtt;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
@@ -2013,6 +2016,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   auto rttvar = server->getConn().lossState.rttvar;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
@@ -2088,6 +2092,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
 
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
@@ -2145,6 +2150,7 @@ TEST_P(
   auto peerAddress = server->getConn().peerAddress;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
@@ -2178,6 +2184,7 @@ TEST_P(
   auto packet = std::move(builder).buildPacket();
   folly::SocketAddress newPeer2("200.101.102.103", 23456);
   try {
+    EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
     deliverData(packetToBuf(packet), false, &newPeer2);
     FAIL();
   } catch (const std::runtime_error& ex) {
@@ -2213,11 +2220,13 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
       server->getConn().transportSettings.maxNumMigrationsAllowed;
   for (uint16_t i = 0; i < maxNumMigrationsAllowed; ++i) {
     folly::SocketAddress newPeer("100.101.102.103", 23456 + i);
+    EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
     deliverData(packetData->clone(), false, &newPeer);
   }
 
   folly::SocketAddress newPeer("200.101.102.103", 23456);
   try {
+    EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
     deliverData(packetData->clone(), false, &newPeer);
   } catch (const std::runtime_error& ex) {
     EXPECT_EQ(std::string(ex.what()), "Invalid migration");
@@ -2615,6 +2624,7 @@ TEST_F(
   auto rttvar = server->getConn().lossState.rttvar;
   auto mrtt = server->getConn().lossState.mrtt;
 
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
@@ -2654,6 +2664,7 @@ TEST_F(
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData2), false);
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);

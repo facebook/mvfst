@@ -88,6 +88,8 @@ class QuicTransportStatsCallback {
 
   virtual void onConnectionCloseZeroBytesWritten() = 0;
 
+  virtual void onPeerAddressChanged() = 0;
+
   // stream level metrics
   virtual void onNewQuicStream() = 0;
 

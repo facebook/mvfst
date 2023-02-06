@@ -1041,6 +1041,7 @@ void onServerReadDataFromOpen(
     }
 
     if (conn.peerAddress != readData.peer) {
+      QUIC_STATS(conn.statsCallback, onPeerAddressChanged);
       auto migrationDenied = (encryptionLevel != EncryptionLevel::AppData) ||
           conn.transportSettings.disableMigration;
       if (migrationDenied) {
