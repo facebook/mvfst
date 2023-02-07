@@ -39,7 +39,7 @@ std::string_view congestionControlTypeToString(CongestionControlType type) {
   }
 }
 
-folly::Optional<CongestionControlType> congestionControlStrToType(
+std::optional<CongestionControlType> congestionControlStrToType(
     std::string_view str) {
   if (str == kCongestionControlCubicStr) {
     return quic::CongestionControlType::Cubic;
@@ -60,7 +60,7 @@ folly::Optional<CongestionControlType> congestionControlStrToType(
   } else if (str == kCongestionControlNoneStr) {
     return quic::CongestionControlType::None;
   }
-  return folly::none;
+  return std::nullopt;
 }
 
 QuicBatchingMode getQuicBatchingMode(uint32_t val) {

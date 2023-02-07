@@ -75,7 +75,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
            */
           if (paramId ==
               static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB)) {
-            folly::Optional<CongestionControlType> cctype =
+            std::optional<CongestionControlType> cctype =
                 congestionControlStrToType(val.asString());
             if (cctype) {
               knobParams.push_back(

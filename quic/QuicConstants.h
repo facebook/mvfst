@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/common/third-party/enum.h>
 #include <sys/types.h>
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <ostream>
 #include <string_view>
 #include <vector>
@@ -449,7 +449,7 @@ enum class CongestionControlType : uint8_t {
   MAX
 };
 std::string_view congestionControlTypeToString(CongestionControlType type);
-folly::Optional<CongestionControlType> congestionControlStrToType(
+std::optional<CongestionControlType> congestionControlStrToType(
     std::string_view str);
 
 // This is an approximation of a small enough number for cwnd to be blocked.

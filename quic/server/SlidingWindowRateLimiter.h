@@ -7,7 +7,9 @@
 
 #pragma once
 
+#include <folly/Optional.h>
 #include <quic/server/RateLimiter.h>
+#include <functional>
 
 namespace quic {
 

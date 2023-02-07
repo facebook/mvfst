@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/Optional.h>
 #include <quic/QuicConstants.h>
 #include <quic/d6d/Types.h>
 #include <chrono>
