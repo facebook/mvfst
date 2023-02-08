@@ -280,7 +280,8 @@ void cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
     uint64_t peerAdvertisedInitialMaxStreamDataUni,
     uint64_t peerAdvertisedInitialMaxStreamsBidi,
-    uint64_t peerAdvertisedInitialMaxStreamUni) {
+    uint64_t peerAdvertisedInitialMaxStreamUni,
+    bool peerAdvertisedKnobFrameSupport) {
   conn.serverInitialParamsSet_ = true;
   conn.peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
   conn.peerAdvertisedInitialMaxStreamDataBidiLocal =
@@ -292,6 +293,7 @@ void cacheServerInitialParams(
   conn.peerAdvertisedInitialMaxStreamsBidi =
       peerAdvertisedInitialMaxStreamsBidi;
   conn.peerAdvertisedInitialMaxStreamsUni = peerAdvertisedInitialMaxStreamUni;
+  conn.peerAdvertisedKnobFrameSupport = peerAdvertisedKnobFrameSupport;
 }
 
 CachedServerTransportParameters getServerCachedTransportParameters(
@@ -313,6 +315,7 @@ CachedServerTransportParameters getServerCachedTransportParameters(
       conn.peerAdvertisedInitialMaxStreamsBidi;
   transportParams.initialMaxStreamsUni =
       conn.peerAdvertisedInitialMaxStreamsUni;
+  transportParams.knobFrameSupport = conn.peerAdvertisedKnobFrameSupport;
 
   return transportParams;
 }
@@ -333,5 +336,6 @@ void updateTransportParamsFromCachedEarlyParams(
       transportParams.initialMaxStreamsBidi);
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       transportParams.initialMaxStreamsUni);
+  conn.peerAdvertisedKnobFrameSupport = transportParams.knobFrameSupport;
 }
 } // namespace quic

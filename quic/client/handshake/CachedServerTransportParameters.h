@@ -22,6 +22,7 @@ struct CachedServerTransportParameters {
   uint64_t initialMaxStreamDataUni;
   uint64_t initialMaxStreamsBidi;
   uint64_t initialMaxStreamsUni;
+  bool knobFrameSupport{false};
 };
 
 } // namespace quic

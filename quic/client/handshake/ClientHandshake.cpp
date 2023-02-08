@@ -41,7 +41,8 @@ void ClientHandshake::connect(
         cachedServerTransportParams->initialMaxStreamDataBidiRemote,
         cachedServerTransportParams->initialMaxStreamDataUni,
         cachedServerTransportParams->initialMaxStreamsBidi,
-        cachedServerTransportParams->initialMaxStreamsUni);
+        cachedServerTransportParams->initialMaxStreamsUni,
+        cachedServerTransportParams->knobFrameSupport);
     updateTransportParamsFromCachedEarlyParams(
         *conn_, *cachedServerTransportParams);
   }

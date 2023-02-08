@@ -28,6 +28,7 @@ constexpr auto initialMaxStreamDataBidiRemote = kDefaultStreamWindowSize + 4;
 constexpr auto initialMaxStreamDataUni = kDefaultStreamWindowSize + 5;
 constexpr auto initialMaxStreamsBidi = kDefaultMaxStreamsBidirectional + 6;
 constexpr auto initialMaxStreamsUni = kDefaultMaxStreamsUnidirectional + 7;
+constexpr auto knobFrameSupport = true;
 const CachedServerTransportParameters kParams{
     std::chrono::milliseconds(idleTimeout).count(),
     maxRecvPacketSize,
@@ -36,7 +37,8 @@ const CachedServerTransportParameters kParams{
     initialMaxStreamDataBidiRemote,
     initialMaxStreamDataUni,
     initialMaxStreamsBidi,
-    initialMaxStreamsUni};
+    initialMaxStreamsUni,
+    knobFrameSupport};
 } // namespace
 
 class ClientStateMachineTest : public Test {
@@ -66,6 +68,7 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsNotIgnorePathMTU) {
 
 TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   client_->transportSettings.canIgnorePathMTU = true;
+  client_->peerAdvertisedKnobFrameSupport = false;
 
   updateTransportParamsFromCachedEarlyParams(*client_, kParams);
   EXPECT_EQ(client_->peerIdleTimeout, idleTimeout);
@@ -80,6 +83,7 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   EXPECT_EQ(
       client_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
       initialMaxStreamDataUni);
+  EXPECT_EQ(client_->peerAdvertisedKnobFrameSupport, knobFrameSupport);
 
   for (unsigned long i = 0; i < initialMaxStreamsBidi; i++) {
     EXPECT_TRUE(
@@ -189,9 +193,11 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
-      static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
-  transportParams.push_back(knobFrameSupport->encode());
+  auto knobFrameSupportParam =
+      std::make_unique<CustomIntegralTransportParameter>(
+          static_cast<uint64_t>(TransportParameterId::knob_frames_supported),
+          1);
+  transportParams.push_back(knobFrameSupportParam->encode());
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   processServerInitialParams(clientConn, serverTransportParams, 0);
@@ -202,9 +208,11 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
-      static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 0);
-  transportParams.push_back(knobFrameSupport->encode());
+  auto knobFrameSupportParam =
+      std::make_unique<CustomIntegralTransportParameter>(
+          static_cast<uint64_t>(TransportParameterId::knob_frames_supported),
+          0);
+  transportParams.push_back(knobFrameSupportParam->encode());
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   processServerInitialParams(clientConn, serverTransportParams, 0);

@@ -724,7 +724,8 @@ void QuicClientTransport::processPacketData(
                 .peerAdvertisedInitialMaxStreamOffsetBidiRemote,
             conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
             maxStreamsBidi.value_or(0),
-            maxStreamsUni.value_or(0));
+            maxStreamsUni.value_or(0),
+            conn_->peerAdvertisedKnobFrameSupport);
 
         if (zeroRttRejected.has_value() && *zeroRttRejected) {
           // verify that the new flow control parameters are >= the original

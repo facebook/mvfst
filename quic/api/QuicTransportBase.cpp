@@ -3392,12 +3392,7 @@ QuicTransportBase::setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) {
 }
 
 bool QuicTransportBase::isKnobSupported() const {
-  // This condition reflects the transition from using the QuicVersion to a
-  // transport parameter.
-  return (conn_->peerAdvertisedKnobFrameSupport) ||
-      (conn_->version &&
-       (*(conn_->version) == QuicVersion::MVFST ||
-        *(conn_->version) == QuicVersion::MVFST_EXPERIMENTAL));
+  return conn_->peerAdvertisedKnobFrameSupport;
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {

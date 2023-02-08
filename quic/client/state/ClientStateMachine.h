@@ -150,7 +150,8 @@ void cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
     uint64_t peerAdvertisedInitialMaxStreamDataUni,
     uint64_t peerAdvertisedInitialMaxStreamsBidi,
-    uint64_t peerAdvertisedInitialMaxStreamUni);
+    uint64_t peerAdvertisedInitialMaxStreamUni,
+    bool peerAdvertisedKnobFrameSupport);
 
 CachedServerTransportParameters getServerCachedTransportParameters(
     const QuicClientConnectionState& conn);
