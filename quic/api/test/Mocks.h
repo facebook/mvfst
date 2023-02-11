@@ -295,6 +295,10 @@ class MockObserver : public QuicSocket::ManagedObserver {
   MOCK_METHOD((void), detached, (QuicSocket*), (noexcept));
   MOCK_METHOD(
       (void),
+      packetsReceived,
+      (QuicSocket*, const SocketObserverInterface::PacketsReceivedEvent&));
+  MOCK_METHOD(
+      (void),
       destroyed,
       (QuicSocket*, QuicSocket::Observer::DestroyContext* ctx),
       (noexcept));
