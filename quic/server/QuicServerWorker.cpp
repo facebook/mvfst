@@ -114,6 +114,10 @@ void QuicServerWorker::bind(
     }
   }
   socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
+
+  if (mvfst_hook_on_socket_create) {
+    mvfst_hook_on_socket_create(socket_->getNetworkSocket().toFd());
+  }
 }
 
 void QuicServerWorker::applyAllSocketOptions() {
