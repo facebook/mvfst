@@ -763,6 +763,8 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream1->lossBuffer.size(), 1);
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
+  EXPECT_EQ(stream1->streamLossCount, 1);
+  EXPECT_EQ(stream2->streamLossCount, 1);
 
   auto& buffer = stream1->lossBuffer.front();
   EXPECT_EQ(buffer.offset, 0);
@@ -810,11 +812,13 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
   markPacketLoss(*conn, packet1, false);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
   EXPECT_EQ(stream1->lossBuffer.size(), 1);
+  EXPECT_EQ(stream1->streamLossCount, 1);
   auto& packet2 =
       getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
   markPacketLoss(*conn, packet2, false);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream1->lossBuffer.size(), 1);
+  EXPECT_EQ(stream1->streamLossCount, 2);
 
   auto combined = buf1->clone();
   combined->prependChain(buf2->clone());
@@ -877,11 +881,13 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
   markPacketLoss(*conn, packet1, false);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 2);
   EXPECT_EQ(stream1->lossBuffer.size(), 1);
+  EXPECT_EQ(stream1->streamLossCount, 1);
   auto& packet3 =
       getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
   markPacketLoss(*conn, packet3, false);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
   EXPECT_EQ(stream1->lossBuffer.size(), 2);
+  EXPECT_EQ(stream1->streamLossCount, 2);
 
   auto& buffer1 = stream1->lossBuffer[0];
   EXPECT_EQ(buffer1.offset, 0);
@@ -926,6 +932,7 @@ TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
   EXPECT_EQ(3, conn->outstandings.packets.size());
   auto packet = conn->outstandings.packets[folly::Random::rand32() % 3];
   markPacketLoss(*conn, packet.packet, false);
+  EXPECT_EQ(1, stream->streamLossCount);
   EXPECT_EQ(2, stream->retransmissionBuffer.size());
 }
 
@@ -2673,6 +2680,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(lostBufMeta1.eof);
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_TRUE(conn->streamManager->hasLoss());
+  ASSERT_EQ(stream->streamLossCount, 1);
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 
   // Lose the 3rd dsr packet:
@@ -2688,6 +2696,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_EQ(400, lostBufMeta2.length);
   EXPECT_TRUE(lostBufMeta2.eof);
   EXPECT_EQ(1, stream->retransmissionBufMetas.size());
+  ASSERT_EQ(stream->streamLossCount, 2);
   EXPECT_TRUE(conn->streamManager->hasLoss());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 
@@ -2705,6 +2714,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_EQ(600, lostBufMeta3.length);
   EXPECT_FALSE(lostBufMeta3.eof);
   EXPECT_EQ(0, stream->retransmissionBufMetas.size());
+  ASSERT_EQ(stream->streamLossCount, 3);
   EXPECT_TRUE(conn->streamManager->hasLoss());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 }

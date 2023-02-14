@@ -314,6 +314,7 @@ struct QuicStreamState : public QuicStreamLike {
     writeBufMeta = other.writeBufMeta;
     retransmissionBufMetas = std::move(other.retransmissionBufMetas);
     lossBufMetas = std::move(other.lossBufMetas);
+    streamLossCount = other.streamLossCount;
   }
 
   // Connection that this stream is associated with.
@@ -467,6 +468,8 @@ struct QuicStreamState : public QuicStreamLike {
 
   // WriteBufferMetas that's already marked lost. They will be retransmitted.
   std::deque<WriteBufferMeta> lossBufMetas;
+
+  uint64_t streamLossCount{0};
 
   /**
    * Insert a new WriteBufferMeta into lossBufMetas. If the new WriteBufferMeta

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/small_vector.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 
@@ -101,11 +102,27 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
   }
 }
 
+template <class T, size_t N>
+using InlineSetVec = folly::small_vector<T, N>;
+
+template <
+    typename Value,
+    size_t N,
+    class Container = InlineSetVec<Value, N>,
+    typename = std::enable_if_t<std::is_integral<Value>::value>>
+using InlineSet = folly::heap_vector_set<
+    Value,
+    std::less<Value>,
+    typename Container::allocator_type,
+    void,
+    Container>;
+
 void markPacketLoss(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,
     bool processed) {
   QUIC_STATS(conn.statsCallback, onPacketLoss);
+  InlineSet<uint64_t, 10> streamsWithAddedStreamLossForPacket;
   for (auto& packetFrame : packet.frames) {
     switch (packetFrame.type()) {
       case QuicWriteFrame::Type::MaxStreamDataFrame: {
@@ -154,6 +171,11 @@ void markPacketLoss(
             break;
           }
           stream->insertIntoLossBuffer(std::move(bufferItr->second));
+          if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
+              streamsWithAddedStreamLossForPacket.end()) {
+            stream->streamLossCount++;
+            streamsWithAddedStreamLossForPacket.insert(frame.streamId);
+          }
           stream->retransmissionBuffer.erase(bufferItr);
         } else {
           auto retxBufMetaItr =
@@ -166,6 +188,11 @@ void markPacketLoss(
           CHECK_EQ(bufMeta.length, frame.len);
           CHECK_EQ(bufMeta.eof, frame.fin);
           stream->insertIntoLossBufMeta(retxBufMetaItr->second);
+          if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
+              streamsWithAddedStreamLossForPacket.end()) {
+            stream->streamLossCount++;
+            streamsWithAddedStreamLossForPacket.insert(frame.streamId);
+          }
           stream->retransmissionBufMetas.erase(retxBufMetaItr);
         }
         conn.streamManager->updateWritableStreams(*stream);
