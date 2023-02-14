@@ -301,10 +301,14 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
                       << " read=" << readData->first->computeChainDataLength()
                       << " sent=" << dataCopy->computeChainDataLength();
             streamData->append(std::move(readData->first), readData->second);
+            if (readData->second) {
+              c->setReadCallback(id, nullptr);
+            }
           }));
   ON_CALL(*readCallback, readError(streamId, _))
-      .WillByDefault(Invoke([streamData](auto, auto err) mutable {
+      .WillByDefault(Invoke([streamData, this](auto sid, auto err) mutable {
         streamData->setException(err);
+        client->setReadCallback(sid, nullptr);
       }));
   return streamData->promise.getFuture().within(30s);
 }
@@ -4333,10 +4337,12 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
   }
   EXPECT_TRUE(dataDelivered);
   const auto& readCbs = client->getReadCallbacks();
-  EXPECT_EQ(0, readCbs.count(streamId));
+  EXPECT_EQ(1, readCbs.count(streamId));
   EXPECT_EQ(0, conn.streamManager->readableStreams().count(streamId));
-  EXPECT_FALSE(conn.streamManager->streamExists(streamId));
+  EXPECT_TRUE(conn.streamManager->streamExists(streamId));
   client->close(folly::none);
+  EXPECT_EQ(0, readCbs.count(streamId));
+  EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4437,9 +4443,11 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
       PacketNumberSpace::AppData));
   deliverData(ackPacket->coalesce());
   EXPECT_FALSE(conn.streamManager->hasDeliverable());
+  EXPECT_TRUE(conn.streamManager->streamExists(streamId));
+  EXPECT_EQ(readCbs.count(streamId), 1);
+  client->close(folly::none);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_EQ(readCbs.count(streamId), 0);
-  client->close(folly::none);
   EXPECT_TRUE(client->isClosed());
 }
 

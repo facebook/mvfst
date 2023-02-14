@@ -2580,8 +2580,9 @@ void QuicTransportBase::checkForClosedStream() {
 
     // We may be in an active read cb when we close the stream
     auto readCbIt = readCallbacks_.find(*itr);
+    // We use the read callback as a way to defer destruction of the stream.
     if (readCbIt != readCallbacks_.end() &&
-        readCbIt->second.readCb != nullptr && !readCbIt->second.deliveredEOM) {
+        readCbIt->second.readCb != nullptr) {
       VLOG(10) << "Not closing stream=" << *itr
                << " because it has active read callback";
       ++itr;
