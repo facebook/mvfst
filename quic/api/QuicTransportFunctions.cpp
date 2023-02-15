@@ -1435,11 +1435,11 @@ WriteQuicDataResult writeConnectionDataToSocket(
       writableBytes -= cipherOverhead;
     }
 
-    const auto& dataPlainFunc =
+    const auto& dataPlaneFunc =
         connection.transportSettings.dataPathType == DataPathType::ChainedMemory
         ? iobufChainBasedBuildScheduleEncrypt
         : continuousMemoryBuildScheduleEncrypt;
-    auto ret = dataPlainFunc(
+    auto ret = dataPlaneFunc(
         connection,
         std::move(header),
         pnSpace,
