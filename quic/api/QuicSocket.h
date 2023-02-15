@@ -252,6 +252,10 @@ class QuicSocket {
 
     // Number of packets transmitted that carry new STREAM frame for this stream
     uint64_t numPacketsTxWithNewData{0};
+
+    // Number of packets that contain STREAM frame for this stream and are
+    // declared to be lost
+    uint64_t streamLossCount{0};
   };
 
   /**
