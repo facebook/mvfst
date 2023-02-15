@@ -332,6 +332,7 @@ struct TransportSettings {
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
   bool advertisedKnobFrameSupport{true};
+  bool removeStreamAfterEomCallbackUnset{false};
 
   // Local configuration for ACK receive timestamps.
   //
