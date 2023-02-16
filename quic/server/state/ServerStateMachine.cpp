@@ -92,7 +92,6 @@ void recoverOrResetCongestionAndRttState(
 void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
   // no-op versions
   if (conn.version == QuicVersion::MVFST_EXPERIMENTAL) {
-    // Set initCwnd=20 set in QuicServerWorker.cpp
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL2) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
   }

@@ -652,10 +652,6 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
         << (transportSettings.dataPathType == DataPathType::ContinuousMemory
                 ? "ContinuousMemory"
                 : "ChainedMemory");
-    // TODO T132636939: remove after experimenting w/ higher init cwnd.
-    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
-      transportSettings.initCwndInMss = 20;
-    }
     trans->setTransportSettings(transportSettings);
     trans->setConnectionIdAlgo(connIdAlgo_.get());
     trans->setServerConnectionIdRejector(this);
