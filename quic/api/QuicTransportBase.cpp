@@ -3886,4 +3886,11 @@ void QuicTransportBase::onStreamPrioritiesChange() {
   conn_->congestionController->setBandwidthUtilizationFactor(targetUtilization);
 }
 
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::setStreamGroupRetransmissionPolicy(
+    StreamGroupId /* groupId */,
+    QuicStreamGroupRetransmissionPolicy /* policy */) noexcept {
+  return folly::unit;
+}
+
 } // namespace quic

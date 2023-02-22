@@ -363,5 +363,10 @@ class MockQuicSocket : public QuicSocket {
       (folly::Expected<StreamId, LocalErrorCode>),
       createUnidirectionalStreamInGroup,
       (StreamGroupId));
+  MOCK_METHOD(
+      (folly::Expected<folly::Unit, LocalErrorCode>),
+      setStreamGroupRetransmissionPolicy,
+      (StreamGroupId, QuicStreamGroupRetransmissionPolicy),
+      (noexcept));
 };
 } // namespace quic

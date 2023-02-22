@@ -699,6 +699,11 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void appendCmsgs(const folly::SocketOptionMap& options);
 
+  folly::Expected<folly::Unit, LocalErrorCode>
+  setStreamGroupRetransmissionPolicy(
+      StreamGroupId groupId,
+      QuicStreamGroupRetransmissionPolicy policy) noexcept override;
+
  protected:
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);

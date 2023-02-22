@@ -19,6 +19,7 @@
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicPriorityQueue.h>
+#include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
 
@@ -1416,6 +1417,14 @@ class QuicSocket {
    */
   virtual folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) = 0;
+
+  /**
+   *  Sets a retransmission policy on a stream group.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  setStreamGroupRetransmissionPolicy(
+      StreamGroupId groupId,
+      QuicStreamGroupRetransmissionPolicy policy) noexcept = 0;
 
  protected:
   /**
