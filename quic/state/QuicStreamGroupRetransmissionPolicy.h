@@ -7,11 +7,19 @@
 
 #pragma once
 
+#include <quic/QuicConstants.h>
+
 namespace quic {
 
-class QuicStreamGroupRetransmissionPolicy {
- public:
-  QuicStreamGroupRetransmissionPolicy() = default;
+struct QuicStreamGroupRetransmissionPolicy {
+  // Params controlling retransmission.
+  DurationRep timeReorderingThreshDividend{
+      kDefaultTimeReorderingThreshDividend};
+  DurationRep timeReorderingThreshDivisor{kDefaultTimeReorderingThreshDivisor};
+  uint32_t reorderingThreshold{kReorderingThreshold};
+
+  // Disables retransmission. completely.
+  bool disableRetransmission{false};
 };
 
 } // namespace quic
