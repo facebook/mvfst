@@ -292,16 +292,38 @@ AckEvent processAckFrame(
       }
 
       {
-        auto tmpIt = packetsWithHandlerContext.emplace(
-            std::find_if(
-                packetsWithHandlerContext.rbegin(),
-                packetsWithHandlerContext.rend(),
-                [&currentPacketNum](const auto& packetWithHandlerContext) {
-                  return packetWithHandlerContext.outstandingPacket.packet
-                             .header.getPacketSequenceNum() > currentPacketNum;
-                })
-                .base(),
-            std::move(*rPacketIt));
+        // We want the elements in packetsWithHandlerContext to be ordered in
+        // ascending order by packet number so that they can be processed in
+        // order. In addition, this ordering ensures that when this container is
+        // destroyed, the OutstandingPackets contained within it are destroyed
+        // in order. This enables PacketProcessors to receive notifications
+        // about destroyed OutstandingPackets in sorted order.
+        //
+        // The packet numbers in the AckBlocks in the AckFrame are relative to
+        // the highest acknowledged packet, and are ordered such that the last
+        // AckBlock acknowledges the highest ACKed packet number.
+        //
+        // Because we (1) process AckBlocks in reverse order; (2) search for
+        // OutstandingPackets in descending order; and (3) only handles ACKs for
+        // a single packet number space on each invocation of processAckFrame,
+        // we expect that the OutstandingPacket currently being processed has a
+        // packet number less than the packet number of any OutstandingPacket
+        // previously processed during this invocation of processAckFrame.
+        //
+        // As a result, inserting the OutstandingPacket at the front of
+        // packetsWithHandlerContext should yield a container of
+        // OutstandingPackets sorted in ascending order by packet number.
+
+        if (!packetsWithHandlerContext.empty()) {
+          DCHECK_LE(
+              currentPacketNum,
+              packetsWithHandlerContext.front()
+                  .outstandingPacket.packet.header.getPacketSequenceNum());
+        }
+
+        auto tmpIt = packetsWithHandlerContext.insert(
+            packetsWithHandlerContext.begin(),
+            OutstandingPacketWithHandlerContext(std::move(*rPacketIt)));
         tmpIt->processAllFrames = needsProcess;
       }
 
@@ -325,11 +347,9 @@ AckEvent processAckFrame(
   // frame types only if the packet doesn't have an associated PacketEvent;
   // or the PacketEvent is in conn.outstandings.packetEvents
   ack.ackedPackets.reserve(packetsWithHandlerContext.size());
-  for (auto packetWithHandlerContextItr = packetsWithHandlerContext.rbegin();
-       packetWithHandlerContextItr != packetsWithHandlerContext.rend();
-       packetWithHandlerContextItr++) {
-    auto& outstandingPacket = packetWithHandlerContextItr->outstandingPacket;
-    const auto processAllFrames = packetWithHandlerContextItr->processAllFrames;
+  for (auto& packetWithHandlerContext : packetsWithHandlerContext) {
+    auto& outstandingPacket = packetWithHandlerContext.outstandingPacket;
+    const auto processAllFrames = packetWithHandlerContext.processAllFrames;
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     for (auto& packetFrame : outstandingPacket.packet.frames) {
       if (!processAllFrames &&
