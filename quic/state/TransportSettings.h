@@ -295,8 +295,6 @@ struct TransportSettings {
   // Whether or not to opportunistically retransmit 0RTT when the handshake
   // completes.
   bool earlyRetransmit0Rtt{false};
-  // Whether to use JumpStarter as the CongestionControllerFactory
-  bool useJumpStart{false};
   // Whether to issue new tokens via NewToken frames.
   bool issueNewTokens{false};
   // Used to generate the number of frames to add to short header packets.
