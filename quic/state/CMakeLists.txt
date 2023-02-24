@@ -35,8 +35,6 @@ add_dependencies(
   mvfst_codec_types
   mvfst_dsr_sender
   mvfst_handshake
-  mvfst_d6d_types
-  mvfst_d6d_probe_raiser
 )
 
 target_link_libraries(
@@ -49,8 +47,6 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_dsr_sender
   mvfst_handshake
-  mvfst_d6d_types
-  mvfst_d6d_probe_raiser
 )
 
 add_library(

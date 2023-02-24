@@ -27,7 +27,7 @@ if(NOT TARGET mvfst::mvfst_transport)
   get_target_property(mvfst_INCLUDE_DIRS mvfst::mvfst_transport INTERFACE_INCLUDE_DIRECTORIES)
 endif()
 
-set(mvfst_LIBRARIES 
+set(mvfst_LIBRARIES
   mvfst::mvfst_constants
   mvfst::mvfst_exception
   mvfst::mvfst_transport
@@ -64,8 +64,6 @@ set(mvfst_LIBRARIES
   mvfst::mvfst_state_functions
   mvfst::mvfst_state_simple_frame_functions
   mvfst::mvfst_state_stream
-  mvfst::mvfst_d6d_state_functions
-  mvfst::mvfst_d6d_types
 )
 
 if(NOT mvfst_FIND_QUIETLY)

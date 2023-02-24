@@ -737,48 +737,6 @@ TEST_F(
       conn->flowControlState.sumCurWriteOffset);
 }
 
-TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNotConsumeSendPing) {
-  auto conn = createConn();
-  conn->pendingEvents.sendPing = true; // Simulate application sendPing()
-  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  packet.packet.frames.push_back(PingFrame());
-  auto packetNum = packet.packet.header.getPacketSequenceNum();
-  conn->d6d.lastProbe = D6DProbePacket(packetNum, 50);
-  updateConnection(
-      *conn,
-      folly::none,
-      packet.packet,
-      Clock::now(),
-      50,
-      0,
-      false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_TRUE(conn->outstandings.packets.front().metadata.isD6DProbe);
-  EXPECT_EQ(1, conn->d6d.outstandingProbes);
-  // sendPing should still be active since d6d probe should be "hidden" from
-  // application
-  EXPECT_TRUE(conn->pendingEvents.sendPing);
-}
-
-TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNeedsAppDataPNSpace) {
-  auto conn = createConn();
-  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  packet.packet.frames.push_back(PingFrame());
-  auto packetNum = packet.packet.header.getPacketSequenceNum();
-  conn->d6d.lastProbe = D6DProbePacket(packetNum, 50);
-  updateConnection(
-      *conn,
-      folly::none,
-      packet.packet,
-      Clock::now(),
-      50,
-      0,
-      false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_FALSE(conn->outstandings.packets.front().metadata.isD6DProbe);
-  EXPECT_EQ(0, conn->d6d.outstandingProbes);
-}
-
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
@@ -4375,43 +4333,6 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   EXPECT_EQ(0, bufPtr->length());
   EXPECT_EQ(0, bufPtr->headroom());
   EXPECT_EQ(conn->outstandings.packets.size(), outstandingPacketsCount + 3);
-}
-
-TEST_F(QuicTransportFunctionsTest, WriteD6DProbesWithInplaceBuilder) {
-  auto conn = createConn();
-  conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  conn->d6d.currentProbeSize = 1450;
-  conn->pendingEvents.d6d.sendProbePacket = true;
-  auto simpleBufAccessor =
-      std::make_unique<SimpleBufAccessor>(kDefaultMaxUDPPayload * 16);
-  auto outputBuf = simpleBufAccessor->obtain();
-  auto bufPtr = outputBuf.get();
-  simpleBufAccessor->release(std::move(outputBuf));
-  conn->bufAccessor = simpleBufAccessor.get();
-  conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
-  EventBase evb;
-  folly::test::MockAsyncUDPSocket mockSock(&evb);
-  EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
-  EXPECT_CALL(mockSock, write(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& sockBuf) {
-        EXPECT_EQ(sockBuf->length(), conn->d6d.currentProbeSize);
-        EXPECT_EQ(sockBuf.get(), bufPtr);
-        EXPECT_TRUE(folly::IOBufEqualTo()(*sockBuf, *bufPtr));
-        EXPECT_FALSE(sockBuf->isChained());
-        return sockBuf->computeChainDataLength();
-      }));
-  writeD6DProbeToSocket(
-      mockSock,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn));
-  EXPECT_EQ(0, bufPtr->length());
-  EXPECT_EQ(0, bufPtr->headroom());
 }
 
 TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {

@@ -122,14 +122,6 @@ class QuicTransportStatsCallback {
 
   virtual void onUDPSocketWriteError(SocketErrorType errorType) = 0;
 
-  virtual void onConnectionD6DStarted() = 0;
-
-  virtual void onConnectionPMTURaised() = 0;
-
-  virtual void onConnectionPMTUBlackholeDetected() = 0;
-
-  virtual void onConnectionPMTUUpperBoundDetected() = 0;
-
   virtual void onTransportKnobApplied(TransportKnobParamId knobType) = 0;
 
   virtual void onTransportKnobError(TransportKnobParamId knobType) = 0;

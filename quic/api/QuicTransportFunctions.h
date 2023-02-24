@@ -310,15 +310,6 @@ uint64_t writeProbingDataToSocket(
     QuicVersion version,
     const std::string& token = std::string());
 
-uint64_t writeD6DProbeToSocket(
-    folly::AsyncUDPSocket& sock,
-    QuicConnectionStateBase& connection,
-    const ConnectionId& srcConnId,
-    const ConnectionId& dstConnId,
-    const Aead& aead,
-    const PacketNumberCipher& headerCipher,
-    QuicVersion version);
-
 HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType);
 HeaderBuilder ShortHeaderBuilder();
 

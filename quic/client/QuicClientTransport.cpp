@@ -1021,9 +1021,6 @@ void QuicClientTransport::startCryptoHandshake() {
   conn_->initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
       *clientConn_->initialDestinationConnectionId, version);
 
-  setD6DBasePMTUTransportParameter();
-  setD6DRaiseTimeoutTransportParameter();
-  setD6DProbeTimeoutTransportParameter();
   setSupportedExtensionTransportParameters();
   maybeEnableStreamGroups();
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
@@ -1655,78 +1652,6 @@ void QuicClientTransport::setHostname(const std::string& hostname) {
 
 void QuicClientTransport::setSelfOwning() {
   selfOwning_ = shared_from_this();
-}
-
-void QuicClientTransport::setD6DBasePMTUTransportParameter() {
-  if (!conn_->transportSettings.d6dConfig.enabled) {
-    return;
-  }
-
-  uint64_t basePMTUSetting =
-      conn_->transportSettings.d6dConfig.advertisedBasePMTU;
-
-  // Sanity check
-  if (basePMTUSetting < kMinMaxUDPPayload ||
-      basePMTUSetting > kDefaultMaxUDPPayload) {
-    LOG(ERROR) << "insane base PMTU, skipping: " << basePMTUSetting;
-    return;
-  }
-
-  auto basePMTUCustomParam = std::make_unique<CustomIntegralTransportParameter>(
-      kD6DBasePMTUParameterId, basePMTUSetting);
-
-  if (!setCustomTransportParameter(
-          std::move(basePMTUCustomParam), customTransportParameters_)) {
-    LOG(ERROR) << "failed to set D6D base PMTU transport parameter";
-  }
-}
-
-void QuicClientTransport::setD6DRaiseTimeoutTransportParameter() {
-  if (!conn_->transportSettings.d6dConfig.enabled) {
-    return;
-  }
-
-  std::chrono::seconds raiseTimeoutSetting =
-      conn_->transportSettings.d6dConfig.advertisedRaiseTimeout;
-
-  // Sanity check
-  if (raiseTimeoutSetting < kMinD6DRaiseTimeout) {
-    LOG(ERROR) << "d6d raise timeout exceeding lower bound, skipping: "
-               << raiseTimeoutSetting.count();
-  }
-
-  auto raiseTimeoutCustomParam =
-      std::make_unique<CustomIntegralTransportParameter>(
-          kD6DRaiseTimeoutParameterId, raiseTimeoutSetting.count());
-
-  if (!setCustomTransportParameter(
-          std::move(raiseTimeoutCustomParam), customTransportParameters_)) {
-    LOG(ERROR) << "failed to set D6D raise timeout transport parameter";
-  }
-}
-
-void QuicClientTransport::setD6DProbeTimeoutTransportParameter() {
-  if (!conn_->transportSettings.d6dConfig.enabled) {
-    return;
-  }
-
-  std::chrono::seconds probeTimeoutSetting =
-      conn_->transportSettings.d6dConfig.advertisedProbeTimeout;
-
-  // Sanity check
-  if (probeTimeoutSetting < kMinD6DProbeTimeout) {
-    LOG(ERROR) << "d6d probe timeout below lower bound, skipping: "
-               << probeTimeoutSetting.count();
-  }
-
-  auto probeTimeoutCustomParam =
-      std::make_unique<CustomIntegralTransportParameter>(
-          kD6DProbeTimeoutParameterId, probeTimeoutSetting.count());
-
-  if (!setCustomTransportParameter(
-          std::move(probeTimeoutCustomParam), customTransportParameters_)) {
-    LOG(ERROR) << "failed to set D6D probe timeout transport parameter";
-  }
 }
 
 void QuicClientTransport::setSupportedExtensionTransportParameters() {

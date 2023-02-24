@@ -359,17 +359,6 @@ class MockLegacyObserver : public LegacyObserver {
       rttSampleGenerated,
       (QuicSocket*, const PacketRTT&),
       (noexcept));
-  MOCK_METHOD((void), pmtuProbingStarted, (QuicSocket*), (noexcept));
-  MOCK_METHOD(
-      (void),
-      pmtuBlackholeDetected,
-      (QuicSocket*, const PMTUBlackholeEvent&),
-      (noexcept));
-  MOCK_METHOD(
-      (void),
-      pmtuUpperBoundDetected,
-      (QuicSocket*, const PMTUUpperBoundEvent&),
-      (noexcept));
   MOCK_METHOD(
       (void),
       spuriousLossDetected,

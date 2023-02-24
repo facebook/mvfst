@@ -55,7 +55,6 @@ class SocketObserverInterfaceTest : public ::testing::Test {
         .setEncodedSize(0)
         .setEncodedBodySize(0)
         .setIsHandshake(false)
-        .setIsD6DProbe(false)
         .setTotalBytesSent(0)
         .setTotalBodyBytesSent(0)
         .setInflightBytes(0)

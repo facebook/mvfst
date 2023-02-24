@@ -7,8 +7,6 @@
 
 #include <quic/common/WindowedCounter.h>
 #include <quic/congestion_control/Bbr.h>
-#include <quic/d6d/BinarySearchProbeSizeRaiser.h>
-#include <quic/d6d/ConstantStepProbeSizeRaiser.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/QuicServerTransport.h>
@@ -187,7 +185,6 @@ void QuicServerTransport::onReadData(
   maybeNotifyHandshakeFinished();
   maybeNotifyConnectionIdRetired();
   maybeIssueConnectionIds();
-  maybeStartD6DProbing();
   maybeNotifyTransportReady();
 }
 
@@ -349,18 +346,6 @@ void QuicServerTransport::writeData() {
           packetLimit,
           *conn_->oneRttWriteCipher,
           writeLoopBeginTime);
-    }
-
-    // D6D probes should be paced
-    if (packetLimit && conn_->pendingEvents.d6d.sendProbePacket) {
-      writeD6DProbeToSocket(
-          *socket_,
-          *conn_,
-          srcConnId,
-          destConnId,
-          *conn_->oneRttWriteCipher,
-          *conn_->oneRttWriteHeaderCipher,
-          version);
     }
   }
 }
@@ -630,45 +615,6 @@ void QuicServerTransport::maybeNotifyTransportReady() {
   }
 }
 
-void QuicServerTransport::maybeStartD6DProbing() {
-  if (!d6dProbingStarted_ && hasReadCipher() &&
-      conn_->d6d.state == D6DMachineState::BASE) {
-    d6dProbingStarted_ = true;
-    auto& d6d = conn_->d6d;
-    switch (conn_->transportSettings.d6dConfig.raiserType) {
-      case ProbeSizeRaiserType::ConstantStep:
-        d6d.raiser = std::make_unique<ConstantStepProbeSizeRaiser>(
-            conn_->transportSettings.d6dConfig.probeRaiserConstantStepSize);
-        break;
-      case ProbeSizeRaiserType::BinarySearch:
-        d6d.raiser = std::make_unique<BinarySearchProbeSizeRaiser>(
-            kMinMaxUDPPayload, d6d.maxPMTU);
-    }
-    d6d.thresholdCounter =
-        std::make_unique<WindowedCounter<uint64_t, uint64_t>>(
-            std::chrono::microseconds(kDefaultD6DBlackholeDetectionWindow)
-                .count(),
-            kDefaultD6DBlackholeDetectionThreshold);
-    d6d.currentProbeSize = d6d.basePMTU;
-    // Start probing after some delay. This filters out short-lived
-    // connections, for which probing is relatively expensive and less
-    // valuable
-    conn_->pendingEvents.d6d.sendProbeDelay = kDefaultD6DKickStartDelay;
-    QUIC_STATS(conn_->statsCallback, onConnectionD6DStarted);
-
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::pmtuEvents>()) {
-      getSocketObserverContainer()
-          ->invokeInterfaceMethod<SocketObserverInterface::Events::pmtuEvents>(
-              [](auto observer, auto observed) {
-                observer->pmtuProbingStarted(observed);
-              });
-    }
-  }
-}
-
 void QuicServerTransport::registerTransportKnobParamHandler(
     uint64_t paramId,
     std::function<void(QuicServerTransport*, TransportKnobParam::Val)>&&
@@ -721,21 +667,6 @@ void QuicServerTransport::verifiedClientAddress() {
 }
 
 void QuicServerTransport::registerAllTransportKnobParamHandlers() {
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(
-          TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
-        // TODO(dvn) TransportKnobParam::Val can probably hold bool value as
-        // well
-        if (static_cast<bool>(std::get<uint64_t>(val))) {
-          server_conn->d6d.noBlackholeDetection = true;
-          VLOG(3)
-              << "Knob param received, pmtu blackhole detection is turned off";
-        }
-      });
-
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),

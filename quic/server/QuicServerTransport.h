@@ -193,7 +193,6 @@ class QuicServerTransport
   void maybeIssueConnectionIds();
   void maybeNotifyHandshakeFinished();
   bool hasReadCipher() const;
-  void maybeStartD6DProbing();
   void registerAllTransportKnobParamHandlers();
 
  private:

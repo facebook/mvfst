@@ -962,25 +962,6 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
   EXPECT_EQ(token1.value(), token2.value());
 }
 
-TEST_P(QuicClientTransportIntegrationTest, D6DEnabledTest) {
-  expectTransportCallbacks();
-  TransportSettings settings;
-  settings.d6dConfig.enabled = true;
-  client->setTransportSettings(settings);
-
-  TransportSettings serverSettings;
-  serverSettings.d6dConfig.enabled = true;
-  serverSettings.statelessResetTokenSecret = getRandSecret();
-  server_->setTransportSettings(serverSettings);
-
-  // we only use 1 worker in test
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-  EXPECT_EQ(1, statsCallbacks_.size());
-  EXPECT_CALL(*statsCallbacks_[0], onConnectionD6DStarted())
-      .WillOnce(Invoke([&] { eventbase_.terminateLoopSoon(); }));
-  eventbase_.loopForever();
-}
-
 INSTANTIATE_TEST_SUITE_P(
     QuicClientTransportIntegrationTests,
     QuicClientTransportIntegrationTest,

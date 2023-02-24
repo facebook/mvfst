@@ -4657,34 +4657,6 @@ TEST_P(
   testSetupConnection();
 }
 
-TEST_P(QuicServerTransportHandshakeTest, TestD6DStartCallback) {
-  LegacyObserver::EventSet eventSet;
-  eventSet.enable(SocketObserverInterface::Events::pmtuEvents);
-
-  auto obs1 = std::make_unique<MockLegacyObserver>();
-  auto obs2 = std::make_unique<MockLegacyObserver>(eventSet);
-  auto obs3 = std::make_unique<MockLegacyObserver>(eventSet);
-  server->addObserver(obs1.get());
-  server->addObserver(obs2.get());
-  server->addObserver(obs3.get());
-
-  // Set oneRttReader so that maybeStartD6DPriobing passes its check
-  auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-  codec->setOneRttReadCipher(createNoOpAead());
-  server->getNonConstConn().readCodec = std::move(codec);
-  // And the state too
-  server->getNonConstConn().d6d.state = D6DMachineState::BASE;
-  EXPECT_CALL(*obs1, pmtuProbingStarted(_)).Times(0); // not enabled
-  EXPECT_CALL(*obs2, pmtuProbingStarted(_)).Times(1);
-  EXPECT_CALL(*obs3, pmtuProbingStarted(_)).Times(1);
-  // CHLO should be enough to trigger probing
-  recvClientHello();
-
-  server->removeObserver(obs1.get());
-  server->removeObserver(obs2.get());
-  server->removeObserver(obs3.get());
-}
-
 TEST_F(QuicUnencryptedServerTransportTest, DuplicateOneRttWriteCipher) {
   setupClientReadCodec();
   recvClientHello();
@@ -4749,14 +4721,6 @@ TEST_F(
       TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
   EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(knobParamId))).Times(1);
   server->handleKnobParams({{knobParamId, uint64_t{1234}}});
-}
-
-TEST_F(QuicServerTransportTest, TestRegisterPMTUZeroBlackholeDetection) {
-  server->handleKnobParams(
-      {{static_cast<uint64_t>(
-            TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
-        uint64_t{1}}});
-  EXPECT_TRUE(server->getConn().d6d.noBlackholeDetection);
 }
 
 TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {

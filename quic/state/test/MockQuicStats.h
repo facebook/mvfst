@@ -52,10 +52,6 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onRead, (size_t));
   MOCK_METHOD(void, onWrite, (size_t));
   MOCK_METHOD(void, onUDPSocketWriteError, (SocketErrorType));
-  MOCK_METHOD(void, onConnectionD6DStarted, ());
-  MOCK_METHOD(void, onConnectionPMTURaised, ());
-  MOCK_METHOD(void, onConnectionPMTUBlackholeDetected, ());
-  MOCK_METHOD(void, onConnectionPMTUUpperBoundDetected, ());
   MOCK_METHOD(void, onTransportKnobApplied, (TransportKnobParamId));
   MOCK_METHOD(void, onTransportKnobError, (TransportKnobParamId));
   MOCK_METHOD(void, onTransportKnobOutOfOrder, (TransportKnobParamId));

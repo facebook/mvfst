@@ -291,10 +291,7 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   // Include previous packets back.
   packetBuf->prepend(prevSize);
   connection.bufAccessor->release(std::move(packetBuf));
-  bool isD6DProbe = pnSpace == PacketNumberSpace::AppData &&
-      connection.d6d.lastProbe.hasValue() &&
-      connection.d6d.lastProbe->packetNum == packetNum;
-  if (!isD6DProbe && encodedSize > connection.udpSendPacketLen) {
+  if (encodedSize > connection.udpSendPacketLen) {
     VLOG(3) << "Quic sending pkt larger than limit, encodedSize="
             << encodedSize;
   }
@@ -632,9 +629,6 @@ void updateConnection(
   uint32_t newStreamBytesSent = 0;
   OutstandingPacket::Metadata::DetailsPerStream detailsPerStream;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
-  bool isD6DProbe = packetNumberSpace == PacketNumberSpace::AppData &&
-      conn.d6d.lastProbe.hasValue() &&
-      conn.d6d.lastProbe->packetNum == packetNum;
   VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
            << " in space=" << packetNumberSpace << " size=" << encodedSize
            << " bodySize: " << encodedBodySize << " isDSR=" << isDSRPacket
@@ -782,15 +776,7 @@ void updateConnection(
         break;
       }
       case QuicWriteFrame::Type::PingFrame:
-        // If this is a d6d probe, the it does not consume the sendPing request
-        // from application, because this packet, albeit containing a ping
-        // frame, is larger than the current PMTU and will potentially get
-        // dropped in the path. Additionally, the loss of this packet will not
-        // trigger retransmission, therefore tying it with the sendPing event
-        // will make this api unreliable.
-        if (!isD6DProbe) {
-          conn.pendingEvents.sendPing = false;
-        }
+        conn.pendingEvents.sendPing = false;
         isPing = true;
         break;
       case QuicWriteFrame::Type::QuicSimpleFrame: {
@@ -865,7 +851,6 @@ void updateConnection(
       encodedSize,
       encodedBodySize,
       isHandshake,
-      isD6DProbe,
       // these numbers should all _include_ the current packet
       // conn.lossState.inflightBytes isn't updated until below
       // conn.outstandings.numOutstanding() + 1 since we're emplacing here
@@ -878,10 +863,6 @@ void updateConnection(
       std::move(detailsPerStream),
       conn.appLimitedTracker.getTotalAppLimitedTime());
 
-  if (isD6DProbe) {
-    ++conn.d6d.outstandingProbes;
-    ++conn.d6d.meta.totalTxedProbes;
-  }
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
       : false;
@@ -1560,51 +1541,6 @@ uint64_t writeProbingDataToSocket(
   VLOG_IF(10, written > 0)
       << nodeToString(connection.nodeType)
       << " writing probes using scheduler=CloningScheduler " << connection;
-  return written;
-}
-
-uint64_t writeD6DProbeToSocket(
-    folly::AsyncUDPSocket& sock,
-    QuicConnectionStateBase& connection,
-    const ConnectionId& srcConnId,
-    const ConnectionId& dstConnId,
-    const Aead& aead,
-    const PacketNumberCipher& headerCipher,
-    QuicVersion version) {
-  if (!connection.pendingEvents.d6d.sendProbePacket) {
-    return 0;
-  }
-  auto builder = ShortHeaderBuilder();
-  // D6D probe is always in AppData pnSpace
-  auto pnSpace = PacketNumberSpace::AppData;
-  // Skip a packet number for probing packets to elicit acks
-  increaseNextPacketNum(connection, pnSpace);
-  D6DProbeScheduler d6dProbeScheduler(
-      connection,
-      "D6DProbeScheduler",
-      aead.getCipherOverhead(),
-      connection.d6d.currentProbeSize);
-  auto written = writeConnectionDataToSocket(
-                     sock,
-                     connection,
-                     srcConnId,
-                     dstConnId,
-                     builder,
-                     pnSpace,
-                     d6dProbeScheduler,
-                     unlimitedWritableBytes,
-                     1,
-                     aead,
-                     headerCipher,
-                     version,
-                     Clock::now())
-                     .packetsWritten;
-  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
-                           << " writing d6d probes using scheduler=D6DScheduler"
-                           << connection;
-  if (written > 0) {
-    connection.pendingEvents.d6d.sendProbePacket = false;
-  }
   return written;
 }
 

@@ -9,7 +9,6 @@
 
 #include <folly/Optional.h>
 #include <quic/QuicConstants.h>
-#include <quic/d6d/Types.h>
 #include <chrono>
 #include <cstdint>
 
@@ -58,71 +57,6 @@ struct BbrConfig {
 struct CcpConfig {
   std::string alg_name = "";
   std::string alg_args = "";
-};
-
-struct D6DConfig {
-  /**
-   * Currently, only server does probing, so this flags means different things
-   * for server and client. For server, it means whether it should enable d6d
-   * when it receives the base PMTU transport parameter. For client, it means
-   * whether it will send the base PMTU transport parameter during handshake.
-   * As a result, d6d is activated for a connection only when *both* client and
-   * server enables d6d.
-   *
-   * TODO: Please make sure QuicConnectionStateBase::D6DState::outstandingProbes
-   * are mutated correctly throughout Mvfst.
-   */
-  bool enabled{false};
-
-  /**
-   * Base PMTU that client advertises to server. This is needed because
-   * depending on the situation there are clients who want to start from a
-   * larger/smaller base PMTU. Server makes no use of this value, but should
-   * rely on the transport parameter received from client.
-   */
-  uint16_t advertisedBasePMTU{kDefaultD6DBasePMTU};
-
-  /**
-   * The number of "big" packet losses we can tolerate before signalling PMTU
-   * blackhole.
-   */
-  uint64_t blackholeDetectionThreshold{kDefaultD6DBlackholeDetectionThreshold};
-
-  /**
-   * The constant pmtu step size used for ConstantStep probe size raiser
-   */
-  uint16_t probeRaiserConstantStepSize{kDefaultD6DProbeStepSize};
-
-  /**
-   * The D6D raise timeout that client advertises to server. We might need to
-   * tune this value for different paths. Again, server makes no use of this
-   * value, but should rely on the transport parameter.
-   */
-  std::chrono::seconds advertisedRaiseTimeout{kDefaultD6DRaiseTimeout};
-
-  /**
-   * The D6D probe timeout. When it expires, we either send another
-   * probe with the same size, or sleep for raise timeout, depending
-   * on the d6d state. There are other events (e.g. probe gets acked
-   * or probe is determined lost) that might cancel this timeout.
-   * Client sends this value as a transport parameter during
-   * handshake.
-   */
-  std::chrono::seconds advertisedProbeTimeout{kDefaultD6DProbeTimeout};
-
-  /**
-   * The moving window within which we check if the detection threshold has been
-   * crossed
-   */
-  std::chrono::seconds blackholeDetectionWindow{
-      kDefaultD6DBlackholeDetectionWindow};
-
-  /**
-   * Default raiser is constant step , since overshot caused by binary
-   * search slows down convergence. Might change in the future when we
-   * have more context.
-   */
-  ProbeSizeRaiserType raiserType{ProbeSizeRaiserType::ConstantStep};
 };
 
 struct DatagramConfig {
@@ -286,8 +220,6 @@ struct TransportSettings {
   bool streamFramePerPacket{false};
   // Ensure read callbacks are ordered by Stream ID.
   bool orderedReadCallbacks{false};
-  // Config struct for D6D
-  D6DConfig d6dConfig;
   // Quic knobs
   std::vector<SerializedKnob> knobs;
   // Datagram config

@@ -255,17 +255,6 @@ AckEvent processAckFrame(
         } // if (rttSample != rttSample.zero())
       } // if (!ack.implicit && currentPacketNum == frame.largestAcked)
 
-      // D6D probe acked. Only if it's for the last probe do we
-      // trigger state change
-      if (rPacketIt->metadata.isD6DProbe) {
-        CHECK(conn.d6d.lastProbe);
-        if (!rPacketIt->declaredLost) {
-          ++conn.d6d.meta.totalAckedProbes;
-          if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
-            onD6DLastProbeAcked(conn);
-          }
-        }
-      }
       // Remove this PacketEvent from the outstandings.packetEvents set
       if (rPacketIt->associatedEvent) {
         conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);

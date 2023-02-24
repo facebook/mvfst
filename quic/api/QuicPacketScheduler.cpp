@@ -848,11 +848,8 @@ CloningScheduler::CloningScheduler(
       cipherOverhead_(cipherOverhead) {}
 
 bool CloningScheduler::hasData() const {
-  // TODO: I'm not completely convinced d6d.outstandingProbes has been updated
-  // correctly.
   return frameScheduler_.hasData() ||
-      conn_.outstandings.numOutstanding() >
-      conn_.d6d.outstandingProbes + conn_.outstandings.dsrCount;
+      conn_.outstandings.numOutstanding() > conn_.outstandings.dsrCount;
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
@@ -879,9 +876,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
   for (auto& outstandingPacket : conn_.outstandings.packets) {
-    if (outstandingPacket.declaredLost ||
-        outstandingPacket.metadata.isD6DProbe ||
-        outstandingPacket.isDSRPacket) {
+    if (outstandingPacket.declaredLost || outstandingPacket.isDSRPacket) {
       continue;
     }
     auto opPnSpace = outstandingPacket.packet.header.getPacketNumberSpace();
@@ -970,84 +965,6 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
 }
 
 folly::StringPiece CloningScheduler::name() const {
-  return name_;
-}
-
-D6DProbeScheduler::D6DProbeScheduler(
-    QuicConnectionStateBase& conn,
-    folly::StringPiece name,
-    uint64_t cipherOverhead,
-    uint32_t probeSize)
-    : conn_(conn),
-      name_(name),
-      cipherOverhead_(cipherOverhead),
-      probeSize_(probeSize) {}
-
-/**
- * This scheduler always has data since all it does is send PING with PADDINGs
- */
-bool D6DProbeScheduler::hasData() const {
-  return !probeSent_;
-}
-
-/**
- * D6DProbeScheduler ignores writableBytes because it does not respect
- * congestion control. The reasons it doesn't are that
- * - d6d probes are occasional burst of bytes in a single packet
- * - no rtx needed when probe lost
- */
-SchedulingResult D6DProbeScheduler::scheduleFramesForPacket(
-    PacketBuilderInterface&& builder,
-    uint32_t /* writableBytes */) {
-  builder.encodePacketHeader();
-  int res = writeFrame(PingFrame(), builder);
-  CHECK_GT(res, 0) << __func__ << " "
-                   << "failed to write ping frame"
-                   << "remainingBytes: " << builder.remainingSpaceInPkt();
-  CHECK(builder.canBuildPacket()) << __func__ << " "
-                                  << "inner builder cannot build packet";
-
-  auto pingOnlyPacket = std::move(builder).buildPacket();
-
-  std::unique_ptr<WrapperPacketBuilderInterface> sizeEnforcedBuilder;
-  if (conn_.transportSettings.dataPathType == DataPathType::ChainedMemory) {
-    sizeEnforcedBuilder = std::make_unique<RegularSizeEnforcedPacketBuilder>(
-        std::move(pingOnlyPacket), probeSize_, cipherOverhead_);
-  } else {
-    CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
-    sizeEnforcedBuilder = std::make_unique<InplaceSizeEnforcedPacketBuilder>(
-        *conn_.bufAccessor,
-        std::move(pingOnlyPacket),
-        probeSize_,
-        cipherOverhead_);
-  }
-  CHECK(sizeEnforcedBuilder->canBuildPacket())
-      << __func__ << " "
-      << "sizeEnforcedBuilder cannot build packet";
-
-  auto resultPacket = std::move(*sizeEnforcedBuilder).buildPacket();
-
-  auto resultPacketSize = resultPacket.header->computeChainDataLength() +
-      resultPacket.body->computeChainDataLength() + cipherOverhead_;
-  CHECK_EQ(resultPacketSize, probeSize_)
-      << __func__ << " "
-      << "result packet does not have enforced size,"
-      << " expecting: " << probeSize_ << " getting: " << resultPacketSize;
-
-  VLOG_IF(4, conn_.d6d.lastProbe.has_value())
-      << __func__ << " "
-      << "invalidating old non-acked d6d probe,"
-      << " seq: " << conn_.d6d.lastProbe->packetNum
-      << " packet size: " << conn_.d6d.lastProbe->packetSize;
-
-  conn_.d6d.lastProbe = D6DProbePacket(
-      resultPacket.packet.header.getPacketSequenceNum(), probeSize_);
-
-  probeSent_ = true;
-  return SchedulingResult(folly::none, std::move(resultPacket));
-}
-
-folly::StringPiece D6DProbeScheduler::name() const {
   return name_;
 }
 

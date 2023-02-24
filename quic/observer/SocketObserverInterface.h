@@ -9,7 +9,6 @@
 
 #include <quic/QuicException.h>
 #include <quic/common/SmallCollections.h>
-#include <quic/d6d/Types.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
@@ -36,7 +35,6 @@ class SocketObserverInterface {
     rttSamples = 4,
     lossEvents = 5,
     spuriousLossEvents = 6,
-    pmtuEvents = 7,
     knobFrameEvents = 8,
     streamEvents = 9,
     acksProcessedEvents = 10,
@@ -358,62 +356,6 @@ class SocketObserverInterface {
         lastAckedPacketInfo;
   };
 
-  struct PMTUBlackholeEvent {
-    explicit PMTUBlackholeEvent(
-        TimePoint blackholeTimeIn,
-        std::chrono::microseconds timeSinceLastNonSearchStateIn,
-        D6DMachineState lastNonSearchStateIn,
-        D6DMachineState currentStateIn,
-        uint64_t udpSendPacketLenIn,
-        uint64_t lastProbeSizeIn,
-        uint64_t blackholeDetectionWindowIn,
-        uint64_t blackholeDetectionThresholdIn,
-        const quic::OutstandingPacket& pkt)
-        : blackholeTime(blackholeTimeIn),
-          timeSinceLastNonSearchState(timeSinceLastNonSearchStateIn),
-          lastNonSearchState(lastNonSearchStateIn),
-          currentState(currentStateIn),
-          udpSendPacketLen(udpSendPacketLenIn),
-          lastProbeSize(lastProbeSizeIn),
-          blackholeDetectionWindow(blackholeDetectionWindowIn),
-          blackholeDetectionThreshold(blackholeDetectionThresholdIn),
-          triggeringPacketMetadata(pkt.metadata) {}
-    TimePoint blackholeTime;
-    // How long since last "stable" state
-    std::chrono::microseconds timeSinceLastNonSearchState;
-    D6DMachineState lastNonSearchState;
-    D6DMachineState currentState;
-    uint64_t udpSendPacketLen;
-    uint64_t lastProbeSize;
-    uint64_t blackholeDetectionWindow;
-    uint64_t blackholeDetectionThreshold;
-    // The metadata of the packet that triggerred blackhole signal
-    const quic::OutstandingPacketMetadata triggeringPacketMetadata;
-  };
-
-  struct PMTUUpperBoundEvent {
-    explicit PMTUUpperBoundEvent(
-        TimePoint upperBoundTimeIn,
-        std::chrono::microseconds timeSinceLastNonSearchStateIn,
-        D6DMachineState lastNonSearchStateIn,
-        uint64_t upperBoundPMTUIn,
-        uint64_t cumulativeProbesSentIn,
-        ProbeSizeRaiserType probeSizeRaiserTypeIn)
-        : upperBoundTime(upperBoundTimeIn),
-          timeSinceLastNonSearchState(timeSinceLastNonSearchStateIn),
-          lastNonSearchState(lastNonSearchStateIn),
-          upperBoundPMTU(upperBoundPMTUIn),
-          cumulativeProbesSent(cumulativeProbesSentIn),
-          probeSizeRaiserType(probeSizeRaiserTypeIn) {}
-    TimePoint upperBoundTime;
-    // How long it took to reach upperbound
-    std::chrono::microseconds timeSinceLastNonSearchState;
-    D6DMachineState lastNonSearchState;
-    uint64_t upperBoundPMTU;
-    uint64_t cumulativeProbesSent;
-    ProbeSizeRaiserType probeSizeRaiserType;
-  };
-
   struct SpuriousLossEvent {
     explicit SpuriousLossEvent(const TimePoint rcvTimeIn = Clock::now())
         : rcvTime(rcvTimeIn) {}
@@ -582,31 +524,6 @@ class SocketObserverInterface {
   virtual void rttSampleGenerated(
       QuicSocket*, /* socket */
       const PacketRTT& /* event */) {}
-
-  /**
-   * pmtuProbingStarted() is invoked when server starts d6d.
-   *
-   * @param socket   Socket when the callback is processed.
-   */
-  virtual void pmtuProbingStarted(QuicSocket* /* socket */) {}
-
-  /**
-   * pmtuBlackholeDetected() is invoked when a PMTU blackhole is detected.
-   *
-   * @param pmtuBlackholeEvent const reference to the PMTU blackhole event
-   */
-  virtual void pmtuBlackholeDetected(
-      QuicSocket*, /* socket */
-      const PMTUBlackholeEvent& /* event */) {}
-
-  /**
-   * pmtuUpperBoundDetected() is invoked when a PMTU upperbound is detected.
-   *
-   * @param pmtuUpperBoundEvent const reference to the PMTU upperbound event
-   */
-  virtual void pmtuUpperBoundDetected(
-      QuicSocket*, /* socket */
-      const PMTUUpperBoundEvent& /* event */) {}
 
   /**
    * spuriousLossDetected() is invoked when an ACK arrives for a packet that is

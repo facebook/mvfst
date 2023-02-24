@@ -369,31 +369,4 @@ class CloningScheduler : public QuicPacketScheduler {
   uint64_t cipherOverhead_;
 };
 
-/**
- * This is the packet scheduler for D6D probe packets. It only schedule a PING
- * frame followed by many PADDING frames, forming a probeSize-sized packet.
- */
-class D6DProbeScheduler : public QuicPacketScheduler {
- public:
-  D6DProbeScheduler(
-      QuicConnectionStateBase& conn,
-      folly::StringPiece name,
-      uint64_t cipherOverhead,
-      uint32_t probSize);
-
-  FOLLY_NODISCARD bool hasData() const override;
-
-  SchedulingResult scheduleFramesForPacket(
-      PacketBuilderInterface&& builder,
-      uint32_t writableBytes) override;
-
-  FOLLY_NODISCARD folly::StringPiece name() const override;
-
- private:
-  QuicConnectionStateBase& conn_;
-  folly::StringPiece name_;
-  uint64_t cipherOverhead_;
-  uint32_t probeSize_;
-  bool probeSent_{false};
-};
 } // namespace quic

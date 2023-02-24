@@ -249,9 +249,6 @@ class QuicClientTransport
     void resize(size_t numPackets);
   };
 
-  void setD6DBasePMTUTransportParameter();
-  void setD6DRaiseTimeoutTransportParameter();
-  void setD6DProbeTimeoutTransportParameter();
   void setSupportedExtensionTransportParameters();
   void adjustGROBuffers();
   void trackDatagramReceived(size_t len);

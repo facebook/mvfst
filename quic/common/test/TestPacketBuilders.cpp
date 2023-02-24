@@ -172,12 +172,6 @@ OutstandingPacketBuilder&& OutstandingPacketBuilder::setIsHandshake(
   return std::move(*this);
 }
 
-OutstandingPacketBuilder&& OutstandingPacketBuilder::setIsD6DProbe(
-    const bool& isD6DProbeIn) {
-  maybeIsD6DProbe = isD6DProbeIn;
-  return std::move(*this);
-}
-
 OutstandingPacketBuilder&& OutstandingPacketBuilder::setTotalBytesSent(
     const uint64_t& totalBytesSentIn) {
   maybeTotalBytesSent = totalBytesSentIn;
@@ -234,7 +228,6 @@ OutstandingPacket OutstandingPacketBuilder::build() && {
       *CHECK_NOTNULL(maybeEncodedSize.get_pointer()),
       *CHECK_NOTNULL(maybeEncodedBodySize.get_pointer()),
       *CHECK_NOTNULL(maybeIsHandshake.get_pointer()),
-      *CHECK_NOTNULL(maybeIsD6DProbe.get_pointer()),
       *CHECK_NOTNULL(maybeTotalBytesSent.get_pointer()),
       *CHECK_NOTNULL(maybeTotalBodyBytesSent.get_pointer()),
       *CHECK_NOTNULL(maybeInflightBytes.get_pointer()),

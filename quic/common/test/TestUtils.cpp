@@ -558,7 +558,6 @@ CongestionController::AckEvent makeAck(
               ackedSize /* encodedSize */,
               ackedSize /* encodedBodySize */,
               false /* isHandshake */,
-              false /* isD6DProbe */,
               0 /* totalBytesSent */,
               0 /* totalBodyBytesSent */,
               0 /* inflightBytes */,

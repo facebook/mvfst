@@ -16,7 +16,6 @@
 #include <quic/common/WindowedCounter.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
-#include <quic/d6d/ProbeSizeRaiser.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
 #include <quic/observer/SocketObserverTypes.h>
@@ -474,31 +473,11 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   uint64_t nextSelfConnectionIdSequence{0};
 
-  // D6D related events
-  struct PendingD6DEvents {
-    // If we should schedule/cancel d6d raise timeout, if it's not
-    // already scheduled/canceled
-    bool scheduleRaiseTimeout{false};
-
-    // If we should schedule/cancel d6d probe timeout, if it's not
-    // already scheduled/canceled
-    bool scheduleProbeTimeout{false};
-
-    // To send a d6d probe packet
-    bool sendProbePacket{false};
-
-    // The delay after which sendD6DProbePacket will be set
-    folly::Optional<std::chrono::milliseconds> sendProbeDelay;
-  };
-
   struct PendingEvents {
     Resets resets;
     folly::Optional<PathChallengeFrame> pathChallenge;
 
     FrameList frames;
-
-    // D6D related events
-    PendingD6DEvents d6d;
 
     std::vector<KnobFrame> knobs;
 
@@ -623,66 +602,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Track stats for various server events
   QuicTransportStatsCallback* statsCallback{nullptr};
-
-  // Meta state of d6d, mostly useful for analytics. D6D can operate without it.
-  struct D6DMetaState {
-    // Cumulative count of acked packets
-    uint64_t totalAckedProbes{0};
-
-    // Cumulative count of lost packets
-    uint64_t totalLostProbes{0};
-
-    // Cumulative count of transmitted packets
-    uint64_t totalTxedProbes{0};
-
-    // Timepoint of when d6d reaches a non-search state
-    // this helps us understand the convergence speed
-    TimePoint timeLastNonSearchState;
-
-    // Last non-search state
-    D6DMachineState lastNonSearchState;
-  };
-
-  struct D6DState {
-    // The lastest d6d probe packet transmitted
-    folly::Optional<D6DProbePacket> lastProbe;
-
-    // The raise timeout
-    std::chrono::seconds raiseTimeout{kDefaultD6DRaiseTimeout};
-
-    // The probe timeout
-    std::chrono::seconds probeTimeout{kDefaultD6DProbeTimeout};
-
-    // The number of outstanding probe packets
-    uint64_t outstandingProbes{0};
-
-    // The base PMTU to start probing with
-    uint16_t basePMTU{kDefaultD6DBasePMTU};
-
-    // The max PMTU, determined by max_packet_size transport parameter
-    uint16_t maxPMTU{kDefaultMaxUDPPayload};
-
-    // Current probe size, dynamically adjusted by the probing algorithm
-    uint32_t currentProbeSize{kDefaultD6DBasePMTU};
-
-    // Probe size raiser
-    std::unique_ptr<ProbeSizeRaiser> raiser;
-
-    // ThresholdCounter to help detect PMTU blackhole
-    std::unique_ptr<WindowedCounter<uint64_t, uint64_t>> thresholdCounter{
-        nullptr};
-
-    // Meta state
-    D6DMetaState meta;
-
-    // Turn off blackhole detection
-    bool noBlackholeDetection{false};
-
-    // D6D Machine State
-    D6DMachineState state{D6DMachineState::DISABLED};
-  };
-
-  D6DState d6d;
 
   // Debug information. Currently only used to debug busy loop of Transport
   // WriteLooper.

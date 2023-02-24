@@ -23,8 +23,6 @@ struct OutstandingPacketMetadata {
   uint32_t encodedBodySize;
   // Whether this packet has any data from stream 0
   bool isHandshake;
-  // Whether the packet is a d6d probe
-  bool isD6DProbe;
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
@@ -114,7 +112,6 @@ struct OutstandingPacketMetadata {
       uint32_t encodedSizeIn,
       uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
-      bool isD6DProbeIn,
       uint64_t totalBytesSentIn,
       uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
@@ -127,7 +124,6 @@ struct OutstandingPacketMetadata {
         encodedSize(encodedSizeIn),
         encodedBodySize(encodedBodySizeIn),
         isHandshake(isHandshakeIn),
-        isD6DProbe(isD6DProbeIn),
         totalBytesSent(totalBytesSentIn),
         totalBodyBytesSent(totalBodyBytesSentIn),
         inflightBytes(inflightBytesIn),
@@ -221,38 +217,6 @@ struct OutstandingPacket {
             encodedSizeIn,
             encodedBodySizeIn,
             isHandshakeIn,
-            false /* isD6DProbeIn */,
-            totalBytesSentIn,
-            totalBodyBytesSentIn,
-            inflightBytesIn,
-            packetsInflightIn,
-            lossStateIn,
-            writeCount,
-            std::move(detailsPerStream),
-            totalAppLimitedTimeUsecs)) {}
-
-  OutstandingPacket(
-      RegularQuicWritePacket packetIn,
-      TimePoint timeIn,
-      uint32_t encodedSizeIn,
-      uint32_t encodedBodySizeIn,
-      bool isHandshakeIn,
-      bool isD6DProbeIn,
-      uint64_t totalBytesSentIn,
-      uint64_t totalBodyBytesSentIn,
-      uint64_t inflightBytesIn,
-      uint64_t packetsInflightIn,
-      const LossState& lossStateIn,
-      uint64_t writeCount,
-      Metadata::DetailsPerStream detailsPerStream,
-      std::chrono::microseconds totalAppLimitedTimeUsecs = 0us)
-      : packet(std::move(packetIn)),
-        metadata(OutstandingPacketMetadata(
-            timeIn,
-            encodedSizeIn,
-            encodedBodySizeIn,
-            isHandshakeIn,
-            isD6DProbeIn,
             totalBytesSentIn,
             totalBodyBytesSentIn,
             inflightBytesIn,

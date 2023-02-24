@@ -181,22 +181,6 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__ << " errorType=" << toString(errorType);
   }
 
-  void onConnectionD6DStarted() override {
-    VLOG(2) << prefix_ << __func__;
-  }
-
-  void onConnectionPMTURaised() override {
-    VLOG(2) << prefix_ << __func__;
-  }
-
-  void onConnectionPMTUBlackholeDetected() override {
-    VLOG(2) << prefix_ << __func__;
-  }
-
-  void onConnectionPMTUUpperBoundDetected() override {
-    VLOG(2) << prefix_ << __func__;
-  }
-
   void onTransportKnobApplied(TransportKnobParamId knobType) override {
     VLOG(2) << prefix_ << __func__ << " knobType=" << knobType._to_string();
   }

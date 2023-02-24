@@ -29,45 +29,6 @@ enum PacketBuilderType { Regular, Inplace };
 
 namespace {
 
-SchedulingResult sendD6DProbe(
-    QuicConnectionStateBase& conn,
-    uint64_t cipherOverhead,
-    uint32_t probeSize,
-    PacketBuilderType builderType) {
-  auto connId = quic::test::getTestConnectionId();
-  D6DProbeScheduler d6dProbeScheduler(
-      conn, "d6d probe", cipherOverhead, probeSize);
-  EXPECT_TRUE(d6dProbeScheduler.hasData());
-
-  ShortHeader shortHeader(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  if (builderType == PacketBuilderType::Regular) {
-    RegularQuicPacketBuilder builder(
-        conn.udpSendPacketLen,
-        std::move(shortHeader),
-        conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-    auto result = d6dProbeScheduler.scheduleFramesForPacket(
-        std::move(builder), kDefaultUDPSendPacketLen);
-    EXPECT_FALSE(d6dProbeScheduler.hasData());
-    return result;
-  } else {
-    // Just enough to build the probe
-    auto simpleBufAccessor = std::make_unique<SimpleBufAccessor>(probeSize);
-    InplaceQuicPacketBuilder builder(
-        *simpleBufAccessor,
-        conn.udpSendPacketLen,
-        std::move(shortHeader),
-        conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-    auto result = d6dProbeScheduler.scheduleFramesForPacket(
-        std::move(builder), kDefaultUDPSendPacketLen);
-    EXPECT_FALSE(d6dProbeScheduler.hasData());
-    return result;
-  }
-  folly::assume_unreachable();
-}
-
 PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
   PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
   std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
@@ -564,54 +525,6 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
   EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
-}
-
-TEST_P(QuicPacketSchedulerTest, D6DProbeSchedulerTest) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  uint64_t cipherOverhead = 2;
-  uint32_t probeSize = 1450;
-  auto connId = getTestConnectionId();
-  D6DProbeScheduler d6dProbeScheduler(
-      conn, "d6d probe", cipherOverhead, probeSize);
-  EXPECT_TRUE(d6dProbeScheduler.hasData());
-
-  ShortHeader shortHeader(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  auto param = GetParam();
-  auto result = sendD6DProbe(conn, cipherOverhead, probeSize, param);
-  ASSERT_TRUE(result.packet.has_value());
-  auto packetSize = result.packet->header->computeChainDataLength() +
-      result.packet->body->computeChainDataLength() + cipherOverhead;
-  EXPECT_EQ(packetSize, probeSize);
-}
-
-TEST_P(QuicPacketSchedulerTest, NoCloningWithOnlyD6DProbes) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  uint64_t cipherOverhead = 2;
-  uint32_t probeSize = 1450;
-  auto param = GetParam();
-  auto result = sendD6DProbe(conn, cipherOverhead, probeSize, param);
-  ASSERT_TRUE(result.packet.has_value());
-  auto packetSize = result.packet->header->computeChainDataLength() +
-      result.packet->body->computeChainDataLength() + cipherOverhead;
-  updateConnection(
-      conn,
-      folly::none,
-      result.packet->packet,
-      Clock::now(),
-      packetSize,
-      result.packet->body->computeChainDataLength(),
-      false /* isDSRPacket */);
-  ASSERT_EQ(1, conn.outstandings.packets.size());
-  EXPECT_TRUE(conn.outstandings.packets.back().metadata.isD6DProbe);
-  FrameScheduler noopScheduler("noopScheduler", conn);
-  CloningScheduler cloningScheduler(
-      noopScheduler, conn, "MarShall Mathers", cipherOverhead);
-  EXPECT_FALSE(cloningScheduler.hasData());
 }
 
 TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
@@ -2436,11 +2349,6 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
   // and it shouldn't get padded.
   EXPECT_LT(packetLength, conn.udpSendPacketLen);
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    QuicPacketSchedulerTests,
-    QuicPacketSchedulerTest,
-    Values(PacketBuilderType::Regular, PacketBuilderType::Inplace));
 
 } // namespace test
 } // namespace quic

@@ -14,7 +14,6 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/Pacer.h>
 #include <quic/congestion_control/TokenlessPacer.h>
-#include <quic/d6d/QuicD6DStateFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -40,9 +39,6 @@ QuicTransportBase::QuicTransportBase(
       keepaliveTimeout_(this),
       drainTimeout_(this),
       pingTimeout_(this),
-      d6dProbeTimeout_(this),
-      d6dRaiseTimeout_(this),
-      d6dTxTimeout_(this),
       readLooper_(new FunctionLooper(
           evb,
           [this]() { invokeReadDataAndCallbacks(); },
@@ -1929,13 +1925,6 @@ void QuicTransportBase::onNetworkData(
       // Received data could contain valid path response, in which case
       // path validation timeout should be canceled
       schedulePathValidationTimeout();
-      // Received data could contain an ack to a d6d probe, in which case we
-      // need to cancel the current d6d probe timeout. The ack might change d6d
-      // state to SEARCH_COMPLETE, in which case we need to schedule d6d raise
-      // timeout. We might also need to schedule the next probe.
-      scheduleD6DProbeTimeout();
-      scheduleD6DRaiseTimeout();
-      scheduleD6DTxTimeout();
     } else {
       // In the closed state, we would want to write a close if possible however
       // the write looper will not be set.
@@ -2668,10 +2657,6 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired);
     }
-    // loss detection might cancel d6d raise timeout, and might cause the next
-    // probe to be scheduled
-    scheduleD6DRaiseTimeout();
-    scheduleD6DTxTimeout();
     pacedWriteDataToSocket();
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -2752,26 +2737,6 @@ void QuicTransportBase::keepaliveTimeoutExpired() noexcept {
   updateWriteLooper(true);
 }
 
-void QuicTransportBase::d6dProbeTimeoutExpired() noexcept {
-  VLOG(4) << __func__ << " " << *this;
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
-  conn_->pendingEvents.d6d.scheduleProbeTimeout = false;
-  onD6DProbeTimeoutExpired(*conn_);
-}
-
-void QuicTransportBase::d6dRaiseTimeoutExpired() noexcept {
-  VLOG(4) << __func__ << " " << *this;
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
-  conn_->pendingEvents.d6d.scheduleRaiseTimeout = false;
-  onD6DRaiseTimeoutExpired(*conn_);
-}
-
-void QuicTransportBase::d6dTxTimeoutExpired() noexcept {
-  VLOG(4) << __func__ << " " << *this;
-  conn_->pendingEvents.d6d.sendProbeDelay = folly::none;
-  conn_->pendingEvents.d6d.sendProbePacket = true;
-}
-
 void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
   if (closeState_ == CloseState::CLOSED) {
     return;
@@ -2848,49 +2813,6 @@ void QuicTransportBase::schedulePathValidationTimeout() {
         folly::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
     VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;
     getEventBase()->timer().scheduleTimeout(&pathValidationTimeout_, timeoutMs);
-  }
-}
-
-void QuicTransportBase::scheduleD6DProbeTimeout() {
-  if (conn_->pendingEvents.d6d.scheduleProbeTimeout) {
-    if (!d6dProbeTimeout_.isScheduled()) {
-      VLOG(10) << __func__ << "timeout=" << conn_->d6d.probeTimeout.count()
-               << "ms " << *this;
-      getEventBase()->timer().scheduleTimeout(
-          &d6dProbeTimeout_, conn_->d6d.probeTimeout);
-    }
-  } else {
-    if (d6dProbeTimeout_.isScheduled()) {
-      VLOG(10) << __func__ << " cancel timeout " << *this;
-      d6dProbeTimeout_.cancelTimeout();
-    }
-  }
-}
-
-void QuicTransportBase::scheduleD6DRaiseTimeout() {
-  if (conn_->pendingEvents.d6d.scheduleRaiseTimeout) {
-    if (!d6dRaiseTimeout_.isScheduled()) {
-      VLOG(10) << __func__ << "timeout=" << conn_->d6d.raiseTimeout.count()
-               << "s " << *this;
-      getEventBase()->timer().scheduleTimeout(
-          &d6dRaiseTimeout_, conn_->d6d.raiseTimeout);
-    }
-  } else {
-    if (d6dRaiseTimeout_.isScheduled()) {
-      VLOG(10) << __func__ << " cancel timeout " << *this;
-      d6dRaiseTimeout_.cancelTimeout();
-    }
-  }
-}
-
-void QuicTransportBase::scheduleD6DTxTimeout() {
-  auto& delay = conn_->pendingEvents.d6d.sendProbeDelay;
-  if (delay) {
-    if (!d6dTxTimeout_.isScheduled()) {
-      VLOG(10) << __func__ << "timeout=" << conn_->d6d.raiseTimeout.count()
-               << "s " << *this;
-      getEventBase()->timer().scheduleTimeout(&d6dTxTimeout_, *delay);
-    }
   }
 }
 
@@ -3261,9 +3183,6 @@ void QuicTransportBase::writeSocketData() {
   // effect.
   scheduleAckTimeout();
   schedulePathValidationTimeout();
-  // Writing data could write out a d6d probe, for which we need to schedule a
-  // probe timeout
-  scheduleD6DProbeTimeout();
   updateWriteLooper(false);
 }
 

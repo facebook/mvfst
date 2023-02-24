@@ -586,51 +586,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class D6DProbeTimeout : public folly::HHWheelTimer::Callback {
-   public:
-    ~D6DProbeTimeout() override = default;
-
-    explicit D6DProbeTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->d6dProbeTimeoutExpired();
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
-  class D6DRaiseTimeout : public folly::HHWheelTimer::Callback {
-   public:
-    ~D6DRaiseTimeout() override = default;
-
-    explicit D6DRaiseTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->d6dRaiseTimeoutExpired();
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
-  class D6DTxTimeout : public folly::HHWheelTimer::Callback {
-   public:
-    ~D6DTxTimeout() override = default;
-
-    explicit D6DTxTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->d6dTxTimeoutExpired();
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
   void cancelLossTimeout();
   bool isLossTimeoutScheduled() const;
@@ -807,9 +762,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void keepaliveTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
-  void d6dProbeTimeoutExpired() noexcept;
-  void d6dRaiseTimeoutExpired() noexcept;
-  void d6dTxTimeoutExpired() noexcept;
 
   void setIdleTimer();
   void scheduleAckTimeout();
@@ -817,9 +769,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void schedulePingTimeout(
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
-  void scheduleD6DRaiseTimeout();
-  void scheduleD6DProbeTimeout();
-  void scheduleD6DTxTimeout();
 
   void validateCongestionAndPacing(CongestionControlType& type);
 
@@ -917,7 +866,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   CloseState closeState_{CloseState::OPEN};
   bool transportReadyNotified_{false};
   bool handshakeDoneNotified_{false};
-  bool d6dProbingStarted_{false};
 
   LossTimeout lossTimeout_;
   AckTimeout ackTimeout_;
@@ -926,9 +874,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   KeepaliveTimeout keepaliveTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
-  D6DProbeTimeout d6dProbeTimeout_;
-  D6DRaiseTimeout d6dRaiseTimeout_;
-  D6DTxTimeout d6dTxTimeout_;
   FunctionLooper::Ptr readLooper_;
   FunctionLooper::Ptr peekLooper_;
   FunctionLooper::Ptr writeLooper_;

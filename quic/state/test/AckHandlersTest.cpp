@@ -2719,8 +2719,6 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(sentPacket);
-    LOG(INFO) << "sentPacket.metadata.isD6DProbe = "
-              << sentPacket.metadata.isD6DProbe;
     packetNum++;
   }
 

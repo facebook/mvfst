@@ -49,43 +49,6 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 // larger than this, unless configured otherwise.
 constexpr uint16_t kDefaultUDPReadBufferSize = 1500;
 
-// Default base PMTU used by d6d probing
-constexpr uint16_t kDefaultD6DBasePMTU = kDefaultUDPSendPacketLen;
-
-// Default maximum number of consecutive d6d probe losses we can
-// tolerate
-constexpr uint16_t kDefaultD6DMaxOutstandingProbes = 2;
-
-// The default d6d raise timeout, recommended by the spec
-constexpr std::chrono::seconds kDefaultD6DRaiseTimeout = 600s;
-
-// The minimum d6d raise timeout
-constexpr std::chrono::seconds kMinD6DRaiseTimeout = 50s;
-
-// The default d6d probe timeout, recommended by the spec
-constexpr std::chrono::seconds kDefaultD6DProbeTimeout = 15s;
-
-// The minimum d6d probe timeout, recommended by the spec
-constexpr std::chrono::seconds kMinD6DProbeTimeout = 1s;
-
-// The default d6d start delay
-constexpr std::chrono::milliseconds kDefaultD6DKickStartDelay = 1000ms;
-
-// Default delay for the next probe when the last one is acked
-constexpr std::chrono::milliseconds kDefaultD6DProbeDelayWhenAcked = 500ms;
-
-// Default delay for the next probe when the last one is lost
-constexpr std::chrono::milliseconds kDefaultD6DProbeDelayWhenLost = 2000ms;
-
-// The default pmtu step size, currently only useful for ConstantStep raiser
-constexpr uint16_t kDefaultD6DProbeStepSize = 10;
-
-// Default window of detecting blackhole caused by invalid pmtu
-constexpr std::chrono::seconds kDefaultD6DBlackholeDetectionWindow = 5s;
-
-// Default threshold for detecting blackhole caused by invalid pmtu
-constexpr uint64_t kDefaultD6DBlackholeDetectionThreshold = 8;
-
 // Number of GRO buffers to use
 // 1 means GRO is not enabled
 // 64 is the max possible value
@@ -168,8 +131,6 @@ BETTER_ENUM(
     UNKNOWN = 0x0,
     // No-op
     NO_OP = 0x1,
-    // Disabling pmtu blackhole detection
-    ZERO_PMTU_BLACKHOLE_DETECTION = 0x8830,
     // Force udp payload size to be equal to max
     // udp payload size
     FORCIBLY_SET_UDP_PAYLOAD_SIZE = 0xba92,
@@ -358,16 +319,6 @@ enum class QuicVersion : uint32_t {
 };
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;
-
-/**
- * Parameter ids for private transport parameter
- */
-
-constexpr uint16_t kD6DBasePMTUParameterId = 0xFF77;
-
-constexpr uint16_t kD6DRaiseTimeoutParameterId = 0xFF95;
-
-constexpr uint16_t kD6DProbeTimeoutParameterId = 0xFF12;
 
 constexpr uint32_t kDrainFactor = 3;
 

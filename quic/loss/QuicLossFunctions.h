@@ -14,7 +14,6 @@
 #include <quic/codec/Types.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionController.h>
-#include <quic/d6d/QuicD6DStateFunctions.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/observer/SocketObserverTypes.h>
@@ -121,22 +120,19 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   bool hasDataToWrite = hasAckDataToWrite(conn) ||
       (hasNonAckDataToWrite(conn) != WriteDataReason::NO_WRITE);
   auto totalPacketsOutstanding = conn.outstandings.numOutstanding();
-  auto totalD6DProbesOutstanding = conn.d6d.outstandingProbes;
   /*
    * We have this condition to disambiguate the case where we have.
-   * (1) All outstanding packets (except for d6d probes) that are clones that
-   *  are processed and there is no data to write.
-   * (2) All outstanding (except for d6d probes) are clones that are processed
-   *  and there is data to write.
-   * If there are only clones with no data, then we don't need to set the timer.
-   * This will free up the evb. However after a PTO verified event, clones take
-   * up space in cwnd. If we have data left to write, we would not be able to
-   * write them since we could be blocked by cwnd. So we must set the loss timer
-   * so that we can write this data with the slack packet space for the clones.
+   * (1) All outstanding packets that are clones that are processed and there is
+   * no data to write. (2) All outstanding are clones that are processed and
+   * there is data to write. If there are only clones with no data, then we
+   * don't need to set the timer. This will free up the evb. However after a PTO
+   * verified event, clones take up space in cwnd. If we have data left to
+   * write, we would not be able to write them since we could be blocked by
+   * cwnd. So we must set the loss timer so that we can write this data with the
+   * slack packet space for the clones.
    */
   if (!hasDataToWrite && conn.outstandings.packetEvents.empty() &&
-      (totalPacketsOutstanding - totalD6DProbesOutstanding) ==
-          conn.outstandings.numClonedPackets()) {
+      totalPacketsOutstanding == conn.outstandings.numClonedPackets()) {
     VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
              << " outstanding=" << totalPacketsOutstanding
              << " handshakePackets="
@@ -309,33 +305,6 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       shouldSetTimer = true;
       break;
     }
-    if (pkt.metadata.isD6DProbe) {
-      // It's a D6D probe, we'll mark it as lost to avoid its stale
-      // ack from affecting PMTU. We don't add it to loss event to
-      // avoid affecting congestion control when there's probably no
-      // congestion
-      CHECK(conn.d6d.lastProbe.hasValue());
-      // Check the decalredLost field first, to avoid double counting
-      // the lost probe since we don't erase them from op list yet
-      if (!pkt.declaredLost) {
-        ++conn.outstandings.declaredLostCount;
-        pkt.declaredLost = true;
-        if (lostByTimeout && rttSample.count() > 0) {
-          pkt.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
-              conn.transportSettings.timeReorderingThreshDivisor / rttSample;
-        }
-        if (lostByReorder) {
-          pkt.lossReorderDistance = reorderDistance;
-        }
-        ++conn.d6d.meta.totalLostProbes;
-        if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
-          onD6DLastProbeLost(conn);
-        }
-      }
-      iter++;
-      continue;
-    }
-    detectPMTUBlackhole(conn, pkt);
     lossEvent.addLostPacket(pkt);
     if (observerLossEvent) {
       observerLossEvent->addLostPacket(lostByTimeout, lostByReorder, pkt);
