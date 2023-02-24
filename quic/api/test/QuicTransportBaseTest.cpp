@@ -4430,5 +4430,33 @@ TEST_P(QuicTransportImplTestWithGroups, onNewStreamsAndGroupsCallbacks) {
   transport.reset();
 }
 
+TEST_P(
+    QuicTransportImplTestWithGroups,
+    TestSetStreamGroupRetransmissionPolicyAllowed) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.advertisedMaxStreamGroups = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  const StreamGroupId groupId = 0x00;
+  const QuicStreamGroupRetransmissionPolicy policy;
+
+  // Test policy set allowed
+  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
+  EXPECT_TRUE(res.hasValue());
+
+  // Test policy set not allowed.
+  transportSettings.advertisedMaxStreamGroups = 0;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+  res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
+  EXPECT_TRUE(res.hasError());
+  EXPECT_EQ(res.error(), LocalErrorCode::INVALID_OPERATION);
+
+  transport.reset();
+}
+
 } // namespace test
 } // namespace quic

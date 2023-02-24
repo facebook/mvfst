@@ -110,4 +110,7 @@ std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
 
 uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn);
 
+bool checkCustomRetransmissionProfilesEnabled(
+    const QuicConnectionStateBase& conn);
+
 } // namespace quic

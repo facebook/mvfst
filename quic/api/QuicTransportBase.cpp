@@ -3805,10 +3805,17 @@ void QuicTransportBase::onStreamPrioritiesChange() {
   conn_->congestionController->setBandwidthUtilizationFactor(targetUtilization);
 }
 
+bool QuicTransportBase::checkCustomRetransmissionProfilesEnabled() const {
+  return quic::checkCustomRetransmissionProfilesEnabled(*conn_);
+}
+
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setStreamGroupRetransmissionPolicy(
     StreamGroupId /* groupId */,
     QuicStreamGroupRetransmissionPolicy /* policy */) noexcept {
+  if (!checkCustomRetransmissionProfilesEnabled()) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
   return folly::unit;
 }
 

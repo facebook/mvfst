@@ -432,4 +432,9 @@ uint64_t updateLargestReceivedPacketNum(
   }
 }
 
+bool checkCustomRetransmissionProfilesEnabled(
+    const QuicConnectionStateBase& conn) {
+  return conn.transportSettings.advertisedMaxStreamGroups > 0;
+}
+
 } // namespace quic

@@ -654,6 +654,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void appendCmsgs(const folly::SocketOptionMap& options);
 
+  /**
+   * Sets stream group retransmission policy.
+   */
   folly::Expected<folly::Unit, LocalErrorCode>
   setStreamGroupRetransmissionPolicy(
       StreamGroupId groupId,
@@ -959,6 +962,13 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * Helper to log new stream event to observer.
    */
   void logStreamOpenEvent(StreamId streamId);
+
+  /**
+   * Helper to check if using custom retransmission profiles is feasible.
+   * Custom retransmission profiles are only applicable when stream groups are
+   * enabled, i.e. advertisedMaxStreamGroups in transport settings is > 0.
+   */
+  [[nodiscard]] bool checkCustomRetransmissionProfilesEnabled() const;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
