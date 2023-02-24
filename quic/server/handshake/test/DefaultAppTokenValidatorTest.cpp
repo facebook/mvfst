@@ -57,6 +57,39 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   EXPECT_TRUE(validator.validate(resState));
 }
 
+TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.version = QuicVersion::MVFST;
+  conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
+      ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+  auto quicStats = std::make_shared<MockQuicStats>();
+  conn.statsCallback = quicStats.get();
+
+  AppToken appToken;
+  appToken.transportParams = createTicketTransportParameters(
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
+      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
+      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
+  appToken.transportParams.parameters.push_back(
+      encodeIntegerParameter(TransportParameterId::disable_migration, 1));
+  ResumptionState resState;
+  resState.appToken = encodeAppToken(appToken);
+
+  conn.earlyDataAppParamsValidator = [](const folly::Optional<std::string>&,
+                                        const Buf&) { return true; };
+  DefaultAppTokenValidator validator(&conn);
+  EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(1);
+  EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
+  EXPECT_TRUE(validator.validate(resState));
+}
+
 TEST(
     DefaultAppTokenValidatorTest,
     TestValidUnequalParamsUpdateTransportSettings) {

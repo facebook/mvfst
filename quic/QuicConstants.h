@@ -589,7 +589,7 @@ constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState = 60s;
 
 constexpr uint16_t kMaxNumMigrationsAllowed = 6;
 
-constexpr auto kExpectedNumOfParamsInTheTicket = 8;
+constexpr auto kMinimumNumOfParamsInTheTicket = 8;
 
 constexpr auto kStatelessResetTokenSecretLength = 32;
 

@@ -29,9 +29,9 @@ void expectAppTokenEqual(
       decodedAppToken->transportParams.parameters.size(),
       appToken.transportParams.parameters.size());
 
-  EXPECT_EQ(
+  EXPECT_GE(
       decodedAppToken->transportParams.parameters.size(),
-      kExpectedNumOfParamsInTheTicket);
+      kMinimumNumOfParamsInTheTicket);
   // TODO Split out into individual flow control parameters.
   auto maxStreamData = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,

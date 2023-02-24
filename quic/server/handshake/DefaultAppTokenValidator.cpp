@@ -58,14 +58,12 @@ bool DefaultAppTokenValidator::validate(
 
   auto& params = appToken->transportParams.parameters;
 
-  // TODO T33454954 Simplify ticket transport params. see comments in D9324131
-  // Currenly only initialMaxData, initialMaxStreamData, ackDelayExponent, and
-  // maxRecvPacketSize are written into the ticket. In case new parameters
-  // are added for making early data decision (although not likely), this
-  // validator fails the check if number of parameters is not
-  // kExpectedNumOfParamsInTheTicket.
-  if (params.size() != kExpectedNumOfParamsInTheTicket) {
-    VLOG(10) << "Unexpected number of parameters in the ticket";
+  // Reject tickets that do not have the minimum number of params in the ticket.
+  // This is a minimum to allow sending additional optional params
+  // that can be ignored by servers that don't support them.
+  if (params.size() < kMinimumNumOfParamsInTheTicket) {
+    VLOG(10)
+        << "Number of parameters in the ticket is less than the minimum expected";
     return validated = false;
   }
 
