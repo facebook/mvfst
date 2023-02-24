@@ -4454,6 +4454,105 @@ TEST_P(
   res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
   EXPECT_TRUE(res.hasError());
   EXPECT_EQ(res.error(), LocalErrorCode::INVALID_OPERATION);
+  EXPECT_EQ(1, transport->getStreamGroupRetransmissionPolicies().size());
+
+  transport.reset();
+}
+
+TEST_P(
+    QuicTransportImplTestWithGroups,
+    TestStreamGroupRetransmissionPolicyReset) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.advertisedMaxStreamGroups = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  const StreamGroupId groupId = 0x00;
+  QuicStreamGroupRetransmissionPolicy policy;
+
+  // Add the policy.
+  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
+
+  // Reset allowed.
+  res = transport->setStreamGroupRetransmissionPolicy(groupId, std::nullopt);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 0);
+
+  // Add the policy back.
+  res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
+
+  // Reset allowed even if custom policies are disabled.
+  transportSettings.advertisedMaxStreamGroups = 0;
+  res = transport->setStreamGroupRetransmissionPolicy(groupId, std::nullopt);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 0);
+
+  transport.reset();
+}
+
+TEST_P(
+    QuicTransportImplTestWithGroups,
+    TestStreamGroupRetransmissionPolicyAddRemove) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.advertisedMaxStreamGroups = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  // Add a policy.
+  const StreamGroupId groupId = 0x00;
+  const QuicStreamGroupRetransmissionPolicy policy;
+  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
+
+  // Add another one.
+  const StreamGroupId groupId2 = 0x04;
+  const QuicStreamGroupRetransmissionPolicy policy2;
+  res = transport->setStreamGroupRetransmissionPolicy(groupId2, policy2);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 2);
+
+  // Remove second policy.
+  res = transport->setStreamGroupRetransmissionPolicy(groupId2, std::nullopt);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
+
+  // Remove first policy.
+  res = transport->setStreamGroupRetransmissionPolicy(groupId, std::nullopt);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 0);
+
+  transport.reset();
+}
+
+TEST_P(
+    QuicTransportImplTestWithGroups,
+    TestStreamGroupRetransmissionPolicyMaxLimit) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.advertisedMaxStreamGroups = 1;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  // Add a policy.
+  const StreamGroupId groupId = 0x00;
+  const QuicStreamGroupRetransmissionPolicy policy;
+  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
+  EXPECT_TRUE(res.hasValue());
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
+
+  // Try adding another one; should be over the limit.
+  const StreamGroupId groupId2 = 0x04;
+  res = transport->setStreamGroupRetransmissionPolicy(groupId2, policy);
+  EXPECT_TRUE(res.hasError());
+  EXPECT_EQ(res.error(), LocalErrorCode::RTX_POLICIES_LIMIT_EXCEEDED);
+  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
 
   transport.reset();
 }

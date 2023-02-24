@@ -26,6 +26,7 @@
 #include <quic/state/PacketEvent.h>
 #include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicConnectionStats.h>
+#include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StreamData.h>
@@ -723,6 +724,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
       maybePeerAckReceiveTimestampsConfig;
 
   bool peerAdvertisedKnobFrameSupport{false};
+  // Retransmission policies map.
+  folly::F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
+      retransmissionPolicies;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

@@ -655,12 +655,21 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void appendCmsgs(const folly::SocketOptionMap& options);
 
   /**
-   * Sets stream group retransmission policy.
+   * Sets the policy per stream group id.
+   * If policy == std::nullopt, the policy is removed for corresponding stream
+   * group id (reset to the default rtx policy).
    */
   folly::Expected<folly::Unit, LocalErrorCode>
   setStreamGroupRetransmissionPolicy(
       StreamGroupId groupId,
-      QuicStreamGroupRetransmissionPolicy policy) noexcept override;
+      std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept
+      override;
+
+  [[nodiscard]] const folly::
+      F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>&
+      getStreamGroupRetransmissionPolicies() const {
+    return conn_->retransmissionPolicies;
+  }
 
  protected:
   void updateCongestionControlSettings(

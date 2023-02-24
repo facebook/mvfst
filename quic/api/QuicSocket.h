@@ -1424,7 +1424,7 @@ class QuicSocket {
   virtual folly::Expected<folly::Unit, LocalErrorCode>
   setStreamGroupRetransmissionPolicy(
       StreamGroupId groupId,
-      QuicStreamGroupRetransmissionPolicy policy) noexcept = 0;
+      std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept = 0;
 
  protected:
   /**

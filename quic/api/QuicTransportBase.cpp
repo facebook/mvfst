@@ -3811,11 +3811,24 @@ bool QuicTransportBase::checkCustomRetransmissionProfilesEnabled() const {
 
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setStreamGroupRetransmissionPolicy(
-    StreamGroupId /* groupId */,
-    QuicStreamGroupRetransmissionPolicy /* policy */) noexcept {
+    StreamGroupId groupId,
+    std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept {
+  // Reset the policy to default one.
+  if (policy == std::nullopt) {
+    conn_->retransmissionPolicies.erase(groupId);
+    return folly::unit;
+  }
+
   if (!checkCustomRetransmissionProfilesEnabled()) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
+
+  if (conn_->retransmissionPolicies.size() >=
+      conn_->transportSettings.advertisedMaxStreamGroups) {
+    return folly::makeUnexpected(LocalErrorCode::RTX_POLICIES_LIMIT_EXCEEDED);
+  }
+
+  conn_->retransmissionPolicies.emplace(groupId, *policy);
   return folly::unit;
 }
 

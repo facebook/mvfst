@@ -366,7 +366,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       setStreamGroupRetransmissionPolicy,
-      (StreamGroupId, QuicStreamGroupRetransmissionPolicy),
+      (StreamGroupId, std::optional<QuicStreamGroupRetransmissionPolicy>),
       (noexcept));
 };
 } // namespace quic

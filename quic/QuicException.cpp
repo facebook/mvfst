@@ -123,6 +123,8 @@ folly::StringPiece toString(LocalErrorCode code) {
       return "Knob Frame Not Supported";
     case LocalErrorCode::PACER_NOT_AVAILABLE:
       return "Pacer not available";
+    case LocalErrorCode::RTX_POLICIES_LIMIT_EXCEEDED:
+      return "Retransmission policies limit exceeded";
     default:
       break;
   }
