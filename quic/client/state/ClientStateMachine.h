@@ -109,6 +109,10 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // Handshake packets we received but couldn't yet decrypt.
   std::vector<PendingClientData> pendingHandshakeData;
 
+  // Whether 0-rtt has been rejected in this connection.
+  // The value should be set after the handshake if 0-rtt was attempted
+  folly::Optional<bool> zeroRttRejected;
+
   explicit QuicClientConnectionState(
       std::shared_ptr<ClientHandshakeFactory> handshakeFactoryIn)
       : QuicConnectionStateBase(QuicNodeType::Client),

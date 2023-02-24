@@ -669,19 +669,22 @@ void QuicClientTransport::processPacketData(
       clientConn_->zeroRttWriteCipher.reset();
       clientConn_->zeroRttWriteHeaderCipher.reset();
     }
-    auto zeroRttRejected = handshakeLayer->getZeroRttRejected();
-    if (zeroRttRejected.has_value() && *zeroRttRejected) {
-      if (conn_->qLogger) {
-        conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
+    if (!clientConn_->zeroRttRejected.has_value()) {
+      clientConn_->zeroRttRejected = handshakeLayer->getZeroRttRejected();
+      if (clientConn_->zeroRttRejected.has_value() &&
+          *clientConn_->zeroRttRejected) {
+        if (conn_->qLogger) {
+          conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
+        }
+        QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
+        handshakeLayer->removePsk(hostname_);
+      } else if (clientConn_->zeroRttRejected.has_value()) {
+        if (conn_->qLogger) {
+          conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
+        }
+        QUIC_STATS(conn_->statsCallback, onZeroRttAccepted);
+        conn_->usedZeroRtt = true;
       }
-      QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
-      handshakeLayer->removePsk(hostname_);
-    } else if (zeroRttRejected.has_value()) {
-      if (conn_->qLogger) {
-        conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
-      }
-      QUIC_STATS(conn_->statsCallback, onZeroRttAccepted);
-      conn_->usedZeroRtt = true;
     }
     // We should get transport parameters if we've derived 1-rtt keys and 0-rtt
     // was rejected, or we have derived 1-rtt keys and 0-rtt was never
@@ -693,8 +696,9 @@ void QuicClientTransport::processPacketData(
             "No server transport params",
             TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
       }
-      if ((zeroRttRejected.has_value() && *zeroRttRejected) ||
-          !zeroRttRejected.has_value()) {
+      if ((clientConn_->zeroRttRejected.has_value() &&
+           *clientConn_->zeroRttRejected) ||
+          !clientConn_->zeroRttRejected.has_value()) {
         auto originalPeerMaxOffset =
             conn_->flowControlState.peerAdvertisedMaxOffset;
         auto originalPeerInitialStreamOffsetBidiLocal =
@@ -727,7 +731,8 @@ void QuicClientTransport::processPacketData(
             maxStreamsUni.value_or(0),
             conn_->peerAdvertisedKnobFrameSupport);
 
-        if (zeroRttRejected.has_value() && *zeroRttRejected) {
+        if (clientConn_->zeroRttRejected.has_value() &&
+            *clientConn_->zeroRttRejected) {
           // verify that the new flow control parameters are >= the original
           // transport parameters that were use. This is the easy case. If the
           // flow control decreases then we are just screwed and we need to have
@@ -754,7 +759,8 @@ void QuicClientTransport::processPacketData(
       // TODO This sucks, but manually update the max packet size until we fix
       // 0-rtt transport parameters.
       if (conn_->transportSettings.canIgnorePathMTU &&
-          zeroRttRejected.has_value() && !*zeroRttRejected) {
+          clientConn_->zeroRttRejected.has_value() &&
+          !*clientConn_->zeroRttRejected) {
         auto updatedPacketSize = getIntegerParameter(
             TransportParameterId::max_packet_size, serverParams->parameters);
         updatedPacketSize = std::max<uint64_t>(
@@ -777,7 +783,8 @@ void QuicClientTransport::processPacketData(
       }
     }
 
-    if (zeroRttRejected.has_value() && *zeroRttRejected) {
+    if (clientConn_->zeroRttRejected.has_value() &&
+        *clientConn_->zeroRttRejected) {
       // TODO: Make sure the alpn is the same, if not then do a full undo of the
       // state.
       clientConn_->zeroRttWriteCipher.reset();
