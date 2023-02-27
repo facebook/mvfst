@@ -746,6 +746,17 @@ void QuicServerWorker::dispatchPacketData(
       return;
     }
 
+    packetDropReason = isDstConnIdMisrouted(dstConnId, client);
+    if (packetDropReason != PacketDropReason::NONE) {
+      QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
+      if (packetDropReason == PacketDropReason::ROUTING_ERROR_WRONG_HOST ||
+          packetDropReason == PacketDropReason::CONNECTION_NOT_FOUND) {
+        // packet was misrouted, send reset packet
+        sendResetPacket(routingData.headerForm, client, networkData, dstConnId);
+      }
+      return;
+    }
+
     // send reset packet if packet fwd-ing isn't enabled or packet has
     // already been fwd-ed
     if (!packetForwardingEnabled_ || isForwardedData) {
@@ -755,27 +766,17 @@ void QuicServerWorker::dispatchPacketData(
       return;
     }
 
-    packetDropReason = isDstConnIdMisrouted(dstConnId, client);
-    if (packetDropReason != PacketDropReason::NONE) {
-      QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
-      if (packetDropReason == PacketDropReason::ROUTING_ERROR_WRONG_HOST ||
-          packetDropReason == PacketDropReason::CONNECTION_NOT_FOUND) {
-        // packet was misrouted, send reset packet
-        sendResetPacket(routingData.headerForm, client, networkData, dstConnId);
-      }
-    } else {
-      // Optimistically route to another server if the packet type is not
-      // Initial and if there is not any connection associated with the given
-      // packet
-      VLOG(4) << fmt::format(
-          "Forwarding packet from client={} to another process, routingInfo={}",
-          client.describe(),
-          logRoutingInfo(dstConnId));
-      auto recvTime = networkData.receiveTimePoint;
-      takeoverPktHandler_.forwardPacketToAnotherServer(
-          client, std::move(networkData).moveAllData(), recvTime);
-      QUIC_STATS(statsCallback_, onPacketForwarded);
-    }
+    // Optimistically route to another server if the packet type is not
+    // Initial and if there is not any connection associated with the given
+    // packet
+    VLOG(4) << fmt::format(
+        "Forwarding packet from client={} to another process, routingInfo={}",
+        client.describe(),
+        logRoutingInfo(dstConnId));
+    auto recvTime = networkData.receiveTimePoint;
+    takeoverPktHandler_.forwardPacketToAnotherServer(
+        client, std::move(networkData).moveAllData(), recvTime);
+    QUIC_STATS(statsCallback_, onPacketForwarded);
   });
 
   // helper fn to handle fwd-ing data to the transport
