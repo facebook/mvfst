@@ -709,6 +709,10 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
   if (connIdParams.processId == static_cast<uint8_t>(processId_)) {
     // There's no existing connection for the packet's CID or the client's
     // addr, and doesn't belong to the old server. Send a Reset.
+    VLOG(3) << fmt::format(
+        "Dropping packet, unknown DCID, from client={}, routingInfo={},",
+        client.describe(),
+        logRoutingInfo(dstConnId));
     return PacketDropReason::CONNECTION_NOT_FOUND;
   }
 
@@ -761,6 +765,10 @@ void QuicServerWorker::dispatchPacketData(
     // already been fwd-ed
     if (!packetForwardingEnabled_ || isForwardedData) {
       packetDropReason = PacketDropReason::CANNOT_FORWARD_DATA;
+      VLOG(3) << fmt::format(
+          "Dropping packet, cannot forward, from client={}, routingInfo={},",
+          client.describe(),
+          logRoutingInfo(dstConnId));
       QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
       sendResetPacket(routingData.headerForm, client, networkData, dstConnId);
       return;
