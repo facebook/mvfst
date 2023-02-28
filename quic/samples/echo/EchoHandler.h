@@ -22,8 +22,11 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
  public:
   using StreamData = std::pair<BufQueue, bool>;
 
-  explicit EchoHandler(folly::EventBase* evbIn, bool useDatagrams = false)
-      : evb(evbIn), useDatagrams_(useDatagrams) {}
+  explicit EchoHandler(
+      folly::EventBase* evbIn,
+      bool useDatagrams = false,
+      bool disableRtx = false)
+      : evb(evbIn), useDatagrams_(useDatagrams), disableRtx_(disableRtx) {}
 
   void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
     sock = socket;
@@ -43,6 +46,11 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     LOG(INFO) << "Got bidirectional stream group id=" << groupId;
     CHECK(streamGroupsData_.find(groupId) == streamGroupsData_.cend());
     streamGroupsData_.emplace(groupId, PerStreamData{});
+    if (disableRtx_) {
+      QuicStreamGroupRetransmissionPolicy policy;
+      policy.disableRetransmission = true;
+      sock->setStreamGroupRetransmissionPolicy(groupId, policy);
+    }
   }
 
   void onNewBidirectionalStreamInGroup(
@@ -232,6 +240,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   using PerStreamData = std::map<quic::StreamId, StreamData>;
   PerStreamData input_;
   std::map<quic::StreamGroupId, PerStreamData> streamGroupsData_;
+  bool disableRtx_{false};
 };
 } // namespace samples
 } // namespace quic

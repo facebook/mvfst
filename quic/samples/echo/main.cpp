@@ -28,6 +28,10 @@ DEFINE_int64(
     "Maximum number of active connection IDs a peer supports");
 DEFINE_bool(enable_migration, true, "Enable/disable migration");
 DEFINE_bool(use_stream_groups, false, "Enable/disable stream groups");
+DEFINE_bool(
+    disable_rtx,
+    false,
+    "Enable/disable retransmission for stream groups");
 
 using namespace quic::samples;
 
@@ -48,7 +52,8 @@ int main(int argc, char* argv[]) {
         FLAGS_use_datagrams,
         FLAGS_active_conn_id_limit,
         FLAGS_enable_migration,
-        FLAGS_use_stream_groups);
+        FLAGS_use_stream_groups,
+        FLAGS_disable_rtx);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {

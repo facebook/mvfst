@@ -38,8 +38,10 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     });
   }
 
-  explicit EchoServerTransportFactory(bool useDatagrams = false)
-      : useDatagrams_(useDatagrams) {}
+  explicit EchoServerTransportFactory(
+      bool useDatagrams = false,
+      bool disableRtx = false)
+      : useDatagrams_(useDatagrams), disableRtx_(disableRtx) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -52,7 +54,8 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     if (draining_) {
       return nullptr;
     }
-    auto echoHandler = std::make_unique<EchoHandler>(evb, useDatagrams_);
+    auto echoHandler =
+        std::make_unique<EchoHandler>(evb, useDatagrams_, disableRtx_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx);
     echoHandler->setQuicSocket(transport);
@@ -66,6 +69,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
   bool useDatagrams_;
   folly::Synchronized<std::vector<std::unique_ptr<EchoHandler>>> echoHandlers_;
   bool draining_{false};
+  bool disableRtx_{false};
 };
 
 class EchoServer {
@@ -76,10 +80,11 @@ class EchoServer {
       bool useDatagrams = false,
       uint64_t activeConnIdLimit = 10,
       bool enableMigration = true,
-      bool enableStreamGroups = false)
+      bool enableStreamGroups = false,
+      bool disableRtx = false)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
-        std::make_unique<EchoServerTransportFactory>(useDatagrams));
+        std::make_unique<EchoServerTransportFactory>(useDatagrams, disableRtx));
     server_->setTransportStatsCallbackFactory(
         std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();
@@ -93,6 +98,11 @@ class EchoServer {
     if (enableStreamGroups) {
       settingsCopy.notifyOnNewStreamsExplicitly = true;
       settingsCopy.advertisedMaxStreamGroups = 1024;
+    }
+    if (disableRtx) {
+      if (!enableStreamGroups) {
+        LOG(FATAL) << "disable_rtx requires use_stream_groups to be enabled";
+      }
     }
     server_->setTransportSettings(std::move(settingsCopy));
   }
