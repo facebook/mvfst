@@ -170,7 +170,9 @@ void markPacketLoss(
             // not have the offset.
             break;
           }
-          stream->insertIntoLossBuffer(std::move(bufferItr->second));
+          if (!streamRetransmissionDisabled(conn, *stream)) {
+            stream->insertIntoLossBuffer(std::move(bufferItr->second));
+          }
           if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
               streamsWithAddedStreamLossForPacket.end()) {
             stream->streamLossCount++;
@@ -187,7 +189,9 @@ void markPacketLoss(
           CHECK_EQ(bufMeta.offset, frame.offset);
           CHECK_EQ(bufMeta.length, frame.len);
           CHECK_EQ(bufMeta.eof, frame.fin);
-          stream->insertIntoLossBufMeta(retxBufMetaItr->second);
+          if (!streamRetransmissionDisabled(conn, *stream)) {
+            stream->insertIntoLossBufMeta(retxBufMetaItr->second);
+          }
           if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
               streamsWithAddedStreamLossForPacket.end()) {
             stream->streamLossCount++;

@@ -2840,5 +2840,243 @@ INSTANTIATE_TEST_SUITE_P(
         PacketNumberSpace::Handshake,
         PacketNumberSpace::AppData));
 
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionDisabled) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+
+  conn->transportSettings.advertisedMaxStreamGroups = 16;
+
+  const auto groupId =
+      conn->streamManager->createNextBidirectionalStreamGroup();
+  QuicStreamGroupRetransmissionPolicy policy;
+  policy.disableRetransmission = true;
+  conn->retransmissionPolicies.emplace(*groupId, policy);
+
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto buf = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+  writeDataToQuicStream(*stream2, buf->clone(), true);
+
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  // One packet in outstandings.
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+
+  // Lose the packet.
+  auto& packet =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  markPacketLoss(*conn, packet, false);
+
+  // The lost packet data should not be transferred to the loss buffer of either
+  // stream.
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream1->lossBuffer.size(), 0);
+  EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream2->lossBuffer.size(), 0);
+}
+
+TEST_F(
+    QuicLossFunctionsTest,
+    TestMarkPacketLossRetransmissionPolicyPresentButNotDisabled) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+
+  conn->transportSettings.advertisedMaxStreamGroups = 16;
+
+  const auto groupId =
+      conn->streamManager->createNextBidirectionalStreamGroup();
+  QuicStreamGroupRetransmissionPolicy policy;
+  policy.disableRetransmission = false;
+  conn->retransmissionPolicies.emplace(*groupId, policy);
+
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto buf = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+  writeDataToQuicStream(*stream2, buf->clone(), true);
+
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  // One packet in outstandings.
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+
+  // Lose the packet.
+  auto& packet =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  markPacketLoss(*conn, packet, false);
+
+  // The data from the lost packet should be transferred to the loss buffer of
+  // both streams because disableRetransmission = false on the policy.
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream1->lossBuffer.size(), 1);
+  EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream2->lossBuffer.size(), 1);
+}
+
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionPolicyTwoGroups) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+
+  conn->transportSettings.advertisedMaxStreamGroups = 16;
+
+  const auto groupId1 =
+      conn->streamManager->createNextBidirectionalStreamGroup();
+  const auto groupId2 =
+      conn->streamManager->createNextBidirectionalStreamGroup();
+
+  QuicStreamGroupRetransmissionPolicy policy1;
+  policy1.disableRetransmission = true;
+  conn->retransmissionPolicies.emplace(*groupId1, policy1);
+
+  QuicStreamGroupRetransmissionPolicy policy2;
+  policy2.disableRetransmission = false;
+  conn->retransmissionPolicies.emplace(*groupId2, policy2);
+
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId1).value()->id;
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId2).value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto buf = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+  writeDataToQuicStream(*stream2, buf->clone(), true);
+
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  // One packet in outstandings.
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+
+  // Lose the packet.
+  auto& packet =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  markPacketLoss(*conn, packet, false);
+
+  // The data from the lost packet should not be transferred to the loss buffer
+  // of stream1, but should be transferred to the loss buffer of stream2.
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream1->lossBuffer.size(), 0);
+  EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream2->lossBuffer.size(), 1);
+}
+
+TEST_F(
+    QuicLossFunctionsTest,
+    TestMarkPacketLossRetransmissionPolicyTwoGroupsTwoPackets) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+
+  conn->transportSettings.advertisedMaxStreamGroups = 16;
+
+  const auto groupId1 =
+      conn->streamManager->createNextBidirectionalStreamGroup();
+  const auto groupId2 =
+      conn->streamManager->createNextBidirectionalStreamGroup();
+
+  QuicStreamGroupRetransmissionPolicy policy1;
+  policy1.disableRetransmission = true;
+  conn->retransmissionPolicies.emplace(*groupId1, policy1);
+
+  QuicStreamGroupRetransmissionPolicy policy2;
+  policy2.disableRetransmission = false;
+  conn->retransmissionPolicies.emplace(*groupId2, policy2);
+
+  // Generate packet 1.
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId1).value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto buf = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  // Generate packet 2.
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream(*groupId2).value()->id;
+  auto stream2 = conn->streamManager->findStream(stream2Id);
+  writeDataToQuicStream(*stream2, buf->clone(), true);
+
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  // Two packets in outstandings.
+  EXPECT_EQ(2, conn->outstandings.packets.size());
+
+  // Lose the first packet.
+  auto& packet =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  markPacketLoss(*conn, packet, false);
+  // Lose the second packet.
+  auto& packet2 =
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  markPacketLoss(*conn, packet2, false);
+
+  // The data from the lost packet should not be transferred to the loss buffer
+  // of stream1, but should be transferred to the loss buffer of stream2.
+  stream1 = conn->streamManager->findStream(stream1Id);
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream1->lossBuffer.size(), 0);
+  stream2 = conn->streamManager->findStream(stream2Id);
+  EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream2->lossBuffer.size(), 1);
+}
+
 } // namespace test
 } // namespace quic

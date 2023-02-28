@@ -113,4 +113,12 @@ uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn);
 bool checkCustomRetransmissionProfilesEnabled(
     const QuicConnectionStateBase& conn);
 
+/**
+ * Checks if the retransmission policy on the stream group prohibits
+ * retransmissions.
+ */
+bool streamRetransmissionDisabled(
+    QuicConnectionStateBase& conn,
+    const QuicStreamState& stream);
+
 } // namespace quic
