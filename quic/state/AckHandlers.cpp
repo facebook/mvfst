@@ -511,7 +511,8 @@ AckEvent processAckFrame(
   // notify observers
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
-    if (spuriousLossEvent && socketObserverContainer &&
+    if (spuriousLossEvent && spuriousLossEvent->hasPackets() &&
+        socketObserverContainer &&
         socketObserverContainer->hasObserversForEvent<
             SocketObserverInterface::Events::spuriousLossEvents>()) {
       socketObserverContainer->invokeInterfaceMethod<
