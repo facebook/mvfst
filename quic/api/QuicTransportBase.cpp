@@ -338,21 +338,11 @@ void QuicTransportBase::closeImpl(
     }
   }
   cancelLossTimeout();
-  if (ackTimeout_.isScheduled()) {
-    ackTimeout_.cancelTimeout();
-  }
-  if (pathValidationTimeout_.isScheduled()) {
-    pathValidationTimeout_.cancelTimeout();
-  }
-  if (idleTimeout_.isScheduled()) {
-    idleTimeout_.cancelTimeout();
-  }
-  if (keepaliveTimeout_.isScheduled()) {
-    keepaliveTimeout_.cancelTimeout();
-  }
-  if (pingTimeout_.isScheduled()) {
-    pingTimeout_.cancelTimeout();
-  }
+  ackTimeout_.cancelTimeout();
+  pathValidationTimeout_.cancelTimeout();
+  idleTimeout_.cancelTimeout();
+  keepaliveTimeout_.cancelTimeout();
+  pingTimeout_.cancelTimeout();
 
   VLOG(10) << "Stopping read looper due to immediate close " << *this;
   readLooper_->stop();
@@ -1958,12 +1948,8 @@ void QuicTransportBase::setIdleTimer() {
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
-  if (idleTimeout_.isScheduled()) {
-    idleTimeout_.cancelTimeout();
-  }
-  if (keepaliveTimeout_.isScheduled()) {
-    keepaliveTimeout_.cancelTimeout();
-  }
+  idleTimeout_.cancelTimeout();
+  keepaliveTimeout_.cancelTimeout();
   auto localIdleTimeout = conn_->transportSettings.idleTimeout;
   // The local idle timeout being zero means it is disabled.
   if (localIdleTimeout == 0ms) {
@@ -2817,9 +2803,7 @@ void QuicTransportBase::schedulePathValidationTimeout() {
 }
 
 void QuicTransportBase::cancelLossTimeout() {
-  if (lossTimeout_.isScheduled()) {
-    lossTimeout_.cancelTimeout();
-  }
+  lossTimeout_.cancelTimeout();
 }
 
 bool QuicTransportBase::isLossTimeoutScheduled() const {
