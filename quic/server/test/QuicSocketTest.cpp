@@ -25,11 +25,6 @@ class QuicSocketTest : public Test {
     handler_.setQuicSocket(socket_);
   }
 
-  void openStream(StreamId) {
-    EXPECT_CALL(*socket_, setReadCallback(3, &handler_, _));
-    socket_->connCb_->onNewBidirectionalStream(3);
-  }
-
  protected:
   folly::EventBase evb_;
   EchoHandler handler_{&evb_};
@@ -43,18 +38,22 @@ std::pair<folly::IOBuf*, bool> readResult(const std::string& str, bool eof) {
 
 TEST_F(QuicSocketTest, simple) {
   InSequence enforceOrder;
-  openStream(3);
+  EXPECT_CALL(*socket_, setReadCallback(3, &handler_, _));
+  socket_->connCb_->onNewBidirectionalStream(3);
 
   EXPECT_CALL(*socket_, readNaked(3, _))
       .WillOnce(Return(readResult("hello world", true)));
   EXPECT_CALL(*socket_, writeChain(3, _, true, nullptr))
       .WillOnce(Return(folly::unit));
+
+  EXPECT_CALL(*socket_, setReadCallback(3, nullptr, _));
   handler_.readAvailable(3);
 }
 
 TEST_F(QuicSocketTest, multiple_reads) {
   InSequence enforceOrder;
-  openStream(3);
+  EXPECT_CALL(*socket_, setReadCallback(3, &handler_, _));
+  socket_->connCb_->onNewBidirectionalStream(3);
 
   EXPECT_CALL(*socket_, readNaked(3, _))
       .WillOnce(Return(readResult("hello ", false)));
@@ -64,5 +63,7 @@ TEST_F(QuicSocketTest, multiple_reads) {
       .WillOnce(Return(readResult("world", true)));
   EXPECT_CALL(*socket_, writeChain(3, _, true, nullptr))
       .WillOnce(Return(folly::unit));
+
+  EXPECT_CALL(*socket_, setReadCallback(3, nullptr, _));
   handler_.readAvailable(3);
 }

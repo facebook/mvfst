@@ -106,6 +106,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     auto res = sock->read(id, 0);
     if (res.hasError()) {
       LOG(ERROR) << "Got error=" << toString(res.error());
+      sock->setReadCallback(id, nullptr);
       return;
     }
     if (input_.find(id) == input_.end()) {
@@ -123,6 +124,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     input_[id].second = eof;
     if (eof) {
       echo(id, input_[id]);
+      LOG(INFO) << "uninstalling read callback";
+      sock->setReadCallback(id, nullptr);
     }
   }
 

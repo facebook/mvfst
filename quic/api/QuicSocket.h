@@ -613,6 +613,9 @@ class QuicSocket {
    * transport to send a StopSending frame with
    * GenericApplicationErrorCode::NO_ERROR. If err is specified to be
    * folly::none, no StopSending will be sent.
+   *
+   * Users should remove the callback via setReadCallback(id, nullptr) after
+   * reading an error or eof to allow streams to be reaped by the transport.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
       StreamId id,
