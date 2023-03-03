@@ -83,7 +83,7 @@ void recoverOrResetCongestionAndRttState(
     conn.lossState.lrtt = lastState->lrtt;
     conn.lossState.rttvar = lastState->rttvar;
     conn.lossState.mrtt = lastState->mrtt;
-    conn.migrationState.lastCongestionAndRtt = folly::none;
+    conn.migrationState.lastCongestionAndRtt.reset();
   } else {
     resetCongestionAndRttState(conn);
   }
@@ -432,7 +432,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     }
     // Clear limit because CFIN is received at this point
     conn.isClientAddrVerified = true;
-    conn.writableBytesLimit = folly::none;
+    conn.writableBytesLimit.reset();
     conn.readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
   }
   auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
@@ -583,7 +583,7 @@ void onConnectionMigration(
 
   bool hasPendingPathChallenge = conn.pendingEvents.pathChallenge.has_value();
   // Clear any pending path challenge frame that is not sent
-  conn.pendingEvents.pathChallenge = folly::none;
+  conn.pendingEvents.pathChallenge.reset();
 
   auto& previousPeerAddresses = conn.migrationState.previousPeerAddresses;
   auto it = std::find(
@@ -612,7 +612,7 @@ void onConnectionMigration(
   // Cancel current path validation if any
   if (hasPendingPathChallenge || conn.outstandingPathValidation) {
     conn.pendingEvents.schedulePathValidationTimeout = false;
-    conn.outstandingPathValidation = folly::none;
+    conn.outstandingPathValidation.reset();
 
     // Only change congestion & rtt state if not NAT rebinding
     if (!isNATRebinding) {

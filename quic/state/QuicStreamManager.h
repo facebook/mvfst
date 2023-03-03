@@ -573,7 +573,7 @@ class QuicStreamManager {
    */
   folly::Optional<uint64_t> remoteBidirectionalStreamLimitUpdate() {
     auto ret = remoteBidirectionalStreamLimitUpdate_;
-    remoteBidirectionalStreamLimitUpdate_ = folly::none;
+    remoteBidirectionalStreamLimitUpdate_.reset();
     return ret;
   }
 
@@ -584,7 +584,7 @@ class QuicStreamManager {
    */
   folly::Optional<uint64_t> remoteUnidirectionalStreamLimitUpdate() {
     auto ret = remoteUnidirectionalStreamLimitUpdate_;
-    remoteUnidirectionalStreamLimitUpdate_ = folly::none;
+    remoteUnidirectionalStreamLimitUpdate_.reset();
     return ret;
   }
 

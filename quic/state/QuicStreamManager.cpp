@@ -39,7 +39,7 @@ static void updateHolBlockedTime(QuicStreamState& stream) {
       stream.totalHolbTime +=
           std::chrono::duration_cast<std::chrono::microseconds>(
               Clock::now() - *stream.lastHolbTime);
-      stream.lastHolbTime = folly::none;
+      stream.lastHolbTime.reset();
     }
     return;
   }

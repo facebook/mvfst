@@ -1627,7 +1627,7 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (!conn.pendingEvents.frames.empty()) {
     return WriteDataReason::SIMPLE;
   }
-  if ((conn.pendingEvents.pathChallenge != folly::none)) {
+  if ((conn.pendingEvents.pathChallenge.has_value())) {
     return WriteDataReason::PATHCHALLENGE;
   }
   if (conn.pendingEvents.sendPing) {

@@ -418,7 +418,7 @@ void BbrCongestionController::handleAckInProbeRtt(
       conn_.lossState.inflightBytes <
           getCongestionWindow() + conn_.udpSendPacketLen) {
     earliestTimeToExitProbeRtt_ = ackTime + kProbeRttDuration;
-    probeRttRound_ = folly::none;
+    probeRttRound_.reset();
     return;
   }
   if (earliestTimeToExitProbeRtt_) {
@@ -453,8 +453,8 @@ void BbrCongestionController::transitToStartup() noexcept {
 void BbrCongestionController::transitToProbeRtt() noexcept {
   state_ = BbrState::ProbeRtt;
   pacingGain_ = 1.0f;
-  earliestTimeToExitProbeRtt_ = folly::none;
-  probeRttRound_ = folly::none;
+  earliestTimeToExitProbeRtt_.reset();
+  probeRttRound_.reset();
   if (bandwidthSampler_) {
     bandwidthSampler_->onAppLimited();
   }

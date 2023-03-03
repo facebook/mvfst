@@ -568,7 +568,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   CongestionControlType congestionControlType = CongestionControlType::None;
   uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
   uint64_t congestionWindow = std::numeric_limits<uint64_t>::max();
-  folly::Optional<CongestionController::State> maybeCCState = folly::none;
+  folly::Optional<CongestionController::State> maybeCCState;
   uint64_t burstSize = 0;
   std::chrono::microseconds pacingInterval = 0ms;
   if (conn_->congestionController) {
@@ -1385,7 +1385,7 @@ folly::
     updateReadLooper(); // consume may affect "read" API
     updateWriteLooper(true);
   };
-  folly::Optional<uint64_t> readOffset = folly::none;
+  folly::Optional<uint64_t> readOffset;
   try {
     // Need to check that the stream exists first so that we don't
     // accidentally let the API create a peer stream that was not
@@ -2698,7 +2698,7 @@ void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
   CHECK(conn_->outstandingPathValidation);
 
   conn_->pendingEvents.schedulePathValidationTimeout = false;
-  conn_->outstandingPathValidation = folly::none;
+  conn_->outstandingPathValidation.reset();
   if (conn_->qLogger) {
     conn_->qLogger->addPathValidationEvent(false);
   }

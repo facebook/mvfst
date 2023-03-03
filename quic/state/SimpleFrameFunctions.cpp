@@ -149,7 +149,7 @@ bool updateSimpleFrameOnPacketReceived(
         conn.qLogger->addPathValidationEvent(true);
       }
       // TODO update source token,
-      conn.outstandingPathValidation = folly::none;
+      conn.outstandingPathValidation.reset();
       conn.pendingEvents.schedulePathValidationTimeout = false;
 
       // stop the clock to measure init rtt

@@ -663,7 +663,7 @@ void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
 void QuicServerTransport::verifiedClientAddress() {
   if (serverConn_) {
     serverConn_->isClientAddrVerified = true;
-    conn_->writableBytesLimit = folly::none;
+    conn_->writableBytesLimit.reset();
   }
 }
 

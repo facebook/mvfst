@@ -80,9 +80,9 @@ void Cubic::onPersistentCongestion() {
   if (steadyState_.tcpFriendly) {
     steadyState_.estRenoCwnd = 0;
   }
-  steadyState_.lastReductionTime = folly::none;
-  steadyState_.lastMaxCwndBytes = folly::none;
-  quiescenceStart_ = folly::none;
+  steadyState_.lastReductionTime.reset();
+  steadyState_.lastMaxCwndBytes.reset();
+  quiescenceStart_.reset();
   hystartState_.found = Cubic::HystartFound::No;
   hystartState_.inRttRound = false;
 
@@ -108,7 +108,7 @@ void Cubic::onPacketSent(const OutstandingPacket& packet) {
 }
 
 void Cubic::onPacketLoss(const LossEvent& loss) {
-  quiescenceStart_ = folly::none;
+  quiescenceStart_.reset();
   DCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());
@@ -178,7 +178,7 @@ void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
             eventTime - *quiescenceStart_);
   }
   if (!idle) {
-    quiescenceStart_ = folly::none;
+    quiescenceStart_.reset();
   }
 }
 
@@ -391,7 +391,7 @@ void Cubic::startHystartRttRound(TimePoint time) noexcept {
   hystartState_.roundStart = hystartState_.lastJiffy = time;
   hystartState_.ackCount = 0;
   hystartState_.lastSampledRtt = hystartState_.currSampledRtt;
-  hystartState_.currSampledRtt = folly::none;
+  hystartState_.currSampledRtt.reset();
   hystartState_.rttRoundEndTarget = Clock::now();
   hystartState_.inRttRound = true;
   hystartState_.found = HystartFound::No;
@@ -456,10 +456,10 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
        * that next time we go back to slow start, we won't be using a very old
        * sampled RTT as the lastSampledRtt:
        */
-      hystartState_.currSampledRtt = folly::none;
-      steadyState_.lastMaxCwndBytes = folly::none;
-      steadyState_.lastReductionTime = folly::none;
-      quiescenceStart_ = folly::none;
+      hystartState_.currSampledRtt.reset();
+      steadyState_.lastMaxCwndBytes.reset();
+      steadyState_.lastReductionTime.reset();
+      quiescenceStart_.reset();
       state_ = CubicStates::Steady;
     } else {
       // No exit yet, but we may still need to end this RTT round
