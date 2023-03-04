@@ -3242,6 +3242,7 @@ void QuicTransportBase::setTransportSettings(
                               : conn_->transportSettings.minCwndInMss;
       conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
       conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
+      conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
     } else {
       LOG(ERROR) << "Pacing cannot be enabled without a timer";
       conn_->transportSettings.pacingEnabled = false;

@@ -123,6 +123,9 @@ struct TransportSettings {
   bool enableSocketErrMsgCallback{true};
   // Whether pacing is enabled.
   bool pacingEnabled{false};
+  // Whether pacing should be enabled for the first flight before the 1-RTT
+  // cipher is available. Turning this on paces 0-rtt packets.
+  bool pacingEnabledFirstFlight{false};
   // The minimum number of packets to burst out during pacing
   uint64_t minBurstPackets{kDefaultMinBurstPackets};
   // Pacing timer tick interval
