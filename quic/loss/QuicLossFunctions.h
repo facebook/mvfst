@@ -186,7 +186,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
 
 void processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
-    const folly::Optional<PacketNum>& largestAcked,
+    PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
     const InlineMap<StreamId, PacketNum, 20>& largestDsrAcked,
     const folly::Optional<PacketNum>& largestNonDsrAcked,

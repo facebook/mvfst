@@ -267,7 +267,7 @@ void markPacketLoss(
 
 void processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
-    const folly::Optional<PacketNum>& largestAcked,
+    PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
     const InlineMap<StreamId, PacketNum, 20>& largestDsrAcked,
     const folly::Optional<PacketNum>& largestNonDsrAcked,
@@ -282,7 +282,7 @@ void processOutstandingsForLoss(
   while (iter != conn.outstandings.packets.end()) {
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
-    if (!largestAcked.has_value() || currentPacketNum >= *largestAcked) {
+    if (currentPacketNum >= largestAcked) {
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
@@ -315,7 +315,7 @@ void processOutstandingsForLoss(
             // non-DSR ACKed. If there were no non-DSR ACKed, we shouldn't
             // declare reorder loss.
             if (largestDsrAcked.empty()) {
-              CHECK(largestNonDsrAcked == largestAcked);
+              CHECK(*largestNonDsrAcked == largestAcked);
               return largestNonDsrAcked.value();
             } else {
               return largestNonDsrAcked.value_or(currentPacketNum);
@@ -445,19 +445,21 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     largestNonDsrAcked = largestAcked;
   }
 
-  processOutstandingsForLoss(
-      conn,
-      largestAcked,
-      pnSpace,
-      largestDsrAcked,
-      largestNonDsrAcked,
-      lossTime,
-      rttSample,
-      lossVisitor,
-      delayUntilLost,
-      shouldSetTimer,
-      lossEvent,
-      observerLossEvent);
+  if (largestAcked.has_value()) {
+    processOutstandingsForLoss(
+        conn,
+        *largestAcked,
+        pnSpace,
+        largestDsrAcked,
+        largestNonDsrAcked,
+        lossTime,
+        rttSample,
+        lossVisitor,
+        delayUntilLost,
+        shouldSetTimer,
+        lossEvent,
+        observerLossEvent);
+  }
 
   // notify observers
   {
