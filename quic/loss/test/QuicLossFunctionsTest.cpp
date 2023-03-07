@@ -413,8 +413,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   EXPECT_CALL(*quicStats_, onPTO());
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_EQ(LossState::AlarmMethod::PTO, conn->lossState.currentAlarmMethod);
-  onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPacket)), MockClock>(
-      *conn, testingLossMarkFunc(lostPacket));
+  onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPacket));
   EXPECT_EQ(conn->lossState.ptoCount, 1);
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
   // PTO shouldn't mark loss
@@ -425,8 +424,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   sendPacket(*conn, TimePoint(), folly::none, PacketType::OneRtt);
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
-  onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPacket)), MockClock>(
-      *conn, testingLossMarkFunc(lostPacket));
+  onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPacket));
   EXPECT_EQ(conn->lossState.ptoCount, 2);
   // PTO doesn't take anything out of outstandings.packets
   EXPECT_FALSE(conn->outstandings.packets.empty());
@@ -727,7 +725,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
   conn->outstandings.packets.erase(
       firstHandshakeOpIter + 2, firstHandshakeOpIter + 5);
   // Ack for packet 9 arrives
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+  auto lossEvent = detectLossPackets(
       *conn,
       9,
       testingLossMarkFunc,
@@ -992,7 +990,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
   conn->outstandings.packets.erase(
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc(lostPacket))>(
+  auto lossEvent = detectLossPackets(
       *conn,
       largestSent,
       testingLossMarkFunc(lostPacket),
@@ -1031,7 +1029,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   PacketNum second =
       sendPacket(*conn, sendTime + 1ms, folly::none, PacketType::Handshake);
   auto lossTime = sendTime + 50ms;
-  detectLossPackets<decltype(testingLossMarkFunc(lostPackets))>(
+  detectLossPackets(
       *conn,
       second,
       testingLossMarkFunc(lostPackets),
@@ -1057,8 +1055,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   getAckState(*conn, PacketNumberSpace::Handshake).largestAckedByPeer = second;
   conn->outstandings.packets.pop_back();
   MockClock::mockNow = [=]() { return sendTime + expectedDelayUntilLost + 5s; };
-  onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), MockClock>(
-      *conn, testingLossMarkFunc(lostPackets));
+  onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPackets));
   auto numDeclaredLost = std::count_if(
       conn->outstandings.packets.begin(),
       conn->outstandings.packets.end(),
@@ -1088,8 +1085,7 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
   }
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
   EXPECT_CALL(*quicStats_, onPTO());
-  onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), MockClock>(
-      *conn, testingLossMarkFunc(lostPackets));
+  onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPackets));
   EXPECT_EQ(1, conn->lossState.ptoCount);
   // Hey PTOs are not losses either from now on
   EXPECT_TRUE(lostPackets.empty());
@@ -1123,8 +1119,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
   EXPECT_CALL(*quicStats_, onPTO());
   // Verify packet count doesn't change across PTO.
   auto originalPacketCount = conn->outstandings.packetCount;
-  onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), Clock>(
-      *conn, testingLossMarkFunc(lostPackets));
+  onLossDetectionAlarm<Clock>(*conn, testingLossMarkFunc(lostPackets));
   EXPECT_EQ(originalPacketCount, conn->outstandings.packetCount);
 
   EXPECT_EQ(0, lostPackets.size());
@@ -1426,7 +1421,7 @@ TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
   auto ackedPacket =
       sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   auto noopLossMarker = [](auto&, auto&, bool) {};
-  detectLossPackets<decltype(noopLossMarker)>(
+  detectLossPackets(
       *conn,
       ackedPacket,
       noopLossMarker,
@@ -1662,7 +1657,7 @@ TEST_F(QuicLossFunctionsTest, TimeThreshold) {
   auto lossVisitor = [&](const auto& /*conn*/, const auto& packet, bool) {
     EXPECT_EQ(packet1, packet.header.getPacketSequenceNum());
   };
-  detectLossPackets<decltype(lossVisitor)>(
+  detectLossPackets(
       *conn,
       packet2,
       lossVisitor,
@@ -2506,7 +2501,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
                   ->metadata))
           .build());
 
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+  auto lossEvent = detectLossPackets(
       *conn,
       9,
       testingLossMarkFunc,
@@ -2589,7 +2584,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
                   ->metadata))
           .build());
 
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+  auto lossEvent = detectLossPackets(
       *conn,
       9,
       testingLossMarkFunc,
@@ -2662,7 +2657,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
                   ->metadata))
           .build());
 
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+  auto lossEvent = detectLossPackets(
       *conn,
       9,
       testingLossMarkFunc,
@@ -2733,7 +2728,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
                   ->metadata))
           .build());
 
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+  auto lossEvent = detectLossPackets(
       *conn,
       9,
       testingLossMarkFunc,
@@ -2813,7 +2808,7 @@ TEST_F(
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc)>(
+  auto lossEvent = detectLossPackets(
       *conn,
       9,
       testingLossMarkFunc,

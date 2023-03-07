@@ -747,4 +747,7 @@ struct AckStateVersion {
   bool operator!=(const AckStateVersion& other) const;
 };
 
+using LossVisitor = std::function<
+    void(QuicConnectionStateBase&, RegularQuicWritePacket&, bool)>;
+
 } // namespace quic
