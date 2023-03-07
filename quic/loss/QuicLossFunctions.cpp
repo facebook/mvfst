@@ -265,7 +265,11 @@ void markPacketLoss(
   }
 }
 
-void processOutstandingsForLoss(
+/**
+ * Processes outstandings for loss and returns true if the loss timer should be
+ * set. False otherwise.
+ */
+bool processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
@@ -275,9 +279,9 @@ void processOutstandingsForLoss(
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
     std::chrono::microseconds& delayUntilLost,
-    bool& shouldSetTimer,
     CongestionController::LossEvent& lossEvent,
     folly::Optional<SocketObserverInterface::LossEvent>& observerLossEvent) {
+  bool shouldSetTimer = false;
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   while (iter != conn.outstandings.packets.end()) {
     auto& pkt = *iter;
@@ -378,6 +382,7 @@ void processOutstandingsForLoss(
     iter->declaredLost = true;
     iter++;
   }
+  return shouldSetTimer;
 }
 
 /*
@@ -412,7 +417,6 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
   }
   // Note that time based loss detection is also within the same PNSpace.
-  bool shouldSetTimer = false;
 
   // Loop over all ACKed packets and collect the largest ACKed packet per DSR
   // stream. This facilitates only considering the reordering threshold per DSR
@@ -445,8 +449,9 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     largestNonDsrAcked = largestAcked;
   }
 
+  bool shouldSetTimer = false;
   if (largestAcked.has_value()) {
-    processOutstandingsForLoss(
+    shouldSetTimer = processOutstandingsForLoss(
         conn,
         *largestAcked,
         pnSpace,
@@ -456,7 +461,6 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
         rttSample,
         lossVisitor,
         delayUntilLost,
-        shouldSetTimer,
         lossEvent,
         observerLossEvent);
   }

@@ -184,7 +184,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   conn.pendingEvents.setLossDetectionAlarm = false;
 }
 
-void processOutstandingsForLoss(
+/**
+ * Processes outstandings for loss and returns true if the loss timer should be
+ * set. False otherwise.
+ */
+bool processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
@@ -194,7 +198,6 @@ void processOutstandingsForLoss(
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
     std::chrono::microseconds& delayUntilLost,
-    bool& shouldSetTimer,
     CongestionController::LossEvent& lossEvent,
     folly::Optional<SocketObserverInterface::LossEvent>& observerLossEvent);
 
