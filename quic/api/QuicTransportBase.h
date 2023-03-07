@@ -654,6 +654,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void appendCmsgs(const folly::SocketOptionMap& options);
 
+  void setAdditionalCmsgsFunc(
+      folly::AsyncUDPSocket::AdditionalCmsgsFunc&& func);
+
   /**
    * Sets the policy per stream group id.
    * If policy == std::nullopt, the policy is removed for corresponding stream

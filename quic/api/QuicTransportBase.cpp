@@ -3748,6 +3748,11 @@ void QuicTransportBase::appendCmsgs(const folly::SocketOptionMap& options) {
   socket_->appendCmsgs(options);
 }
 
+void QuicTransportBase::setAdditionalCmsgsFunc(
+    folly::AsyncUDPSocket::AdditionalCmsgsFunc&& func) {
+  socket_->setAdditionalCmsgsFunc(std::move(func));
+}
+
 void QuicTransportBase::setBackgroundModeParameters(
     PriorityLevel maxBackgroundPriority,
     float backgroundUtilizationFactor) {
