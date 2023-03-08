@@ -315,6 +315,7 @@ struct QuicStreamState : public QuicStreamLike {
     retransmissionBufMetas = std::move(other.retransmissionBufMetas);
     lossBufMetas = std::move(other.lossBufMetas);
     streamLossCount = other.streamLossCount;
+    newStreamBytesSent = other.newStreamBytesSent;
   }
 
   // Connection that this stream is associated with.
@@ -470,6 +471,10 @@ struct QuicStreamState : public QuicStreamLike {
   std::deque<WriteBufferMeta> lossBufMetas;
 
   uint64_t streamLossCount{0};
+
+  // Total number of 'new' stream bytes sent on this stream.
+  // Does not include retransmissions of stream bytes.
+  uint64_t newStreamBytesSent{0};
 
   /**
    * Insert a new WriteBufferMeta into lossBufMetas. If the new WriteBufferMeta

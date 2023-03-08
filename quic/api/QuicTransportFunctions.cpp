@@ -670,6 +670,7 @@ void updateConnection(
           maybeWriteDataBlockedAfterSocketWrite(conn);
           conn.streamManager->addTx(writeStreamFrame.streamId);
           newStreamBytesSent += writeStreamFrame.len;
+          stream->newStreamBytesSent += writeStreamFrame.len;
         }
         conn.streamManager->updateWritableStreams(*stream);
         conn.streamManager->updateLossStreams(*stream);
