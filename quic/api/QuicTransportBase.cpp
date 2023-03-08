@@ -3505,7 +3505,8 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
       stream->holbCount,
       bool(stream->lastHolbTime),
       packets,
-      stream->streamLossCount};
+      stream->streamLossCount,
+      stream->newStreamBytesSent};
 }
 
 void QuicTransportBase::describe(std::ostream& os) const {

@@ -257,6 +257,10 @@ class QuicSocket {
     // Number of packets that contain STREAM frame for this stream and are
     // declared to be lost
     uint64_t streamLossCount{0};
+
+    // Total number of 'new' stream bytes sent on this stream.
+    // Does not include retransmissions of stream bytes.
+    uint64_t newStreamBytesSent{0};
   };
 
   /**
