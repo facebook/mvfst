@@ -261,6 +261,9 @@ class QuicSocket {
     // Total number of 'new' stream bytes sent on this stream.
     // Does not include retransmissions of stream bytes.
     uint64_t newStreamBytesSent{0};
+
+    // Total number of stream bytes received on this stream.
+    folly::Optional<uint64_t> streamBytesReceived{0};
   };
 
   /**
