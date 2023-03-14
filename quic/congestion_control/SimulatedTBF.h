@@ -85,7 +85,8 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
       const TimePoint& windowEndTime) const;
 
   /**
-   * Returns if the bucket were empty or in debt at the specified time.
+   * Returns if the bucket were empty or in debt at the specified time in the
+   * past.
    *
    * @param time
    * @return      If bucket were empty or in debt
@@ -103,7 +104,18 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   void forgetEmptyIntervalsPriorTo(const TimePoint& time);
 
   /**
-   * Return the number of intervals in which the bucket were empty or in
+   * Returns the number of tokens available in bytes at the specified time (now
+   * or in future).
+   *
+   * @param time
+   * @return      The number of tokens in bytes.
+   *
+   */
+  [[nodiscard]] double getNumAvailableTokensInBytes(
+      const TimePoint& time) const;
+
+  /**
+   * Returns the number of intervals in which the bucket were empty or in
    * debt.
    */
   [[nodiscard]] unsigned int getNumEmptyIntervalsTracked() const;

@@ -154,6 +154,16 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
   }
 }
 
+[[nodiscard]] double SimulatedTBF::getNumAvailableTokensInBytes(
+    const TimePoint& time) const {
+  double timeDouble =
+      std::chrono::duration<double>(
+          time.time_since_epoch() // convert to double and seconds
+          )
+          .count();
+  return available(rateBytesPerSecond_, burstSizeBytes_, timeDouble);
+}
+
 [[nodiscard]] unsigned int SimulatedTBF::getNumEmptyIntervalsTracked() const {
   return emptyBucketTimeIntervals_.size();
 }
