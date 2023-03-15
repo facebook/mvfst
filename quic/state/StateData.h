@@ -320,7 +320,6 @@ using Resets = folly::F14FastMap<StreamId, RstStreamFrame>;
 
 using FrameList = std::vector<QuicSimpleFrame>;
 
-class Logger;
 class CongestionControllerFactory;
 class LoopDetectorCallback;
 class PendingPathRateLimiter;
@@ -594,9 +593,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   };
 
   PacketSchedulingState schedulingState;
-
-  // Logger for this connection.
-  std::shared_ptr<Logger> logger;
 
   // QLogger for this connection
   std::shared_ptr<QLogger> qLogger;

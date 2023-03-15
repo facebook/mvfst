@@ -177,7 +177,6 @@ void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
   // an application close, so the peer knows it didn't come from the transport.
   errorCode = maybeSetGenericAppError(errorCode);
   closeImpl(std::move(errorCode), true);
-  conn_->logger.reset();
 }
 
 void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
@@ -193,8 +192,6 @@ void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
     drainTimeout_.cancelTimeout();
     drainTimeoutExpired();
   }
-
-  conn_->logger.reset();
 }
 
 void QuicTransportBase::closeGracefully() {

@@ -598,10 +598,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void describe(std::ostream& os) const;
 
-  void setLogger(std::shared_ptr<Logger> logger) {
-    conn_->logger = std::move(logger);
-  }
-
   virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
 
   void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
