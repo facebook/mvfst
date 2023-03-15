@@ -1028,7 +1028,7 @@ void onServerReadDataFromOpen(
               conn,
               packetNumberSpace,
               ackFrame,
-              [&](const OutstandingPacket&,
+              [&](const OutstandingPacketWrapper&,
                   const QuicWriteFrame& packetFrame,
                   const ReadAckFrame&) {
                 switch (packetFrame.type()) {

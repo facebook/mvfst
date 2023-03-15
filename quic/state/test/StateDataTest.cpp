@@ -145,7 +145,7 @@ TEST_F(StateDataTest, SingleLostPacketEvent) {
       getTestConnectionId(),
       100,
       kVersion));
-  OutstandingPacket outstandingPacket(
+  OutstandingPacketWrapper outstandingPacket(
       packet,
       Clock::now(),
       1234,
@@ -171,7 +171,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       getTestConnectionId(),
       100,
       kVersion));
-  OutstandingPacket outstandingPacket1(
+  OutstandingPacketWrapper outstandingPacket1(
       packet1,
       Clock::now(),
       1234,
@@ -191,7 +191,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       getTestConnectionId(),
       110,
       kVersion));
-  OutstandingPacket outstandingPacket2(
+  OutstandingPacketWrapper outstandingPacket2(
       packet2,
       Clock::now(),
       1357,

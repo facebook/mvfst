@@ -58,7 +58,7 @@ class CCP : public CongestionController {
   ~CCP() override;
 
   void onRemoveBytesFromInflight(uint64_t) override;
-  void onPacketSent(const OutstandingPacket& packet) override;
+  void onPacketSent(const OutstandingPacketWrapper& packet) override;
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;

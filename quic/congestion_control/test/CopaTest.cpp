@@ -29,7 +29,7 @@ class CopaTest : public Test {
       RegularQuicWritePacket packet(
           ShortHeader(ProtectionType::KeyPhaseZero, connId, packetData.first));
       totalSentBytes += 10;
-      loss.addLostPacket(OutstandingPacket(
+      loss.addLostPacket(OutstandingPacketWrapper(
           std::move(packet),
           Clock::now(),
           10,
@@ -48,7 +48,7 @@ class CopaTest : public Test {
     return loss;
   }
 
-  OutstandingPacket createPacket(
+  OutstandingPacketWrapper createPacket(
       PacketNum packetNum,
       uint32_t size,
       uint64_t totalSent,
@@ -56,7 +56,7 @@ class CopaTest : public Test {
     auto connId = getTestConnectionId();
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
-    return OutstandingPacket(
+    return OutstandingPacketWrapper(
         std::move(packet),
         Clock::now(),
         size,

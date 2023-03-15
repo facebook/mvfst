@@ -97,7 +97,7 @@ void Cubic::onPersistentCongestion() {
   }
 }
 
-void Cubic::onPacketSent(const OutstandingPacket& packet) {
+void Cubic::onPacketSent(const OutstandingPacketWrapper& packet) {
   if (std::numeric_limits<uint64_t>::max() - conn_.lossState.inflightBytes <
       packet.metadata.encodedSize) {
     throw QuicInternalException(

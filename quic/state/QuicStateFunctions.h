@@ -68,18 +68,18 @@ uint64_t updateLargestReceivedPacketNum(
     PacketNum packetNum,
     TimePoint receivedTime);
 
-std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(
+std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace,
-    std::deque<OutstandingPacket>::iterator from);
-std::deque<OutstandingPacket>::iterator getFirstOutstandingPacket(
+    std::deque<OutstandingPacketWrapper>::iterator from);
+std::deque<OutstandingPacketWrapper>::iterator getFirstOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace);
 
-std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
+std::deque<OutstandingPacketWrapper>::reverse_iterator getLastOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace);
-std::deque<OutstandingPacket>::reverse_iterator
+std::deque<OutstandingPacketWrapper>::reverse_iterator
 getLastOutstandingPacketIncludingLost(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace);

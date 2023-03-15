@@ -59,7 +59,7 @@ struct OutstandingPacketBuilderFields {
   folly::Optional<uint64_t> maybePacketsInflight;
   folly::Optional<std::reference_wrapper<const LossState>> maybeLossState;
   folly::Optional<uint64_t> maybeWriteCount;
-  folly::Optional<OutstandingPacket::Metadata::DetailsPerStream>
+  folly::Optional<OutstandingPacketWrapper::Metadata::DetailsPerStream>
       maybeDetailsPerStream;
   folly::Optional<std::chrono::microseconds> maybeTotalAppLimitedTimeUsecs;
   explicit OutstandingPacketBuilderFields() = default;
@@ -80,10 +80,11 @@ struct OutstandingPacketBuilder : public OutstandingPacketBuilderFields {
       const std::reference_wrapper<const LossState>& lossStateIn);
   Builder&& setWriteCount(const uint64_t& writeCountIn);
   Builder&& setDetailsPerStream(
-      const OutstandingPacket::Metadata::DetailsPerStream& detailsPerStreamIn);
+      const OutstandingPacketWrapper::Metadata::DetailsPerStream&
+          detailsPerStreamIn);
   Builder&& setTotalAppLimitedTimeUsecs(
       const std::chrono::microseconds& totalAppLimitedTimeUsecsIn);
-  OutstandingPacket build() &&;
+  OutstandingPacketWrapper build() &&;
   explicit OutstandingPacketBuilder() = default;
 };
 

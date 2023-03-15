@@ -95,7 +95,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Since this is a reference to a packet in the outstanding packets deque, it
    * should not be stored.
    */
-  const OutstandingPacket* FOLLY_NULLABLE
+  const OutstandingPacketWrapper* FOLLY_NULLABLE
   getOldestOutstandingPacket(const quic::PacketNumberSpace packetNumberSpace) {
     const auto outstandingPacketIt =
         getFirstOutstandingPacket(this->getNonConstConn(), packetNumberSpace);
@@ -114,7 +114,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Since this is a reference to a packet in the outstanding packets deque, it
    * should not be stored.
    */
-  const OutstandingPacket* FOLLY_NULLABLE
+  const OutstandingPacketWrapper* FOLLY_NULLABLE
   getNewestOutstandingPacket(const quic::PacketNumberSpace packetNumberSpace) {
     const auto outstandingPacketIt =
         getLastOutstandingPacket(this->getNonConstConn(), packetNumberSpace);
@@ -133,7 +133,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Since this is a reference to a packet in the outstanding packets deque, it
    * should not be stored.
    */
-  const OutstandingPacket* FOLLY_NULLABLE getNewestAppDataOutstandingPacket() {
+  const OutstandingPacketWrapper* FOLLY_NULLABLE
+  getNewestAppDataOutstandingPacket() {
     return getNewestOutstandingPacket(PacketNumberSpace::AppData);
   }
 

@@ -393,7 +393,7 @@ void QuicClientTransport::processPacketData(
             *conn_,
             pnSpace,
             ackFrame,
-            [&](const OutstandingPacket& outstandingPacket,
+            [&](const OutstandingPacketWrapper& outstandingPacket,
                 const QuicWriteFrame& packetFrame,
                 const ReadAckFrame&) {
               auto outstandingProtectionType =

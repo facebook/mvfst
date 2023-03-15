@@ -627,7 +627,7 @@ void updateConnection(
   uint32_t ackFrameCounter = 0;
   uint32_t streamBytesSent = 0;
   uint32_t newStreamBytesSent = 0;
-  OutstandingPacket::Metadata::DetailsPerStream detailsPerStream;
+  OutstandingPacketWrapper::Metadata::DetailsPerStream detailsPerStream;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
   VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
            << " in space=" << packetNumberSpace << " size=" << encodedSize

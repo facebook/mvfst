@@ -27,10 +27,10 @@ struct AckEvent {
    * sent, which in turn can be used to infer whether the RTT measurement could
    * have been subject to self-induced congestion.
    *
-   * If the OutstandingPacket with the largestAckedPacket packet number had
-   * already been acked or removed from the list of list of OutstandingPackets,
-   * either due to being marked lost or acked by an earlier AckEvent, then this
-   * information will be unavailable.
+   * If the OutstandingPacketWrapper with the largestAckedPacket packet number
+   * had already been acked or removed from the list of list of
+   * OutstandingPackets, either due to being marked lost or acked by an earlier
+   * AckEvent, then this information will be unavailable.
    *
    * Equivalent to getLargestAckedPacket() unless this is an implicit AckEvent
    * (for which RttSamples are unavailable); this helper exists to make it
@@ -52,10 +52,10 @@ struct AckEvent {
    * Can be used to get packet metadata, including send time, app limited state,
    * and other aspects.
    *
-   * If the OutstandingPacket with the largestAckedPacket packet number had
-   * already been acked or removed from the list of list of OutstandingPackets,
-   * either due to being marked lost or acked by an earlier AckEvent, then this
-   * information will be unavailable.
+   * If the OutstandingPacketWrapper with the largestAckedPacket packet number
+   * had already been acked or removed from the list of list of
+   * OutstandingPackets, either due to being marked lost or acked by an earlier
+   * AckEvent, then this information will be unavailable.
    */
   [[nodiscard]] const AckPacket* FOLLY_NULLABLE getLargestAckedPacket() const {
     for (const auto& packet : ackedPackets) {
@@ -109,8 +109,9 @@ struct AckEvent {
   // the largest acked packet included in the AckFrame received from sender.
   //
   // this may not be the same as largestNewlyAckedPacket (below) if the
-  // OutstandingPacket with this packet number had already been removed from the
-  // list of OutstandingPackets, either due to being marked lost or acked.
+  // OutstandingPacketWrapper with this packet number had already been removed
+  // from the list of OutstandingPackets, either due to being marked lost or
+  // acked.
   const PacketNum largestAckedPacket;
 
   // for all packets (newly) acked during this event, sum of encoded sizes
@@ -129,9 +130,10 @@ struct AckEvent {
 
   // the highest packet number newly acked during processing of this event.
   //
-  // this may not be the same as the largestAckedPacket if the OutstandingPacket
-  // with that packet number had already been acked or removed from the list of
-  // list of OutstandingPackets, either due to being marked lost or acked.
+  // this may not be the same as the largestAckedPacket if the
+  // OutstandingPacketWrapper with that packet number had already been acked or
+  // removed from the list of list of OutstandingPackets, either due to being
+  // marked lost or acked.
   //
   // the reason that this is an optional type is that we construct an
   // AckEvent first, then go through the acked packets that are still
@@ -282,8 +284,9 @@ struct AckEvent {
     DetailsPerStream detailsPerStream;
 
     // LastAckedPacketInfo from this acked packet'r original sent
-    // OutstandingPacket structure.
-    folly::Optional<OutstandingPacket::LastAckedPacketInfo> lastAckedPacketInfo;
+    // OutstandingPacketWrapper structure.
+    folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
+        lastAckedPacketInfo;
 
     // Whether this packet was sent when CongestionController is in
     // app-limited state.
@@ -295,7 +298,7 @@ struct AckEvent {
           OutstandingPacketMetadata&& outstandingPacketMetadataIn);
       Builder&& setDetailsPerStream(DetailsPerStream&& detailsPerStreamIn);
       Builder&& setLastAckedPacketInfo(
-          folly::Optional<OutstandingPacket::LastAckedPacketInfo>&&
+          folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>&&
               lastAckedPacketInfoIn);
       Builder&& setAppLimited(bool appLimitedIn);
       AckPacket build() &&;
@@ -305,7 +308,7 @@ struct AckEvent {
       folly::Optional<quic::PacketNum> packetNum;
       folly::Optional<OutstandingPacketMetadata> outstandingPacketMetadata;
       folly::Optional<DetailsPerStream> detailsPerStream;
-      folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+      folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
           lastAckedPacketInfo;
       bool isAppLimited{false};
     };
@@ -315,7 +318,7 @@ struct AckEvent {
         quic::PacketNum packetNumIn,
         OutstandingPacketMetadata&& outstandingPacketMetadataIn,
         DetailsPerStream&& detailsPerStreamIn,
-        folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+        folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
             lastAckedPacketInfoIn,
         bool isAppLimitedIn);
   };

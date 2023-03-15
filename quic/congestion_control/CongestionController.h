@@ -66,7 +66,7 @@ struct CongestionController {
 
     explicit LossEvent(TimePoint time = Clock::now()) : lossTime(time) {}
 
-    void addLostPacket(const OutstandingPacket& packet) {
+    void addLostPacket(const OutstandingPacketWrapper& packet) {
       if (std::numeric_limits<uint64_t>::max() - lostBytes <
           packet.metadata.encodedSize) {
         throw QuicInternalException(
@@ -94,7 +94,7 @@ struct CongestionController {
    * Take bytes out of flight without mutating other states of the controller
    */
   virtual void onRemoveBytesFromInflight(uint64_t) = 0;
-  virtual void onPacketSent(const OutstandingPacket& packet) = 0;
+  virtual void onPacketSent(const OutstandingPacketWrapper& packet) = 0;
   virtual void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE ackEvent,
       const LossEvent* FOLLY_NULLABLE lossEvent) = 0;

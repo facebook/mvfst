@@ -1777,7 +1777,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
               testing::ElementsAre(Interval<uint64_t>(
                   frameOffset, frameOffset + frameLen - 1)))));
   const auto pktMatcher = testing::Field(
-      &OutstandingPacket::metadata,
+      &OutstandingPacketWrapper::metadata,
       testing::AllOf(
           testing::Field(
               &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -1821,7 +1821,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
               &PacketStreamDetails::streamIntervals,
               testing::ElementsAre(Interval<uint64_t>(0, 14)))));
   const auto pktMatcher = testing::Field(
-      &OutstandingPacket::metadata,
+      &OutstandingPacketWrapper::metadata,
       testing::AllOf(
           testing::Field(
               &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -1869,7 +1869,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 testing::ElementsAre(Interval<uint64_t>(
                     frame1Offset, frame1Offset + frame1Len - 1)))));
     const auto pktMatcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -1909,7 +1909,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 testing::ElementsAre(Interval<uint64_t>(
                     frame1Offset, frame1Offset + frame1Len - 1)))));
     const auto pktMatcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
@@ -1956,7 +1956,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 testing::ElementsAre(Interval<uint64_t>(
                     frame1Offset, frame2Offset + frame2Len - 1)))));
     const auto pktMatcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
@@ -1998,7 +1998,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 testing::ElementsAre(Interval<uint64_t>(
                     frame1Offset, frame2Offset + frame2Len - 1)))));
     const auto pktMatcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(4)),
@@ -2067,7 +2067,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
     };
 
     const auto pkt1Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -2076,7 +2076,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                 testing::UnorderedElementsAre(getStreamDetailsMatcher(
                     frame1Offset, false /* finObserved */)))));
     const auto pkt2Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
@@ -2122,7 +2122,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                     frame1Offset, frame2Offset + frameLen - 1)))));
 
     const auto pkt3Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
@@ -2207,7 +2207,7 @@ TEST_F(
     };
 
     const auto pkt1Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -2216,7 +2216,7 @@ TEST_F(
                 testing::UnorderedElementsAre(
                     getStreamDetailsMatcher(frame1Offset)))));
     const auto pkt2Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
@@ -2225,7 +2225,7 @@ TEST_F(
                 testing::UnorderedElementsAre(
                     getStreamDetailsMatcher(frame2Offset)))));
     const auto pkt3Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
@@ -2274,7 +2274,7 @@ TEST_F(
                         frame3Offset, frame3Offset + frameLen - 1)))));
 
     const auto pkt4Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(4)),
@@ -2361,7 +2361,7 @@ TEST_F(
     };
 
     const auto pkt1Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -2370,7 +2370,7 @@ TEST_F(
                 testing::UnorderedElementsAre(
                     getStreamDetailsMatcher(frame1Offset)))));
     const auto pkt2Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
@@ -2379,7 +2379,7 @@ TEST_F(
                 testing::UnorderedElementsAre(
                     getStreamDetailsMatcher(frame2Offset)))));
     const auto pkt3Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
@@ -2428,7 +2428,7 @@ TEST_F(
                         frame3Offset, frame3Offset + frameLen - 1)))));
 
     const auto pkt4Matcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(4)),
@@ -2532,7 +2532,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                     stream3Offset, stream3Offset + stream3Len - 1)))));
 
     const auto pktMatcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
@@ -2604,7 +2604,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                     stream3Offset, stream3Offset + stream3Len - 1)))));
 
     const auto pktMatcher = testing::Field(
-        &OutstandingPacket::metadata,
+        &OutstandingPacketWrapper::metadata,
         testing::AllOf(
             testing::Field(
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
@@ -2937,7 +2937,7 @@ TEST_F(QuicTransportFunctionsTest, NothingWritten) {
 }
 
 const QuicWriteFrame& getFirstFrameInOutstandingPackets(
-    const std::deque<OutstandingPacket>& outstandingPackets,
+    const std::deque<OutstandingPacketWrapper>& outstandingPackets,
     QuicWriteFrame::Type frameType) {
   for (const auto& packet : outstandingPackets) {
     for (const auto& frame : packet.packet.frames) {

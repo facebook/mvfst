@@ -25,7 +25,7 @@ CongestionController::LossEvent createLossEvent(
   for (auto packetData : lostPackets) {
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetData.first));
-    loss.addLostPacket(OutstandingPacket(
+    loss.addLostPacket(OutstandingPacketWrapper(
         std::move(packet),
         Clock::now(),
         10,
@@ -61,7 +61,7 @@ CongestionController::AckEvent createAckEvent(
   ack.largestNewlyAckedPacket = largestAcked;
   ack.ackedBytes = ackedSize;
   ack.ackedPackets.push_back(
-      makeAckPacketFromOutstandingPacket(OutstandingPacket(
+      makeAckPacketFromOutstandingPacket(OutstandingPacketWrapper(
           std::move(packet),
           packetSentTime,
           ackedSize,
@@ -77,7 +77,7 @@ CongestionController::AckEvent createAckEvent(
   return ack;
 }
 
-OutstandingPacket createPacket(
+OutstandingPacketWrapper createPacket(
     PacketNum packetNum,
     uint32_t size,
     TimePoint sendTime,
@@ -85,7 +85,7 @@ OutstandingPacket createPacket(
   auto connId = getTestConnectionId();
   RegularQuicWritePacket packet(
       ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
-  return OutstandingPacket(
+  return OutstandingPacketWrapper(
       std::move(packet),
       sendTime,
       size,

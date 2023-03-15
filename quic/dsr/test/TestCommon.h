@@ -105,7 +105,9 @@ class DSRCommonTestFixture : public testing::Test {
     return std::all_of(
         conn_.outstandings.packets.begin(),
         conn_.outstandings.packets.end(),
-        [](const OutstandingPacket& packet) { return packet.isDSRPacket; });
+        [](const OutstandingPacketWrapper& packet) {
+          return packet.isDSRPacket;
+        });
   }
 
  protected:

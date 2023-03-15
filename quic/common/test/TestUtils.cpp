@@ -503,7 +503,7 @@ void addAckStatesWithCurrentTimestamps(
   ackState.largestRecvdPacketTime = Clock::now();
 }
 
-OutstandingPacket makeTestingWritePacket(
+OutstandingPacketWrapper makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
@@ -517,7 +517,7 @@ OutstandingPacket makeTestingWritePacket(
       desiredPacketSeqNum,
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(longHeader));
-  return OutstandingPacket(
+  return OutstandingPacketWrapper(
       packet,
       sentTime,
       desiredSize,
@@ -698,7 +698,7 @@ bool matchError(QuicError errorCode, ApplicationErrorCode error) {
 }
 
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
-    OutstandingPacket outstandingPacket) {
+    OutstandingPacketWrapper outstandingPacket) {
   return CongestionController::AckEvent::AckPacket::Builder()
       .setPacketNum(outstandingPacket.packet.header.getPacketSequenceNum())
       .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))

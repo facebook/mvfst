@@ -60,7 +60,7 @@ auto emplacePackets(
     packetRcvTime.emplace_back(sentTime);
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         sentTime,
         1,
@@ -73,7 +73,7 @@ auto emplacePackets(
         quic::LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 }
@@ -212,7 +212,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
   WriteStreamFrame frame(streamId, 0, 200, false);
   regularPacket.frames.emplace_back(frame);
   conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
-  OutstandingPacket sentPacket(
+  OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
       1,
@@ -225,7 +225,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       quic::LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.emplace_back(sentPacket);
+  conn.outstandings.packets.emplace_back(std::move(sentPacket));
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -283,7 +283,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
   WriteStreamFrame frame(streamId, 50, 50, false);
   regularPacket.frames.emplace_back(frame);
   conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
-  OutstandingPacket sentPacket(
+  OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
       1,
@@ -296,7 +296,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       quic::LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.emplace_back(sentPacket);
+  conn.outstandings.packets.emplace_back(std::move(sentPacket));
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -360,7 +360,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
   WriteStreamFrame frame(streamId, 0, 50, false);
   regularPacket.frames.emplace_back(frame);
   conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
-  OutstandingPacket sentPacket(
+  OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
       1,
@@ -373,7 +373,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
       quic::LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.emplace_back(sentPacket);
+  conn.outstandings.packets.emplace_back(std::move(sentPacket));
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -434,7 +434,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
   WriteStreamFrame frame(streamId, 50, 150, false);
   regularPacket.frames.emplace_back(frame);
   conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
-  OutstandingPacket sentPacket(
+  OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
       1,
@@ -447,7 +447,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
       quic::LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.emplace_back(sentPacket);
+  conn.outstandings.packets.emplace_back(std::move(sentPacket));
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -610,7 +610,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn,
       GetParam(),
       ackFrame,
-      [](auto, auto, auto) {},
+      [](auto&, auto, auto) {},
       [](auto&, auto&, auto) {},
       Clock::now());
   itr = std::find_if(
@@ -627,7 +627,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn,
       GetParam(),
       ackFrame,
-      [](auto, auto, auto) {},
+      [](auto&, auto, auto) {},
       [](auto&, auto&, auto) {},
       Clock::now() + 2 * calculatePTO(conn));
 
@@ -1269,7 +1269,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   // We need to at least have one frame to trigger ackVisitor
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
-  OutstandingPacket outstandingPacket(
+  OutstandingPacketWrapper outstandingPacket(
       std::move(regularPacket),
       Clock::now(),
       1,
@@ -1393,7 +1393,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   regularPacket1.frames.push_back(frame);
   regularPacket2.frames.push_back(frame);
 
-  OutstandingPacket outstandingPacket1(
+  OutstandingPacketWrapper outstandingPacket1(
       std::move(regularPacket1),
       Clock::now(),
       1,
@@ -1408,7 +1408,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       OutstandingPacketMetadata::DetailsPerStream());
   outstandingPacket1.associatedEvent.emplace(GetParam(), packetNum1);
 
-  OutstandingPacket outstandingPacket2(
+  OutstandingPacketWrapper outstandingPacket2(
       std::move(regularPacket2),
       Clock::now(),
       1,
@@ -1475,7 +1475,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto packetNum1 = conn.ackStates.appDataAckState.nextPacketNum;
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
   regularPacket1.frames.push_back(frame);
-  OutstandingPacket outstandingPacket1(
+  OutstandingPacketWrapper outstandingPacket1(
       std::move(regularPacket1),
       Clock::now(),
       1,
@@ -1494,7 +1494,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto packetNum2 = conn.ackStates.appDataAckState.nextPacketNum;
   auto regularPacket2 = createNewPacket(packetNum2, GetParam());
   regularPacket2.frames.push_back(frame);
-  OutstandingPacket outstandingPacket2(
+  OutstandingPacketWrapper outstandingPacket2(
       std::move(regularPacket2),
       Clock::now(),
       1,
@@ -1622,7 +1622,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   auto delayUntilLost = 200ms *
       conn.transportSettings.timeReorderingThreshDividend /
       conn.transportSettings.timeReorderingThreshDivisor;
-  OutstandingPacket outstandingPacket(
+  OutstandingPacketWrapper outstandingPacket(
       std::move(regularPacket),
       Clock::now() - delayUntilLost - 20ms,
       1,
@@ -1700,7 +1700,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       conn,
       GetParam(),
       ackFrame,
-      [&](auto, auto, auto) { /* ackVisitor */ },
+      [&](auto&, auto, auto) { /* ackVisitor */ },
       [&](auto&, auto&, auto) { /* lossVisitor */ },
       receiveTime);
   EXPECT_EQ(2468 + 111, conn.lossState.totalBytesSentAtLastAck);
@@ -1742,7 +1742,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -1756,7 +1756,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -1873,7 +1873,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -1887,7 +1887,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -2002,7 +2002,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -2016,7 +2016,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -2113,7 +2113,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -2127,7 +2127,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -2218,7 +2218,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -2232,7 +2232,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -2330,7 +2330,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -2344,7 +2344,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -2564,7 +2564,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
 
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -2578,7 +2578,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = false;
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
   EXPECT_EQ(4, conn.outstandings.numOutstanding());
@@ -2704,7 +2704,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
         1 /* encodedSizeIn */,
@@ -2718,7 +2718,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -2803,7 +2803,7 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
     packetRcvTime.emplace_back(sentTime);
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
-    OutstandingPacket sentPacket(
+    OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         sentTime,
         1,
@@ -2817,7 +2817,7 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
         0,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = false;
-    conn.outstandings.packets.emplace_back(sentPacket);
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
     packetNum++;
   }
 
@@ -3249,7 +3249,7 @@ class AckEventForAppDataTest : public Test {
         *conn_,
         PacketNumberSpace::AppData,
         ackFrame,
-        [&](const OutstandingPacket& /* packet */,
+        [&](const OutstandingPacketWrapper& /* packet */,
             const QuicWriteFrame& packetFrame,
             const ReadAckFrame&) {
           switch (packetFrame.type()) {

@@ -275,7 +275,6 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
 
   EXPECT_EQ(3, stream->retransmissionBuffer.size());
   EXPECT_EQ(3, conn->outstandings.packets.size());
-  auto packet = conn->outstandings.packets[folly::Random::rand32() % 3];
   auto streamFrame = *conn->outstandings.packets[std::rand() % 3]
                           .packet.frames.front()
                           .asWriteStreamFrame();

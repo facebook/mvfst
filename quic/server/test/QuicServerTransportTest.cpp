@@ -4089,7 +4089,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
  * Returns the number of new token frames (should either be zero or one).
  */
 std::pair<int, std::vector<const NewTokenFrame*>> getNewTokenFrame(
-    const std::deque<OutstandingPacket>& packets) {
+    const std::deque<OutstandingPacketWrapper>& packets) {
   int numNewTokens = 0;
   std::vector<const NewTokenFrame*> frames;
 

@@ -19,7 +19,7 @@ void StaticCwndCongestionController::onRemoveBytesFromInflight(
 }
 
 void StaticCwndCongestionController::onPacketSent(
-    const OutstandingPacket& packet) {
+    const OutstandingPacketWrapper& packet) {
   isAppLimited_ = false;
   addAndCheckOverflow(inflightBytes_, packet.metadata.encodedSize);
 }

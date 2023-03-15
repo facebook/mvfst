@@ -382,7 +382,7 @@ class MockLegacyObserver : public LegacyObserver {
 
   static auto getLossPacketNum(PacketNum packetNum) {
     return testing::Field(
-        &OutstandingPacket::packet,
+        &OutstandingPacketWrapper::packet,
         testing::Field(
             &RegularPacket::header,
             testing::Property(&PacketHeader::getPacketSequenceNum, packetNum)));

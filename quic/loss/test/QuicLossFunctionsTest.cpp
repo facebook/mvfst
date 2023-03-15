@@ -40,21 +40,21 @@ auto getOutstandingPacketMatcher(
     bool lostByTimeout) {
   return AllOf(
       testing::Field(
-          &quic::OutstandingPacket::metadata,
+          &quic::OutstandingPacketWrapper::metadata,
           testing::Field(
               &quic::OutstandingPacketMetadata::lossReorderDistance,
               testing::Property(
                   &folly::Optional<uint32_t>::hasValue,
                   testing::Eq(lostByReorder)))),
       testing::Field(
-          &quic::OutstandingPacket::metadata,
+          &quic::OutstandingPacketWrapper::metadata,
           testing::Field(
               &quic::OutstandingPacketMetadata::lossTimeoutDividend,
               testing::Property(
                   &folly::Optional<quic::DurationRep>::hasValue,
                   testing::Eq(lostByTimeout)))),
       testing::Field(
-          &quic::OutstandingPacket::packet,
+          &quic::OutstandingPacketWrapper::packet,
           testing::Field(
               &quic::RegularPacket::header,
               testing::Property(
@@ -252,7 +252,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     encodedSize += packet.body->computeChainDataLength();
     encodedBodySize += packet.body->computeChainDataLength();
   }
-  auto outstandingPacket = OutstandingPacket(
+  auto outstandingPacket = OutstandingPacketWrapper(
       packet.packet,
       time,
       encodedSize,
@@ -666,7 +666,7 @@ TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
       *buf3);
   EXPECT_EQ(3, stream->retransmissionBuffer.size());
   EXPECT_EQ(3, conn->outstandings.packets.size());
-  auto packet = conn->outstandings.packets[folly::Random::rand32() % 3];
+  auto& packet = conn->outstandings.packets[folly::Random::rand32() % 3];
   markPacketLoss(*conn, packet.packet, false);
   EXPECT_EQ(1, stream->streamLossCount);
   EXPECT_EQ(2, stream->retransmissionBuffer.size());

@@ -85,7 +85,7 @@ class Cubic : public CongestionController {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
   void onRemoveBytesFromInflight(uint64_t) override;
-  void onPacketSent(const OutstandingPacket& packet) override;
+  void onPacketSent(const OutstandingPacketWrapper& packet) override;
 
   uint64_t getWritableBytes() const noexcept override;
   uint64_t getCongestionWindow() const noexcept override;

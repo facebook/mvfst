@@ -13,7 +13,7 @@ namespace quic {
 
 SocketObserverInterface::WriteEvent::Builder&&
 SocketObserverInterface::WriteEvent::Builder::setOutstandingPackets(
-    const std::deque<OutstandingPacket>& outstandingPacketsIn) {
+    const std::deque<OutstandingPacketWrapper>& outstandingPacketsIn) {
   maybeOutstandingPacketsRef = outstandingPacketsIn;
   return std::move(*this);
 }
@@ -69,7 +69,7 @@ SocketObserverInterface::WriteEvent::WriteEvent(
 
 SocketObserverInterface::AppLimitedEvent::Builder&&
 SocketObserverInterface::AppLimitedEvent::Builder::setOutstandingPackets(
-    const std::deque<OutstandingPacket>& outstandingPacketsIn) {
+    const std::deque<OutstandingPacketWrapper>& outstandingPacketsIn) {
   maybeOutstandingPacketsRef = outstandingPacketsIn;
   return std::move(*this);
 }
@@ -120,7 +120,7 @@ SocketObserverInterface::AppLimitedEvent::AppLimitedEvent(
 
 void SocketObserverInterface::PacketsWrittenEvent::
     invokeForEachNewOutstandingPacketOrdered(
-        const std::function<void(const OutstandingPacket&)>& fn) const {
+        const std::function<void(const OutstandingPacketWrapper&)>& fn) const {
   DCHECK_GE(outstandingPackets.size(), numAckElicitingPacketsWritten);
   if (numAckElicitingPacketsWritten == 0) {
     return; // nothing to do
@@ -139,13 +139,15 @@ void SocketObserverInterface::PacketsWrittenEvent::
   // N most recently sent OutstandingPackets. We use this to avoid needing to
   // scan the queue when the following is true:
   //
-  //    (1) If the writeCount of the OutstandingPacket N packets from the end of
+  //    (1) If the writeCount of the OutstandingPacketWrapper N packets from the
+  //    end of
   //        the deque has a writeCount equal to that reported by this event, and
-  //    (2) If when scanning from the OutstandingPacket N packets from the end
+  //    (2) If when scanning from the OutstandingPacketWrapper N packets from
+  //    the end
   //        of the deque to the end of the deque, the numAckElicitingPacketsSent
-  //        recorded for each OutstandingPacket is one larger than that of the
-  //        previous OutstandingPacket, and writeCount recorded is equal to the
-  //        writeCount reported by this event.
+  //        recorded for each OutstandingPacketWrapper is one larger than that
+  //        of the previous OutstandingPacketWrapper, and writeCount recorded is
+  //        equal to the writeCount reported by this event.
   //
   // If the above is true, then the N OutstandingPackets from the end of the
   // deque were all sent during this write operation, and they are already
@@ -190,7 +192,7 @@ void SocketObserverInterface::PacketsWrittenEvent::
   //
   // From the front of the deque, find OutstandingPackets with the writeCount
   // reported by this event and insert references to them into a vector.
-  std::vector<std::reference_wrapper<const OutstandingPacket>>
+  std::vector<std::reference_wrapper<const OutstandingPacketWrapper>>
       newOutstandingPackets;
   newOutstandingPackets.reserve(numAckElicitingPacketsWritten);
   for (const auto& packet : outstandingPackets) {
@@ -222,7 +224,7 @@ void SocketObserverInterface::PacketsWrittenEvent::
 
 SocketObserverInterface::PacketsWrittenEvent::Builder&&
 SocketObserverInterface::PacketsWrittenEvent::Builder::setOutstandingPackets(
-    const std::deque<OutstandingPacket>& outstandingPacketsIn) {
+    const std::deque<OutstandingPacketWrapper>& outstandingPacketsIn) {
   maybeOutstandingPacketsRef = outstandingPacketsIn;
   return std::move(*this);
 }

@@ -209,7 +209,8 @@ OutstandingPacketBuilder&& OutstandingPacketBuilder::setWriteCount(
 }
 
 OutstandingPacketBuilder&& OutstandingPacketBuilder::setDetailsPerStream(
-    const OutstandingPacket::Metadata::DetailsPerStream& detailsPerStreamIn) {
+    const OutstandingPacketWrapper::Metadata::DetailsPerStream&
+        detailsPerStreamIn) {
   maybeDetailsPerStream = detailsPerStreamIn;
   return std::move(*this);
 }
@@ -221,8 +222,8 @@ OutstandingPacketBuilder::setTotalAppLimitedTimeUsecs(
   return std::move(*this);
 }
 
-OutstandingPacket OutstandingPacketBuilder::build() && {
-  return OutstandingPacket{
+OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
+  return OutstandingPacketWrapper{
       *CHECK_NOTNULL(maybePacket.get_pointer()),
       *CHECK_NOTNULL(maybeTime.get_pointer()),
       *CHECK_NOTNULL(maybeEncodedSize.get_pointer()),

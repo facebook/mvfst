@@ -23,7 +23,8 @@ uint64_t PacketRebuilder::getHeaderBytes() const {
   return builder_.getHeaderBytes();
 }
 
-PacketEvent PacketRebuilder::cloneOutstandingPacket(OutstandingPacket& packet) {
+PacketEvent PacketRebuilder::cloneOutstandingPacket(
+    OutstandingPacketWrapper& packet) {
   // Either the packet has never been cloned before, or it's associatedEvent is
   // still in the outstandings.packetEvents set.
   DCHECK(
@@ -43,7 +44,7 @@ PacketEvent PacketRebuilder::cloneOutstandingPacket(OutstandingPacket& packet) {
 }
 
 folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
-    OutstandingPacket& packet) {
+    OutstandingPacketWrapper& packet) {
   // TODO: if PMTU changes between the transmission of the original packet and
   // now, then we cannot clone everything in the packet.
 

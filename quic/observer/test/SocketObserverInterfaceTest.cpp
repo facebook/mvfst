@@ -16,7 +16,7 @@ namespace quic::test {
 class SocketObserverInterfaceTest : public ::testing::Test {
  public:
   /**
-   * Fields in OutstandingPacket that are relevant to this test.
+   * Fields in OutstandingPacketWrapper that are relevant to this test.
    */
   struct OutstandingPacketRelevantFields {
     folly::Optional<PacketNumberSpace> maybePnSpace;
@@ -26,7 +26,7 @@ class SocketObserverInterfaceTest : public ::testing::Test {
     folly::Optional<uint64_t> maybeNumAckElicitingPacketsWritten;
   };
 
-  static OutstandingPacket buildOutstandingPacket(
+  static OutstandingPacketWrapper buildOutstandingPacket(
       const OutstandingPacketRelevantFields& relevantFields) {
     // unwrap optionals
     const auto& pnSpace = relevantFields.maybePnSpace.value();
@@ -40,14 +40,14 @@ class SocketObserverInterfaceTest : public ::testing::Test {
     // setup relevant LossState fields
     //
     // LossState is taken as a reference but does not need to remain alive
-    // after OutstandingPacket generation; relevant fields are stored within
-    // the OutstandingPacket's metadata
+    // after OutstandingPacketWrapper generation; relevant fields are stored
+    // within the OutstandingPacketWrapper's metadata
     LossState lossState;
     lossState.totalPacketsSent = numPacketsWritten;
     lossState.totalAckElicitingPacketsSent = numAckElicitingPacketsWritten;
 
     auto regularPacket = createNewPacket(packetNum, pnSpace);
-    OutstandingPacket::Metadata::DetailsPerStream detailsPerStream;
+    OutstandingPacketWrapper::Metadata::DetailsPerStream detailsPerStream;
 
     return OutstandingPacketBuilder()
         .setPacket(regularPacket)
@@ -75,8 +75,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // no new packets, no old packets
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
 
     // build event with writeCount = 10
     const auto event = SocketObserverInterface::PacketsWrittenEvent::Builder()
@@ -94,7 +94,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -105,8 +105,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // no new packets, has old packets
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -133,7 +133,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -144,8 +144,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // no new ack eliciting packets, no old packets
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
 
     // build event with writeCount = 10
     const auto event = SocketObserverInterface::PacketsWrittenEvent::Builder()
@@ -163,7 +163,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -174,8 +174,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // no new ack eliciting packets, has old packets
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -202,7 +202,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -213,8 +213,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // first packet sent for initial, handshake, app data, single write, ordered
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::Initial;
@@ -261,7 +261,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -292,8 +292,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // first packet sent for initial, handshake, app data, single write, reversed
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -340,7 +340,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -372,8 +372,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
   // first packet sent for initial, handshake, app data, single write, misorder
   // specifically, ordered by packet number, but random on pnspace
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::Handshake;
@@ -420,7 +420,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -451,8 +451,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // first packet for initial, handshake, app data, separate writes, ordered
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::Initial;
@@ -499,7 +499,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -516,8 +516,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // first packet for initial, handshake, app data, separate writes, reversed
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -564,7 +564,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -581,8 +581,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // retransmit initial
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::Initial;
@@ -639,7 +639,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -656,8 +656,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // retransmit all three
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::Initial;
@@ -734,7 +734,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -765,8 +765,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // just app data, single new packet
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -793,7 +793,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -810,8 +810,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // just app data, single new packet, non-ack eliciting written
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -838,7 +838,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -855,8 +855,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // just app data, multiple new packets
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -893,7 +893,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -918,8 +918,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // just app data, multiple new packets, non-ack eliciting written
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -956,7 +956,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -981,8 +981,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // just app data, multiple old packets, multiple new packets
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -1039,7 +1039,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -1064,8 +1064,8 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
 
   // just app data, multiple old packets, single new packet
   {
-    // create OutstandingPacket deque
-    std::deque<OutstandingPacket> outstandingPackets;
+    // create OutstandingPacketWrapper deque
+    std::deque<OutstandingPacketWrapper> outstandingPackets;
     outstandingPackets.emplace_back([]() {
       OutstandingPacketRelevantFields fields;
       fields.maybePnSpace = PacketNumberSpace::AppData;
@@ -1112,7 +1112,7 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
     std::vector<InvokedOutstandingPacketFields> outstandingPacketsDuringInvoke;
     event.invokeForEachNewOutstandingPacketOrdered(
         [&outstandingPacketsDuringInvoke](
-            const OutstandingPacket& outstandingPacket) {
+            const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
                   outstandingPacket.packet.header.getPacketNumberSpace(),

@@ -64,7 +64,7 @@ AckEvent::AckPacket::AckPacket(
     quic::PacketNum packetNumIn,
     OutstandingPacketMetadata&& outstandingPacketMetadataIn,
     DetailsPerStream&& detailsPerStreamIn,
-    folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+    folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
         lastAckedPacketInfoIn,
     bool isAppLimitedIn)
     : packetNum(packetNumIn),
@@ -95,7 +95,7 @@ AckEvent::AckPacket::Builder::setDetailsPerStream(
 
 AckEvent::AckPacket::Builder&&
 AckEvent::AckPacket::Builder::setLastAckedPacketInfo(
-    folly::Optional<OutstandingPacket::LastAckedPacketInfo>&&
+    folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>&&
         lastAckedPacketInfoIn) {
   lastAckedPacketInfo = std::move(lastAckedPacketInfoIn);
   return std::move(*this);

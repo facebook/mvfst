@@ -22,7 +22,7 @@ class Copa2 : public CongestionController {
  public:
   explicit Copa2(QuicConnectionStateBase& conn);
   void onRemoveBytesFromInflight(uint64_t) override;
-  void onPacketSent(const OutstandingPacket& packet) override;
+  void onPacketSent(const OutstandingPacketWrapper& packet) override;
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;

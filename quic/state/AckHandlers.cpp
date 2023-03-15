@@ -22,10 +22,10 @@ namespace {
  */
 struct OutstandingPacketWithHandlerContext {
   explicit OutstandingPacketWithHandlerContext(
-      OutstandingPacket outstandingPacketIn)
+      OutstandingPacketWrapper outstandingPacketIn)
       : outstandingPacket(std::move(outstandingPacketIn)) {}
 
-  OutstandingPacket outstandingPacket;
+  OutstandingPacketWrapper outstandingPacket;
   bool processAllFrames{false};
 };
 
@@ -298,11 +298,12 @@ AckEvent processAckFrame(
         // Because we (1) process AckBlocks in reverse order; (2) search for
         // OutstandingPackets in descending order; and (3) only handles ACKs for
         // a single packet number space on each invocation of processAckFrame,
-        // we expect that the OutstandingPacket currently being processed has a
-        // packet number less than the packet number of any OutstandingPacket
-        // previously processed during this invocation of processAckFrame.
+        // we expect that the OutstandingPacketWrapper currently being processed
+        // has a packet number less than the packet number of any
+        // OutstandingPacketWrapper previously processed during this invocation
+        // of processAckFrame.
         //
-        // As a result, inserting the OutstandingPacket at the front of
+        // As a result, inserting the OutstandingPacketWrapper at the front of
         // packetsWithHandlerContext should yield a container of
         // OutstandingPackets sorted in ascending order by packet number.
 

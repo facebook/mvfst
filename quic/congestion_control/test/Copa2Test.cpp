@@ -18,7 +18,7 @@ namespace quic::test {
 
 class Copa2Test : public Test {
  public:
-  OutstandingPacket createPacket(
+  OutstandingPacketWrapper createPacket(
       PacketNum packetNum,
       uint32_t size,
       uint64_t totalSent,
@@ -26,7 +26,7 @@ class Copa2Test : public Test {
     auto connId = getTestConnectionId();
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
-    return OutstandingPacket(
+    return OutstandingPacketWrapper(
         std::move(packet),
         Clock::now(),
         size,

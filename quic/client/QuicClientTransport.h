@@ -226,7 +226,7 @@ class QuicClientTransport
   void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept;
 
   void handleAckFrame(
-      const OutstandingPacket& outstandingPacket,
+      const OutstandingPacketWrapper& outstandingPacket,
       const QuicWriteFrame& packetFrame,
       const ReadAckFrame&);
 

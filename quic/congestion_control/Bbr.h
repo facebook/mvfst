@@ -125,7 +125,7 @@ class BbrCongestionController : public CongestionController {
   };
 
   void onRemoveBytesFromInflight(uint64_t bytesToRemove) override;
-  void onPacketSent(const OutstandingPacket&) override;
+  void onPacketSent(const OutstandingPacketWrapper&) override;
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;

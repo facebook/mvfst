@@ -179,7 +179,7 @@ struct OutstandingPacket {
   };
   folly::Optional<LastAckedPacketInfo> lastAckedPacketInfo;
 
-  // PacketEvent associated with this OutstandingPacket. This will be a
+  // PacketEvent associated with this OutstandingPacketWrapper. This will be a
   // folly::none if the packet isn't a clone and hasn't been cloned.
   folly::Optional<PacketEvent> associatedEvent;
 
@@ -197,6 +197,7 @@ struct OutstandingPacket {
   // lost.
   bool declaredLost{false};
 
+ protected:
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
@@ -225,5 +226,53 @@ struct OutstandingPacket {
             writeCount,
             std::move(detailsPerStream),
             totalAppLimitedTimeUsecs)) {}
+
+  OutstandingPacket(OutstandingPacket&&) = default;
+
+  OutstandingPacket& operator=(OutstandingPacket&&) = default;
+};
+
+struct OutstandingPacketWrapper : OutstandingPacket {
+  OutstandingPacketWrapper(
+      RegularQuicWritePacket packetIn,
+      TimePoint timeIn,
+      uint32_t encodedSizeIn,
+      uint32_t encodedBodySizeIn,
+      bool isHandshakeIn,
+      uint64_t totalBytesSentIn,
+      uint64_t totalBodyBytesSentIn,
+      uint64_t inflightBytesIn,
+      uint64_t packetsInflightIn,
+      const LossState& lossStateIn,
+      uint64_t writeCount,
+      Metadata::DetailsPerStream detailsPerStream,
+      std::chrono::microseconds totalAppLimitedTimeUsecs = 0us)
+      : OutstandingPacket(
+            std::move(packetIn),
+            timeIn,
+            encodedSizeIn,
+            encodedBodySizeIn,
+            isHandshakeIn,
+            totalBytesSentIn,
+            totalBodyBytesSentIn,
+            inflightBytesIn,
+            packetsInflightIn,
+            lossStateIn,
+            writeCount,
+            std::move(detailsPerStream),
+            totalAppLimitedTimeUsecs) {}
+
+  OutstandingPacketWrapper(const OutstandingPacketWrapper& source) = delete;
+  OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
+
+  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) noexcept
+      : OutstandingPacket(std::move(static_cast<OutstandingPacket&>(rhs))) {}
+
+  OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
+    OutstandingPacket::operator=(std::move(rhs));
+    return *this;
+  }
+
+  ~OutstandingPacketWrapper() = default;
 };
 } // namespace quic

@@ -209,11 +209,11 @@ void updateAckState(
     TimePoint receivedTime);
 
 template <typename Match>
-OutstandingPacket* findOutstandingPacket(
+OutstandingPacketWrapper* findOutstandingPacket(
     QuicConnectionStateBase& conn,
     Match match) {
-  auto helper =
-      [&](std::deque<OutstandingPacket>& packets) -> OutstandingPacket* {
+  auto helper = [&](std::deque<OutstandingPacketWrapper>& packets)
+      -> OutstandingPacketWrapper* {
     for (auto& packet : packets) {
       if (match(packet)) {
         return &packet;
@@ -232,7 +232,7 @@ void addAckStatesWithCurrentTimestamps(
     PacketNum start,
     PacketNum end);
 
-OutstandingPacket makeTestingWritePacket(
+OutstandingPacketWrapper makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
@@ -301,7 +301,7 @@ auto findFrameInPacketFunc() {
 }
 
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
-    OutstandingPacket outstandingPacket);
+    OutstandingPacketWrapper outstandingPacket);
 
 // A Buf based overload of writeCryptoFrame for test only
 folly::Optional<WriteCryptoFrame>

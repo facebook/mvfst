@@ -35,7 +35,7 @@ struct StaticCwndCongestionController : public CongestionController {
 
   void onRemoveBytesFromInflight(uint64_t bytesToRemove) override;
 
-  void onPacketSent(const OutstandingPacket& packet) override;
+  void onPacketSent(const OutstandingPacketWrapper& packet) override;
 
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE ackEvent,

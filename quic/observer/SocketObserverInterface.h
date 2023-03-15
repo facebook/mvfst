@@ -86,13 +86,13 @@ class SocketObserverInterface {
   };
 
   struct WriteEvent {
-    [[nodiscard]] const std::deque<OutstandingPacket>& getOutstandingPackets()
-        const {
+    [[nodiscard]] const std::deque<OutstandingPacketWrapper>&
+    getOutstandingPackets() const {
       return outstandingPackets;
     }
 
     // Reference to the current list of outstanding packets.
-    const std::deque<OutstandingPacket>& outstandingPackets;
+    const std::deque<OutstandingPacketWrapper>& outstandingPackets;
 
     // Monotonically increasing number assigned to each write operation.
     const uint64_t writeCount;
@@ -112,7 +112,7 @@ class SocketObserverInterface {
 
     struct BuilderFields {
       folly::Optional<
-          std::reference_wrapper<const std::deque<OutstandingPacket>>>
+          std::reference_wrapper<const std::deque<OutstandingPacketWrapper>>>
           maybeOutstandingPacketsRef;
       folly::Optional<uint64_t> maybeWriteCount;
       folly::Optional<TimePoint> maybeLastPacketSentTime;
@@ -123,7 +123,7 @@ class SocketObserverInterface {
 
     struct Builder : public BuilderFields {
       Builder&& setOutstandingPackets(
-          const std::deque<OutstandingPacket>& outstandingPacketsIn);
+          const std::deque<OutstandingPacketWrapper>& outstandingPacketsIn);
       Builder&& setWriteCount(const uint64_t writeCountIn);
       Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
       Builder&& setLastPacketSentTime(
@@ -153,7 +153,7 @@ class SocketObserverInterface {
   struct AppLimitedEvent : public WriteEvent {
     struct Builder : public WriteEvent::BuilderFields {
       Builder&& setOutstandingPackets(
-          const std::deque<OutstandingPacket>& outstandingPacketsIn);
+          const std::deque<OutstandingPacketWrapper>& outstandingPacketsIn);
       Builder&& setWriteCount(const uint64_t writeCountIn);
       Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
       Builder&& setLastPacketSentTime(
@@ -172,10 +172,11 @@ class SocketObserverInterface {
 
   struct PacketsWrittenEvent : public WriteEvent {
     /**
-     * For each new OutstandingPacket (ACK eliciting packet), invoke function.
+     * For each new OutstandingPacketWrapper (ACK eliciting packet), invoke
+     * function.
      */
     void invokeForEachNewOutstandingPacketOrdered(
-        const std::function<void(const OutstandingPacket&)>& fn) const;
+        const std::function<void(const OutstandingPacketWrapper&)>& fn) const;
 
     // Number of packets just written, including ACK eliciting packets.
     const uint64_t numPacketsWritten;
@@ -196,7 +197,7 @@ class SocketObserverInterface {
 
     struct Builder : public BuilderFields {
       Builder&& setOutstandingPackets(
-          const std::deque<OutstandingPacket>& outstandingPacketsIn);
+          const std::deque<OutstandingPacketWrapper>& outstandingPacketsIn);
       Builder&& setWriteCount(const uint64_t writeCountIn);
       Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
       Builder&& setLastPacketSentTime(
@@ -352,7 +353,7 @@ class SocketObserverInterface {
         TimePoint rcvTimeIn,
         std::chrono::microseconds rttSampleIn,
         std::chrono::microseconds ackDelayIn,
-        const quic::OutstandingPacket& pkt)
+        const quic::OutstandingPacketWrapper& pkt)
         : rcvTime(rcvTimeIn),
           rttSample(rttSampleIn),
           ackDelay(ackDelayIn),
@@ -362,7 +363,7 @@ class SocketObserverInterface {
     std::chrono::microseconds rttSample;
     std::chrono::microseconds ackDelay;
     const quic::OutstandingPacketMetadata metadata;
-    const folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+    const folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
         lastAckedPacketInfo;
   };
 

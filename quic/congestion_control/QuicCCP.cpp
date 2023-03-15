@@ -77,7 +77,7 @@ void CCP::onRemoveBytesFromInflight(uint64_t bytes) {
   conn_.lossState.inflightBytes -= bytes;
 }
 
-void CCP::onPacketSent(const OutstandingPacket& packet) {
+void CCP::onPacketSent(const OutstandingPacketWrapper& packet) {
   if (std::numeric_limits<uint64_t>::max() - conn_.lossState.inflightBytes <
       packet.metadata.encodedSize) {
     throw QuicInternalException(
@@ -297,7 +297,7 @@ CCP::CCP(QuicConnectionStateBase& conn)
       fallbackCC_(conn) {}
 
 void CCP::onRemoveBytesFromInflight(uint64_t) {}
-void CCP::onPacketSent(const OutstandingPacket&) {}
+void CCP::onPacketSent(const OutstandingPacketWrapper&) {}
 void CCP::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE,
     const LossEvent* FOLLY_NULLABLE) {}

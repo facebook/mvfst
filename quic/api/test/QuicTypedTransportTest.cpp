@@ -629,7 +629,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
       .Times(1)
-      .WillOnce(Invoke([&](auto outstandingPacket) {
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
         EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
         EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
@@ -685,12 +685,12 @@ TYPED_TEST(
 
   EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
       .Times(2)
-      .WillOnce(Invoke([&](auto outstandingPacket) {
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
         EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
         EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
       }))
-      .WillOnce(Invoke([&](auto outstandingPacket) {
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(5, outstandingPacket.metadata.totalPacketsSent);
         EXPECT_EQ(2, outstandingPacket.metadata.packetsInflight);
         EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
@@ -764,7 +764,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   {
     EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
         .Times(2)
-        .WillOnce(Invoke([&](auto outstandingPacket) {
+        .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
           EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
           EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
@@ -772,7 +772,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
           firstPacketTotalAppLimitedTimeUsecs =
               outstandingPacket.metadata.totalAppLimitedTimeUsecs;
         }))
-        .WillOnce(Invoke([&](auto outstandingPacket) {
+        .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(5, outstandingPacket.metadata.totalPacketsSent);
           EXPECT_EQ(2, outstandingPacket.metadata.packetsInflight);
           EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
@@ -807,7 +807,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   {
     EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
         .Times(4)
-        .WillOnce(Invoke([&](auto outstandingPacket) {
+        .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
           EXPECT_LE(
               firstPacketTotalAppLimitedTimeUsecs + 10ms,
@@ -815,7 +815,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
           thirdPacketTotalAppLimitedTimeUsecs =
               outstandingPacket.metadata.totalAppLimitedTimeUsecs;
         }))
-        .WillRepeatedly(Invoke([&](auto outstandingPacket) {
+        .WillRepeatedly(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(
               thirdPacketTotalAppLimitedTimeUsecs,
               outstandingPacket.metadata.totalAppLimitedTimeUsecs);
@@ -841,7 +841,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   {
     EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
         .Times(3)
-        .WillRepeatedly(Invoke([&](auto outstandingPacket) {
+        .WillRepeatedly(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(
               thirdPacketTotalAppLimitedTimeUsecs,
               outstandingPacket.metadata.totalAppLimitedTimeUsecs);
@@ -865,14 +865,14 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
     auto penultimatePacketTotalAppLimitedTimeUsecs = 0us;
     EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
         .Times(2)
-        .WillOnce(Invoke([&](auto outstandingPacket) {
+        .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_LE(
               thirdPacketTotalAppLimitedTimeUsecs + 10ms,
               outstandingPacket.metadata.totalAppLimitedTimeUsecs);
           penultimatePacketTotalAppLimitedTimeUsecs =
               outstandingPacket.metadata.totalAppLimitedTimeUsecs;
         }))
-        .WillOnce(Invoke([&](auto outstandingPacket) {
+        .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(
               penultimatePacketTotalAppLimitedTimeUsecs,
               outstandingPacket.metadata.totalAppLimitedTimeUsecs);
@@ -2623,7 +2623,7 @@ TYPED_TEST(
                       const auto& /* socket */, const auto& event) {
           event.invokeForEachNewOutstandingPacketOrdered(
               [&outstandingPacketsDuringInvoke](
-                  const OutstandingPacket& outstandingPacket) {
+                  const OutstandingPacketWrapper& outstandingPacket) {
                 outstandingPacketsDuringInvoke.emplace_back(
                     InvokedOutstandingPacketFields{
                         outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -2662,7 +2662,7 @@ TYPED_TEST(
                       const auto& /* socket */, const auto& event) {
           event.invokeForEachNewOutstandingPacketOrdered(
               [&outstandingPacketsDuringInvoke](
-                  const OutstandingPacket& outstandingPacket) {
+                  const OutstandingPacketWrapper& outstandingPacket) {
                 outstandingPacketsDuringInvoke.emplace_back(
                     InvokedOutstandingPacketFields{
                         outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -2725,7 +2725,7 @@ TYPED_TEST(
                       const auto& /* socket */, const auto& event) {
           event.invokeForEachNewOutstandingPacketOrdered(
               [&outstandingPacketsDuringInvoke](
-                  const OutstandingPacket& outstandingPacket) {
+                  const OutstandingPacketWrapper& outstandingPacket) {
                 outstandingPacketsDuringInvoke.emplace_back(
                     InvokedOutstandingPacketFields{
                         outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -2773,7 +2773,7 @@ TYPED_TEST(
                       const auto& /* socket */, const auto& event) {
           event.invokeForEachNewOutstandingPacketOrdered(
               [&outstandingPacketsDuringInvoke](
-                  const OutstandingPacket& outstandingPacket) {
+                  const OutstandingPacketWrapper& outstandingPacket) {
                 outstandingPacketsDuringInvoke.emplace_back(
                     InvokedOutstandingPacketFields{
                         outstandingPacket.packet.header.getPacketNumberSpace(),
@@ -2812,7 +2812,7 @@ TYPED_TEST(
                       const auto& /* socket */, const auto& event) {
           event.invokeForEachNewOutstandingPacketOrdered(
               [&outstandingPacketsDuringInvoke](
-                  const OutstandingPacket& outstandingPacket) {
+                  const OutstandingPacketWrapper& outstandingPacket) {
                 outstandingPacketsDuringInvoke.emplace_back(
                     InvokedOutstandingPacketFields{
                         outstandingPacket.packet.header.getPacketNumberSpace(),

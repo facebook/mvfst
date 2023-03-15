@@ -27,7 +27,7 @@ class MockCongestionController : public CongestionController {
  public:
   ~MockCongestionController() override {}
   MOCK_METHOD(void, onRemoveBytesFromInflight, (uint64_t));
-  MOCK_METHOD(void, onPacketSent, (const OutstandingPacket&));
+  MOCK_METHOD(void, onPacketSent, (const OutstandingPacketWrapper&));
   MOCK_METHOD(
       void,
       onPacketAckOrLoss,
@@ -49,7 +49,11 @@ class MockCongestionController : public CongestionController {
 class MockPacketProcessor : public PacketProcessor {
  public:
   ~MockPacketProcessor() override = default;
-  MOCK_METHOD(void, onPacketSent, (const OutstandingPacket&), (override));
+  MOCK_METHOD(
+      void,
+      onPacketSent,
+      (const OutstandingPacketWrapper&),
+      (override));
   MOCK_METHOD(void, onPacketAck, (const AckEvent* FOLLY_NULLABLE), (override));
 };
 

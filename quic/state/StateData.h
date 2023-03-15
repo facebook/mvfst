@@ -99,11 +99,11 @@ struct NetworkDataSingle {
 
 struct OutstandingsInfo {
   // Sent packets which have not been acked. These are sorted by PacketNum.
-  std::deque<OutstandingPacket> packets;
+  std::deque<OutstandingPacketWrapper> packets;
 
-  // All PacketEvents of this connection. If a OutstandingPacket doesn't have an
-  // associatedEvent or if it's not in this set, there is no need to process its
-  // frames upon ack or loss.
+  // All PacketEvents of this connection. If a OutstandingPacketWrapper doesn't
+  // have an associatedEvent or if it's not in this set, there is no need to
+  // process its frames upon ack or loss.
   folly::F14FastSet<PacketEvent, PacketEventHash> packetEvents;
 
   // Number of outstanding packets not including cloned

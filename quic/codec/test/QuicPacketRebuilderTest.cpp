@@ -25,10 +25,10 @@ using namespace testing;
 namespace quic {
 namespace test {
 
-OutstandingPacket makeDummyOutstandingPacket(
+OutstandingPacketWrapper makeDummyOutstandingPacket(
     const RegularQuicWritePacket& writePacket,
     uint64_t totalBytesSentOnConnection) {
-  OutstandingPacket packet(
+  OutstandingPacketWrapper packet(
       writePacket,
       Clock::now(),
       1000,

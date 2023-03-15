@@ -4189,7 +4189,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
 RegularQuicWritePacket* findPacketWithStream(
     QuicConnectionStateBase& conn,
     StreamId streamId) {
-  auto op = findOutstandingPacket(conn, [=](OutstandingPacket& packet) {
+  auto op = findOutstandingPacket(conn, [=](OutstandingPacketWrapper& packet) {
     for (auto& frame : packet.packet.frames) {
       bool tryPacket = false;
       WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();

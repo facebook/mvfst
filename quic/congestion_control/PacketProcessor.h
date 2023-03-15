@@ -17,7 +17,7 @@ class PacketProcessor {
  public:
   virtual ~PacketProcessor() = default;
 
-  virtual void onPacketSent(const OutstandingPacket& packet) = 0;
+  virtual void onPacketSent(const OutstandingPacketWrapper& packet) = 0;
   virtual void onPacketAck(const AckEvent* FOLLY_NULLABLE ackEvent) = 0;
 };
 } // namespace quic

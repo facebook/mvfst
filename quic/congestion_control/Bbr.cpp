@@ -118,7 +118,8 @@ void BbrCongestionController::onPacketLoss(
   }
 }
 
-void BbrCongestionController::onPacketSent(const OutstandingPacket& packet) {
+void BbrCongestionController::onPacketSent(
+    const OutstandingPacketWrapper& packet) {
   if (!conn_.lossState.inflightBytes && isAppLimited()) {
     exitingQuiescene_ = true;
   }

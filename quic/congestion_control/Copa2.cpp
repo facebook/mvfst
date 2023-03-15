@@ -34,7 +34,7 @@ void Copa2::onRemoveBytesFromInflight(uint64_t bytes) {
   }
 }
 
-void Copa2::onPacketSent(const OutstandingPacket& packet) {
+void Copa2::onPacketSent(const OutstandingPacketWrapper& packet) {
   addAndCheckOverflow(
       conn_.lossState.inflightBytes, packet.metadata.encodedSize);
 

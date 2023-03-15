@@ -63,7 +63,7 @@ Bandwidth BbrTestingCongestionController::bandwidth() const noexcept {
 }
 
 void BbrTestingCongestionController::onPacketSent(
-    const OutstandingPacket& packet) {
+    const OutstandingPacketWrapper& packet) {
   BbrCongestionController::onPacketSent(packet);
 
   if (packet.packet.header.getPacketNumberSpace() !=

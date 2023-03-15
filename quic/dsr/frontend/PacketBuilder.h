@@ -22,7 +22,7 @@ struct DSRPacketBuilderBase {
 
 /**
  * This is likely a bad name. The point of having a "Packet Builder" is to
- * create the OutstandingPacket when we send out send instructions.
+ * create the OutstandingPacketWrapper when we send out send instructions.
  *
  * I do think from perf perspective we can do better than this in the future.
  */

@@ -14,8 +14,10 @@
 
 namespace quic {
 
-using AckVisitor = std::function<
-    void(const OutstandingPacket&, const QuicWriteFrame&, const ReadAckFrame&)>;
+using AckVisitor = std::function<void(
+    const OutstandingPacketWrapper&,
+    const QuicWriteFrame&,
+    const ReadAckFrame&)>;
 
 /**
  * Processes an ack frame and removes any outstanding packets

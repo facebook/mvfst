@@ -44,7 +44,7 @@ class BbrTestingCongestionController : public BbrCongestionController {
  public:
   explicit BbrTestingCongestionController(QuicConnectionStateBase& conn);
 
-  void onPacketSent(const OutstandingPacket& packet) override;
+  void onPacketSent(const OutstandingPacketWrapper& packet) override;
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE ackEvent,
       const LossEvent* FOLLY_NULLABLE lossEvent) override;
