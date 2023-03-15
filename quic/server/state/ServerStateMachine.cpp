@@ -1562,60 +1562,50 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
 std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     QuicServerConnectionState& conn) {
   std::vector<TransportParameter> customTransportParams;
-  if (conn.transportSettings.datagramConfig.enabled) {
-    auto maxDatagramFrameSize =
-        std::make_unique<CustomIntegralTransportParameter>(
-            static_cast<uint64_t>(
-                TransportParameterId::max_datagram_frame_size),
-            conn.datagramState.maxReadFrameSize);
-    customTransportParams.push_back(maxDatagramFrameSize->encode());
+  const auto& ts = conn.transportSettings;
+  if (ts.datagramConfig.enabled) {
+    CustomIntegralTransportParameter maxDatagramFrameSize(
+        static_cast<uint64_t>(TransportParameterId::max_datagram_frame_size),
+        conn.datagramState.maxReadFrameSize);
   }
 
-  if (conn.transportSettings.advertisedMaxStreamGroups > 0) {
-    auto streamGroupsEnabledParam =
-        std::make_unique<CustomIntegralTransportParameter>(
-            static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-            conn.transportSettings.advertisedMaxStreamGroups);
+  if (ts.advertisedMaxStreamGroups > 0) {
+    CustomIntegralTransportParameter streamGroupsEnabledParam(
+        static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
+        ts.advertisedMaxStreamGroups);
 
     if (!setCustomTransportParameter(
-            std::move(streamGroupsEnabledParam), customTransportParams)) {
+            streamGroupsEnabledParam, customTransportParams)) {
       LOG(ERROR) << "failed to set stream groups enabled transport parameter";
     }
   }
 
-  auto ackReceiveTimestampsEnabled =
-      std::make_unique<CustomIntegralTransportParameter>(
-          static_cast<uint64_t>(
-              TransportParameterId::ack_receive_timestamps_enabled),
-          conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-                  .has_value()
-              ? 1
-              : 0);
-  customTransportParams.push_back(ackReceiveTimestampsEnabled->encode());
-  if (conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-          .has_value()) {
-    auto maxReceiveTimestampsPerAck =
-        std::make_unique<CustomIntegralTransportParameter>(
-            static_cast<uint64_t>(
-                TransportParameterId::max_receive_timestamps_per_ack),
-            conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-                .value()
-                .max_receive_timestamps_per_ack);
-    customTransportParams.push_back(maxReceiveTimestampsPerAck->encode());
-    auto receiveTimestampsExponent =
-        std::make_unique<CustomIntegralTransportParameter>(
-            static_cast<uint64_t>(
-                TransportParameterId::receive_timestamps_exponent),
-            conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-                .value()
-                .receive_timestamps_exponent);
-    customTransportParams.push_back(receiveTimestampsExponent->encode());
+  CustomIntegralTransportParameter ackReceiveTimestampsEnabled(
+      static_cast<uint64_t>(
+          TransportParameterId::ack_receive_timestamps_enabled),
+      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);
+  customTransportParams.push_back(ackReceiveTimestampsEnabled.encode());
+
+  if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
+    CustomIntegralTransportParameter maxReceiveTimestampsPerAck(
+        static_cast<uint64_t>(
+            TransportParameterId::max_receive_timestamps_per_ack),
+        ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
+            .max_receive_timestamps_per_ack);
+    customTransportParams.push_back(maxReceiveTimestampsPerAck.encode());
+
+    CustomIntegralTransportParameter receiveTimestampsExponent(
+        static_cast<uint64_t>(
+            TransportParameterId::receive_timestamps_exponent),
+        ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
+            .receive_timestamps_exponent);
+    customTransportParams.push_back(receiveTimestampsExponent.encode());
   }
 
-  if (conn.transportSettings.advertisedKnobFrameSupport) {
-    auto knobFrameSupport = std::make_unique<CustomIntegralTransportParameter>(
+  if (ts.advertisedKnobFrameSupport) {
+    CustomIntegralTransportParameter knobFrameSupport(
         static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
-    customTransportParams.push_back(knobFrameSupport->encode());
+    customTransportParams.push_back(knobFrameSupport.encode());
   }
 
   return customTransportParams;

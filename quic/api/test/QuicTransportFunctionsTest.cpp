@@ -4535,28 +4535,26 @@ TEST_F(QuicTransportFunctionsTest, CustomTransportParamTest) {
 
   // Add new param.
   EXPECT_TRUE(setCustomTransportParameter(
-      std::make_unique<CustomIntegralTransportParameter>(
-          kCustomTransportParameterThreshold, 0),
+      CustomIntegralTransportParameter(kCustomTransportParameterThreshold, 0),
       customTransportParameters));
   EXPECT_EQ(customTransportParameters.size(), 1);
 
   // Existing param not added.
   EXPECT_FALSE(setCustomTransportParameter(
-      std::make_unique<CustomIntegralTransportParameter>(
-          kCustomTransportParameterThreshold, 1),
+      CustomIntegralTransportParameter(kCustomTransportParameterThreshold, 1),
       customTransportParameters));
   EXPECT_EQ(customTransportParameters.size(), 1);
 
   // Bad param id is not added.
   EXPECT_FALSE(setCustomTransportParameter(
-      std::make_unique<CustomIntegralTransportParameter>(
+      CustomIntegralTransportParameter(
           kCustomTransportParameterThreshold - 1, 2),
       customTransportParameters));
   EXPECT_EQ(customTransportParameters.size(), 1);
 
   // Another valid param added.
   EXPECT_TRUE(setCustomTransportParameter(
-      std::make_unique<CustomIntegralTransportParameter>(
+      CustomIntegralTransportParameter(
           kCustomTransportParameterThreshold + 1, 0),
       customTransportParameters));
   EXPECT_EQ(customTransportParameters.size(), 2);

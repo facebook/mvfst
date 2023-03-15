@@ -56,7 +56,7 @@ struct TransportParameter {
 
 class CustomTransportParameter {
  public:
-  TransportParameterId getParameterId();
+  TransportParameterId getParameterId() const;
 
   virtual TransportParameter encode() const = 0;
 

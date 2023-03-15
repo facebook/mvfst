@@ -1745,11 +1745,11 @@ bool hasInitialOrHandshakeCiphers(QuicConnectionStateBase& conn) {
 }
 
 bool setCustomTransportParameter(
-    std::unique_ptr<CustomTransportParameter> customParam,
+    const CustomTransportParameter& customParam,
     std::vector<TransportParameter>& customTransportParameters) {
   // Check that the parameter id is in the "private parameter" range, as
   // described by the spec.
-  if (static_cast<uint16_t>(customParam->getParameterId()) <
+  if (static_cast<uint16_t>(customParam.getParameterId()) <
       kCustomTransportParameterThreshold) {
     LOG(ERROR) << "invalid parameter id";
     return false;
@@ -1761,7 +1761,7 @@ bool setCustomTransportParameter(
       customTransportParameters.begin(),
       customTransportParameters.end(),
       [&customParam](const TransportParameter& param) {
-        return param.parameter == customParam->getParameterId();
+        return param.parameter == customParam.getParameterId();
       });
 
   // if a match has been found, we return failure
@@ -1770,7 +1770,7 @@ bool setCustomTransportParameter(
     return false;
   }
 
-  customTransportParameters.push_back(customParam->encode());
+  customTransportParameters.push_back(customParam.encode());
   return true;
 }
 

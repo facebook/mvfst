@@ -80,7 +80,7 @@ TransportParameter encodeIntegerParameter(
   return {id, std::move(data)};
 }
 
-TransportParameterId CustomTransportParameter::getParameterId() {
+TransportParameterId CustomTransportParameter::getParameterId() const {
   return static_cast<TransportParameterId>(id_);
 }
 

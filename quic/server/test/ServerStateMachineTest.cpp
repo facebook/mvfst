@@ -296,12 +296,11 @@ TEST_P(
   std::vector<TransportParameter> transportParams;
 
   if (GetParam().peerMaxGroupsIn > 0) {
-    auto streamGroupsEnabledParam =
-        std::make_unique<CustomIntegralTransportParameter>(
-            static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-            GetParam().peerMaxGroupsIn);
-    CHECK(setCustomTransportParameter(
-        std::move(streamGroupsEnabledParam), transportParams));
+    CustomIntegralTransportParameter streamGroupsEnabledParam(
+        static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
+        GetParam().peerMaxGroupsIn);
+    CHECK(
+        setCustomTransportParameter(streamGroupsEnabledParam, transportParams));
   }
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};

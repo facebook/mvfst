@@ -332,7 +332,7 @@ bool writeLoopTimeLimit(
  * - checks that the param is not in the provided vector already
  */
 bool setCustomTransportParameter(
-    std::unique_ptr<CustomTransportParameter> customParam,
+    const CustomTransportParameter& customParam,
     std::vector<TransportParameter>& customTransportParameters);
 
 bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn);
