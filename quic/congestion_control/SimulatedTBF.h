@@ -66,8 +66,11 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
    * @param time       The time when the bytes were sent.
    *                   Should be greater than or equal to the previous time
    *                   value passed to this function.
+   * @return           The number of bytes consumed from the TBF, including
+   *                   bytes will be consumed at a later time interval. As
+   *                   a result, this will equal either bytesSent or 0.
    */
-  void consumeWithBorrowNonBlockingAndUpdateState(
+  double consumeWithBorrowNonBlockingAndUpdateState(
       double bytesSent,
       TimePoint time);
 

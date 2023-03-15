@@ -29,7 +29,7 @@ SimulatedTBF::SimulatedTBF(const Config& params)
           params.burstSizeBytes,
           params.maxDebtQueueSizeBytes) {}
 
-void SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
+double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     double toConsume,
     TimePoint sendTime) {
   if (toConsume > burstSizeBytes_) {
@@ -70,7 +70,7 @@ void SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     if (toConsume > numTokensAvailable +
             (maybeMaxDebtQueueSizeBytes_.value() - currDebtQueueSizeBytes)) {
       // Not enough space left to consume the entire packet
-      return;
+      return 0;
     }
   }
 
@@ -104,6 +104,7 @@ void SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     }
   }
   zeroTime_ = sendTimeDouble + maybeDebtPayOffTimeDouble.value();
+  return toConsume;
 }
 
 [[nodiscard]] bool SimulatedTBF::bucketEmptyThroughoutWindow(
