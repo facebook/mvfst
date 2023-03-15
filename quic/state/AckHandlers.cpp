@@ -144,19 +144,19 @@ AckEvent processAckFrame(
         CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.lossState.totalPacketsSpuriouslyMarkedLost++;
         if (conn.transportSettings.useAdaptiveLossReorderingThresholds) {
-          if (rPacketIt->lossReorderDistance.hasValue() &&
-              rPacketIt->lossReorderDistance.value() >
+          if (rPacketIt->metadata.lossReorderDistance.hasValue() &&
+              rPacketIt->metadata.lossReorderDistance.value() >
                   conn.lossState.reorderingThreshold) {
             conn.lossState.reorderingThreshold =
-                rPacketIt->lossReorderDistance.value();
+                rPacketIt->metadata.lossReorderDistance.value();
           }
         }
         if (conn.transportSettings.useAdaptiveLossTimeThresholds) {
-          if (rPacketIt->lossTimeoutDividend.hasValue() &&
-              rPacketIt->lossTimeoutDividend.value() >
+          if (rPacketIt->metadata.lossTimeoutDividend.hasValue() &&
+              rPacketIt->metadata.lossTimeoutDividend.value() >
                   conn.transportSettings.timeReorderingThreshDividend) {
             conn.transportSettings.timeReorderingThreshDividend =
-                rPacketIt->lossTimeoutDividend.value();
+                rPacketIt->metadata.lossTimeoutDividend.value();
           }
         }
         if (conn.transportSettings.removeFromLossBufferOnSpurious) {
@@ -182,7 +182,10 @@ AckEvent processAckFrame(
         CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.outstandings.declaredLostCount--;
         if (spuriousLossEvent) {
-          spuriousLossEvent->addSpuriousPacket(*rPacketIt);
+          spuriousLossEvent->addSpuriousPacket(
+              rPacketIt->metadata,
+              rPacketIt->packet.header.getPacketSequenceNum(),
+              rPacketIt->packet.header.getPacketNumberSpace());
         }
         rPacketIt++;
         continue;

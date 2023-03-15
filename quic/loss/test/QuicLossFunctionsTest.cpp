@@ -40,15 +40,19 @@ auto getOutstandingPacketMatcher(
     bool lostByTimeout) {
   return AllOf(
       testing::Field(
-          &quic::OutstandingPacket::lossReorderDistance,
-          testing::Property(
-              &folly::Optional<uint32_t>::hasValue,
-              testing::Eq(lostByReorder))),
+          &quic::OutstandingPacket::metadata,
+          testing::Field(
+              &quic::OutstandingPacketMetadata::lossReorderDistance,
+              testing::Property(
+                  &folly::Optional<uint32_t>::hasValue,
+                  testing::Eq(lostByReorder)))),
       testing::Field(
-          &quic::OutstandingPacket::lossTimeoutDividend,
-          testing::Property(
-              &folly::Optional<quic::DurationRep>::hasValue,
-              testing::Eq(lostByTimeout))),
+          &quic::OutstandingPacket::metadata,
+          testing::Field(
+              &quic::OutstandingPacketMetadata::lossTimeoutDividend,
+              testing::Property(
+                  &folly::Optional<quic::DurationRep>::hasValue,
+                  testing::Eq(lostByTimeout)))),
       testing::Field(
           &quic::OutstandingPacket::packet,
           testing::Field(

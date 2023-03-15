@@ -42,6 +42,15 @@ struct OutstandingPacketMetadata {
   // tracks the number of writes on this socket.
   uint64_t writeCount{0};
 
+  // Has value if the packet is lost by timout. The value is the loss timeout
+  // dividend that was used to declare this packet.
+  folly::Optional<DurationRep> lossTimeoutDividend;
+
+  // Has value if the packet is lost by reorder. The value is the distance
+  // between this packet and the acknowleded packet when it was declared lost
+  // due to reordering
+  folly::Optional<uint32_t> lossReorderDistance;
+
   struct StreamDetails {
     template <class T>
     using IntervalSetVec = SmallVec<T, 4 /* stack size */>;
@@ -187,15 +196,6 @@ struct OutstandingPacket {
   // True if spurious loss detection is enabled and this packet was declared
   // lost.
   bool declaredLost{false};
-
-  // Has value if the packet is lost by timout. The value is the loss timeout
-  // dividend that was used to declare this packet.
-  folly::Optional<DurationRep> lossTimeoutDividend;
-
-  // Has value if the packet is lost by reorder. The value is the distance
-  // between this packet and the acknowleded packet when it was declared lost
-  // due to reordering
-  folly::Optional<uint32_t> lossReorderDistance;
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,

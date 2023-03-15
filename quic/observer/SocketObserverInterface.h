@@ -308,16 +308,21 @@ class SocketObserverInterface {
 
   struct LostPacket {
     explicit LostPacket(
-        bool lostbytimeout,
-        bool lostbyreorder,
-        quic::OutstandingPacket pkt)
-
-        : lostByTimeout(lostbytimeout),
-          lostByReorderThreshold(lostbyreorder),
-          packet(std::move(pkt)) {}
+        bool lostByTimeout,
+        bool lostByReorderThreshold,
+        quic::OutstandingPacketMetadata pktMetadata,
+        quic::PacketNum packetNum,
+        quic::PacketNumberSpace pnSpace)
+        : lostByTimeout(lostByTimeout),
+          lostByReorderThreshold(lostByReorderThreshold),
+          packetMetadata(std::move(pktMetadata)),
+          packetNum(packetNum),
+          pnSpace(pnSpace) {}
     bool lostByTimeout{false};
     bool lostByReorderThreshold{false};
-    const quic::OutstandingPacket packet;
+    const quic::OutstandingPacketMetadata packetMetadata;
+    const quic::PacketNum packetNum;
+    const quic::PacketNumberSpace pnSpace;
   };
 
   struct LossEvent {
@@ -328,10 +333,15 @@ class SocketObserverInterface {
     }
 
     void addLostPacket(
-        bool lostByTimeout,
-        bool lostByReorder,
-        const quic::OutstandingPacket& packet) {
-      lostPackets.emplace_back(lostByTimeout, lostByReorder, packet);
+        const quic::OutstandingPacketMetadata& pktMetadata,
+        const quic::PacketNum packetNum,
+        const quic::PacketNumberSpace pnSpace) {
+      lostPackets.emplace_back(
+          pktMetadata.lossTimeoutDividend.has_value(),
+          pktMetadata.lossReorderDistance.has_value(),
+          pktMetadata,
+          packetNum,
+          pnSpace);
     }
     const TimePoint lossTime;
     std::vector<LostPacket> lostPackets;
@@ -364,11 +374,16 @@ class SocketObserverInterface {
       return spuriousPackets.size() > 0;
     }
 
-    void addSpuriousPacket(const quic::OutstandingPacket& pkt) {
+    void addSpuriousPacket(
+        const quic::OutstandingPacketMetadata& pktMetadata,
+        const quic::PacketNum packetNum,
+        const quic::PacketNumberSpace pnSpace) {
       spuriousPackets.emplace_back(
-          pkt.lossTimeoutDividend.hasValue(),
-          pkt.lossReorderDistance.hasValue(),
-          pkt);
+          pktMetadata.lossTimeoutDividend.has_value(),
+          pktMetadata.lossReorderDistance.has_value(),
+          pktMetadata,
+          packetNum,
+          pnSpace);
     }
     const TimePoint rcvTime;
     std::vector<LostPacket> spuriousPackets;

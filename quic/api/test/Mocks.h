@@ -396,7 +396,7 @@ class MockLegacyObserver : public LegacyObserver {
         testing::Field(
             &LostPacket::lostByReorderThreshold, testing::Eq(reorderLoss)),
         testing::Field(&LostPacket::lostByTimeout, testing::Eq(timeoutLoss)),
-        testing::Field(&LostPacket::packet, getLossPacketNum(packetNum)));
+        testing::Field(&LostPacket::packetNum, testing::Eq(packetNum)));
   }
 
   static auto getStreamEventMatcher(

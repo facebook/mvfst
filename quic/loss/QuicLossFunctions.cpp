@@ -338,10 +338,6 @@ bool processOutstandingsForLoss(
       shouldSetTimer = true;
       break;
     }
-    lossEvent.addLostPacket(pkt);
-    if (observerLossEvent) {
-      observerLossEvent->addLostPacket(lostByTimeout, lostByReorder, pkt);
-    }
 
     if (pkt.isDSRPacket) {
       CHECK_GT(conn.outstandings.dsrCount, 0);
@@ -371,12 +367,19 @@ bool processOutstandingsForLoss(
     conn.lossState.totalPacketsMarkedLost++;
     if (lostByTimeout && rttSample.count() > 0) {
       conn.lossState.totalPacketsMarkedLostByPto++;
-      pkt.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
+      pkt.metadata.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
           conn.transportSettings.timeReorderingThreshDivisor / rttSample;
     }
     if (lostByReorder) {
       conn.lossState.totalPacketsMarkedLostByReorderingThreshold++;
-      iter->lossReorderDistance = reorderDistance;
+      iter->metadata.lossReorderDistance = reorderDistance;
+    }
+    lossEvent.addLostPacket(pkt);
+    if (observerLossEvent) {
+      observerLossEvent->addLostPacket(
+          pkt.metadata,
+          pkt.packet.header.getPacketSequenceNum(),
+          pkt.packet.header.getPacketNumberSpace());
     }
     conn.outstandings.declaredLostCount++;
     iter->declaredLost = true;
