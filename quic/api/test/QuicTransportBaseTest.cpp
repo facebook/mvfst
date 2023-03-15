@@ -538,7 +538,10 @@ class TestQuicTransport
   }
 
   void enableDatagram() {
-    conn_->datagramState.maxReadFrameSize = 65535;
+    // Note: the RFC says to use 65535 to enable the datagram extension.
+    // We are using +1 in tests to make sure that we avoid representing this
+    // value with an uint16
+    conn_->datagramState.maxReadFrameSize = 65536;
     conn_->datagramState.maxReadBufferSize = 10;
   }
 

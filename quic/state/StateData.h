@@ -695,8 +695,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   uint64_t numProbesWritableBytesLimited{0};
 
   struct DatagramState {
-    uint16_t maxReadFrameSize{kDefaultMaxDatagramFrameSize};
-    uint16_t maxWriteFrameSize{kDefaultMaxDatagramFrameSize};
+    uint32_t maxReadFrameSize{kDefaultMaxDatagramFrameSize};
+    uint32_t maxWriteFrameSize{kDefaultMaxDatagramFrameSize};
     uint32_t maxReadBufferSize{kDefaultMaxDatagramsBuffered};
     uint32_t maxWriteBufferSize{kDefaultMaxDatagramsBuffered};
     // Buffers Incoming Datagrams
