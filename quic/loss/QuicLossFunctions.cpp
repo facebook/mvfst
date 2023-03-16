@@ -290,7 +290,7 @@ bool processOutstandingsForLoss(
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
-    if (currentPacketNumberSpace != pnSpace) {
+    if (currentPacketNumberSpace != pnSpace || iter->declaredLost) {
       iter++;
       continue;
     }
@@ -333,10 +333,9 @@ bool processOutstandingsForLoss(
     bool lostByReorder = reorderDistance > conn.lossState.reorderingThreshold;
 
     if (!(lostByTimeout || lostByReorder)) {
-      // We can exit early here because if packet N doesn't meet the
-      // threshold, then packet N + 1 will not either.
       shouldSetTimer = true;
-      break;
+      iter++;
+      continue;
     }
 
     if (pkt.isDSRPacket) {

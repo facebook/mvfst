@@ -2627,7 +2627,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
     op.isDSRPacket = true;
     conn->outstandings.dsrCount++;
   }
-  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  // Add another non-DSR after
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  EXPECT_EQ(7, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   // Assume some packets are already acked
   for (auto iter =
            getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
@@ -2639,10 +2641,10 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
   conn->outstandings.packets.erase(
       firstAppDataOpIter + 2, firstAppDataOpIter + 5);
-  // Ack for packet 9 arrives
+  // Ack for packet 20 arrives
   auto ack = AckEvent::Builder()
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
+                 .setLargestAckedPacket(20)
                  .setIsImplicitAck(false)
                  .setAckTime(Clock::now())
                  .setAdjustedAckTime(Clock::now())
@@ -2654,8 +2656,16 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
       WriteStreamFrame{4, 10, 100, false, true}, false);
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(9)
+          .setPacketNum(20)
           .setDetailsPerStream(std::move(detailsPerStream))
+          .setOutstandingPacketMetadata(std::move(
+              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                  ->metadata))
+          .build());
+  ack.ackedPackets.emplace_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(19)
+          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
                   ->metadata))
@@ -2663,12 +2673,12 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
 
   auto lossEvent = detectLossPackets(
       *conn,
-      9,
+      20,
       testingLossMarkFunc,
       TimePoint(90ms),
       PacketNumberSpace::AppData,
       &ack);
-  EXPECT_FALSE(lossEvent.has_value());
+  ASSERT_TRUE(lossEvent.has_value());
 
   EXPECT_EQ(3, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
 
@@ -2676,8 +2686,8 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
       conn->outstandings.packets.begin(),
       conn->outstandings.packets.end(),
       [](auto& op) { return op.declaredLost; });
-  EXPECT_EQ(0, numDeclaredLost);
-  EXPECT_EQ(conn->outstandings.packets.size(), 3);
+  // We should declare the non DSR packet lost.
+  EXPECT_EQ(1, numDeclaredLost);
 }
 
 TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
