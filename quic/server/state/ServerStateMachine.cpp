@@ -591,10 +591,8 @@ void onConnectionMigration(
       previousPeerAddresses.end(),
       newPeerAddress);
   if (it == previousPeerAddresses.end()) {
-    // Send new path challenge
-    uint64_t pathData;
-    folly::Random::secureRandom(&pathData, sizeof(pathData));
-    conn.pendingEvents.pathChallenge = PathChallengeFrame(pathData);
+    // send new path challenge
+    conn.pendingEvents.pathChallenge.emplace(folly::Random::secureRand64());
 
     // If we are already in the middle of a migration reset
     // the available bytes in the rate-limited window, but keep the

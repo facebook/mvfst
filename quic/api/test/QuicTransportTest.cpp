@@ -2480,26 +2480,37 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame>());
-  EXPECT_EQ(numPathResponsePackets, 1);
+  EXPECT_EQ(numPathResponsePackets, 2);
 }
 
-TEST_F(QuicTransportTest, DoNotResendPathResponseOnLoss) {
+TEST_F(QuicTransportTest, ResendPathResponseOnLoss) {
   auto& conn = transport_->getConnectionState();
+  auto& outstandingPackets = conn.outstandings.packets;
 
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
-  PathResponseFrame pathResponse(123);
-  sendSimpleFrame(conn, pathResponse);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+  sendSimpleFrame(conn, PathResponseFrame(folly::Random::rand64()));
   transport_->updateWriteLooper(true);
   loopForWrites();
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
 
-  EXPECT_EQ(1, conn.outstandings.packets.size());
-  auto packet =
+  // pathResponseFrame should no longer be in pendingEvents
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
+  // verify presence of frame in outstanding packet
+  EXPECT_EQ(outstandingPackets.size(), 1);
+  auto& packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
+  auto numPathResponseFrames = std::count_if(
+      outstandingPackets.begin(),
+      outstandingPackets.end(),
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame>());
+  EXPECT_EQ(numPathResponseFrames, 1);
 
+  // pathResponseFrame should be queued for re-tx on packet loss
   markPacketLoss(conn, packet, false);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+  numPathResponseFrames = std::count_if(
+      conn.pendingEvents.frames.begin(),
+      conn.pendingEvents.frames.end(),
+      [](const auto& frame) { return frame.asPathResponseFrame(); });
+  EXPECT_EQ(numPathResponseFrames, 1);
 }
 
 TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
