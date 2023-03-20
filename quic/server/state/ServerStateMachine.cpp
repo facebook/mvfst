@@ -1565,6 +1565,7 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     CustomIntegralTransportParameter maxDatagramFrameSize(
         static_cast<uint64_t>(TransportParameterId::max_datagram_frame_size),
         conn.datagramState.maxReadFrameSize);
+    customTransportParams.push_back(maxDatagramFrameSize.encode());
   }
 
   if (ts.advertisedMaxStreamGroups > 0) {
