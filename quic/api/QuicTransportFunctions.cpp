@@ -845,6 +845,14 @@ void updateConnection(
                 packetNum;
           })
           .base();
+
+  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
+      [&conn](const quic::OutstandingPacketWrapper& pkt) {
+        for (auto& packetProcessor : conn.packetProcessors) {
+          packetProcessor->onPacketDestroyed(pkt);
+        }
+      };
+
   auto& pkt = *conn.outstandings.packets.emplace(
       packetIt,
       std::move(packet),
@@ -862,7 +870,8 @@ void updateConnection(
       conn.lossState,
       conn.writeCount,
       std::move(detailsPerStream),
-      conn.appLimitedTracker.getTotalAppLimitedTime());
+      conn.appLimitedTracker.getTotalAppLimitedTime(),
+      packetDestroyFn);
 
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
