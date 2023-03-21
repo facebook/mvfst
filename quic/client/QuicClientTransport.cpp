@@ -669,7 +669,9 @@ void QuicClientTransport::processPacketData(
       clientConn_->zeroRttWriteCipher.reset();
       clientConn_->zeroRttWriteHeaderCipher.reset();
     }
-    if (!clientConn_->zeroRttRejected.has_value()) {
+    if (!clientConn_->zeroRttRejected.has_value() ||
+        (conn_->version.has_value() &&
+         conn_->version.value() == QuicVersion::MVFST_EXPERIMENTAL)) {
       clientConn_->zeroRttRejected = handshakeLayer->getZeroRttRejected();
       if (clientConn_->zeroRttRejected.has_value() &&
           *clientConn_->zeroRttRejected) {
