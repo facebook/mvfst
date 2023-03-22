@@ -47,15 +47,10 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   struct Config {
     double rateBytesPerSecond{0};
     double burstSizeBytes{0};
-    folly::Optional<double> maxDebtQueueSizeBytes;
+    folly::Optional<double> maybeMaxDebtQueueSizeBytes;
   };
 
-  explicit SimulatedTBF(double rate, double burst);
-  explicit SimulatedTBF(
-      double rate,
-      double burst,
-      folly::Optional<double> debtQueueSize);
-  explicit SimulatedTBF(const Config& params);
+  explicit SimulatedTBF(Config config);
 
   /**
    * Models sending of specified number of bytes at the specified time. If the
@@ -130,11 +125,9 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   [[nodiscard]] folly::Optional<double> getMaxDebtQueueSizeBytes() const;
 
  private:
-  double rateBytesPerSecond_;
-  double burstSizeBytes_;
-  folly::Optional<double> maybeMaxDebtQueueSizeBytes_;
-  double zeroTime_{0};
+  Config config_;
 
+  double zeroTime_{0};
   std::deque<TimeInterval> emptyBucketTimeIntervals_;
   folly::Optional<TimePoint> maybeLastSendTimeBucketNotEmpty_;
   folly::Optional<TimePoint> maybeLastForgetEmptyIntervalTime_;
