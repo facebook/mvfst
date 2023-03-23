@@ -1658,7 +1658,7 @@ void QuicClientTransport::setSelfOwning() {
 
 void QuicClientTransport::setSupportedExtensionTransportParameters() {
   const auto& ts = conn_->transportSettings;
-
+  customTransportParameters_.clear();
   if (ts.minAckDelay.hasValue()) {
     CustomIntegralTransportParameter minAckDelayParam(
         static_cast<uint64_t>(TransportParameterId::min_ack_delay),

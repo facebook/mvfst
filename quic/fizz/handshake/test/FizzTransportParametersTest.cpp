@@ -51,8 +51,8 @@ class QuicExtensionsTest : public testing::Test {
 
 StringPiece clientParamsV1{"0039000604049d7f3e7d"};
 StringPiece clientParamsD29{"ffa5000604049d7f3e7d"};
-StringPiece serverParamsV1{"0039001004049d7f3e7d00081212547612561469"};
-StringPiece serverParamsD29{"ffa5001004049d7f3e7d00081212547612561469"};
+StringPiece serverParamsV1{"003900100008121254761256146904049d7f3e7d"};
+StringPiece serverParamsD29{"ffa500100008121254761256146904049d7f3e7d"};
 StringPiece ticketParamsV1{"0039000604049d7f3e7d"};
 StringPiece ticketParamsD29{"ffa5000604049d7f3e7d"};
 
@@ -92,10 +92,10 @@ TEST_F(QuicExtensionsTest, TestServerParamsV1) {
   auto ext = getServerExtension(exts, QuicVersion::QUIC_V1);
 
   EXPECT_EQ(
-      ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      ext->parameters[1].parameter,
+      ext->parameters[0].parameter,
       TransportParameterId::original_destination_connection_id);
+  EXPECT_EQ(
+      ext->parameters[1].parameter, TransportParameterId::initial_max_data);
   EXPECT_EQ(
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
@@ -120,10 +120,10 @@ TEST_F(QuicExtensionsTest, TestServerParamsD29) {
   auto ext = getServerExtension(exts, QuicVersion::QUIC_DRAFT);
 
   EXPECT_EQ(
-      ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      ext->parameters[1].parameter,
+      ext->parameters[0].parameter,
       TransportParameterId::original_destination_connection_id);
+  EXPECT_EQ(
+      ext->parameters[1].parameter, TransportParameterId::initial_max_data);
   EXPECT_EQ(
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
