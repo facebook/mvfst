@@ -55,6 +55,124 @@ TEST_F(QuicPriorityQueueTest, TestBasic) {
   EXPECT_TRUE(queue_.empty());
 }
 
+TEST_F(QuicPriorityQueueTest, Sequential) {
+  PriorityQueue pq;
+  Priority pri(1, false);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 0);
+  EXPECT_FALSE(level.iterator->end());
+  level.iterator->next();
+  EXPECT_TRUE(level.iterator->end());
+
+  pq.insertOrUpdate(1, pri);
+  level.iterator->begin();
+  level.iterator->next();
+  EXPECT_EQ(level.iterator->current(), 1);
+  level.iterator->next();
+  EXPECT_TRUE(level.iterator->end());
+
+  pq.erase(0);
+  pq.insertOrUpdate(2, pri);
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 1);
+}
+
+TEST_F(QuicPriorityQueueTest, IncrementalBasic) {
+  PriorityQueue pq;
+  Priority pri(1, true);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 0);
+  EXPECT_TRUE(level.iterator->end());
+}
+
+TEST_F(QuicPriorityQueueTest, IncrementalRoundRobin) {
+  PriorityQueue pq;
+  Priority pri(1, true);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+  pq.insertOrUpdate(1, pri);
+
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 0);
+
+  level.iterator->next();
+  EXPECT_EQ(level.iterator->current(), 1);
+  EXPECT_FALSE(level.iterator->end());
+
+  level.iterator->next();
+  EXPECT_EQ(level.iterator->current(), 0);
+  EXPECT_TRUE(level.iterator->end());
+}
+
+TEST_F(QuicPriorityQueueTest, IncrementalMultipleIterations) {
+  PriorityQueue pq;
+  Priority pri(1, true);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+  pq.insertOrUpdate(1, pri);
+
+  level.iterator->begin();
+  level.iterator->next();
+
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 1);
+}
+
+TEST_F(QuicPriorityQueueTest, IncrementalEraseLeft) {
+  PriorityQueue pq;
+  Priority pri(1, true);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+  pq.insertOrUpdate(1, pri);
+  level.iterator->begin();
+
+  pq.erase(0);
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 1);
+}
+
+TEST_F(QuicPriorityQueueTest, IncrementalEraseMiddle) {
+  PriorityQueue pq;
+  Priority pri(1, true);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+  pq.insertOrUpdate(1, pri);
+  pq.insertOrUpdate(2, pri);
+  level.iterator->begin();
+  level.iterator->next();
+
+  pq.erase(1);
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 2);
+}
+
+TEST_F(QuicPriorityQueueTest, IncrementalEraseRight) {
+  PriorityQueue pq;
+  Priority pri(1, true);
+  const auto& level = pq.levels[PriorityQueue::priority2index(pri)];
+
+  pq.insertOrUpdate(0, pri);
+  pq.insertOrUpdate(1, pri);
+  pq.insertOrUpdate(2, pri);
+  level.iterator->begin();
+  level.iterator->next();
+
+  pq.erase(2);
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 1);
+}
+
 TEST_F(QuicPriorityQueueTest, TestUpdate) {
   queue_.insertOrUpdate(0, Priority(0, false));
   EXPECT_EQ(queue_.count(0), 1);
