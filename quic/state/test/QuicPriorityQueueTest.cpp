@@ -34,7 +34,13 @@ TEST_F(QuicPriorityQueueTest, TestBasic) {
   }
 
   for (auto& level : queue_.levels) {
-    EXPECT_EQ(level.streams.size(), 2);
+    level.iterator->begin();
+    size_t count = 0;
+    do {
+      level.iterator->next();
+      count++;
+    } while (!level.iterator->end());
+    EXPECT_EQ(count, 2);
   }
 
   for (uint8_t i = 0; i < queue_.levels.size(); i++) {

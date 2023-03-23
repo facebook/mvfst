@@ -44,15 +44,87 @@ extern const Priority kDefaultPriority;
  */
 struct PriorityQueue {
   struct Level {
+    class Iterator {
+     protected:
+      const Level& level;
+
+     public:
+      explicit Iterator(const Level& inLevel)
+          : level(inLevel), nextStreamIt(level.streams.end()) {}
+      virtual ~Iterator() = default;
+      virtual void begin() const {
+        CHECK(!level.empty());
+        if (nextStreamIt == level.streams.end()) {
+          nextStreamIt = level.streams.begin();
+        }
+      }
+      virtual bool end() const = 0;
+      virtual StreamId current() const {
+        return *nextStreamIt;
+      }
+      virtual void next() = 0;
+      mutable std::set<StreamId>::const_iterator nextStreamIt;
+    };
+
+    class IncrementalIterator : public Iterator {
+     private:
+      mutable std::set<StreamId>::const_iterator startStreamIt;
+
+     public:
+      explicit IncrementalIterator(const Level& inLevel)
+          : Iterator(inLevel), startStreamIt(nextStreamIt) {}
+      void begin() const override {
+        Iterator::begin();
+        startStreamIt = nextStreamIt;
+      }
+      bool end() const override {
+        return nextStreamIt == startStreamIt;
+      }
+      void next() override {
+        CHECK(!level.empty());
+        nextStreamIt++;
+        if (nextStreamIt == level.streams.end()) {
+          nextStreamIt = level.streams.begin();
+        }
+      }
+    };
+
+    class SequentialIterator : public Iterator {
+     public:
+      explicit SequentialIterator(const Level& inLevel) : Iterator(inLevel) {}
+      void begin() const override {
+        nextStreamIt = level.streams.begin();
+      }
+      bool end() const override {
+        return nextStreamIt == level.streams.end();
+      }
+
+      void next() override {
+        CHECK(!level.empty());
+        nextStreamIt++;
+      }
+    };
+
     std::set<StreamId> streams;
-    mutable decltype(streams)::const_iterator next{streams.end()};
     bool incremental{false};
+    std::unique_ptr<Iterator> iterator;
+
+    FOLLY_NODISCARD bool empty() const {
+      return streams.empty();
+    }
   };
   std::vector<Level> levels;
 
   PriorityQueue() : levels(kDefaultPriorityLevelsSize) {
-    for (size_t index = 1; index < levels.size(); index += 2) {
-      levels[index].incremental = true;
+    for (size_t index = 0; index < levels.size(); index++) {
+      if (index % 2 == 1) {
+        levels[index].incremental = true;
+        levels[index].iterator =
+            std::make_unique<Level::IncrementalIterator>(levels[index]);
+      } else {
+        levels[index].iterator =
+            std::make_unique<Level::SequentialIterator>(levels[index]);
+      }
     }
   }
 
@@ -103,7 +175,7 @@ struct PriorityQueue {
     writableStreamsToLevel_.clear();
     for (auto& level : levels) {
       level.streams.clear();
-      level.next = level.streams.end();
+      level.iterator->nextStreamIt = level.streams.end();
     }
   }
 
@@ -122,18 +194,19 @@ struct PriorityQueue {
     auto& level = levels[it->second];
     auto streamIt = level.streams.find(id);
     CHECK(streamIt != level.streams.end());
-    level.next = streamIt;
+    level.iterator->nextStreamIt = streamIt;
   }
 
   // Only used for testing
   FOLLY_NODISCARD StreamId
   getNextScheduledStream(Priority pri = kDefaultPriority) const {
     auto& level = levels[priority2index(pri)];
-    if (level.next == level.streams.end()) {
+    if (!level.incremental ||
+        level.iterator->nextStreamIt == level.streams.end()) {
       CHECK(!level.streams.empty());
       return *level.streams.begin();
     }
-    return *level.next;
+    return *level.iterator->nextStreamIt;
   }
 
  private:
@@ -148,8 +221,8 @@ struct PriorityQueue {
                   << " not found in PriorityQueue level=" << id;
       return;
     }
-    if (streamIt == level.next) {
-      level.next = level.streams.erase(streamIt);
+    if (streamIt == level.iterator->nextStreamIt) {
+      level.iterator->nextStreamIt = level.streams.erase(streamIt);
     } else {
       level.streams.erase(streamIt);
     }
