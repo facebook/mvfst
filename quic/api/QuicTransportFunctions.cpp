@@ -1443,6 +1443,9 @@ WriteQuicDataResult writeConnectionDataToSocket(
         headerCipher);
 
     if (!ret.buildSuccess) {
+      // If we're returning because we couldn't schedule more packets,
+      // make sure we flush the buffer in this function.
+      ioBufBatch.flush();
       return {ioBufBatch.getPktSent(), 0, bytesWritten};
     }
     // If we build a packet, we updateConnection(), even if write might have
@@ -1473,7 +1476,9 @@ WriteQuicDataResult writeConnectionDataToSocket(
     }
   }
 
+  // Ensure that the buffer is flushed before returning
   ioBufBatch.flush();
+
   if (connection.transportSettings.dataPathType ==
       DataPathType::ContinuousMemory) {
     CHECK(connection.bufAccessor->ownsBuffer());
@@ -1803,5 +1808,4 @@ bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
       hasAcksToSchedule(conn.ackStates.appDataAckState) &&
       conn.ackStates.appDataAckState.needsToSendAckImmediately);
 }
-
 } // namespace quic

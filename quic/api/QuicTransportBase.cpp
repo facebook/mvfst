@@ -57,6 +57,10 @@ QuicTransportBase::QuicTransportBase(
     }
     return 0us;
   });
+  if (socket_) {
+    socket_->setAdditionalCmsgsFunc(
+        [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+  }
 }
 
 void QuicTransportBase::setPacingTimer(
@@ -3071,6 +3075,8 @@ void QuicTransportBase::writeSocketData() {
     const auto beforeNumOutstandingPackets =
         conn_->outstandings.numOutstanding();
 
+    updatePacketProcessorsPrewriteRequests();
+
     // if we're starting to write from app limited, notify observers
     if (conn_->appLimitedTracker.isAppLimited() &&
         conn_->congestionController) {
@@ -3747,11 +3753,6 @@ void QuicTransportBase::appendCmsgs(const folly::SocketOptionMap& options) {
   socket_->appendCmsgs(options);
 }
 
-void QuicTransportBase::setAdditionalCmsgsFunc(
-    folly::AsyncUDPSocket::AdditionalCmsgsFunc&& func) {
-  socket_->setAdditionalCmsgsFunc(std::move(func));
-}
-
 void QuicTransportBase::setBackgroundModeParameters(
     PriorityLevel maxBackgroundPriority,
     float backgroundUtilizationFactor) {
@@ -3819,6 +3820,35 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 
   conn_->retransmissionPolicies.emplace(groupId, *policy);
   return folly::unit;
+}
+
+void QuicTransportBase::updatePacketProcessorsPrewriteRequests() {
+  folly::SocketOptionMap cmsgs;
+  for (const auto& pp : conn_->packetProcessors) {
+    // In case of overlapping cmsg keys, the priority is given to
+    // that were added to the QuicSocket first.
+    auto writeRequest = pp->prewrite();
+    if (writeRequest && writeRequest->cmsgs) {
+      cmsgs.insert(writeRequest->cmsgs->begin(), writeRequest->cmsgs->end());
+    }
+  }
+  if (!cmsgs.empty()) {
+    conn_->socketCmsgsState.additionalCmsgs = cmsgs;
+  } else {
+    conn_->socketCmsgsState.additionalCmsgs.reset();
+  }
+  conn_->socketCmsgsState.targetWriteCount = conn_->writeCount;
+}
+
+folly::Optional<folly::SocketOptionMap>
+QuicTransportBase::getAdditionalCmsgsForAsyncUDPSocket() {
+  if (conn_->socketCmsgsState.additionalCmsgs) {
+    // This callback should be happening for the target write
+    DCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
+    return conn_->socketCmsgsState.additionalCmsgs;
+  } else {
+    return folly::none;
+  }
 }
 
 } // namespace quic

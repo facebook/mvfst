@@ -1748,6 +1748,10 @@ void QuicClientTransport::onNetworkSwitch(
     sock->close();
 
     socket_ = std::move(newSock);
+    if (socket_) {
+      socket_->setAdditionalCmsgsFunc(
+          [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+    }
     happyEyeballsSetUpSocket(
         *socket_,
         conn_->localAddress,

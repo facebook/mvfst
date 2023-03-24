@@ -60,6 +60,7 @@ class MockPacketProcessor : public PacketProcessor {
       onPacketDestroyed,
       (const OutstandingPacketWrapper&),
       (override));
+  MOCK_METHOD(folly::Optional<PrewriteRequest>, prewrite, (), (override));
 };
 
 class MockPacer : public Pacer {

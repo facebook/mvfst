@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/io/SocketOptionMap.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/PacketEvent.h>
@@ -15,7 +16,20 @@ namespace quic {
 
 class PacketProcessor {
  public:
+  struct PrewriteRequest {
+    folly::Optional<folly::SocketOptionMap> cmsgs;
+  };
+
   virtual ~PacketProcessor() = default;
+
+  /**
+   * Called before a write loop start. The returned PrewriteRequest
+   * will apply to that write loop only.
+   */
+  virtual folly::Optional<PrewriteRequest> prewrite() {
+    return folly::none;
+  }
+
   /**
    * Called each time a packet is sent.
    *
