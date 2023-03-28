@@ -19,23 +19,42 @@ namespace quic {
 constexpr uint8_t kDefaultPriorityLevels = kDefaultMaxPriority + 1;
 constexpr uint8_t kDefaultPriorityLevelsSize = 2 * kDefaultPriorityLevels;
 
+using OrderId = uint64_t;
+
+struct OrderedStream {
+  StreamId streamId;
+  OrderId orderId;
+  OrderedStream(StreamId s, OrderId o) : streamId(s), orderId(o) {}
+};
+
+struct ordered_stream_cmp {
+  bool operator()(OrderedStream lhs, OrderedStream rhs) const {
+    return (lhs.orderId == rhs.orderId) ? lhs.streamId < rhs.streamId
+                                        : lhs.orderId < rhs.orderId;
+  }
+};
+
+using OrderedStreamSet =
+    folly::sorted_vector_set<OrderedStream, ordered_stream_cmp>;
+
 /**
  * Priority is expressed as a level [0,7] and an incremental flag.
  */
 struct Priority {
   uint8_t level : 3;
   bool incremental : 1;
+  OrderId orderId : 58;
 
-  Priority(uint8_t l, bool i) : level(l), incremental(i) {}
+  Priority(uint8_t l, bool i, OrderId o = 0)
+      : level(l), incremental(i), orderId(o) {}
 
   bool operator==(Priority other) const noexcept {
-    return level == other.level && incremental == other.incremental;
+    return level == other.level && incremental == other.incremental &&
+        orderId == other.orderId;
   }
 };
 
 extern const Priority kDefaultPriority;
-
-using StreamSet = folly::sorted_vector_set<StreamId>;
 
 /**
  * Priority queue for Quic streams.  It represents each level/incremental bucket
@@ -57,13 +76,13 @@ struct PriorityQueue {
       virtual void begin() const = 0;
       virtual bool end() const = 0;
       virtual StreamId current() const {
-        return *nextStreamIt;
+        return nextStreamIt->streamId;
       }
       virtual void next() = 0;
-      virtual void override(StreamSet::const_iterator it) {
+      virtual void override(OrderedStreamSet::const_iterator it) {
         nextStreamIt = it;
       }
-      mutable StreamSet::const_iterator nextStreamIt;
+      mutable OrderedStreamSet::const_iterator nextStreamIt;
     };
 
     class IncrementalIterator : public Iterator {
@@ -75,8 +94,8 @@ struct PriorityQueue {
       explicit IncrementalIterator(const Level& inLevel) : Iterator(inLevel) {}
       void begin() const override {
         nextStreamIt = findStart();
-        nextStreamId = *nextStreamIt;
-        startStreamId = *nextStreamIt;
+        nextStreamId = nextStreamIt->streamId;
+        startStreamId = nextStreamIt->streamId;
       }
       bool end() const override {
         return *nextStreamId == *startStreamId;
@@ -87,20 +106,27 @@ struct PriorityQueue {
         if (nextStreamIt == level.streams.end()) {
           nextStreamIt = level.streams.begin();
         }
-        nextStreamId = *nextStreamIt;
+        nextStreamId = nextStreamIt->streamId;
       }
-      void override(StreamSet::const_iterator it) override {
+      void override(OrderedStreamSet::const_iterator it) override {
         Iterator::override(it);
-        nextStreamId = *it;
+        nextStreamId = it->streamId;
       }
 
      private:
-      StreamSet::const_iterator findStart() const {
+      OrderedStreamSet::const_iterator findStart() const {
         CHECK(!level.empty());
         if (!nextStreamId) {
           return level.streams.begin();
         }
-        auto upperIt = level.streams.lower_bound(*nextStreamId);
+        auto stream = level.getOrderedStream(*nextStreamId);
+        auto upperIt = level.streams.upper_bound(stream);
+        if (upperIt == level.streams.begin()) {
+          return upperIt;
+        }
+        if ((upperIt - 1)->streamId == *nextStreamId) {
+          return upperIt - 1;
+        }
         if (upperIt == level.streams.end()) {
           return level.streams.begin();
         }
@@ -123,13 +149,37 @@ struct PriorityQueue {
       }
     };
 
-    StreamSet streams;
+    OrderedStreamSet streams;
     bool incremental{false};
     std::unique_ptr<Iterator> iterator;
 
     FOLLY_NODISCARD bool empty() const {
       return streams.empty();
     }
+
+    FOLLY_NODISCARD OrderedStream getOrderedStream(StreamId id) const {
+      auto it = streamToOrderId.find(id);
+      if (it == streamToOrderId.end()) {
+        return OrderedStream(id, 0);
+      }
+      return OrderedStream(id, it->second);
+    }
+
+    bool insert(StreamId streamId, OrderId orderId) {
+      if (orderId > 0) {
+        streamToOrderId[streamId] = orderId;
+      }
+      return streams.insert(OrderedStream(streamId, orderId)).second;
+    }
+
+    OrderedStreamSet::const_iterator erase(
+        OrderedStreamSet::const_iterator it) {
+      streamToOrderId.erase(it->streamId);
+      return streams.erase(it);
+    }
+
+   private:
+    folly::F14FastMap<StreamId, OrderId> streamToOrderId;
   };
   std::vector<Level> levels;
 
@@ -174,9 +224,9 @@ struct PriorityQueue {
       updateExistingStreamPriority(it, pri);
     } else {
       writableStreamsToLevel_.emplace(id, index);
-      auto res = levels[index].streams.insert(id);
-      DCHECK(res.second) << "PriorityQueue inconsistent: stream=" << id
-                         << " already at level=" << index;
+      auto res = levels[index].insert(id, pri.orderId);
+      DCHECK(res) << "PriorityQueue inconsistent: stream=" << id
+                  << " already at level=" << index;
     }
   }
 
@@ -210,7 +260,8 @@ struct PriorityQueue {
     auto it = writableStreamsToLevel_.find(id);
     CHECK(it != writableStreamsToLevel_.end());
     auto& level = levels[it->second];
-    auto streamIt = level.streams.find(id);
+    const auto& stream = level.getOrderedStream(id);
+    auto streamIt = level.streams.find(stream);
     CHECK(streamIt != level.streams.end());
     level.iterator->override(streamIt);
   }
@@ -228,9 +279,9 @@ struct PriorityQueue {
     if (!level.incremental ||
         level.iterator->nextStreamIt == level.streams.end()) {
       CHECK(!level.streams.empty());
-      return *level.streams.begin();
+      return level.streams.begin()->streamId;
     }
-    return *level.iterator->nextStreamIt;
+    return level.iterator->nextStreamIt->streamId;
   }
 
  private:
@@ -239,16 +290,16 @@ struct PriorityQueue {
 
   void eraseFromLevel(uint8_t levelIndex, StreamId id) {
     auto& level = levels[levelIndex];
-    auto streamIt = level.streams.find(id);
+    const auto& stream = level.getOrderedStream(id);
+    auto streamIt = level.streams.find(stream);
     if (streamIt == level.streams.end()) {
       LOG(DFATAL) << "Stream=" << levelIndex
                   << " not found in PriorityQueue level=" << id;
       return;
     }
+    auto eraseIt = level.erase(streamIt);
     if (streamIt == level.iterator->nextStreamIt) {
-      level.iterator->nextStreamIt = level.streams.erase(streamIt);
-    } else {
-      level.streams.erase(streamIt);
+      level.iterator->nextStreamIt = eraseIt;
     }
   }
 
@@ -263,9 +314,9 @@ struct PriorityQueue {
             << it->second << " to " << index;
     eraseFromLevel(it->second, it->first);
     it->second = index;
-    auto res = levels[index].streams.insert(it->first);
-    DCHECK(res.second) << "PriorityQueue inconsistent: stream=" << it->first
-                       << " already at level=" << index;
+    auto res = levels[index].insert(it->first, pri.orderId);
+    DCHECK(res) << "PriorityQueue inconsistent: stream=" << it->first
+                << " already at level=" << index;
   }
 };
 

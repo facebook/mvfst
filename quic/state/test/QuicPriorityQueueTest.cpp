@@ -172,6 +172,22 @@ TEST_F(QuicPriorityQueueTest, IncrementalEraseRight) {
   EXPECT_EQ(level.iterator->current(), 1);
 }
 
+TEST_F(QuicPriorityQueueTest, OrderedIds) {
+  PriorityQueue pq;
+  pq.insertOrUpdate(0, Priority(1, false, 2));
+  pq.insertOrUpdate(1, Priority(1, false, 1));
+  pq.insertOrUpdate(2, Priority(1, false));
+
+  const auto& level =
+      pq.levels[PriorityQueue::priority2index(Priority(1, false))];
+  level.iterator->begin();
+  EXPECT_EQ(level.iterator->current(), 2);
+  level.iterator->next();
+  EXPECT_EQ(level.iterator->current(), 1);
+  level.iterator->next();
+  EXPECT_EQ(level.iterator->current(), 0);
+}
+
 TEST_F(QuicPriorityQueueTest, TestUpdate) {
   queue_.insertOrUpdate(0, Priority(0, false));
   EXPECT_EQ(queue_.count(0), 1);
