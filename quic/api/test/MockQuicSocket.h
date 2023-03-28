@@ -368,5 +368,10 @@ class MockQuicSocket : public QuicSocket {
       setStreamGroupRetransmissionPolicy,
       (StreamGroupId, std::optional<QuicStreamGroupRetransmissionPolicy>),
       (noexcept));
+  MOCK_METHOD(
+      (const std::shared_ptr<const folly::AsyncTransportCertificate>),
+      getPeerCertificate,
+      (),
+      (const));
 };
 } // namespace quic
