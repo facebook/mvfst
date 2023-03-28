@@ -567,8 +567,20 @@ class QuicSocket {
    * Set stream priority.
    * level: can only be in [0, 7].
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  setStreamPriority(StreamId id, PriorityLevel level, bool incremental) = 0;
+  folly::Expected<folly::Unit, LocalErrorCode>
+  setStreamPriority(StreamId id, PriorityLevel level, bool incremental) {
+    return setStreamPriority(id, Priority(level, incremental));
+  }
+
+  /**
+   * Set stream priority.
+   * level: can only be in [0, 7].
+   * incremental: true/false
+   * orderId: uint64
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
+      StreamId id,
+      Priority priority) = 0;
 
   /**
    * Get stream priority.

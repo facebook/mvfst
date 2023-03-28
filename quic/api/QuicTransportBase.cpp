@@ -3311,14 +3311,11 @@ const TransportSettings& QuicTransportBase::getTransportSettings() const {
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setStreamPriority(
-    StreamId id,
-    PriorityLevel level,
-    bool incremental) {
+QuicTransportBase::setStreamPriority(StreamId id, Priority priority) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  if (level > kDefaultMaxPriority) {
+  if (priority.level > kDefaultMaxPriority) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (!conn_->streamManager->streamExists(id)) {
@@ -3327,10 +3324,9 @@ QuicTransportBase::setStreamPriority(
   }
   // It's not an error to prioritize a stream after it's sent its FIN - this
   // can reprioritize retransmissions.
-  bool updated =
-      conn_->streamManager->setStreamPriority(id, level, incremental);
+  bool updated = conn_->streamManager->setStreamPriority(id, priority);
   if (updated && conn_->qLogger) {
-    conn_->qLogger->addPriorityUpdate(id, level, incremental);
+    conn_->qLogger->addPriorityUpdate(id, priority.level, priority.incremental);
   }
   return folly::unit;
 }

@@ -337,8 +337,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
-      PriorityLevel level,
-      bool incremental) override;
+      Priority priority) override;
 
   folly::Expected<Priority, LocalErrorCode> getStreamPriority(
       StreamId id) override;
