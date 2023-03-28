@@ -25,7 +25,6 @@ TEST_F(QuicPriorityQueueTest, TestBasic) {
   // Insert two streams for every level and incremental
   for (uint8_t i = 0; i < queue_.levels.size(); i++) {
     queue_.insertOrUpdate(id++, Priority(i / 2, i & 0x1));
-    queue_.setNextScheduledStream(id - 1);
     queue_.insertOrUpdate(id++, Priority(i / 2, i & 0x1));
   }
 
@@ -185,6 +184,7 @@ TEST_F(QuicPriorityQueueTest, TestUpdate) {
   queue_.insertOrUpdate(0, Priority(0, true));
   EXPECT_EQ(queue_.count(0), 1);
 
+  queue_.prepareIterator(Priority(0, true));
   EXPECT_EQ(queue_.getNextScheduledStream(Priority(0, true)), 0);
 }
 
@@ -193,8 +193,10 @@ TEST_F(QuicPriorityQueueTest, UpdateIfExist) {
   EXPECT_EQ(0, queue_.count(0));
 
   queue_.insertOrUpdate(0, Priority(0, false));
+  queue_.prepareIterator(Priority(0, false));
   EXPECT_EQ(queue_.getNextScheduledStream(Priority(0, false)), 0);
   queue_.updateIfExist(0, Priority(1, true));
+  queue_.prepareIterator(Priority(1, true));
   EXPECT_EQ(queue_.getNextScheduledStream(Priority(1, true)), 0);
 }
 

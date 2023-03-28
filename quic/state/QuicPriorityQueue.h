@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/container/F14Map.h>
+#include <folly/sorted_vector_types.h>
 #include <glog/logging.h>
 #include <set>
 
@@ -34,6 +35,8 @@ struct Priority {
 
 extern const Priority kDefaultPriority;
 
+using StreamSet = folly::sorted_vector_set<StreamId>;
+
 /**
  * Priority queue for Quic streams.  It represents each level/incremental bucket
  * as an entry in a vector.  Each entry holds a set of streams (sorted by
@@ -49,36 +52,34 @@ struct PriorityQueue {
       const Level& level;
 
      public:
-      explicit Iterator(const Level& inLevel)
-          : level(inLevel), nextStreamIt(level.streams.end()) {}
+      explicit Iterator(const Level& inLevel) : level(inLevel) {}
       virtual ~Iterator() = default;
-      virtual void begin() const {
-        CHECK(!level.empty());
-        if (nextStreamIt == level.streams.end()) {
-          nextStreamIt = level.streams.begin();
-        }
-      }
+      virtual void begin() const = 0;
       virtual bool end() const = 0;
       virtual StreamId current() const {
         return *nextStreamIt;
       }
       virtual void next() = 0;
-      mutable std::set<StreamId>::const_iterator nextStreamIt;
+      virtual void override(StreamSet::const_iterator it) {
+        nextStreamIt = it;
+      }
+      mutable StreamSet::const_iterator nextStreamIt;
     };
 
     class IncrementalIterator : public Iterator {
      private:
-      mutable std::set<StreamId>::const_iterator startStreamIt;
+      mutable std::optional<StreamId> startStreamId;
+      mutable std::optional<StreamId> nextStreamId;
 
      public:
-      explicit IncrementalIterator(const Level& inLevel)
-          : Iterator(inLevel), startStreamIt(nextStreamIt) {}
+      explicit IncrementalIterator(const Level& inLevel) : Iterator(inLevel) {}
       void begin() const override {
-        Iterator::begin();
-        startStreamIt = nextStreamIt;
+        nextStreamIt = findStart();
+        nextStreamId = *nextStreamIt;
+        startStreamId = *nextStreamIt;
       }
       bool end() const override {
-        return nextStreamIt == startStreamIt;
+        return *nextStreamId == *startStreamId;
       }
       void next() override {
         CHECK(!level.empty());
@@ -86,6 +87,24 @@ struct PriorityQueue {
         if (nextStreamIt == level.streams.end()) {
           nextStreamIt = level.streams.begin();
         }
+        nextStreamId = *nextStreamIt;
+      }
+      void override(StreamSet::const_iterator it) override {
+        Iterator::override(it);
+        nextStreamId = *it;
+      }
+
+     private:
+      StreamSet::const_iterator findStart() const {
+        CHECK(!level.empty());
+        if (!nextStreamId) {
+          return level.streams.begin();
+        }
+        auto upperIt = level.streams.lower_bound(*nextStreamId);
+        if (upperIt == level.streams.end()) {
+          return level.streams.begin();
+        }
+        return upperIt;
       }
     };
 
@@ -98,14 +117,13 @@ struct PriorityQueue {
       bool end() const override {
         return nextStreamIt == level.streams.end();
       }
-
       void next() override {
         CHECK(!level.empty());
         nextStreamIt++;
       }
     };
 
-    std::set<StreamId> streams;
+    StreamSet streams;
     bool incremental{false};
     std::unique_ptr<Iterator> iterator;
 
@@ -194,7 +212,13 @@ struct PriorityQueue {
     auto& level = levels[it->second];
     auto streamIt = level.streams.find(id);
     CHECK(streamIt != level.streams.end());
-    level.iterator->nextStreamIt = streamIt;
+    level.iterator->override(streamIt);
+  }
+
+  // Only used for testing
+  void prepareIterator(Priority pri = kDefaultPriority) {
+    auto& level = levels[priority2index(pri)];
+    level.iterator->begin();
   }
 
   // Only used for testing
