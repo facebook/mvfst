@@ -52,6 +52,12 @@ struct TransportParameter {
   TransportParameter(const TransportParameter& other)
       : parameter(other.parameter),
         value(other.value ? other.value->clone() : nullptr) {}
+
+  TransportParameter& operator=(TransportParameter&& other) noexcept {
+    parameter = other.parameter;
+    value = std::move(other.value);
+    return *this;
+  }
 };
 
 class CustomTransportParameter {

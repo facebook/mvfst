@@ -36,12 +36,13 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   const auto& levelIter = std::find_if(
       writableDSRStreams.levels.cbegin(),
       writableDSRStreams.levels.cend(),
-      [&](const auto& level) { return !level.streams.empty(); });
+      [&](const auto& level) { return !level.empty(); });
   if (levelIter == writableDSRStreams.levels.cend()) {
     return result;
   }
-  auto streamId = levelIter->streams.cbegin();
-  auto stream = conn_.streamManager->findStream(*streamId);
+  levelIter->iterator->begin();
+  auto streamId = levelIter->iterator->current();
+  auto stream = conn_.streamManager->findStream(streamId);
   CHECK(stream);
   CHECK(stream->dsrSender);
   result.sender = stream->dsrSender.get();
@@ -49,11 +50,11 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   bool hasLossBufMeta = !stream->lossBufMetas.empty();
   CHECK(hasFreshBufMeta || hasLossBufMeta);
   if (hasLossBufMeta) {
-    SendInstruction::Builder instructionBuilder(conn_, *streamId);
+    SendInstruction::Builder instructionBuilder(conn_, streamId);
     auto encodedSize = writeDSRStreamFrame(
         builder,
         instructionBuilder,
-        *streamId,
+        streamId,
         stream->lossBufMetas.front().offset,
         stream->lossBufMetas.front().length,
         stream->lossBufMetas.front()
@@ -90,11 +91,11 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   auto flowControlLen = std::min(streamFlowControlLen, connWritableBytes);
   bool canWriteFin = stream->finalWriteOffset.has_value() &&
       stream->writeBufMeta.length <= flowControlLen;
-  SendInstruction::Builder instructionBuilder(conn_, *streamId);
+  SendInstruction::Builder instructionBuilder(conn_, streamId);
   auto encodedSize = writeDSRStreamFrame(
       builder,
       instructionBuilder,
-      *streamId,
+      streamId,
       stream->writeBufMeta.offset,
       stream->writeBufMeta.length,
       flowControlLen,

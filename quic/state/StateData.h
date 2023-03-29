@@ -723,6 +723,15 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Retransmission policies map.
   folly::F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
       retransmissionPolicies;
+
+  struct SocketCmsgsState {
+    folly::Optional<folly::SocketOptionMap> additionalCmsgs;
+    // The write count which this SocketCmsgs state is intended for.
+    // This is used to make sure this cmsgs list does not end up used
+    // for multiple writes.
+    uint64_t targetWriteCount;
+  };
+  SocketCmsgsState socketCmsgsState;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

@@ -450,42 +450,25 @@ void StreamFrameScheduler::writeStreamsHelper(
        builder.remainingSpaceInPkt() > 0;
        index++) {
     PriorityQueue::Level& level = writableStreams.levels[index];
-    if (level.streams.empty()) {
+    if (level.empty()) {
       // No data here, keep going
       continue;
     }
-    if (level.incremental) {
-      // Round robin the streams at this level
-      MiddleStartingIterationWrapper wrapper(level.streams, level.next);
-      auto writableStreamItr = wrapper.cbegin();
-      while (writableStreamItr != wrapper.cend()) {
-        auto stream = conn_.streamManager->findStream(*writableStreamItr);
-        CHECK(stream);
-        if (!writeSingleStream(builder, *stream, connWritableBytes)) {
-          break;
-        }
-        writableStreamItr++;
-        if (streamPerPacket) {
-          level.next = writableStreamItr.rawIterator();
-          return;
-        }
+
+    level.iterator->begin();
+    do {
+      auto streamId = level.iterator->current();
+      auto stream = conn_.streamManager->findStream(streamId);
+      CHECK(stream) << "streamId=" << streamId
+                    << "inc=" << uint64_t(level.incremental);
+      if (!writeSingleStream(builder, *stream, connWritableBytes)) {
+        break;
       }
-      level.next = writableStreamItr.rawIterator();
-    } else {
-      // walk the sequential streams in order until we run out of space
-      for (auto streamIt = level.streams.begin();
-           streamIt != level.streams.end();
-           ++streamIt) {
-        auto stream = conn_.streamManager->findStream(*streamIt);
-        CHECK(stream);
-        if (!writeSingleStream(builder, *stream, connWritableBytes)) {
-          break;
-        }
-        if (streamPerPacket) {
-          return;
-        }
+      level.iterator->next();
+      if (streamPerPacket) {
+        return;
       }
-    }
+    } while (!level.iterator->end());
   }
 }
 

@@ -66,12 +66,14 @@ TEST_P(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
   Priority currentPriority = stream.value()->priority;
   EXPECT_TRUE(manager.setStreamPriority(
       streamId,
-      (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
-      !currentPriority.incremental));
+      Priority(
+          (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
+          !currentPriority.incremental)));
   EXPECT_FALSE(manager.setStreamPriority(
       streamId,
-      (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
-      !currentPriority.incremental));
+      Priority(
+          (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
+          !currentPriority.incremental)));
 }
 
 TEST_P(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
@@ -672,7 +674,7 @@ TEST_P(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
   auto stream = manager.createNextUnidirectionalStream().value();
   EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
 
-  manager.setStreamPriority(stream->id, 1, false);
+  manager.setStreamPriority(stream->id, Priority(1, false));
   EXPECT_EQ(manager.getHighestPriorityLevel(), 1);
 
   EXPECT_CALL(mObserver, onStreamPrioritiesChange())
@@ -692,7 +694,7 @@ TEST_P(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
 
   EXPECT_CALL(mObserver, onStreamPrioritiesChange())
       .Times(1); // On increasing the priority of one of the streams
-  manager.setStreamPriority(stream3->id, 0, false);
+  manager.setStreamPriority(stream3->id, Priority(0, false));
   EXPECT_EQ(manager.getHighestPriorityLevel(), 0);
 
   EXPECT_CALL(mObserver, onStreamPrioritiesChange())
@@ -732,7 +734,7 @@ TEST_P(QuicStreamManagerTest, StreamPriorityExcludesControl) {
   auto stream = manager.createNextUnidirectionalStream().value();
   EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
 
-  manager.setStreamPriority(stream->id, 1, false);
+  manager.setStreamPriority(stream->id, Priority(1, false));
   EXPECT_EQ(manager.getHighestPriorityLevel(), 1);
 
   manager.setStreamAsControl(*stream);

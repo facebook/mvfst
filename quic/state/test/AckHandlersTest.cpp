@@ -483,6 +483,322 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
   EXPECT_EQ(streamState->ackedIntervals.front().end, 199);
 }
 
+TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = 10s;
+
+  StreamId currentStreamId = 10;
+  auto sentTime = Clock::now();
+  conn.lossState.reorderingThreshold = 15;
+  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
+      [&conn](const quic::OutstandingPacketWrapper& pkt) {
+        for (auto& packetProcessor : conn.packetProcessors) {
+          packetProcessor->onPacketDestroyed(pkt);
+        }
+      };
+
+  for (PacketNum packetNum = 1; packetNum <= 3; packetNum++) {
+    RegularQuicWritePacket regularPacket =
+        createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    conn.outstandings.packets.emplace_back(
+        std::move(regularPacket),
+        sentTime,
+        1,
+        0,
+        false,
+        packetNum,
+        0,
+        0,
+        0,
+        LossState(),
+        0,
+        OutstandingPacketMetadata::DetailsPerStream(),
+        0us,
+        packetDestroyFn);
+  }
+  EXPECT_EQ(conn.outstandings.packets.size(), 3);
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 3;
+  ackFrame.ackBlocks.emplace_back(1, 3);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
+      .Times(3)
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
+      }))
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
+      }))
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      Clock::now());
+
+  EXPECT_EQ(conn.outstandings.packets.size(), 0);
+}
+
+TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
+
+  TimePoint startTime = Clock::now();
+  // setting a very high reordering threshold to force loss by timeout only
+  conn.lossState.reorderingThreshold = 100;
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure the first packet timeout
+  conn.lossState.srtt = 200ms;
+  conn.lossState.lrtt = 150ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+
+  StreamId currentStreamId = 10;
+  //   conn.lossState.reorderingThreshold = 1;
+  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
+      [&conn](const quic::OutstandingPacketWrapper& pkt) {
+        for (auto& packetProcessor : conn.packetProcessors) {
+          packetProcessor->onPacketDestroyed(pkt);
+        }
+      };
+
+  for (PacketNum packetNum = 1; packetNum <= 3; packetNum++) {
+    RegularQuicWritePacket regularPacket =
+        createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    conn.outstandings.packets.emplace_back(
+        std::move(regularPacket),
+        startTime + std::chrono::milliseconds((packetNum - 1) * 100),
+        1,
+        0,
+        false,
+        packetNum,
+        0,
+        0,
+        0,
+        LossState(),
+        0,
+        OutstandingPacketMetadata::DetailsPerStream(),
+        0us,
+        packetDestroyFn);
+  }
+  EXPECT_EQ(conn.outstandings.packets.size(), 3);
+
+  detectLossPackets(
+      conn, 3, [](auto&, auto&, bool) {}, startTime + 250ms, GetParam());
+
+  // now we get late acks for #2 and #3, triggering #1 to be marked lost.
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 3;
+  ackFrame.ackBlocks.emplace_back(2, 3);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
+      .Times(2)
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
+      }))
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      startTime + 260ms);
+
+  // Send and ACK another packet #4, which should clear both #1 and #4.
+  {
+    PacketNum packetNum = 4;
+    RegularQuicWritePacket regularPacket =
+        createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    conn.outstandings.packets.emplace_back(
+        std::move(regularPacket),
+        startTime + std::chrono::milliseconds((packetNum - 1) * 100),
+        1,
+        0,
+        false,
+        packetNum,
+        0,
+        0,
+        0,
+        LossState(),
+        0,
+        OutstandingPacketMetadata::DetailsPerStream(),
+        0us,
+        packetDestroyFn);
+  }
+
+  // Send ACK for #4, which should clear # 1 as well.
+  ReadAckFrame ackFrame1;
+  ackFrame1.largestAcked = 4;
+  ackFrame1.ackBlocks.emplace_back(4, 4);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
+      .Times(2)
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
+        EXPECT_EQ(true, outstandingPacket.declaredLost);
+      }))
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(4, outstandingPacket.packet.header.getPacketSequenceNum());
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame1,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      startTime + 600ms);
+
+  EXPECT_EQ(conn.outstandings.packets.size(), 0);
+}
+
+TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = 10s;
+
+  StreamId currentStreamId = 10;
+  auto sentTime = Clock::now();
+  conn.lossState.reorderingThreshold = 15;
+  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
+      [&conn](const quic::OutstandingPacketWrapper& pkt) {
+        for (auto& packetProcessor : conn.packetProcessors) {
+          packetProcessor->onPacketDestroyed(pkt);
+        }
+      };
+
+  // send 1000 packets, starting at packet 1
+  for (PacketNum packetNum = 1; packetNum <= 1000; packetNum++) {
+    RegularQuicWritePacket regularPacket =
+        createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    conn.outstandings.packets.emplace_back(
+        std::move(regularPacket),
+        sentTime,
+        1,
+        0,
+        false,
+        packetNum,
+        0,
+        0,
+        0,
+        LossState(),
+        0,
+        OutstandingPacketMetadata::DetailsPerStream(),
+        0us,
+        packetDestroyFn);
+  }
+  EXPECT_EQ(conn.outstandings.packets.size(), 1000);
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 999;
+  ackFrame.ackBlocks.emplace_back(2, 999);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
+
+  EXPECT_CALL(
+      *rawPacketProcessor,
+      onPacketDestroyed(testing::Property(
+          &OutstandingPacket::getPacketSequenceNum, AllOf(Lt(1000), Gt(1)))))
+      .Times(998);
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      Clock::now());
+
+  // Shrink the deque to the remaining packets.
+  conn.outstandings.packets.shrink_to_fit();
+
+  ReadAckFrame ackFrame1;
+  ackFrame1.largestAcked = 1;
+  ackFrame1.ackBlocks.emplace_back(1, 1);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
+        EXPECT_EQ(true, outstandingPacket.declaredLost);
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame1,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      Clock::now());
+
+  ReadAckFrame ackFrame2;
+  ackFrame2.largestAcked = 1000;
+  ackFrame2.ackBlocks.emplace_back(1000, 1000);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
+  EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto& outstandingPacket) {
+        EXPECT_EQ(1000, outstandingPacket.packet.header.getPacketSequenceNum());
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame2,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      Clock::now());
+
+  EXPECT_EQ(conn.outstandings.packets.size(), 0);
+}
+
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

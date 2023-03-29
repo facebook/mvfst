@@ -48,6 +48,13 @@ quic_add_test(TARGET AckHandlersTest
   mvfst_test_utils
 )
 
+quic_add_test(TARGET OutstandingPacketTest
+  SOURCES
+  OutstandingPacketTest.cpp
+  DEPENDS
+  mvfst_test_utils
+)
+
 quic_add_test(TARGET QuicStateFunctionsTest
   SOURCES
   QuicStateFunctionsTest.cpp

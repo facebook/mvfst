@@ -893,6 +893,60 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   this->destroyTransport();
 }
 
+/**
+ * Verify PacketProcessor prewrite requests are collected
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorPrewriteRequestQueried) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // First packet processor
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
+    PacketProcessor::PrewriteRequest req;
+    req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}});
+    return req;
+  });
+
+  // Second packet processor
+  auto mockPacketProcessor2 = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor2 = mockPacketProcessor2.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor2));
+
+  EXPECT_CALL(*rawPacketProcessor2, prewrite()).Times(1).WillOnce([]() {
+    PacketProcessor::PrewriteRequest req;
+    req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_DONTFRAG}, 1}});
+    return req;
+  });
+
+  // Third packet processor overwriting the value from the second one.
+  auto mockPacketProcessor3 = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor3 = mockPacketProcessor3.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor3));
+
+  EXPECT_CALL(*rawPacketProcessor3, prewrite()).Times(1).WillOnce([]() {
+    PacketProcessor::PrewriteRequest req;
+    req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_DONTFRAG}, 0}});
+    return req;
+  });
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  const auto bufLength = 1700;
+  auto buf = buildRandomInputData(bufLength);
+  this->getTransport()->writeChain(streamId, std::move(buf), false);
+  this->loopForWrites();
+
+  this->destroyTransport();
+}
+
 TYPED_TEST(
     QuicTypedTransportAfterStartTest,
     StreamAckedIntervalsDeliveryCallbacks) {
