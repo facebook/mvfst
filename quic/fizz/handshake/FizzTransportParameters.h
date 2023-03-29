@@ -36,6 +36,23 @@ inline void encodeVarintParams(
   }
 }
 
+inline void removeDuplicateParams(std::vector<TransportParameter>& params) {
+  std::sort(
+      params.begin(),
+      params.end(),
+      [](const TransportParameter& a, const TransportParameter& b) {
+        return a.parameter < b.parameter;
+      });
+  params.erase(
+      std::unique(
+          params.begin(),
+          params.end(),
+          [](const TransportParameter& a, const TransportParameter& b) {
+            return a.parameter == b.parameter;
+          }),
+      params.end());
+}
+
 inline void decodeVarintParams(
     std::vector<TransportParameter>& parameters,
     folly::io::Cursor& cursor) {
@@ -53,6 +70,7 @@ inline void decodeVarintParams(
     parameters.emplace_back(
         static_cast<TransportParameterId>(id.value().first), std::move(val));
   }
+  removeDuplicateParams(parameters);
 }
 
 // TODO all the 40s here in the appenders are very likely not the optimal

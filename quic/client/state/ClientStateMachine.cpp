@@ -9,7 +9,6 @@
 #include <quic/codec/Types.h>
 #include <quic/loss/QuicLossFunctions.h>
 
-#include <folly/io/async/AsyncSocketException.h>
 #include <quic/QuicConstants.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/codec/Decode.h>

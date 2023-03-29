@@ -11,28 +11,12 @@
 
 namespace quic {
 
-SimulatedTBF::SimulatedTBF(double rate, double burst)
-    : rateBytesPerSecond_(rate), burstSizeBytes_(burst), zeroTime_(0) {}
-
-SimulatedTBF::SimulatedTBF(
-    double rate,
-    double burst,
-    folly::Optional<double> debtQueueSize)
-    : rateBytesPerSecond_(rate),
-      burstSizeBytes_(burst),
-      maybeMaxDebtQueueSizeBytes_(debtQueueSize),
-      zeroTime_(0) {}
-
-SimulatedTBF::SimulatedTBF(const Config& params)
-    : SimulatedTBF(
-          params.rateBytesPerSecond,
-          params.burstSizeBytes,
-          params.maxDebtQueueSizeBytes) {}
+SimulatedTBF::SimulatedTBF(Config config) : config_(std::move(config)) {}
 
 double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     double toConsume,
     TimePoint sendTime) {
-  if (toConsume > burstSizeBytes_) {
+  if (toConsume > config_.burstSizeBytes) {
     throw QuicInternalException(
         "toConsume is greater than burst size",
         LocalErrorCode::INVALID_OPERATION);
@@ -54,21 +38,23 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 
   // Check the number of tokens available at sendTime before consuming. Note
   // that available returns zero if bucket is in debt
-  auto numTokensAvailable =
-      available(rateBytesPerSecond_, burstSizeBytes_, sendTimeDouble);
+  auto numTokensAvailable = available(
+      config_.rateBytesPerSecond, config_.burstSizeBytes, sendTimeDouble);
 
   if (numTokensAvailable > 0) {
     maybeLastSendTimeBucketNotEmpty_.assign(sendTime);
   }
 
-  if (maybeMaxDebtQueueSizeBytes_.has_value()) {
-    DCHECK(maybeMaxDebtQueueSizeBytes_.value() >= 0);
-    auto currDebtQueueSizeBytes =
-        std::max(0.0, (zeroTime_ - sendTimeDouble) * rateBytesPerSecond_);
-    DCHECK(currDebtQueueSizeBytes <= maybeMaxDebtQueueSizeBytes_.value());
+  if (config_.maybeMaxDebtQueueSizeBytes.has_value()) {
+    DCHECK(config_.maybeMaxDebtQueueSizeBytes.value() >= 0);
+    auto currDebtQueueSizeBytes = std::max(
+        0.0, (zeroTime_ - sendTimeDouble) * config_.rateBytesPerSecond);
+    DCHECK(
+        currDebtQueueSizeBytes <= config_.maybeMaxDebtQueueSizeBytes.value());
 
     if (toConsume > numTokensAvailable +
-            (maybeMaxDebtQueueSizeBytes_.value() - currDebtQueueSizeBytes)) {
+            (config_.maybeMaxDebtQueueSizeBytes.value() -
+             currDebtQueueSizeBytes)) {
       // Not enough space left to consume the entire packet
       return 0;
     }
@@ -76,7 +62,10 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 
   folly::Optional<double> maybeDebtPayOffTimeDouble =
       consumeWithBorrowNonBlocking(
-          toConsume, rateBytesPerSecond_, burstSizeBytes_, sendTimeDouble);
+          toConsume,
+          config_.rateBytesPerSecond,
+          config_.burstSizeBytes,
+          sendTimeDouble);
   DCHECK(maybeDebtPayOffTimeDouble.hasValue());
   if (maybeDebtPayOffTimeDouble.value() > 0) {
     // Bucket is in debt now after consuming toConsume tokens
@@ -162,7 +151,8 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
           time.time_since_epoch() // convert to double and seconds
           )
           .count();
-  return available(rateBytesPerSecond_, burstSizeBytes_, timeDouble);
+  return available(
+      config_.rateBytesPerSecond, config_.burstSizeBytes, timeDouble);
 }
 
 [[nodiscard]] unsigned int SimulatedTBF::getNumEmptyIntervalsTracked() const {
@@ -170,16 +160,16 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
 }
 
 [[nodiscard]] double SimulatedTBF::getRateBytesPerSecond() const {
-  return rateBytesPerSecond_;
+  return config_.rateBytesPerSecond;
 }
 
 [[nodiscard]] double SimulatedTBF::getBurstSizeBytes() const {
-  return burstSizeBytes_;
+  return config_.burstSizeBytes;
 }
 
 [[nodiscard]] folly::Optional<double> SimulatedTBF::getMaxDebtQueueSizeBytes()
     const {
-  return maybeMaxDebtQueueSizeBytes_;
+  return config_.maybeMaxDebtQueueSizeBytes;
 }
 
 } // namespace quic

@@ -55,6 +55,12 @@ class MockPacketProcessor : public PacketProcessor {
       (const OutstandingPacketWrapper&),
       (override));
   MOCK_METHOD(void, onPacketAck, (const AckEvent* FOLLY_NULLABLE), (override));
+  MOCK_METHOD(
+      void,
+      onPacketDestroyed,
+      (const OutstandingPacketWrapper&),
+      (override));
+  MOCK_METHOD(folly::Optional<PrewriteRequest>, prewrite, (), (override));
 };
 
 class MockPacer : public Pacer {

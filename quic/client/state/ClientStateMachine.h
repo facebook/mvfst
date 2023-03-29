@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/io/async/AsyncSocketException.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/congestion_control/QuicCubic.h>

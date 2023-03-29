@@ -57,6 +57,10 @@ QuicTransportBase::QuicTransportBase(
     }
     return 0us;
   });
+  if (socket_) {
+    socket_->setAdditionalCmsgsFunc(
+        [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+  }
 }
 
 void QuicTransportBase::setPacingTimer(
@@ -3071,6 +3075,8 @@ void QuicTransportBase::writeSocketData() {
     const auto beforeNumOutstandingPackets =
         conn_->outstandings.numOutstanding();
 
+    updatePacketProcessorsPrewriteRequests();
+
     // if we're starting to write from app limited, notify observers
     if (conn_->appLimitedTracker.isAppLimited() &&
         conn_->congestionController) {
@@ -3305,14 +3311,11 @@ const TransportSettings& QuicTransportBase::getTransportSettings() const {
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setStreamPriority(
-    StreamId id,
-    PriorityLevel level,
-    bool incremental) {
+QuicTransportBase::setStreamPriority(StreamId id, Priority priority) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  if (level > kDefaultMaxPriority) {
+  if (priority.level > kDefaultMaxPriority) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (!conn_->streamManager->streamExists(id)) {
@@ -3321,10 +3324,9 @@ QuicTransportBase::setStreamPriority(
   }
   // It's not an error to prioritize a stream after it's sent its FIN - this
   // can reprioritize retransmissions.
-  bool updated =
-      conn_->streamManager->setStreamPriority(id, level, incremental);
+  bool updated = conn_->streamManager->setStreamPriority(id, priority);
   if (updated && conn_->qLogger) {
-    conn_->qLogger->addPriorityUpdate(id, level, incremental);
+    conn_->qLogger->addPriorityUpdate(id, priority.level, priority.incremental);
   }
   return folly::unit;
 }
@@ -3747,11 +3749,6 @@ void QuicTransportBase::appendCmsgs(const folly::SocketOptionMap& options) {
   socket_->appendCmsgs(options);
 }
 
-void QuicTransportBase::setAdditionalCmsgsFunc(
-    folly::AsyncUDPSocket::AdditionalCmsgsFunc&& func) {
-  socket_->setAdditionalCmsgsFunc(std::move(func));
-}
-
 void QuicTransportBase::setBackgroundModeParameters(
     PriorityLevel maxBackgroundPriority,
     float backgroundUtilizationFactor) {
@@ -3819,6 +3816,35 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 
   conn_->retransmissionPolicies.emplace(groupId, *policy);
   return folly::unit;
+}
+
+void QuicTransportBase::updatePacketProcessorsPrewriteRequests() {
+  folly::SocketOptionMap cmsgs;
+  for (const auto& pp : conn_->packetProcessors) {
+    // In case of overlapping cmsg keys, the priority is given to
+    // that were added to the QuicSocket first.
+    auto writeRequest = pp->prewrite();
+    if (writeRequest && writeRequest->cmsgs) {
+      cmsgs.insert(writeRequest->cmsgs->begin(), writeRequest->cmsgs->end());
+    }
+  }
+  if (!cmsgs.empty()) {
+    conn_->socketCmsgsState.additionalCmsgs = cmsgs;
+  } else {
+    conn_->socketCmsgsState.additionalCmsgs.reset();
+  }
+  conn_->socketCmsgsState.targetWriteCount = conn_->writeCount;
+}
+
+folly::Optional<folly::SocketOptionMap>
+QuicTransportBase::getAdditionalCmsgsForAsyncUDPSocket() {
+  if (conn_->socketCmsgsState.additionalCmsgs) {
+    // This callback should be happening for the target write
+    DCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
+    return conn_->socketCmsgsState.additionalCmsgs;
+  } else {
+    return folly::none;
+  }
 }
 
 } // namespace quic

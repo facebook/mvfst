@@ -338,5 +338,4 @@ bool setCustomTransportParameter(
 bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn);
 bool toWriteHandshakeAcks(const quic::QuicConnectionStateBase& conn);
 bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn);
-
 } // namespace quic

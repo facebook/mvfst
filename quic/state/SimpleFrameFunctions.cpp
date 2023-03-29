@@ -35,8 +35,7 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       }
       return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathResponseFrame:
-      // Do not clone PATH_RESPONSE to avoid buffering
-      return folly::none;
+      return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::NewConnectionIdFrame:
     case QuicSimpleFrame::Type::MaxStreamsFrame:
     case QuicSimpleFrame::Type::HandshakeDoneFrame:
@@ -91,12 +90,11 @@ void updateSimpleFrameOnPacketLoss(
       break;
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
-      // Do not retransmit PATH_RESPONSE to avoid buffering
+      conn.pendingEvents.frames.push_back(*frame.asPathResponseFrame());
       break;
     }
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {
-      const auto& handshakeDoneFrame = *frame.asHandshakeDoneFrame();
-      conn.pendingEvents.frames.push_back(handshakeDoneFrame);
+      conn.pendingEvents.frames.push_back(*frame.asHandshakeDoneFrame());
       break;
     }
     case QuicSimpleFrame::Type::NewConnectionIdFrame:

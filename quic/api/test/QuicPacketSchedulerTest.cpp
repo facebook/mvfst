@@ -1670,12 +1670,12 @@ TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
   lowPriStream->lossBuffer.push_back(
       StreamBuffer(folly::IOBuf::copyBuffer("Onegin"), 0, false));
   conn.streamManager->updateWritableStreams(*lowPriStream);
-  conn.streamManager->setStreamPriority(lowPriStream->id, 5, false);
+  conn.streamManager->setStreamPriority(lowPriStream->id, Priority(5, false));
 
   auto inBuf = buildRandomInputData(conn.udpSendPacketLen * 10);
   writeDataToQuicStream(*highPriStream, inBuf->clone(), false);
   conn.streamManager->updateWritableStreams(*highPriStream);
-  conn.streamManager->setStreamPriority(highPriStream->id, 0, false);
+  conn.streamManager->setStreamPriority(highPriStream->id, Priority(0, false));
 
   StreamFrameScheduler scheduler(conn);
   ShortHeader shortHeader(
@@ -1816,7 +1816,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
 
   auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
-  conn.streamManager->setStreamPriority(streamId, 0, false);
+  conn.streamManager->setStreamPriority(streamId, Priority(0, false));
   auto stream = conn.streamManager->findStream(streamId);
   auto data = buildRandomInputData(1000);
   writeDataToQuicStream(*stream, std::move(data), true);

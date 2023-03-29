@@ -337,8 +337,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
-      PriorityLevel level,
-      bool incremental) override;
+      Priority priority) override;
 
   folly::Expected<Priority, LocalErrorCode> getStreamPriority(
       StreamId id) override;
@@ -650,9 +649,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void appendCmsgs(const folly::SocketOptionMap& options);
 
-  void setAdditionalCmsgsFunc(
-      folly::AsyncUDPSocket::AdditionalCmsgsFunc&& func);
-
   /**
    * Sets the policy per stream group id.
    * If policy == std::nullopt, the policy is removed for corresponding stream
@@ -837,6 +833,12 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void processConnectionSetupCallbacks(const QuicError& cancelCode);
   void processConnectionCallbacks(const QuicError& cancelCode);
 
+  /**
+   * The callback function for AsyncUDPSocket to provide the additional cmsgs
+   * required by this QuicSocket's packet processors.
+   */
+  folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
+
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
@@ -977,6 +979,14 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * enabled, i.e. advertisedMaxStreamGroups in transport settings is > 0.
    */
   [[nodiscard]] bool checkCustomRetransmissionProfilesEnabled() const;
+
+  /**
+   * Helper function to collect prewrite requests from the PacketProcessors
+   * Currently this collects cmsgs to be written. The Cmsgs will be stored in
+   * the connection state and passed to AsyncUDPSocket in the next
+   * additionalCmsgs callback
+   */
+  void updatePacketProcessorsPrewriteRequests();
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
