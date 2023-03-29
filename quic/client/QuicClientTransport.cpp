@@ -669,7 +669,9 @@ void QuicClientTransport::processPacketData(
       clientConn_->zeroRttWriteCipher.reset();
       clientConn_->zeroRttWriteHeaderCipher.reset();
     }
-    if (!clientConn_->zeroRttRejected.has_value()) {
+    if (!clientConn_->zeroRttRejected.has_value() ||
+        (conn_->version.has_value() &&
+         conn_->version.value() == QuicVersion::MVFST_EXPERIMENTAL)) {
       clientConn_->zeroRttRejected = handshakeLayer->getZeroRttRejected();
       if (clientConn_->zeroRttRejected.has_value() &&
           *clientConn_->zeroRttRejected) {
@@ -1656,7 +1658,7 @@ void QuicClientTransport::setSelfOwning() {
 
 void QuicClientTransport::setSupportedExtensionTransportParameters() {
   const auto& ts = conn_->transportSettings;
-
+  customTransportParameters_.clear();
   if (ts.minAckDelay.hasValue()) {
     CustomIntegralTransportParameter minAckDelayParam(
         static_cast<uint64_t>(TransportParameterId::min_ack_delay),
@@ -1746,6 +1748,10 @@ void QuicClientTransport::onNetworkSwitch(
     sock->close();
 
     socket_ = std::move(newSock);
+    if (socket_) {
+      socket_->setAdditionalCmsgsFunc(
+          [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+    }
     happyEyeballsSetUpSocket(
         *socket_,
         conn_->localAddress,

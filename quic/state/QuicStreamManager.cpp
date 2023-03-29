@@ -228,13 +228,9 @@ bool QuicStreamManager::consumeMaxLocalUnidirectionalStreamIdIncreased() {
   return res;
 }
 
-bool QuicStreamManager::setStreamPriority(
-    StreamId id,
-    PriorityLevel level,
-    bool incremental) {
+bool QuicStreamManager::setStreamPriority(StreamId id, Priority newPriority) {
   auto stream = findStream(id);
   if (stream) {
-    Priority newPriority(level, incremental);
     if (stream->priority == newPriority) {
       return false;
     }
@@ -250,7 +246,7 @@ bool QuicStreamManager::setStreamPriority(
       }
       notifyStreamPriorityChanges();
     }
-    // If this stream is already in the writable or loss queus, update the
+    // If this stream is already in the writable or loss queues, update the
     // priority there.
     writableStreams_.updateIfExist(id, stream->priority);
     writableDSRStreams_.updateIfExist(id, stream->priority);

@@ -4217,7 +4217,7 @@ TEST_P(QuicTransportImplTestBase, BackgroundModeChangeWithStreamChanges) {
   EXPECT_CALL(*rawCongestionController, setBandwidthUtilizationFactor(_))
       .Times(0); // Backgound params not set
   auto stream = manager.createNextUnidirectionalStream().value();
-  manager.setStreamPriority(stream->id, 1, false);
+  manager.setStreamPriority(stream->id, Priority(1, false));
 
   EXPECT_CALL(*rawCongestionController, setBandwidthUtilizationFactor(0.5))
       .Times(1); // On setting the background params
@@ -4236,7 +4236,7 @@ TEST_P(QuicTransportImplTestBase, BackgroundModeChangeWithStreamChanges) {
 
   EXPECT_CALL(*rawCongestionController, setBandwidthUtilizationFactor(1.0))
       .Times(1); // On increasing the priority of one of the streams
-  manager.setStreamPriority(stream3id, 0, false);
+  manager.setStreamPriority(stream3id, Priority(0, false));
 
   EXPECT_CALL(*rawCongestionController, setBandwidthUtilizationFactor(1.0))
       .Times(1); // a new lower priority stream does not affect the utlization

@@ -197,6 +197,10 @@ struct OutstandingPacket {
   // lost.
   bool declaredLost{false};
 
+  quic::PacketNum getPacketSequenceNum() const {
+    return packet.header.getPacketSequenceNum();
+  }
+
  protected:
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
@@ -233,6 +237,9 @@ struct OutstandingPacket {
 };
 
 struct OutstandingPacketWrapper : OutstandingPacket {
+  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn_ =
+      nullptr;
+
   OutstandingPacketWrapper(
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
@@ -246,7 +253,9 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       const LossState& lossStateIn,
       uint64_t writeCount,
       Metadata::DetailsPerStream detailsPerStream,
-      std::chrono::microseconds totalAppLimitedTimeUsecs = 0us)
+      std::chrono::microseconds totalAppLimitedTimeUsecs = 0us,
+      std::function<void(const quic::OutstandingPacketWrapper&)>
+          packetDestroyFn = nullptr)
       : OutstandingPacket(
             std::move(packetIn),
             timeIn,
@@ -260,19 +269,37 @@ struct OutstandingPacketWrapper : OutstandingPacket {
             lossStateIn,
             writeCount,
             std::move(detailsPerStream),
-            totalAppLimitedTimeUsecs) {}
+            totalAppLimitedTimeUsecs),
+        packetDestroyFn_(std::move(packetDestroyFn)) {}
 
   OutstandingPacketWrapper(const OutstandingPacketWrapper& source) = delete;
   OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
 
   OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) noexcept
-      : OutstandingPacket(std::move(static_cast<OutstandingPacket&>(rhs))) {}
+      : OutstandingPacket(std::move(static_cast<OutstandingPacket&>(rhs))) {
+    packetDestroyFn_ = rhs.packetDestroyFn_;
+    rhs.packetDestroyFn_ = nullptr;
+  }
 
   OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
+    // If this->packetDestroyFn_ is populated, then this OutstandingPacket is
+    // populated. We must call packetDestroyFn_(this) first, before moving the
+    // rest of the fields from the source packet (rhs).
+
+    if (this != &rhs && packetDestroyFn_ != nullptr) {
+      packetDestroyFn_(*this);
+    }
+
+    packetDestroyFn_ = rhs.packetDestroyFn_;
+    rhs.packetDestroyFn_ = nullptr;
     OutstandingPacket::operator=(std::move(rhs));
     return *this;
   }
 
-  ~OutstandingPacketWrapper() = default;
+  ~OutstandingPacketWrapper() {
+    if (packetDestroyFn_) {
+      packetDestroyFn_(*this);
+    }
+  }
 };
 } // namespace quic

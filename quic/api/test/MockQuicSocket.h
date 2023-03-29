@@ -126,7 +126,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       setStreamPriority,
-      (StreamId, uint8_t, bool));
+      (StreamId, Priority));
   MOCK_METHOD(
       (folly::Expected<Priority, LocalErrorCode>),
       getStreamPriority,
@@ -368,5 +368,10 @@ class MockQuicSocket : public QuicSocket {
       setStreamGroupRetransmissionPolicy,
       (StreamGroupId, std::optional<QuicStreamGroupRetransmissionPolicy>),
       (noexcept));
+  MOCK_METHOD(
+      (const std::shared_ptr<const folly::AsyncTransportCertificate>),
+      getPeerCertificate,
+      (),
+      (const));
 };
 } // namespace quic

@@ -403,7 +403,7 @@ class QuicStreamManager {
    * passed in values are different from current priority. Return true if
    * stream priority is update, false otherwise.
    */
-  bool setStreamPriority(StreamId id, PriorityLevel level, bool incremental);
+  bool setStreamPriority(StreamId id, Priority priority);
 
   // TODO figure out a better interface here.
   /*
