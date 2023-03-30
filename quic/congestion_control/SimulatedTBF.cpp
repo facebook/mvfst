@@ -11,7 +11,14 @@
 
 namespace quic {
 
-SimulatedTBF::SimulatedTBF(Config config) : config_(std::move(config)) {}
+SimulatedTBF::SimulatedTBF(Config config)
+    : config_(std::move(config)),
+      maybeEmptyIntervalState(
+          config_.trackEmptyIntervals
+              ? folly::make_optional(EmptyIntervalState{
+                    .emptyBucketTimeIntervals_ =
+                        std::make_shared<std::deque<TimeInterval>>()})
+              : folly::none) {}
 
 double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     double toConsume,
@@ -22,29 +29,34 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
         LocalErrorCode::INVALID_OPERATION);
   }
 
-  DCHECK(
-      !maybeLastSendTimeBucketNotEmpty_.has_value() ||
-      sendTime >= maybeLastSendTimeBucketNotEmpty_.value());
-
-  if (!maybeLastForgetEmptyIntervalTime_.has_value()) {
-    maybeLastForgetEmptyIntervalTime_.assign(sendTime - 1us);
+  if (config_.trackEmptyIntervals) {
+    auto& emptyIntervalState = getEmptyIntervalState();
+    DCHECK(
+        !emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.has_value() ||
+        sendTime >=
+            emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.value());
+    if (!emptyIntervalState.maybeLastForgetEmptyIntervalTime_.has_value()) {
+      emptyIntervalState.maybeLastForgetEmptyIntervalTime_.assign(
+          sendTime - 1us);
+    }
   }
 
-  double sendTimeDouble =
+  const double sendTimeDouble =
       std::chrono::duration<double>(
           sendTime.time_since_epoch() // convert to double and seconds
           )
           .count();
 
-  // Check the number of tokens available at sendTime before consuming. Note
-  // that available returns zero if bucket is in debt
-  auto numTokensAvailable = available(
+  // Check the number of tokens available at sendTime before consuming.
+  // available() returns zero if bucket is in debt.
+  const auto numTokensAvailable = available(
       config_.rateBytesPerSecond, config_.burstSizeBytes, sendTimeDouble);
-
-  if (numTokensAvailable > 0) {
-    maybeLastSendTimeBucketNotEmpty_.assign(sendTime);
+  if (config_.trackEmptyIntervals && numTokensAvailable > 0) {
+    auto& emptyIntervalState = getEmptyIntervalState();
+    emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.assign(sendTime);
   }
 
+  // If the amount of debt is limited, check if we can consume.
   if (config_.maybeMaxDebtQueueSizeBytes.has_value()) {
     DCHECK(config_.maybeMaxDebtQueueSizeBytes.value() >= 0);
     auto currDebtQueueSizeBytes = std::max(
@@ -60,6 +72,7 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     }
   }
 
+  // Send (consume tokens) and determine if any new debt.
   folly::Optional<double> maybeDebtPayOffTimeDouble =
       consumeWithBorrowNonBlocking(
           toConsume,
@@ -69,26 +82,31 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
   DCHECK(maybeDebtPayOffTimeDouble.hasValue());
   if (maybeDebtPayOffTimeDouble.value() > 0) {
     // Bucket is in debt now after consuming toConsume tokens
-
     const auto debtPayOffTimeUs =
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::duration<double>(maybeDebtPayOffTimeDouble.value()));
 
-    DCHECK(maybeLastSendTimeBucketNotEmpty_
-               .has_value()); // assuming burst size > 0
-    // Check if the previous packets with the same send time were sent when
-    // bucket had some tokens. In that case, skip.
-    if (sendTime != maybeLastSendTimeBucketNotEmpty_.value()) {
-      if (emptyBucketTimeIntervals_.empty() ||
-          emptyBucketTimeIntervals_.back().end <
-              maybeLastSendTimeBucketNotEmpty_.value()) {
-        // Add a new interval to the back of deque
-        emptyBucketTimeIntervals_.emplace_back(
-            sendTime, sendTime + debtPayOffTimeUs);
-      } else {
-        // The bucket has been empty before this was called, so extend the end
-        // time of the existing interval on the back of the deque
-        emptyBucketTimeIntervals_.back().end = sendTime + debtPayOffTimeUs;
+    // Since we're now in debt, update empty intervals if tracking
+    if (config_.trackEmptyIntervals) {
+      auto& emptyIntervalState = getEmptyIntervalState();
+      DCHECK(emptyIntervalState.maybeLastSendTimeBucketNotEmpty_
+                 .has_value()); // assuming burst size > 0
+      // Check if the previous packets with the same send time were sent when
+      // bucket had some tokens. In that case, skip.
+      if (sendTime !=
+          emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.value()) {
+        if (emptyIntervalState.emptyBucketTimeIntervals_->empty() ||
+            emptyIntervalState.emptyBucketTimeIntervals_->back().end <
+                emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.value()) {
+          // Add a new interval to the back of deque
+          emptyIntervalState.emptyBucketTimeIntervals_->emplace_back(
+              sendTime, sendTime + debtPayOffTimeUs);
+        } else {
+          // The bucket has been empty before this was called, so extend the end
+          // time of the existing interval on the back of the deque
+          emptyIntervalState.emptyBucketTimeIntervals_->back().end =
+              sendTime + debtPayOffTimeUs;
+        }
       }
     }
   }
@@ -99,19 +117,24 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 [[nodiscard]] bool SimulatedTBF::bucketEmptyThroughoutWindow(
     const TimePoint& startTime,
     const TimePoint& endTime) const {
+  const auto& emptyIntervalState =
+      getEmptyIntervalState(); // throws if not tracked
+
   LOG_IF(ERROR, endTime < startTime)
       << "Invalid input range: endTime < startTime";
-  LOG_IF(ERROR, !maybeLastForgetEmptyIntervalTime_.has_value())
+  LOG_IF(
+      ERROR, !emptyIntervalState.maybeLastForgetEmptyIntervalTime_.has_value())
       << "Trying to query a range before sending any bytes.";
 
-  if (maybeLastForgetEmptyIntervalTime_.has_value() &&
-      startTime < maybeLastForgetEmptyIntervalTime_.value()) {
+  if (emptyIntervalState.maybeLastForgetEmptyIntervalTime_.has_value() &&
+      startTime <
+          emptyIntervalState.maybeLastForgetEmptyIntervalTime_.value()) {
     throw QuicInternalException(
         "Invalid input range: part of the input range was already forgotten",
         LocalErrorCode::INVALID_OPERATION);
   }
 
-  for (const auto& interval : emptyBucketTimeIntervals_) {
+  for (const auto& interval : (*emptyIntervalState.emptyBucketTimeIntervals_)) {
     if (interval.start <= startTime && endTime <= interval.end) {
       return true;
     } else if (startTime > interval.end) {
@@ -130,14 +153,17 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 }
 
 void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
-  maybeLastForgetEmptyIntervalTime_.assign(time);
-  while (!emptyBucketTimeIntervals_.empty()) {
-    if (emptyBucketTimeIntervals_.front().start > time) {
+  auto& emptyIntervalState = getEmptyIntervalState(); // throws if not tracked
+
+  emptyIntervalState.maybeLastForgetEmptyIntervalTime_.assign(time);
+  while (!emptyIntervalState.emptyBucketTimeIntervals_->empty()) {
+    if (emptyIntervalState.emptyBucketTimeIntervals_->front().start > time) {
       return;
-    } else if (emptyBucketTimeIntervals_.front().end <= time) {
-      emptyBucketTimeIntervals_.pop_front();
+    } else if (
+        emptyIntervalState.emptyBucketTimeIntervals_->front().end <= time) {
+      emptyIntervalState.emptyBucketTimeIntervals_->pop_front();
     } else {
-      emptyBucketTimeIntervals_.front().start =
+      emptyIntervalState.emptyBucketTimeIntervals_->front().start =
           time + std::chrono::microseconds{1};
       return;
     }
@@ -156,7 +182,9 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
 }
 
 [[nodiscard]] unsigned int SimulatedTBF::getNumEmptyIntervalsTracked() const {
-  return emptyBucketTimeIntervals_.size();
+  const auto& emptyIntervalState =
+      getEmptyIntervalState(); // throws if not tracked
+  return emptyIntervalState.emptyBucketTimeIntervals_->size();
 }
 
 [[nodiscard]] double SimulatedTBF::getRateBytesPerSecond() const {
@@ -170,6 +198,27 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
 [[nodiscard]] folly::Optional<double> SimulatedTBF::getMaxDebtQueueSizeBytes()
     const {
   return config_.maybeMaxDebtQueueSizeBytes;
+}
+
+SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState() {
+  if (!config_.trackEmptyIntervals) {
+    throw QuicInternalException(
+        "Empty interval tracking not enabled",
+        LocalErrorCode::INVALID_OPERATION);
+  }
+  CHECK(maybeEmptyIntervalState.has_value());
+  return maybeEmptyIntervalState.value();
+}
+
+const SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState()
+    const {
+  if (!config_.trackEmptyIntervals) {
+    throw QuicInternalException(
+        "Empty interval tracking not enabled",
+        LocalErrorCode::INVALID_OPERATION);
+  }
+  CHECK(maybeEmptyIntervalState.has_value());
+  return maybeEmptyIntervalState.value();
 }
 
 } // namespace quic

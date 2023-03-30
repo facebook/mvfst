@@ -38,6 +38,61 @@ TEST_F(SimulatedTBFTest, InitWithMaxQueueSize) {
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
 }
 
+TEST_F(SimulatedTBFTest, InitWithEmptyIntervalsTrackingDisabled) {
+  SimulatedTBF::Config config;
+  config.rateBytesPerSecond = 100;
+  config.burstSizeBytes = 200;
+  config.maybeMaxDebtQueueSizeBytes = 400;
+  config.trackEmptyIntervals = false;
+  SimulatedTBF stbf(config);
+  EXPECT_EQ(stbf.getRateBytesPerSecond(), config.rateBytesPerSecond);
+  EXPECT_EQ(stbf.getBurstSizeBytes(), config.burstSizeBytes);
+  EXPECT_EQ(stbf.getMaxDebtQueueSizeBytes(), config.maybeMaxDebtQueueSizeBytes);
+  EXPECT_THROW((void)stbf.getNumEmptyIntervalsTracked(), QuicInternalException);
+}
+
+/*
+ * Case with empty intervals tracking disabled.
+ * Expectations:
+ *    - With or without any consume operations, calling the functions that
+ *      operate on empty intervals should always throw a QuicInternalException.
+ *    - Without empty intervals tracking, the SimulatedTBF should operate as
+ *      expected when consuming bytes.
+ */
+TEST_F(SimulatedTBFTest, EmptyIntervalsTrackingDisabled_WithConsume) {
+  SimulatedTBF::Config config;
+  config.rateBytesPerSecond = 100;
+  config.burstSizeBytes = 200;
+  config.maybeMaxDebtQueueSizeBytes = 0;
+  config.trackEmptyIntervals = false;
+  SimulatedTBF stbf(config);
+  const TimePoint t = Clock::now();
+  EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), stbf.getBurstSizeBytes());
+
+  EXPECT_THROW((void)stbf.bucketEmptyAt(t), QuicInternalException);
+  EXPECT_THROW(
+      (void)stbf.bucketEmptyThroughoutWindow(t, t), QuicInternalException);
+  EXPECT_THROW(
+      (void)stbf.forgetEmptyIntervalsPriorTo(t), QuicInternalException);
+
+  // Consume 100 bytes
+  EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(100, t), 100);
+  EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), config.burstSizeBytes - 100);
+  // Consume the rest of the bytes in bucket
+  EXPECT_EQ(
+      stbf.consumeWithBorrowNonBlockingAndUpdateState(
+          config.burstSizeBytes - 100, t),
+      config.burstSizeBytes - 100);
+  EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(1, t), 0);
+
+  EXPECT_THROW((void)stbf.bucketEmptyAt(t), QuicInternalException);
+  EXPECT_THROW(
+      (void)stbf.bucketEmptyThroughoutWindow(t, t), QuicInternalException);
+  EXPECT_THROW(
+      (void)stbf.forgetEmptyIntervalsPriorTo(t), QuicInternalException);
+}
+
 /*
  * Case with no consume operations, should have no empty intervals.
  */
