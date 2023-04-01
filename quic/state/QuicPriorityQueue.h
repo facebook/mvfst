@@ -8,7 +8,6 @@
 #pragma once
 
 #include <folly/container/F14Map.h>
-#include <folly/sorted_vector_types.h>
 #include <glog/logging.h>
 #include <set>
 
@@ -34,8 +33,7 @@ struct ordered_stream_cmp {
   }
 };
 
-using OrderedStreamSet =
-    folly::sorted_vector_set<OrderedStream, ordered_stream_cmp>;
+using OrderedStreamSet = std::set<OrderedStream, ordered_stream_cmp>;
 
 /**
  * Priority is expressed as a level [0,7] and an incremental flag.
@@ -71,7 +69,8 @@ struct PriorityQueue {
       const Level& level;
 
      public:
-      explicit Iterator(const Level& inLevel) : level(inLevel) {}
+      explicit Iterator(const Level& inLevel)
+          : level(inLevel), nextStreamIt(level.streams.end()) {}
       virtual ~Iterator() = default;
       virtual void begin() const = 0;
       virtual bool end() const = 0;
@@ -87,18 +86,19 @@ struct PriorityQueue {
 
     class IncrementalIterator : public Iterator {
      private:
-      mutable std::optional<StreamId> startStreamId;
-      mutable std::optional<StreamId> nextStreamId;
+      mutable OrderedStreamSet::const_iterator startStreamIt;
 
      public:
-      explicit IncrementalIterator(const Level& inLevel) : Iterator(inLevel) {}
+      explicit IncrementalIterator(const Level& inLevel)
+          : Iterator(inLevel), startStreamIt(level.streams.end()) {}
       void begin() const override {
-        nextStreamIt = findStart();
-        nextStreamId = nextStreamIt->streamId;
-        startStreamId = nextStreamIt->streamId;
+        if (nextStreamIt == level.streams.end()) {
+          nextStreamIt = level.streams.begin();
+        }
+        startStreamIt = nextStreamIt;
       }
       bool end() const override {
-        return *nextStreamId == *startStreamId;
+        return nextStreamIt == startStreamIt;
       }
       void next() override {
         CHECK(!level.empty());
@@ -106,31 +106,6 @@ struct PriorityQueue {
         if (nextStreamIt == level.streams.end()) {
           nextStreamIt = level.streams.begin();
         }
-        nextStreamId = nextStreamIt->streamId;
-      }
-      void override(OrderedStreamSet::const_iterator it) override {
-        Iterator::override(it);
-        nextStreamId = it->streamId;
-      }
-
-     private:
-      OrderedStreamSet::const_iterator findStart() const {
-        CHECK(!level.empty());
-        if (!nextStreamId) {
-          return level.streams.begin();
-        }
-        auto stream = level.getOrderedStream(*nextStreamId);
-        auto upperIt = level.streams.upper_bound(stream);
-        if (upperIt == level.streams.begin()) {
-          return upperIt;
-        }
-        if ((upperIt - 1)->streamId == *nextStreamId) {
-          return upperIt - 1;
-        }
-        if (upperIt == level.streams.end()) {
-          return level.streams.begin();
-        }
-        return upperIt;
       }
     };
 
@@ -297,9 +272,10 @@ struct PriorityQueue {
                   << " not found in PriorityQueue level=" << id;
       return;
     }
-    auto eraseIt = level.erase(streamIt);
     if (streamIt == level.iterator->nextStreamIt) {
-      level.iterator->nextStreamIt = eraseIt;
+      level.iterator->nextStreamIt = level.streams.erase(streamIt);
+    } else {
+      level.streams.erase(streamIt);
     }
   }
 
