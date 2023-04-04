@@ -34,7 +34,7 @@ class PacketProcessor {
    * Called each time a packet is sent.
    *
    * Every call to onPacketSent() will (eventually) trigger a corresponding call
-   * to onPacketRemoved(). See onPacketRemoved() for details.
+   * to onPacketDestroyed(), q.v.
    */
   virtual void onPacketSent(const OutstandingPacketWrapper& /* packet */) {}
 
@@ -51,9 +51,9 @@ class PacketProcessor {
    * useful for a number of reasons. For example:
    *
    *  - When an OutstandingPacket is marked lost it is not immediately
-   *    destroyed. Instead, the packet remains alive for some period to provide
+   *    destroyed. Instead, the packet remains alive for some period to
    *    provide an opportunity for spurious loss detection. This callback
-   * enables processors to know when such an opportunity has expired.
+   *    enables processors to know when such an opportunity has expired.
    *
    *  - When an OutstandingPacket is destroyed, its metadata can be reviewed by
    *    processors to understand what the packet experienced, including
