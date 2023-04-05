@@ -139,6 +139,6 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
 
   Config config_;
   double zeroTime_{0};
-  folly::Optional<EmptyIntervalState> maybeEmptyIntervalState;
+  folly::Optional<EmptyIntervalState> maybeEmptyIntervalState_;
 };
 } // namespace quic

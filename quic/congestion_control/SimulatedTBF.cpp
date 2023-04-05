@@ -11,14 +11,14 @@
 
 namespace quic {
 
-SimulatedTBF::SimulatedTBF(Config config)
-    : config_(std::move(config)),
-      maybeEmptyIntervalState(
-          config_.trackEmptyIntervals
-              ? folly::make_optional(EmptyIntervalState{
-                    .emptyBucketTimeIntervals_ =
-                        std::make_shared<std::deque<TimeInterval>>()})
-              : folly::none) {}
+SimulatedTBF::SimulatedTBF(Config config) : config_(std::move(config)) {
+  if (config_.trackEmptyIntervals) {
+    EmptyIntervalState emptyIntervalState = {};
+    emptyIntervalState.emptyBucketTimeIntervals_ =
+        std::make_shared<std::deque<TimeInterval>>();
+    maybeEmptyIntervalState_.assign(emptyIntervalState);
+  }
+}
 
 double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     double toConsume,
@@ -206,8 +206,8 @@ SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState() {
         "Empty interval tracking not enabled",
         LocalErrorCode::INVALID_OPERATION);
   }
-  CHECK(maybeEmptyIntervalState.has_value());
-  return maybeEmptyIntervalState.value();
+  CHECK(maybeEmptyIntervalState_.has_value());
+  return maybeEmptyIntervalState_.value();
 }
 
 const SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState()
@@ -217,8 +217,8 @@ const SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState()
         "Empty interval tracking not enabled",
         LocalErrorCode::INVALID_OPERATION);
   }
-  CHECK(maybeEmptyIntervalState.has_value());
-  return maybeEmptyIntervalState.value();
+  CHECK(maybeEmptyIntervalState_.has_value());
+  return maybeEmptyIntervalState_.value();
 }
 
 } // namespace quic
