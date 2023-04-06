@@ -873,6 +873,8 @@ void updateConnection(
       conn.appLimitedTracker.getTotalAppLimitedTime(),
       packetDestroyFn);
 
+  pkt.metadata.cmsgs = conn.socketCmsgsState.additionalCmsgs;
+
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
       : false;

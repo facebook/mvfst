@@ -926,7 +926,8 @@ TYPED_TEST(
     return req;
   });
 
-  // Third packet processor overwriting the value from the second one.
+  // Third packet processor whose cmsgs will not be applied because priority is
+  // given to the cmsg value from the second one.
   auto mockPacketProcessor3 = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor3 = mockPacketProcessor3.get();
   this->getNonConstConn().packetProcessors.push_back(
@@ -939,10 +940,112 @@ TYPED_TEST(
   });
 
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  const auto bufLength = 1700;
+  const auto bufLength = 1000;
   auto buf = buildRandomInputData(bufLength);
   this->getTransport()->writeChain(streamId, std::move(buf), false);
   this->loopForWrites();
+  ASSERT_FALSE(this->getConn().outstandings.packets.empty());
+
+  folly::SocketOptionMap expectedCmsgs;
+  expectedCmsgs[{IPPROTO_IPV6, IPV6_HOPLIMIT}] = 255;
+  expectedCmsgs[{IPPROTO_IPV6, IPV6_DONTFRAG}] = 1;
+  auto pkt = this->getConn().outstandings.packets.rbegin();
+  ASSERT_TRUE(pkt->metadata.cmsgs);
+  EXPECT_THAT(
+      pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+
+  this->destroyTransport();
+}
+
+/**
+ * Verify PacketProcessor prewrite requests apply to each write
+ * and are honored for each packet
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorPrewriteRequestMultiple) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // Packet processor
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  auto packetsSent = 0;
+  {
+    // Send two packets with the same marking
+    EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
+      PacketProcessor::PrewriteRequest req;
+      req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}});
+      return req;
+    });
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    const auto bufLength = 1700; // Two packets
+    auto buf = buildRandomInputData(bufLength);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    this->loopForWrites();
+    packetsSent += 2;
+    ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
+
+    // Verify both packets are marked
+    folly::SocketOptionMap expectedCmsgs;
+    expectedCmsgs[{IPPROTO_IPV6, IPV6_HOPLIMIT}] = 255;
+    auto pkt = this->getConn().outstandings.packets.rbegin();
+    ASSERT_TRUE(pkt->metadata.cmsgs);
+    EXPECT_THAT(
+        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+    ASSERT_TRUE((++pkt)->metadata.cmsgs);
+    EXPECT_THAT(
+        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+  }
+
+  {
+    // Send two packets with no marking
+    EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
+      return folly::none;
+    });
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    const auto bufLength = 1700; // Two packets
+    auto buf = buildRandomInputData(bufLength);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    this->loopForWrites();
+    packetsSent += 2;
+    ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
+
+    // Verify the last two packets have no marks
+    auto pkt = this->getConn().outstandings.packets.rbegin();
+    EXPECT_FALSE(pkt->metadata.cmsgs);
+    EXPECT_FALSE((++pkt)->metadata.cmsgs);
+  }
+
+  {
+    // Send two packets with the same marking
+    EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
+      PacketProcessor::PrewriteRequest req;
+      req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_DONTFRAG}, 1}});
+      return req;
+    });
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    const auto bufLength = 1700; // Two packets
+    auto buf = buildRandomInputData(bufLength);
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    this->loopForWrites();
+    packetsSent += 2;
+    ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
+
+    // Verify the last two packets are marked
+    folly::SocketOptionMap expectedCmsgs;
+    expectedCmsgs[{IPPROTO_IPV6, IPV6_DONTFRAG}] = 1;
+    auto pkt = this->getConn().outstandings.packets.rbegin();
+    ASSERT_TRUE(pkt->metadata.cmsgs);
+    EXPECT_THAT(
+        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+    ASSERT_TRUE((++pkt)->metadata.cmsgs);
+    EXPECT_THAT(
+        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+  }
 
   this->destroyTransport();
 }

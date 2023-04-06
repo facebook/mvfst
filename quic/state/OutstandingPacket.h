@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/io/SocketOptionMap.h>
 #include <quic/codec/Types.h>
 #include <quic/state/LossState.h>
 #include <quic/state/PacketEvent.h>
@@ -41,6 +42,8 @@ struct OutstandingPacketMetadata {
   // Write Count is the value of the monotonically increasing counter which
   // tracks the number of writes on this socket.
   uint64_t writeCount{0};
+  // Cmsgs added by the QuicSocket when this packet was written
+  folly::Optional<folly::SocketOptionMap> cmsgs;
 
   // Has value if the packet is lost by timout. The value is the loss timeout
   // dividend that was used to declare this packet.
