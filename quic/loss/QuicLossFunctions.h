@@ -9,7 +9,6 @@
 
 #include <folly/Chrono.h>
 #include <folly/Optional.h>
-#include <folly/io/async/AsyncTimeout.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/TimeUtil.h>
