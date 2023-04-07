@@ -16,6 +16,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/test/Mocks.h>
+#include <chrono>
 
 using namespace testing;
 
@@ -227,6 +228,55 @@ TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
       std::move(transportParams)};
   processClientInitialParams(serverConn, clientTransportParams);
   EXPECT_EQ(serverConn.datagramState.maxWriteFrameSize, 0);
+}
+
+TEST(ServerStateMachineTest, TestProcessMinAckDelayNotSet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_FALSE(serverConn.peerAdvertisedKnobFrameSupport);
+}
+
+TEST(ServerStateMachineTest, TestProcessMinAckDelaySet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::min_ack_delay, 1000));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_TRUE(serverConn.peerMinAckDelay.has_value());
+  ASSERT_EQ(
+      serverConn.peerMinAckDelay.value(), std::chrono::microseconds(1000));
+}
+
+TEST(ServerStateMachineTest, TestEncodeMinAckDelayParamSet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.minAckDelay = std::chrono::microseconds(1000);
+  auto customTransportParams =
+      quic::setSupportedExtensionTransportParameters(serverConn);
+  auto minAckDelayParam = getIntegerParameter(
+      TransportParameterId::min_ack_delay, customTransportParams);
+  ASSERT_TRUE(minAckDelayParam.has_value());
+  EXPECT_EQ(minAckDelayParam.value(), 1000);
+}
+
+TEST(ServerStateMachineTest, TestEncodeMinAckDelayParamNotSet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.advertisedKnobFrameSupport = false;
+  auto customTransportParams =
+      quic::setSupportedExtensionTransportParameters(serverConn);
+  EXPECT_THAT(
+      customTransportParams,
+      Not(Contains(testing::Field(
+          &TransportParameter::parameter,
+          testing::Eq(TransportParameterId::min_ack_delay)))));
 }
 
 TEST(ServerStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {

@@ -1601,6 +1601,13 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     customTransportParams.push_back(receiveTimestampsExponent.encode());
   }
 
+  if (ts.minAckDelay) {
+    CustomIntegralTransportParameter minAckDelay(
+        static_cast<uint64_t>(TransportParameterId::min_ack_delay),
+        ts.minAckDelay.value().count());
+    customTransportParams.push_back(minAckDelay.encode());
+  }
+
   if (ts.advertisedKnobFrameSupport) {
     CustomIntegralTransportParameter knobFrameSupport(
         static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
