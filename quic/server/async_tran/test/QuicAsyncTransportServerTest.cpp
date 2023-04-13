@@ -44,6 +44,13 @@ class MockConnection : public wangle::ManagedConnection {
   }
   void dumpConnectionState(uint8_t) final {}
 
+  [[nodiscard]] const folly::SocketAddress& getPeerAddress()
+      const noexcept override {
+    return dummyAddress;
+  }
+
+  folly::SocketAddress dummyAddress;
+
  private:
   folly::AsyncTransport::UniquePtr sock_;
 };
