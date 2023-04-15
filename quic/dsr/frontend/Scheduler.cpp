@@ -66,7 +66,10 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
         return result;
       }
       enrichInstruction(instructionBuilder, *stream);
-      builder.addSendInstruction(instructionBuilder.build(), encodedSize);
+      builder.addSendInstruction(
+          instructionBuilder.build(),
+          /*streamEncodedSize=*/encodedSize,
+          /*streamPacketIdx=*/stream->streamPacketIdx++);
       result.writeSuccess = true;
       return result;
     }
@@ -106,7 +109,8 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
       return result;
     }
     enrichInstruction(instructionBuilder, *stream);
-    builder.addSendInstruction(instructionBuilder.build(), encodedSize);
+    builder.addSendInstruction(
+        instructionBuilder.build(), encodedSize, stream->streamPacketIdx++);
     result.writeSuccess = true;
     return result;
   }

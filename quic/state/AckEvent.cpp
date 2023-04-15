@@ -26,7 +26,9 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameDelivered(
   if (retransmission) {
     outstandingPacketStreamDetails.streamBytesAckedByRetrans += frame.len;
   }
-  outstandingPacketStreamDetails.dsrStream = frame.fromBufMeta;
+  if (frame.fromBufMeta) {
+    outstandingPacketStreamDetails.streamPacketIdx = frame.streamPacketIdx;
+  }
 }
 
 void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
@@ -43,7 +45,9 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
   auto& outstandingPacketStreamDetails = it->second;
   outstandingPacketStreamDetails.dupAckedStreamIntervals.insert(
       frame.offset, frame.offset + frame.len - 1);
-  outstandingPacketStreamDetails.dsrStream = frame.fromBufMeta;
+  if (frame.fromBufMeta) {
+    outstandingPacketStreamDetails.streamPacketIdx = frame.streamPacketIdx;
+  }
 }
 
 void AckEvent::AckPacket::DetailsPerStream::recordDeliveryOffsetUpdate(

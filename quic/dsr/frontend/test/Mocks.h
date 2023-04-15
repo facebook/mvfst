@@ -20,7 +20,10 @@ class MockDSRPacketBuilder : public DSRPacketBuilderBase {
     return const_cast<MockDSRPacketBuilder&>(*this).remainingSpaceNonConst();
   }
 
-  MOCK_METHOD(void, addSendInstruction, (SendInstruction&&, uint32_t));
+  MOCK_METHOD(
+      void,
+      addSendInstruction,
+      (SendInstruction&&, uint32_t, uint64_t));
 };
 
 } // namespace quic::test

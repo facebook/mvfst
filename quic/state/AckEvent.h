@@ -181,7 +181,7 @@ struct AckEvent {
     struct StreamDetails {
       uint64_t streamBytesAcked{0};
       uint64_t streamBytesAckedByRetrans{0};
-      bool dsrStream{false};
+      folly::Optional<uint64_t> streamPacketIdx;
       folly::Optional<uint64_t> maybeNewDeliveryOffset;
 
       // definition for DupAckedStreamIntervalSet

@@ -369,6 +369,10 @@ struct QuicStreamState : public QuicStreamLike {
 
   Priority priority{kDefaultPriority};
 
+  // This monotonically increases by 1 this stream is written to packets. Note
+  // that this is only used for DSR and facilitates loss detection.
+  uint64_t streamPacketIdx{0};
+
   // Returns true if both send and receive state machines are in a terminal
   // state
   bool inTerminalStates() const {

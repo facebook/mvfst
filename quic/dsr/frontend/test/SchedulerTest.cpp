@@ -45,8 +45,8 @@ TEST_F(SchedulerTest, ScheduleStream) {
   EXPECT_TRUE(scheduler.hasPendingData());
   EXPECT_CALL(builder_, remainingSpaceNonConst()).WillRepeatedly(Return(1000));
   uint64_t writtenLength = 0;
-  EXPECT_CALL(builder_, addSendInstruction(_, _))
-      .WillOnce(Invoke([&](SendInstruction&& instruction, uint32_t) {
+  EXPECT_CALL(builder_, addSendInstruction(_, _, _))
+      .WillOnce(Invoke([&](SendInstruction&& instruction, uint32_t, uint64_t) {
         EXPECT_EQ(stream->id, (size_t)instruction.streamId);
         EXPECT_EQ(expectedBufMetaOffset, instruction.streamOffset);
         EXPECT_GT(200, instruction.len);
@@ -72,8 +72,8 @@ TEST_F(SchedulerTest, ScheduleStream) {
   conn_.streamManager->updateWritableStreams(*stream);
   EXPECT_TRUE(conn_.streamManager->hasDSRWritable());
   EXPECT_FALSE(conn_.streamManager->writableDSRStreams().empty());
-  EXPECT_CALL(builder_, addSendInstruction(_, _))
-      .WillOnce(Invoke([&](SendInstruction&& instruction, uint32_t) {
+  EXPECT_CALL(builder_, addSendInstruction(_, _, _))
+      .WillOnce(Invoke([&](SendInstruction&& instruction, uint32_t, uint64_t) {
         EXPECT_EQ(stream->id, (size_t)instruction.streamId);
         EXPECT_EQ(nextExpectedOffset, instruction.streamOffset);
         EXPECT_GT(instruction.len, 0);

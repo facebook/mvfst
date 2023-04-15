@@ -17,7 +17,10 @@ namespace quic {
 struct DSRPacketBuilderBase {
   virtual ~DSRPacketBuilderBase() = default;
   virtual size_t remainingSpace() const noexcept = 0;
-  virtual void addSendInstruction(SendInstruction&&, uint32_t) = 0;
+  virtual void addSendInstruction(
+      SendInstruction&&,
+      uint32_t streamEncodedSize,
+      uint64_t streamPacketIdx) = 0;
 };
 
 /**
@@ -38,11 +41,13 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
 
   void addSendInstruction(
       SendInstruction&& sendInstruction,
-      uint32_t streamEncodedSize) override {
+      uint32_t streamEncodedSize,
+      uint64_t streamPacketIdx) override {
     CHECK(
         sendInstructions_.empty() ||
         sendInstructions_.back().streamId == sendInstruction.streamId);
     WriteStreamFrame frame = sendInstructionToWriteStreamFrame(sendInstruction);
+    frame.streamPacketIdx = streamPacketIdx;
     packet_.frames.push_back(frame);
     sendInstructions_.push_back(std::move(sendInstruction));
     packetSize_ -= streamEncodedSize;

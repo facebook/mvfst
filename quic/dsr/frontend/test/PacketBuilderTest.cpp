@@ -58,7 +58,7 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
   uint32_t streamEncodedSize = 1003;
   SendInstruction instructionCopy(sendInstruction);
   packetBuilder.addSendInstruction(
-      std::move(sendInstruction), streamEncodedSize);
+      std::move(sendInstruction), streamEncodedSize, 5);
   auto packet = std::move(packetBuilder).buildPacket();
   const auto& writePacket = packet.packet;
   const auto& si = packet.sendInstructions.front();
@@ -67,6 +67,8 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
       *writePacket.frames.front().asWriteStreamFrame();
   EXPECT_TRUE(writeStreamFrame == instructionCopy);
   EXPECT_TRUE(writeStreamFrame == si);
+  EXPECT_TRUE(writeStreamFrame.fromBufMeta);
+  EXPECT_EQ(writeStreamFrame.streamPacketIdx, 5);
   EXPECT_GT(packet.encodedSize, streamEncodedSize);
 }
 
@@ -86,7 +88,8 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
           .setFin(false)
           .setBufMetaStartingOffset(333)
           .build(),
-      110);
+      110,
+      5);
   packetBuilder.addSendInstruction(
       SendInstruction::Builder(conn_, id)
           .setStreamOffset(100)
@@ -94,13 +97,15 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
           .setFin(true)
           .setBufMetaStartingOffset(333)
           .build(),
-      110);
+      110,
+      6);
   auto packet = std::move(packetBuilder).buildPacket();
   const auto& writePacket = packet.packet;
   EXPECT_EQ(2, packet.sendInstructions.size());
   EXPECT_EQ(2, writePacket.frames.size());
-  WriteStreamFrame expectedFirstFrame(id, 0, 100, false, true);
-  WriteStreamFrame expectedSecondFrame(id, 100, 100, true, true);
+  WriteStreamFrame expectedFirstFrame(id, 0, 100, false, true, folly::none, 5);
+  WriteStreamFrame expectedSecondFrame(
+      id, 100, 100, true, true, folly::none, 6);
   EXPECT_EQ(expectedFirstFrame, *writePacket.frames[0].asWriteStreamFrame());
   EXPECT_EQ(expectedSecondFrame, *writePacket.frames[1].asWriteStreamFrame());
   EXPECT_TRUE(expectedFirstFrame == packet.sendInstructions[0]);
