@@ -53,9 +53,10 @@ void FunctionLooper::commonLoopBody() noexcept {
 
 bool FunctionLooper::schedulePacingTimeout() noexcept {
   if (pacingFunc_ && pacingTimer_ && !isScheduled()) {
-    auto nextPacingTime = (*pacingFunc_)();
-    if (nextPacingTime != 0us) {
-      pacingTimer_->scheduleTimeout(this, nextPacingTime);
+    auto timeUntilWrite = (*pacingFunc_)();
+    if (timeUntilWrite != 0us) {
+      nextPacingTime_ = Clock::now() + timeUntilWrite;
+      pacingTimer_->scheduleTimeout(this, timeUntilWrite);
       return true;
     }
   }
@@ -77,9 +78,25 @@ void FunctionLooper::run(bool thisIteration) noexcept {
             << " in loop body and using pacing - not rescheduling";
     return;
   }
-  if (isLoopCallbackScheduled() || isScheduled()) {
+  if (isLoopCallbackScheduled() || (!fireLoopEarly_ && isScheduled())) {
     VLOG(10) << __func__ << ": " << type_ << " already scheduled";
     return;
+  }
+  // If we are pacing, we're about to write again, if it's close, just write
+  // now.
+  if (isScheduled()) {
+    auto n = Clock::now();
+    auto timeUntilWrite = nextPacingTime_ < n
+        ? 0us
+        : std::chrono::duration_cast<std::chrono::milliseconds>(
+              nextPacingTime_ - n);
+    if (timeUntilWrite <= 1ms) {
+      cancelTimeout();
+      // The next loop is good enough
+      thisIteration = false;
+    } else {
+      return;
+    }
   }
   evb_->runInLoop(this, thisIteration);
 }

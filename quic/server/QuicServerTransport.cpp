@@ -17,6 +17,7 @@
 #include <folly/Optional.h>
 #include <quic/common/TransportKnobs.h>
 #include <algorithm>
+#include <chrono>
 #include <stdexcept>
 
 namespace quic {
@@ -1004,6 +1005,25 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           VLOG(3) << errMsg;
           throw std::runtime_error(errMsg);
         }
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::FIRE_LOOP_EARLY),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        serverTransport->writeLooper_->setFireLoopEarly(static_cast<bool>(val));
+        VLOG(3) << "FIRE_LOOP_EARLY KnobParam received: "
+                << static_cast<bool>(val);
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::PACING_TIMER_TICK),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.pacingTimerTickInterval =
+            std::chrono::microseconds(val);
+        VLOG(3) << "FIRE_LOOP_EARLY KnobParam received: " << val;
       });
 }
 

@@ -163,7 +163,11 @@ BETTER_ENUM(
     // Knob for setting max pacing rate, with sequence number
     MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999,
     // Control ACK_FREQUENCY policy
-    ACK_FREQUENCY_POLICY = 0x10000)
+    ACK_FREQUENCY_POLICY = 0x10000,
+    // Controls whether to fire write loops early when pacing
+    FIRE_LOOP_EARLY = 0x10001,
+    // Controls the timer tick used for pacing
+    PACING_TIMER_TICK = 0x10002)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

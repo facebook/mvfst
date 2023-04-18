@@ -10,6 +10,7 @@
 
 #include <folly/Function.h>
 #include <folly/io/async/EventBase.h>
+#include <quic/QuicConstants.h>
 #include <quic/common/Timers.h>
 
 namespace quic {
@@ -82,6 +83,14 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
 
   folly::Optional<std::chrono::microseconds> getTimerTickInterval() noexcept;
 
+  /*
+   * Controls whether to fire a loop early when the pacing timer has been
+   * missed or is scheduled to fire "soon" (within 1ms).
+   */
+  void setFireLoopEarly(bool val) {
+    fireLoopEarly_ = val;
+  }
+
  private:
   ~FunctionLooper() override = default;
   void commonLoopBody() noexcept;
@@ -94,5 +103,7 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
   bool running_{false};
   bool inLoopBody_{false};
   const LooperType type_;
+  TimePoint nextPacingTime_;
+  bool fireLoopEarly_{false};
 };
 } // namespace quic
