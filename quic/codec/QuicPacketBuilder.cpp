@@ -209,6 +209,15 @@ void RegularQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
   packet_.frames.push_back(std::move(frame));
 }
 
+void RegularQuicPacketBuilder::appendPaddingFrame() {
+  if (!packet_.frames.empty() &&
+      packet_.frames.back().type() == QuicWriteFrame::Type::PaddingFrame) {
+    packet_.frames.back().asPaddingFrame()->numFrames++;
+  } else {
+    packet_.frames.push_back(PaddingFrame());
+  }
+}
+
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   CHECK(packetNumberEncoding_.hasValue());
   // at this point everything should been set in the packet_
@@ -638,6 +647,15 @@ void InplaceQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
 
 void InplaceQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
   packet_.frames.push_back(std::move(frame));
+}
+
+void InplaceQuicPacketBuilder::appendPaddingFrame() {
+  if (!packet_.frames.empty() &&
+      packet_.frames.back().type() == QuicWriteFrame::Type::PaddingFrame) {
+    packet_.frames.back().asPaddingFrame()->numFrames++;
+  } else {
+    packet_.frames.push_back(PaddingFrame());
+  }
 }
 
 const PacketHeader& InplaceQuicPacketBuilder::getPacketHeader() const {

@@ -527,10 +527,9 @@ TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
   }
   EXPECT_EQ(headerBytes, builder1->getHeaderBytes());
   auto builtOut1 = std::move(*builder1).buildPacket();
-  EXPECT_EQ(20, builtOut1.packet.frames.size());
-  for (size_t i = 0; i < 20; i++) {
-    EXPECT_TRUE(builtOut1.packet.frames[i].asPaddingFrame() != nullptr);
-  }
+  EXPECT_EQ(1, builtOut1.packet.frames.size());
+  ASSERT_TRUE(builtOut1.packet.frames[0].asPaddingFrame());
+  EXPECT_EQ(builtOut1.packet.frames[0].asPaddingFrame()->numFrames, 20);
 
   auto builder2 = std::make_unique<InplaceQuicPacketBuilder>(
       bufAccessor,
@@ -543,10 +542,10 @@ TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
     writeFrame(PaddingFrame(), *builder2);
   }
   auto builtOut2 = std::move(*builder2).buildPacket();
-  EXPECT_EQ(40, builtOut2.packet.frames.size());
-  for (size_t i = 0; i < 40; i++) {
-    EXPECT_TRUE(builtOut2.packet.frames[i].asPaddingFrame() != nullptr);
-  }
+  EXPECT_EQ(1, builtOut2.packet.frames.size());
+  ASSERT_TRUE(builtOut2.packet.frames[0].asPaddingFrame());
+  EXPECT_EQ(builtOut2.packet.frames[0].asPaddingFrame()->numFrames, 40);
+
   EXPECT_EQ(builtOut2.header->length(), builtOut1.header->length());
   EXPECT_EQ(20, builtOut2.body->length() - builtOut1.body->length());
 }

@@ -60,8 +60,10 @@ struct RecvdPacketInfo {
 };
 
 struct PaddingFrame {
-  bool operator==(const PaddingFrame& /*rhs*/) const {
-    return true;
+  // How many contiguous padding frames this represents.
+  uint16_t numFrames{1};
+  bool operator==(const PaddingFrame& rhs) const {
+    return numFrames == rhs.numFrames;
   }
 };
 

@@ -966,8 +966,18 @@ RegularQuicPacket decodeRegularPacket(
   RegularQuicPacket packet(std::move(header));
   BufQueue queue;
   queue.append(std::move(packetData));
+  if (UNLIKELY(queue.chainLength() == 0)) {
+    return packet;
+  }
+  // Parse out one packet before any conditionals.
+  packet.frames.push_back(parseFrame(queue, packet.header, params));
   while (queue.chainLength() > 0) {
-    packet.frames.push_back(parseFrame(queue, packet.header, params));
+    auto f = parseFrame(queue, packet.header, params);
+    if (packet.frames.back().asPaddingFrame() && f.asPaddingFrame()) {
+      packet.frames.back().asPaddingFrame()->numFrames++;
+    } else {
+      packet.frames.push_back(std::move(f));
+    }
   }
   return packet;
 }

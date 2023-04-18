@@ -108,7 +108,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
   for (const auto& quicFrame : regularPacket.frames) {
     switch (quicFrame.type()) {
       case QuicFrame::Type::PaddingFrame: {
-        ++numPaddingFrames;
+        numPaddingFrames += quicFrame.asPaddingFrame()->numFrames;
         break;
       }
       case QuicFrame::Type::RstStreamFrame: {
@@ -233,7 +233,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
   for (const auto& quicFrame : writePacket.frames) {
     switch (quicFrame.type()) {
       case QuicWriteFrame::Type::PaddingFrame:
-        ++numPaddingFrames;
+        numPaddingFrames += quicFrame.asPaddingFrame()->numFrames;
         break;
       case QuicWriteFrame::Type::RstStreamFrame: {
         const RstStreamFrame& frame = *quicFrame.asRstStreamFrame();

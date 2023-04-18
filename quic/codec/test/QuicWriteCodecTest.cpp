@@ -98,6 +98,15 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
       .WillRepeatedly(WithArgs<0>(
           Invoke([&](auto frame) { pktBuilder.frames_.push_back(frame); })));
 
+  EXPECT_CALL(pktBuilder, appendPaddingFrame()).WillRepeatedly(Invoke([&]() {
+    if (!pktBuilder.frames_.empty() &&
+        pktBuilder.frames_.back().asPaddingFrame()) {
+      pktBuilder.frames_.back().asPaddingFrame()->numFrames++;
+    } else {
+      pktBuilder.frames_.push_back(PaddingFrame());
+    }
+  }));
+
   EXPECT_CALL(pktBuilder, _insert(_))
       .WillRepeatedly(WithArgs<0>(Invoke([&](Buf& buf) {
         pktBuilder.remaining_ -= buf->computeChainDataLength();

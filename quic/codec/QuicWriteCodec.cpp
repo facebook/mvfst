@@ -772,11 +772,10 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
 
   switch (frame.type()) {
     case QuicWriteFrame::Type::PaddingFrame: {
-      PaddingFrame& paddingFrame = *frame.asPaddingFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PADDING));
       if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
         builder.write(intFrameType);
-        builder.appendFrame(std::move(paddingFrame));
+        builder.appendPaddingFrame();
         return intFrameType.getSize();
       }
       return size_t(0);

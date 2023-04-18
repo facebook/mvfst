@@ -663,10 +663,8 @@ RegularQuicWritePacket createPacketWithAckFrames() {
 RegularQuicWritePacket createPacketWithPaddingFrames() {
   RegularQuicWritePacket packet =
       createNewPacket(100, PacketNumberSpace::Initial);
-  for (int i = 0; i < 20; ++i) {
-    PaddingFrame paddingFrame;
-    packet.frames.emplace_back(paddingFrame);
-  }
+  PaddingFrame paddingFrame{20};
+  packet.frames.emplace_back(paddingFrame);
   return packet;
 }
 

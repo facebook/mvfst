@@ -45,6 +45,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
     _insert(buf, limit);
   }
   MOCK_METHOD(void, appendFrame, (QuicWriteFrame));
+  MOCK_METHOD(void, appendPaddingFrame, ());
   MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&));
   MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&, size_t));
   MOCK_METHOD(void, insert, (const BufQueue&, size_t));
