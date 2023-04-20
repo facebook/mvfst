@@ -3362,6 +3362,9 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
   client->idleTimeout().cancelTimeout();
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
   ASSERT_FALSE(client->idleTimeout().isScheduled());
+  quicStats_ = std::make_shared<testing::NiceMock<MockQuicStats>>();
+  client->setTransportStatsCallback(quicStats_);
+  EXPECT_CALL(*quicStats_, onDuplicatedPacketReceived());
   // Try delivering the same packet again
   deliverData(packet->coalesce(), false);
 

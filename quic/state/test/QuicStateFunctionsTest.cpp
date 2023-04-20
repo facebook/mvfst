@@ -69,7 +69,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, FirstPacketNotOutOfOrder) {
    */
   PacketNum firstPacket = folly::Random::rand32(1, 100);
   EXPECT_FALSE(updateLargestReceivedPacketNum(
-      getAckState(conn, GetParam()), firstPacket, Clock::now()));
+      conn, getAckState(conn, GetParam()), firstPacket, Clock::now()));
 }
 
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNew) {
@@ -80,7 +80,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNew) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived + 1;
   auto distance = updateLargestReceivedPacketNum(
-      getAckState(conn, GetParam()), newReceived, Clock::now());
+      conn, getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 0);
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
@@ -95,7 +95,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNewWithGap) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived + 3;
   auto distance = updateLargestReceivedPacketNum(
-      getAckState(conn, GetParam()), newReceived, Clock::now());
+      conn, getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 2); // newReceived is 2 after the expected pkt num
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
@@ -110,7 +110,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveOld) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived - 1;
   auto distance = updateLargestReceivedPacketNum(
-      getAckState(conn, GetParam()), newReceived, Clock::now());
+      conn, getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 2); // newReceived is 2 before the expected pkt num
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
@@ -125,7 +125,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveOldWithGap) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived - 5;
   auto distance = updateLargestReceivedPacketNum(
-      getAckState(conn, GetParam()), newReceived, Clock::now());
+      conn, getAckState(conn, GetParam()), newReceived, Clock::now());
   EXPECT_EQ(distance, 6); // newReceived is 6 before the expected pkt num
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,

@@ -399,6 +399,7 @@ uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn) {
 }
 
 uint64_t updateLargestReceivedPacketNum(
+    QuicConnectionStateBase& conn,
     AckState& ackState,
     PacketNum packetNum,
     TimePoint receivedTime) {
@@ -408,7 +409,11 @@ uint64_t updateLargestReceivedPacketNum(
   }
   ackState.largestRecvdPacketNum = std::max<PacketNum>(
       ackState.largestRecvdPacketNum.value_or(packetNum), packetNum);
+  auto preInsertVersion = ackState.acks.insertVersion();
   ackState.acks.insert(packetNum);
+  if (preInsertVersion == ackState.acks.insertVersion()) {
+    QUIC_STATS(conn.statsCallback, onDuplicatedPacketReceived);
+  }
   if (ackState.largestRecvdPacketNum == packetNum) {
     ackState.largestRecvdPacketTime = receivedTime;
   }

@@ -889,12 +889,12 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   void expectQuicStatsPacketDrop(PacketDropReason expectedReason) {
-    auto quicStats = std::make_shared<testing::NiceMock<MockQuicStats>>();
-    EXPECT_CALL(*quicStats, onPacketDropped(testing::_))
+    quicStats_ = std::make_shared<testing::NiceMock<MockQuicStats>>();
+    EXPECT_CALL(*quicStats_, onPacketDropped(testing::_))
         .WillOnce(testing::Invoke([=](PacketDropReason reason) {
           EXPECT_EQ(expectedReason, reason);
         }));
-    client->setTransportStatsCallback(quicStats);
+    client->setTransportStatsCallback(quicStats_);
   }
 
  protected:

@@ -64,6 +64,7 @@ void increaseNextPacketNum(
  * distance from the next packet number we expect to receive.
  */
 uint64_t updateLargestReceivedPacketNum(
+    QuicConnectionStateBase& conn,
     AckState& ackState,
     PacketNum packetNum,
     TimePoint receivedTime);

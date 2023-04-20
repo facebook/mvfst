@@ -1004,7 +1004,7 @@ void onServerReadDataFromOpen(
 
     auto& ackState = getAckState(conn, packetNumberSpace);
     uint64_t distanceFromExpectedPacketNum = updateLargestReceivedPacketNum(
-        ackState, packetNum, readData.networkData.receiveTimePoint);
+        conn, ackState, packetNum, readData.networkData.receiveTimePoint);
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }

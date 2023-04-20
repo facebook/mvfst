@@ -479,7 +479,7 @@ void updateAckState(
     bool pkHasCryptoData,
     TimePoint receivedTime) {
   uint64_t distance = updateLargestReceivedPacketNum(
-      getAckState(conn, pnSpace), packetNum, receivedTime);
+      conn, getAckState(conn, pnSpace), packetNum, receivedTime);
   updateAckSendStateOnRecvPacket(
       conn,
       getAckState(conn, pnSpace),
