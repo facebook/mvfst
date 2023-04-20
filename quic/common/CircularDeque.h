@@ -73,7 +73,9 @@ struct CircularDeque {
     capacity_ = 0;
   }
   // Missing: more constructor overloads, and custom Allocator
-  // Missing: comparison operators... I'm lazy. I'm waiting for my spaceship.
+  bool operator==(const CircularDeque& other) const {
+    return size() == other.size() && std::equal(begin(), end(), other.begin());
+  }
 
   // Iterator
   template <typename U>
