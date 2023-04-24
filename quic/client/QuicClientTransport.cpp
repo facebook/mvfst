@@ -591,9 +591,7 @@ void QuicClientTransport::processPacketData(
         }
         conn_->peerConnectionError =
             QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
-        throw QuicTransportException(
-            "Peer closed", TransportErrorCode::NO_ERROR);
-        break;
+        return;
       }
       case QuicFrame::Type::PingFrame:
         // Ping isn't retransmittable. But we would like to ack them early.

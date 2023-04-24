@@ -1890,6 +1890,11 @@ void QuicTransportBase::onNetworkData(
       onReadData(
           peer,
           NetworkDataSingle(std::move(packet), networkData.receiveTimePoint));
+      if (conn_->peerConnectionError) {
+        closeImpl(QuicError(
+            QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));
+        return;
+      }
     }
 
     processCallbacksAfterNetworkData();

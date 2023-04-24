@@ -1221,9 +1221,7 @@ void onServerReadDataFromOpen(
               conn.flowControlState.sumCurStreamBufferLen) {
             VLOG(2) << "Client gives up a flow control blocked connection";
           }
-          throw QuicTransportException(
-              "Peer closed", TransportErrorCode::NO_ERROR);
-          break;
+          return;
         }
         case QuicFrame::Type::PingFrame:
           isNonProbingPacket = true;
