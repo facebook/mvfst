@@ -134,10 +134,11 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   WriteAckFrameState ackState;
   ackState.acks = *CHECK_NOTNULL(maybeAckBlocks.get_pointer());
   WriteAckFrameMetaData ackData = {
-      .ackState = ackState,
-      .ackDelay = *CHECK_NOTNULL(maybeAckDelay.get_pointer()),
-      .ackDelayExponent = static_cast<uint8_t>(
-          CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent)};
+      ackState,
+      *CHECK_NOTNULL(maybeAckDelay.get_pointer()),
+      static_cast<uint8_t>(
+          CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent),
+      TimePoint()};
   writeAckFrame(ackData, builder);
   return std::move(builder).buildPacket();
 }
