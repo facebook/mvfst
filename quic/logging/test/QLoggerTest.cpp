@@ -746,12 +746,20 @@ TEST_F(QLoggerTest, AddingAckReceiveTimestampFrame) {
                    "latest_recvd_packet_num": 400,
                    "latest_recvd_packet_time": 100000,
                    "timestamp_ranges": [
-                    [
-                      1,
-                      1,
-                      1,
-                      1
-                    ]
+                    {
+                      "deltas": [
+                        1, 1, 1, 1, 1
+                      ],
+                      "gap": 0,
+                      "timestamp_delta_count": 5
+                    },
+                    {
+                      "deltas": [
+                        1, 1, 1 ,1, 1
+                      ],
+                      "gap": 100,
+                      "timestamp_delta_count": 5
+                    }
                   ]
                  },
                  {
@@ -782,9 +790,12 @@ TEST_F(QLoggerTest, AddingAckReceiveTimestampFrame) {
   ackFrame.ackBlocks.emplace_back(100, 200);
   ackFrame.maybeLatestRecvdPacketNum = 400;
   ackFrame.maybeLatestRecvdPacketTime = 100ms;
-  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange = {
-      .gap = 1, .timestamp_delta_count = 1, .deltas = {1}};
-  ackFrame.recvdPacketsTimestampRanges = {recvdPacketsTimestampsRange};
+  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
+      .gap = 0, .timestamp_delta_count = 5, .deltas = {1, 1, 1, 1, 1}};
+  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange2 = {
+      .gap = 100, .timestamp_delta_count = 5, .deltas = {1, 1, 1, 1, 1}};
+  ackFrame.recvdPacketsTimestampRanges = {
+      recvdPacketsTimestampsRange1, recvdPacketsTimestampsRange2};
   WriteStreamFrame streamFrame(streamId, offset, len, fin);
 
   packet.frames.emplace_back(std::move(ackFrame));
@@ -1785,12 +1796,20 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
                    "latest_recvd_packet_num": 400,
                    "latest_recvd_packet_time": 100000,
                    "timestamp_ranges": [
-                    [
-                      1,
-                      1,
-                      1,
-                      1
-                    ]
+                    {
+                      "deltas": [
+                        1, 1, 1, 1, 1
+                      ],
+                      "gap": 0,
+                      "timestamp_delta_count": 5
+                    },
+                    {
+                      "deltas": [
+                        1, 1, 1 ,1, 1
+                      ],
+                      "gap": 100,
+                      "timestamp_delta_count": 5
+                    }
                   ]
                 }
              ],
@@ -1827,9 +1846,12 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
   ackFrame.ackBlocks.emplace_back(100, 200);
   ackFrame.maybeLatestRecvdPacketNum = 400;
   ackFrame.maybeLatestRecvdPacketTime = 100ms;
-  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange = {
-      .gap = 1, .timestamp_delta_count = 1, .deltas = {1}};
-  ackFrame.recvdPacketsTimestampRanges = {recvdPacketsTimestampsRange};
+  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
+      .gap = 0, .timestamp_delta_count = 5, .deltas = {1, 1, 1, 1, 1}};
+  RecvdPacketsTimestampsRange recvdPacketsTimestampsRange2 = {
+      .gap = 100, .timestamp_delta_count = 5, .deltas = {1, 1, 1, 1, 1}};
+  ackFrame.recvdPacketsTimestampRanges = {
+      recvdPacketsTimestampsRange1, recvdPacketsTimestampsRange2};
 
   ReadStreamFrame frame(streamId, offset, fin);
 

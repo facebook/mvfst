@@ -231,11 +231,14 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
     for (auto it = recvdPacketsTimestampRanges.cbegin();
          it != recvdPacketsTimestampRanges.cend();
          ++it) {
-      recvdPacketsTimestampRangesDynamic.push_back(folly::dynamic::array(
-          it->gap,
-          it->timestamp_delta_count,
-          it->deltas.front(),
-          it->deltas.back()));
+      folly::dynamic currentRxTimestampRange = folly::dynamic::object();
+      currentRxTimestampRange["gap"] = it->gap;
+      currentRxTimestampRange["timestamp_delta_count"] =
+          it->timestamp_delta_count;
+      currentRxTimestampRange["deltas"] =
+          folly::dynamic::array(it->deltas.begin(), it->deltas.end());
+
+      recvdPacketsTimestampRangesDynamic.push_back(currentRxTimestampRange);
     }
     d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
   }
@@ -261,14 +264,18 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
     if (maybeLatestRecvdPacketNum.has_value()) {
       d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
     }
+
     for (auto it = recvdPacketsTimestampRanges.cbegin();
          it != recvdPacketsTimestampRanges.cend();
          ++it) {
-      recvdPacketsTimestampRangesDynamic.push_back(folly::dynamic::array(
-          it->gap,
-          it->timestamp_delta_count,
-          it->deltas.front(),
-          it->deltas.back()));
+      folly::dynamic currentRxTimestampRange = folly::dynamic::object();
+      currentRxTimestampRange["gap"] = it->gap;
+      currentRxTimestampRange["timestamp_delta_count"] =
+          it->timestamp_delta_count;
+
+      currentRxTimestampRange["deltas"] =
+          folly::dynamic::array(it->deltas.begin(), it->deltas.end());
+      recvdPacketsTimestampRangesDynamic.push_back(currentRxTimestampRange);
     }
     d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
   }
