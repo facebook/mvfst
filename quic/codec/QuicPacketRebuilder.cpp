@@ -269,6 +269,14 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
       (shouldWriteWindowUpdate && !windowUpdateWritten && !writeSuccess)) {
     return folly::none;
   }
+
+  if (encryptionLevel == EncryptionLevel::Initial) {
+    // Pad anything else that's left.
+    while (builder_.remainingSpaceInPkt() > 0) {
+      writeFrame(PaddingFrame(), builder_);
+    }
+  }
+
   return cloneOutstandingPacket(packet);
 }
 

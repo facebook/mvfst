@@ -60,6 +60,45 @@ TEST_F(QuicPacketRebuilderTest, RebuildEmpty) {
   EXPECT_TRUE(packet.body->empty());
 }
 
+TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
+  auto srcConnId = getTestConnectionId(0);
+  auto dstConnId = getTestConnectionId(1);
+  QuicVersion version = QuicVersion::MVFST;
+  PacketNum num = 1;
+  LongHeader initialHeader1(
+      LongHeader::Types::Initial, srcConnId, dstConnId, num, version, "");
+  LongHeader initialHeader2(
+      LongHeader::Types::Initial, srcConnId, dstConnId, num + 1, version, "");
+
+  RegularQuicPacketBuilder regularBuilder1(
+      kDefaultUDPSendPacketLen, std::move(initialHeader1), 0);
+  RegularQuicPacketBuilder regularBuilder2(
+      kDefaultUDPSendPacketLen, std::move(initialHeader2), 0);
+
+  PingFrame pingFrame{};
+  writeFrame(pingFrame, regularBuilder1);
+  MaxStreamsFrame maxStreamsFrame(4321, true);
+  writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
+  regularBuilder1.encodePacketHeader();
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  PacketRebuilder rebuilder(regularBuilder2, conn);
+  auto packet = std::move(regularBuilder1).buildPacket();
+  auto outstanding = makeDummyOutstandingPacket(packet.packet, 1000);
+  EXPECT_FALSE(packet.header->empty());
+  ASSERT_EQ(packet.packet.frames.size(), 2);
+  EXPECT_FALSE(packet.body->empty());
+  regularBuilder2.encodePacketHeader();
+  ASSERT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuilt = std::move(regularBuilder2).buildPacket();
+  EXPECT_FALSE(rebuilt.header->empty());
+  ASSERT_EQ(rebuilt.packet.frames.size(), 3);
+  auto padding = rebuilt.packet.frames.back().asPaddingFrame();
+  ASSERT_TRUE(padding != nullptr);
+  EXPECT_GT(padding->numFrames, 1000);
+  EXPECT_FALSE(rebuilt.body->empty());
+  EXPECT_GT(rebuilt.body->computeChainDataLength(), 1200);
+}
+
 TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   ShortHeader shortHeader1(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
