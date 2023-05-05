@@ -39,8 +39,9 @@ class QuicAsyncTransportServer {
 
   void shutdown();
 
+  void setTransportSettings(const quic::TransportSettings& ts);
+
  protected:
-  void setTransportSettings();
   void createAcceptors(std::vector<folly::EventBase*>& evbs);
 
   QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook_;

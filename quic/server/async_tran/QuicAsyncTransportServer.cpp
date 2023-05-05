@@ -23,14 +23,9 @@ void QuicAsyncTransportServer::setFizzContext(
   fizzCtx_ = std::move(ctx);
 }
 
-void QuicAsyncTransportServer::setTransportSettings() {
-  quic::TransportSettings transportSettings;
-  uint64_t flowControl = 2024 * 1024 * 1024;
-  transportSettings.advertisedInitialConnectionWindowSize = flowControl;
-  transportSettings.advertisedInitialBidiLocalStreamWindowSize = flowControl;
-  transportSettings.advertisedInitialBidiRemoteStreamWindowSize = flowControl;
-  transportSettings.advertisedInitialUniStreamWindowSize = flowControl;
-  quicServer_->setTransportSettings(transportSettings);
+void QuicAsyncTransportServer::setTransportSettings(
+    const quic::TransportSettings& ts) {
+  quicServer_->setTransportSettings(ts);
 }
 
 void QuicAsyncTransportServer::start(
@@ -52,7 +47,6 @@ void QuicAsyncTransportServer::start(
 void QuicAsyncTransportServer::start(
     const folly::SocketAddress& address,
     std::vector<folly::EventBase*> evbs) {
-  setTransportSettings();
   quicServer_->initialize(address, evbs, false /* useDefaultTransport */);
   quicServer_->waitUntilInitialized();
   createAcceptors(evbs);
