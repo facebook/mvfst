@@ -9,19 +9,19 @@
 
 #include <folly/io/async/AsyncTransport.h>
 #include <quic/server/QuicServerTransportFactory.h>
-#include <wangle/acceptor/Acceptor.h>
 
 namespace quic {
 
-class QuicAsyncTransportAcceptor : public wangle::Acceptor,
-                                   public quic::QuicServerTransportFactory {
+class QuicAsyncTransportAcceptor : public quic::QuicServerTransportFactory {
  public:
-  using ManagedConnectionFactory = folly::Function<wangle::ManagedConnection*(
-      folly::AsyncTransport::UniquePtr)>;
+  // Hook/Callback function to be invoked when a new connection is accepted and
+  // passed in the associated AsyncTransport.
+  using AsyncTransportHook =
+      folly::Function<void(folly::AsyncTransport::UniquePtr)>;
 
   QuicAsyncTransportAcceptor(
       folly::EventBase* evb,
-      ManagedConnectionFactory connectionFactory);
+      AsyncTransportHook asyncTransportHook);
   ~QuicAsyncTransportAcceptor() override = default;
 
   // quic::QuicServerTransportFactory
@@ -34,7 +34,7 @@ class QuicAsyncTransportAcceptor : public wangle::Acceptor,
       override;
 
  private:
-  ManagedConnectionFactory connectionFactory_;
+  AsyncTransportHook asyncTransportHook_;
   folly::EventBase* evb_;
 };
 

@@ -21,7 +21,7 @@ namespace quic {
 class QuicAsyncTransportServer {
  public:
   explicit QuicAsyncTransportServer(
-      QuicAsyncTransportAcceptor::ManagedConnectionFactory connectionFactory);
+      QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook);
   virtual ~QuicAsyncTransportServer() = default;
 
   void setFizzContext(
@@ -39,7 +39,7 @@ class QuicAsyncTransportServer {
   void setTransportSettings();
   void createAcceptors();
 
-  QuicAsyncTransportAcceptor::ManagedConnectionFactory connectionFactory_;
+  QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook_;
   std::shared_ptr<quic::QuicServer> quicServer_;
   std::vector<std::unique_ptr<QuicAsyncTransportAcceptor>> acceptors_;
   std::vector<std::unique_ptr<folly::ScopedEventBaseThread>> workerEvbs_;

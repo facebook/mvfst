@@ -28,33 +28,6 @@ using namespace testing;
 
 namespace quic::test {
 
-class MockConnection : public wangle::ManagedConnection {
- public:
-  explicit MockConnection(folly::AsyncTransport::UniquePtr sock)
-      : sock_(std::move(sock)) {}
-  void timeoutExpired() noexcept final {}
-  void describe(std::ostream&) const final {}
-  bool isBusy() const final {
-    return true;
-  }
-  void notifyPendingShutdown() final {}
-  void closeWhenIdle() final {}
-  void dropConnection(const std::string& /*errorMsg*/ = "") final {
-    destroy();
-  }
-  void dumpConnectionState(uint8_t) final {}
-
-  [[nodiscard]] const folly::SocketAddress& getPeerAddress()
-      const noexcept override {
-    return dummyAddress;
-  }
-
-  folly::SocketAddress dummyAddress;
-
- private:
-  folly::AsyncTransport::UniquePtr sock_;
-};
-
 class QuicAsyncTransportServerTest : public Test {
  public:
   void SetUp() override {
@@ -84,7 +57,6 @@ class QuicAsyncTransportServerTest : public Test {
     server_ = std::make_shared<QuicAsyncTransportServer>([this](auto sock) {
       sock->setReadCB(&serverReadCB_);
       serverAsyncWrapper_ = std::move(sock);
-      return new MockConnection(nullptr);
     });
     server_->setFizzContext(test::createServerCtx());
     folly::SocketAddress addr("::1", 0);

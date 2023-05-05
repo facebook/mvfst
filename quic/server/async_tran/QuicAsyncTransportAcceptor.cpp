@@ -14,12 +14,8 @@ namespace quic {
 
 QuicAsyncTransportAcceptor::QuicAsyncTransportAcceptor(
     folly::EventBase* evb,
-    ManagedConnectionFactory connectionFactory)
-    : wangle::Acceptor(wangle::ServerSocketConfig()),
-      connectionFactory_(std::move(connectionFactory)),
-      evb_(evb) {
-  Acceptor::initDownstreamConnectionManager(evb_);
-}
+    AsyncTransportHook asyncTransportHook)
+    : asyncTransportHook_(std::move(asyncTransportHook)), evb_(evb) {}
 
 quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
     folly::EventBase* evb,
@@ -33,9 +29,9 @@ quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
   auto transport = quic::QuicServerTransport::make(
       evb, std::move(sock), asyncWrapper.get(), asyncWrapper.get(), ctx);
   asyncWrapper->setServerSocket(transport);
-  wangle::ManagedConnection* managedConnection =
-      connectionFactory_(std::move(asyncWrapper));
-  Acceptor::addConnection(managedConnection);
+  if (asyncTransportHook_) {
+    asyncTransportHook_(std::move(asyncWrapper));
+  }
   return transport;
 }
 

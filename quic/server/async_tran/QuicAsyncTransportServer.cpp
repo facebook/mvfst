@@ -12,9 +12,11 @@
 namespace quic {
 
 QuicAsyncTransportServer::QuicAsyncTransportServer(
-    QuicAsyncTransportAcceptor::ManagedConnectionFactory connectionFactory)
-    : connectionFactory_(std::move(connectionFactory)),
-      quicServer_(quic::QuicServer::createQuicServer()) {}
+    QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook)
+    : asyncTransportHook_(std::move(asyncTransportHook)),
+      quicServer_(quic::QuicServer::createQuicServer()) {
+  CHECK(asyncTransportHook_);
+}
 
 void QuicAsyncTransportServer::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
@@ -57,7 +59,7 @@ void QuicAsyncTransportServer::createAcceptors() {
     quicServer_->setFizzContext(evb, fizzCtx_);
     auto acceptor = std::make_unique<QuicAsyncTransportAcceptor>(
         evb, [this](folly::AsyncTransport::UniquePtr tran) {
-          return connectionFactory_(std::move(tran));
+          asyncTransportHook_(std::move(tran));
         });
     quicServer_->addTransportFactory(evb, acceptor.get());
     acceptors_.push_back(std::move(acceptor));
@@ -66,10 +68,6 @@ void QuicAsyncTransportServer::createAcceptors() {
 
 void QuicAsyncTransportServer::shutdown() {
   quicServer_->rejectNewConnections([]() { return true; });
-  for (size_t i = 0; i < workerEvbs_.size(); i++) {
-    workerEvbs_[i]->getEventBase()->runInEventBaseThreadAndWait(
-        [&] { acceptors_[i]->dropAllConnections(); });
-  }
   quicServer_->shutdown();
   quicServer_.reset();
 }
