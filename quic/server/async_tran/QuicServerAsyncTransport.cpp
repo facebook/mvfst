@@ -17,14 +17,12 @@ void QuicServerAsyncTransport::setServerSocket(
 }
 
 void QuicServerAsyncTransport::onNewBidirectionalStream(StreamId id) noexcept {
-  if (id != 0) {
-    CHECK(false) << "Only single stream 0 is supported";
-  }
+  CHECK_EQ(id, 0) << "only single stream w/ id=0 is supported";
   setStreamId(id);
 }
 void QuicServerAsyncTransport::onNewUnidirectionalStream(
     StreamId /*id*/) noexcept {
-  CHECK(false) << "Unidirectional stream not supported";
+  LOG(FATAL) << "Unidirectional stream not supported";
 }
 
 void QuicServerAsyncTransport::onStopSending(

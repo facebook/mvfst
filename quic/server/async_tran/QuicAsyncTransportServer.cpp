@@ -42,20 +42,26 @@ void QuicAsyncTransportServer::start(
   std::vector<folly::EventBase*> evbs;
   for (size_t i = 0; i < numThreads; ++i) {
     auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>();
+    evbs.push_back(scopedEvb->getEventBase());
     workerEvbs_.push_back(std::move(scopedEvb));
-    auto workerEvb = workerEvbs_.back()->getEventBase();
-    evbs.push_back(workerEvb);
   }
+
+  start(address, std::move(evbs));
+}
+
+void QuicAsyncTransportServer::start(
+    const folly::SocketAddress& address,
+    std::vector<folly::EventBase*> evbs) {
   setTransportSettings();
   quicServer_->initialize(address, evbs, false /* useDefaultTransport */);
   quicServer_->waitUntilInitialized();
-  createAcceptors();
+  createAcceptors(evbs);
   quicServer_->start();
 }
 
-void QuicAsyncTransportServer::createAcceptors() {
-  for (auto& worker : workerEvbs_) {
-    auto evb = worker->getEventBase();
+void QuicAsyncTransportServer::createAcceptors(
+    std::vector<folly::EventBase*>& evbs) {
+  for (auto evb : evbs) {
     quicServer_->setFizzContext(evb, fizzCtx_);
     auto acceptor = std::make_unique<QuicAsyncTransportAcceptor>(
         evb, [this](folly::AsyncTransport::UniquePtr tran) {
