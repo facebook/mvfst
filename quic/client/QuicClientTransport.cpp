@@ -208,8 +208,15 @@ void QuicClientTransport::processPacketData(
       conn_->qLogger->addPacket(*retryPacket, packetSize, true);
     }
 
-    if (!clientConn_->retryToken.empty()) {
-      VLOG(4) << "Server sent more than one retry packet";
+    // we reject retry packet if our initial has been processed or we've rx'd a
+    // prior retry packet; note that initialAckState is reset to nullptr only
+    // after we've confirmed handshake.
+    bool shouldRejectRetryPacket = !conn_->ackStates.initialAckState ||
+        conn_->ackStates.initialAckState->largestRecvdPacketNum.has_value() ||
+        !clientConn_->retryToken.empty();
+
+    if (shouldRejectRetryPacket) {
+      VLOG(4) << "Server incorrectly issued a retry packet; dropping retry";
       return;
     }
 

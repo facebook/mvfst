@@ -4867,6 +4867,16 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
                                    ->coalesce());
 }
 
+TEST_F(QuicClientTransportAfterStartTest, RetryPacketAfterRxInitial) {
+  ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+  client->getNonConstConn().originalDestinationConnectionId = initialDstConnId;
+  recvServerRetry(serverAddr);
+  loopForWrites();
+  // validate we dropped the retry packet via retryToken str
+  EXPECT_TRUE(client->getConn().retryToken.empty());
+  client->close(folly::none);
+}
+
 TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
   EXPECT_THROW(performFakeHandshake(), std::runtime_error);
 }
