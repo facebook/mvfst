@@ -205,31 +205,10 @@ class QuicServerWorkerTest : public Test {
       ShortHeader shortHeader,
       PacketDropReason dropReason);
 
-  std::string testSendRetry(
-      ConnectionId& srcConnId,
-      ConnectionId& dstConnId,
-      const folly::SocketAddress& clientAddr);
-
-  std::string testSendRetryUnfinished(
-      ConnectionId& srcConnId,
-      ConnectionId& dstConnId,
-      const folly::SocketAddress& clientAddr);
-
-  void testSendInitialWithRetryToken(
-      const std::string& retryToken,
-      ConnectionId& srcConnId,
-      ConnectionId& dstConnId,
-      const folly::SocketAddress& clientAddr);
-
   void expectConnCreateRefused();
   void createQuicConnectionDuringShedding(
       const folly::SocketAddress& addr,
       ConnectionId connId);
-
-  void expectServerRetryPacketWrite(
-      std::string& encryptedRetryToken,
-      ConnectionId& dstConnId,
-      const folly::SocketAddress& clientAddr);
 
  protected:
   folly::SocketAddress fakeAddress_;
@@ -378,136 +357,6 @@ void QuicServerWorkerTest::testSendReset(
       NetworkData(packet->clone(), Clock::now()),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
-}
-
-/**
- * Helper method that expects a socketPtr_->write() contains a retry packet, and
- * retrieves the token value from its header. Sets the retry token value to the
- * encryptedRetryToken parameter.
- */
-void QuicServerWorkerTest::expectServerRetryPacketWrite(
-    std::string& encryptedRetryToken,
-    ConnectionId& dstConnId,
-    const folly::SocketAddress& clientAddr) {
-  EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
-  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
-  EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
-
-  EXPECT_CALL(*socketPtr_, write(_, _))
-      .WillOnce(Invoke([&](const folly::SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& buf) {
-        // Validate that the retry packet has been created
-        QuicReadCodec codec(QuicNodeType::Client);
-        auto packetQueue = bufToQueue(buf->clone());
-        AckStates ackStates;
-
-        auto parsedPacket = codec.parsePacket(packetQueue, ackStates);
-        EXPECT_NE(parsedPacket.retryPacket(), nullptr);
-
-        // Validate the generated retry token
-        RetryPacket* retryPacket = parsedPacket.retryPacket();
-        EXPECT_TRUE(retryPacket->header.hasToken());
-        encryptedRetryToken = retryPacket->header.getToken();
-        auto tokenBuf = folly::IOBuf::copyBuffer(encryptedRetryToken);
-
-        TokenGenerator generator(tokenSecret_);
-        RetryToken token(dstConnId, clientAddr.getIPAddress(), 0);
-
-        auto maybeDecryptedTokenMs = generator.decryptToken(
-            std::move(tokenBuf), token.genAeadAssocData());
-
-        EXPECT_TRUE(maybeDecryptedTokenMs);
-
-        return buf->computeChainDataLength();
-      }));
-}
-
-// Helper method to send a client initial to the server
-// Will return the encrypted retry token
-std::string QuicServerWorkerTest::testSendRetry(
-    ConnectionId& srcConnId,
-    ConnectionId& dstConnId,
-    const folly::SocketAddress& clientAddr) {
-  // Retry packet will only be sent if rate-limiting is configured
-  worker_->setRateLimiter(
-      std::make_unique<SlidingWindowRateLimiter>([]() { return 0; }, 60s));
-
-  // Send a client inital to the server - the server will respond with retry
-  // packet
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
-  auto data = createData(kMinInitialPacketSize);
-
-  std::string encryptedRetryToken;
-
-  expectServerRetryPacketWrite(encryptedRetryToken, dstConnId, clientAddr);
-
-  worker_->dispatchPacketData(
-      clientAddr,
-      std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
-      QuicVersion::MVFST);
-  eventbase_.loopIgnoreKeepAlive();
-
-  return encryptedRetryToken;
-}
-
-std::string QuicServerWorkerTest::testSendRetryUnfinished(
-    ConnectionId& srcConnId,
-    ConnectionId& dstConnId,
-    const folly::SocketAddress& clientAddr) {
-  worker_->setUnfinishedHandshakeLimit([]() { return 0; });
-
-  // Send a client inital to the server - the server will respond with retry
-  // packet
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
-  auto data = createData(kMinInitialPacketSize);
-
-  std::string encryptedRetryToken;
-  expectServerRetryPacketWrite(encryptedRetryToken, dstConnId, clientAddr);
-
-  worker_->dispatchPacketData(
-      clientAddr,
-      std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
-      QuicVersion::MVFST);
-  eventbase_.loopIgnoreKeepAlive();
-
-  return encryptedRetryToken;
-}
-
-// Helper method to send a client initial that contains the retry token to the
-// server in response to the retry packet
-void QuicServerWorkerTest::testSendInitialWithRetryToken(
-    const std::string& retryToken,
-    ConnectionId& srcConnId,
-    ConnectionId& dstConnId,
-    const folly::SocketAddress& clientAddr) {
-  QuicVersion version = QuicVersion::MVFST;
-  PacketNum num = 1;
-  LongHeader initialHeader(
-      LongHeader::Types::Initial,
-      srcConnId,
-      dstConnId,
-      num,
-      version,
-      retryToken);
-
-  RegularQuicPacketBuilder initialBuilder(
-      kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
-  initialBuilder.encodePacketHeader();
-  while (initialBuilder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), initialBuilder);
-  }
-  auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
-  worker_->dispatchPacketData(
-      clientAddr,
-      std::move(routingData),
-      NetworkData(initialPacket->clone(), Clock::now()),
-      version);
 }
 
 TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
@@ -760,103 +609,6 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr4, connId4)), 1);
   eventbase_.loopIgnoreKeepAlive();
-}
-
-// Validate that when the worker receives a valid NewToken, it invokes
-// transportInfo->onNewTokenReceived().
-TEST_F(QuicServerWorkerTest, TestNewTokenStatsCallback) {
-  EXPECT_CALL(*quicStats_, onNewTokenReceived());
-
-  NewToken newToken(kClientAddr.getIPAddress());
-  // Create the encrypted retry token
-  TokenGenerator generator(tokenSecret_);
-  auto encryptedToken = generator.encryptToken(newToken);
-
-  CHECK(encryptedToken.has_value());
-  std::string encryptedTokenStr =
-      encryptedToken.value()->moveToFbString().toStdString();
-
-  auto dstConnId = getTestConnectionId(hostId_);
-  auto srcConnId = getTestConnectionId(0);
-
-  // we piggyback the retrytoken logic with a new token
-  testSendInitialWithRetryToken(
-      encryptedTokenStr, srcConnId, dstConnId, kClientAddr);
-}
-
-TEST_F(QuicServerWorkerTest, TestRetryValidInitial) {
-  // The second client initial packet with the retry token is valid
-  // as the client IP is the same as the one stored in the retry token
-
-  auto dstConnId = getTestConnectionId(hostId_);
-  auto srcConnId = getTestConnectionId(0);
-  expectConnectionCreation(kClientAddr, transport_);
-  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
-  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
-  auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
-  testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr);
-}
-
-TEST_F(QuicServerWorkerTest, TestRetryUnfinishedValidInitial) {
-  // The second client initial packet with the retry token is valid
-  // as the client IP is the same as the one stored in the retry token
-  auto dstConnId = getTestConnectionId(hostId_);
-  auto srcConnId = getTestConnectionId(0);
-  expectConnectionCreation(kClientAddr, transport_);
-  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
-  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
-  auto retryToken = testSendRetryUnfinished(srcConnId, dstConnId, kClientAddr);
-  testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr);
-}
-
-TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
-  // The second client initial packet with the retry token is invalid
-  // as the client IP is different from the one stored in the retry token
-  auto dstConnId = getTestConnectionId(hostId_);
-  auto srcConnId = getTestConnectionId(0);
-  auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
-
-  // Rate limited servers will issue an retry packet in response to invalid
-  // retry tokens
-  std::string encryptedRetryToken;
-  expectServerRetryPacketWrite(encryptedRetryToken, dstConnId, kClientAddr2);
-
-  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
-  testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr2);
-}
-
-TEST_F(QuicServerWorkerTest, TestRetryUnfinishedInvalidInitialClientIp) {
-  // The second client initial packet with the retry token is invalid
-  // as the client IP is different from the one stored in the retry token
-  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
-
-  auto dstConnId = getTestConnectionId(hostId_);
-  auto srcConnId = getTestConnectionId(0);
-  auto retryToken = testSendRetryUnfinished(srcConnId, dstConnId, kClientAddr);
-
-  std::string _;
-  expectServerRetryPacketWrite(_, dstConnId, kClientAddr2);
-
-  testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr2);
-}
-
-TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialDstConnId) {
-  // Dest conn ID is invalid as it is different from the original dst conn ID
-  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
-  auto dstConnId = getTestConnectionId(hostId_);
-  auto srcConnId = getTestConnectionId(0);
-  auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
-
-  auto invalidDstConnId = getTestConnectionId(1);
-
-  // Rate limited servers will issue an retry packet in response to invalid
-  // retry tokens
-  std::string encryptedRetryToken;
-  expectServerRetryPacketWrite(
-      encryptedRetryToken, invalidDstConnId, kClientAddr);
-
-  testSendInitialWithRetryToken(
-      retryToken, srcConnId, invalidDstConnId, kClientAddr);
 }
 
 TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {
@@ -1719,6 +1471,213 @@ ConnectionId createConnIdForServer(ProcessId server) {
   uint8_t processId = (server == ProcessId::ONE) ? 1 : 0;
   ServerConnectionIdParams params(0, processId, 0);
   return *connIdAlgo->encodeConnectionId(params);
+}
+
+class QuicServerWorkerRetryTest : public QuicServerWorkerTest {
+ public:
+  // Helper method to send a client initial that may contain the retry token to
+  // the server in response to the retry packet
+  void testSendInitial(
+      ConnectionId& clientSrcConnId,
+      ConnectionId& dstConnId,
+      const folly::SocketAddress& clientAddr,
+      const std::string& retryToken = "") {
+    QuicVersion version = QuicVersion::MVFST;
+    PacketNum num = 1;
+    LongHeader initialHeader(
+        LongHeader::Types::Initial,
+        clientSrcConnId,
+        dstConnId,
+        num,
+        version,
+        retryToken);
+
+    RegularQuicPacketBuilder initialBuilder(
+        kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
+    initialBuilder.encodePacketHeader();
+    while (initialBuilder.remainingSpaceInPkt() > 0) {
+      writeFrame(PaddingFrame(), initialBuilder);
+    }
+    auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
+    RoutingData routingData(
+        HeaderForm::Long, true, false, true, dstConnId, clientSrcConnId);
+    worker_->dispatchPacketData(
+        clientAddr,
+        std::move(routingData),
+        NetworkData(initialPacket->clone(), Clock::now()),
+        version);
+    eventbase_.loopIgnoreKeepAlive();
+  }
+
+  /**
+   * Helper method that expects a socketPtr_->write() contains a retry packet,
+   * and retrieves the token value from its header. Sets the retry token value
+   * to the encryptedRetryToken parameter.
+   */
+  void expectServerRetryPacketWrite(std::string& encryptedRetryToken) {
+    EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
+    EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
+    EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
+
+    EXPECT_CALL(*socketPtr_, write(_, _))
+        .WillOnce(Invoke([&](const folly::SocketAddress& clientAddr,
+                             const std::unique_ptr<folly::IOBuf>& buf) {
+          // Validate that the retry packet has been created
+          QuicReadCodec codec(QuicNodeType::Client);
+          auto packetQueue = bufToQueue(buf->clone());
+          AckStates ackStates;
+
+          auto parsedPacket = codec.parsePacket(packetQueue, ackStates);
+          auto* retryPacket = parsedPacket.retryPacket();
+          CHECK(retryPacket);
+
+          const ConnectionId& serverChosenRetrySrcConnId =
+              retryPacket->header.getSourceConnId();
+
+          // Validate the generated retry token
+          EXPECT_TRUE(retryPacket->header.hasToken());
+          encryptedRetryToken = retryPacket->header.getToken();
+          auto tokenBuf = folly::IOBuf::copyBuffer(encryptedRetryToken);
+
+          TokenGenerator generator(tokenSecret_);
+          RetryToken token(
+              serverChosenRetrySrcConnId, clientAddr.getIPAddress(), 0);
+
+          auto maybeDecryptedTokenMs = generator.decryptToken(
+              std::move(tokenBuf), token.genAeadAssocData());
+
+          CHECK(maybeDecryptedTokenMs > 0);
+
+          return buf->computeChainDataLength();
+        }));
+  }
+
+  void enableRateLimiterForRetry() {
+    // Retry packet will only be sent if rate-limiting is configured
+    worker_->setRateLimiter(
+        std::make_unique<SlidingWindowRateLimiter>([]() { return 0; }, 60s));
+  }
+
+  void enableUnfinishedHandshakeLimitForRetry() {
+    worker_->setUnfinishedHandshakeLimit([]() { return 0; });
+  }
+};
+
+// Validate that when the worker receives a valid NewToken, it invokes
+// transportInfo->onNewTokenReceived().
+TEST_F(QuicServerWorkerRetryTest, TestNewTokenStatsCallback) {
+  EXPECT_CALL(*quicStats_, onNewTokenReceived());
+
+  NewToken newToken(kClientAddr.getIPAddress());
+  // Create the encrypted retry token
+  TokenGenerator generator(tokenSecret_);
+  auto encryptedToken = generator.encryptToken(newToken);
+
+  CHECK(encryptedToken.has_value());
+  std::string encryptedTokenStr =
+      encryptedToken.value()->moveToFbString().toStdString();
+
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+
+  testSendInitial(srcConnId, dstConnId, kClientAddr, encryptedTokenStr);
+}
+
+TEST_F(QuicServerWorkerRetryTest, TestRetryValidInitial) {
+  // The second client initial packet with the retry token is valid
+  // as the client IP is the same as the one stored in the retry token
+  enableRateLimiterForRetry();
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+  expectConnectionCreation(kClientAddr, transport_);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
+
+  // send initial to extract the retry token sent by the server
+  std::string retryToken{""};
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr);
+
+  // test that the retry token extracted is accepted by the server
+  testSendInitial(srcConnId, dstConnId, kClientAddr, retryToken);
+}
+
+TEST_F(QuicServerWorkerRetryTest, TestRetryUnfinishedValidInitial) {
+  // The second client initial packet with the retry token is valid
+  // as the client IP is the same as the one stored in the retry token
+  enableUnfinishedHandshakeLimitForRetry();
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+  expectConnectionCreation(kClientAddr, transport_);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
+
+  // send initial to extract the retry token sent by the server
+  std::string retryToken{""};
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr);
+
+  // test that the retry token extracted is accepted by the server
+  testSendInitial(srcConnId, dstConnId, kClientAddr, retryToken);
+}
+
+TEST_F(QuicServerWorkerRetryTest, TestRetryInvalidInitialClientIp) {
+  // The second client initial packet with the retry token is invalid
+  // as the client IP is different from the one stored in the retry token
+  enableRateLimiterForRetry();
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+
+  // send initial to extract the retry token sent by the server
+  std::string retryToken{""};
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr);
+
+  // send another client initial with the retry token rx'd above but with a
+  // different client addr to verify it's invalid (i.e. will send another retry
+  // packet)
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr2, retryToken);
+}
+
+TEST_F(QuicServerWorkerRetryTest, TestRetryUnfinishedInvalidInitialClientIp) {
+  // The second client initial packet with the retry token is invalid
+  // as the client IP is different from the one stored in the retry token
+  enableUnfinishedHandshakeLimitForRetry();
+
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+
+  // send initial to extract the retry token sent by the server
+  std::string retryToken{""};
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr);
+
+  // send another client initial with the retry token rx'd above but with a
+  // different client addr to verify it's invalid
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr2, retryToken);
+}
+
+TEST_F(QuicServerWorkerRetryTest, TestRetryInvalidInitialDstConnId) {
+  enableRateLimiterForRetry();
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+
+  // send initial to extract the retry token sent by the server
+  std::string retryToken{""};
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, dstConnId, kClientAddr);
+
+  // send another client initial with the retry token rx'd above but with a
+  // different dst conn id to verify it's invalid (i.e. will send another retry
+  // packet)
+  auto invalidDstConnId = getTestConnectionId(1);
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
+  expectServerRetryPacketWrite(retryToken);
+  testSendInitial(srcConnId, invalidDstConnId, kClientAddr, retryToken);
 }
 
 class QuicServerWorkerTakeoverTest : public Test {
