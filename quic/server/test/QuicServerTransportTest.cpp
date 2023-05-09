@@ -5118,7 +5118,18 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   server->writeBufMeta(streamId, bufMeta, true);
   server->writeData();
   EXPECT_FALSE(server->getConn().outstandings.packets.empty());
-  EXPECT_TRUE(server->getConn().outstandings.packets.back().isDSRPacket);
+  EXPECT_EQ(server->getConn().outstandings.packets.size(), 2);
+  int numDsr = 0;
+  int numNonDsr = 0;
+  for (auto& p : server->getConn().outstandings.packets) {
+    if (p.isDSRPacket) {
+      numDsr++;
+    } else {
+      numNonDsr++;
+    }
+  }
+  EXPECT_EQ(numDsr, 1);
+  EXPECT_EQ(numNonDsr, 1);
   EXPECT_CALL(*rawDSRSender, release()).Times(1);
   server->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR);
   EXPECT_EQ(server->getConn().dsrPacketCount, 1);

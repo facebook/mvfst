@@ -325,28 +325,43 @@ void QuicServerTransport::writeData() {
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
-    // TODO(yangchi): I don't know which one to prioritize. I can see arguments
-    // both ways. I'm going with writing regular packets first since they
-    // contain ack and flow control update and other important info.
+    // This kind of sucks, but right now we don't have a way to schedule DSR
+    // and non-DSR streams as part of the same priority queue. This can lead
+    // to prioritity inversions and starving of one kind of stream over the
+    // other. To mitigate this, randomly decide whether to write DSR or non
+    // DSR data first which at least ensures fairness over time.
     auto writeLoopBeginTime = Clock::now();
-    packetLimit -= writeQuicDataToSocket(
-                       *socket_,
-                       *conn_,
-                       srcConnId /* src */,
-                       destConnId /* dst */,
-                       *conn_->oneRttWriteCipher,
-                       *conn_->oneRttWriteHeaderCipher,
-                       version,
-                       packetLimit,
-                       writeLoopBeginTime)
-                       .packetsWritten;
-    if (packetLimit) {
-      packetLimit -= writePacketizationRequest(
+    auto nonDsrPath = [&]() {
+      return writeQuicDataToSocket(
+                 *socket_,
+                 *conn_,
+                 srcConnId /* src */,
+                 destConnId /* dst */,
+                 *conn_->oneRttWriteCipher,
+                 *conn_->oneRttWriteHeaderCipher,
+                 version,
+                 packetLimit,
+                 writeLoopBeginTime)
+          .packetsWritten;
+    };
+    auto dsrPath = [&]() {
+      return writePacketizationRequest(
           *serverConn_,
           destConnId,
           packetLimit,
           *conn_->oneRttWriteCipher,
           writeLoopBeginTime);
+    };
+    if (folly::Random::oneIn(2)) {
+      packetLimit -= dsrPath();
+      if (packetLimit) {
+        packetLimit -= nonDsrPath();
+      }
+    } else {
+      packetLimit -= nonDsrPath();
+      if (packetLimit) {
+        packetLimit -= dsrPath();
+      }
     }
   }
 }
