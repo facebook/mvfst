@@ -333,16 +333,15 @@ void QuicServerTransport::writeData() {
     auto writeLoopBeginTime = Clock::now();
     auto nonDsrPath = [&]() {
       return writeQuicDataToSocket(
-                 *socket_,
-                 *conn_,
-                 srcConnId /* src */,
-                 destConnId /* dst */,
-                 *conn_->oneRttWriteCipher,
-                 *conn_->oneRttWriteHeaderCipher,
-                 version,
-                 packetLimit,
-                 writeLoopBeginTime)
-          .packetsWritten;
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          destConnId /* dst */,
+          *conn_->oneRttWriteCipher,
+          *conn_->oneRttWriteHeaderCipher,
+          version,
+          packetLimit,
+          writeLoopBeginTime);
     };
     auto dsrPath = [&]() {
       return writePacketizationRequest(
@@ -355,10 +354,15 @@ void QuicServerTransport::writeData() {
     if (folly::Random::oneIn(2)) {
       packetLimit -= dsrPath();
       if (packetLimit) {
-        packetLimit -= nonDsrPath();
+        packetLimit -= nonDsrPath().packetsWritten;
       }
     } else {
-      packetLimit -= nonDsrPath();
+      auto written = nonDsrPath();
+      // If we didn't write much from the non DSR path, don't penalize DSR
+      // a full packet.
+      if (written.bytesWritten >= conn_->udpSendPacketLen / 2) {
+        packetLimit -= written.packetsWritten;
+      }
       if (packetLimit) {
         packetLimit -= dsrPath();
       }
