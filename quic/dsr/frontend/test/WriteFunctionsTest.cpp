@@ -143,6 +143,44 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
 
+TEST_F(WriteFunctionsTest, WriteTwoStreamsNonIncremental) {
+  prepareFlowControlAndStreamLimit();
+  auto streamId1 = prepareOneStream(2000);
+  auto streamId2 = prepareOneStream(1000);
+  auto stream1 = conn_.streamManager->findStream(streamId1);
+  auto stream2 = conn_.streamManager->findStream(streamId2);
+  conn_.streamManager->setStreamPriority(streamId1, Priority{3, false});
+  conn_.streamManager->setStreamPriority(streamId2, Priority{3, false});
+  auto cid = getTestConnectionId();
+  size_t packetLimit = 2;
+  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  EXPECT_EQ(2, stream1->retransmissionBufMetas.size());
+  EXPECT_EQ(0, stream2->retransmissionBufMetas.size());
+  EXPECT_EQ(2, countInstructions(streamId1));
+  EXPECT_EQ(0, countInstructions(streamId2));
+  EXPECT_EQ(2, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+}
+
+TEST_F(WriteFunctionsTest, WriteTwoStreamsIncremental) {
+  prepareFlowControlAndStreamLimit();
+  auto streamId1 = prepareOneStream(2000);
+  auto streamId2 = prepareOneStream(1000);
+  auto stream1 = conn_.streamManager->findStream(streamId1);
+  auto stream2 = conn_.streamManager->findStream(streamId2);
+  conn_.streamManager->setStreamPriority(streamId1, Priority{3, true});
+  conn_.streamManager->setStreamPriority(streamId2, Priority{3, true});
+  auto cid = getTestConnectionId();
+  size_t packetLimit = 2;
+  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
+  EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
+  EXPECT_EQ(1, countInstructions(streamId1));
+  EXPECT_EQ(1, countInstructions(streamId2));
+  EXPECT_EQ(2, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+}
+
 TEST_F(WriteFunctionsTest, LossAndFreshTwoInstructionsInTwoPackets) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(1000);

@@ -71,6 +71,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
           /*streamEncodedSize=*/encodedSize,
           /*streamPacketIdx=*/stream->streamPacketIdx++);
       result.writeSuccess = true;
+      levelIter->iterator->next();
       return result;
     }
   }
@@ -112,6 +113,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
     builder.addSendInstruction(
         instructionBuilder.build(), encodedSize, stream->streamPacketIdx++);
     result.writeSuccess = true;
+    levelIter->iterator->next();
     return result;
   }
   return result;
