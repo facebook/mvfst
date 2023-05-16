@@ -203,7 +203,7 @@ class QuicSocket {
     uint32_t totalPacketsSent{0};
     uint32_t totalAckElicitingPacketsSent{0};
     uint32_t totalPacketsMarkedLost{0};
-    uint32_t totalPacketsMarkedLostByPto{0};
+    uint32_t totalPacketsMarkedLostByTimeout{0};
     uint32_t totalPacketsMarkedLostByReorderingThreshold{0};
     uint32_t totalPacketsSpuriouslyMarkedLost{0};
     uint32_t timeoutBasedLoss{0};

@@ -90,11 +90,11 @@ struct LossState {
   // Total number of packets which were declared lost, including losses that
   // we later detected were spurious (see totalPacketsSpuriouslyMarkedLost).
   uint32_t totalPacketsMarkedLost{0};
-  // Total number of packets which were declared lost due to PTO; a packet can
-  // marked as lost by multiple detection mechanisms.
-  uint32_t totalPacketsMarkedLostByPto{0};
+  // Total number of packets which were declared lost due to a timeout; a packet
+  // can be marked as lost by multiple detection mechanisms.
+  uint32_t totalPacketsMarkedLostByTimeout{0};
   // Total number of packets which were declared lost based on the reordering
-  // threshold; a packet can marked as lost by multiple detection mechanisms.
+  // threshold; a packet can be marked as lost by multiple detection mechanisms.
   uint32_t totalPacketsMarkedLostByReorderingThreshold{0};
   // Total number of packets which were declared lost spuriously, i.e. we
   // received an ACK for them later.

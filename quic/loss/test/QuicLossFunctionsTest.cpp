@@ -2181,11 +2181,11 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {
   // 0, 1, and 5 should be marked lost due to reordering, none due to timeout
   // 6 is outstanding / on the wire still (no determination made)
   EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
-TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPto) {
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeout) {
   auto conn = createConn();
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 
@@ -2215,11 +2215,11 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPto) {
 
   // All 7 packets should be marked as lost by PTO
   EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
-TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoPartial) {
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutPartial) {
   auto conn = createConn();
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 
@@ -2255,11 +2255,11 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoPartial) {
   // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
   // 0, 1, 5, and 6 should be marked lost due to timeout, none due to reordering
   EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
-TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoAndReordering) {
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutAndReordering) {
   auto conn = createConn();
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 
@@ -2297,7 +2297,7 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoAndReordering) {
   // 0, 1, and 5 should be marked lost due to reordering AND timeout
   // 6 should be marked as lost due to timeout only
   EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 

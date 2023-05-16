@@ -376,7 +376,7 @@ bool processOutstandingsForLoss(
     // determine if this was spurious later.
     conn.lossState.totalPacketsMarkedLost++;
     if (lostByTimeout && rttSample.count() > 0) {
-      conn.lossState.totalPacketsMarkedLostByPto++;
+      conn.lossState.totalPacketsMarkedLostByTimeout++;
       pkt.metadata.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
           conn.transportSettings.timeReorderingThreshDivisor / rttSample;
     }
