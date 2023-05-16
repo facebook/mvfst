@@ -1217,7 +1217,10 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
       folly::IOBuf::copyBuffer("some data"),
       false);
   scheduler.writeStreams(builder);
-  EXPECT_EQ(conn.streamManager->writableStreams().getNextScheduledStream(), 0);
+  EXPECT_EQ(
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          kDefaultPriority),
+      0);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
@@ -1262,7 +1265,10 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
       false);
   // Force the wraparound initially.
   scheduler.writeStreams(builder);
-  EXPECT_EQ(conn.streamManager->writableStreams().getNextScheduledStream(), 4);
+  EXPECT_EQ(
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          kDefaultPriority),
+      4);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
   NiceMock<MockQuicPacketBuilder> builder2;
@@ -1327,7 +1333,9 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   // The default is to wraparound initially.
   scheduler.writeStreams(builder1);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(), stream2);
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          kDefaultPriority),
+      stream2);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
   NiceMock<MockQuicPacketBuilder> builder2;
@@ -1475,7 +1483,9 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   // The default is to wraparound initially.
   scheduler.writeStreams(builder);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(), stream3);
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          kDefaultPriority),
+      stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
   // Should write frames for stream2, stream4, followed by stream 3 then 1.
@@ -1501,7 +1511,9 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   EXPECT_EQ(*frames[3].asWriteStreamFrame(), f4);
 
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(), stream3);
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          kDefaultPriority),
+      stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 }
 
@@ -1525,7 +1537,10 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   auto stream1 = conn.streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream1, folly::IOBuf::copyBuffer("some data"), false);
   scheduler.writeStreams(builder);
-  EXPECT_EQ(conn.streamManager->writableStreams().getNextScheduledStream(), 0);
+  EXPECT_EQ(
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          kDefaultPriority),
+      0);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {

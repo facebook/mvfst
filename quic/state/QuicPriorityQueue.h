@@ -185,14 +185,14 @@ struct PriorityQueue {
    * This is a no-op if the stream doesn't exist, or its priority is the same as
    * the input.
    */
-  void updateIfExist(StreamId id, Priority priority = kDefaultPriority) {
+  void updateIfExist(StreamId id, Priority priority) {
     auto iter = writableStreamsToLevel_.find(id);
     if (iter != writableStreamsToLevel_.end()) {
       updateExistingStreamPriority(iter, priority);
     }
   }
 
-  void insertOrUpdate(StreamId id, Priority pri = kDefaultPriority) {
+  void insertOrUpdate(StreamId id, Priority pri) {
     auto it = writableStreamsToLevel_.find(id);
     auto index = priority2index(pri);
     if (it != writableStreamsToLevel_.end()) {
@@ -242,14 +242,13 @@ struct PriorityQueue {
   }
 
   // Only used for testing
-  void prepareIterator(Priority pri = kDefaultPriority) {
+  void prepareIterator(Priority pri) {
     auto& level = levels[priority2index(pri)];
     level.iterator->begin();
   }
 
   // Only used for testing
-  FOLLY_NODISCARD StreamId
-  getNextScheduledStream(Priority pri = kDefaultPriority) const {
+  FOLLY_NODISCARD StreamId getNextScheduledStream(Priority pri) const {
     auto& level = levels[priority2index(pri)];
     if (!level.incremental ||
         level.iterator->nextStreamIt == level.streams.end()) {

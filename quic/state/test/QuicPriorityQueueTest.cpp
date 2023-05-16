@@ -205,7 +205,7 @@ TEST_F(QuicPriorityQueueTest, TestUpdate) {
 }
 
 TEST_F(QuicPriorityQueueTest, UpdateIfExist) {
-  queue_.updateIfExist(0);
+  queue_.updateIfExist(0, kDefaultPriority);
   EXPECT_EQ(0, queue_.count(0));
 
   queue_.insertOrUpdate(0, Priority(0, false));
