@@ -1010,12 +1010,14 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               "ACK_FREQUENCY_POLICY KnobParam received, "
               "ackElicitingThreshold={}, "
               "reorderingThreshold={}, "
-              "minRttDivisor={}",
-              "useSmallThresholdDuringStartup={}",
+              "minRttDivisor={}, "
+              "useSmallThresholdDuringStartup={}, "
+              "raw knob={}",
               ackFrequencyConfig.ackElicitingThreshold,
               ackFrequencyConfig.reorderingThreshold,
               ackFrequencyConfig.minRttDivisor,
-              ackFrequencyConfig.useSmallThresholdDuringStartup);
+              ackFrequencyConfig.useSmallThresholdDuringStartup,
+              val);
           serverTransport->conn_->transportSettings.bbrConfig
               .ackFrequencyConfig = ackFrequencyConfig;
         } else {
