@@ -1689,14 +1689,14 @@ void QuicClientTransport::setSupportedExtensionTransportParameters() {
         static_cast<uint64_t>(
             TransportParameterId::max_receive_timestamps_per_ack),
         ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .max_receive_timestamps_per_ack);
+            .maxReceiveTimestampsPerAck);
     customTransportParameters_.push_back(maxReceiveTimestampsPerAck.encode());
 
     CustomIntegralTransportParameter receiveTimestampsExponent(
         static_cast<uint64_t>(
             TransportParameterId::receive_timestamps_exponent),
         ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .receive_timestamps_exponent);
+            .receiveTimestampsExponent);
     customTransportParameters_.push_back(receiveTimestampsExponent.encode());
   }
 

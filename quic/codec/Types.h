@@ -21,7 +21,6 @@
 #include <quic/common/IntervalSet.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/common/Variant.h>
-#include <quic/state/TransportSettings.h>
 
 /**
  * This details the types of objects that can be serialized or deserialized
@@ -263,11 +262,6 @@ struct WriteAckFrameMetaData {
 
   // Receive timestamps basis
   TimePoint connTime;
-
-  folly::Optional<AckReceiveTimestampsConfig> recvTimestampsConfig =
-      folly::none;
-
-  folly::Optional<uint64_t> maxAckReceiveTimestampsToSend = folly::none;
 };
 
 struct WriteAckFrameResult {

@@ -126,7 +126,8 @@ size_t computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
     const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
-    FrameType frameType = FrameType::ACK_RECEIVE_TIMESTAMPS);
+    const AckReceiveTimestampsConfig& recvTimestampsConfig,
+    uint64_t maxRecvTimestampsToSend);
 
 folly::Optional<quic::WriteAckFrame> writeAckFrameToPacketBuilder(
     const WriteAckFrameMetaData& ackFrameMetaData,

@@ -307,7 +307,7 @@ ReadAckFrame decodeAckFrameWithReceivedTimestamps(
     uint8_t receiveTimestampsExponentToUse =
         (params.maybeAckReceiveTimestampsConfig)
         ? params.maybeAckReceiveTimestampsConfig.value()
-              .receive_timestamps_exponent
+              .receiveTimestampsExponent
         : kDefaultReceiveTimestampsExponent;
     for (uint64_t i = 0; i < receiveTimeStampsLen->first; i++) {
       auto delta = decodeQuicInteger(cursor);

@@ -1587,15 +1587,15 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     CustomIntegralTransportParameter maxReceiveTimestampsPerAck(
         static_cast<uint64_t>(
             TransportParameterId::max_receive_timestamps_per_ack),
-        ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .max_receive_timestamps_per_ack);
+        ts.maybeAckReceiveTimestampsConfigSentToPeer
+            ->maxReceiveTimestampsPerAck);
     customTransportParams.push_back(maxReceiveTimestampsPerAck.encode());
 
     CustomIntegralTransportParameter receiveTimestampsExponent(
         static_cast<uint64_t>(
             TransportParameterId::receive_timestamps_exponent),
-        ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .receive_timestamps_exponent);
+        ts.maybeAckReceiveTimestampsConfigSentToPeer
+            ->receiveTimestampsExponent);
     customTransportParams.push_back(receiveTimestampsExponent.encode());
   }
 

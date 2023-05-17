@@ -574,8 +574,7 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
       ackDelay, /* ackDelay */
       static_cast<uint8_t>(ackDelayExponentToUse), /* ackDelayExponent */
       conn_.connectionTime, /* connect timestamp */
-      folly::none, /* recvTimestampsConfig */
-      folly::none /* maxAckReceiveTimestampsToSend */};
+  };
 
   folly::Optional<WriteAckFrameResult> ackWriteResult;
 
@@ -594,12 +593,12 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
   if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
     ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK);
   } else {
-    meta.recvTimestampsConfig =
-        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-            .value();
-    meta.maxAckReceiveTimestampsToSend = peerRequestedTimestampsCount;
     ackWriteResult = writeAckFrameWithReceivedTimestamps(
-        meta, builder, FrameType::ACK_RECEIVE_TIMESTAMPS);
+        meta,
+        builder,
+        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+            .value(),
+        peerRequestedTimestampsCount);
   }
   if (!ackWriteResult) {
     return folly::none;

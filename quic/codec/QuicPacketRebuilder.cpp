@@ -235,8 +235,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         ackDelay, /* ackDelay */
         static_cast<uint8_t>(ackDelayExponent), /* ackDelayExponent */
         conn_.connectionTime, /* connect timestamp */
-        folly::none, /* recvTimestampsConfig */
-        folly::none /* maxAckReceiveTimestampsToSend */};
+    };
 
     folly::Optional<WriteAckFrameResult> ackWriteResult;
 
@@ -254,12 +253,12 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
       writeAckFrame(meta, builder_, FrameType::ACK);
     } else {
-      meta.recvTimestampsConfig =
-          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-              .value();
-      meta.maxAckReceiveTimestampsToSend = peerRequestedTimestampsCount;
       writeAckFrameWithReceivedTimestamps(
-          meta, builder_, FrameType::ACK_RECEIVE_TIMESTAMPS);
+          meta,
+          builder_,
+          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+              .value(),
+          peerRequestedTimestampsCount);
     }
   }
   // We shouldn't clone if:

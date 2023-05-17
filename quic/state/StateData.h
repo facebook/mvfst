@@ -712,10 +712,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // GSO supported on conn.
   folly::Optional<bool> gsoSupported;
 
-  struct AckReceiveTimestampsConfig {
-    uint64_t maxReceiveTimestampsPerAck;
-    uint64_t receiveTimestampsExponent;
-  };
   folly::Optional<AckReceiveTimestampsConfig>
       maybePeerAckReceiveTimestampsConfig;
 

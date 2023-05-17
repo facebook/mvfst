@@ -286,7 +286,8 @@ static size_t fillPacketReceiveTimestamps(
     WriteAckFrame& ackFrame,
     uint64_t largestAckedPacketNum,
     uint64_t spaceLeft,
-    uint64_t receiveTimestampsExponent) {
+    uint64_t receiveTimestampsExponent,
+    uint64_t maxRecvTimestampsToSend) {
   if (ackFrameMetaData.ackState.recvdPacketInfos.size() == 0) {
     return 0;
   }
@@ -294,9 +295,6 @@ static size_t fillPacketReceiveTimestamps(
   // Insert all received packet timestamps into an interval set, to identify
   // continguous ranges
 
-  DCHECK(ackFrameMetaData.maxAckReceiveTimestampsToSend.has_value());
-  auto maxRecvTimestampsToSend =
-      ackFrameMetaData.maxAckReceiveTimestampsToSend.value();
   uint64_t pktsAdded = 0;
   IntervalSet<PacketNum> receivedPktNumsIntervalSet;
   for (auto& recvdPkt : recvdPacketInfos) {
@@ -491,10 +489,11 @@ folly::Optional<WriteAckFrameResult> writeAckFrame(
 folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
-    FrameType frameType) {
+    const AckReceiveTimestampsConfig& recvTimestampsConfig,
+    uint64_t maxRecvTimestampsToSend) {
   auto beginningSpace = builder.remainingSpaceInPkt();
-  auto maybeAckFrame =
-      writeAckFrameToPacketBuilder(ackFrameMetaData, builder, frameType);
+  auto maybeAckFrame = writeAckFrameToPacketBuilder(
+      ackFrameMetaData, builder, FrameType::ACK_RECEIVE_TIMESTAMPS);
   if (!maybeAckFrame.has_value()) {
     return folly::none;
   }
@@ -527,16 +526,14 @@ folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
   if (spaceLeft > 0) {
     auto largestAckedPacket = ackState.acks.back().end;
     uint8_t receiveTimestampsExponentToUse =
-        ackFrameMetaData.recvTimestampsConfig.has_value()
-        ? ackFrameMetaData.recvTimestampsConfig.value()
-              .receive_timestamps_exponent
-        : kDefaultReceiveTimestampsExponent;
+        recvTimestampsConfig.receiveTimestampsExponent;
     countTimestampRanges = fillPacketReceiveTimestamps(
         ackFrameMetaData,
         ackFrame,
         largestAckedPacket,
         spaceLeft,
-        receiveTimestampsExponentToUse);
+        receiveTimestampsExponentToUse,
+        maxRecvTimestampsToSend);
     if (countTimestampRanges > 0) {
       QuicInteger timeStampRangeCountInt(
           ackFrame.recvdPacketsTimestampRanges.size());

@@ -69,8 +69,8 @@ struct DatagramConfig {
 };
 
 struct AckReceiveTimestampsConfig {
-  uint64_t max_receive_timestamps_per_ack{kMaxReceivedPktsTimestampsStored};
-  uint64_t receive_timestamps_exponent{kDefaultReceiveTimestampsExponent};
+  uint64_t maxReceiveTimestampsPerAck{kMaxReceivedPktsTimestampsStored};
+  uint64_t receiveTimestampsExponent{kDefaultReceiveTimestampsExponent};
 };
 
 // JSON-serialized transport knobs
