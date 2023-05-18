@@ -9,6 +9,7 @@
 
 #include <folly/Optional.h>
 #include <quic/QuicConstants.h>
+#include <quic/state/QuicPriorityQueue.h>
 #include <chrono>
 #include <cstdint>
 
@@ -266,6 +267,9 @@ struct TransportSettings {
   bool dropIngressOnStopSending{false};
   bool advertisedKnobFrameSupport{true};
   bool removeStreamAfterEomCallbackUnset{false};
+
+  // The default priority to instantiate streams with.
+  Priority defaultPriority{kDefaultPriority};
 
   // Local configuration for ACK receive timestamps.
   //

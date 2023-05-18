@@ -1046,6 +1046,31 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             std::chrono::microseconds(val);
         VLOG(3) << "PACING_TIMER_TICK KnobParam received: " << val;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<std::string>(value);
+        auto serverConn = serverTransport->serverConn_;
+        uint8_t level;
+        bool incremental;
+        bool parseSuccess = false;
+        try {
+          parseSuccess = folly::split(",", val, level, incremental);
+        } catch (std::exception&) {
+          parseSuccess = false;
+        }
+        if (!parseSuccess) {
+          auto errMsg = fmt::format(
+              "Received invalid KnobParam for DEFAULT_STREAM_PRIORITY: {}",
+              val);
+          VLOG(3) << errMsg;
+          throw std::runtime_error(errMsg);
+        }
+        serverConn->transportSettings.defaultPriority =
+            Priority(level, incremental);
+        VLOG(3) << "DEFAULT_STREAM_PRIORITY KnobParam received: " << val;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

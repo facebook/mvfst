@@ -1430,6 +1430,73 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
   EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
 }
 
+TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.defaultPriority = Priority(0, false);
+  auto connId = getTestConnectionId();
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  auto stream1 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream3 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
+  auto curBuf = largeBuf.get();
+  do {
+    curBuf->append(curBuf->capacity());
+    curBuf = curBuf->next();
+  } while (curBuf != largeBuf.get());
+  auto chainLen = largeBuf->computeChainDataLength();
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream2),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream3),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  // The default is to wraparound initially.
+  scheduler.writeStreams(builder1);
+  EXPECT_EQ(
+      conn.streamManager->writableStreams().getNextScheduledStream(
+          Priority(0, false)),
+      stream1);
+
+  // Should write frames for stream1, stream2, stream3, in that order.
+  NiceMock<MockQuicPacketBuilder> builder2;
+  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder2.frames_.push_back(f);
+  }));
+  scheduler.writeStreams(builder2);
+  auto& frames = builder2.frames_;
+  ASSERT_EQ(frames.size(), 3);
+  WriteStreamFrame f1(stream1, 0, chainLen, false);
+  WriteStreamFrame f2(stream2, 0, 9, false);
+  WriteStreamFrame f3(stream3, 0, 9, false);
+  ASSERT_TRUE(frames[0].asWriteStreamFrame());
+  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
+  ASSERT_TRUE(frames[1].asWriteStreamFrame());
+  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
+  ASSERT_TRUE(frames[2].asWriteStreamFrame());
+  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
+}
+
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());

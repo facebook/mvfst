@@ -38,6 +38,7 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
       sendState = StreamSendState::Invalid;
     }
   }
+  priority = connIn.transportSettings.defaultPriority;
 }
 
 QuicStreamState::QuicStreamState(
