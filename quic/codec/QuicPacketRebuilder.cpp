@@ -80,7 +80,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         // which may make the packet larger. We keep track of this
         // for now and rebuild the frame after the loop.
         shouldRebuildWriteAckFrame = true;
-        break;
+        continue;
       }
       case QuicWriteFrame::Type::WriteStreamFrame: {
         const WriteStreamFrame& streamFrame = *frame.asWriteStreamFrame();

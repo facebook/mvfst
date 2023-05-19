@@ -134,10 +134,11 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
 
   PingFrame pingFrame{};
   // Write them with a regular builder
+  // Write the ACK frame first since it has special rebuilder handling.
+  writeAckFrame(ackMeta, regularBuilder1);
   writeFrame(connCloseFrame, regularBuilder1);
   writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
   writeFrame(pingFrame, regularBuilder1);
-  writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrameHeader(
       regularBuilder1,
       streamId,
