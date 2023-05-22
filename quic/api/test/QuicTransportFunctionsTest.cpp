@@ -3096,6 +3096,60 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   EXPECT_TRUE(folly::IOBufEqualTo()(pktBodyCaptured, secondBodyCaptured));
 }
 
+TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
+  auto conn = createConn();
+  conn->congestionController.reset();
+  conn->peerMinAckDelay = 1ms;
+  EventBase evb;
+  auto socket =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = socket.get();
+  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(100));
+  auto capturingAead = std::make_unique<MockAead>();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = folly::IOBuf::copyBuffer("Where you wanna go");
+  writeDataToQuicStream(*stream, buf->clone(), true);
+
+  folly::IOBuf pktBodyCaptured;
+  EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
+      .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
+        if (buf) {
+          pktBodyCaptured.prependChain(buf->clone());
+          return buf->clone();
+        } else {
+          return folly::IOBuf::create(0);
+        }
+      }));
+  EXPECT_EQ(
+      2,
+      writeProbingDataToSocketForTest(
+          *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+
+  auto immAck =
+      getFirstFrameInOutstandingPackets(
+          conn->outstandings.packets, QuicWriteFrame::Type::ImmediateAckFrame)
+          .asImmediateAckFrame();
+  EXPECT_TRUE(immAck);
+  // Now we have no new data, let's probe again, and verify the same old data
+  // is sent.
+  folly::IOBuf secondBodyCaptured;
+  EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
+      .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
+        if (buf) {
+          secondBodyCaptured.prependChain(buf->clone());
+          return buf->clone();
+        } else {
+          return folly::IOBuf::create(0);
+        }
+      }));
+  EXPECT_EQ(
+      2,
+      writeProbingDataToSocketForTest(
+          *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  // Verify two pacekts have the same body
+  EXPECT_TRUE(folly::IOBufEqualTo()(pktBodyCaptured, secondBodyCaptured));
+}
+
 TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -3179,7 +3233,7 @@ TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
   writeCryptoDataProbesToSocketForTest(
       *rawSocket, conn, probesToSend, *aead, *headerCipher, getVersion(conn));
 
-  EXPECT_EQ(conn.numProbesWritableBytesLimited, 1);
+  EXPECT_EQ(conn.numProbesWritableBytesLimited, 2);
   EXPECT_LT(currentPacketSeqNum, conn.ackStates.initialAckState->nextPacketNum);
   EXPECT_FALSE(conn.outstandings.packets.empty());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
@@ -3234,6 +3288,34 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
           *headerCipher,
           getVersion(*conn)));
   // Ping is the only non-retransmittable packet that will go into OP list
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+}
+
+TEST_F(QuicTransportFunctionsTest, ProbingFallbackToImmediateAck) {
+  auto conn = createConn();
+  conn->peerMinAckDelay = 1ms;
+  EventBase evb;
+  auto socket =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = socket.get();
+  EXPECT_CALL(*rawSocket, write(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const SocketAddress&,
+                           const std::unique_ptr<folly::IOBuf>& iobuf) {
+        return iobuf->computeChainDataLength();
+      }));
+  uint8_t probesToSend = 1;
+  EXPECT_EQ(
+      1,
+      writeProbingDataToSocketForTest(
+          *rawSocket,
+          *conn,
+          probesToSend,
+          *aead,
+          *headerCipher,
+          getVersion(*conn)));
+  // Immediate Ack is the only non-retransmittable packet that will go into OP
+  // list
   EXPECT_EQ(1, conn->outstandings.packets.size());
 }
 
@@ -4134,6 +4216,60 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
   EXPECT_EQ(
       QuicWriteFrame::Type::MaxDataFrame,
       conn->outstandings.packets[1].packet.frames[0].type());
+}
+
+TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFramesAckFreq) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = 1200;
+  conn->peerMinAckDelay = 1ms;
+  EventBase evb;
+  auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = sock.get();
+
+  EXPECT_CALL(*rawSocket, write(_, _))
+      .WillRepeatedly(Invoke([&](const SocketAddress&,
+                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
+        return iobuf->computeChainDataLength();
+      }));
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = folly::IOBuf::copyBuffer("Drug facts");
+  writeDataToQuicStream(*stream, buf->clone(), true);
+  writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_EQ(1, stream->retransmissionBuffer.size());
+
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 1;
+  conn->flowControlState.windowSize *= 2;
+  conn->flowControlState.timeOfLastFlowControlUpdate = Clock::now() - 20s;
+  maybeSendConnWindowUpdate(*conn, Clock::now());
+  writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      1 /* limit to 1 packet */);
+  EXPECT_EQ(3, conn->outstandings.packets.size());
+  auto packet = stripPaddingFrames(conn->outstandings.packets[1].packet);
+  EXPECT_EQ(1, packet.frames.size());
+  EXPECT_EQ(
+      QuicWriteFrame::Type::MaxDataFrame,
+      conn->outstandings.packets[1].packet.frames[0].type());
+  packet = stripPaddingFrames(conn->outstandings.packets[2].packet);
+  EXPECT_EQ(1, packet.frames.size());
+  EXPECT_EQ(
+      QuicWriteFrame::Type::ImmediateAckFrame,
+      conn->outstandings.packets[2].packet.frames[0].type());
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {

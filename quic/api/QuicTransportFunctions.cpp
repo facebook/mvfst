@@ -16,6 +16,7 @@
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
 #include <quic/state/AckHandlers.h>
+#include <quic/state/QuicAckFrequencyFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
@@ -804,9 +805,9 @@ void updateConnection(
         break;
       }
       case QuicWriteFrame::Type::ImmediateAckFrame: {
-        // do not mark immediate acks as retranmittable.
         // turn off the immediate ack pending event.
         conn.pendingEvents.requestImmediateAck = false;
+        retransmittable = true;
         break;
       }
       default:
@@ -1511,54 +1512,69 @@ uint64_t writeProbingDataToSocket(
       scheduler, connection, "CloningScheduler", aead.getCipherOverhead());
   auto writeLoopBeginTime = Clock::now();
 
-  auto written = writeConnectionDataToSocket(
-                     sock,
-                     connection,
-                     srcConnId,
-                     dstConnId,
-                     builder,
-                     pnSpace,
-                     cloningScheduler,
-                     connection.transportSettings.enableWritableBytesLimit
-                         ? probePacketWritableBytes
-                         : unlimitedWritableBytes,
-                     probesToSend,
-                     aead,
-                     headerCipher,
-                     version,
-                     writeLoopBeginTime,
-                     token)
-                     .packetsWritten;
-  if (probesToSend && !written) {
-    // Fall back to send a ping:
-    connection.pendingEvents.sendPing = true;
-    auto pingScheduler =
-        std::move(FrameScheduler::Builder(
-                      connection, encryptionLevel, pnSpace, "PingScheduler")
-                      .pingFrames())
-            .build();
-    written += writeConnectionDataToSocket(
-                   sock,
-                   connection,
-                   srcConnId,
-                   dstConnId,
-                   builder,
-                   pnSpace,
-                   pingScheduler,
-                   connection.transportSettings.enableWritableBytesLimit
-                       ? probePacketWritableBytes
-                       : unlimitedWritableBytes,
-                   probesToSend - written,
-                   aead,
-                   headerCipher,
-                   version,
-                   writeLoopBeginTime)
-                   .packetsWritten;
+  // If we have the ability to draw an ACK for AppData, let's send a probe that
+  // is just an IMMEDIATE_ACK. Increase the number of probes to do so.
+  uint8_t dataProbesToSend = probesToSend;
+  if (probesToSend && canSendAckControlFrames(connection) &&
+      encryptionLevel == EncryptionLevel::AppData) {
+    probesToSend = std::max<uint8_t>(probesToSend, kPacketToSendForPTO);
+    dataProbesToSend = probesToSend - 1;
   }
-  VLOG_IF(10, written > 0)
+  auto probesWritten = writeConnectionDataToSocket(
+                           sock,
+                           connection,
+                           srcConnId,
+                           dstConnId,
+                           builder,
+                           pnSpace,
+                           cloningScheduler,
+                           connection.transportSettings.enableWritableBytesLimit
+                               ? probePacketWritableBytes
+                               : unlimitedWritableBytes,
+                           dataProbesToSend,
+                           aead,
+                           headerCipher,
+                           version,
+                           writeLoopBeginTime,
+                           token)
+                           .packetsWritten;
+  if (probesWritten < probesToSend) {
+    // If we can use an IMMEDIATE_ACK, that's better than a PING.
+    auto probeSchedulerBuilder = FrameScheduler::Builder(
+        connection, encryptionLevel, pnSpace, "ProbeScheduler");
+    // Might as well include some ACKs.
+    probeSchedulerBuilder.ackFrames();
+    if (canSendAckControlFrames(connection) &&
+        encryptionLevel == EncryptionLevel::AppData) {
+      requestPeerImmediateAck(connection);
+      probeSchedulerBuilder.immediateAckFrames();
+    } else {
+      connection.pendingEvents.sendPing = true;
+      probeSchedulerBuilder.pingFrames();
+    }
+    auto probeScheduler = std::move(probeSchedulerBuilder).build();
+    probesWritten += writeConnectionDataToSocket(
+                         sock,
+                         connection,
+                         srcConnId,
+                         dstConnId,
+                         builder,
+                         pnSpace,
+                         probeScheduler,
+                         connection.transportSettings.enableWritableBytesLimit
+                             ? probePacketWritableBytes
+                             : unlimitedWritableBytes,
+                         probesToSend - probesWritten,
+                         aead,
+                         headerCipher,
+                         version,
+                         writeLoopBeginTime)
+                         .packetsWritten;
+  }
+  VLOG_IF(10, probesWritten > 0)
       << nodeToString(connection.nodeType)
       << " writing probes using scheduler=CloningScheduler " << connection;
-  return written;
+  return probesWritten;
 }
 
 WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
