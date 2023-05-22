@@ -4077,6 +4077,56 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       res.packetsWritten);
 }
 
+TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
+  auto conn = createConn();
+  conn->lossState.srtt = 50ms;
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_NONE;
+  conn->transportSettings.writeLimitRttFraction = 0;
+
+  EventBase evb;
+  auto socket =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = socket.get();
+
+  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = buildRandomInputData(2048 * 2048);
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+
+  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(1));
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(50));
+  auto writeLoopBeginTime = Clock::now();
+  auto res = writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      1000 /* packetLimit */,
+      writeLoopBeginTime);
+
+  EXPECT_GT(1000, res.packetsWritten);
+  EXPECT_EQ(res.probesWritten, 0);
+
+  res = writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      1000 /* packetLimit */,
+      writeLoopBeginTime);
+  EXPECT_EQ(1000, res.packetsWritten);
+}
+
 TEST_F(QuicTransportFunctionsTest, CongestionControlWritableBytesRoundUp) {
   auto conn = createConn();
   conn->udpSendPacketLen = 2000;

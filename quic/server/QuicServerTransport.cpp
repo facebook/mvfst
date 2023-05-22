@@ -1071,6 +1071,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             Priority(level, incremental);
         VLOG(3) << "DEFAULT_STREAM_PRIORITY KnobParam received: " << val;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.writeLimitRttFraction = val;
+        VLOG(3) << "WRITE_LOOP_TIME_FRACTION KnobParam received: " << val;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

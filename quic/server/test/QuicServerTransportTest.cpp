@@ -4837,6 +4837,10 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
       {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
         "4,0,10"}});
   EXPECT_EQ(server->getTransportSettings().defaultPriority, Priority(4, false));
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
+        uint64_t(2)}});
+  EXPECT_EQ(server->getTransportSettings().writeLimitRttFraction, 2);
 }
 
 TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {

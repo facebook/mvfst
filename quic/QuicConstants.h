@@ -168,7 +168,10 @@ BETTER_ENUM(
     FIRE_LOOP_EARLY = 0x10001,
     // Controls the timer tick used for pacing
     PACING_TIMER_TICK = 0x10002,
-    DEFAULT_STREAM_PRIORITY = 0x10003)
+    // Controls default stream priority
+    DEFAULT_STREAM_PRIORITY = 0x10003,
+    // Controls write loop time fraction in terms of srtt
+    WRITE_LOOP_TIME_FRACTION = 0x10004)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

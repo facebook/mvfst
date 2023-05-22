@@ -403,6 +403,7 @@ bool writeLoopTimeLimit(
     TimePoint loopBeginTime,
     const QuicConnectionStateBase& connection) {
   return connection.lossState.srtt == 0us ||
+      connection.transportSettings.writeLimitRttFraction == 0 ||
       Clock::now() - loopBeginTime < connection.lossState.srtt /
           connection.transportSettings.writeLimitRttFraction;
 }

@@ -91,6 +91,34 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimit) {
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
 
+TEST_F(WriteFunctionsTest, WriteLoopTimeLimitNoLimit) {
+  prepareFlowControlAndStreamLimit();
+  auto streamId = prepareOneStream(3000);
+  auto cid = getTestConnectionId();
+  auto stream = conn_.streamManager->findStream(streamId);
+  auto currentBufMetaOffset = stream->writeBufMeta.offset;
+  size_t packetLimit = 2;
+  conn_.lossState.srtt = 100ms;
+  conn_.transportSettings.writeLimitRttFraction = 0;
+  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
+  EXPECT_EQ(2, stream->retransmissionBufMetas.size());
+  EXPECT_EQ(2, countInstructions(streamId));
+  EXPECT_EQ(2, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+
+  // Fake the time so it's in the past.
+  auto writeLoopBeginTime = Clock::now() - 200ms;
+  EXPECT_EQ(
+      1,
+      writePacketizationRequest(
+          conn_, cid, packetLimit, *aead_, writeLoopBeginTime));
+  EXPECT_EQ(3, stream->retransmissionBufMetas.size());
+  EXPECT_EQ(3, countInstructions(streamId));
+  EXPECT_EQ(3, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+}
+
 TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(2000);
