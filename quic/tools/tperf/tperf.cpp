@@ -34,7 +34,7 @@ DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
 DEFINE_int32(duration, 10, "Duration of test in seconds");
 DEFINE_uint64(
     block_size,
-    4096,
+    1024 * 1024,
     "Amount of data written to stream each iteration");
 DEFINE_uint64(writes_per_loop, 40, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 1024 * 1024, "Flow control window size");
