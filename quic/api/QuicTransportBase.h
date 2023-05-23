@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
+#include <quic/common/Events.h>
 #include <quic/common/FunctionLooper.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
@@ -839,7 +840,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    */
   folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
 
-  std::atomic<folly::EventBase*> evb_;
+  std::atomic<QuicEventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
   ConnectionCallback* connCallback_{nullptr};

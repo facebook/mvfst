@@ -14,7 +14,6 @@
 #include <folly/SocketAddress.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
-#include <folly/io/async/EventBase.h>
 #include <folly/io/async/HHWheelTimer.h>
 #include <folly/net/NetOps.h>
 #include <folly/portability/Sockets.h>
@@ -65,7 +64,7 @@ void happyEyeballsAddSocket(
 
 void startHappyEyeballs(
     QuicClientConnectionState& connection,
-    folly::EventBase* evb,
+    QuicEventBase* evb,
     sa_family_t cachedFamily,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttempDelay,

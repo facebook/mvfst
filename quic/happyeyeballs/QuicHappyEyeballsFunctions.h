@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/common/Events.h>
 
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
@@ -34,7 +35,7 @@ void happyEyeballsAddSocket(
 
 void startHappyEyeballs(
     QuicClientConnectionState& connection,
-    folly::EventBase* evb,
+    QuicEventBase* evb,
     sa_family_t cachedFamily,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttemptDelay,

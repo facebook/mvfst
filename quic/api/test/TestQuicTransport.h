@@ -9,6 +9,7 @@
 
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/common/Events.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>

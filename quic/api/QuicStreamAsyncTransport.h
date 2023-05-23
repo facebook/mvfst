@@ -9,6 +9,7 @@
 
 #include <folly/io/async/AsyncTransport.h>
 #include <quic/api/QuicSocket.h>
+#include <quic/common/Events.h>
 
 namespace quic {
 
@@ -19,7 +20,7 @@ namespace quic {
 class QuicStreamAsyncTransport : public folly::AsyncTransport,
                                  public QuicSocket::ReadCallback,
                                  public QuicSocket::WriteCallback,
-                                 public folly::EventBase::LoopCallback {
+                                 public QuicEventBase::LoopCallback {
  public:
   using UniquePtr = std::unique_ptr<
       QuicStreamAsyncTransport,
@@ -138,7 +139,7 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
   void onStreamWriteError(StreamId /*id*/, QuicError error) noexcept override;
 
   //
-  // folly::EventBase::LoopCallback overrides
+  // QuicEventBase::LoopCallback overrides
   //
   void runLoopCallback() noexcept override;
 

@@ -9,7 +9,6 @@
 
 #include <folly/Optional.h>
 #include <folly/functional/Invoke.h>
-#include <folly/io/async/EventBase.h>
 #include <string>
 
 #include <quic/QuicConstants.h>

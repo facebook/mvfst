@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/io/async/EventBase.h>
 #include <folly/portability/GMock.h>
 #include <quic/QuicException.h>
 

@@ -568,7 +568,7 @@ class TestQuicTransport
 class QuicTransportImplTest : public Test {
  public:
   void SetUp() override {
-    evb = std::make_unique<folly::EventBase>();
+    evb = std::make_unique<QuicEventBase>();
     auto socket =
         std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(evb.get());
     socketPtr = socket.get();
@@ -601,7 +601,7 @@ class QuicTransportImplTest : public Test {
   }
 
  protected:
-  std::unique_ptr<folly::EventBase> evb;
+  std::unique_ptr<QuicEventBase> evb;
   NiceMock<MockConnectionSetupCallback> connSetupCallback;
   NiceMock<MockConnectionCallback> connCallback;
   TestByteEventCallback byteEventCallback;
@@ -4111,7 +4111,7 @@ TEST_P(QuicTransportImplTestBase, ObserverDetachAndAttachEvb) {
 
   // check the current event base and create a new one
   EXPECT_EQ(evb.get(), transport->getEventBase());
-  folly::EventBase evb2;
+  QuicEventBase evb2;
 
   // Detach the event base evb
   EXPECT_CALL(*obs1, evbDetach(transport.get(), evb.get())).Times(0);

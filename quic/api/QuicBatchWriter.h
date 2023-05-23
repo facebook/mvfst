@@ -11,6 +11,7 @@
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/Events.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -30,7 +31,7 @@ class BatchWriter {
     }
   }
 
-  FOLLY_NODISCARD folly::EventBase* evb() const {
+  FOLLY_NODISCARD QuicEventBase* evb() const {
     return evb_;
   }
 
@@ -66,7 +67,7 @@ class BatchWriter {
       const folly::SocketAddress& address) = 0;
 
  protected:
-  folly::EventBase* evb_{nullptr};
+  QuicEventBase* evb_{nullptr};
   int fd_{-1};
 };
 

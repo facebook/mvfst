@@ -13,7 +13,7 @@ namespace quic {
 using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
-    folly::EventBase* evb,
+    QuicEventBase* evb,
     folly::Function<void()>&& func,
     LooperType type)
     : evb_(evb), func_(std::move(func)), type_(type) {}
@@ -112,7 +112,7 @@ bool FunctionLooper::isRunning() const {
   return running_;
 }
 
-void FunctionLooper::attachEventBase(folly::EventBase* evb) {
+void FunctionLooper::attachEventBase(QuicEventBase* evb) {
   VLOG(10) << __func__ << ": " << type_;
   DCHECK(!evb_);
   DCHECK(evb && evb->isInEventBaseThread());

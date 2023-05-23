@@ -9,7 +9,6 @@
 
 #include <quic/api/QuicSocket.h>
 
-#include <folly/io/async/EventBase.h>
 #include <quic/common/BufUtil.h>
 
 namespace quic {
