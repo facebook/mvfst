@@ -3231,7 +3231,7 @@ void QuicTransportBase::setTransportSettings(
     conn_->transportSettings.initCwndInMss =
         std::max(conn_->transportSettings.initCwndInMss, kInitCwndInMss);
     conn_->transportSettings.minCwndInMss =
-        std::max(conn_->transportSettings.initCwndInMss, kMinCwndInMss);
+        std::max(conn_->transportSettings.minCwndInMss, kMinCwndInMss);
     conn_->transportSettings.initCwndInMss = std::max(
         conn_->transportSettings.minCwndInMss,
         conn_->transportSettings.initCwndInMss);
