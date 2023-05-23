@@ -538,13 +538,13 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
   EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
       .Times(3)
       .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
+        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
       }))
       .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
       }))
       .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
+        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
   processAckFrame(
@@ -622,10 +622,10 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
   EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
       .Times(2)
       .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
+        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
       }))
       .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
+        EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
   processAckFrame(
