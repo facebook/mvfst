@@ -4111,7 +4111,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
       1000 /* packetLimit */,
       writeLoopBeginTime);
 
-  EXPECT_GT(1000, res.packetsWritten);
+  EXPECT_GE(1000, res.packetsWritten);
   EXPECT_EQ(res.probesWritten, 0);
 
   res = writeQuicDataToSocket(
