@@ -144,30 +144,27 @@ ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor&) {
   return ImmediateAckFrame();
 }
 
-uint64_t computeAdjustedDelay(
+uint64_t convertEncodedDurationToMicroseconds(
     FrameType frameType,
     uint8_t exponentToUse,
-    folly::Optional<std::pair<uint64_t, size_t>> delay) {
+    uint64_t delay) {
   // ackDelayExponentToUse is guaranteed to be less than the size of uint64_t
   uint64_t delayOverflowMask = 0xFFFFFFFFFFFFFFFF;
-  uint8_t leftShift = (sizeof(delay->first) * 8 - exponentToUse);
+  uint8_t leftShift = (sizeof(delay) * 8 - exponentToUse);
   DCHECK_LT(leftShift, sizeof(delayOverflowMask) * 8);
   delayOverflowMask = delayOverflowMask << leftShift;
-  if ((delay->first & delayOverflowMask) != 0) {
+  if ((delay & delayOverflowMask) != 0) {
     throw QuicTransportException(
         "Decoded delay overflows",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         frameType);
   }
-  uint64_t adjustedDelay = delay->first << exponentToUse;
+  uint64_t adjustedDelay = delay << exponentToUse;
   if (adjustedDelay >
       static_cast<uint64_t>(
           std::numeric_limits<std::chrono::microseconds::rep>::max())) {
     throw QuicTransportException(
         "Bad delay", quic::TransportErrorCode::FRAME_ENCODING_ERROR, frameType);
-  } else if (UNLIKELY(adjustedDelay > 1000 * 1000 * 1000 /* 1000s */)) {
-    LOG(ERROR) << "Quic recvd long ack delay=" << adjustedDelay;
-    adjustedDelay = 0;
   }
   return adjustedDelay;
 }
@@ -220,8 +217,17 @@ ReadAckFrame decodeAckFrame(
   PacketNum currentPacketNum =
       nextAckedPacketLen(largestAcked, firstAckBlockLen->first);
   frame.largestAcked = largestAcked;
-  frame.ackDelay = std::chrono::microseconds(
-      computeAdjustedDelay(frameType, ackDelayExponentToUse, ackDelay));
+
+  auto adjustedDelay = convertEncodedDurationToMicroseconds(
+      frameType, ackDelayExponentToUse, ackDelay->first);
+
+  if (UNLIKELY(adjustedDelay > 1000 * 1000 * 1000 /* 1000s */)) {
+    LOG(ERROR) << "Quic recvd long ack delay=" << adjustedDelay
+               << " frame type: " << static_cast<uint64_t>(frameType);
+    adjustedDelay = 0;
+  }
+  frame.ackDelay = std::chrono::microseconds(adjustedDelay);
+
   frame.ackBlocks.emplace_back(currentPacketNum, largestAcked);
   for (uint64_t numBlocks = 0; numBlocks < additionalAckBlocks->first;
        ++numBlocks) {
@@ -318,8 +324,8 @@ ReadAckFrame decodeAckFrameWithReceivedTimestamps(
             quic::FrameType::ACK_RECEIVE_TIMESTAMPS);
       }
       DCHECK_LT(receiveTimestampsExponentToUse, sizeof(delta->first) * 8);
-      auto adjustedDelta = computeAdjustedDelay(
-          frameType, receiveTimestampsExponentToUse, delta);
+      auto adjustedDelta = convertEncodedDurationToMicroseconds(
+          frameType, receiveTimestampsExponentToUse, delta->first);
       timeStampRange.deltas.push_back(adjustedDelta);
     }
     frame.recvdPacketsTimestampRanges.emplace_back(timeStampRange);
