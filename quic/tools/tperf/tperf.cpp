@@ -304,6 +304,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void dsrSend(quic::StreamId id, uint64_t toSend, bool eof) {
     if (streamsHavingDSRSender_.find(id) == streamsHavingDSRSender_.end()) {
       auto dsrSender = std::make_unique<TperfDSRSender>(blockSize_, udpSock_);
+      auto serverTransport = dynamic_cast<QuicServerTransport*>(sock_.get());
+      dsrSender->setCipherInfo(serverTransport->getOneRttCipherInfo());
       auto res =
           sock_->setDSRPacketizationRequestSender(id, std::move(dsrSender));
       if (res.hasError()) {

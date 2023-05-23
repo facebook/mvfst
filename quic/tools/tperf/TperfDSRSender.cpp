@@ -18,22 +18,23 @@ bool TperfDSRSender::addSendInstruction(const SendInstruction& instruction) {
   return true;
 }
 
+void TperfDSRSender::setCipherInfo(CipherInfo info) {
+  CipherBuilder builder;
+  cipherPair_ = builder.buildCiphers(
+      fizz::TrafficKey{
+          std::move(info.trafficKey.key), std::move(info.trafficKey.iv)},
+      info.cipherSuite,
+      std::move(info.packetProtectionKey));
+}
+
 bool TperfDSRSender::flush() {
   // TODO remove this when we make instructions match the request.
   auto& firstInstruction = instructions_.front();
-  CipherBuilder builder;
-  auto cipherPair = builder.buildCiphers(
-      fizz::TrafficKey{
-          std::move(firstInstruction.trafficKey.key),
-          std::move(firstInstruction.trafficKey.iv)},
-      firstInstruction.cipherSuite,
-      firstInstruction.packetProtectionKey->clone());
-
   RequestGroup prs{
       firstInstruction.dcid,
       firstInstruction.scid,
       firstInstruction.clientAddress,
-      &cipherPair,
+      &cipherPair_,
       {}};
   for (const auto& instruction : instructions_) {
     prs.requests.push_back(

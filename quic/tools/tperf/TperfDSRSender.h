@@ -10,6 +10,8 @@
 #include <folly/io/async/EventBase.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/dsr/Types.h>
+#include <quic/dsr/backend/DSRPacketizer.h>
+#include <quic/server/QuicServerTransport.h>
 #include <vector>
 
 #pragma once
@@ -36,10 +38,13 @@ class TperfDSRSender : public DSRPacketizationRequestSender {
 
   void release() override;
 
+  void setCipherInfo(CipherInfo info);
+
  private:
   std::vector<SendInstruction> instructions_;
   uint64_t blockSize_;
   folly::AsyncUDPSocket& sock_;
+  CipherPair cipherPair_;
 };
 
 } // namespace quic
