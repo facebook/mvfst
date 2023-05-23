@@ -10,8 +10,8 @@
 
 namespace quic {
 
-TperfDSRSender::TperfDSRSender(uint64_t blockSize, folly::AsyncUDPSocket& sock)
-    : blockSize_(blockSize), sock_(sock) {}
+TperfDSRSender::TperfDSRSender(Buf sendBuf, folly::AsyncUDPSocket& sock)
+    : sock_(sock), buf_(std::move(sendBuf)) {}
 
 bool TperfDSRSender::addSendInstruction(const SendInstruction& instruction) {
   instructions_.push_back(instruction);
@@ -28,7 +28,6 @@ void TperfDSRSender::setCipherInfo(CipherInfo info) {
 }
 
 bool TperfDSRSender::flush() {
-  // TODO remove this when we make instructions match the request.
   auto& firstInstruction = instructions_.front();
   RequestGroup prs{
       firstInstruction.dcid,
@@ -42,12 +41,14 @@ bool TperfDSRSender::flush() {
   }
   auto written =
       writePacketsGroup(sock_, prs, [=](const PacketizationRequest& req) {
-        auto buf = folly::IOBuf::createChain(req.len, blockSize_);
-        auto curBuf = buf.get();
+        Buf buf;
+        uint64_t remainingLen = req.len;
         do {
-          curBuf->append(curBuf->capacity());
-          curBuf = curBuf->next();
-        } while (curBuf != buf.get());
+          buf = buf_->clone();
+          uint64_t appendLen = std::min(remainingLen, buf->capacity());
+          buf->append(appendLen);
+          remainingLen -= appendLen;
+        } while (buf->length() < req.len);
         return buf;
       });
   instructions_.clear();
