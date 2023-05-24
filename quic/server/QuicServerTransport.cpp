@@ -352,7 +352,9 @@ void QuicServerTransport::writeData() {
           writeLoopBeginTime);
     };
     if (folly::Random::oneIn(2)) {
-      packetLimit -= dsrPath();
+      if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
+        packetLimit -= dsrPath();
+      }
       if (packetLimit) {
         packetLimit -= nonDsrPath().packetsWritten;
       }
@@ -363,7 +365,7 @@ void QuicServerTransport::writeData() {
       if (written.bytesWritten >= conn_->udpSendPacketLen / 2) {
         packetLimit -= written.packetsWritten;
       }
-      if (packetLimit) {
+      if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
         packetLimit -= dsrPath();
       }
     }
