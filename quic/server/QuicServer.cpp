@@ -520,7 +520,6 @@ void QuicServer::shutdown(LocalErrorCode error) {
     // the erase could potentally affect concurrent accesses from other threads
     std::lock_guard<std::mutex> guard(startMutex_);
     evbToWorkers_.erase(worker->getEventBase());
-    evbToAcceptors_.erase(worker->getEventBase());
   }
   startCv_.notify_all();
 }
@@ -719,7 +718,6 @@ void QuicServer::addTransportFactory(
     if (shutdown_) {
       return;
     }
-    evbToAcceptors_.emplace(evb, acceptor);
     auto it = evbToWorkers_.find(evb);
     if (it != evbToWorkers_.end()) {
       it->second->setTransportFactory(acceptor);

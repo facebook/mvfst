@@ -416,7 +416,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   TransportSettings transportSettings_;
   std::mutex startMutex_;
   std::atomic<bool> initialized_{false};
-  std::atomic<bool> workersInitialized_{false};
   std::condition_variable startCv_;
   std::atomic<bool> takeoverHandlerInitialized_{false};
   std::vector<std::unique_ptr<folly::ScopedEventBaseThread>> workerEvbs_;
@@ -429,8 +428,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   folly::ThreadLocalPtr<QuicServerWorker> workerPtr_;
   folly::F14FastMap<folly::EventBase*, QuicServerWorker*> evbToWorkers_;
   std::unique_ptr<QuicServerTransportFactory> transportFactory_;
-  folly::F14FastMap<folly::EventBase*, QuicServerTransportFactory*>
-      evbToAcceptors_;
   // factory used for workers to create their listening / bound sockets
   std::unique_ptr<QuicUDPSocketFactory> listenerSocketFactory_;
   // factory used by workers to create sockets for connection transports
