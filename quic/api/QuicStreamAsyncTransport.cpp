@@ -5,9 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <quic/api/QuicStreamAsyncTransport.h>
-
 #include <folly/io/Cursor.h>
+#include <quic/api/QuicStreamAsyncTransport.h>
 
 namespace quic {
 
@@ -43,19 +42,18 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
   id_ = id;
 
   // TODO: handle timeout for assigning stream id
-  if (readCb_) {
-    sock_->setReadCallback(*id_, this);
-    handleRead();
-  }
+  sock_->setReadCallback(*id_, this);
+  handleRead();
 
   if (!writeCallbacks_.empty()) {
     // adjust offsets of buffered writes
     auto streamWriteOffset = sock_->getStreamWriteOffset(*id_);
     if (streamWriteOffset.hasError()) {
       folly::AsyncSocketException ex(
-          folly::AsyncSocketException::UNKNOWN,
+          folly::AsyncSocketException::INTERNAL_ERROR,
           folly::to<std::string>(
-              "Quic write error: ", toString(streamWriteOffset.error())));
+              "QuicSocket::getStreamWriteOffset error: ",
+              toString(streamWriteOffset.error())));
       closeNowImpl(std::move(ex));
       return;
     }
@@ -79,13 +77,14 @@ void QuicStreamAsyncTransport::setReadCB(
     AsyncTransport::ReadCallback* callback) {
   readCb_ = callback;
   if (id_) {
-    if (readCb_) {
+    if (!readCb_) {
+      sock_->pauseRead(*id_);
+    } else if (sock_->resumeRead(*id_).hasError()) {
+      // this is our first time installing the read callback
       sock_->setReadCallback(*id_, this);
-      // It should be ok to do this immediately, rather than in the loop
-      handleRead();
-    } else {
-      sock_->setReadCallback(*id_, nullptr);
     }
+    // It should be ok to do this immediately, rather than in the loop
+    handleRead();
   }
 }
 
@@ -348,7 +347,6 @@ std::string QuicStreamAsyncTransport::getSecurityProtocol() const {
 
 void QuicStreamAsyncTransport::readAvailable(
     quic::StreamId /*streamId*/) noexcept {
-  CHECK(readCb_);
   // defer the actual read until the loop callback.  This prevents possible
   // tail recursion with readAvailable -> setReadCallback -> readAvailable
   sock_->getEventBase()->runInLoop(this, true);
