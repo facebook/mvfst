@@ -39,6 +39,10 @@ size_t getWorkerToRouteTo(
              ->workerId %
       numWorkers;
 }
+
+constexpr std::string_view kQuicServerNotInitialized =
+    "Quic server is not initialized. "
+    "Consider calling waitUntilInitialized() prior to: ";
 } // namespace
 
 QuicServer::QuicServer() {
@@ -68,9 +72,7 @@ void QuicServer::setListenerSocketFactory(
 
 void QuicServer::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  CHECK(!initialized_)
-      << " Congestion Control Factorty must be set before the server is "
-      << "initialized.";
+  CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   CHECK(ccFactory);
   ccFactory_ = std::move(ccFactory);
 }
@@ -321,7 +323,7 @@ void QuicServer::bindWorkersToSocket(
 }
 
 void QuicServer::start() {
-  CHECK(initialized_);
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   // initialize the thread local ptr to workers
   runOnAllWorkers([&](auto worker) mutable {
     // pass in no-op deleter to ThreadLocalPtr since the destruction of
@@ -563,21 +565,19 @@ void QuicServer::runOnAllWorkersSync(
 }
 
 void QuicServer::setHostId(uint32_t hostId) noexcept {
-  CHECK(!initialized_) << "Host id must be set before initializing Quic server";
+  CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   hostId_ = hostId;
 }
 
 void QuicServer::setConnectionIdVersion(
     ConnectionIdVersion cidVersion) noexcept {
-  CHECK(!initialized_)
-      << "ConnectionIdVersion must be set before initializing Quic server";
+  CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   cidVersion_ = cidVersion;
 }
 
 void QuicServer::setTransportSettingsOverrideFn(
     TransportSettingsOverrideFn fn) {
-  CHECK(!initialized_) << "Transport settings override function must be"
-                       << "set before initializing Quic server";
+  CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   transportSettingsOverrideFn_ = std::move(fn);
 }
 
@@ -728,8 +728,7 @@ void QuicServer::addTransportFactory(
 }
 
 const folly::SocketAddress& QuicServer::getAddress() const {
-  CHECK(initialized_) << "Quic server is not initialized. "
-                      << "Consider calling waitUntilInitialized() before this ";
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   return boundAddress_;
 }
 
@@ -739,14 +738,12 @@ void QuicServer::setListeningFDs(const std::vector<int>& fds) {
 }
 
 int QuicServer::getListeningSocketFD() const {
-  CHECK(initialized_) << "Quic server is not initialized. "
-                      << "Consider calling waitUntilInitialized() before this ";
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   return workers_[0]->getFD();
 }
 
 std::vector<int> QuicServer::getAllListeningSocketFDs() const noexcept {
-  CHECK(initialized_) << "Quic server is not initialized. "
-                      << "Consider calling waitUntilInitialized() before this ";
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   std::vector<int> sockets(workers_.size());
   for (const auto& worker : workers_) {
     if (worker->getFD() != -1) {
@@ -774,7 +771,7 @@ int QuicServer::getTakeoverHandlerSocketFD() const {
 }
 
 std::vector<folly::EventBase*> QuicServer::getWorkerEvbs() const noexcept {
-  CHECK(initialized_) << "Quic server is not initialized. ";
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   std::vector<folly::EventBase*> ebvs;
   for (const auto& worker : workers_) {
     ebvs.push_back(worker->getEventBase());
@@ -785,7 +782,7 @@ std::vector<folly::EventBase*> QuicServer::getWorkerEvbs() const noexcept {
 bool QuicServer::addAcceptObserver(
     folly::EventBase* evb,
     AcceptObserver* observer) {
-  CHECK(initialized_);
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   CHECK(evb);
   bool success = false;
   evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
@@ -809,7 +806,7 @@ bool QuicServer::addAcceptObserver(
 bool QuicServer::removeAcceptObserver(
     folly::EventBase* evb,
     AcceptObserver* observer) {
-  CHECK(initialized_);
+  CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   CHECK(evb);
   bool success = false;
   evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
