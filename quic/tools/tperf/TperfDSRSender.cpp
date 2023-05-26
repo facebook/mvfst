@@ -35,6 +35,7 @@ bool TperfDSRSender::flush() {
       firstInstruction.clientAddress,
       &cipherPair_,
       {}};
+  prs.requests.reserve(instructions_.size());
   for (const auto& instruction : instructions_) {
     prs.requests.push_back(
         test::sendInstructionToPacketizationRequest(instruction));
