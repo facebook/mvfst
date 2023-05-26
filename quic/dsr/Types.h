@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include <fizz/crypto/aead/Aead.h>
-#include <fizz/record/Types.h>
 #include <folly/Optional.h>
 #include <folly/SocketAddress.h>
 #include <quic/codec/QuicConnectionId.h>
@@ -66,16 +64,7 @@ struct SendInstruction {
         streamOffset(other.streamOffset),
         len(other.len),
         fin(other.fin),
-        bufMetaStartingOffset(other.bufMetaStartingOffset),
-        cipherSuite(other.cipherSuite),
-        packetProtectionKey(other.packetProtectionKey) {
-    if (other.trafficKey.key) {
-      trafficKey.key = other.trafficKey.key->clone();
-    }
-    if (other.trafficKey.iv) {
-      trafficKey.iv = other.trafficKey.iv->clone();
-    }
-  }
+        bufMetaStartingOffset(other.bufMetaStartingOffset) {}
 
   explicit SendInstruction(SendInstruction&& other)
       : dcid(other.dcid),
@@ -88,10 +77,7 @@ struct SendInstruction {
         streamOffset(other.streamOffset),
         len(other.len),
         fin(other.fin),
-        bufMetaStartingOffset(other.bufMetaStartingOffset),
-        trafficKey(std::move(other.trafficKey)),
-        cipherSuite(other.cipherSuite),
-        packetProtectionKey(other.packetProtectionKey) {}
+        bufMetaStartingOffset(other.bufMetaStartingOffset) {}
 
   // Connection info:
   const ConnectionId& dcid;
@@ -108,23 +94,12 @@ struct SendInstruction {
   bool fin;
   uint64_t bufMetaStartingOffset;
 
-  // Cipher info
-  TrafficKey trafficKey;
-  fizz::CipherSuite cipherSuite;
-  const Buf& packetProtectionKey;
-
   struct Builder {
     explicit Builder(const QuicServerConnectionState& conn, StreamId idIn)
         : dcid(*conn.clientConnectionId),
           scid(*conn.serverConnectionId),
           clientAddr(conn.peerAddress),
-          streamId(idIn),
-          trafficKey(*conn.oneRttWriteCipher->getKey()),
-          // TODO the value_or here is a test hack because it's very difficult
-          // to plumb it down properly at the moment.
-          cipherSuite(conn.serverHandshakeLayer->getState().cipher().value_or(
-              fizz::CipherSuite::TLS_AES_128_GCM_SHA256)),
-          packetProtectionKey(conn.oneRttWriteHeaderCipher->getKey()) {}
+          streamId(idIn) {}
 
     SendInstruction build() {
       return SendInstruction(
@@ -138,10 +113,7 @@ struct SendInstruction {
           *streamOffset,
           *len,
           fin,
-          *bufMetaStartingOffset,
-          std::move(trafficKey),
-          cipherSuite,
-          packetProtectionKey);
+          *bufMetaStartingOffset);
     }
 
     Builder& setPacketNum(PacketNum val) {
@@ -179,16 +151,6 @@ struct SendInstruction {
       return *this;
     }
 
-    Builder& setTrafficKey(TrafficKey val) {
-      trafficKey = std::move(val);
-      return *this;
-    }
-
-    Builder& setCipherSuite(fizz::CipherSuite val) {
-      cipherSuite = val;
-      return *this;
-    }
-
    private:
     const ConnectionId& dcid;
     const ConnectionId& scid;
@@ -201,9 +163,6 @@ struct SendInstruction {
     folly::Optional<uint64_t> len;
     bool fin{false};
     folly::Optional<uint64_t> bufMetaStartingOffset;
-    TrafficKey trafficKey;
-    fizz::CipherSuite cipherSuite;
-    const Buf& packetProtectionKey;
   };
 
  private:
@@ -218,10 +177,7 @@ struct SendInstruction {
       uint64_t streamOffsetIn,
       uint64_t lenIn,
       bool finIn,
-      uint64_t bufMetaStartingOffsetIn,
-      TrafficKey trafficKeyIn,
-      fizz::CipherSuite cipherSuiteIn,
-      const Buf& packetProtectionKeyIn)
+      uint64_t bufMetaStartingOffsetIn)
       : dcid(dcidIn),
         scid(scidIn),
         clientAddress(clientAddrIn),
@@ -232,10 +188,7 @@ struct SendInstruction {
         streamOffset(streamOffsetIn),
         len(lenIn),
         fin(finIn),
-        bufMetaStartingOffset(bufMetaStartingOffsetIn),
-        trafficKey(std::move(trafficKeyIn)),
-        cipherSuite(cipherSuiteIn),
-        packetProtectionKey(packetProtectionKeyIn) {}
+        bufMetaStartingOffset(bufMetaStartingOffsetIn) {}
 };
 
 WriteStreamFrame sendInstructionToWriteStreamFrame(

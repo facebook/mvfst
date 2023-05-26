@@ -179,11 +179,10 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   auto& instruction = pendingInstructions_.front();
   CipherBuilder builder;
   auto cipherPair = builder.buildCiphers(
-      fizz::TrafficKey{
-          std::move(instruction.trafficKey.key),
-          std::move(instruction.trafficKey.iv)},
-      instruction.cipherSuite,
-      instruction.packetProtectionKey->clone());
+      getFizzTestKey(),
+      fizz::CipherSuite::TLS_AES_128_GCM_SHA256,
+      packetProtectionKey_->clone());
+
   RequestGroup requests{
       instruction.dcid,
       instruction.scid,
