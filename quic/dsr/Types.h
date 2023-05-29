@@ -192,6 +192,7 @@ struct SendInstruction {
 };
 
 WriteStreamFrame sendInstructionToWriteStreamFrame(
-    const SendInstruction& sendInstruction);
+    const SendInstruction& sendInstruction,
+    uint64_t streamPacketIdx);
 
 } // namespace quic

@@ -46,9 +46,8 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
     CHECK(
         sendInstructions_.empty() ||
         sendInstructions_.back().streamId == sendInstruction.streamId);
-    WriteStreamFrame frame = sendInstructionToWriteStreamFrame(sendInstruction);
-    frame.streamPacketIdx = streamPacketIdx;
-    packet_.frames.push_back(frame);
+    packet_.frames.push_back(
+        sendInstructionToWriteStreamFrame(sendInstruction, streamPacketIdx));
     sendInstructions_.push_back(std::move(sendInstruction));
     packetSize_ -= streamEncodedSize;
     encodedSize_ += streamEncodedSize;
@@ -56,12 +55,12 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
 
   struct Packet {
     RegularQuicWritePacket packet;
-    std::vector<SendInstruction> sendInstructions;
+    SmallVec<SendInstruction, 1> sendInstructions;
     uint32_t encodedSize;
 
     Packet(
         RegularQuicWritePacket pkt,
-        std::vector<SendInstruction> instructions,
+        SmallVec<SendInstruction, 1> instructions,
         uint32_t size)
         : packet(std::move(pkt)),
           sendInstructions(std::move(instructions)),
@@ -97,7 +96,7 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
  private:
   size_t packetSize_;
   RegularQuicWritePacket packet_;
-  std::vector<SendInstruction> sendInstructions_;
+  SmallVec<SendInstruction, 1> sendInstructions_;
   uint32_t encodedSize_{0};
 };
 

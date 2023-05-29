@@ -9,13 +9,15 @@
 
 namespace quic {
 WriteStreamFrame sendInstructionToWriteStreamFrame(
-    const SendInstruction& sendInstruction) {
+    const SendInstruction& sendInstruction,
+    uint64_t streamPacketIdx) {
   WriteStreamFrame frame(
       sendInstruction.streamId,
       sendInstruction.streamOffset,
       sendInstruction.len,
       sendInstruction.fin);
   frame.fromBufMeta = true;
+  frame.streamPacketIdx = streamPacketIdx;
   return frame;
 }
 } // namespace quic
