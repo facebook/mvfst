@@ -277,7 +277,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
         eof = true;
       }
     }
-    if (dsrEnabled_) {
+    if (dsrEnabled_ && (((id - 3) / 4) % 2) == 0) {
       dsrSend(id, toSend, eof);
     } else {
       regularSend(id, toSend, eof);
@@ -449,6 +449,7 @@ class TPerfServer {
     settings.pacingEnabled = pacing;
     if (pacing) {
       settings.pacingTimerTickInterval = 200us;
+      settings.writeLimitRttFraction = 0;
     }
     if (gso) {
       settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
@@ -546,6 +547,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       folly::split("\n", os.str(), lines);
       for (const auto& line : lines) {
         LOG(INFO) << line;
+      }
+      LOG(INFO) << "Per stream bytes breakdown: ";
+      for (const auto& [k, v] : bytesPerStream_) {
+        LOG(INFO) << fmt::format("stream: {}, bytes: {}", k, v);
       }
     }
   }
@@ -658,6 +663,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
         congestionControlType_ == CongestionControlType::BBRTesting) {
       settings.pacingEnabled = true;
       settings.pacingTimerTickInterval = 200us;
+      settings.writeLimitRttFraction = 0;
     }
     if (gso_) {
       settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
