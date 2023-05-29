@@ -45,7 +45,6 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   auto stream = conn_.streamManager->findStream(streamId);
   CHECK(stream);
   CHECK(stream->dsrSender);
-  result.sender = stream->dsrSender.get();
   bool hasFreshBufMeta = stream->writeBufMeta.length > 0;
   bool hasLossBufMeta = !stream->lossBufMetas.empty();
   CHECK(hasFreshBufMeta || hasLossBufMeta);
@@ -71,6 +70,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
           /*streamEncodedSize=*/encodedSize,
           /*streamPacketIdx=*/stream->streamPacketIdx++);
       result.writeSuccess = true;
+      result.sender = stream->dsrSender.get();
       levelIter->iterator->next();
       return result;
     }
@@ -113,6 +113,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
     builder.addSendInstruction(
         instructionBuilder.build(), encodedSize, stream->streamPacketIdx++);
     result.writeSuccess = true;
+    result.sender = stream->dsrSender.get();
     levelIter->iterator->next();
     return result;
   }
