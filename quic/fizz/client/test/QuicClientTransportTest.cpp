@@ -611,9 +611,10 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
-  std::string newToken;
-  client->setNewTokenCallback(
-      [&](std::string token) { newToken = std::move(token); });
+  auto newToken = std::make_shared<std::string>("");
+  client->setNewTokenCallback([newToken = newToken](std::string token) {
+    *newToken = std::move(token);
+  });
   client->start(&clientConnSetupCallback, &clientConnCallback);
 
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
@@ -628,13 +629,14 @@ TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
   expected->prependChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
-  EXPECT_FALSE(newToken.empty());
+  EXPECT_FALSE(newToken->empty());
 }
 
 TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
-  std::string newToken;
-  client->setNewTokenCallback(
-      [&](std::string token) { newToken = std::move(token); });
+  auto newToken = std::make_shared<std::string>("");
+  client->setNewTokenCallback([newToken = newToken](std::string token) {
+    *newToken = std::move(token);
+  });
   client->start(&clientConnSetupCallback, &clientConnCallback);
 
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
@@ -649,7 +651,7 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
   expected->prependChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
-  EXPECT_FALSE(newToken.empty());
+  EXPECT_FALSE(newToken->empty());
 
   /**
    * At this point we have a valid new token, so we're going to do the
@@ -664,7 +666,7 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
    *    equal.
    */
   client = createClient();
-  client->setNewToken(newToken);
+  client->setNewToken(*newToken);
 
   auto retryServer = createServer(ProcessId::ONE, true);
   client->getNonConstConn().peerAddress = retryServer->getAddress();
@@ -683,7 +685,7 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
   eventbase_.loopForever();
 
   EXPECT_FALSE(client->getConn().retryToken.empty());
-  EXPECT_NE(newToken, client->getConn().retryToken);
+  EXPECT_NE(*newToken, client->getConn().retryToken);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
