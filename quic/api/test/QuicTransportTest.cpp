@@ -165,7 +165,6 @@ void dropPackets(QuicServerConnectionState& conn) {
           std::move(*itr->second));
       stream->retransmissionBuffer.erase(itr);
       conn.streamManager->updateWritableStreams(*stream);
-      conn.streamManager->updateLossStreams(*stream);
     }
   }
   conn.outstandings.reset();
@@ -295,7 +294,6 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
   } while (curBuf != largeBuf.get());
   lossStreamState->lossBuffer.emplace_back(std::move(largeBuf), 31, false);
   conn.streamManager->updateWritableStreams(*lossStreamState);
-  conn.streamManager->updateLossStreams(*lossStreamState);
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
@@ -4262,7 +4260,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandings.reset();
 
   // Start from stream2 instead of stream1
-  conn.streamManager->writableStreams().setNextScheduledStream(s2);
+  conn.streamManager->writeQueue().setNextScheduledStream(s2);
   writableBytes = kDefaultUDPSendPacketLen - 100;
 
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
@@ -4287,7 +4285,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandings.reset();
 
   // Test wrap around
-  conn.streamManager->writableStreams().setNextScheduledStream(s2);
+  conn.streamManager->writeQueue().setNextScheduledStream(s2);
   writableBytes = kDefaultUDPSendPacketLen;
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   writeQuicDataToSocket(

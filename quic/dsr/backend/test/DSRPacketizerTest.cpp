@@ -140,6 +140,11 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(1000);
   auto stream = conn_.streamManager->findStream(streamId);
+  // Pretend we sent the non DSR data
+  stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
+  stream->currentWriteOffset = stream->writeBuffer.chainLength();
+  stream->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
   // Move part of the BufMetas to lossBufMetas
   auto split = stream->writeBufMeta.split(500);

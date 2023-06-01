@@ -27,7 +27,6 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
-  stream.conn.streamManager->updateLossStreams(stream);
 }
 
 void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
@@ -63,7 +62,6 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
-  stream.conn.streamManager->updateLossStreams(stream);
   QUIC_STATS(stream.conn.statsCallback, onQuicStreamReset, frame.errorCode);
 }
 

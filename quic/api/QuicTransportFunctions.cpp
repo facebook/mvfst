@@ -675,7 +675,6 @@ void updateConnection(
           stream->newStreamBytesSent += writeStreamFrame.len;
         }
         conn.streamManager->updateWritableStreams(*stream);
-        conn.streamManager->updateLossStreams(*stream);
         streamBytesSent += writeStreamFrame.len;
         detailsPerStream.addFrame(writeStreamFrame, newStreamDataWritten);
         break;

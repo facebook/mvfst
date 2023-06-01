@@ -246,10 +246,7 @@ bool QuicStreamManager::setStreamPriority(StreamId id, Priority newPriority) {
       }
       notifyStreamPriorityChanges();
     }
-    // If this stream is already in the writable or loss queues, update the
-    // priority there.
-    writableStreams_.updateIfExist(id, stream->priority);
-    writableDSRStreams_.updateIfExist(id, stream->priority);
+    writeQueue_.updateIfExist(id, stream->priority);
     return true;
   }
   return false;
@@ -560,10 +557,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   DCHECK(it->second.inTerminalStates());
   readableStreams_.erase(streamId);
   peekableStreams_.erase(streamId);
-  writableStreams_.erase(streamId);
-  writableDSRStreams_.erase(streamId);
-  writableControlStreams_.erase(streamId);
-  removeLoss(streamId);
+  removeWritable(it->second);
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
   txStreams_.erase(streamId);
@@ -644,22 +638,49 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
     CHECK(stream.lossBuffer.empty());
     CHECK(stream.lossBufMetas.empty());
     removeWritable(stream);
-    removeDSRWritable(stream);
+    writableStreams_.erase(stream.id);
+    writableDSRStreams_.erase(stream.id);
+    lossStreams_.erase(stream.id);
+    lossDSRStreams_.erase(stream.id);
+    if (stream.isControl) {
+      controlWriteQueue_.erase(stream.id);
+    } else {
+      writeQueue_.erase(stream.id);
+    }
     return;
   }
-  if (stream.hasWritableData() || !stream.lossBuffer.empty()) {
-    addWritable(stream);
+  if (stream.hasWritableData()) {
+    writableStreams_.emplace(stream.id);
   } else {
-    removeWritable(stream);
+    writableStreams_.erase(stream.id);
   }
-  if (stream.isControl) {
-    return;
-  }
-  if (stream.dsrSender &&
-      (stream.hasWritableBufMeta() || !stream.lossBufMetas.empty())) {
-    addDSRWritable(stream);
+  if (stream.hasWritableBufMeta()) {
+    writableDSRStreams_.emplace(stream.id);
   } else {
-    removeDSRWritable(stream);
+    writableDSRStreams_.erase(stream.id);
+  }
+  if (!stream.lossBuffer.empty()) {
+    lossStreams_.emplace(stream.id);
+  } else {
+    lossStreams_.erase(stream.id);
+  }
+  if (!stream.lossBufMetas.empty()) {
+    lossDSRStreams_.emplace(stream.id);
+  } else {
+    lossDSRStreams_.erase(stream.id);
+  }
+  if (stream.hasSchedulableData() || stream.hasSchedulableDsr()) {
+    if (stream.isControl) {
+      controlWriteQueue_.emplace(stream.id);
+    } else {
+      writeQueue_.insertOrUpdate(stream.id, stream.priority);
+    }
+  } else {
+    if (stream.isControl) {
+      controlWriteQueue_.erase(stream.id);
+    } else {
+      writeQueue_.erase(stream.id);
+    }
   }
 }
 

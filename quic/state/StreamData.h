@@ -411,6 +411,15 @@ struct QuicStreamState : public QuicStreamLike {
     return false;
   }
 
+  // Whether this stream has non-DSR data in the write buffer or loss buffer.
+  FOLLY_NODISCARD bool hasSchedulableData() const {
+    return hasWritableData() || !lossBuffer.empty();
+  }
+
+  FOLLY_NODISCARD bool hasSchedulableDsr() const {
+    return hasWritableBufMeta() || !lossBufMetas.empty();
+  }
+
   FOLLY_NODISCARD bool hasWritableBufMeta() const {
     if (writeBufMeta.offset == 0) {
       return false;

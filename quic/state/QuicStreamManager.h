@@ -130,9 +130,10 @@ class QuicStreamManager {
     lossDSRStreams_ = std::move(other.lossDSRStreams_);
     readableStreams_ = std::move(other.readableStreams_);
     peekableStreams_ = std::move(other.peekableStreams_);
+    writeQueue_ = std::move(other.writeQueue_);
+    controlWriteQueue_ = std::move(other.controlWriteQueue_);
     writableStreams_ = std::move(other.writableStreams_);
     writableDSRStreams_ = std::move(other.writableDSRStreams_);
-    writableControlStreams_ = std::move(other.writableControlStreams_);
     txStreams_ = std::move(other.txStreams_);
     deliverableStreams_ = std::move(other.deliverableStreams_);
     closedStreams_ = std::move(other.closedStreams_);
@@ -385,19 +386,6 @@ class QuicStreamManager {
     lossStreams_.insert(id);
   }
 
-  void updateLossStreams(const QuicStreamState& stream) {
-    if (!stream.hasLoss()) {
-      removeLoss(stream.id);
-    } else {
-      if (!stream.lossBuffer.empty()) {
-        lossStreams_.emplace(stream.id);
-      }
-      if (!stream.lossBufMetas.empty()) {
-        lossDSRStreams_.emplace(stream.id);
-      }
-    }
-  }
-
   /**
    * Update stream priority if the stream indicated by id exists, and the
    * passed in values are different from current priority. Return true if
@@ -423,16 +411,19 @@ class QuicStreamManager {
    * Returns a mutable reference to the container holding the writable stream
    * IDs.
    */
-  auto& writableControlStreams() {
-    return writableControlStreams_;
+  auto& controlWriteQueue() {
+    return controlWriteQueue_;
+  }
+
+  auto& writeQueue() {
+    return writeQueue_;
   }
 
   /*
    * Returns if there are any writable streams.
    */
   bool hasWritable() const {
-    return !writableStreams_.empty() || !writableDSRStreams_.empty() ||
-        !writableControlStreams_.empty();
+    return !writeQueue_.empty() || !controlWriteQueue_.empty();
   }
 
   FOLLY_NODISCARD bool hasDSRWritable() const {
@@ -440,7 +431,7 @@ class QuicStreamManager {
   }
 
   bool hasNonDSRWritable() const {
-    return !writableStreams_.empty() || !writableControlStreams_.empty();
+    return !writableStreams_.empty() || !controlWriteQueue_.empty();
   }
 
   /*
@@ -448,17 +439,26 @@ class QuicStreamManager {
    */
   void addWritable(const QuicStreamState& stream) {
     if (stream.isControl) {
-      writableControlStreams_.insert(stream.id);
+      // Control streams get their own queue.
+      CHECK(stream.hasSchedulableData());
+      controlWriteQueue_.insert(stream.id);
     } else {
-      CHECK(stream.hasWritableData() || !stream.lossBuffer.empty());
-      writableStreams_.insertOrUpdate(stream.id, stream.priority);
+      CHECK(stream.hasSchedulableData() || stream.hasSchedulableDsr());
+      writeQueue_.insertOrUpdate(stream.id, stream.priority);
     }
-  }
-
-  void addDSRWritable(const QuicStreamState& stream) {
-    CHECK(!stream.isControl);
-    CHECK(stream.hasWritableBufMeta() || !stream.lossBufMetas.empty());
-    writableDSRStreams_.insertOrUpdate(stream.id, stream.priority);
+    if (stream.hasWritableData()) {
+      writableStreams_.insert(stream.id);
+    }
+    if (stream.hasWritableBufMeta()) {
+      LOG(ERROR) << "writable DSR: " << stream.id;
+      writableDSRStreams_.insert(stream.id);
+    }
+    if (!stream.lossBuffer.empty()) {
+      lossStreams_.insert(stream.id);
+    }
+    if (!stream.lossBufMetas.empty()) {
+      lossDSRStreams_.insert(stream.id);
+    }
   }
 
   /*
@@ -466,15 +466,14 @@ class QuicStreamManager {
    */
   void removeWritable(const QuicStreamState& stream) {
     if (stream.isControl) {
-      writableControlStreams_.erase(stream.id);
+      controlWriteQueue_.erase(stream.id);
     } else {
-      writableStreams_.erase(stream.id);
+      writeQueue_.erase(stream.id);
     }
-  }
-
-  void removeDSRWritable(const QuicStreamState& stream) {
-    CHECK(!stream.isControl);
+    writableStreams_.erase(stream.id);
     writableDSRStreams_.erase(stream.id);
+    lossStreams_.erase(stream.id);
+    lossDSRStreams_.erase(stream.id);
   }
 
   /*
@@ -483,7 +482,8 @@ class QuicStreamManager {
   void clearWritable() {
     writableStreams_.clear();
     writableDSRStreams_.clear();
-    writableControlStreams_.clear();
+    writeQueue_.clear();
+    controlWriteQueue_.clear();
   }
 
   /*
@@ -1166,12 +1166,14 @@ class QuicStreamManager {
   // Set of streams that have pending peeks
   folly::F14FastSet<StreamId> peekableStreams_;
 
-  // Set of !control streams that have writable data
-  PriorityQueue writableStreams_;
-  PriorityQueue writableDSRStreams_;
+  // Set of !control streams that have writable data used for frame scheduling
+  PriorityQueue writeQueue_;
 
   // Set of control streams that have writable data
-  std::set<StreamId> writableControlStreams_;
+  std::set<StreamId> controlWriteQueue_;
+
+  folly::F14FastSet<StreamId> writableStreams_;
+  folly::F14FastSet<StreamId> writableDSRStreams_;
 
   // Streams that may be able to call TxCallback
   folly::F14FastSet<StreamId> txStreams_;

@@ -69,6 +69,11 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimit) {
   auto streamId = prepareOneStream(3000);
   auto cid = getTestConnectionId();
   auto stream = conn_.streamManager->findStream(streamId);
+  // Pretend we sent the non DSR data
+  stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
+  stream->currentWriteOffset = stream->writeBuffer.chainLength();
+  stream->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream);
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 2;
   conn_.lossState.srtt = 100ms;
@@ -96,6 +101,11 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimitNoLimit) {
   auto streamId = prepareOneStream(3000);
   auto cid = getTestConnectionId();
   auto stream = conn_.streamManager->findStream(streamId);
+  // Pretend we sent the non DSR data
+  stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
+  stream->currentWriteOffset = stream->writeBuffer.chainLength();
+  stream->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream);
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 2;
   conn_.lossState.srtt = 100ms;
@@ -123,6 +133,11 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(2000);
   auto stream = conn_.streamManager->findStream(streamId);
+  // Pretend we sent the non DSR data
+  stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
+  stream->currentWriteOffset = stream->writeBuffer.chainLength();
+  stream->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
   EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
@@ -136,6 +151,11 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(2000 * 100);
   auto stream = conn_.streamManager->findStream(streamId);
+  // Pretend we sent the non DSR data
+  stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
+  stream->currentWriteOffset = stream->writeBuffer.chainLength();
+  stream->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream);
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -157,17 +177,48 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   auto streamId2 = prepareOneStream(1000);
   auto stream1 = conn_.streamManager->findStream(streamId1);
   auto stream2 = conn_.streamManager->findStream(streamId2);
+  // Pretend we sent the non DSR data on second stream
+  stream2->ackedIntervals.insert(0, stream2->writeBuffer.chainLength() - 1);
+  stream2->currentWriteOffset = stream2->writeBuffer.chainLength();
+  stream2->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
   EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
-  // TODO: This needs to be fixed later: The stream and the sender needs to be
-  // 1:1 in the future. Then there will be two senders for this test case and
-  // each of them will send out one instruction.
   EXPECT_EQ(1, countInstructions(streamId1));
   EXPECT_EQ(1, countInstructions(streamId2));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+}
+
+TEST_F(WriteFunctionsTest, WriteThreeStreamsNonDsrAndDsr) {
+  prepareFlowControlAndStreamLimit();
+  auto streamId1 = prepareOneStream(1000);
+  auto streamId2 = prepareOneStream(1000);
+  auto streamId3 = prepareOneStream(1000);
+  auto stream1 = conn_.streamManager->findStream(streamId1);
+  auto stream2 = conn_.streamManager->findStream(streamId2);
+  auto stream3 = conn_.streamManager->findStream(streamId3);
+  auto cid = getTestConnectionId();
+  size_t packetLimit = 20;
+  // First loop only write a single packet because it will find there's non-DSR
+  // data to write on the next stream.
+  EXPECT_EQ(1, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  // Pretend we sent the non DSR data for last stream
+  stream3->ackedIntervals.insert(0, stream3->writeBuffer.chainLength() - 1);
+  stream3->currentWriteOffset = stream3->writeBuffer.chainLength();
+  stream3->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream3);
+  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
+  EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
+  EXPECT_EQ(1, stream3->retransmissionBufMetas.size());
+  EXPECT_EQ(1, countInstructions(streamId1));
+  EXPECT_EQ(1, countInstructions(streamId2));
+  EXPECT_EQ(1, countInstructions(streamId3));
+  EXPECT_EQ(3, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
 
@@ -179,6 +230,11 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsNonIncremental) {
   auto stream2 = conn_.streamManager->findStream(streamId2);
   conn_.streamManager->setStreamPriority(streamId1, Priority{3, false});
   conn_.streamManager->setStreamPriority(streamId2, Priority{3, false});
+  // Pretend we sent the non DSR data on first stream
+  stream1->ackedIntervals.insert(0, stream1->writeBuffer.chainLength() - 1);
+  stream1->currentWriteOffset = stream1->writeBuffer.chainLength();
+  stream1->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream1);
   auto cid = getTestConnectionId();
   size_t packetLimit = 2;
   EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
@@ -198,6 +254,11 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsIncremental) {
   auto stream2 = conn_.streamManager->findStream(streamId2);
   conn_.streamManager->setStreamPriority(streamId1, Priority{3, true});
   conn_.streamManager->setStreamPriority(streamId2, Priority{3, true});
+  // Pretend we sent the non DSR data on second stream
+  stream2->ackedIntervals.insert(0, stream2->writeBuffer.chainLength() - 1);
+  stream2->currentWriteOffset = stream2->writeBuffer.chainLength();
+  stream2->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 2;
   EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
@@ -213,6 +274,11 @@ TEST_F(WriteFunctionsTest, LossAndFreshTwoInstructionsInTwoPackets) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(1000);
   auto stream = conn_.streamManager->findStream(streamId);
+  // Pretend we sent the non DSR data
+  stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
+  stream->currentWriteOffset = stream->writeBuffer.chainLength();
+  stream->writeBuffer.move();
+  conn_.streamManager->updateWritableStreams(*stream);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
   // Move part of the BufMetas to lossBufMetas
   auto split = stream->writeBufMeta.split(500);
@@ -246,7 +312,7 @@ TEST_F(
   // Move part of the BufMetas to lossBufMetas
   auto split = stream->writeBufMeta.split(500);
   stream->lossBufMetas.push_back(split);
-  conn_.streamManager->updateLossStreams(*stream);
+  conn_.streamManager->updateWritableStreams(*stream);
   // Zero out conn flow control.
   conn_.flowControlState.sumCurWriteOffset =
       conn_.flowControlState.peerAdvertisedMaxOffset;

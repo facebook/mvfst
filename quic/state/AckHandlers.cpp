@@ -170,7 +170,6 @@ AckEvent processAckFrame(
                     streamFrame->offset, streamFrame->len, streamFrame->fin);
                 stream->updateAckedIntervals(
                     streamFrame->offset, streamFrame->len, streamFrame->fin);
-                conn.streamManager->updateLossStreams(*stream);
                 conn.streamManager->updateWritableStreams(*stream);
               }
             }

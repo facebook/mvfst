@@ -458,7 +458,11 @@ void StreamFrameScheduler::writeStreamsHelper(
     level.iterator->begin();
     do {
       auto streamId = level.iterator->current();
-      auto stream = conn_.streamManager->findStream(streamId);
+      auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
+      if (!stream->hasSchedulableData() && stream->hasSchedulableDsr()) {
+        // We hit a DSR stream
+        return;
+      }
       CHECK(stream) << "streamId=" << streamId
                     << "inc=" << uint64_t(level.incremental);
       if (!writeSingleStream(builder, *stream, connWritableBytes)) {
@@ -476,30 +480,40 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
   DCHECK(conn_.streamManager->hasWritable());
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
   // Write the control streams first as a naive binary priority mechanism.
-  const auto& writableControlStreams =
-      conn_.streamManager->writableControlStreams();
-  if (!writableControlStreams.empty()) {
+  const auto& controlWriteQueue = conn_.streamManager->controlWriteQueue();
+  if (!controlWriteQueue.empty()) {
     conn_.schedulingState.nextScheduledControlStream = writeStreamsHelper(
         builder,
-        writableControlStreams,
+        controlWriteQueue,
         conn_.schedulingState.nextScheduledControlStream,
         connWritableBytes,
         conn_.transportSettings.streamFramePerPacket);
   }
-  auto& writableStreams = conn_.streamManager->writableStreams();
-  if (!writableStreams.empty()) {
+  auto& writeQueue = conn_.streamManager->writeQueue();
+  if (!writeQueue.empty()) {
     writeStreamsHelper(
         builder,
-        writableStreams,
+        writeQueue,
         connWritableBytes,
         conn_.transportSettings.streamFramePerPacket);
+    // If the next non-control stream is DSR, record that fact in the scheduler
+    // so that we don't try to write a non DSR stream again. Note that this
+    // means that in the presence of many large control streams and DSR
+    // streams, we won't completely prioritize control streams but they
+    // will not be starved.
+    auto streamId = writeQueue.getNextScheduledStream();
+    auto stream = conn_.streamManager->findStream(streamId);
+    if (stream && !stream->hasSchedulableData()) {
+      nextStreamDsr_ = true;
+    }
   }
-} // namespace quic
+}
 
 bool StreamFrameScheduler::hasPendingData() const {
-  return conn_.streamManager->hasNonDSRLoss() ||
-      (conn_.streamManager->hasNonDSRWritable() &&
-       getSendConnFlowControlBytesWire(conn_) > 0);
+  return !nextStreamDsr_ &&
+      (conn_.streamManager->hasNonDSRLoss() ||
+       (conn_.streamManager->hasNonDSRWritable() &&
+        getSendConnFlowControlBytesWire(conn_) > 0));
 }
 
 bool StreamFrameScheduler::writeStreamFrame(

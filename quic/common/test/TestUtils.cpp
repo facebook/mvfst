@@ -731,8 +731,8 @@ void overridePacketWithToken(
 }
 
 bool writableContains(QuicStreamManager& streamManager, StreamId streamId) {
-  return streamManager.writableStreams().count(streamId) > 0 ||
-      streamManager.writableControlStreams().count(streamId) > 0;
+  return streamManager.writeQueue().count(streamId) > 0 ||
+      streamManager.controlWriteQueue().count(streamId) > 0;
 }
 
 std::unique_ptr<PacketNumberCipher>

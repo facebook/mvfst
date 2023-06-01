@@ -2236,14 +2236,14 @@ TEST_F(QuicStreamFunctionsTest, LossBufferEmpty) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   conn.streamManager->addLoss(id);
-  conn.streamManager->updateLossStreams(stream);
+  conn.streamManager->updateWritableStreams(stream);
   EXPECT_FALSE(conn.streamManager->hasLoss());
 }
 
 TEST_F(QuicStreamFunctionsTest, LossBufferEmptyNoChange) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
-  conn.streamManager->updateLossStreams(stream);
+  conn.streamManager->updateWritableStreams(stream);
   EXPECT_FALSE(conn.streamManager->hasLoss());
 }
 
@@ -2251,7 +2251,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   stream.lossBuffer.emplace_back(IOBuf::create(10), 10, false);
-  conn.streamManager->updateLossStreams(stream);
+  conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
@@ -2263,7 +2263,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferMetaHasData) {
   b.setOffset(10);
   b.setEOF(false);
   stream.lossBufMetas.emplace_back(b.build());
-  conn.streamManager->updateLossStreams(stream);
+  conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
@@ -2276,7 +2276,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferMetaStillHasData) {
   b.setOffset(10);
   b.setEOF(false);
   stream.lossBufMetas.emplace_back(b.build());
-  conn.streamManager->updateLossStreams(stream);
+  conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
@@ -2285,7 +2285,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferStillHasData) {
   QuicStreamState stream(id, conn);
   conn.streamManager->addLoss(id);
   stream.lossBuffer.emplace_back(IOBuf::create(10), 10, false);
-  conn.streamManager->updateLossStreams(stream);
+  conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 

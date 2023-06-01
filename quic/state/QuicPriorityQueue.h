@@ -157,6 +157,7 @@ struct PriorityQueue {
     folly::F14FastMap<StreamId, OrderId> streamToOrderId;
   };
   std::vector<Level> levels;
+  using LevelItr = decltype(levels)::const_iterator;
 
   PriorityQueue() : levels(kDefaultPriorityLevelsSize) {
     for (size_t index = 0; index < levels.size(); index++) {
@@ -256,6 +257,18 @@ struct PriorityQueue {
       return level.streams.begin()->streamId;
     }
     return level.iterator->nextStreamIt->streamId;
+  }
+
+  FOLLY_NODISCARD StreamId getNextScheduledStream() const {
+    const auto& levelIter =
+        std::find_if(levels.cbegin(), levels.cend(), [&](const auto& level) {
+          return !level.empty();
+        });
+    // The expectation is that calling this function on an empty queue is
+    // a bug.
+    CHECK(levelIter != levels.cend());
+    levelIter->iterator->begin();
+    return levelIter->iterator->current();
   }
 
  private:

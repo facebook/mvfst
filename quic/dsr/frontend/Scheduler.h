@@ -37,8 +37,17 @@ class DSRStreamFrameScheduler {
   void enrichInstruction(
       SendInstruction::Builder& builder,
       const QuicStreamState& stream);
+  SchedulingResult enrichAndAddSendInstruction(
+      uint32_t,
+      SchedulingResult,
+      DSRPacketBuilderBase&,
+      SendInstruction::Builder&,
+      const PriorityQueue&,
+      const PriorityQueue::LevelItr&,
+      QuicStreamState&);
 
  private:
   QuicServerConnectionState& conn_;
+  bool nextStreamNonDsr_{false};
 };
 } // namespace quic

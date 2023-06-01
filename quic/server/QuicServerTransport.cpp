@@ -325,13 +325,8 @@ void QuicServerTransport::writeData() {
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
-    // This kind of sucks, but right now we don't have a way to schedule DSR
-    // and non-DSR streams as part of the same priority queue. This can lead
-    // to prioritity inversions and starving of one kind of stream over the
-    // other. To mitigate this, randomly decide whether to write DSR or non
-    // DSR data first which at least ensures fairness over time.
     auto writeLoopBeginTime = Clock::now();
-    auto nonDsrPath = [&]() {
+    auto nonDsrPath = [&](auto limit) {
       return writeQuicDataToSocket(
           *socket_,
           *conn_,
@@ -340,33 +335,34 @@ void QuicServerTransport::writeData() {
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher,
           version,
-          packetLimit,
+          limit,
           writeLoopBeginTime);
     };
-    auto dsrPath = [&]() {
+    auto dsrPath = [&](auto limit) {
       return writePacketizationRequest(
           *serverConn_,
           destConnId,
-          packetLimit,
+          limit,
           *conn_->oneRttWriteCipher,
           writeLoopBeginTime);
     };
-    if (folly::Random::oneIn(2)) {
-      if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
-        packetLimit -= dsrPath();
-      }
-      if (packetLimit) {
-        packetLimit -= nonDsrPath().packetsWritten;
-      }
-    } else {
-      auto written = nonDsrPath();
+    // We need a while loop because both paths write streams from the same
+    // queue, which can result in empty writes.
+    while (packetLimit) {
+      auto startingPacketLimit = packetLimit;
+      // Give the non-DSR path a chance.
+      auto written = nonDsrPath(packetLimit);
       // If we didn't write much from the non DSR path, don't penalize DSR
       // a full packet.
       if (written.bytesWritten >= conn_->udpSendPacketLen / 2) {
         packetLimit -= written.packetsWritten;
       }
       if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
-        packetLimit -= dsrPath();
+        packetLimit -= dsrPath(packetLimit);
+      }
+      if (startingPacketLimit == packetLimit) {
+        // We haven't written anything with either path, so we're done.
+        break;
       }
     }
   }

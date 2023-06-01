@@ -2348,7 +2348,6 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_EQ(200, retxBufMetaIter->second.length);
   ASSERT_FALSE(retxBufMetaIter->second.eof);
   conn->streamManager->updateWritableStreams(*stream);
-  conn->streamManager->updateLossStreams(*stream);
   EXPECT_FALSE(conn->streamManager->hasLoss());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 
@@ -2370,7 +2369,6 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_EQ(400, retxBufMetaIter->second.length);
   ASSERT_FALSE(retxBufMetaIter->second.eof);
   conn->streamManager->updateWritableStreams(*stream);
-  conn->streamManager->updateLossStreams(*stream);
   EXPECT_FALSE(conn->streamManager->hasLoss());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 
@@ -2392,7 +2390,6 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_EQ(400, retxBufMetaIter->second.length);
   ASSERT_TRUE(retxBufMetaIter->second.eof);
   conn->streamManager->updateWritableStreams(*stream);
-  conn->streamManager->updateLossStreams(*stream);
   EXPECT_FALSE(conn->streamManager->hasLoss());
   EXPECT_TRUE(conn->streamManager->writableDSRStreams().empty());
 
@@ -2411,7 +2408,9 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_TRUE(conn->streamManager->hasLoss());
   ASSERT_EQ(stream->streamLossCount, 1);
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+  EXPECT_FALSE(stream->hasWritableBufMeta());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
+  EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
 
   // Lose the 3rd dsr packet:
   RegularQuicWritePacket packet3(PacketHeader(ShortHeader(
@@ -2428,7 +2427,9 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_EQ(1, stream->retransmissionBufMetas.size());
   ASSERT_EQ(stream->streamLossCount, 2);
   EXPECT_TRUE(conn->streamManager->hasLoss());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+  EXPECT_FALSE(stream->hasWritableBufMeta());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
+  EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
 
   // Lose the 3nd dsr packet, it should be merged together with the first
   // element in the lossBufMetas:
@@ -2446,7 +2447,9 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_EQ(0, stream->retransmissionBufMetas.size());
   ASSERT_EQ(stream->streamLossCount, 3);
   EXPECT_TRUE(conn->streamManager->hasLoss());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+  EXPECT_FALSE(stream->hasWritableBufMeta());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
+  EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
 }
 
 TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {

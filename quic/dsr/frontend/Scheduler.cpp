@@ -18,9 +18,34 @@ DSRStreamFrameScheduler::DSRStreamFrameScheduler(
     : conn_(conn) {}
 
 bool DSRStreamFrameScheduler::hasPendingData() const {
-  return conn_.streamManager->hasDSRLoss() ||
-      (conn_.streamManager->hasDSRWritable() &&
-       getSendConnFlowControlBytesWire(conn_) > 0);
+  return !nextStreamNonDsr_ &&
+      (conn_.streamManager->hasDSRLoss() ||
+       (conn_.streamManager->hasDSRWritable() &&
+        getSendConnFlowControlBytesWire(conn_) > 0));
+}
+
+DSRStreamFrameScheduler::SchedulingResult
+DSRStreamFrameScheduler::enrichAndAddSendInstruction(
+    uint32_t encodedSize,
+    DSRStreamFrameScheduler::SchedulingResult result,
+    DSRPacketBuilderBase& packetBuilder,
+    SendInstruction::Builder& instructionBuilder,
+    const PriorityQueue& writeQueue,
+    const PriorityQueue::LevelItr& levelIter,
+    QuicStreamState& stream) {
+  enrichInstruction(instructionBuilder, stream);
+  packetBuilder.addSendInstruction(
+      instructionBuilder.build(), encodedSize, stream.streamPacketIdx++);
+  result.writeSuccess = true;
+  result.sender = stream.dsrSender.get();
+  levelIter->iterator->next();
+  auto nextStreamId = writeQueue.getNextScheduledStream();
+  auto nextStream =
+      CHECK_NOTNULL(conn_.streamManager->findStream(nextStreamId));
+  if (nextStream->hasSchedulableData()) {
+    nextStreamNonDsr_ = true;
+  }
+  return result;
 }
 
 /**
@@ -32,22 +57,25 @@ bool DSRStreamFrameScheduler::hasPendingData() const {
 DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
     DSRPacketBuilderBase& builder) {
   SchedulingResult result;
-  auto& writableDSRStreams = conn_.streamManager->writableDSRStreams();
+  auto& writeQueue = conn_.streamManager->writeQueue();
   const auto& levelIter = std::find_if(
-      writableDSRStreams.levels.cbegin(),
-      writableDSRStreams.levels.cend(),
+      writeQueue.levels.cbegin(),
+      writeQueue.levels.cend(),
       [&](const auto& level) { return !level.empty(); });
-  if (levelIter == writableDSRStreams.levels.cend()) {
+  if (levelIter == writeQueue.levels.cend()) {
     return result;
   }
   levelIter->iterator->begin();
   auto streamId = levelIter->iterator->current();
   auto stream = conn_.streamManager->findStream(streamId);
   CHECK(stream);
-  CHECK(stream->dsrSender);
+  if (!stream->dsrSender || !stream->hasSchedulableDsr()) {
+    nextStreamNonDsr_ = true;
+    return result;
+  }
   bool hasFreshBufMeta = stream->writeBufMeta.length > 0;
   bool hasLossBufMeta = !stream->lossBufMetas.empty();
-  CHECK(hasFreshBufMeta || hasLossBufMeta);
+  CHECK(stream->hasSchedulableDsr());
   if (hasLossBufMeta) {
     SendInstruction::Builder instructionBuilder(conn_, streamId);
     auto encodedSize = writeDSRStreamFrame(
@@ -64,15 +92,14 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
       if (builder.remainingSpace() < encodedSize) {
         return result;
       }
-      enrichInstruction(instructionBuilder, *stream);
-      builder.addSendInstruction(
-          instructionBuilder.build(),
-          /*streamEncodedSize=*/encodedSize,
-          /*streamPacketIdx=*/stream->streamPacketIdx++);
-      result.writeSuccess = true;
-      result.sender = stream->dsrSender.get();
-      levelIter->iterator->next();
-      return result;
+      return enrichAndAddSendInstruction(
+          encodedSize,
+          std::move(result),
+          builder,
+          instructionBuilder,
+          writeQueue,
+          levelIter,
+          *stream);
     }
   }
   if (!hasFreshBufMeta || builder.remainingSpace() == 0) {
@@ -109,13 +136,14 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
     if (builder.remainingSpace() < encodedSize) {
       return result;
     }
-    enrichInstruction(instructionBuilder, *stream);
-    builder.addSendInstruction(
-        instructionBuilder.build(), encodedSize, stream->streamPacketIdx++);
-    result.writeSuccess = true;
-    result.sender = stream->dsrSender.get();
-    levelIter->iterator->next();
-    return result;
+    return enrichAndAddSendInstruction(
+        encodedSize,
+        std::move(result),
+        builder,
+        instructionBuilder,
+        writeQueue,
+        levelIter,
+        *stream);
   }
   return result;
 }

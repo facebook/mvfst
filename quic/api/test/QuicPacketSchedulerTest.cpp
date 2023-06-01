@@ -1218,8 +1218,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
       false);
   scheduler.writeStreams(builder);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
-          kDefaultPriority),
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       0);
 }
 
@@ -1266,8 +1265,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   // Force the wraparound initially.
   scheduler.writeStreams(builder);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
-          kDefaultPriority),
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       4);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
@@ -1333,8 +1331,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   // The default is to wraparound initially.
   scheduler.writeStreams(builder1);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
-          kDefaultPriority),
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       stream2);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
@@ -1359,6 +1356,97 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
   ASSERT_TRUE(frames[2].asWriteStreamFrame());
   EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
+}
+
+TEST_F(
+    QuicPacketSchedulerTest,
+    StreamFrameSchedulerRoundRobinStreamPerPacketHitsDsr) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.streamFramePerPacket = true;
+  auto connId = getTestConnectionId();
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  auto stream1 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream3 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream4 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
+  auto curBuf = largeBuf.get();
+  do {
+    curBuf->append(curBuf->capacity());
+    curBuf = curBuf->next();
+  } while (curBuf != largeBuf.get());
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream2),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream3),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  auto sender = std::make_unique<MockDSRPacketizationRequestSender>();
+  ON_CALL(*sender, addSendInstruction(testing::_))
+      .WillByDefault(testing::Return(true));
+  ON_CALL(*sender, flush()).WillByDefault(testing::Return(true));
+  auto dsrStream = conn.streamManager->findStream(stream4);
+  dsrStream->dsrSender = std::move(sender);
+  BufferMeta bufMeta(20);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream4),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  writeBufMetaToQuicStream(
+      *conn.streamManager->findStream(stream4), bufMeta, true /* eof */);
+  // Pretend we sent the non DSR data
+  dsrStream->ackedIntervals.insert(0, dsrStream->writeBuffer.chainLength() - 1);
+  dsrStream->currentWriteOffset = dsrStream->writeBuffer.chainLength();
+  dsrStream->writeBuffer.move();
+  conn.streamManager->updateWritableStreams(*dsrStream);
+
+  // The default is to wraparound initially.
+  scheduler.writeStreams(builder1);
+  EXPECT_EQ(
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
+      stream2);
+
+  // Should write frames for stream2, stream3, followed by an empty write.
+  NiceMock<MockQuicPacketBuilder> builder2;
+  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder2.frames_.push_back(f);
+  }));
+  auto& frames = builder2.frames_;
+  ASSERT_TRUE(scheduler.hasPendingData());
+  scheduler.writeStreams(builder2);
+  ASSERT_EQ(frames.size(), 1);
+  ASSERT_TRUE(scheduler.hasPendingData());
+  scheduler.writeStreams(builder2);
+  ASSERT_EQ(frames.size(), 2);
+  EXPECT_FALSE(scheduler.hasPendingData());
+  scheduler.writeStreams(builder2);
+  WriteStreamFrame f1(stream2, 0, 9, false);
+  WriteStreamFrame f2(stream3, 0, 9, false);
+  ASSERT_TRUE(frames[0].asWriteStreamFrame());
+  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
+  ASSERT_TRUE(frames[1].asWriteStreamFrame());
+  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
@@ -1406,7 +1494,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
   // The default is to wraparound initially.
   scheduler.writeStreams(builder1);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
+      conn.streamManager->writeQueue().getNextScheduledStream(
           Priority(0, false)),
       stream1);
 
@@ -1473,7 +1561,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
   // The default is to wraparound initially.
   scheduler.writeStreams(builder1);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
+      conn.streamManager->writeQueue().getNextScheduledStream(
           Priority(0, false)),
       stream1);
 
@@ -1550,8 +1638,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   // The default is to wraparound initially.
   scheduler.writeStreams(builder);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
-          kDefaultPriority),
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
@@ -1578,8 +1665,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   EXPECT_EQ(*frames[3].asWriteStreamFrame(), f4);
 
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
-          kDefaultPriority),
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 }
@@ -1605,8 +1691,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   writeDataToQuicStream(*stream1, folly::IOBuf::copyBuffer("some data"), false);
   scheduler.writeStreams(builder);
   EXPECT_EQ(
-      conn.streamManager->writableStreams().getNextScheduledStream(
-          kDefaultPriority),
+      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       0);
 }
 
@@ -1644,7 +1729,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
 
   // Manually remove a stream and set the next scheduled to that stream.
   builder.frames_.clear();
-  conn.streamManager->writableStreams().setNextScheduledStream(stream2);
+  conn.streamManager->writeQueue().setNextScheduledStream(stream2);
   conn.streamManager->removeWritable(*conn.streamManager->findStream(stream2));
   scheduler.writeStreams(builder);
   ASSERT_EQ(builder.frames_.size(), 1);
@@ -1817,7 +1902,6 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   stream->lossBuffer.emplace_back(std::move(*stream->retransmissionBuffer[0]));
   stream->retransmissionBuffer.clear();
   conn.streamManager->updateWritableStreams(*stream);
-  conn.streamManager->updateLossStreams(*stream);
   EXPECT_TRUE(scheduler.hasPendingData());
 
   // Write again
@@ -1862,7 +1946,6 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   dsrStream->insertIntoLossBufMeta(bufMeta);
   conn.streamManager->updateWritableStreams(*stream);
   conn.streamManager->updateWritableStreams(*dsrStream);
-  conn.streamManager->updateLossStreams(*dsrStream);
 
   StreamFrameScheduler scheduler(conn);
   EXPECT_TRUE(scheduler.hasPendingData());
@@ -1931,7 +2014,6 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   stream->lossBuffer.emplace_back(std::move(*stream->retransmissionBuffer[0]));
   stream->retransmissionBuffer.clear();
   conn.streamManager->updateWritableStreams(*stream);
-  conn.streamManager->updateLossStreams(*stream);
   EXPECT_TRUE(scheduler.hasPendingData());
 
   // Write again
