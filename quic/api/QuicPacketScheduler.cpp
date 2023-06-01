@@ -468,7 +468,12 @@ void StreamFrameScheduler::writeStreamsHelper(
       if (!writeSingleStream(builder, *stream, connWritableBytes)) {
         break;
       }
-      level.iterator->next();
+      auto remainingSpaceAfter = builder.remainingSpaceInPkt();
+      // If we wrote a stream frame and there's still space in the packet,
+      // that implies we ran out of data or flow control on the stream and
+      // we should bypass the nextsPerStream in the priority queue.
+      bool forceNext = remainingSpaceAfter > 0;
+      level.iterator->next(forceNext);
       if (streamPerPacket) {
         return;
       }

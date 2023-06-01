@@ -271,6 +271,10 @@ struct TransportSettings {
   // The default priority to instantiate streams with.
   Priority defaultPriority{kDefaultPriority};
 
+  // How many times we will a schedule a stream to packets before moving onto
+  // the next one in the queue. Only relevant for incremental priority.
+  uint64_t priorityQueueWritesPerStream{1};
+
   // Local configuration for ACK receive timestamps.
   //
   // Determines the ACK receive timestamp configuration sent to peer,

@@ -60,6 +60,8 @@ class QuicStreamManager {
     nextBidirectionalStreamGroupId_ = nextBidirectionalStreamId_;
     nextUnidirectionalStreamGroupId_ = nextUnidirectionalStreamId_;
     refreshTransportSettings(transportSettings);
+    writeQueue_.setMaxNextsPerStream(
+        transportSettings.priorityQueueWritesPerStream);
   }
 
   /**

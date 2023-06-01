@@ -4841,6 +4841,10 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
       {{static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
         uint64_t(2)}});
   EXPECT_EQ(server->getTransportSettings().writeLimitRttFraction, 2);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::WRITES_PER_STREAM),
+        uint64_t(5)}});
+  EXPECT_EQ(server->getTransportSettings().priorityQueueWritesPerStream, 5);
 }
 
 TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {

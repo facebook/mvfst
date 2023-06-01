@@ -1288,6 +1288,86 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
 }
 
+TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.streamManager->writeQueue().setMaxNextsPerStream(2);
+  conn.transportSettings.defaultPriority = Priority(0, true);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connId = getTestConnectionId();
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder.encodePacketHeader();
+  auto stream1 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto stream3 =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
+  auto curBuf = largeBuf.get();
+  do {
+    curBuf->append(curBuf->capacity());
+    curBuf = curBuf->next();
+  } while (curBuf != largeBuf.get());
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream2),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(stream3),
+      folly::IOBuf::copyBuffer("some data"),
+      false);
+  // Should write frames for stream1, stream1, stream2, stream3, followed by
+  // stream1 again.
+  NiceMock<MockQuicPacketBuilder> builder2;
+  std::vector<uint64_t> remainingRet = {1500, 0, 1400, 0, 1300, 1100, 1000, 0};
+  auto remainingItr = remainingRet.begin();
+
+  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder2.frames_.push_back(f);
+    remainingItr++;
+  }));
+  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
+    return *remainingItr;
+  }));
+  scheduler.writeStreams(builder2);
+  remainingItr++;
+  ASSERT_EQ(conn.streamManager->writeQueue().getNextScheduledStream(), stream1);
+  ASSERT_EQ(builder2.frames_.size(), 1);
+  ASSERT_EQ(*remainingItr, 1400);
+  scheduler.writeStreams(builder2);
+  ASSERT_EQ(builder2.frames_.size(), 2);
+  ASSERT_EQ(conn.streamManager->writeQueue().getNextScheduledStream(), stream2);
+  ASSERT_EQ(*remainingItr, 0);
+  remainingItr++;
+  scheduler.writeStreams(builder2);
+  scheduler.writeStreams(builder2);
+  auto& frames = builder2.frames_;
+  ASSERT_EQ(frames.size(), 5);
+  ASSERT_TRUE(frames[0].asWriteStreamFrame());
+  EXPECT_EQ(frames[0].asWriteStreamFrame()->streamId, stream1);
+  ASSERT_TRUE(frames[1].asWriteStreamFrame());
+  EXPECT_EQ(frames[1].asWriteStreamFrame()->streamId, stream1);
+  ASSERT_TRUE(frames[2].asWriteStreamFrame());
+  EXPECT_EQ(frames[2].asWriteStreamFrame()->streamId, stream2);
+  ASSERT_TRUE(frames[3].asWriteStreamFrame());
+  EXPECT_EQ(frames[3].asWriteStreamFrame()->streamId, stream3);
+  ASSERT_TRUE(frames[4].asWriteStreamFrame());
+  EXPECT_EQ(frames[4].asWriteStreamFrame()->streamId, stream1);
+}
+
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -2075,7 +2155,7 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   updateConnection(
       conn, folly::none, packet1, Clock::now(), 1200, 0, false /* isDSR */);
-  EXPECT_EQ(2, packet1.frames.size());
+  ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId1, writeStreamFrame1.streamId);
   EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));

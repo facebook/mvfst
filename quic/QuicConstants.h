@@ -171,7 +171,9 @@ BETTER_ENUM(
     // Controls default stream priority
     DEFAULT_STREAM_PRIORITY = 0x10003,
     // Controls write loop time fraction in terms of srtt
-    WRITE_LOOP_TIME_FRACTION = 0x10004)
+    WRITE_LOOP_TIME_FRACTION = 0x10004,
+    // Controls number of times a stream gets a write in incremental mode
+    WRITES_PER_STREAM = 0x10005)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

@@ -161,7 +161,6 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
       streamType.hasFin(),
       false /* fromBufMetaIn */,
       streamGroupId));
-  DCHECK(dataLen <= builder.remainingSpaceInPkt());
   return folly::make_optional(dataLen);
 }
 
