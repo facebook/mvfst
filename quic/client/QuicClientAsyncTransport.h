@@ -27,7 +27,7 @@ class QuicClientAsyncTransport : public QuicStreamAsyncTransport,
       const std::shared_ptr<QuicClientTransport>& clientSock);
 
  protected:
-  ~QuicClientAsyncTransport() override = default;
+  ~QuicClientAsyncTransport() override;
 
   //
   // QuicSocket::ConnectionCallback

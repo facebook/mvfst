@@ -18,6 +18,13 @@ QuicClientAsyncTransport::QuicClientAsyncTransport(
   clientSock->start(this, this);
 }
 
+QuicClientAsyncTransport::~QuicClientAsyncTransport() {
+  if (sock_) {
+    sock_->setConnectionCallback(nullptr);
+    sock_->setConnectionSetupCallback(nullptr);
+  }
+}
+
 void QuicClientAsyncTransport::onNewBidirectionalStream(
     StreamId /*id*/) noexcept {
   CHECK(false);
