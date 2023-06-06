@@ -32,7 +32,7 @@ enum class TransportParameterId : uint64_t {
   initial_source_connection_id = 0x000f,
   retry_source_connection_id = 0x0010,
   max_datagram_frame_size = 0x0020,
-  min_ack_delay = 0xff02de1a,
+  min_ack_delay = 0xff04de1a,
   ack_receive_timestamps_enabled = 0xff0a001,
   max_receive_timestamps_per_ack = 0xff0a002,
   receive_timestamps_exponent = 0xff0a003,
