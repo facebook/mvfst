@@ -74,6 +74,10 @@ DEFINE_uint32(
     max_receive_packet_size,
     quic::kDefaultMaxUDPPayload,
     "Maximum packet size to advertise to the peer.");
+DEFINE_bool(
+    override_packet_size,
+    true,
+    "Sender trusts the peer's advertised max packet size.");
 DEFINE_bool(use_inplace_write, true, "Data path type");
 DEFINE_double(latency_factor, 0.5, "Latency factor (delta) for Copa");
 DEFINE_uint32(
@@ -425,7 +429,8 @@ class TPerfServer {
       uint64_t maxBytesPerStream,
       uint32_t maxReceivePacketSize,
       bool useInplaceWrite,
-      bool dsrEnabled)
+      bool dsrEnabled,
+      bool overridePacketSize)
       : host_(host),
         port_(port),
         acceptObserver_(std::make_unique<TPerfAcceptObserver>()),
@@ -456,6 +461,7 @@ class TPerfServer {
       settings.maxBatchSize = writesPerLoop;
     }
     settings.maxRecvPacketSize = maxReceivePacketSize;
+    settings.canIgnorePathMTU = overridePacketSize;
     settings.copaDeltaParam = FLAGS_latency_factor;
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
@@ -745,7 +751,8 @@ int main(int argc, char* argv[]) {
         FLAGS_bytes_per_stream,
         FLAGS_max_receive_packet_size,
         FLAGS_use_inplace_write,
-        FLAGS_dsr);
+        FLAGS_dsr,
+        FLAGS_override_packet_size);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_num_streams != 1) {
