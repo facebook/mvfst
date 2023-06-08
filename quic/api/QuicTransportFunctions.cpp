@@ -646,8 +646,7 @@ void updateConnection(
         auto stream = CHECK_NOTNULL(
             conn.streamManager->getStream(writeStreamFrame.streamId));
         bool newStreamDataWritten = false;
-        // TODO: Remove UNLIKELY here when DSR is ready for test.
-        if (UNLIKELY(writeStreamFrame.fromBufMeta)) {
+        if (writeStreamFrame.fromBufMeta) {
           newStreamDataWritten = handleStreamBufMetaWritten(
               conn,
               *stream,
