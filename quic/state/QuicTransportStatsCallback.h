@@ -151,6 +151,8 @@ class QuicTransportStatsCallback {
 
   virtual void onPeerMaxBidiStreamsLimitSaturated() = 0;
 
+  virtual void onConnectionIdCreated(size_t encodedTimes) = 0;
+
   static const char* toString(SocketErrorType errorType) {
     switch (errorType) {
       case SocketErrorType::AGAIN:

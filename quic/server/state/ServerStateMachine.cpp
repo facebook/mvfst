@@ -28,7 +28,7 @@ namespace quic {
 using namespace std::chrono_literals;
 
 namespace {
-constexpr size_t kConnIdEncodingRetryLimit = 16;
+constexpr size_t kConnIdEncodingRetryLimit = 32;
 
 bool maybeNATRebinding(
     const folly::SocketAddress& newPeerAddress,
@@ -1537,17 +1537,19 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
 
   // The default connectionId algo has 36 bits of randomness.
   auto encodedCid = connIdAlgo->encodeConnectionId(*serverConnIdParams);
-  size_t encodedTimes = 0;
+  size_t encodedTimes = 1;
   while (encodedCid && connIdRejector &&
          connIdRejector->rejectConnectionId(*encodedCid) &&
-         ++encodedTimes < kConnIdEncodingRetryLimit) {
+         encodedTimes < kConnIdEncodingRetryLimit) {
     encodedCid = connIdAlgo->encodeConnectionId(*serverConnIdParams);
+    encodedTimes++;
   }
   LOG_IF(ERROR, encodedTimes == kConnIdEncodingRetryLimit)
       << "Quic CIDRejector rejected all conneectionIDs";
   if (encodedCid.hasError()) {
     return folly::none;
   }
+  QUIC_STATS(statsCallback, onConnectionIdCreated, encodedTimes);
   auto newConnIdData =
       ConnectionIdData{*encodedCid, nextSelfConnectionIdSequence++};
   newConnIdData.token = generator.generateToken(newConnIdData.connId);

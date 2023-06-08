@@ -16,6 +16,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/test/Mocks.h>
+#include <quic/state/test/MockQuicStats.h>
 #include <chrono>
 
 using namespace testing;
@@ -44,13 +45,18 @@ TEST(ServerStateMachineTest, TestAddConnId) {
   serverState.connIdAlgo = algo.get();
   serverState.serverConnIdParams = originalParams;
   serverState.serverAddr = folly::SocketAddress("0.0.0.0", 42069);
+  quic::MockQuicStats mockQuicStats;
+  serverState.statsCallback = &mockQuicStats;
 
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverState.transportSettings.statelessResetTokenSecret = secret;
   EXPECT_EQ(serverState.selfConnectionIds.size(), 0);
   serverState.peerActiveConnectionIdLimit = 2;
+  EXPECT_CALL(mockQuicStats, onConnectionIdCreated(1)).Times(1);
   auto newConnId1 = serverState.createAndAddNewSelfConnId();
+  EXPECT_CALL(mockQuicStats, onConnectionIdCreated(1)).Times(1);
   auto newConnId2 = serverState.createAndAddNewSelfConnId();
+  EXPECT_CALL(mockQuicStats, onConnectionIdCreated(1)).Times(1);
   auto newConnId3 = serverState.createAndAddNewSelfConnId();
 
   // Sequence numbers correctly set.
@@ -94,6 +100,8 @@ TEST(ServerStateMachineTest, TestCidRejected) {
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverConn.transportSettings.statelessResetTokenSecret = secret;
   serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 225);
+  quic::MockQuicStats mockQuicStats;
+  serverConn.statsCallback = &mockQuicStats;
 
   auto firstCid = getTestConnectionId(0);
   auto secondCid = getTestConnectionId(1);
@@ -109,6 +117,7 @@ TEST(ServerStateMachineTest, TestCidRejected) {
         EXPECT_EQ(inputCid, secondCid);
         return false;
       }));
+  EXPECT_CALL(mockQuicStats, onConnectionIdCreated(2)).Times(1);
   serverConn.createAndAddNewSelfConnId();
 }
 
@@ -126,6 +135,8 @@ TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverConn.transportSettings.statelessResetTokenSecret = secret;
   serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 770);
+  quic::MockQuicStats mockQuicStats;
+  serverConn.statsCallback = &mockQuicStats;
 
   auto firstCid = getTestConnectionId(0);
   EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
@@ -137,6 +148,7 @@ TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
         EXPECT_EQ(inputCid, firstCid);
         return true;
       }));
+  EXPECT_CALL(mockQuicStats, onConnectionIdCreated(_)).Times(0);
   serverConn.createAndAddNewSelfConnId();
 }
 
@@ -154,19 +166,19 @@ TEST(ServerStateMachineTest, TestCidRejectedGiveUp) {
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverConn.transportSettings.statelessResetTokenSecret = secret;
   serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 770);
+  quic::MockQuicStats mockQuicStats;
+  serverConn.statsCallback = &mockQuicStats;
 
   auto firstCid = getTestConnectionId(0);
   EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
       .WillRepeatedly(Return(firstCid));
-  size_t rejectCounter = 0;
   EXPECT_CALL(mockRejector, rejectConnectionIdNonConst(_))
       .WillRepeatedly(Invoke([&](const ConnectionId& inputCid) {
         EXPECT_EQ(inputCid, firstCid);
-        rejectCounter++;
         return true;
       }));
+  EXPECT_CALL(mockQuicStats, onConnectionIdCreated(32)).Times(1);
   serverConn.createAndAddNewSelfConnId();
-  EXPECT_EQ(rejectCounter, 16);
 }
 
 TEST(ServerStateMachineTest, TestProcessMaxRecvPacketSizeParamBelowMin) {

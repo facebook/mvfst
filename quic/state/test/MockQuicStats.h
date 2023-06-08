@@ -69,6 +69,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onShortHeaderPadding, (size_t));
   MOCK_METHOD(void, onPacerTimerLagged, ());
   MOCK_METHOD(void, onPeerMaxBidiStreamsLimitSaturated, ());
+  MOCK_METHOD(void, onConnectionIdCreated, (size_t));
 };
 
 class MockQuicStatsFactory : public QuicTransportStatsCallbackFactory {

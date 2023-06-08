@@ -241,6 +241,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
+  void onConnectionIdCreated(size_t encodedTimes) override {
+    VLOG(2) << prefix_ << __func__ << " encodedTimes=" << encodedTimes;
+  }
+
  private:
   std::string prefix_;
 };
