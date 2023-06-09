@@ -1,4 +1,3 @@
-#![feature(atomic_mut_ptr)]
 // Step 1/2: Add new alg crates here.
 //
 // NOTE: Must be listed in TARGETS deps
