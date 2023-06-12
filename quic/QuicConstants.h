@@ -530,10 +530,16 @@ constexpr uint16_t kDefaultMaxNumPTO = 7;
 constexpr uint32_t kRequiredMaxEarlyDataSize = 0xffffffff;
 
 // min connId size for one chosen by 'mvfst' as a peer (for version 1 of CID)
+// the server id/worker id/process id info are in the first 4 bytes
 constexpr size_t kMinSelfConnectionIdV1Size = 4;
 
 // min connId size for one chosen by 'mvfst' as a peer (for version 2 of CID)
+// the server id/worker id/process id info are in the first 6 bytes
 constexpr size_t kMinSelfConnectionIdV2Size = 6;
+
+// min connId size for one chosen by 'mvfst' as a peer (for version 3 of CID)
+// the server id/worker id/process id info are in the first 7 bytes
+constexpr size_t kMinSelfConnectionIdV3Size = 7;
 
 // 22 bytes longer than minimum connection id.
 constexpr uint16_t kMinStatelessPacketSize = 22 + kMinSelfConnectionIdV1Size;

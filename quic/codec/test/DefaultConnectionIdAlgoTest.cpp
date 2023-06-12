@@ -21,10 +21,15 @@ TEST(DefaultConnectionIdAlgoTest, canParse) {
   EXPECT_TRUE(al.canParse(ConnectionId({0x40, 0x01, 0x02, 0x03})));
   // version 2
   EXPECT_TRUE(al.canParse(ConnectionId({0x80, 0x01, 0x02, 0x03, 0x04, 0x05})));
+  // version 3
+  EXPECT_TRUE(
+      al.canParse(ConnectionId({0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06})));
   // version 1, too small size
   EXPECT_FALSE(al.canParse(ConnectionId({0x40, 0x01, 0x02})));
-  // // version 2, too small size
+  // version 2, too small size
   EXPECT_FALSE(al.canParse(ConnectionId({0x80, 0x01, 0x02, 0x03, 0x04})));
+  // version 3, too small size
+  EXPECT_FALSE(al.canParse(ConnectionId({0xc0, 0x01, 0x02, 0x03, 0x04, 0x05})));
 }
 
 TEST(DefaultConnectionIdAlgoTest, decodeV1) {
@@ -64,11 +69,29 @@ TEST(DefaultConnectionIdAlgoTest, decodeV2) {
   EXPECT_EQ(params1->processId, 1);
 }
 
+TEST(DefaultConnectionIdAlgoTest, decodeV3) {
+  DefaultConnectionIdAlgo al;
+  ConnectionId cid1(
+      {/*version*/ 0xc0,
+       /*host*/ 0xAA,
+       0xBB,
+       0xCC,
+       0xDD,
+       /*worker*/ 0xFF,
+       /*process*/ 0x80});
+  EXPECT_TRUE(al.canParse(cid1));
+  auto params1 = al.parseConnectionId(cid1);
+  EXPECT_EQ(params1->version, ConnectionIdVersion::V3);
+  EXPECT_EQ(params1->hostId, 0xAABBCCDD);
+  EXPECT_EQ(params1->workerId, 0xFF);
+  EXPECT_EQ(params1->processId, 1);
+}
+
 TEST(DefaultConnectionIdAlgoTest, encodeDecode) {
   DefaultConnectionIdAlgo al;
   for (uint8_t i = 0; i <= 254; i++) {
     uint8_t processId = i % 2;
-    uint16_t hostId = folly::Random::rand32();
+    uint32_t hostId = folly::Random::rand32();
     ServerConnectionIdParams params(hostId, processId, i);
     auto paramsAfterEncode =
         al.parseConnectionId(*al.encodeConnectionId(params));
@@ -87,10 +110,17 @@ TEST(DefaultConnectionIdAlgoTest, encodeDecode) {
     EXPECT_EQ(paramsAfterEncode2->hostId, hostId & 0x00FFFFFF);
     EXPECT_EQ(paramsAfterEncode2->workerId, i);
     EXPECT_EQ(paramsAfterEncode2->processId, processId);
-  }
 
-  ServerConnectionIdParams vParam(ConnectionIdVersion::V3, 7, 7, 7);
-  EXPECT_FALSE(al.canParse(*al.encodeConnectionId(vParam)));
+    ServerConnectionIdParams params3(
+        ConnectionIdVersion::V3, hostId, processId, i);
+    auto paramsAfterEncode3 =
+        al.parseConnectionId(*al.encodeConnectionId(params3));
+    EXPECT_TRUE(al.canParse(*al.encodeConnectionId(params3)));
+    // in CID v3 server id is 32-bit
+    EXPECT_EQ(paramsAfterEncode3->hostId, hostId);
+    EXPECT_EQ(paramsAfterEncode3->workerId, i);
+    EXPECT_EQ(paramsAfterEncode3->processId, processId);
+  }
 }
 
 } // namespace quic::test

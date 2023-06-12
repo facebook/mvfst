@@ -16,6 +16,7 @@ namespace {
 // mask to extract process id bit from the connectionId
 constexpr uint8_t kProcessIdV1BitMask = 0x20;
 constexpr uint8_t kProcessIdV2BitMask = 0x80;
+constexpr uint8_t kProcessIdV3BitMask = 0x80;
 // mask to set the first 6 bits from host-id
 constexpr uint8_t kHostIdV1FirstByteMask = 0x3f;
 // mask to set the next 8 bits from host-id
@@ -36,7 +37,7 @@ folly::Expected<folly::Unit, quic::QuicInternalException>
 setVersionBitsInConnId(
     quic::ConnectionId& connId,
     quic::ConnectionIdVersion version) noexcept {
-  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV1Size)) {
+  if (UNLIKELY(connId.size() == 0)) {
     return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for version",
         quic::LocalErrorCode::INTERNAL_ERROR));
@@ -101,6 +102,17 @@ folly::Expected<folly::Unit, quic::QuicInternalException> setHostIdBitsInConnId(
     connId.data()[2] = hostId >> 8;
     connId.data()[3] = hostId;
     return folly::unit;
+  } else if (version == quic::ConnectionIdVersion::V3) {
+    if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
+      return folly::makeUnexpected(quic::QuicInternalException(
+          "ConnectionId is too small for hostid V3",
+          quic::LocalErrorCode::INTERNAL_ERROR));
+    }
+    connId.data()[1] = hostId >> 24;
+    connId.data()[2] = hostId >> 16;
+    connId.data()[3] = hostId >> 8;
+    connId.data()[4] = hostId;
+    return folly::unit;
   } else {
     return folly::makeUnexpected(quic::QuicInternalException(
         "Unsupported CID version", quic::LocalErrorCode::INTERNAL_ERROR));
@@ -140,6 +152,18 @@ folly::Expected<uint32_t, quic::QuicInternalException> getHostIdBitsInConnId(
     hostId |= connId.data()[2] << 8;
     hostId |= connId.data()[3];
     return hostId;
+  } else if (version == quic::ConnectionIdVersion::V3) {
+    if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
+      return folly::makeUnexpected(quic::QuicInternalException(
+          "ConnectionId is too small for hostid V3",
+          quic::LocalErrorCode::INTERNAL_ERROR));
+    }
+    uint32_t hostId = 0;
+    hostId |= connId.data()[1] << 24;
+    hostId |= connId.data()[2] << 16;
+    hostId |= connId.data()[3] << 8;
+    hostId |= connId.data()[4];
+    return hostId;
   } else {
     return folly::makeUnexpected(quic::QuicInternalException(
         "Unsupported CID version", quic::LocalErrorCode::INTERNAL_ERROR));
@@ -177,6 +201,14 @@ setWorkerIdBitsInConnId(
     }
     connId.data()[4] = workerId;
     return folly::unit;
+  } else if (version == quic::ConnectionIdVersion::V3) {
+    if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
+      return folly::makeUnexpected(quic::QuicInternalException(
+          "ConnectionId is too small for hostid V3",
+          quic::LocalErrorCode::INTERNAL_ERROR));
+    }
+    connId.data()[5] = workerId;
+    return folly::unit;
   } else {
     return folly::makeUnexpected(quic::QuicInternalException(
         "Unsupported CID version", quic::LocalErrorCode::INTERNAL_ERROR));
@@ -207,6 +239,13 @@ folly::Expected<uint8_t, quic::QuicInternalException> getWorkerIdFromConnId(
           quic::LocalErrorCode::INTERNAL_ERROR));
     }
     return connId.data()[4];
+  } else if (version == quic::ConnectionIdVersion::V3) {
+    if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
+      return folly::makeUnexpected(quic::QuicInternalException(
+          "ConnectionId is too small for workerid V3",
+          quic::LocalErrorCode::INTERNAL_ERROR));
+    }
+    return connId.data()[5];
   } else {
     return folly::makeUnexpected(quic::QuicInternalException(
         "Unsupported CID version", quic::LocalErrorCode::INTERNAL_ERROR));
@@ -241,6 +280,16 @@ setProcessIdBitsInConnId(
     connId.data()[5] &= (~kProcessIdV2BitMask);
     connId.data()[5] |= (kProcessIdV2BitMask & (processId << 7));
     return folly::unit;
+  } else if (version == quic::ConnectionIdVersion::V3) {
+    if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
+      return folly::makeUnexpected(quic::QuicInternalException(
+          "ConnectionId is too small for processid V3",
+          quic::LocalErrorCode::INTERNAL_ERROR));
+    }
+    // clear the 40th bit
+    connId.data()[6] &= (~kProcessIdV3BitMask);
+    connId.data()[6] |= (kProcessIdV3BitMask & (processId << 7));
+    return folly::unit;
   } else {
     return folly::makeUnexpected(quic::QuicInternalException(
         "Unsupported CID version", quic::LocalErrorCode::INTERNAL_ERROR));
@@ -272,6 +321,15 @@ getProcessIdBitsFromConnId(
     uint8_t processId = 0;
     processId = (kProcessIdV2BitMask & connId.data()[5]) >> 7;
     return processId;
+  } else if (version == quic::ConnectionIdVersion::V3) {
+    if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
+      return folly::makeUnexpected(quic::QuicInternalException(
+          "ConnectionId is too small for processid V3",
+          quic::LocalErrorCode::INTERNAL_ERROR));
+    }
+    uint8_t processId = 0;
+    processId = (kProcessIdV3BitMask & connId.data()[6]) >> 7;
+    return processId;
   } else {
     return folly::makeUnexpected(quic::QuicInternalException(
         "Unsupported CID version", quic::LocalErrorCode::INTERNAL_ERROR));
@@ -291,6 +349,8 @@ bool DefaultConnectionIdAlgo::canParse(const ConnectionId& id) const noexcept {
     return (id.size() >= kMinSelfConnectionIdV1Size);
   } else if (version == ConnectionIdVersion::V2) {
     return (id.size() >= kMinSelfConnectionIdV2Size);
+  } else if (version == ConnectionIdVersion::V3) {
+    return (id.size() >= kMinSelfConnectionIdV3Size);
   } else {
     return false;
   }

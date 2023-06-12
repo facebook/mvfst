@@ -27,18 +27,27 @@ namespace quic {
  * Version 1:
  *    Next 16 bits (2 - 17)  are reserved for host id (L4 LB use)
  *    Next 8 bits (18 - 25) are reserved for worker id
- *    Next bit 26 is reserved for the Quic server id: server id is used to
+ *    Next bit 26 is reserved for the process id: process id is used to
  *    distinguish between the takeover instance and the taken over one
-   0     1   2 3 4 .. 17    18 .. 25        26        27 28 .. 63
-  |VERSION|  For L4 LB    | WORKER_ID  | SERVER_ID |  ..
+   0     1   2 3 4 .. 17    18 .. 25       26        27 28 .. 63
+  |VERSION|  For L4 LB    | WORKER_ID  | PROC_ID |  ..
  *
  * Version 2:
  *    Next 6 bits (2 - 7) are not used (random)
  *    Next 24 bits (8 - 31) are reserved for host id
  *    Next 8 bits (32 - 39) are reserved for worker id
- *    Next bit 40 is reserved for the Quic server id
+ *    Next bit 40 is reserved for the process id
    0     1 2  ..  7 8   ..   31 32   ..   39    40       41 ... 63
-  |VERSION| UNUSED | For L4 LB | WORKER_ID  | SERVER_ID |  ..
+  |VERSION| UNUSED | For L4 LB | WORKER_ID  | PROC_ID |  ..
+
+ *
+ * Version 3:
+ *    Next 6 bits (2 - 7) are not used (random)
+ *    Next 32 bits (8 - 39) and bits(48 - 55) are reserved for host id
+ *    Next 8 bits (40 - 47) are reserved for worker id
+ *    Next bit 48 is reserved for the process id
+   0     1 2  ..  7 8   ..   39 40   ..   47    48       49 ... 63
+  |VERSION| UNUSED | For L4 LB | WORKER_ID  | PROC_ID |  ..
 
  */
 class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
