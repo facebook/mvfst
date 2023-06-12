@@ -181,11 +181,27 @@ void QuicServerWorker::start() {
         evb_.get(), transportSettings_.pacingTimerTickInterval);
   }
   socket_->resumeRead(this);
+  if (statsCallback_) {
+    evb_->timer().scheduleTimeout(this, timeLoggingSamplingInterval_);
+  }
   VLOG(10) << fmt::format(
       "Registered read on worker={}, thread={}, processId={}",
       fmt::ptr(this),
       folly::getCurrentThreadID(),
       (int)processId_);
+}
+
+void QuicServerWorker::timeoutExpired() noexcept {
+  logTimeBasedStats();
+}
+
+void QuicServerWorker::logTimeBasedStats() {
+  for (auto [transport, handle] : boundServerTransports_) {
+    if (!handle.expired()) {
+      transport->logTimeBasedStats();
+    }
+  }
+  evb_->timer().scheduleTimeout(this, timeLoggingSamplingInterval_);
 }
 
 void QuicServerWorker::pauseRead() {
@@ -1275,6 +1291,10 @@ void QuicServerWorker::onConnectionIdAvailable(
                << (existingTransportPtr == transportPtr);
   } else if (boundServerTransports_.emplace(transportPtr, weakTransport)
                  .second) {
+    if (!isScheduled()) {
+      // If we aren't currently running, start the timer.
+      evb_->timer().scheduleTimeout(this, timeLoggingSamplingInterval_);
+    }
     QUIC_STATS(statsCallback_, onNewConnection);
   }
 }
@@ -1323,6 +1343,10 @@ void QuicServerWorker::onConnectionUnbound(
   // Ensures we only process `onConnectionUnbound()` once.
   transport->setRoutingCallback(nullptr);
   boundServerTransports_.erase(transport);
+  // Cancel the timeout if we don't have any connections.
+  if (boundServerTransports_.empty()) {
+    cancelTimeout();
+  }
 
   for (auto& connId : connectionIdData) {
     VLOG(4) << fmt::format(
@@ -1402,6 +1426,8 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
           QuicError(QuicErrorCode(error), std::string("shutting down")));
     }
   }
+  cancelTimeout();
+  boundServerTransports_.clear();
   sourceAddressMap_.clear();
   connectionIdMap_.clear();
   takeoverPktHandler_.stop();

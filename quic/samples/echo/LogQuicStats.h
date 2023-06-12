@@ -158,6 +158,18 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
+  void onInflightBytesSample(uint64_t inflightBytes) override {
+    VLOG(2) << __func__ << " inflightBytes=" << inflightBytes;
+  }
+
+  void onRttSample(uint64_t rtt) override {
+    VLOG(2) << __func__ << " rtt=" << rtt;
+  }
+
+  void onBandwidthSample(uint64_t bandwidth) override {
+    VLOG(2) << __func__ << " bandwidth=" << bandwidth;
+  }
+
   void onNewCongestionController(CongestionControlType type) override {
     VLOG(2) << prefix_ << __func__
             << " type=" << congestionControlTypeToString(type);

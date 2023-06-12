@@ -165,6 +165,11 @@ class QuicServerTransport
 
   virtual CipherInfo getOneRttCipherInfo() const;
 
+  /* Log a collection of statistics that are meant to be sampled consistently
+   * over time, rather than driven by transport events.
+   */
+  void logTimeBasedStats() const;
+
  protected:
   // From QuicSocket
   SocketObserverContainer* getSocketObserverContainer() const override {

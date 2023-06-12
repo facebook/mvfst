@@ -109,6 +109,12 @@ class QuicTransportStatsCallback {
 
   virtual void onCwndBlocked() = 0;
 
+  virtual void onInflightBytesSample(uint64_t) = 0;
+
+  virtual void onRttSample(uint64_t) = 0;
+
+  virtual void onBandwidthSample(uint64_t) = 0;
+
   virtual void onNewCongestionController(CongestionControlType type) = 0;
 
   // retransmission timeout counter

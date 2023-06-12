@@ -40,7 +40,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
                          public QuicServerTransport::HandshakeFinishedCallback,
                          public ServerConnectionIdRejector,
                          public folly::EventRecvmsgCallback,
-                         public folly::EventRecvmsgMultishotCallback {
+                         public folly::EventRecvmsgMultishotCallback,
+                         public folly::HHWheelTimer::Callback {
  private:
   struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
     static auto constexpr kBuffSize = 1024;
@@ -521,6 +522,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
 
   void getAllConnectionsStats(std::vector<QuicConnectionStats>& stats);
 
+  void timeoutExpired() noexcept override;
+  void logTimeBasedStats();
+
  private:
   /**
    * Creates accepting socket from this server's listening address.
@@ -660,6 +664,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
   // QuicServerWorker maintains ownership of the info stats callback
   std::unique_ptr<QuicTransportStatsCallback> statsCallback_;
+  std::chrono::seconds timeLoggingSamplingInterval_{1};
 
   // Handle takeover between processes
   std::unique_ptr<TakeoverHandlerCallback> takeoverCB_;

@@ -1105,4 +1105,35 @@ CipherInfo QuicServerTransport::getOneRttCipherInfo() const {
       conn_->oneRttWriteHeaderCipher->getKey()->clone()};
 }
 
+void QuicServerTransport::logTimeBasedStats() const {
+  if (!conn_ || !conn_->statsCallback) {
+    return;
+  }
+  // Ignore 0 inflight bytes samples for now to not affect sampling.
+  if (conn_->lossState.inflightBytes > 0) {
+    QUIC_STATS(
+        conn_->statsCallback,
+        onInflightBytesSample,
+        conn_->lossState.inflightBytes);
+  }
+  // Only consider RTT sample if handshake is done.
+  if (serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    QUIC_STATS(
+        conn_->statsCallback,
+        onRttSample,
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            conn_->lossState.srtt)
+            .count());
+  }
+  if (conn_->congestionController) {
+    // We only log the bandwidth if it's available and the units are bytes/s.
+    auto bandwidth = conn_->congestionController->getBandwidth();
+    if (bandwidth.has_value() &&
+        bandwidth->unitType == Bandwidth::UnitType::BYTES) {
+      uint64_t bitsPerSecSample = bandwidth->normalize() * 8;
+      QUIC_STATS(conn_->statsCallback, onBandwidthSample, bitsPerSecSample);
+    }
+  }
+}
+
 } // namespace quic

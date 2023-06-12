@@ -78,6 +78,8 @@ TEST_F(SimpleQuicServerWorkerTest, RejectCid) {
       nullptr);
   workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
   worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  worker_->setSocket(
+      std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_));
   auto includeCid = getTestConnectionId(0);
   auto excludeCid = getTestConnectionId(1);
   EXPECT_FALSE(worker_->rejectConnectionId(includeCid));
@@ -675,6 +677,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
   worker_->onConnectionIdBound(transport_);
+  EXPECT_TRUE(worker_->isScheduled());
+  worker_->cancelTimeout();
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
@@ -741,6 +745,8 @@ TEST_F(QuicServerWorkerTest, RetireConnIds) {
   EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
   worker_->onConnectionIdBound(transport_);
+  EXPECT_TRUE(worker_->isScheduled());
+  worker_->cancelTimeout();
 
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
 
@@ -821,6 +827,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
   worker_->onConnectionIdBound(transport_);
+  EXPECT_TRUE(worker_->isScheduled());
+  worker_->cancelTimeout();
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(
@@ -1175,7 +1183,7 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
     hasShutdown_ = true;
   }));
   std::thread t([&] { eventbase_.loopForever(); });
-  worker_->shutdownAllConnections(LocalErrorCode::SHUTTING_DOWN);
+  eventbase_.runInEventBaseThreadAndWait([&] { worker_.reset(); });
   eventbase_.terminateLoopSoon();
   t.join();
 }
@@ -1215,7 +1223,7 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
     hasShutdown_ = true;
   }));
   std::thread t([&] { eventbase_.loopForever(); });
-  worker_.reset();
+  eventbase_.runInEventBaseThreadAndWait([&] { worker_.reset(); });
   eventbase_.terminateLoopSoon();
   t.join();
 }
