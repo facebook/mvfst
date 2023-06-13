@@ -55,6 +55,7 @@ set(mvfst_LIBRARIES
   mvfst::mvfst_loss
   mvfst::mvfst_observer
   mvfst::mvfst_server
+  mvfst::mvfst_server_async_tran
   mvfst::mvfst_server_state
   mvfst::mvfst_state_machine
   mvfst::mvfst_state_ack_handler
