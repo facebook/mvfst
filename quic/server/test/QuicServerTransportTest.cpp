@@ -5128,16 +5128,20 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   getFakeHandshakeLayer()->setCipherSuite(
       fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto streamId = server->createBidirectionalStream().value();
-  server->writeChain(
-      streamId, folly::IOBuf::copyBuffer("Allegro Maestoso"), false);
+  // Large-ish non-DSR data but not a full packet's worth.
+  auto buf = folly::IOBuf::create(1100);
+  buf->append(1100);
+  server->writeChain(streamId, std::move(buf), false);
   auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
   auto rawDSRSender = mockDSRSender.get();
   server->setDSRPacketizationRequestSender(streamId, std::move(mockDSRSender));
-  BufferMeta bufMeta(2000);
+  // Explicitly control how many packets we expect.
+  server->getNonConstConn().transportSettings.writeConnectionDataPacketsLimit =
+      6;
+  // Ensure we have plenty of data.
+  BufferMeta bufMeta(server->getConn().udpSendPacketLen * 50);
   server->writeBufMeta(streamId, bufMeta, true);
   server->writeData();
-  EXPECT_FALSE(server->getConn().outstandings.packets.empty());
-  EXPECT_EQ(server->getConn().outstandings.packets.size(), 2);
   int numDsr = 0;
   int numNonDsr = 0;
   for (auto& p : server->getConn().outstandings.packets) {
@@ -5147,11 +5151,14 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
       numNonDsr++;
     }
   }
-  EXPECT_EQ(numDsr, 1);
+  EXPECT_EQ(server->getConn().outstandings.packets.size(), 7);
+  // Since there's only a small non-DSR packet, we should have 6 DSR and 1
+  // non-DSR.
+  EXPECT_EQ(numDsr, 6);
   EXPECT_EQ(numNonDsr, 1);
   EXPECT_CALL(*rawDSRSender, release()).Times(1);
   server->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR);
-  EXPECT_EQ(server->getConn().dsrPacketCount, 1);
+  EXPECT_EQ(server->getConn().dsrPacketCount, 6);
 }
 
 } // namespace test

@@ -339,28 +339,36 @@ void QuicServerTransport::writeData() {
           writeLoopBeginTime);
     };
     auto dsrPath = [&](auto limit) {
-      return writePacketizationRequest(
-          *serverConn_,
-          destConnId,
-          limit,
-          *conn_->oneRttWriteCipher,
-          writeLoopBeginTime);
+      auto bytesBefore = conn_->lossState.totalBytesSent;
+      // The DSR path can't write probes.
+      // This is packetsWritte, probesWritten, bytesWritten.
+      return WriteQuicDataResult{
+          writePacketizationRequest(
+              *serverConn_,
+              destConnId,
+              limit,
+              *conn_->oneRttWriteCipher,
+              writeLoopBeginTime),
+          0,
+          conn_->lossState.totalBytesSent - bytesBefore};
     };
     // We need a while loop because both paths write streams from the same
     // queue, which can result in empty writes.
     while (packetLimit) {
-      auto startingPacketLimit = packetLimit;
-      // Give the non-DSR path a chance.
+      auto totalSentBefore = conn_->lossState.totalBytesSent;
+      // Give the non-DSR path a chance first for things like ACKs and flow
+      // control.
       auto written = nonDsrPath(packetLimit);
-      // If we didn't write much from the non DSR path, don't penalize DSR
-      // a full packet.
-      if (written.bytesWritten >= conn_->udpSendPacketLen / 2) {
-        packetLimit -= written.packetsWritten;
-      }
+      // For both paths we only consider full packets against the packet
+      // limit. While this is slightly more aggressive than the intended
+      // packet limit it also helps ensure that small packets don't cause
+      // us to underutilize the link when mixing between DSR and non-DSR.
+      packetLimit -= written.bytesWritten / conn_->udpSendPacketLen;
       if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
-        packetLimit -= dsrPath(packetLimit);
+        written = dsrPath(packetLimit);
+        packetLimit -= written.bytesWritten / conn_->udpSendPacketLen;
       }
-      if (startingPacketLimit == packetLimit) {
+      if (totalSentBefore == conn_->lossState.totalBytesSent) {
         // We haven't written anything with either path, so we're done.
         break;
       }
