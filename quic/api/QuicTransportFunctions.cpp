@@ -129,6 +129,7 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
   WriteQuicDataResult result;
   auto& packetsWritten = result.packetsWritten;
   auto& probesWritten = result.probesWritten;
+  auto& bytesWritten = result.bytesWritten;
   auto& numProbePackets =
       connection.pendingEvents.numProbePackets[PacketNumberSpace::AppData];
   if (numProbePackets) {
@@ -149,7 +150,7 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
       probeSchedulerBuilder.cryptoFrames();
     }
     auto probeScheduler = std::move(probeSchedulerBuilder).build();
-    probesWritten = writeProbingDataToSocket(
+    auto probeResult = writeProbingDataToSocket(
         sock,
         connection,
         srcConnId,
@@ -162,6 +163,8 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
         aead,
         headerCipher,
         version);
+    probesWritten = probeResult.probesWritten;
+    bytesWritten += probeResult.bytesWritten;
     // We only get one chance to write out the probes.
     numProbePackets = 0;
     packetLimit =
@@ -186,21 +189,22 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
     schedulerBuilder.cryptoFrames();
   }
   FrameScheduler scheduler = std::move(schedulerBuilder).build();
-  packetsWritten = writeConnectionDataToSocket(
-                       sock,
-                       connection,
-                       srcConnId,
-                       dstConnId,
-                       std::move(builder),
-                       PacketNumberSpace::AppData,
-                       scheduler,
-                       congestionControlWritableBytes,
-                       packetLimit,
-                       aead,
-                       headerCipher,
-                       version,
-                       writeLoopBeginTime)
-                       .packetsWritten;
+  auto connectionDataResult = writeConnectionDataToSocket(
+      sock,
+      connection,
+      srcConnId,
+      dstConnId,
+      std::move(builder),
+      PacketNumberSpace::AppData,
+      scheduler,
+      congestionControlWritableBytes,
+      packetLimit,
+      aead,
+      headerCipher,
+      version,
+      writeLoopBeginTime);
+  packetsWritten += connectionDataResult.packetsWritten;
+  bytesWritten += connectionDataResult.bytesWritten;
   VLOG_IF(10, packetsWritten || probesWritten)
       << nodeToString(connection.nodeType) << " written data "
       << (exceptCryptoStream ? "without crypto data " : "")
@@ -1022,7 +1026,7 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
           .numProbePackets[LongHeader::typeToPacketNumberSpace(packetType)];
   if (numProbePackets &&
       (cryptoStream.retransmissionBuffer.size() || scheduler.hasData())) {
-    probesWritten = writeProbingDataToSocket(
+    auto probeResult = writeProbingDataToSocket(
         sock,
         connection,
         srcConnId,
@@ -1036,6 +1040,8 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
         headerCipher,
         version,
         token);
+    probesWritten += probeResult.probesWritten;
+    bytesWritten += probeResult.bytesWritten;
   }
   packetLimit = probesWritten > packetLimit ? 0 : (packetLimit - probesWritten);
   // Only get one chance to write probes.
@@ -1491,7 +1497,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
   return {ioBufBatch.getPktSent(), 0, bytesWritten};
 }
 
-uint64_t writeProbingDataToSocket(
+WriteQuicDataResult writeProbingDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -1519,24 +1525,25 @@ uint64_t writeProbingDataToSocket(
     probesToSend = std::max<uint8_t>(probesToSend, kPacketToSendForPTO);
     dataProbesToSend = probesToSend - 1;
   }
-  auto probesWritten = writeConnectionDataToSocket(
-                           sock,
-                           connection,
-                           srcConnId,
-                           dstConnId,
-                           builder,
-                           pnSpace,
-                           cloningScheduler,
-                           connection.transportSettings.enableWritableBytesLimit
-                               ? probePacketWritableBytes
-                               : unlimitedWritableBytes,
-                           dataProbesToSend,
-                           aead,
-                           headerCipher,
-                           version,
-                           writeLoopBeginTime,
-                           token)
-                           .packetsWritten;
+  auto cloningResult = writeConnectionDataToSocket(
+      sock,
+      connection,
+      srcConnId,
+      dstConnId,
+      builder,
+      pnSpace,
+      cloningScheduler,
+      connection.transportSettings.enableWritableBytesLimit
+          ? probePacketWritableBytes
+          : unlimitedWritableBytes,
+      dataProbesToSend,
+      aead,
+      headerCipher,
+      version,
+      writeLoopBeginTime,
+      token);
+  auto probesWritten = cloningResult.packetsWritten;
+  auto bytesWritten = cloningResult.bytesWritten;
   if (probesWritten < probesToSend) {
     // If we can use an IMMEDIATE_ACK, that's better than a PING.
     auto probeSchedulerBuilder = FrameScheduler::Builder(
@@ -1552,28 +1559,29 @@ uint64_t writeProbingDataToSocket(
       probeSchedulerBuilder.pingFrames();
     }
     auto probeScheduler = std::move(probeSchedulerBuilder).build();
-    probesWritten += writeConnectionDataToSocket(
-                         sock,
-                         connection,
-                         srcConnId,
-                         dstConnId,
-                         builder,
-                         pnSpace,
-                         probeScheduler,
-                         connection.transportSettings.enableWritableBytesLimit
-                             ? probePacketWritableBytes
-                             : unlimitedWritableBytes,
-                         probesToSend - probesWritten,
-                         aead,
-                         headerCipher,
-                         version,
-                         writeLoopBeginTime)
-                         .packetsWritten;
+    auto probingResult = writeConnectionDataToSocket(
+        sock,
+        connection,
+        srcConnId,
+        dstConnId,
+        builder,
+        pnSpace,
+        probeScheduler,
+        connection.transportSettings.enableWritableBytesLimit
+            ? probePacketWritableBytes
+            : unlimitedWritableBytes,
+        probesToSend - probesWritten,
+        aead,
+        headerCipher,
+        version,
+        writeLoopBeginTime);
+    probesWritten += probingResult.packetsWritten;
+    bytesWritten += probingResult.bytesWritten;
   }
   VLOG_IF(10, probesWritten > 0)
       << nodeToString(connection.nodeType)
       << " writing probes using scheduler=CloningScheduler " << connection;
-  return probesWritten;
+  return {0, probesWritten, bytesWritten};
 }
 
 WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {

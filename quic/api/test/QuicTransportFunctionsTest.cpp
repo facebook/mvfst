@@ -43,18 +43,19 @@ uint64_t writeProbingDataToSocketForTest(
                                            .cryptoFrames())
                                  .build();
   return writeProbingDataToSocket(
-      sock,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      ShortHeaderBuilder(),
-      EncryptionLevel::AppData,
-      PacketNumberSpace::AppData,
-      scheduler,
-      probesToSend,
-      aead,
-      headerCipher,
-      version);
+             sock,
+             conn,
+             *conn.clientConnectionId,
+             *conn.serverConnectionId,
+             ShortHeaderBuilder(),
+             EncryptionLevel::AppData,
+             PacketNumberSpace::AppData,
+             scheduler,
+             probesToSend,
+             aead,
+             headerCipher,
+             version)
+      .probesWritten;
 }
 
 void writeCryptoDataProbesToSocketForTest(
@@ -2727,6 +2728,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       conn->transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(0, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
+  EXPECT_EQ(0, res.bytesWritten);
 
   // Normal limit
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
@@ -2734,11 +2736,13 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 0;
   conn->transportSettings.writeConnectionDataPacketsLimit =
       kDefaultWriteConnectionDataPacketLimit;
+  uint64_t actualWritten = 0;
   EXPECT_CALL(*rawSocket, write(_, _))
       .Times(1)
       .WillOnce(Invoke([&](const SocketAddress&,
                            const std::unique_ptr<folly::IOBuf>& iobuf) {
         writableBytes -= iobuf->computeChainDataLength();
+        actualWritten += iobuf->computeChainDataLength();
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
@@ -2755,9 +2759,11 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
 
   EXPECT_EQ(1, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
+  EXPECT_EQ(actualWritten, res.bytesWritten);
 
   // Probing can exceed packet limit. In practice we limit it to
   // kPacketToSendForPTO
+  actualWritten = 0;
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] =
       kDefaultWriteConnectionDataPacketLimit * 2;
   writeDataToQuicStream(*stream1, buf->clone(), true);
@@ -2769,6 +2775,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       .Times(kDefaultWriteConnectionDataPacketLimit * 2)
       .WillRepeatedly(Invoke([&](const SocketAddress&,
                                  const std::unique_ptr<folly::IOBuf>& iobuf) {
+        actualWritten += iobuf->computeChainDataLength();
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
@@ -2787,6 +2794,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
 
   EXPECT_EQ(0, res.packetsWritten);
   EXPECT_EQ(kDefaultWriteConnectionDataPacketLimit * 2, res.probesWritten);
+  EXPECT_EQ(actualWritten, res.bytesWritten);
 }
 
 TEST_F(
@@ -2934,6 +2942,7 @@ TEST_F(QuicTransportFunctionsTest, NothingWritten) {
       conn->transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(0, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
+  EXPECT_EQ(0, res.bytesWritten);
 }
 
 const QuicWriteFrame& getFirstFrameInOutstandingPackets(
@@ -3370,6 +3379,7 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
 
   EXPECT_EQ(1, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
+  EXPECT_EQ(conn->udpSendPacketLen, res.bytesWritten);
   ASSERT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
                   ->metadata.isHandshake);
@@ -3469,10 +3479,12 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(0));
 
+  uint64_t actualWritten = 0;
   EXPECT_CALL(*rawSocket, write(_, _))
       .WillRepeatedly(Invoke([&](const SocketAddress&,
                                  const std::unique_ptr<folly::IOBuf>& iobuf) {
         EXPECT_LE(iobuf->computeChainDataLength(), 30);
+        actualWritten += iobuf->computeChainDataLength();
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
@@ -3486,6 +3498,7 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_GT(res.packetsWritten, 0);
+  EXPECT_EQ(res.bytesWritten, actualWritten);
   EXPECT_EQ(0, conn->outstandings.packets.size());
 }
 
@@ -4044,7 +4057,13 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
   auto buf = buildRandomInputData(2048 * 2048);
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
-  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(1));
+  uint64_t actualWritten = 0;
+  EXPECT_CALL(*rawSocket, write(_, _))
+      .WillRepeatedly(Invoke([&](const SocketAddress&,
+                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
+        actualWritten += iobuf->computeChainDataLength();
+        return iobuf->computeChainDataLength();
+      }));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(50));
   auto writeLoopBeginTime = Clock::now();
@@ -4060,6 +4079,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       writeLoopBeginTime);
 
   EXPECT_GT(1000, res.packetsWritten);
+  EXPECT_EQ(actualWritten, res.bytesWritten);
   EXPECT_EQ(res.probesWritten, 0);
 
   res = writeQuicDataToSocket(

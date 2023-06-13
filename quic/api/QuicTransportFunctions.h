@@ -295,7 +295,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
     TimePoint writeLoopBeginTime,
     const std::string& token = std::string());
 
-uint64_t writeProbingDataToSocket(
+WriteQuicDataResult writeProbingDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
