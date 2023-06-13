@@ -46,7 +46,8 @@ bool TperfDSRSender::flush() {
         uint64_t remainingLen = req.len;
         do {
           buf = buf_->clone();
-          uint64_t appendLen = std::min(remainingLen, buf->capacity());
+          uint64_t appendLen =
+              std::min<uint64_t>(remainingLen, buf->capacity());
           buf->append(appendLen);
           remainingLen -= appendLen;
         } while (buf->length() < req.len);

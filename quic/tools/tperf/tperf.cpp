@@ -92,6 +92,15 @@ DEFINE_string(
     "",
     "JSON-serialized dictionary of transport knob params");
 DEFINE_bool(dsr, false, "if you want to debug perf");
+DEFINE_bool(
+    use_ack_receive_timestamps,
+    false,
+    "Replace the ACK frame with ACK_RECEIVE_TIMESTAMPS frame"
+    "which carries the received packet timestamps");
+DEFINE_uint32(
+    max_ack_receive_timestamps_to_send,
+    quic::kMaxReceivedPktsTimestampsStored,
+    "Controls how many packet receive timestamps the peer should send");
 
 namespace quic {
 namespace tperf {
@@ -463,6 +472,14 @@ class TPerfServer {
     settings.maxRecvPacketSize = maxReceivePacketSize;
     settings.canIgnorePathMTU = overridePacketSize;
     settings.copaDeltaParam = FLAGS_latency_factor;
+    if (FLAGS_use_ack_receive_timestamps) {
+      LOG(INFO) << " Using ACK receive timestamps on server";
+      settings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+          {.maxReceiveTimestampsPerAck =
+               FLAGS_max_ack_receive_timestamps_to_send,
+           .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent});
+    }
+
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
@@ -681,6 +698,15 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
           {kDefaultQuicTransportKnobSpace,
            kDefaultQuicTransportKnobId,
            FLAGS_transport_knob_params});
+    }
+
+    if (FLAGS_use_ack_receive_timestamps) {
+      LOG(INFO) << " Using ACK receive timestamps on client";
+
+      settings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+          {.maxReceiveTimestampsPerAck =
+               FLAGS_max_ack_receive_timestamps_to_send,
+           .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent});
     }
     quicClient_->setTransportSettings(settings);
 
