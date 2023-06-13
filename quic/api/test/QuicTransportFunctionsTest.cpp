@@ -541,9 +541,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
   //   total = 48
   EXPECT_EQ(conn->lossState.totalStreamBytesSent, 48); // sum(len)
 
-  EXPECT_EQ(stream1->newStreamBytesSent, 12);
-  EXPECT_EQ(stream2->newStreamBytesSent, 12);
-
   // totalNewStreamBytesSent: just sum(len)
   EXPECT_EQ(conn->lossState.totalNewStreamBytesSent, 24);
   EXPECT_EQ(
@@ -733,10 +730,6 @@ TEST_F(
   //   the second packet contained 12 + 12 + 13 stream bytes
   //   total = 66
   EXPECT_EQ(conn->lossState.totalStreamBytesSent, 66); // sum(len)
-
-  EXPECT_EQ(stream1->newStreamBytesSent, 12);
-  EXPECT_EQ(stream2->newStreamBytesSent, 12);
-  EXPECT_EQ(stream3->newStreamBytesSent, 13);
 
   // totalNewStreamBytesSent: just sum(len)
   EXPECT_EQ(conn->lossState.totalNewStreamBytesSent, 37);

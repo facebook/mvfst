@@ -3510,7 +3510,7 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
       bool(stream->lastHolbTime),
       packets,
       stream->streamLossCount,
-      stream->newStreamBytesSent,
+      stream->finalWriteOffset,
       stream->finalReadOffset};
 }
 
