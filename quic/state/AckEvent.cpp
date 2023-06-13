@@ -7,6 +7,7 @@
 
 #include <folly/MapUtil.h>
 #include <quic/state/AckEvent.h>
+#include <chrono>
 #include <utility>
 
 namespace quic {
@@ -70,11 +71,13 @@ AckEvent::AckPacket::AckPacket(
     DetailsPerStream&& detailsPerStreamIn,
     folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
         lastAckedPacketInfoIn,
-    bool isAppLimitedIn)
+    bool isAppLimitedIn,
+    folly::Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec)
     : packetNum(packetNumIn),
       outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
       detailsPerStream(std::move(detailsPerStreamIn)),
       lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
+      receiveRelativeTimeStampUsec(std::move(receiveRelativeTimeStampUsec)),
       isAppLimited(isAppLimitedIn) {}
 
 AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setPacketNum(
@@ -111,6 +114,13 @@ AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setAppLimited(
   return std::move(*this);
 }
 
+AckEvent::AckPacket::Builder&&
+AckEvent::AckPacket::Builder::setReceiveDeltaTimeStamp(
+    folly::Optional<std::chrono::microseconds>&& receiveTimeStampIn) {
+  receiveRelativeTimeStampUsec = receiveTimeStampIn;
+  return std::move(*this);
+}
+
 AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
   CHECK(packetNum.has_value());
   CHECK(outstandingPacketMetadata.has_value());
@@ -120,7 +130,8 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
       std::move(outstandingPacketMetadata.value()),
       std::move(detailsPerStream.value()),
       std::move(lastAckedPacketInfo),
-      isAppLimited);
+      isAppLimited,
+      std::move(receiveRelativeTimeStampUsec));
 }
 
 AckEvent::Builder&& AckEvent::Builder::setAckTime(TimePoint ackTimeIn) {

@@ -287,6 +287,9 @@ struct AckEvent {
     // OutstandingPacketWrapper structure.
     folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
         lastAckedPacketInfo;
+    // Delta RX Timestamp of the current packet relative to the previous packet
+    // (or connection start time).
+    folly::Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
 
     // Whether this packet was sent when CongestionController is in
     // app-limited state.
@@ -301,6 +304,9 @@ struct AckEvent {
           folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>&&
               lastAckedPacketInfoIn);
       Builder&& setAppLimited(bool appLimitedIn);
+      Builder&& setReceiveDeltaTimeStamp(
+          folly::Optional<std::chrono::microseconds>&&
+              receiveRelativeTimeStampUsec);
       AckPacket build() &&;
       explicit Builder() = default;
 
@@ -310,6 +316,7 @@ struct AckEvent {
       folly::Optional<DetailsPerStream> detailsPerStream;
       folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
           lastAckedPacketInfo;
+      folly::Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
       bool isAppLimited{false};
     };
 
@@ -320,7 +327,9 @@ struct AckEvent {
         DetailsPerStream&& detailsPerStreamIn,
         folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
             lastAckedPacketInfoIn,
-        bool isAppLimitedIn);
+        bool isAppLimitedIn,
+        folly::Optional<std::chrono::microseconds>&&
+            receiveRelativeTimeStampUsec);
   };
 
   // Information about each packet ACKed during this event
@@ -333,6 +342,7 @@ struct AckEvent {
     folly::Optional<PacketNumberSpace> maybePacketNumberSpace;
     folly::Optional<PacketNum> maybeLargestAckedPacket;
     bool isImplicitAck{false};
+    folly::Optional<std::chrono::microseconds> maybeReceiveDeltaTimestamp;
     explicit BuilderFields() = default;
   };
 

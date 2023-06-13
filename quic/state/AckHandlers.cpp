@@ -70,6 +70,15 @@ AckEvent processAckFrame(
   SmallVec<OutstandingPacketWithHandlerContext, 50> packetsWithHandlerContext;
 
   auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
+
+  // Store first outstanding packet number to ignore old receive timestamps.
+  const auto& firstOutstandingPacket =
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
+  folly::Optional<PacketNum> firstPacketNum =
+      (firstOutstandingPacket != conn.outstandings.packets.end())
+      ? folly::make_optional(firstOutstandingPacket->getPacketSequenceNum())
+      : folly::none;
+
   uint64_t dsrPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
@@ -312,6 +321,13 @@ AckEvent processAckFrame(
     ackBlockIt++;
   }
 
+  // Store any (new) Rx timestamps reported by the peer.
+  folly::F14FastMap<PacketNum, uint64_t> packetReceiveTimeStamps;
+  if (pnSpace == PacketNumberSpace::AppData) {
+    parseAckReceiveTimestamps(
+        conn, frame, packetReceiveTimeStamps, firstPacketNum);
+  }
+
   // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
   // frame types only if the packet doesn't have an associated PacketEvent;
   // or the PacketEvent is in conn.outstandings.packetEvents
@@ -425,6 +441,8 @@ AckEvent processAckFrame(
         }
       }
     }
+    auto maybeRxTimestamp = packetReceiveTimeStamps.find(
+        outstandingPacket.packet.header.getPacketSequenceNum());
     ack.ackedPackets.emplace_back(
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(
@@ -434,6 +452,11 @@ AckEvent processAckFrame(
             .setLastAckedPacketInfo(
                 std::move(outstandingPacket.lastAckedPacketInfo))
             .setAppLimited(outstandingPacket.isAppLimited)
+            .setReceiveDeltaTimeStamp(
+                maybeRxTimestamp != packetReceiveTimeStamps.end()
+                    ? folly::make_optional(
+                          std::chrono::microseconds(maybeRxTimestamp->second))
+                    : folly::none)
             .build());
   }
   if (lastAckedPacketSentTime) {
@@ -544,6 +567,94 @@ void clearOldOutstandingPackets(
     if (eraseBegin != opItr) {
       conn.outstandings.packets.erase(eraseBegin, opItr);
     }
+  }
+}
+
+void parseAckReceiveTimestamps(
+    const QuicConnectionStateBase& conn,
+    const quic::ReadAckFrame& frame,
+    folly::F14FastMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
+    folly::Optional<PacketNum> firstPacketNum) {
+  if (frame.frameType != FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    return;
+  }
+
+  // Ignore if we didn't request packet receive timestamps from the peer.
+  if (!conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+           .has_value()) {
+    return;
+  }
+
+  DCHECK(frame.maybeLatestRecvdPacketNum.has_value());
+
+  // Confirm there is at least one timestamp range and one timestamp delta
+  // within that range.
+  if (frame.recvdPacketsTimestampRanges.empty() ||
+      frame.recvdPacketsTimestampRanges[0].deltas.empty()) {
+    return;
+  }
+  auto receivedPacketNum = frame.maybeLatestRecvdPacketNum.value();
+
+  // Don't parse for packets already ACKed.
+  if (!firstPacketNum.has_value() ||
+      receivedPacketNum < firstPacketNum.value()) {
+    return;
+  }
+
+  const auto& maxReceiveTimestampsRequestedFromPeer =
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.value()
+          .maxReceiveTimestampsPerAck;
+
+  auto decrementPacketNum = [](PacketNum pktNum) {
+    return pktNum > 0 ? --pktNum : 0;
+  };
+
+  /*
+   * From RFC, the first delta timestamp is relative to connection start time on
+   * the peer while the rest of the timestamps are relative to the previous
+   * delta timestamp. Since peer's connection start time isn't known, receive
+   * timestamps will be stored as deltas to previous packet's receive timestamp.
+   * We do not want to use our connection start time as a proxy for the peer's,
+   * as the two clocks might not be in sync and propagation delay isn't
+   * accounted for.
+   */
+
+  // First delta timestamp is relative to connection start time, so multiply by
+  // 2 to keep loop semantics consistent for this first timestamp as well. T0 =
+  // 2D0 - D0 = D0 for the first timestamp.
+  // Tn = Tn-1 - Dn for other timestamps.
+  auto receiveTimeStamp = 2 * frame.recvdPacketsTimestampRanges[0].deltas[0];
+  // Walk through each timestamp range (separated by gaps) and calculate the
+  // Rx timestamp.
+  for (auto& timeStampRange : frame.recvdPacketsTimestampRanges) {
+    receivedPacketNum -= timeStampRange.gap;
+
+    for (const auto& delta : timeStampRange.deltas) {
+      // // Don't parse for packets already ACKed.
+      if (!firstPacketNum.has_value() ||
+          receivedPacketNum < firstPacketNum.value()) {
+        return;
+      }
+      // We don't need to process more than the requested Receive timestamps
+      // sent by peer.
+      if (packetReceiveTimeStamps.size() >=
+          maxReceiveTimestampsRequestedFromPeer) {
+        LOG(ERROR) << " Received more timestamps "
+                   << packetReceiveTimeStamps.size()
+                   << " than requested timestamps from peer: "
+                   << maxReceiveTimestampsRequestedFromPeer << " current PN "
+                   << receivedPacketNum << " largest PN "
+                   << frame.maybeLatestRecvdPacketNum.value() << " deltas  "
+                   << timeStampRange.deltas.size();
+        return;
+      }
+      receiveTimeStamp -= delta;
+      packetReceiveTimeStamps[receivedPacketNum] = receiveTimeStamp;
+      receivedPacketNum = decrementPacketNum(receivedPacketNum);
+    }
+    // Additional decrement to maintain a gap of "2" for subsequent timestamp
+    // ranges per RFC.
+    receivedPacketNum = decrementPacketNum(receivedPacketNum);
   }
 }
 
