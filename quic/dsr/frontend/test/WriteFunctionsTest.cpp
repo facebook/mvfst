@@ -14,7 +14,11 @@ using namespace testing;
 
 namespace quic::test {
 
-class WriteFunctionsTest : public DSRCommonTestFixture {};
+class WriteFunctionsTest : public DSRCommonTestFixture {
+  void SetUp() override {
+    aead_ = createNoOpAead(16);
+  }
+};
 
 TEST_F(WriteFunctionsTest, SchedulerNoData) {
   prepareFlowControlAndStreamLimit();
@@ -145,6 +149,10 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+  // Check the packet size is full.
+  EXPECT_EQ(
+      conn_.outstandings.packets[0].metadata.encodedSize,
+      conn_.udpSendPacketLen);
 }
 
 TEST_F(WriteFunctionsTest, PacketLimit) {
@@ -169,6 +177,10 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
   EXPECT_EQ(20, countInstructions(streamId));
   EXPECT_EQ(20, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+  // All packets should be full.
+  for (auto& outstanding : conn_.outstandings.packets) {
+    EXPECT_EQ(outstanding.metadata.encodedSize, conn_.udpSendPacketLen);
+  }
 }
 
 TEST_F(WriteFunctionsTest, WriteTwoStreams) {

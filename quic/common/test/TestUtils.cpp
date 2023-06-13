@@ -241,8 +241,8 @@ void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx) {
   ctx.setCertManager(std::move(certManager));
 }
 
-std::unique_ptr<MockAead> createNoOpAead() {
-  return createNoOpAeadImpl<MockAead>();
+std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead) {
+  return createNoOpAeadImpl<MockAead>(cipherOverhead);
 }
 
 std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipher() {

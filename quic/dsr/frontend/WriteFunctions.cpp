@@ -87,7 +87,7 @@ uint64_t writePacketizationRequest(
         folly::none /* Packet Event */,
         packet.packet,
         Clock::now(),
-        packet.encodedSize,
+        packet.encodedSize + cipherOverhead,
         // TODO: (yangchi) Figure out how to calculate the
         // packet.encodedBodySize for the DSR case. For now, it's not being
         // used, so setting it to 0
