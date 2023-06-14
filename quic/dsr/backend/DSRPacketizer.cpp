@@ -99,10 +99,8 @@ BufQuicBatchResult writePacketsGroup(
     LOG(ERROR) << "Empty packetization request";
     return {};
   }
-  // TODO: Why don't I just limit the batch size to reqGroup.size()? What can go
-  //  wrong?
   auto batchWriter =
-      BatchWriterPtr(new GSOPacketBatchWriter(kDefaultQuicMaxBatchSize));
+      BatchWriterPtr(new GSOPacketBatchWriter(reqGroup.requests.size()));
   // This doesn't matter:
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
