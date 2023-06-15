@@ -177,7 +177,6 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
           PacketNumberSpace::AppData,
           exceptCryptoStream ? "FrameSchedulerWithoutCrypto" : "FrameScheduler")
           .streamFrames()
-          .ackFrames()
           .resetFrames()
           .windowUpdateFrames()
           .blockedFrames()
@@ -185,6 +184,13 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
           .pingFrames()
           .datagramFrames()
           .immediateAckFrames();
+  // Only add ACK frames if we need to send an ACK, or if the write reason isn't
+  // just streams.
+  if (connection.transportSettings.opportunisticAcking ||
+      toWriteAppDataAcks(connection) ||
+      (hasNonAckDataToWrite(connection) != WriteDataReason::STREAM)) {
+    schedulerBuilder.ackFrames();
+  }
   if (!exceptCryptoStream) {
     schedulerBuilder.cryptoFrames();
   }

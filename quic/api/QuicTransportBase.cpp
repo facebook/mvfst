@@ -3618,6 +3618,9 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
     stream->dsrSender = std::move(sender);
+    // Default to disabling opportunistic ACKing for DSR since it causes extra
+    // writes and spurious losses.
+    conn_->transportSettings.opportunisticAcking = false;
     // Fow now, no appLimited or appIdle update here since we are not writing
     // either BufferMetas yet. The first BufferMeta write will update it.
   } catch (const QuicTransportException& ex) {

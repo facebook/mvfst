@@ -274,6 +274,8 @@ struct TransportSettings {
   // How many times we will a schedule a stream to packets before moving onto
   // the next one in the queue. Only relevant for incremental priority.
   uint64_t priorityQueueWritesPerStream{1};
+  // Whether to include ACKs whenever we have data to write and packets to ACK.
+  bool opportunisticAcking{true};
 
   // Local configuration for ACK receive timestamps.
   //

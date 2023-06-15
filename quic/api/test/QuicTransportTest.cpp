@@ -2025,6 +2025,43 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
   EXPECT_EQ(0, ackState.numNonRxPacketsRecvd);
 }
 
+TEST_F(QuicTransportTest, NoWritePendingAckIfHavingData) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.opportunisticAcking = false;
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(20);
+  PacketNum start = 10;
+  PacketNum end = 15;
+  addAckStatesWithCurrentTimestamps(conn.ackStates.appDataAckState, start, end);
+  conn.ackStates.appDataAckState.needsToSendAckImmediately = false;
+  conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
+  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  // We should write acks if there is data pending
+  transport_->writeChain(streamId, buf->clone(), true);
+  loopForWrites();
+  EXPECT_EQ(conn.outstandings.packets.size(), 1);
+  auto& packet =
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
+  EXPECT_GE(packet.frames.size(), 1);
+
+  bool ackFound = false;
+  for (auto& frame : packet.frames) {
+    auto ackFrame = frame.asWriteAckFrame();
+    if (!ackFrame) {
+      continue;
+    }
+    ackFound = true;
+  }
+  EXPECT_FALSE(ackFound);
+  EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, folly::none);
+
+  auto pnSpace = packet.header.getPacketNumberSpace();
+  auto ackState = getAckState(conn, pnSpace);
+  EXPECT_EQ(ackState.largestAckScheduled, folly::none);
+  EXPECT_FALSE(ackState.needsToSendAckImmediately);
+  EXPECT_EQ(3, ackState.numNonRxPacketsRecvd);
+}
+
 TEST_F(QuicTransportTest, RstStream) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
