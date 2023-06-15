@@ -116,7 +116,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
  public:
   ~InplaceQuicPacketBuilder() override;
 
-  explicit InplaceQuicPacketBuilder(
+  InplaceQuicPacketBuilder(
       BufAccessor& bufAccessor,
       uint32_t remainingBytes,
       PacketHeader header,

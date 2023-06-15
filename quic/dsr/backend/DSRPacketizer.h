@@ -135,6 +135,7 @@ class QuicPacketizer {
  */
 bool writeSingleQuicPacket(
     IOBufQuicBatch& ioBufBatch,
+    BufAccessor& accessor,
     ConnectionId dcid,
     PacketNum packetNum,
     PacketNum largestAckedByPeer,

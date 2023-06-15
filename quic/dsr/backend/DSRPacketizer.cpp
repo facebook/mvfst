@@ -12,6 +12,7 @@
 namespace quic {
 bool writeSingleQuicPacket(
     IOBufQuicBatch& ioBufBatch,
+    BufAccessor& accessor,
     ConnectionId dcid,
     PacketNum packetNum,
     PacketNum largestAckedByPeer,
@@ -26,13 +27,20 @@ bool writeSingleQuicPacket(
     LOG(ERROR) << "Insufficient data buffer";
     return false;
   }
+  auto buildBuf = accessor.obtain();
+  auto prevSize = buildBuf->length();
+  accessor.release(std::move(buildBuf));
+
+  auto rollbackBuf = [&accessor, prevSize]() {
+    auto buildBuf = accessor.obtain();
+    buildBuf->trimEnd(buildBuf->length() - prevSize);
+    accessor.release(std::move(buildBuf));
+  };
+
   ShortHeader shortHeader(ProtectionType::KeyPhaseZero, dcid, packetNum);
-  // The the stream length limit calculated by the frontend should have
-  // already taken the PMTU limit into account. Thus the packet builder uses
-  // uint32 max value as packet size limit.
-  // TODO: InplaceQuicPacketBuilder in the future
-  RegularQuicPacketBuilder builder(
-      std::numeric_limits<uint32_t>::max() /* udpSendPacketLen */,
+  InplaceQuicPacketBuilder builder(
+      accessor,
+      kDefaultMaxUDPPayload,
       std::move(shortHeader),
       largestAckedByPeer);
   builder.encodePacketHeader();
@@ -50,6 +58,7 @@ bool writeSingleQuicPacket(
   BufQueue bufQueue(std::move(buf));
   writeStreamFrameData(builder, bufQueue, *dataLen);
   auto packet = std::move(builder).buildPacket();
+  CHECK(accessor.ownsBuffer());
 
   if (packet.packet.frames.empty()) {
     LOG(ERROR) << "DSR Send failed: Build empty packet.";
@@ -58,37 +67,63 @@ bool writeSingleQuicPacket(
   }
   if (!packet.body) {
     LOG(ERROR) << "DSR Send failed: Build empty body buffer";
+    rollbackBuf();
     ioBufBatch.flush();
     return false;
   }
-  packet.header->coalesce();
+  CHECK(!packet.header->isChained());
+
   auto headerLen = packet.header->length();
-  auto bodyLen = packet.body->computeChainDataLength();
-  auto unencrypted = folly::IOBuf::createCombined(
-      headerLen + bodyLen + aead.getCipherOverhead());
-  auto bodyCursor = folly::io::Cursor(packet.body.get());
-  bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
-  unencrypted->advance(headerLen);
-  unencrypted->append(bodyLen);
-  auto packetBuf = aead.inplaceEncrypt(
-      std::move(unencrypted), packet.header.get(), packetNum);
-  DCHECK(packetBuf->headroom() == headerLen);
-  packetBuf->clear();
-  auto headerCursor = folly::io::Cursor(packet.header.get());
-  headerCursor.pull(packetBuf->writableData(), headerLen);
-  packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
+  buildBuf = accessor.obtain();
+  CHECK(
+      packet.body->data() > buildBuf->data() &&
+      packet.body->tail() <= buildBuf->tail());
+  CHECK(
+      packet.header->data() >= buildBuf->data() &&
+      packet.header->tail() < buildBuf->tail());
+  // Trim off everything before the current packet, and the header length, so
+  // buildBuf's data starts from the body part of buildBuf.
+  buildBuf->trimStart(prevSize + headerLen);
+  // buildBuf and packetbuildBuf is actually the same.
+  auto packetbuildBuf =
+      aead.inplaceEncrypt(std::move(buildBuf), packet.header.get(), packetNum);
+  CHECK_EQ(packetbuildBuf->headroom(), headerLen + prevSize);
+  // Include header back.
+  packetbuildBuf->prepend(headerLen);
+
+  HeaderForm headerForm = packet.packet.header.getHeaderForm();
   encryptPacketHeader(
-      HeaderForm::Short,
-      packetBuf->writableData(),
+      headerForm,
+      packetbuildBuf->writableData(),
       headerLen,
-      packetBuf->data() + headerLen,
-      packetBuf->length() - headerLen,
+      packetbuildBuf->data() + headerLen,
+      packetbuildBuf->length() - headerLen,
       headerCipher);
-  auto encodedSize = packetBuf->computeChainDataLength();
-  bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
-  // If ret is false, IOBufQuicBatch::flush() inside the IOBufQuicBatch::write()
-  // above has failed, no need to try flush() again.
+  CHECK(!packetbuildBuf->isChained());
+  auto encodedSize = packetbuildBuf->length();
+  // Include previous packets back.
+  packetbuildBuf->prepend(prevSize);
+  accessor.release(std::move(packetbuildBuf));
+  bool ret =
+      ioBufBatch.write(nullptr /* no need to pass buildBuf */, encodedSize);
   return ret;
+}
+
+// TODO using a connection state for this is kind of janky and we should
+// refactor the batch writer interface to not need this.
+// This isn't a real connection, it's just used for the batch writer state.
+// 44 is near the number of the maximum GSO the kernel can accept for a full
+// Ethernet MTU (44 * 1452 = 63888)
+static auto& getThreadLocalConn(size_t maxPackets = 44) {
+  static thread_local QuicConnectionStateBase fakeConn{QuicNodeType::Server};
+  static thread_local bool initAccessor FOLLY_MAYBE_UNUSED = [&]() {
+    fakeConn.bufAccessor =
+        new SimpleBufAccessor{kDefaultMaxUDPPayload * maxPackets};
+    // Store this so we can use it to set the batch writer.
+    fakeConn.transportSettings.maxBatchSize = maxPackets;
+    return true;
+  }();
+  return fakeConn;
 }
 
 BufQuicBatchResult writePacketsGroup(
@@ -99,9 +134,10 @@ BufQuicBatchResult writePacketsGroup(
     LOG(ERROR) << "Empty packetization request";
     return {};
   }
-  auto batchWriter =
-      BatchWriterPtr(new GSOPacketBatchWriter(reqGroup.requests.size()));
-  // This doesn't matter:
+  auto& fakeConn = getThreadLocalConn();
+  auto& bufAccessor = *fakeConn.bufAccessor;
+  auto batchWriter = BatchWriterPtr(new GSOInplacePacketBatchWriter(
+      fakeConn, fakeConn.transportSettings.maxBatchSize));
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       false /* thread local batching */,
@@ -119,6 +155,7 @@ BufQuicBatchResult writePacketsGroup(
   for (const auto& request : reqGroup.requests) {
     auto ret = writeSingleQuicPacket(
         ioBufBatch,
+        bufAccessor,
         reqGroup.dcid,
         request.packetNum,
         request.largestAckedPacketNum,

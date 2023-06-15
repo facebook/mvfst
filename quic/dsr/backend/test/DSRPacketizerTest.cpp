@@ -71,8 +71,10 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
   size_t length = 100;
   bool eof = false;
   auto dcid = test::getTestConnectionId();
+  SimpleBufAccessor accessor{16 * kDefaultMaxUDPPayload};
   auto ret = writeSingleQuicPacket(
       ioBufBatch,
+      accessor,
       dcid,
       packetNum,
       largestAckedByPeer,
@@ -113,8 +115,10 @@ TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
   size_t offset = 0;
   size_t length = 100;
   bool eof = false;
+  SimpleBufAccessor accessor{16 * kDefaultMaxUDPPayload};
   auto ret = writeSingleQuicPacket(
       ioBufBatch,
+      accessor,
       test::getTestConnectionId(),
       packetNum,
       largestAckedByPeer,

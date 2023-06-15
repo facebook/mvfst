@@ -36,7 +36,7 @@ DEFINE_uint64(
     block_size,
     1024 * 1024,
     "Amount of data written to stream each iteration");
-DEFINE_uint64(writes_per_loop, 40, "Amount of socket writes per event loop");
+DEFINE_uint64(writes_per_loop, 44, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 1024 * 1024, "Flow control window size");
 DEFINE_bool(autotune_window, true, "Automatically increase the receive window");
 DEFINE_string(congestion, "cubic", "newreno/cubic/bbr/ccp/none");
