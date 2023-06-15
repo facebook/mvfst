@@ -181,9 +181,6 @@ void QuicServerWorker::start() {
         evb_.get(), transportSettings_.pacingTimerTickInterval);
   }
   socket_->resumeRead(this);
-  if (statsCallback_) {
-    evb_->timer().scheduleTimeout(this, timeLoggingSamplingInterval_);
-  }
   VLOG(10) << fmt::format(
       "Registered read on worker={}, thread={}, processId={}",
       fmt::ptr(this),
