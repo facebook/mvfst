@@ -9,7 +9,8 @@
 
 namespace quic {
 SimpleBufAccessor::SimpleBufAccessor(size_t capacity)
-    : buf_(folly::IOBuf::create(capacity)), capacity_(buf_->capacity()) {}
+    : buf_(folly::IOBuf::createCombined(capacity)),
+      capacity_(buf_->capacity()) {}
 
 Buf SimpleBufAccessor::obtain() {
   Buf ret;
