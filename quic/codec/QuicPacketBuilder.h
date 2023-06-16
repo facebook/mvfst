@@ -80,6 +80,8 @@ class PacketBuilderInterface {
 
   virtual void appendPaddingFrame() = 0;
 
+  virtual void markNonEmpty() = 0;
+
   // Returns the packet header for the current packet.
   FOLLY_NODISCARD virtual const PacketHeader& getPacketHeader() const = 0;
 
@@ -144,6 +146,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
 
   void appendFrame(QuicWriteFrame frame) override;
   void appendPaddingFrame() override;
+  void markNonEmpty() override;
   FOLLY_NODISCARD const PacketHeader& getPacketHeader() const override;
 
   PacketBuilderInterface::Packet buildPacket() && override;
@@ -221,6 +224,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
 
   void appendFrame(QuicWriteFrame frame) override;
   void appendPaddingFrame() override;
+  void markNonEmpty() override;
   FOLLY_NODISCARD const PacketHeader& getPacketHeader() const override;
 
   Packet buildPacket() && override;
@@ -518,6 +522,10 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
 
   void appendPaddingFrame() override {
     builder.appendPaddingFrame();
+  }
+
+  void markNonEmpty() override {
+    builder.markNonEmpty();
   }
 
   void push(const uint8_t* data, size_t len) override {

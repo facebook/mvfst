@@ -206,16 +206,22 @@ void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
 }
 
 void RegularQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
+  packet_.empty = false;
   packet_.frames.push_back(std::move(frame));
 }
 
 void RegularQuicPacketBuilder::appendPaddingFrame() {
+  packet_.empty = false;
   if (!packet_.frames.empty() &&
       packet_.frames.back().type() == QuicWriteFrame::Type::PaddingFrame) {
     packet_.frames.back().asPaddingFrame()->numFrames++;
   } else {
     packet_.frames.push_back(PaddingFrame());
   }
+}
+
+void RegularQuicPacketBuilder::markNonEmpty() {
+  packet_.empty = false;
 }
 
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
@@ -227,7 +233,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   size_t extraDataWritten = 0;
   size_t bodyLength = body_->computeChainDataLength();
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
-         !packet_.frames.empty() && remainingBytes_ > kMaxPacketLenSize) {
+         !packet_.empty && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
     write(paddingType);
@@ -646,16 +652,22 @@ void InplaceQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
 }
 
 void InplaceQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
+  packet_.empty = false;
   packet_.frames.push_back(std::move(frame));
 }
 
 void InplaceQuicPacketBuilder::appendPaddingFrame() {
+  packet_.empty = false;
   if (!packet_.frames.empty() &&
       packet_.frames.back().type() == QuicWriteFrame::Type::PaddingFrame) {
     packet_.frames.back().asPaddingFrame()->numFrames++;
   } else {
     packet_.frames.push_back(PaddingFrame());
   }
+}
+
+void InplaceQuicPacketBuilder::markNonEmpty() {
+  packet_.empty = false;
 }
 
 const PacketHeader& InplaceQuicPacketBuilder::getPacketHeader() const {
@@ -670,7 +682,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   size_t extraDataWritten = 0;
   size_t bodyLength = iobuf_->tail() - bodyStart_;
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
-         !packet_.frames.empty() && remainingBytes_ > kMaxPacketLenSize) {
+         !packet_.empty && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
     write(paddingType);

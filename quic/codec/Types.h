@@ -1186,6 +1186,7 @@ struct RegularQuicPacket : public RegularPacket {
 struct RegularQuicWritePacket : public RegularPacket {
   using Vec = std::vector<QuicWriteFrame>;
   Vec frames;
+  bool empty{true};
 
   explicit RegularQuicWritePacket(PacketHeader&& headerIn)
       : RegularPacket(std::move(headerIn)) {

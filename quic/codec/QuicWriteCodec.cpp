@@ -38,7 +38,8 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
     uint64_t flowControlLen,
     bool fin,
     folly::Optional<bool> skipLenHint,
-    folly::Optional<StreamGroupId> streamGroupId) {
+    folly::Optional<StreamGroupId> streamGroupId,
+    bool appendFrame) {
   if (builder.remainingSpaceInPkt() == 0) {
     return folly::none;
   }
@@ -154,13 +155,17 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   if (dataLenLen > 0) {
     builder.write(QuicInteger(dataLen));
   }
-  builder.appendFrame(WriteStreamFrame(
-      id,
-      offset,
-      dataLen,
-      streamType.hasFin(),
-      false /* fromBufMetaIn */,
-      streamGroupId));
+  if (appendFrame) {
+    builder.appendFrame(WriteStreamFrame(
+        id,
+        offset,
+        dataLen,
+        streamType.hasFin(),
+        false /* fromBufMetaIn */,
+        streamGroupId));
+  } else {
+    builder.markNonEmpty();
+  }
   return folly::make_optional(dataLen);
 }
 

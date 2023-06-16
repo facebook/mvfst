@@ -54,13 +54,15 @@ bool writeSingleQuicPacket(
       length,
       length /* flow control len*/,
       eof,
-      true /* skip length field in stream header */);
+      true /* skip length field in stream header */,
+      folly::none, /* stream group id */
+      false /* don't append frame to builder */);
   BufQueue bufQueue(std::move(buf));
   writeStreamFrameData(builder, bufQueue, *dataLen);
   auto packet = std::move(builder).buildPacket();
   CHECK(accessor.ownsBuffer());
 
-  if (packet.packet.frames.empty()) {
+  if (packet.packet.empty) {
     LOG(ERROR) << "DSR Send failed: Build empty packet.";
     ioBufBatch.flush();
     return false;

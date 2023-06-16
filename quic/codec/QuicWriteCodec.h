@@ -57,7 +57,8 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
     uint64_t flowControlLen,
     bool fin,
     folly::Optional<bool> skipLenHint,
-    folly::Optional<StreamGroupId> streamGroupId = folly::none);
+    folly::Optional<StreamGroupId> streamGroupId = folly::none,
+    bool appendFrame = true);
 
 /**
  * Write stream frama data into builder
