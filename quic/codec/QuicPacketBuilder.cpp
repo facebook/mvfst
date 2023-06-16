@@ -125,14 +125,19 @@ folly::Optional<PacketNumEncodingResult> encodeShortHeaderHelper(
 RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     uint32_t remainingBytes,
     PacketHeader header,
-    PacketNum largestAckedPacketNum)
+    PacketNum largestAckedPacketNum,
+    uint8_t frameHint)
     : remainingBytes_(remainingBytes),
       largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
       header_(folly::IOBuf::create(kLongHeaderHeaderSize)),
       body_(folly::IOBuf::create(kAppenderGrowthSize)),
       headerAppender_(header_.get(), kLongHeaderHeaderSize),
-      bodyAppender_(body_.get(), kAppenderGrowthSize) {}
+      bodyAppender_(body_.get(), kAppenderGrowthSize) {
+  if (frameHint) {
+    packet_.frames.reserve(frameHint);
+  }
+}
 
 uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
   bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
@@ -585,14 +590,19 @@ InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(
     BufAccessor& bufAccessor,
     uint32_t remainingBytes,
     PacketHeader header,
-    PacketNum largestAckedPacketNum)
+    PacketNum largestAckedPacketNum,
+    uint8_t frameHint)
     : bufAccessor_(bufAccessor),
       iobuf_(bufAccessor_.obtain()),
       bufWriter_(*iobuf_, remainingBytes),
       remainingBytes_(remainingBytes),
       largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
-      headerStart_(iobuf_->tail()) {}
+      headerStart_(iobuf_->tail()) {
+  if (frameHint) {
+    packet_.frames.reserve(frameHint);
+  }
+}
 
 uint32_t InplaceQuicPacketBuilder::remainingSpaceInPkt() const {
   return remainingBytes_;

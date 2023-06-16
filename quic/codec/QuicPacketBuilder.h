@@ -122,7 +122,8 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
       BufAccessor& bufAccessor,
       uint32_t remainingBytes,
       PacketHeader header,
-      PacketNum largestAckedPacketNum);
+      PacketNum largestAckedPacketNum,
+      uint8_t frameHint = 8);
 
   // PacketBuilderInterface
   FOLLY_NODISCARD uint32_t remainingSpaceInPkt() const override;
@@ -197,7 +198,8 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   RegularQuicPacketBuilder(
       uint32_t remainingBytes,
       PacketHeader header,
-      PacketNum largestAckedPacketNum);
+      PacketNum largestAckedPacketNum,
+      uint8_t frameHint = 8);
 
   FOLLY_NODISCARD uint32_t getHeaderBytes() const override;
 

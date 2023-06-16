@@ -1189,9 +1189,7 @@ struct RegularQuicWritePacket : public RegularPacket {
   bool empty{true};
 
   explicit RegularQuicWritePacket(PacketHeader&& headerIn)
-      : RegularPacket(std::move(headerIn)) {
-    frames.reserve(8);
-  }
+      : RegularPacket(std::move(headerIn)) {}
 };
 
 /**
