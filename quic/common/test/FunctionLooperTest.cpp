@@ -19,7 +19,8 @@ namespace test {
 class FunctionLooperTest : public Test {};
 
 TEST(FunctionLooperTest, LooperNotRunning) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   auto func = [&]() { called = true; };
   FunctionLooper::Ptr looper(
@@ -32,7 +33,8 @@ TEST(FunctionLooperTest, LooperNotRunning) {
 }
 
 TEST(FunctionLooperTest, LooperStarted) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   auto func = [&]() { called = true; };
   FunctionLooper::Ptr looper(
@@ -47,7 +49,8 @@ TEST(FunctionLooperTest, LooperStarted) {
 }
 
 TEST(FunctionLooperTest, LooperStopped) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   auto func = [&]() { called = true; };
   FunctionLooper::Ptr looper(
@@ -63,7 +66,8 @@ TEST(FunctionLooperTest, LooperStopped) {
 }
 
 TEST(FunctionLooperTest, LooperRestarted) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   auto func = [&]() { called = true; };
   FunctionLooper::Ptr looper(
@@ -82,7 +86,8 @@ TEST(FunctionLooperTest, LooperRestarted) {
 }
 
 TEST(FunctionLooperTest, DestroyLooperDuringFunc) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   FunctionLooper::Ptr* looperPtr = nullptr;
 
@@ -101,7 +106,8 @@ TEST(FunctionLooperTest, DestroyLooperDuringFunc) {
 }
 
 TEST(FunctionLooperTest, StopLooperDuringFunc) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   FunctionLooper::Ptr* looperPtr = nullptr;
 
@@ -122,7 +128,8 @@ TEST(FunctionLooperTest, StopLooperDuringFunc) {
 }
 
 TEST(FunctionLooperTest, RunLooperDuringFunc) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   FunctionLooper::Ptr* looperPtr = nullptr;
 
@@ -143,7 +150,8 @@ TEST(FunctionLooperTest, RunLooperDuringFunc) {
 }
 
 TEST(FunctionLooperTest, DetachStopsLooper) {
-  EventBase evb;
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
   bool called = false;
   auto func = [&]() { called = true; };
   FunctionLooper::Ptr looper(
@@ -157,8 +165,9 @@ TEST(FunctionLooperTest, DetachStopsLooper) {
 }
 
 TEST(FunctionLooperTest, PacingOnce) {
-  EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&backingEvb, 1ms));
   int count = 0;
   auto func = [&]() { ++count; };
   bool firstTime = true;
@@ -183,8 +192,10 @@ TEST(FunctionLooperTest, PacingOnce) {
 }
 
 TEST(FunctionLooperTest, KeepPacing) {
-  EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
+  TimerHighRes::SharedPtr pacingTimer(
+      TimerHighRes::newTimer(evb.getBackingEventBase(), 1ms));
   int count = 0;
   auto func = [&]() { ++count; };
   bool stopPacing = false;
@@ -226,8 +237,10 @@ TEST(FunctionLooperTest, KeepPacing) {
 }
 
 TEST(FunctionLooperTest, TimerTickSize) {
-  EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
+  TimerHighRes::SharedPtr pacingTimer(
+      TimerHighRes::newTimer(evb.getBackingEventBase(), 123ms));
   FunctionLooper::Ptr looper(new FunctionLooper(
       &evb, [&]() {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
@@ -235,21 +248,26 @@ TEST(FunctionLooperTest, TimerTickSize) {
 }
 
 TEST(FunctionLooperTest, TimerTickSizeAfterNewEvb) {
-  EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
+  TimerHighRes::SharedPtr pacingTimer(
+      TimerHighRes::newTimer(evb.getBackingEventBase(), 123ms));
   FunctionLooper::Ptr looper(new FunctionLooper(
       &evb, [&]() {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
   looper->detachEventBase();
-  EventBase evb2;
+  EventBase backingEvb2;
+  QuicEventBase evb2(&backingEvb2);
   looper->attachEventBase(&evb2);
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
 }
 
 TEST(FunctionLooperTest, NoLoopCallbackInPacingMode) {
-  EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
+  EventBase backingEvb;
+  QuicEventBase evb(&backingEvb);
+  TimerHighRes::SharedPtr pacingTimer(
+      TimerHighRes::newTimer(evb.getBackingEventBase(), 1ms));
   auto runFunc = [&]() {};
   auto pacingFunc = [&]() { return 3600000ms; };
   FunctionLooper::Ptr looper(

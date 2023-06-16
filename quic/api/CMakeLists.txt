@@ -36,6 +36,7 @@ add_dependencies(
   mvfst_codec_pktrebuilder
   mvfst_codec_types
   mvfst_constants
+  mvfst_events
   mvfst_exception
   mvfst_flowcontrol
   mvfst_happyeyeballs
@@ -65,6 +66,7 @@ target_link_libraries(
   mvfst_codec_pktrebuilder
   mvfst_codec_types
   mvfst_constants
+  mvfst_events
   mvfst_exception
   mvfst_flowcontrol
   mvfst_happyeyeballs

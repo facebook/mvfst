@@ -276,11 +276,12 @@ bool QuicStreamAsyncTransport::error() const {
   return bool(ex_);
 }
 
-QuicEventBase* QuicStreamAsyncTransport::getEventBase() const {
+folly::EventBase* QuicStreamAsyncTransport::getEventBase() const {
   return sock_->getEventBase();
 }
 
-void QuicStreamAsyncTransport::attachEventBase(QuicEventBase* /*eventBase*/) {
+void QuicStreamAsyncTransport::attachEventBase(
+    folly::EventBase* /*eventBase*/) {
   LOG(FATAL) << "Does QUICSocket support this?";
 }
 

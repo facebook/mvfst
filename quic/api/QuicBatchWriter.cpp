@@ -97,21 +97,22 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
     if (enabled_) {
       auto* evb = writer->evb();
 
-      if (evb && !socket_) {
+      if (evb && evb->getBackingEventBase() && !socket_) {
         auto fd = writer->getAndResetFd();
         if (fd >= 0) {
-          socket_ = std::make_unique<folly::AsyncUDPSocket>(evb);
+          socket_ = std::make_unique<folly::AsyncUDPSocket>(
+              evb->getBackingEventBase());
           socket_->setFD(
               folly::NetworkSocket(fd),
               folly::AsyncUDPSocket::FDOwnership::OWNS);
         }
-        attachTimeoutManager(evb);
+        attachTimeoutManager(evb->getBackingEventBase());
       }
 
       batchWriter_.reset(writer);
 
       // start the timer if not active
-      if (evb && socket_ && !timerActive_) {
+      if (evb && evb->getBackingEventBase() && socket_ && !timerActive_) {
         addRef();
         timerActive_ = true;
         evb->scheduleTimeoutHighRes(this, threadLocalDelay_);

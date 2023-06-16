@@ -71,6 +71,28 @@ target_link_libraries(
 )
 
 add_library(
+  mvfst_events STATIC
+  Events.cpp
+)
+
+target_include_directories(
+  mvfst_events PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_events
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_events PUBLIC
+  Folly::folly
+)
+
+add_library(
   mvfst_socketutil STATIC
   SocketUtil.cpp
 )
@@ -139,6 +161,12 @@ install(
 
 install(
   TARGETS mvfst_bufutil
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_events
   EXPORT mvfst-exports
   DESTINATION lib
 )

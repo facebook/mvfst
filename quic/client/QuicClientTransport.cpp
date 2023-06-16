@@ -1558,7 +1558,7 @@ void QuicClientTransport::start(
     // TODO Supply v4 delay amount from somewhere when we want to tune this
     startHappyEyeballs(
         *clientConn_,
-        evb_,
+        qEvbPtr_,
         happyEyeballsCachedFamily_,
         happyEyeballsConnAttemptDelayTimeout_,
         happyEyeballsCachedFamily_ == AF_UNSPEC

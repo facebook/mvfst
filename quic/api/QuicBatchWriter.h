@@ -25,14 +25,14 @@ class BatchWriter {
   }
 
   void setSock(folly::AsyncUDPSocket* sock) {
-    if (sock && !evb_) {
+    if (sock && !evb_.getBackingEventBase()) {
       fd_ = ::dup(sock->getNetworkSocket().toFd());
-      evb_ = sock->getEventBase();
+      evb_.setBackingEventBase(sock->getEventBase());
     }
   }
 
-  FOLLY_NODISCARD QuicEventBase* evb() const {
-    return evb_;
+  FOLLY_NODISCARD QuicEventBase* evb() {
+    return &evb_;
   }
 
   int getAndResetFd() {
@@ -67,7 +67,7 @@ class BatchWriter {
       const folly::SocketAddress& address) = 0;
 
  protected:
-  QuicEventBase* evb_{nullptr};
+  QuicEventBase evb_;
   int fd_{-1};
 };
 

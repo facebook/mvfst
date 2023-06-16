@@ -29,8 +29,7 @@ QuicTransportBase::QuicTransportBase(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> socket,
     bool useConnectionEndWithErrorCallback)
-    : evb_(evb),
-      socket_(std::move(socket)),
+    : socket_(std::move(socket)),
       useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),
       lossTimeout_(this),
       ackTimeout_(this),
@@ -40,17 +39,19 @@ QuicTransportBase::QuicTransportBase(
       drainTimeout_(this),
       pingTimeout_(this),
       readLooper_(new FunctionLooper(
-          evb,
+          evb ? &qEvb_ : nullptr,
           [this]() { invokeReadDataAndCallbacks(); },
           LooperType::ReadLooper)),
       peekLooper_(new FunctionLooper(
-          evb,
+          evb ? &qEvb_ : nullptr,
           [this]() { invokePeekDataAndCallbacks(); },
           LooperType::PeekLooper)),
       writeLooper_(new FunctionLooper(
-          evb,
+          evb ? &qEvb_ : nullptr,
           [this]() { pacedWriteDataToSocket(); },
           LooperType::WriteLooper)) {
+  qEvbPtr_ = evb ? &qEvb_ : nullptr;
+  qEvb_.setBackingEventBase(evb);
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
       return conn_->pacer->getTimeUntilNextWrite();
@@ -79,7 +80,7 @@ void QuicTransportBase::setCongestionControllerFactory(
 }
 
 folly::EventBase* QuicTransportBase::getEventBase() const {
-  return evb_.load();
+  return qEvb_.getBackingEventBase();
 }
 
 const std::shared_ptr<QLogger> QuicTransportBase::getQLogger() const {
@@ -3387,7 +3388,8 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   VLOG(10) << __func__ << " " << *this;
   DCHECK(!getEventBase());
   DCHECK(evb && evb->isInEventBaseThread());
-  evb_ = evb;
+  qEvb_.setBackingEventBase(evb);
+  qEvbPtr_ = &qEvb_;
   if (socket_) {
     socket_->attachEventBase(evb);
   }
@@ -3396,9 +3398,9 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   schedulePathValidationTimeout();
   setIdleTimer();
 
-  readLooper_->attachEventBase(evb);
-  peekLooper_->attachEventBase(evb);
-  writeLooper_->attachEventBase(evb);
+  readLooper_->attachEventBase(&qEvb_);
+  peekLooper_->attachEventBase(&qEvb_);
+  writeLooper_->attachEventBase(&qEvb_);
   updateReadLooper();
   updatePeekLooper();
   updateWriteLooper(false);
@@ -3409,8 +3411,8 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
               SocketObserverInterface::Events::evbEvents>()) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::evbEvents>(
-            [evb](auto observer, auto observed) {
-              observer->evbAttach(observed, evb);
+            [this](auto observer, auto observed) {
+              observer->evbAttach(observed, qEvb_.getBackingEventBase());
             });
   }
 }
@@ -3439,12 +3441,13 @@ void QuicTransportBase::detachEventBase() {
               SocketObserverInterface::Events::evbEvents>()) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::evbEvents>(
-            [evb = evb_.load()](auto observer, auto observed) {
-              observer->evbDetach(observed, evb);
+            [this](auto observer, auto observed) {
+              observer->evbDetach(observed, qEvb_.getBackingEventBase());
             });
   }
 
-  evb_ = nullptr;
+  qEvb_.setBackingEventBase(nullptr);
+  qEvbPtr_ = nullptr;
 }
 
 folly::Optional<LocalErrorCode> QuicTransportBase::setControlStream(

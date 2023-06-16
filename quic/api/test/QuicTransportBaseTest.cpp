@@ -568,12 +568,16 @@ class TestQuicTransport
 class QuicTransportImplTest : public Test {
  public:
   void SetUp() override {
-    evb = std::make_unique<QuicEventBase>();
-    auto socket =
-        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(evb.get());
+    backingEvb = std::make_unique<folly::EventBase>();
+    evb = std::make_unique<QuicEventBase>(backingEvb.get());
+    auto socket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+        backingEvb.get());
     socketPtr = socket.get();
     transport = std::make_shared<TestQuicTransport>(
-        evb.get(), std::move(socket), &connSetupCallback, &connCallback);
+        evb->getBackingEventBase(),
+        std::move(socket),
+        &connSetupCallback,
+        &connCallback);
     auto& conn = *transport->transportConn;
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;
@@ -601,6 +605,7 @@ class QuicTransportImplTest : public Test {
   }
 
  protected:
+  std::unique_ptr<folly::EventBase> backingEvb;
   std::unique_ptr<QuicEventBase> evb;
   NiceMock<MockConnectionSetupCallback> connSetupCallback;
   NiceMock<MockConnectionCallback> connCallback;
@@ -3104,7 +3109,7 @@ TEST_P(QuicTransportImplTestBase, GetLocalAddressUnboundSocket) {
 
 TEST_P(QuicTransportImplTestBase, GetLocalAddressBadSocket) {
   auto badTransport = std::make_shared<TestQuicTransport>(
-      evb.get(), nullptr, &connSetupCallback, &connCallback);
+      evb->getBackingEventBase(), nullptr, &connSetupCallback, &connCallback);
   badTransport->closeWithoutWrite();
   SocketAddress localAddr = badTransport->getLocalAddress();
   EXPECT_FALSE(localAddr.isInitialized());
@@ -4110,36 +4115,50 @@ TEST_P(QuicTransportImplTestBase, ObserverDetachAndAttachEvb) {
   transport->addObserver(obs3.get());
 
   // check the current event base and create a new one
-  EXPECT_EQ(evb.get(), transport->getEventBase());
-  QuicEventBase evb2;
+  EXPECT_EQ(evb->getBackingEventBase(), transport->getEventBase());
+
+  folly::EventBase backingEvb2;
+  QuicEventBase evb2(&backingEvb2);
 
   // Detach the event base evb
-  EXPECT_CALL(*obs1, evbDetach(transport.get(), evb.get())).Times(0);
-  EXPECT_CALL(*obs2, evbDetach(transport.get(), evb.get())).Times(1);
-  EXPECT_CALL(*obs3, evbDetach(transport.get(), evb.get())).Times(1);
+  EXPECT_CALL(*obs1, evbDetach(transport.get(), evb->getBackingEventBase()))
+      .Times(0);
+  EXPECT_CALL(*obs2, evbDetach(transport.get(), evb->getBackingEventBase()))
+      .Times(1);
+  EXPECT_CALL(*obs3, evbDetach(transport.get(), evb->getBackingEventBase()))
+      .Times(1);
   transport->detachEventBase();
   EXPECT_EQ(nullptr, transport->getEventBase());
 
   // Attach a new event base evb2
-  EXPECT_CALL(*obs1, evbAttach(transport.get(), &evb2)).Times(0);
-  EXPECT_CALL(*obs2, evbAttach(transport.get(), &evb2)).Times(1);
-  EXPECT_CALL(*obs3, evbAttach(transport.get(), &evb2)).Times(1);
-  transport->attachEventBase(&evb2);
-  EXPECT_EQ(&evb2, transport->getEventBase());
+  EXPECT_CALL(*obs1, evbAttach(transport.get(), evb2.getBackingEventBase()))
+      .Times(0);
+  EXPECT_CALL(*obs2, evbAttach(transport.get(), evb2.getBackingEventBase()))
+      .Times(1);
+  EXPECT_CALL(*obs3, evbAttach(transport.get(), evb2.getBackingEventBase()))
+      .Times(1);
+  transport->attachEventBase(evb2.getBackingEventBase());
+  EXPECT_EQ(evb2.getBackingEventBase(), transport->getEventBase());
 
   // Detach the event base evb2
-  EXPECT_CALL(*obs1, evbDetach(transport.get(), &evb2)).Times(0);
-  EXPECT_CALL(*obs2, evbDetach(transport.get(), &evb2)).Times(1);
-  EXPECT_CALL(*obs3, evbDetach(transport.get(), &evb2)).Times(1);
+  EXPECT_CALL(*obs1, evbDetach(transport.get(), evb2.getBackingEventBase()))
+      .Times(0);
+  EXPECT_CALL(*obs2, evbDetach(transport.get(), evb2.getBackingEventBase()))
+      .Times(1);
+  EXPECT_CALL(*obs3, evbDetach(transport.get(), evb2.getBackingEventBase()))
+      .Times(1);
   transport->detachEventBase();
   EXPECT_EQ(nullptr, transport->getEventBase());
 
   // Attach the original event base evb
-  EXPECT_CALL(*obs1, evbAttach(transport.get(), evb.get())).Times(0);
-  EXPECT_CALL(*obs2, evbAttach(transport.get(), evb.get())).Times(1);
-  EXPECT_CALL(*obs3, evbAttach(transport.get(), evb.get())).Times(1);
-  transport->attachEventBase(evb.get());
-  EXPECT_EQ(evb.get(), transport->getEventBase());
+  EXPECT_CALL(*obs1, evbAttach(transport.get(), evb->getBackingEventBase()))
+      .Times(0);
+  EXPECT_CALL(*obs2, evbAttach(transport.get(), evb->getBackingEventBase()))
+      .Times(1);
+  EXPECT_CALL(*obs3, evbAttach(transport.get(), evb->getBackingEventBase()))
+      .Times(1);
+  transport->attachEventBase(evb->getBackingEventBase());
+  EXPECT_EQ(evb->getBackingEventBase(), transport->getEventBase());
 
   EXPECT_TRUE(transport->removeObserver(obs1.get()));
   EXPECT_TRUE(transport->removeObserver(obs2.get()));

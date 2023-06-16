@@ -194,7 +194,9 @@ void QuicServerTransport::accept() {
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
   serverConn_->serverHandshakeLayer->initialize(
-      evb_, this, std::make_unique<DefaultAppTokenValidator>(serverConn_));
+      qEvbPtr_.load()->getBackingEventBase(),
+      this,
+      std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
 void QuicServerTransport::writeData() {

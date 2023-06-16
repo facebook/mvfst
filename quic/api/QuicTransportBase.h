@@ -840,7 +840,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    */
   folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
 
-  std::atomic<QuicEventBase*> evb_;
+  std::atomic<QuicEventBase*> qEvbPtr_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
   ConnectionCallback* connCallback_{nullptr};
@@ -988,6 +988,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * additionalCmsgs callback
    */
   void updatePacketProcessorsPrewriteRequests();
+
+ private:
+  QuicEventBase qEvb_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
