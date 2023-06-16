@@ -180,14 +180,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void setTransportSettings(TransportSettings transportSettings);
 
   /**
-   * If the calling application wants to use CCP for CC, it's the
-   * app's responsibility to start an instance of CCP -- this ID
-   * refers to that unique instance of CCP so we (QuicServer) know
-   * how to connect to it.
-   */
-  void setCcpId(uint64_t ccpId);
-
-  /**
    * Tells the server to start rejecting any new connection. The parameter
    * function is stored and evaluated on each new connection before being
    * accepted.
@@ -409,8 +401,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
        QuicVersion::QUIC_V1_ALIAS,
        QuicVersion::QUIC_DRAFT}};
 
-  bool isUsingCCP();
-
   std::atomic<bool> shutdown_{true};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   TransportSettings transportSettings_;
@@ -469,14 +459,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
   folly::AsyncUDPSocket::BindOptions bindOptions_;
-
-#ifdef CCP_ENABLED
-  std::unique_ptr<folly::ScopedEventBaseThread> ccpEvb_;
-#endif
-  // Random number to uniquely identify this instance of quic to ccp
-  // in case there are multiple concurrent instances (e.g. when proxygen is
-  // migrating connections and there are two concurrent instances of proxygen)
-  uint64_t ccpId_{0};
 
   // set by getEventBaseBackend if multishot callback is
   // supprted

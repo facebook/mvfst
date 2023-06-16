@@ -12,15 +12,11 @@
 #include <folly/portability/GFlags.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
-#include <iterator>
-#ifdef CCP_ENABLED
-#include <quic/congestion_control/third_party/ccp/libstartccp.h>
-#endif
-#include <quic/server/CCPReader.h>
 #include <quic/server/QuicReusePortUDPSocketFactory.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
+#include <iterator>
 
 FOLLY_GFLAGS_DEFINE_bool(
     qs_io_uring_use_async_recv,
@@ -235,19 +231,12 @@ void QuicServer::bindWorkersToSocket(
   auto numWorkers = evbs.size();
   CHECK(!initialized_);
   boundAddress_ = address;
-  auto usingCCP = isUsingCCP();
-  if (!usingCCP) {
-    VLOG(2) << "NOT using CCP";
-  }
-  auto ccpInitFailed = false;
   for (size_t i = 0; i < numWorkers; ++i) {
     auto workerEvb = evbs[i];
     workerEvb->runImmediatelyOrRunInEventBaseThreadAndWait(
         [self = this->shared_from_this(),
          workerEvb,
          numWorkers,
-         usingCCP,
-         &ccpInitFailed,
          processId = processId_,
          idx = i] {
           std::lock_guard<std::mutex> guard(self->startMutex_);
@@ -288,37 +277,12 @@ void QuicServer::bindWorkersToSocket(
               self->boundAddress_ = worker->getAddress();
             }
           }
-          if (usingCCP) {
-            auto serverId = self->boundAddress_.getIPAddress().hash() |
-                self->boundAddress_.getPort();
-            try {
-              worker->getCcpReader()->try_initialize(
-                  worker->getEventBase(),
-                  self->ccpId_,
-                  serverId,
-                  worker->getWorkerId());
-              worker->getCcpReader()->connect();
-            } catch (const folly::AsyncSocketException& ex) {
-              // probably means the unix socket failed to bind
-              LOG(ERROR) << "exception while initializing ccp: " << ex.what()
-                         << "\nshutting down...";
-              // TODO also update counters
-              ccpInitFailed = true;
-            } catch (const std::exception& ex) {
-              LOG(ERROR) << "exception initializing ccp: " << ex.what()
-                         << "\nshutting down...";
-              ccpInitFailed = true;
-            }
-          }
           if (idx == (numWorkers - 1)) {
             VLOG(4) << "Initialized all workers in the eventbase";
             self->initialized_ = true;
             self->startCv_.notify_all();
           }
         });
-  }
-  if (usingCCP && ccpInitFailed) {
-    shutdown();
   }
 }
 
@@ -331,14 +295,9 @@ void QuicServer::start() {
     workerPtr_.reset(
         worker, [](auto /* worker */, folly::TLPDestructionMode) {});
   });
-  auto usingCCP = isUsingCCP();
   for (auto& worker : workers_) {
-    worker->getEventBase()->runInEventBaseThread([&worker, usingCCP] {
-      if (usingCCP) {
-        worker->getCcpReader()->start();
-      }
-      worker->start();
-    });
+    worker->getEventBase()->runInEventBaseThread(
+        [&worker] { worker->start(); });
   }
 }
 
@@ -509,13 +468,9 @@ void QuicServer::shutdown(LocalErrorCode error) {
     return;
   }
   shutdown_ = true;
-  auto usingCCP = isUsingCCP();
   for (auto& worker : workers_) {
     worker->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
       worker->shutdownAllConnections(error);
-      if (usingCCP) {
-        worker->getCcpReader()->shutdown();
-      }
       workerPtr_.reset();
     });
     // protecting the erase in map with the mutex since
@@ -624,30 +579,6 @@ void QuicServer::setTransportSettings(TransportSettings transportSettings) {
   runOnAllWorkers([transportSettings](auto worker) mutable {
     worker->setTransportSettings(transportSettings);
   });
-}
-
-void QuicServer::setCcpId(uint64_t ccpId) {
-  ccpId_ = ccpId;
-}
-
-bool QuicServer::isUsingCCP() {
-  auto foundId = ccpId_ != 0;
-#ifdef CCP_ENABLED
-  auto default_is_ccp = transportSettings_.defaultCongestionController ==
-      CongestionControlType::CCP;
-  if (foundId && default_is_ccp) {
-    return true;
-  } else {
-    return false;
-  }
-  return foundId;
-#else
-  if (foundId) {
-    LOG(ERROR)
-        << "found ccp id, but server was not compiled with ccp support. recompile with -DCCP_ENABLED.";
-  }
-  return false;
-#endif
 }
 
 void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {

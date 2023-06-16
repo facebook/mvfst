@@ -14,7 +14,6 @@
 #include <quic/congestion_control/Copa.h>
 #include <quic/congestion_control/Copa2.h>
 #include <quic/congestion_control/NewReno.h>
-#include <quic/congestion_control/QuicCCP.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 
@@ -35,15 +34,6 @@ ServerCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::NewReno:
       congestionController = std::make_unique<NewReno>(conn);
       break;
-    case CongestionControlType::CCP:
-#ifdef CCP_ENABLED
-      congestionController = std::make_unique<CCP>(conn);
-      break;
-#else
-      LOG(ERROR)
-          << "Server CC Factory cannot make CCP (unless recompiled with -DCCP_ENABLED). Falling back to cubic.";
-      FOLLY_FALLTHROUGH;
-#endif
     case CongestionControlType::Cubic:
       congestionController = std::make_unique<Cubic>(conn);
       break;

@@ -392,7 +392,6 @@ constexpr std::string_view kCongestionControlBbrTestingStr = "bbr_testing";
 constexpr std::string_view kCongestionControlCopaStr = "copa";
 constexpr std::string_view kCongestionControlCopa2Str = "copa2";
 constexpr std::string_view kCongestionControlNewRenoStr = "newreno";
-constexpr std::string_view kCongestionControlCcpStr = "ccp";
 constexpr std::string_view kCongestionControlStaticCwndStr = "staticcwnd";
 constexpr std::string_view kCongestionControlNoneStr = "none";
 
@@ -404,7 +403,6 @@ enum class CongestionControlType : uint8_t {
   Copa2,
   BBR,
   BBRTesting,
-  CCP,
   StaticCwnd,
   None,
   // NOTE: MAX should always be at the end

@@ -45,16 +45,6 @@ find_package(Fizz REQUIRED)
 find_package(Glog REQUIRED)
 find_package(Threads)
 
-if(DEFINED CCP_ENABLED)
-    find_package(libccp REQUIRED)
-    set(LIBCCP_LIBRARY libccp::ccp_static)
-    # mvfst implementation of ccp is guarded with ifdef CCP_ENABLED
-    add_compile_definitions(CCP_ENABLED=${CCP_ENABLED})
-    # libccp header files include extern c if __CPLUSPLUS__ is defined
-    add_compile_definitions(__CPLUSPLUS__=1)
-endif()
-
-
 SET(GFLAG_DEPENDENCIES "")
 SET(QUIC_EXTRA_LINK_LIBRARIES "")
 SET(QUIC_EXTRA_INCLUDE_DIRECTORIES "")

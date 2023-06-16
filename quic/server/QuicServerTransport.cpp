@@ -656,12 +656,6 @@ void QuicServerTransport::setBufAccessor(BufAccessor* bufAccessor) {
   conn_->bufAccessor = bufAccessor;
 }
 
-#ifdef CCP_ENABLED
-void QuicServerTransport::setCcpDatapath(struct ccp_datapath* datapath) {
-  serverConn_->ccpDatapath = datapath;
-}
-#endif
-
 const std::shared_ptr<const folly::AsyncTransportCertificate>
 QuicServerTransport::getPeerCertificate() const {
   const auto handshakeLayer = serverConn_->serverHandshakeLayer;
@@ -720,16 +714,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << congestionControlTypeToString(cctype);
         if (cctype == server_conn->congestionController->type()) {
           return;
-        }
-        if (cctype == CongestionControlType::CCP) {
-          bool ccpAvailable = false;
-#ifdef CCP_ENABLED
-          ccpAvailable = server_conn->ccpDatapath != nullptr;
-#endif
-          if (!ccpAvailable) {
-            LOG(ERROR) << "ccp not enabled on this server";
-            return;
-          }
         }
         server_conn->congestionController =
             server_conn->congestionControllerFactory->makeCongestionController(

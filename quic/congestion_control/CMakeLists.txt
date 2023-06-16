@@ -16,7 +16,6 @@ add_library(
   Copa2.cpp
   NewReno.cpp
   QuicCubic.cpp
-  QuicCCP.cpp
   ServerCongestionControllerFactory.cpp
   SimulatedTBF.cpp
   StaticCwndCongestionController.cpp
@@ -50,7 +49,6 @@ target_link_libraries(
   mvfst_exception
   mvfst_state_machine
   mvfst_state_functions
-  ${LIBCCP_LIBRARY}
 )
 
 file(
@@ -71,4 +69,3 @@ install(
 )
 
 add_subdirectory(test)
-add_subdirectory(third_party/ccp)

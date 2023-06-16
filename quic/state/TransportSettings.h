@@ -55,11 +55,6 @@ struct BbrConfig {
   folly::Optional<AckFrequencyConfig> ackFrequencyConfig;
 };
 
-struct CcpConfig {
-  std::string alg_name = "";
-  std::string alg_args = "";
-};
-
 struct DatagramConfig {
   bool enabled{false};
   bool framePerPacket{true};
@@ -209,8 +204,6 @@ struct TransportSettings {
   bool shouldUseRecvmmsgForBatchRecv{false};
   // Config struct for BBR
   BbrConfig bbrConfig;
-  // Config struct for CCP
-  CcpConfig ccpConfig;
   // A packet is considered loss when a packet that's sent later by at least
   // timeReorderingThreshold * RTT is acked by peer.
   DurationRep timeReorderingThreshDividend{

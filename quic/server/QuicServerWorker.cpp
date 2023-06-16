@@ -26,7 +26,6 @@
 #include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 #include <quic/server/AcceptObserver.h>
-#include <quic/server/CCPReader.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/handshake/TokenGenerator.h>
@@ -58,7 +57,6 @@ QuicServerWorker::QuicServerWorker(
       setEventCallback_(ec),
       takeoverPktHandler_(this),
       observerList_(this) {
-  ccpReader_ = std::make_unique<CCPReader>();
   pending0RttData_.setPruneHook(
       [&](auto, auto) { QUIC_STATS(statsCallback_, onZeroRttBufferedPruned); });
 }
@@ -647,9 +645,6 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     if (validNewToken) {
       trans->verifiedClientAddress();
     }
-#ifdef CCP_ENABLED
-    trans->setCcpDatapath(getCcpReader()->getDatapath());
-#endif
     trans->setCongestionControllerFactory(ccFactory_);
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
 
@@ -1179,10 +1174,6 @@ void QuicServerWorker::setHostId(uint32_t hostId) noexcept {
 void QuicServerWorker::setConnectionIdVersion(
     ConnectionIdVersion cidVersion) noexcept {
   cidVersion_ = cidVersion;
-}
-
-CCPReader* QuicServerWorker::getCcpReader() const noexcept {
-  return ccpReader_.get();
 }
 
 void QuicServerWorker::setNewConnectionSocketFactory(

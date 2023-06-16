@@ -33,10 +33,6 @@ DefaultCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::NewReno:
       congestionController = std::make_unique<NewReno>(conn);
       break;
-    case CongestionControlType::CCP:
-      LOG(ERROR)
-          << "Default CC Factory cannot make CCP. Falling back to cubic.";
-      FOLLY_FALLTHROUGH;
     case CongestionControlType::Cubic:
       congestionController = std::make_unique<Cubic>(conn);
       break;

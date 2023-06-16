@@ -27,10 +27,6 @@
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
 
-#ifdef CCP_ENABLED
-#include <ccp/ccp.h>
-#endif
-
 #include <folly/ExceptionWrapper.h>
 #include <folly/IPAddress.h>
 #include <folly/Overload.h>
@@ -152,16 +148,6 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 
   // Sequence number of the last received MAX_PACING_RATE_KNOB_SEQUENCED.
   folly::Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{folly::none};
-
-#ifdef CCP_ENABLED
-  // Pointer to struct that maintains state needed for interacting with libccp.
-  // Once instance of this struct is created for each instance of
-  // QuicServerWorker (but lives in the worker's corresponding CCPReader). We
-  // need to store a pointer to it here, because it needs to be accessible by
-  // the QuicCCP congestion control algorithm, which only has access to the
-  // connection's QuicConnectionStateBase.
-  struct ccp_datapath* ccpDatapath;
-#endif
 
   folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 

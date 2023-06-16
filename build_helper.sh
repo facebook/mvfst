@@ -25,14 +25,13 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -m                                     (optional): Build folly without jemalloc
   -s                                     (optional): Skip installing system package dependencies
   -c                                     (optional): Use ccache
-  -z                                     (optional): enable CCP support
   -f                                     (optional): Skip fetching dependencies (to test local changes)
   -h|?                                               Show this help message
 EOF
 }
 
 FETCH_DEPENDENCIES=true
-while getopts ":hp:i:msczf" arg; do
+while getopts ":hp:i:mscf" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
@@ -48,9 +47,6 @@ while getopts ":hp:i:msczf" arg; do
       ;;
     c)
       MVFST_USE_CCACHE=true
-      ;;
-    z)
-      MVFST_ENABLE_CCP=true
       ;;
     f)
       FETCH_DEPENDENCIES=false
@@ -88,12 +84,10 @@ mkdir -p "$MVFST_BUILD_DIR"
 if [ -z "${INSTALL_PREFIX-}" ]; then
   FOLLY_INSTALL_DIR=$DEPS_DIR
   FIZZ_INSTALL_DIR=$DEPS_DIR
-  LIBCCP_INSTALL_DIR=$DEPS_DIR
   MVFST_INSTALL_DIR=$BWD
 else
   FOLLY_INSTALL_DIR=$INSTALL_PREFIX
   FIZZ_INSTALL_DIR=$INSTALL_PREFIX
-  LIBCCP_INSTALL_DIR=$INSTALL_PREFIX
   MVFST_INSTALL_DIR=$INSTALL_PREFIX
 fi
 
@@ -354,32 +348,6 @@ function detect_platform() {
   echo -e "${COLOR_GREEN}Detected platform: $Platform ${COLOR_OFF}"
 }
 
-function setup_libccp() {
-  LIBCCP_DIR=$DEPS_DIR/libccp
-  LIBCCP_BUILD_DIR=$LIBCCP_DIR/build/
-  if [ ! -d "$LIBCCP_DIR" ] ; then
-    echo -e "${COLOR_GREEN}[ INFO ] Cloning libccp repo ${COLOR_OFF}"
-    git clone https://github.com/ccp-project/libccp "$LIBCCP_DIR"
-  fi
-
-  #synch_dependency_to_commit "$LIBCCP_DIR" "$MVFST_ROOT_DIR/build/deps/github_hashes/libccp-rev.txt"
-
-  echo -e "${COLOR_GREEN}Building libccp ${COLOR_OFF}"
-  mkdir -p "$LIBCCP_BUILD_DIR"
-  cd "$LIBCCP_BUILD_DIR" || exit
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
-    -DBUILD_TESTS=OFF                               \
-    -DCMAKE_PREFIX_PATH="$LIBCCP_INSTALL_DIR"       \
-    -DCMAKE_INSTALL_PREFIX="$LIBCCP_INSTALL_DIR"    \
-    -DCMAKE_CXX_FLAGS=\D__CPLUSPLUS__=1             \
-    ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
-    "$LIBCCP_DIR"
-  make -j "$nproc"
-  make install
-  echo -e "${COLOR_GREEN}libccp is installed ${COLOR_OFF}"
-  cd "$BWD" || exit
-}
-
 function setup_rust() {
   if ! [ -x "$(command -v rustc)" ] || ! [ -x "$(command -v cargo)" ]; then
     echo -e "${COLOR_RED}[ ERROR ] Rust not found (required for CCP support).${COLOR_OFF}\n"
@@ -398,10 +366,6 @@ setup_googletest
 setup_zstd
 setup_folly
 setup_fizz
-if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
-  setup_libccp
-  setup_rust
-fi
 
 
 # build mvfst:
@@ -413,9 +377,6 @@ mvfst_cmake_build_args=(
   -DBUILD_TESTS=On                                \
   ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
 )
-if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
-    mvfst_cmake_build_args+=(-DCCP_ENABLED=TRUE)
-fi
 cmake "${mvfst_cmake_build_args[@]}" ../..
 make -j "$nproc"
 

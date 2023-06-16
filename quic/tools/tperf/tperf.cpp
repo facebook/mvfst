@@ -20,7 +20,6 @@
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/AcceptObserver.h>
-#include <quic/server/QuicCcpThreadLauncher.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
@@ -39,8 +38,7 @@ DEFINE_uint64(
 DEFINE_uint64(writes_per_loop, 44, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 1024 * 1024, "Flow control window size");
 DEFINE_bool(autotune_window, true, "Automatically increase the receive window");
-DEFINE_string(congestion, "cubic", "newreno/cubic/bbr/ccp/none");
-DEFINE_string(ccp_config, "", "Additional args to pass to ccp");
+DEFINE_string(congestion, "cubic", "newreno/cubic/bbr/none");
 DEFINE_bool(pacing, false, "Enable pacing");
 DEFINE_uint64(
     max_pacing_rate,
@@ -138,8 +136,8 @@ class TPerfObserver : public LegacyObserver {
 };
 
 /**
- * A helper accpetor observer that installs life cycle observers to
- * transport upon accpet
+ * A helper acceptor observer that installs life cycle observers to
+ * transport upon accept
  */
 class TPerfAcceptObserver : public AcceptObserver {
  public:
@@ -483,16 +481,6 @@ class TPerfServer {
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
-
-    if (congestionControlType == quic::CongestionControlType::CCP) {
-#ifdef CCP_ENABLED
-      quicCcpThreadLauncher_.start(FLAGS_ccp_config);
-      server_->setCcpId(quicCcpThreadLauncher_.getCcpId());
-#else
-      LOG(ERROR)
-          << "To use CCP you must recompile tperf and all dependencies with -DCCP_ENABLED";
-#endif
-    }
   }
 
   void start() {
@@ -514,7 +502,6 @@ class TPerfServer {
   folly::EventBase eventBase_;
   std::unique_ptr<TPerfAcceptObserver> acceptObserver_;
   std::shared_ptr<quic::QuicServer> server_;
-  quic::QuicCcpThreadLauncher quicCcpThreadLauncher_;
 };
 
 class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
