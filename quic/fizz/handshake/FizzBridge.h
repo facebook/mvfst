@@ -44,13 +44,19 @@ class FizzAead final : public Aead {
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {
-    return fizzAead->decrypt(std::move(ciphertext), associatedData, seqNum);
+    fizz::Aead::AeadOptions options;
+    options.bufferOpt = fizz::Aead::BufferOption::AllowInPlace;
+    return fizzAead->decrypt(
+        std::move(ciphertext), associatedData, seqNum, options);
   }
   folly::Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {
-    return fizzAead->tryDecrypt(std::move(ciphertext), associatedData, seqNum);
+    fizz::Aead::AeadOptions options;
+    options.bufferOpt = fizz::Aead::BufferOption::AllowInPlace;
+    return fizzAead->tryDecrypt(
+        std::move(ciphertext), associatedData, seqNum, options);
   }
   size_t getCipherOverhead() const override {
     return fizzAead->getCipherOverhead();
