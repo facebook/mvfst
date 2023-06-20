@@ -3992,7 +3992,7 @@ TEST_F(QuicTransportTest, SetPacingTimerThenEnablesPacing) {
   TransportSettings transportSettings;
   transportSettings.pacingEnabled = true;
   transport_->setPacingTimer(
-      TimerHighRes::newTimer(&evb_, transportSettings.pacingTimerTickInterval));
+      TimerHighRes::newTimer(&evb_, transportSettings.pacingTimerResolution));
   transport_->setTransportSettings(transportSettings);
   transport_->getConnectionState().canBePaced = true;
   EXPECT_TRUE(isConnectionPaced(transport_->getConnectionState()));
@@ -4881,7 +4881,7 @@ TEST_F(QuicTransportTest, SetMaxPacingRateWithAndWithoutPacing) {
   EXPECT_EQ(LocalErrorCode::PACER_NOT_AVAILABLE, res1.error());
   settings.pacingEnabled = true;
   transport_->setPacingTimer(
-      TimerHighRes::newTimer(&evb_, settings.pacingTimerTickInterval));
+      TimerHighRes::newTimer(&evb_, settings.pacingTimerResolution));
   transport_->setTransportSettings(settings);
   auto res2 = transport_->setMaxPacingRate(125000);
   EXPECT_FALSE(res2.hasError());

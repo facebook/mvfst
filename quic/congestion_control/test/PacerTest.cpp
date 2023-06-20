@@ -20,7 +20,7 @@ namespace test {
 class TokenlessPacerTest : public Test {
  public:
   void SetUp() override {
-    conn.transportSettings.pacingTimerTickInterval = 1us;
+    conn.transportSettings.pacingTickInterval = 1us;
   }
 
  protected:
@@ -122,7 +122,7 @@ TEST_F(TokenlessPacerTest, RttFactor) {
 }
 
 TEST_F(TokenlessPacerTest, ImpossibleToPace) {
-  conn.transportSettings.pacingTimerTickInterval = 1ms;
+  conn.transportSettings.pacingTickInterval = 1ms;
   pacer.setPacingRateCalculator([](const QuicConnectionStateBase& conn,
                                    uint64_t cwndBytes,
                                    uint64_t,
@@ -230,7 +230,7 @@ TEST_F(TokenlessPacerTest, SetMaxPacingRateOnUnlimitedPacer) {
 TEST_F(TokenlessPacerTest, SetZeroPacingRate) {
   auto timestamp = Clock::now();
   // A Zero pacing rate should not result in a divide-by-zero
-  conn.transportSettings.pacingTimerTickInterval = 1000us;
+  conn.transportSettings.pacingTickInterval = 1000us;
   pacer.setPacingRate(0);
   EXPECT_EQ(0, pacer.updateAndGetWriteBatchSize(timestamp));
   EXPECT_EQ(1000, pacer.getTimeUntilNextWrite(timestamp).count());
@@ -239,7 +239,7 @@ TEST_F(TokenlessPacerTest, SetZeroPacingRate) {
 TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsZero) {
   auto timestamp = Clock::now();
   // rtt=0 should not result in a divide-by-zero
-  conn.transportSettings.pacingTimerTickInterval = 1000us;
+  conn.transportSettings.pacingTickInterval = 1000us;
   pacer.refreshPacingRate(100, 0us);
   // Verify burst is writeConnectionDataPacketsLimit and interval is
   // 0us right after writing
@@ -258,7 +258,7 @@ TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsDefault) {
                                    std::chrono::microseconds rtt) {
     return PacingRate::Builder().setInterval(rtt).setBurstSize(cwnd).build();
   });
-  conn.transportSettings.pacingTimerTickInterval = tick;
+  conn.transportSettings.pacingTickInterval = tick;
 
   // rtt=kDefaultMinRTT should result in this update being skipped
   // There should be no pacing. Interval and Burst should use the defaults

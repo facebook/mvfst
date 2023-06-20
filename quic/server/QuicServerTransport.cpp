@@ -1034,7 +1034,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
-        serverConn->transportSettings.pacingTimerTickInterval =
+        serverConn->transportSettings.pacingTickInterval =
             std::chrono::microseconds(val);
         VLOG(3) << "PACING_TIMER_TICK KnobParam received: " << val;
       });

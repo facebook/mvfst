@@ -435,7 +435,7 @@ TEST_F(CopaTest, TestVelocity) {
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   conn.transportSettings.copaUseRttStanding = true;
-  conn.transportSettings.pacingTimerTickInterval = 10ms;
+  conn.transportSettings.pacingTickInterval = 10ms;
   conn.transportSettings.initCwndInMss = 11;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);

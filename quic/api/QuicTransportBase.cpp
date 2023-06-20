@@ -3290,8 +3290,10 @@ void QuicTransportBase::updateCongestionControlSettings(
   conn_->transportSettings.limitedCwndInMss =
       transportSettings.limitedCwndInMss;
   conn_->transportSettings.pacingEnabled = transportSettings.pacingEnabled;
-  conn_->transportSettings.pacingTimerTickInterval =
-      transportSettings.pacingTimerTickInterval;
+  conn_->transportSettings.pacingTickInterval =
+      transportSettings.pacingTickInterval;
+  conn_->transportSettings.pacingTimerResolution =
+      transportSettings.pacingTimerResolution;
   conn_->transportSettings.minBurstPackets = transportSettings.minBurstPackets;
   conn_->transportSettings.copaDeltaParam = transportSettings.copaDeltaParam;
   conn_->transportSettings.copaUseRttStanding =

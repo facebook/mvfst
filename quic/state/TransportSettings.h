@@ -124,9 +124,13 @@ struct TransportSettings {
   bool pacingEnabledFirstFlight{false};
   // The minimum number of packets to burst out during pacing
   uint64_t minBurstPackets{kDefaultMinBurstPackets};
-  // Pacing timer tick interval
-  std::chrono::microseconds pacingTimerTickInterval{
-      kDefaultPacingTimerTickInterval};
+  // This is the smallest interval the pacer will use as its interval.
+  std::chrono::microseconds pacingTickInterval{kDefaultPacingTickInterval};
+  // This is the size of the buckets in the timer triggering the pacing
+  // callbacks. For pacing to work accurately, this should be reasonably smaller
+  // than kDefaultPacingTickInterval.
+  std::chrono::microseconds pacingTimerResolution{
+      kDefaultPacingTimerResolution};
   ZeroRttSourceTokenMatchingPolicy zeroRttSourceTokenMatchingPolicy{
       ZeroRttSourceTokenMatchingPolicy::REJECT_IF_NO_EXACT_MATCH};
   // Scale pacing rate for CC, non-empty indicates override via transport knobs

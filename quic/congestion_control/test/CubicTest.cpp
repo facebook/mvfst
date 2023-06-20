@@ -244,7 +244,7 @@ TEST_F(CubicTest, AppIdle) {
 
 TEST_F(CubicTest, PacingGain) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.transportSettings.pacingTimerTickInterval = 1ms;
+  conn.transportSettings.pacingTickInterval = 1ms;
   auto mockPacer = std::make_unique<MockPacer>();
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);

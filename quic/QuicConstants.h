@@ -377,11 +377,14 @@ constexpr auto kPacketToSendForPTO = 2;
 constexpr uint64_t kDefaultWriteConnectionDataPacketLimit = 5;
 // Minimum number of packets to write per burst in pacing
 constexpr uint64_t kDefaultMinBurstPackets = 5;
-// Default timer tick interval for pacing timer
-// the microsecond timers are accurate to  about 5 usec
-// but the notifications can get delayed if the event loop is busy
-// this is subject to testing but I would suggest a value >= 200usec
-constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
+
+// Default tick interval for pacing timer. This is the smallest interval the
+// pacer will use as its interval.
+constexpr std::chrono::microseconds kDefaultPacingTickInterval{1000};
+// Default pacing timer resolution. This is the size of the buckets in the timer
+// triggering the pacing callbacks. For pacing to work accurately, this should
+// be reasonably smaller than kDefaultPacingTickInterval.
+constexpr std::chrono::microseconds kDefaultPacingTimerResolution{100};
 // Fraction of RTT that is used to limit how long a write function can loop
 constexpr DurationRep kDefaultWriteLimitRttFraction = 25;
 

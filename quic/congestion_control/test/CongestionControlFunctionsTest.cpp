@@ -22,14 +22,14 @@ TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   conn.transportSettings.minBurstPackets = 1;
-  conn.transportSettings.pacingTimerTickInterval = 10ms;
+  conn.transportSettings.pacingTickInterval = 10ms;
   std::chrono::microseconds rtt(1000 * 100);
   auto result =
       calculatePacingRate(conn, 50, conn.transportSettings.minCwndInMss, rtt);
   EXPECT_EQ(10ms, result.interval);
   EXPECT_EQ(5, result.burstSize);
 
-  conn.transportSettings.pacingTimerTickInterval = 1ms;
+  conn.transportSettings.pacingTickInterval = 1ms;
   auto result2 =
       calculatePacingRate(conn, 300, conn.transportSettings.minCwndInMss, rtt);
   EXPECT_EQ(1ms, result2.interval);
@@ -39,7 +39,7 @@ TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
 TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
-  conn.transportSettings.pacingTimerTickInterval = 1ms;
+  conn.transportSettings.pacingTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 100, conn.transportSettings.minCwndInMss, 100ms);
   // 100 ms rtt, 1ms tick interval, 100 mss cwnd, 5 mss min burst -> 5 mss every
@@ -52,7 +52,7 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   conn.transportSettings.minBurstPackets = 1;
-  conn.transportSettings.pacingTimerTickInterval = 1ms;
+  conn.transportSettings.pacingTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 10, conn.transportSettings.minCwndInMss, 100000us);
   EXPECT_EQ(10ms, result.interval);
@@ -63,7 +63,7 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   conn.transportSettings.minBurstPackets = 1;
-  conn.transportSettings.pacingTimerTickInterval = 10ms;
+  conn.transportSettings.pacingTickInterval = 10ms;
   auto result =
       calculatePacingRate(conn, 10, conn.transportSettings.minCwndInMss, 1ms);
   EXPECT_EQ(std::chrono::milliseconds::zero(), result.interval);

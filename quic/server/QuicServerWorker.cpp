@@ -176,7 +176,7 @@ void QuicServerWorker::start() {
   CHECK(socket_);
   if (!pacingTimer_) {
     pacingTimer_ = TimerHighRes::newTimer(
-        evb_.get(), transportSettings_.pacingTimerTickInterval);
+        evb_.get(), transportSettings_.pacingTimerResolution);
   }
   socket_->resumeRead(this);
   VLOG(10) << fmt::format(

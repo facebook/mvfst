@@ -31,7 +31,7 @@ void TokenlessPacer::refreshPacingRate(
       : cwndBytes * 1s / rtt;
   if (targetRateBytesPerSec > maxPacingRateBytesPerSec_) {
     return setPacingRate(maxPacingRateBytesPerSec_);
-  } else if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
+  } else if (rtt < conn_.transportSettings.pacingTickInterval) {
     writeInterval_ = 0us;
     batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
   } else {
@@ -58,14 +58,14 @@ void TokenlessPacer::setPacingRate(uint64_t rateBps) {
 
   if (rateBps == 0) {
     batchSize_ = 0;
-    writeInterval_ = conn_.transportSettings.pacingTimerTickInterval;
+    writeInterval_ = conn_.transportSettings.pacingTickInterval;
   } else {
     batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
     uint64_t interval =
         (batchSize_ * conn_.udpSendPacketLen * 1000000) / rateBps;
     writeInterval_ = std::max(
         std::chrono::microseconds(interval),
-        conn_.transportSettings.pacingTimerTickInterval);
+        conn_.transportSettings.pacingTickInterval);
   }
 
   if (conn_.qLogger) {
@@ -116,7 +116,7 @@ std::chrono::microseconds TokenlessPacer::getTimeUntilNextWrite(
   }
   return std::max(
       writeInterval_ - timeSinceLastWrite,
-      conn_.transportSettings.pacingTimerTickInterval);
+      conn_.transportSettings.pacingTickInterval);
 }
 
 uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {

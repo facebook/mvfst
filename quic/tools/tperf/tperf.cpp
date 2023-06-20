@@ -460,7 +460,7 @@ class TPerfServer {
     settings.defaultCongestionController = congestionControlType;
     settings.pacingEnabled = pacing;
     if (pacing) {
-      settings.pacingTimerTickInterval = 200us;
+      settings.pacingTickInterval = 200us;
       settings.writeLimitRttFraction = 0;
     }
     if (gso) {
@@ -672,7 +672,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     if (congestionControlType_ == quic::CongestionControlType::BBR ||
         congestionControlType_ == CongestionControlType::BBRTesting) {
       settings.pacingEnabled = true;
-      settings.pacingTimerTickInterval = 200us;
+      settings.pacingTickInterval = 200us;
       settings.writeLimitRttFraction = 0;
     }
     if (gso_) {

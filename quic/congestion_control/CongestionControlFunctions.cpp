@@ -28,7 +28,7 @@ PacingRate calculatePacingRate(
     uint64_t cwnd,
     uint64_t minCwndInMss,
     std::chrono::microseconds rtt) {
-  if (conn.transportSettings.pacingTimerTickInterval > rtt) {
+  if (conn.transportSettings.pacingTickInterval > rtt) {
     // We cannot really pace in this case.
     return PacingRate::Builder()
         .setInterval(0us)
@@ -43,10 +43,10 @@ PacingRate calculatePacingRate(
       static_cast<uint64_t>(std::ceil(
           static_cast<double>(cwndInPackets) *
           static_cast<double>(
-              conn.transportSettings.pacingTimerTickInterval.count()) /
+              conn.transportSettings.pacingTickInterval.count()) /
           static_cast<double>(rtt.count()))));
   auto interval = timeMax(
-      conn.transportSettings.pacingTimerTickInterval,
+      conn.transportSettings.pacingTickInterval,
       rtt * burstPerInterval / cwndInPackets);
   return PacingRate::Builder()
       .setInterval(interval)
