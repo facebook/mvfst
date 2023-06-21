@@ -168,8 +168,6 @@ target_link_libraries(
   mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
-  ${LIBCCP_LIBRARY}
-  ${LIBSTARTCCP_LIBRARY}
 )
 
 file(
