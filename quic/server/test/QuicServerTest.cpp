@@ -271,7 +271,7 @@ void QuicServerWorkerTest::createQuicConnectionDuringShedding(
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  RoutingData routingData(HeaderForm::Long, true, false, true, connId, connId);
+  RoutingData routingData(HeaderForm::Long, true, false, connId, connId);
 
   auto data = createData(kMinInitialPacketSize + 10);
   expectConnCreateRefused();
@@ -293,7 +293,7 @@ void QuicServerWorkerTest::createQuicConnection(
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  RoutingData routingData(HeaderForm::Long, true, false, true, connId, connId);
+  RoutingData routingData(HeaderForm::Long, true, false, connId, connId);
 
   auto data = createData(kMinInitialPacketSize + 10);
   MockQuicTransport::Ptr transport = transport_;
@@ -348,7 +348,6 @@ void QuicServerWorkerTest::testSendReset(
 
   RoutingData routingData(
       HeaderForm::Short,
-      false,
       false,
       false,
       shortHeader.getConnectionId(),
@@ -412,8 +411,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       .WillRepeatedly(ReturnRef(kClientAddr));
   auto connId1 = getTestConnectionId(hostId_);
   QuicVersion version = QuicVersion::MVFST;
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, connId1, connId1);
+  RoutingData routingData(HeaderForm::Long, true, false, connId1, connId1);
 
   auto data = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -448,8 +446,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       .WillRepeatedly(ReturnRef(caddr2));
   ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
-  RoutingData routingData2(
-      HeaderForm::Long, true, false, true, connId2, connId2);
+  RoutingData routingData2(HeaderForm::Long, true, false, connId2, connId2);
 
   auto data2 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -469,8 +466,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
   ConnectionId connId3({8, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
-  RoutingData routingData3(
-      HeaderForm::Long, true, false, true, connId3, connId3);
+  RoutingData routingData3(HeaderForm::Long, true, false, connId3, connId3);
   auto data3 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
   worker_->dispatchPacketData(
@@ -505,8 +501,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       .WillRepeatedly(ReturnRef(kClientAddr));
   auto connId1 = getTestConnectionId(hostId_);
   QuicVersion version = QuicVersion::MVFST;
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, connId1, connId1);
+  RoutingData routingData(HeaderForm::Long, true, false, connId1, connId1);
 
   auto data = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -541,8 +536,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       .WillRepeatedly(ReturnRef(caddr2));
   ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
-  RoutingData routingData2(
-      HeaderForm::Long, true, false, true, connId2, connId2);
+  RoutingData routingData2(HeaderForm::Long, true, false, connId2, connId2);
 
   auto data2 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -562,8 +556,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
   ConnectionId connId3({3, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
-  RoutingData routingData3(
-      HeaderForm::Long, true, false, true, connId3, connId3);
+  RoutingData routingData3(HeaderForm::Long, true, false, connId3, connId3);
   auto data3 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
   worker_->dispatchPacketData(
@@ -596,8 +589,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       .WillRepeatedly(ReturnRef(caddr4));
   ConnectionId connId4({4, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
-  RoutingData routingData4(
-      HeaderForm::Long, true, false, true, connId4, connId4);
+  RoutingData routingData4(HeaderForm::Long, true, false, connId4, connId4);
 
   auto data4 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -688,7 +680,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
   RoutingData routingData2(
-      HeaderForm::Short, false, false, false, connId, folly::none);
+      HeaderForm::Short, false, false, connId, folly::none);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
@@ -706,7 +698,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
   RoutingData routingData3(
-      HeaderForm::Short, false, false, false, connId2, folly::none);
+      HeaderForm::Short, false, false, connId2, folly::none);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData3),
@@ -806,7 +798,6 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       HeaderForm::Short,
       false,
       false,
-      false,
       shortHeaderConnId.getConnectionId(),
       folly::none);
   worker_->dispatchPacketData(
@@ -840,7 +831,6 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)));
   RoutingData routingData2(
       HeaderForm::Short,
-      false,
       false,
       false,
       shortHeaderConnId.getConnectionId(),
@@ -879,7 +869,6 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   RoutingData routingData3(
       HeaderForm::Short,
-      false,
       false,
       false,
       shortHeaderConnId2.getConnectionId(),
@@ -928,7 +917,6 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
       HeaderForm::Long,
       true,
       false,
-      true,
       header.getDestinationConnId(),
       header.getSourceConnId());
   worker_->dispatchPacketData(
@@ -1089,12 +1077,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   auto packet = packetToBuf(std::move(builder).buildPacket());
   // To force dropping path, set initial to false
   RoutingData routingData(
-      HeaderForm::Long,
-      false /* isInitial */,
-      false,
-      true /* isUsingClientCid */,
-      dstConnId,
-      srcConnId);
+      HeaderForm::Long, false /* isInitial */, false, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
 
   EXPECT_CALL(*rawConnIdAlgo, canParseNonConst(_)).WillOnce(Return(true));
@@ -1131,8 +1114,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
     writeFrame(PaddingFrame(), builder);
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
+  RoutingData routingData(HeaderForm::Long, true, false, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
@@ -1160,8 +1142,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
     writeFrame(PaddingFrame(), builder);
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
-  RoutingData routingData(
-      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
+  RoutingData routingData(HeaderForm::Long, true, false, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
@@ -1508,7 +1489,7 @@ class QuicServerWorkerRetryTest : public QuicServerWorkerTest {
     }
     auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
     RoutingData routingData(
-        HeaderForm::Long, true, false, true, dstConnId, clientSrcConnId);
+        HeaderForm::Long, true, false, dstConnId, clientSrcConnId);
     worker_->dispatchPacketData(
         clientAddr,
         std::move(routingData),
@@ -2287,7 +2268,6 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
         HeaderForm::Long,
         true,
         false,
-        true,
         header.getDestinationConnId(),
         header.getSourceConnId());
     server_->routeDataToWorker(
@@ -2335,7 +2315,6 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
       HeaderForm::Long,
       true,
       false,
-      true,
       header.getDestinationConnId(),
       header.getSourceConnId());
 

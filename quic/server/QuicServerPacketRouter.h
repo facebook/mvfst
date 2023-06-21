@@ -35,13 +35,16 @@ struct RoutingData {
   HeaderForm headerForm;
   bool isInitial;
   bool is0Rtt;
-  bool isUsingClientConnId;
+  // true if destinationConnId below was randomly chosen by the client (for 0rtt
+  // or initial packets), or issued by server after processing 0rtt/initial
+  const bool clientChosenDcid;
 
   // The destination connection id is the connection id picked by the
   // server for non initial packets and the sourceConnId is the one chosen
   // by the peer.
   ConnectionId destinationConnId;
 
+  //
   // Source connection may not be present for short header packets.
   folly::Optional<ConnectionId> sourceConnId;
 
@@ -49,13 +52,12 @@ struct RoutingData {
       HeaderForm headerFormIn,
       bool isInitialIn,
       bool is0RttIn,
-      bool isUsingClientConnIdIn,
       ConnectionId destinationConnIdIn,
       folly::Optional<ConnectionId> sourceConnIdIn)
       : headerForm(headerFormIn),
         isInitial(isInitialIn),
         is0Rtt(is0RttIn),
-        isUsingClientConnId(isUsingClientConnIdIn),
+        clientChosenDcid(isInitial || is0Rtt),
         destinationConnId(std::move(destinationConnIdIn)),
         sourceConnId(std::move(sourceConnIdIn)) {}
 };

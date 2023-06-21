@@ -420,7 +420,6 @@ void QuicServerWorker::handleNetworkData(
             headerForm,
             false, /* isInitial */
             false, /* is0Rtt */
-            false, /* isUsingClientConnId */
             std::move(maybeParsedShortHeader->destinationConnId),
             folly::none);
         return forwardNetworkData(
@@ -437,7 +436,6 @@ void QuicServerWorker::handleNetworkData(
       LongHeader::Types longHeaderType = parseLongHeaderType(initialByte);
       bool isInitial = longHeaderType == LongHeader::Types::Initial;
       bool is0Rtt = longHeaderType == LongHeader::Types::ZeroRtt;
-      bool isUsingClientConnId = isInitial || is0Rtt;
       auto& invariant = maybeParsedLongHeader->invariant;
 
       if (isInitial) {
@@ -450,7 +448,8 @@ void QuicServerWorker::handleNetworkData(
         return;
       }
 
-      if (!isUsingClientConnId &&
+      bool isClientChosenDcid = isInitial || is0Rtt;
+      if (!isClientChosenDcid &&
           invariant.dstConnId.size() < kMinSelfConnectionIdV1Size) {
         // drop packet if connId is present but is not valid.
         VLOG(3) << "Dropping packet due to invalid connectionId";
@@ -461,7 +460,6 @@ void QuicServerWorker::handleNetworkData(
           headerForm,
           isInitial,
           is0Rtt,
-          isUsingClientConnId,
           std::move(invariant.dstConnId),
           std::move(invariant.srcConnId));
       return forwardNetworkData(
@@ -584,7 +582,7 @@ void QuicServerWorker::forwardNetworkData(
     bool isForwardedData) {
   // if it's not Client initial or ZeroRtt, AND if the connectionId version
   // mismatches: foward if pktForwarding is enabled else dropPacket
-  if (!routingData.isUsingClientConnId &&
+  if (!routingData.clientChosenDcid &&
       !connIdAlgo_->canParse(routingData.destinationConnId)) {
     if (packetForwardingEnabled_ && !isForwardedData) {
       VLOG(3) << fmt::format(

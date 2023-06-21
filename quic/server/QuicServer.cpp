@@ -400,7 +400,7 @@ void QuicServer::routeDataToWorker(
   // Without this, when (bpf / kernel) hash and userspace hash get out of sync
   // (e.g. due to shuffling of sockets in the hash ring), it results in
   // very high amount of 'misses'
-  if (routingData.isUsingClientConnId && workerPtr_) {
+  if (routingData.clientChosenDcid && workerPtr_) {
     CHECK(workerPtr_->getEventBase()->isInEventBaseThread());
     workerPtr_->dispatchPacketData(
         client,
