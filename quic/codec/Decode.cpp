@@ -840,20 +840,22 @@ QuicFrame parseFrame(
     throw QuicTransportException(
         "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  queue.trimStart(cursor - queue.front());
+  queue.trimStart(frameTypeInt->second);
   bool consumedQueue = false;
   bool error = false;
   SCOPE_EXIT {
     if (consumedQueue || error) {
       return;
     }
-    queue.trimStart(cursor - queue.front());
+    if (!queue.empty()) {
+      queue.trimStart(cursor - queue.front());
+    }
   };
-  cursor.reset(queue.front());
+  // trimStart() may have free'd the IOBuf;
+  folly::IOBuf emptyBuf{};
+  cursor.reset(queue.empty() ? &emptyBuf : queue.front());
   FrameType frameType = static_cast<FrameType>(frameTypeInt->first);
-  try
-
-  {
+  try {
     switch (frameType) {
       case FrameType::PADDING:
         return QuicFrame(decodePaddingFrame(cursor));

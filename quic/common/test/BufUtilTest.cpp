@@ -187,6 +187,15 @@ TEST(BufQueue, TrimStartAtMost) {
   checkConsistency(queue);
 }
 
+TEST(BufQueue, TrimStartOneByte) {
+  BufQueue queue;
+  queue.append(IOBuf::copyBuffer(SCL("H")));
+  checkConsistency(queue);
+  queue.trimStart(1);
+  checkConsistency(queue);
+  EXPECT_TRUE(queue.front() == nullptr);
+}
+
 TEST(BufQueue, CloneBufNull) {
   BufQueue queue;
   auto buf = queue.clone();
