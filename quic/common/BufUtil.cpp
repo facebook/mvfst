@@ -10,54 +10,51 @@
 namespace quic {
 
 Buf BufQueue::splitAtMost(size_t len) {
-  Buf result;
   folly::IOBuf* current = chain_.get();
-  if (current == nullptr) {
-    DCHECK_EQ(chainLength_, 0);
+  // empty queue / requested 0 bytes
+  if (current == nullptr || len == 0) {
     return folly::IOBuf::create(0);
   }
-  size_t remaining = len;
-  while (remaining != 0) {
-    if (current->length() < remaining) {
-      remaining -= current->length();
-    } else {
-      Buf clone;
-      if (remaining < current->length()) {
-        clone = current->cloneOne();
-        clone->trimStart(remaining);
-      }
-      current->trimEnd(current->length() - remaining);
-      remaining = 0;
-      auto next = current->next();
-      if (next == chain_.get()) {
-        result = std::move(chain_);
-      } else {
-        auto chain = chain_.release();
-        result = next->separateChain(chain, current);
-        if (clone) {
-          clone->prependChain(std::unique_ptr<folly::IOBuf>(next));
-        } else {
-          clone = std::unique_ptr<folly::IOBuf>(next);
-        }
-      }
-      chain_ = std::move(clone);
+  // entire chain requested
+  if (len >= chainLength_) {
+    return move();
+  }
+
+  chainLength_ -= len;
+  Buf result;
+  /**
+   * Find the last IOBuf containing range requested. This will definitively
+   * terminate without looping back to chain_ since we know chainLength_ > len.
+   */
+  while (len != 0) {
+    if (current->length() > len) {
       break;
     }
+    len -= current->length();
     current = current->next();
-    if (current == chain_.get()) {
-      break;
+  }
+
+  if (len == 0) {
+    // edge case if last chunk ended exactly "len" bytes; we know this can't be
+    // the last IOBuf in the list since otherwise len >= chainLength_
+    result = current->separateChain(chain_.get(), current->prev());
+  } else {
+    // clone current node and remove overlap b/n result & chain_
+    result = current->cloneOne();
+    result->trimEnd(current->length() - len);
+    current->trimStart(len);
+
+    // if current isn't head node, move all prior nodes into result
+    if (current != chain_.get()) {
+      result->appendToChain(
+          current->separateChain(chain_.get(), current->prev()));
+      result = Buf(result.release()->next());
     }
   }
-  if (remaining > 0) {
-    // We did not find all the data we needed, so we are going to consume the
-    // entire chain instead.
-    result = std::move(chain_);
-  }
-  chainLength_ -= (len - remaining);
+  // update chain_
+  chain_.release();
+  chain_ = std::unique_ptr<folly::IOBuf>(current);
   DCHECK_EQ(chainLength_, chain_ ? chain_->computeChainDataLength() : 0);
-  if (result == nullptr) {
-    return folly::IOBuf::create(0);
-  }
   return result;
 }
 

@@ -82,35 +82,46 @@ TEST(BufQueue, Split) {
   checkConsistency(queue);
   EXPECT_EQ(1, prefix->computeChainDataLength());
   EXPECT_EQ(11, queue.front()->computeChainDataLength());
+  EXPECT_EQ(prefix->to<std::string>(), "H");
+
   prefix = queue.splitAtMost(2);
   checkConsistency(queue);
   EXPECT_EQ(2, prefix->computeChainDataLength());
   EXPECT_EQ(9, queue.front()->computeChainDataLength());
+  EXPECT_EQ(prefix->to<std::string>(), "el");
+
   prefix = queue.splitAtMost(3);
   checkConsistency(queue);
   EXPECT_EQ(3, prefix->computeChainDataLength());
   EXPECT_EQ(6, queue.front()->computeChainDataLength());
+  EXPECT_EQ(prefix->to<std::string>(), "lo,");
+
   prefix = queue.splitAtMost(1);
   checkConsistency(queue);
   EXPECT_EQ(1, prefix->computeChainDataLength());
   EXPECT_EQ(5, queue.front()->computeChainDataLength());
+  EXPECT_EQ(prefix->to<std::string>(), " ");
+
   prefix = queue.splitAtMost(5);
   checkConsistency(queue);
   EXPECT_EQ(5, prefix->computeChainDataLength());
   EXPECT_EQ((IOBuf*)nullptr, queue.front());
+  EXPECT_EQ(prefix->to<std::string>(), "World");
 
   queue.append(IOBuf::copyBuffer(SCL("Hello,")));
+  checkConsistency(queue);
   prefix = queue.splitAtMost(3);
+  checkConsistency(queue);
   EXPECT_EQ(3, prefix->computeChainDataLength());
   EXPECT_EQ(3, queue.chainLength());
-  checkConsistency(queue);
+  EXPECT_EQ(prefix->to<std::string>(), "Hel");
 
   queue.append(IOBuf::copyBuffer(SCL(" World")));
   checkConsistency(queue);
-
   prefix = queue.splitAtMost(13);
   EXPECT_EQ(9, prefix->computeChainDataLength());
   EXPECT_EQ(0, queue.chainLength());
+  EXPECT_EQ(prefix->to<std::string>(), "lo, World");
   checkConsistency(queue);
 }
 
