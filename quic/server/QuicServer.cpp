@@ -116,11 +116,6 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
         nullptr,
         "");
     workerEvbs_.push_back(std::move(scopedEvb));
-    if (evbObserver_) {
-      workerEvbs_.back()->getEventBase()->runInEventBaseThreadAndWait([&] {
-        workerEvbs_.back()->getEventBase()->setObserver(evbObserver_);
-      });
-    }
     auto workerEvb = workerEvbs_.back()->getEventBase();
     evbs.push_back(workerEvb);
   }

@@ -425,7 +425,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // factory used to create specific instance of Congestion control algorithm
   std::shared_ptr<CongestionControllerFactory> ccFactory_;
 
-  std::shared_ptr<folly::EventBaseObserver> evbObserver_;
   folly::Optional<std::string> healthCheckToken_;
   // vector of all the listening fds on each quic server worker
   std::vector<int> listeningFDs_;
