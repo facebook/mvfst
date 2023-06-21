@@ -22,6 +22,10 @@ FOLLY_GFLAGS_DEFINE_bool(
     qs_io_uring_use_async_recv,
     true,
     "io_uring backend use async recv");
+FOLLY_GFLAGS_DEFINE_int32(
+    qs_conn_id_version,
+    0,
+    "connection id format version quic server used for encoding. only non-zero version is honored");
 
 namespace quic {
 namespace {
@@ -49,6 +53,11 @@ QuicServer::QuicServer() {
   listenerSocketFactory_ = std::make_unique<QuicReusePortUDPSocketFactory>();
 #endif
   socketFactory_ = std::make_unique<QuicSharedUDPSocketFactory>();
+  if (FLAGS_qs_conn_id_version) {
+    // only set cidVersion_ if gflag is non-zero. otherwise,
+    // cidVersion_ is V1 by default
+    cidVersion_ = (ConnectionIdVersion)FLAGS_qs_conn_id_version;
+  }
 }
 
 void QuicServer::setQuicServerTransportFactory(
@@ -522,7 +531,12 @@ void QuicServer::setHostId(uint32_t hostId) noexcept {
 void QuicServer::setConnectionIdVersion(
     ConnectionIdVersion cidVersion) noexcept {
   CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
-  cidVersion_ = cidVersion;
+  if (FLAGS_qs_conn_id_version) {
+    LOG(ERROR) << "Connection Id Version has been set to " << (int)cidVersion_
+               << " by --qs_conn_id_version from the command line.";
+  } else {
+    cidVersion_ = cidVersion;
+  }
 }
 
 void QuicServer::setTransportSettingsOverrideFn(

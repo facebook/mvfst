@@ -25,6 +25,8 @@
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
+FOLLY_GFLAGS_DECLARE_int32(qs_conn_id_version);
+
 namespace quic {
 
 class QuicServer : public QuicServerWorker::WorkerCallback,
