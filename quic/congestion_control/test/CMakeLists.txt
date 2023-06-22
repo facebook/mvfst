@@ -13,6 +13,7 @@ quic_add_test(TARGET CongestionControllerTests
   BbrBandwidthSamplerTest.cpp
   BbrRttSamplerTest.cpp
   BbrTest.cpp
+  Bbr2Test.cpp
   CongestionControlFunctionsTest.cpp
   CopaTest.cpp
   CubicHystartTest.cpp
