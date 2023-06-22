@@ -18,6 +18,8 @@ std::string_view congestionControlTypeToString(CongestionControlType type) {
       return kCongestionControlCubicStr;
     case CongestionControlType::BBR:
       return kCongestionControlBbrStr;
+    case CongestionControlType::BBR2:
+      return kCongestionControlBbr2Str;
     case CongestionControlType::BBRTesting:
       return kCongestionControlBbrTestingStr;
     case CongestionControlType::Copa:
@@ -41,6 +43,8 @@ std::optional<CongestionControlType> congestionControlStrToType(
     std::string_view str) {
   if (str == kCongestionControlCubicStr) {
     return quic::CongestionControlType::Cubic;
+  } else if (str == kCongestionControlBbr2Str) {
+    return quic::CongestionControlType::BBR2;
   } else if (str == kCongestionControlBbrStr) {
     return quic::CongestionControlType::BBR;
   } else if (str == kCongestionControlBbrTestingStr) {

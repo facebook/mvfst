@@ -21,6 +21,10 @@ struct BbrStats {
   uint8_t state;
 };
 
+struct Bbr2Stats {
+  uint8_t state;
+};
+
 struct CopaStats {
   double deltaParam;
   bool useRttStanding;
@@ -34,6 +38,7 @@ struct CubicStats {
 
 union CongestionControllerStats {
   struct BbrStats bbrStats;
+  struct Bbr2Stats bbr2Stats;
   struct CopaStats copaStats;
   struct CubicStats cubicStats;
 };

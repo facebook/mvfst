@@ -8,6 +8,7 @@
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 
 #include <quic/congestion_control/Bbr.h>
+#include <quic/congestion_control/Bbr2.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/BbrRttSampler.h>
 #include <quic/congestion_control/BbrTesting.h>
@@ -53,6 +54,11 @@ ServerCongestionControllerFactory::makeCongestionController(
       auto bbr = std::make_unique<BbrTestingCongestionController>(conn);
       setupBBR(bbr.get());
       congestionController = std::move(bbr);
+      break;
+    }
+    case CongestionControlType::BBR2: {
+      auto bbr2 = std::make_unique<Bbr2CongestionController>(conn);
+      congestionController = std::move(bbr2);
       break;
     }
     case CongestionControlType::StaticCwnd: {

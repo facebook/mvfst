@@ -24,22 +24,28 @@ struct Bandwidth {
   uint64_t units{0};
   std::chrono::microseconds interval{0us};
   UnitType unitType{UnitType::BYTES};
+  bool isAppLimited{false};
 
   explicit Bandwidth()
       : units(0), interval(std::chrono::microseconds::zero()) {}
 
   explicit Bandwidth(
       uint64_t unitsDelievered,
-      std::chrono::microseconds deliveryInterval)
-      : units(unitsDelievered), interval(deliveryInterval) {}
+      std::chrono::microseconds deliveryInterval,
+      bool appLimited = false)
+      : units(unitsDelievered),
+        interval(deliveryInterval),
+        isAppLimited(appLimited) {}
 
   explicit Bandwidth(
       uint64_t unitsDelievered,
       std::chrono::microseconds deliveryInterval,
-      UnitType unitTypeIn)
+      UnitType unitTypeIn,
+      bool appLimited = false)
       : units(unitsDelievered),
         interval(deliveryInterval),
-        unitType(unitTypeIn) {}
+        unitType(unitTypeIn),
+        isAppLimited(appLimited) {}
 
   explicit operator bool() const noexcept {
     return units != 0 && interval != 0us;
@@ -94,6 +100,9 @@ bool operator<=(const Bandwidth& lhs, const Bandwidth& rhs);
 bool operator>(const Bandwidth& lhs, const Bandwidth& rhs);
 bool operator>=(const Bandwidth& lhs, const Bandwidth& rhs);
 bool operator==(const Bandwidth& lhs, const Bandwidth& rhs);
+
+template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+Bandwidth operator*(T t, const Bandwidth& bandwidth) noexcept;
 
 uint64_t operator*(std::chrono::microseconds delay, const Bandwidth& bandwidth);
 std::ostream& operator<<(std::ostream& os, const Bandwidth& bandwidth);

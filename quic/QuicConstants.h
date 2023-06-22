@@ -282,6 +282,7 @@ enum class LocalErrorCode : uint32_t {
   CWND_OVERFLOW = 0x40000007,
   INFLIGHT_BYTES_OVERFLOW = 0x40000008,
   LOST_BYTES_OVERFLOW = 0x40000009,
+  CONGESTION_CONTROL_ERROR = 0x4000000A,
   // This is a retryable error. When encountering this error,
   // the user should retry the request.
   NEW_VERSION_NEGOTIATED = 0x4000000A,
@@ -391,6 +392,7 @@ constexpr DurationRep kDefaultWriteLimitRttFraction = 25;
 // Congestion control:
 constexpr std::string_view kCongestionControlCubicStr = "cubic";
 constexpr std::string_view kCongestionControlBbrStr = "bbr";
+constexpr std::string_view kCongestionControlBbr2Str = "bbr2";
 constexpr std::string_view kCongestionControlBbrTestingStr = "bbr_testing";
 constexpr std::string_view kCongestionControlCopaStr = "copa";
 constexpr std::string_view kCongestionControlCopa2Str = "copa2";
@@ -405,6 +407,7 @@ enum class CongestionControlType : uint8_t {
   Copa,
   Copa2,
   BBR,
+  BBR2,
   BBRTesting,
   StaticCwnd,
   None,
