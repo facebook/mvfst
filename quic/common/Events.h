@@ -10,6 +10,8 @@
 #include <folly/io/async/EventBase.h>
 #include <functional>
 
+FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
+
 namespace quic {
 
 class QuicEventBase {
