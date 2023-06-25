@@ -59,9 +59,45 @@ Buf BufQueue::splitAtMost(size_t len) {
 }
 
 size_t BufQueue::trimStartAtMost(size_t amount) {
-  auto oldChainLength = chainLength_;
-  splitAtMost(amount);
-  return oldChainLength - chainLength_;
+  auto original = amount;
+  folly::IOBuf* current = chain_.get();
+  if (current == nullptr || amount == 0) {
+    return 0;
+  }
+  while (amount > 0) {
+    if (current->length() >= amount) {
+      current->trimStart(amount);
+      amount = 0;
+      break;
+    }
+    amount -= current->length();
+    current = current->next();
+    if (current == chain_.get()) {
+      break;
+    }
+  }
+  auto prev = current->prev();
+  /** We are potentially in 2 states here,
+   * 1. we found the entire amount
+   * 2. or we did not.
+   * If we did not find the entire amount, then current ==
+   * chain and we can remove the entire chain.
+   * If we did, then we can split from the chain head to the previous buffer and
+   * then keep the current buffer.
+   */
+  if (prev != current && current != chain_.get()) {
+    auto chain = chain_.release();
+    current->separateChain(chain, prev);
+    chain_ = std::unique_ptr<folly::IOBuf>(current);
+  } else if (amount > 0) {
+    DCHECK_EQ(current, chain_.get());
+    chain_ = nullptr;
+  }
+  size_t trimmed = original - amount;
+  DCHECK_GE(chainLength_, trimmed);
+  chainLength_ -= trimmed;
+  DCHECK(chainLength_ == 0 || !chain_->empty());
+  return trimmed;
 }
 
 // TODO replace users with trimStartAtMost
