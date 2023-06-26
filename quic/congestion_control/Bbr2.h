@@ -50,6 +50,8 @@ class Bbr2CongestionController : public CongestionController {
 
   FOLLY_NODISCARD bool isAppLimited() const override;
 
+  FOLLY_NODISCARD folly::Optional<Bandwidth> getBandwidth() const override;
+
   void setAppLimited() noexcept override;
 
   void getStats(CongestionControllerStats& /*stats*/) const override;
@@ -189,20 +191,11 @@ class Bbr2CongestionController : public CongestionController {
   float pacingGain_{1.0};
   float cwndGain_{1.0};
 
-  // ProbeBW
-  enum class AckPhase : uint8_t {
-    ProbeStopping = 0,
-    ProbeStarting = 1,
-    ProbeRefilling = 2,
-    ProbeFeedback = 3,
-  };
-
   uint64_t probeUpCount_{0};
   TimePoint probeBWCycleStart_;
   uint64_t roundsSinceBwProbe_;
   std::chrono::milliseconds bwProbeWait_;
   uint64_t bwProbeSamples_;
-  AckPhase ackPhase_;
   uint64_t probeUpRounds_{0};
   uint64_t probeUpAcks_{0};
 };

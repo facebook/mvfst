@@ -197,6 +197,10 @@ bool Bbr2CongestionController::isInBackgroundMode() const {
   return false;
 }
 
+folly::Optional<Bandwidth> Bbr2CongestionController::getBandwidth() const {
+  return bandwidth_;
+}
+
 bool Bbr2CongestionController::isAppLimited() const {
   return appLimited_;
 }
@@ -531,15 +535,11 @@ void Bbr2CongestionController::adaptUpperBounds(
     uint64_t ackedBytes,
     uint64_t inflightBytesAtLargestAckedPacket,
     uint64_t lostBytes) {
-  /* Track ACK state and update BBR.max_bw window and
+  /* Advance probeBw round if necessary and update BBR.max_bw window and
    * BBR.inflight_hi and BBR.bw_hi. */
-  if (ackPhase_ == AckPhase::ProbeStarting && roundStart_) {
-    /* starting to get bw probing samples */
-    ackPhase_ = AckPhase::ProbeFeedback;
-  }
-  if (ackPhase_ == AckPhase::ProbeStopping && roundStart_) {
+  if (state_ == State::ProbeBw_Down && roundStart_) {
     /* end of samples from bw probing phase */
-    if (isProbeBwState(state_) && !isAppLimited()) {
+    if (!isAppLimited()) {
       cycleCount_++;
     }
   }
@@ -679,7 +679,6 @@ void Bbr2CongestionController::checkProbeRtt(uint64_t ackedBytes) {
     enterProbeRtt();
     saveCwnd();
     probeRttDoneTimestamp_.reset();
-    ackPhase_ = AckPhase::ProbeStopping;
     startRound();
   }
   if (state_ == State::ProbeRTT) {
@@ -813,7 +812,6 @@ void Bbr2CongestionController::startProbeBwDown() {
   bwProbeWait_ = std::chrono::milliseconds(2 + folly::Random::rand32() % 1000);
 
   probeBWCycleStart_ = Clock::now();
-  ackPhase_ = AckPhase::ProbeStopping;
   state_ = State::ProbeBw_Down;
   pacingGain_ = kProbeBwDownPacingGain;
   startRound();
@@ -827,13 +825,11 @@ void Bbr2CongestionController::startProbeBwRefill() {
   resetLowerBounds();
   probeUpRounds_ = 0;
   probeUpAcks_ = 0;
-  ackPhase_ = AckPhase::ProbeRefilling;
   state_ = State::ProbeBw_Refill;
   pacingGain_ = kProbeBwRefillPacingGain;
   startRound();
 }
 void Bbr2CongestionController::startProbeBwUp() {
-  ackPhase_ = AckPhase::ProbeStarting;
   probeBWCycleStart_ = Clock::now();
   state_ = State::ProbeBw_Up;
   pacingGain_ = kProbeBwUpPacingGain;
