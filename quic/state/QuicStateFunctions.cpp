@@ -260,9 +260,14 @@ PacketNum getNextPacketNum(
 
 void increaseNextPacketNum(
     QuicConnectionStateBase& conn,
-    PacketNumberSpace pnSpace) noexcept {
-  getAckState(conn, pnSpace).nextPacketNum++;
-  if (getAckState(conn, pnSpace).nextPacketNum == kMaxPacketNumber - 1) {
+    PacketNumberSpace pnSpace,
+    bool dsrPacket) noexcept {
+  auto& ackState = getAckState(conn, pnSpace);
+  ackState.nextPacketNum++;
+  if (!dsrPacket) {
+    ackState.nonDsrPacketSequenceNumber++;
+  }
+  if (ackState.nextPacketNum == kMaxPacketNumber) {
     conn.pendingEvents.closeTransport = true;
   }
 }

@@ -190,6 +190,8 @@ struct OutstandingPacket {
   // by transport directly.
   bool isDSRPacket{false};
 
+  folly::Optional<uint64_t> nonDsrPacketSequenceNumber;
+
   /**
    * Whether the packet is sent when congestion controller is in app-limited
    * state.

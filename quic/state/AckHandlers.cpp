@@ -447,6 +447,8 @@ AckEvent processAckFrame(
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(
                 outstandingPacket.packet.header.getPacketSequenceNum())
+            .setNonDsrPacketSequenceNumber(
+                outstandingPacket.nonDsrPacketSequenceNumber.value_or(0))
             .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
             .setDetailsPerStream(std::move(detailsPerStream))
             .setLastAckedPacketInfo(

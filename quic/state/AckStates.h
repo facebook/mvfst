@@ -30,6 +30,8 @@ struct AckState : WriteAckFrameState {
   folly::Optional<PacketNum> largestReceivedAtLastCloseSent;
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
+  // Incremented for each non-DSR packet.
+  uint64_t nonDsrPacketSequenceNumber{0};
   uint64_t reorderThreshold{0};
   folly::Optional<uint64_t> tolerance;
   folly::Optional<uint64_t> ackFrequencySequenceNumber;

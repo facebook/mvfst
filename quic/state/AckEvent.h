@@ -174,6 +174,7 @@ struct AckEvent {
   struct AckPacket {
     // Sequence number of previously outstanding (now acked) packet
     quic::PacketNum packetNum;
+    uint64_t nonDsrPacketSequenceNumber{0};
 
     // Metadata of the previously outstanding (now acked) packet
     OutstandingPacketMetadata outstandingPacketMetadata;
@@ -297,6 +298,8 @@ struct AckEvent {
 
     struct Builder {
       Builder&& setPacketNum(quic::PacketNum packetNumIn);
+      Builder&& setNonDsrPacketSequenceNumber(
+          uint64_t nonDsrPacketSequenceNumberIn);
       Builder&& setOutstandingPacketMetadata(
           OutstandingPacketMetadata&& outstandingPacketMetadataIn);
       Builder&& setDetailsPerStream(DetailsPerStream&& detailsPerStreamIn);
@@ -312,6 +315,7 @@ struct AckEvent {
 
      private:
       folly::Optional<quic::PacketNum> packetNum;
+      folly::Optional<uint64_t> nonDsrPacketSequenceNumber;
       folly::Optional<OutstandingPacketMetadata> outstandingPacketMetadata;
       folly::Optional<DetailsPerStream> detailsPerStream;
       folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
@@ -323,6 +327,7 @@ struct AckEvent {
    private:
     explicit AckPacket(
         quic::PacketNum packetNumIn,
+        uint64_t nonDsrPacketSequenceNumberIn,
         OutstandingPacketMetadata&& outstandingPacketMetadataIn,
         DetailsPerStream&& detailsPerStreamIn,
         folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>

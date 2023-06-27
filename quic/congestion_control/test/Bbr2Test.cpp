@@ -96,8 +96,9 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
   // Send 10 packets. All get sent at once 10 ms into the connection
   for (int i = 0; i < 10; i++) {
     auto packet = makeTestingWritePacket(
-        pn++, packetSize, totalSent += packetSize, testStart_ + 10ms);
+        pn, packetSize, totalSent += packetSize, testStart_ + 10ms);
     bbr2.onPacketSent(packet);
+    packet.nonDsrPacketSequenceNumber = pn++;
     conn_->outstandings.packets.emplace_back(std::move(packet));
     ASSERT_EQ(conn_->lossState.inflightBytes, totalSent);
   }
@@ -123,6 +124,8 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
     auto ackPkt =
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(pkt.getPacketSequenceNum())
+            .setNonDsrPacketSequenceNumber(
+                pkt.nonDsrPacketSequenceNumber.value())
             .setOutstandingPacketMetadata(std::move(pkt.metadata))
             .setLastAckedPacketInfo(std::move(pkt.lastAckedPacketInfo))
             .setAppLimited(pkt.isAppLimited)

@@ -96,7 +96,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
       TimePoint time,
       folly::Optional<PacketEvent> associatedEvent,
       PacketType packetType,
-      folly::Optional<uint16_t> forcedSize = folly::none);
+      folly::Optional<uint16_t> forcedSize = folly::none,
+      bool isDsr = false);
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
     auto conn = std::make_unique<QuicServerConnectionState>(
@@ -104,8 +105,11 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->ackStates.initialAckState->nextPacketNum = 1;
+    conn->ackStates.initialAckState->nonDsrPacketSequenceNumber = 1;
     conn->ackStates.handshakeAckState->nextPacketNum = 1;
+    conn->ackStates.handshakeAckState->nonDsrPacketSequenceNumber = 1;
     conn->ackStates.appDataAckState.nextPacketNum = 1;
+    conn->ackStates.appDataAckState.nonDsrPacketSequenceNumber = 1;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
@@ -186,7 +190,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     TimePoint time,
     folly::Optional<PacketEvent> associatedEvent,
     PacketType packetType,
-    folly::Optional<uint16_t> forcedSize) {
+    folly::Optional<uint16_t> forcedSize,
+    bool isDsr) {
   folly::Optional<PacketHeader> header;
   bool isHandshake = false;
   switch (packetType) {
@@ -294,7 +299,12 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   }
   conn.outstandings.packets.emplace_back(std::move(outstandingPacket));
   conn.lossState.largestSent = getNextPacketNum(conn, packetNumberSpace);
-  increaseNextPacketNum(conn, packetNumberSpace);
+  increaseNextPacketNum(conn, packetNumberSpace, isDsr);
+  conn.outstandings.packets.back().isDSRPacket = isDsr;
+  if (!isDsr) {
+    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
+        getAckState(conn, packetNumberSpace).nonDsrPacketSequenceNumber - 1;
+  }
   conn.pendingEvents.setLossDetectionAlarm = true;
   return conn.lossState.largestSent.value();
 }
@@ -1786,6 +1796,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
+          .setNonDsrPacketSequenceNumber(1)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               currentTime + 12s /* sentTime */,
               0 /* encodedSize */,
@@ -1821,6 +1832,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
+          .setNonDsrPacketSequenceNumber(1)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               currentTime + 4s /* sentTime */,
               0 /* encodedSize */,
@@ -1855,6 +1867,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
+          .setNonDsrPacketSequenceNumber(1)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               currentTime + 12s /* sentTime */,
               0 /* encodedSize */,
@@ -2467,7 +2480,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
     lostPacket.push_back(packetNum);
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        true);
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
@@ -2510,6 +2529,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
+          .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -2559,7 +2579,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
     lostPacket.push_back(packetNum);
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        true);
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
@@ -2594,6 +2620,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(0)
+          .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -2631,7 +2658,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
     lostPacket.push_back(packetNum);
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        true);
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
@@ -2676,6 +2709,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(20)
+          .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -2684,6 +2718,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(19)
+          .setNonDsrPacketSequenceNumber(19 - 6)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -2754,6 +2789,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
+          .setNonDsrPacketSequenceNumber(9)
           .setDetailsPerStream(std::move(detailsPerStream))
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -2825,6 +2861,7 @@ TEST_F(
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
+          .setNonDsrPacketSequenceNumber(9)
           .setDetailsPerStream(std::move(detailsPerStream))
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -2833,6 +2870,7 @@ TEST_F(
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(0)
+          .setNonDsrPacketSequenceNumber(0)
           .setOutstandingPacketMetadata(std::move(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
                   ->metadata))
@@ -2873,7 +2911,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
     lostPacket.push_back(packetNum);
   };
   for (int i = 0; i < 4; ++i) {
-    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        true);
   }
   // Add some DSR frames and build the ACK
   auto ack = AckEvent::Builder()
@@ -2899,6 +2943,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
       ack.ackedPackets.emplace_back(
           CongestionController::AckEvent::AckPacket::Builder()
               .setPacketNum(op.packet.header.getPacketSequenceNum())
+              .setNonDsrPacketSequenceNumber(0)
               .setDetailsPerStream(std::move(detailsPerStream))
               .setOutstandingPacketMetadata(std::move(op.metadata))
               .build());
@@ -2909,17 +2954,26 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
   }
   // Add another non-DSR burst and ACK all of them
   for (int i = 0; i < 4; ++i) {
-    sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        false);
     auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
     ack.ackedPackets.emplace_back(
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(op.packet.header.getPacketSequenceNum())
+            .setNonDsrPacketSequenceNumber(
+                op.nonDsrPacketSequenceNumber.value())
             .setDetailsPerStream({})
             .setOutstandingPacketMetadata(std::move(op.metadata))
             .build());
   }
   // Add one more DSR packet from the same stream, ACKed
-  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  sendPacket(
+      *conn, Clock::now(), folly::none, PacketType::OneRtt, folly::none, true);
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame f{0, 10, 100, false, true, folly::none, 5};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
@@ -2930,6 +2984,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(op.packet.header.getPacketSequenceNum())
+          .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
           .setOutstandingPacketMetadata(std::move(op.metadata))
           .build());
@@ -2959,6 +3014,121 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
       conn->outstandings.packets.end(),
       [](auto& op) { return op.declaredLost; });
   // The DSR packet before the burst shouldn't be lost.
+  EXPECT_EQ(0, numDeclaredLost);
+}
+
+TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
+  std::vector<PacketNum> lostPacket;
+  auto conn = createConn();
+
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
+      .WillRepeatedly(Return());
+
+  auto testingLossMarkFunc = [&lostPacket](auto& /*conn*/, auto& packet, bool) {
+    auto packetNum = packet.header.getPacketSequenceNum();
+    lostPacket.push_back(packetNum);
+  };
+  for (int i = 0; i < 4; ++i) {
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        false);
+  }
+  // Add some non-DSR frames and build the ACK
+  auto ack = AckEvent::Builder()
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(9)
+                 .setIsImplicitAck(false)
+                 .setAckTime(Clock::now())
+                 .setAdjustedAckTime(Clock::now())
+                 .setAckDelay(0us)
+                 .build();
+  for (auto& op : conn->outstandings.packets) {
+    WriteStreamFrame f{0, 10, 100, false, false, folly::none, 0};
+    AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+    if (op.packet.header.getPacketSequenceNum() != 4) {
+      detailsPerStream.recordFrameDelivered(f, false);
+      ack.ackedPackets.emplace_back(
+          CongestionController::AckEvent::AckPacket::Builder()
+              .setPacketNum(op.packet.header.getPacketSequenceNum())
+              .setNonDsrPacketSequenceNumber(
+                  op.nonDsrPacketSequenceNumber.value())
+              .setDetailsPerStream(std::move(detailsPerStream))
+              .setOutstandingPacketMetadata(std::move(op.metadata))
+              .build());
+    }
+    op.packet.frames.emplace_back(f);
+  }
+  // Add a DSR burst and ACK all of them
+  for (int i = 0; i < 4; ++i) {
+    sendPacket(
+        *conn,
+        Clock::now(),
+        folly::none,
+        PacketType::OneRtt,
+        folly::none,
+        true);
+    auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
+    WriteStreamFrame f{
+        4, 10, 100, false, true, folly::none, conn->outstandings.dsrCount++};
+    AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+    detailsPerStream.recordFrameDelivered(f, false);
+    ack.ackedPackets.emplace_back(
+        CongestionController::AckEvent::AckPacket::Builder()
+            .setPacketNum(op.packet.header.getPacketSequenceNum())
+            .setNonDsrPacketSequenceNumber(0)
+            .setDetailsPerStream(std::move(detailsPerStream))
+            .setOutstandingPacketMetadata(std::move(op.metadata))
+            .build());
+    op.packet.frames.emplace_back(f);
+    op.isDSRPacket = true;
+  }
+  // Add one more non-DSR packet from the same stream, ACKed
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame f{0, 10, 100, false, false, folly::none, 0};
+  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+  detailsPerStream.recordFrameDelivered(f, false);
+  op.packet.frames.emplace_back(f);
+  ack.ackedPackets.emplace_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(op.packet.header.getPacketSequenceNum())
+          .setNonDsrPacketSequenceNumber(op.nonDsrPacketSequenceNumber.value())
+          .setDetailsPerStream(std::move(detailsPerStream))
+          .setOutstandingPacketMetadata(std::move(op.metadata))
+          .build());
+
+  ASSERT_EQ(9, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  // ACK everything that isn't packet 4.
+  auto itr = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  while (itr != conn->outstandings.packets.end()) {
+    if (itr->packet.header.getPacketSequenceNum() != 4) {
+      itr = conn->outstandings.packets.erase(itr);
+      conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
+    } else {
+      itr++;
+    }
+  }
+  auto lossEvent = detectLossPackets(
+      *conn,
+      10,
+      testingLossMarkFunc,
+      TimePoint(90ms),
+      PacketNumberSpace::AppData,
+      &ack);
+  EXPECT_FALSE(lossEvent.has_value());
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  // The non-DSR packet before the burst shouldn't be lost.
   EXPECT_EQ(0, numDeclaredLost);
 }
 

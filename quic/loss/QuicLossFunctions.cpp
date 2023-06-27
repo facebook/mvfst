@@ -322,7 +322,6 @@ bool processOutstandingsForLoss(
         // non-DSR ACKed. If there were no non-DSR ACKed, we shouldn't
         // declare reorder loss.
         if (largestDsrAcked.empty()) {
-          CHECK(*largestNonDsrAcked == largestAcked);
           return largestNonDsrAcked.value();
         } else {
           return largestNonDsrAcked.value_or(currentPacketNum);
@@ -331,8 +330,12 @@ bool processOutstandingsForLoss(
     }();
 
     // Use the translated virtual number for the current packet if it's a DSR
-    // packet.
-    currentPacketNum = maybeCurrentStreamPacketIdx.value_or(currentPacketNum);
+    // packet, or the non DSR sequence number otherwise.
+    if (maybeCurrentStreamPacketIdx.has_value()) {
+      currentPacketNum = *maybeCurrentStreamPacketIdx;
+    } else if (pkt.nonDsrPacketSequenceNumber.has_value()) {
+      currentPacketNum = pkt.nonDsrPacketSequenceNumber.value();
+    }
     // The max ensures that we don't overflow on the subtraction if the largest
     // ACKed is smaller.
     largestAckedForComparison =
@@ -446,20 +449,22 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
                   largestDsrAcked, stream, *details.streamPacketIdx),
               *details.streamPacketIdx);
         } else {
-          largestNonDsrAcked =
-              std::max(largestNonDsrAcked.value_or(0), ackPacket.packetNum);
+          largestNonDsrAcked = std::max(
+              largestNonDsrAcked.value_or(0),
+              ackPacket.nonDsrPacketSequenceNumber);
         }
       }
       // If there are no streams, then it's not a DSR packet.
       if (ackPacket.detailsPerStream.empty()) {
-        largestNonDsrAcked =
-            std::max(largestNonDsrAcked.value_or(0), ackPacket.packetNum);
+        largestNonDsrAcked = std::max(
+            largestNonDsrAcked.value_or(0),
+            ackPacket.nonDsrPacketSequenceNumber);
       }
     }
   }
   // This covers the case where there's no ackedPackets.
-  if (largestDsrAcked.empty()) {
-    largestNonDsrAcked = largestAcked;
+  if (largestDsrAcked.empty() && largestAcked.has_value()) {
+    largestNonDsrAcked = largestNonDsrAcked.value_or(largestAcked.value());
   }
 
   bool shouldSetTimer = false;

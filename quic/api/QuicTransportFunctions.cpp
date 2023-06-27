@@ -823,7 +823,12 @@ void updateConnection(
     }
   }
 
-  increaseNextPacketNum(conn, packetNumberSpace);
+  // This increments the next packet number and (potentially) the next non-DSR
+  // packet sequence number. Capture the non DSR sequence number before
+  // increment.
+  auto nonDsrPacketSequenceNumber =
+      getAckState(conn, packetNumberSpace).nonDsrPacketSequenceNumber;
+  increaseNextPacketNum(conn, packetNumberSpace, isDSRPacket);
   conn.lossState.largestSent =
       std::max(conn.lossState.largestSent.value_or(packetNum), packetNum);
   // updateConnection may be called multiple times during write. If before or
@@ -905,6 +910,10 @@ void updateConnection(
   if (isDSRPacket) {
     ++conn.outstandings.dsrCount;
     QUIC_STATS(conn.statsCallback, onDSRPacketSent, encodedSize);
+  } else {
+    // If it's not a DSR packet, set the sequence number to the previous one,
+    // as the state currently is the _next_ one after this packet.
+    pkt.nonDsrPacketSequenceNumber = nonDsrPacketSequenceNumber;
   }
 
   if (conn.congestionController) {

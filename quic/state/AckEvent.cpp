@@ -67,6 +67,7 @@ void AckEvent::AckPacket::DetailsPerStream::recordDeliveryOffsetUpdate(
 
 AckEvent::AckPacket::AckPacket(
     quic::PacketNum packetNumIn,
+    uint64_t nonDsrPacketSequenceNumberIn,
     OutstandingPacketMetadata&& outstandingPacketMetadataIn,
     DetailsPerStream&& detailsPerStreamIn,
     folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
@@ -74,6 +75,7 @@ AckEvent::AckPacket::AckPacket(
     bool isAppLimitedIn,
     folly::Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec)
     : packetNum(packetNumIn),
+      nonDsrPacketSequenceNumber(nonDsrPacketSequenceNumberIn),
       outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
       detailsPerStream(std::move(detailsPerStreamIn)),
       lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
@@ -83,6 +85,13 @@ AckEvent::AckPacket::AckPacket(
 AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setPacketNum(
     quic::PacketNum packetNumIn) {
   packetNum = packetNumIn;
+  return std::move(*this);
+}
+
+AckEvent::AckPacket::Builder&&
+AckEvent::AckPacket::Builder::setNonDsrPacketSequenceNumber(
+    uint64_t nonDsrPacketSequenceNumberIn) {
+  nonDsrPacketSequenceNumber = nonDsrPacketSequenceNumberIn;
   return std::move(*this);
 }
 
@@ -127,6 +136,7 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
   CHECK(detailsPerStream.has_value());
   return AckEvent::AckPacket(
       packetNum.value(),
+      nonDsrPacketSequenceNumber.value(),
       std::move(outstandingPacketMetadata.value()),
       std::move(detailsPerStream.value()),
       std::move(lastAckedPacketInfo),

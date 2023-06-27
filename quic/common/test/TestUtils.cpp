@@ -553,6 +553,7 @@ CongestionController::AckEvent makeAck(
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(seq)
+          .setNonDsrPacketSequenceNumber(seq)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               sentTime,
               ackedSize /* encodedSize */,
@@ -699,6 +700,8 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacketWrapper outstandingPacket) {
   return CongestionController::AckEvent::AckPacket::Builder()
       .setPacketNum(outstandingPacket.packet.header.getPacketSequenceNum())
+      .setNonDsrPacketSequenceNumber(
+          outstandingPacket.packet.header.getPacketSequenceNum())
       .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
       .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
       .setAppLimited(outstandingPacket.isAppLimited)

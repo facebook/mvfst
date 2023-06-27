@@ -1228,7 +1228,7 @@ TEST_F(QuicStateFunctionsTest, EarliestLossTimer) {
 
 TEST_P(QuicStateFunctionsTest, CloseTranportStateChange) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
-  getAckState(conn, GetParam()).nextPacketNum = kMaxPacketNumber - 2;
+  getAckState(conn, GetParam()).nextPacketNum = kMaxPacketNumber - 1;
   EXPECT_FALSE(conn.pendingEvents.closeTransport);
   increaseNextPacketNum(conn, GetParam());
   EXPECT_TRUE(conn.pendingEvents.closeTransport);
