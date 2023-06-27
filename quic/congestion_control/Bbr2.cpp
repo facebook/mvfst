@@ -919,5 +919,6 @@ std::string bbr2StateToString(Bbr2CongestionController::State state) {
     case Bbr2CongestionController::State::ProbeRTT:
       return "ProbeRTT";
   }
+  folly::assume_unreachable();
 }
 } // namespace quic

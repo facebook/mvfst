@@ -968,8 +968,7 @@ class QuicSocket {
   struct ByteEvent {
     enum class Type { ACK = 1, TX = 2 };
     static constexpr std::array<Type, 2> kByteEventTypes = {
-        Type::ACK,
-        Type::TX};
+        {Type::ACK, Type::TX}};
 
     StreamId id{0};
     uint64_t offset{0};

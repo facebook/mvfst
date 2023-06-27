@@ -123,6 +123,7 @@ bool isUnprotectedPacketFrameInvalid(const QuicFrame& quicFrame) {
     case QuicFrame::Type::QuicSimpleFrame:
       return true;
   }
+  folly::assume_unreachable();
 }
 
 bool isZeroRttPacketSimpleFrameInvalid(const QuicSimpleFrame& quicSimpleFrame) {
@@ -140,6 +141,7 @@ bool isZeroRttPacketSimpleFrameInvalid(const QuicSimpleFrame& quicSimpleFrame) {
     case QuicSimpleFrame::Type::NewTokenFrame:
       return false;
   }
+  folly::assume_unreachable();
 }
 
 bool isZeroRttPacketFrameInvalid(const QuicFrame& quicFrame) {
@@ -165,6 +167,7 @@ bool isZeroRttPacketFrameInvalid(const QuicFrame& quicFrame) {
     case QuicFrame::Type::QuicSimpleFrame:
       return isZeroRttPacketSimpleFrameInvalid(*quicFrame.asQuicSimpleFrame());
   }
+  folly::assume_unreachable();
 }
 } // namespace
 
