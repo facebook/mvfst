@@ -369,18 +369,19 @@ struct WriteCryptoFrame {
 };
 
 struct NewTokenFrame {
-  std::string token;
+  Buf token;
 
-  explicit NewTokenFrame(std::string tokenIn) {
-    token = std::move(tokenIn);
-  }
+  explicit NewTokenFrame(Buf tokenIn) : token(std::move(tokenIn)) {}
 
   NewTokenFrame(const NewTokenFrame& other) {
-    token = other.token;
+    if (other.token) {
+      token = other.token->clone();
+    }
   }
 
   bool operator==(const NewTokenFrame& rhs) const {
-    return token == rhs.token;
+    folly::IOBufEqualTo eq;
+    return eq(token, rhs.token);
   }
 };
 

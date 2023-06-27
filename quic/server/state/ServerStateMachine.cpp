@@ -464,10 +464,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
       auto encryptedToken = generator.encryptToken(token);
       CHECK(encryptedToken.has_value());
 
-      std::string encryptedTokenStr =
-          encryptedToken.value()->moveToFbString().toStdString();
-
-      sendSimpleFrame(conn, NewTokenFrame(std::move(encryptedTokenStr)));
+      sendSimpleFrame(conn, NewTokenFrame(std::move(encryptedToken.value())));
       QUIC_STATS(conn.statsCallback, onNewTokenIssued);
 
       conn.sentNewTokenFrame = true;

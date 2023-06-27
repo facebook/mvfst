@@ -3561,7 +3561,7 @@ TEST_F(
       server->getConn().supportedVersions[0]);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
-  writeSimpleFrame(NewTokenFrame("token!"), builder);
+  writeSimpleFrame(NewTokenFrame(IOBuf::copyBuffer("token!")), builder);
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
@@ -4143,9 +4143,9 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
 
   auto clientReadNewTokenFrame = clientParsedFrame->asReadNewTokenFrame();
 
-  auto serverToken = serverWriteNewTokenFrame.second[0]->token;
-  auto clientToken =
-      clientReadNewTokenFrame->token->moveToFbString().toStdString();
+  auto serverToken =
+      serverWriteNewTokenFrame.second[0]->token->to<std::string>();
+  auto clientToken = clientReadNewTokenFrame->token->to<std::string>();
 
   EXPECT_EQ(clientToken, serverToken);
   loopForWrites();

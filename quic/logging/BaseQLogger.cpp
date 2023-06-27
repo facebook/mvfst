@@ -73,8 +73,9 @@ void addQuicSimpleFrameToEvent(
     }
     case quic::QuicSimpleFrame::Type::NewTokenFrame: {
       const quic::NewTokenFrame& frame = *simpleFrame.asNewTokenFrame();
+      auto tokenHexStr = folly::hexlify(frame.token->coalesce());
       event->frames.push_back(
-          std::make_unique<quic::NewTokenFrameLog>(frame.token));
+          std::make_unique<quic::NewTokenFrameLog>(tokenHexStr));
       break;
     }
   }
