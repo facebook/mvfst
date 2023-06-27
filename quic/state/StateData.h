@@ -13,7 +13,6 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
-#include <quic/common/WindowedCounter.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
 #include <quic/handshake/HandshakeLayer.h>

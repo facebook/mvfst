@@ -5,7 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <quic/common/WindowedCounter.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
