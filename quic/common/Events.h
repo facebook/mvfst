@@ -8,49 +8,56 @@
 #pragma once
 
 #include <folly/io/async/EventBase.h>
+#include <quic/common/QuicEventBaseInterface.h>
 #include <functional>
 
 FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
 
 namespace quic {
 
-class QuicEventBase {
+class QuicEventBase : public QuicEventBaseInterface<
+                          folly::EventBase::LoopCallback,
+                          folly::EventBase,
+                          folly::AsyncTimeout,
+                          folly::HHWheelTimer> {
  public:
   QuicEventBase() = default;
   explicit QuicEventBase(folly::EventBase* evb) : backingEvb_(evb) {}
-  virtual ~QuicEventBase() = default;
+  ~QuicEventBase() override = default;
 
   using LoopCallback = folly::EventBase::LoopCallback;
 
-  void setBackingEventBase(folly::EventBase* evb);
+  void setBackingEventBase(folly::EventBase* evb) override;
 
-  [[nodiscard]] folly::EventBase* getBackingEventBase() const;
+  [[nodiscard]] folly::EventBase* getBackingEventBase() const override;
 
-  void runInLoop(LoopCallback* callback, bool thisIteration = false);
+  void runInLoop(
+      folly::EventBase::LoopCallback* callback,
+      bool thisIteration = false) override;
 
-  void runInLoop(std::function<void()> cb, bool thisIteration = false);
+  void runInLoop(std::function<void()> cb, bool thisIteration = false) override;
 
-  void runAfterDelay(std::function<void()> cb, uint32_t milliseconds);
+  void runAfterDelay(std::function<void()> cb, uint32_t milliseconds) override;
 
-  void runInEventBaseThreadAndWait(std::function<void()> fn) noexcept;
+  void runInEventBaseThreadAndWait(std::function<void()> fn) noexcept override;
 
-  [[nodiscard]] bool isInEventBaseThread() const;
+  [[nodiscard]] bool isInEventBaseThread() const override;
 
   bool scheduleTimeoutHighRes(
       folly::AsyncTimeout* obj,
-      std::chrono::microseconds timeout);
+      std::chrono::microseconds timeout) override;
 
-  folly::HHWheelTimer& timer();
+  folly::HHWheelTimer& timer() override;
 
-  bool loopOnce(int flags = 0);
+  bool loopOnce(int flags = 0) override;
 
-  bool loop();
+  bool loop() override;
 
-  void loopForever();
+  void loopForever() override;
 
-  bool loopIgnoreKeepAlive();
+  bool loopIgnoreKeepAlive() override;
 
-  void terminateLoopSoon();
+  void terminateLoopSoon() override;
 
  private:
   folly::EventBase* backingEvb_{nullptr};
