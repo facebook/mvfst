@@ -982,7 +982,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         bool parseSuccess = false;
         try {
           parseSuccess = folly::split(
-              ",",
+              ',',
               val,
               ackFrequencyConfig.ackElicitingThreshold,
               ackFrequencyConfig.reorderingThreshold,
@@ -1047,7 +1047,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         bool incremental;
         bool parseSuccess = false;
         try {
-          parseSuccess = folly::split(",", val, level, incremental);
+          parseSuccess = folly::split(',', val, level, incremental);
         } catch (std::exception&) {
           parseSuccess = false;
         }

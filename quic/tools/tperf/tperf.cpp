@@ -554,7 +554,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       std::ostringstream os;
       bytesPerStreamHistogram_.toTSV(os);
       std::vector<std::string> lines;
-      folly::split("\n", os.str(), lines);
+      folly::split('\n', os.str(), lines);
       for (const auto& line : lines) {
         LOG(INFO) << line;
       }
