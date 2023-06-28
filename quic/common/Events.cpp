@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#ifndef MVFST_USE_LIBEV
+
 #include <quic/common/Events.h>
 
 namespace quic {
@@ -71,3 +73,5 @@ void QuicEventBase::terminateLoopSoon() {
 }
 
 } // namespace quic
+
+#endif // !MVFST_USE_LIBEV
