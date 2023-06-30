@@ -19,24 +19,32 @@ FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
 
 namespace quic {
 
+#ifdef MVFST_USE_LIBEV
+#else
+using QuicEventBaseLoopCallback = folly::EventBase::LoopCallback;
+using QuicBackingEventBase = folly::EventBase;
+using QuicAsyncTimeout = folly::AsyncTimeout;
+using QuicHHWheelTimer = folly::HHWheelTimer;
+#endif
+
 class QuicEventBase : public QuicEventBaseInterface<
-                          folly::EventBase::LoopCallback,
-                          folly::EventBase,
-                          folly::AsyncTimeout,
-                          folly::HHWheelTimer> {
+                          QuicEventBaseLoopCallback,
+                          QuicBackingEventBase,
+                          QuicAsyncTimeout,
+                          QuicHHWheelTimer> {
  public:
   QuicEventBase() = default;
-  explicit QuicEventBase(folly::EventBase* evb) : backingEvb_(evb) {}
+  explicit QuicEventBase(QuicBackingEventBase* evb) : backingEvb_(evb) {}
   ~QuicEventBase() override = default;
 
-  using LoopCallback = folly::EventBase::LoopCallback;
+  using LoopCallback = QuicEventBaseLoopCallback;
 
-  void setBackingEventBase(folly::EventBase* evb) override;
+  void setBackingEventBase(QuicBackingEventBase* evb) override;
 
-  [[nodiscard]] folly::EventBase* getBackingEventBase() const override;
+  [[nodiscard]] QuicBackingEventBase* getBackingEventBase() const override;
 
   void runInLoop(
-      folly::EventBase::LoopCallback* callback,
+      QuicEventBaseLoopCallback* callback,
       bool thisIteration = false) override;
 
   void runInLoop(std::function<void()> cb, bool thisIteration = false) override;
@@ -48,10 +56,10 @@ class QuicEventBase : public QuicEventBaseInterface<
   [[nodiscard]] bool isInEventBaseThread() const override;
 
   bool scheduleTimeoutHighRes(
-      folly::AsyncTimeout* obj,
+      QuicAsyncTimeout* obj,
       std::chrono::microseconds timeout) override;
 
-  folly::HHWheelTimer& timer() override;
+  QuicHHWheelTimer& timer() override;
 
   bool loopOnce(int flags = 0) override;
 
@@ -64,7 +72,7 @@ class QuicEventBase : public QuicEventBaseInterface<
   void terminateLoopSoon() override;
 
  private:
-  folly::EventBase* backingEvb_{nullptr};
+  QuicBackingEventBase* backingEvb_{nullptr};
 };
 
 } // namespace quic

@@ -11,15 +11,17 @@
 
 namespace quic {
 
-void QuicEventBase::setBackingEventBase(folly::EventBase* evb) {
+void QuicEventBase::setBackingEventBase(QuicBackingEventBase* evb) {
   backingEvb_ = evb;
 }
 
-folly::EventBase* QuicEventBase::getBackingEventBase() const {
+QuicBackingEventBase* QuicEventBase::getBackingEventBase() const {
   return backingEvb_;
 }
 
-void QuicEventBase::runInLoop(LoopCallback* callback, bool thisIteration) {
+void QuicEventBase::runInLoop(
+    QuicEventBaseLoopCallback* callback,
+    bool thisIteration) {
   return backingEvb_->runInLoop(callback, thisIteration);
 }
 
@@ -43,12 +45,12 @@ bool QuicEventBase::isInEventBaseThread() const {
 }
 
 bool QuicEventBase::scheduleTimeoutHighRes(
-    folly::AsyncTimeout* obj,
+    QuicAsyncTimeout* obj,
     std::chrono::microseconds timeout) {
   return backingEvb_->scheduleTimeoutHighRes(obj, timeout);
 }
 
-folly::HHWheelTimer& QuicEventBase::timer() {
+QuicHHWheelTimer& QuicEventBase::timer() {
   return backingEvb_->timer();
 }
 
