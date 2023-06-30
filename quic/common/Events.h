@@ -7,11 +7,15 @@
 
 #pragma once
 
+#ifdef MVFST_USE_LIBEV
+#include <ev.h>
+#else
 #include <folly/io/async/EventBase.h>
+FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
+#endif
+
 #include <quic/common/QuicEventBaseInterface.h>
 #include <functional>
-
-FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
 
 namespace quic {
 

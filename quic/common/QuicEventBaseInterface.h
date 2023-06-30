@@ -7,6 +7,10 @@
 
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+
 namespace quic {
 
 template <
