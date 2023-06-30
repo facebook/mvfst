@@ -24,12 +24,14 @@ class BatchWriter {
     }
   }
 
+#ifndef MVFST_USE_LIBEV
   void setSock(folly::AsyncUDPSocket* sock) {
     if (sock && !evb_.getBackingEventBase()) {
       fd_ = ::dup(sock->getNetworkSocket().toFd());
       evb_.setBackingEventBase(sock->getEventBase());
     }
   }
+#endif
 
   FOLLY_NODISCARD QuicEventBase* evb() {
     return &evb_;
@@ -194,6 +196,7 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
 };
 
+#ifndef MVFST_USE_LIBEV
 class SendmmsgGSOPacketBatchWriter : public BatchWriter {
  public:
   explicit SendmmsgGSOPacketBatchWriter(size_t maxBufs);
@@ -244,6 +247,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
 
   folly::F14FastMap<folly::SocketAddress, Index> addrMap_;
 };
+#endif
 
 struct BatchWriterDeleter {
   void operator()(BatchWriter* batchWriter);

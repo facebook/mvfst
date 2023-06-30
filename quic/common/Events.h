@@ -8,6 +8,8 @@
 #pragma once
 
 #ifdef MVFST_USE_LIBEV
+#include <quic/common/EventsMobile.h>
+
 #include <ev.h>
 #else
 #include <folly/io/async/EventBase.h>
