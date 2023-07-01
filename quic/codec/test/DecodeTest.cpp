@@ -602,6 +602,29 @@ TEST_F(DecodeTest, StreamIncorrectDataLength) {
   EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
 }
 
+TEST_F(DecodeTest, StreamNoRemainingData) {
+  // assume after parsing the frame type (stream frame), there was no remaining
+  // data
+  quic::Buf buf = folly::IOBuf::copyBuffer("test");
+  BufQueue queue(std::move(buf));
+  queue.trimStartAtMost(4);
+
+  const auto streamType =
+      StreamTypeField(static_cast<uint8_t>(FrameType::STREAM));
+  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
+}
+
+TEST_F(DecodeTest, DatagramNoRemainingData) {
+  // assume after parsing the frame type (datagram frame), there was no
+  // remaining data
+  quic::Buf buf = folly::IOBuf::copyBuffer("test");
+  BufQueue queue(std::move(buf));
+  queue.trimStartAtMost(4);
+
+  // invalid len
+  EXPECT_THROW(decodeDatagramFrame(queue, true), QuicTransportException);
+}
+
 std::unique_ptr<folly::IOBuf> CreateMaxStreamsIdFrame(
     unsigned long long maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = folly::IOBuf::create(sizeof(QuicInteger));
