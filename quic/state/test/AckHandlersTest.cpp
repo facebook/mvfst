@@ -3777,6 +3777,8 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
   conn.packetProcessors.push_back(std::move(mockPacketProcessor));
+  conn.lossState.totalBytesAcked =
+      100; // start with some bytes acked before the implicit ack
 
   const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
@@ -3844,7 +3846,9 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
             Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
 
         EXPECT_EQ(10, ack->ackedBytes);
-        EXPECT_EQ(0, ack->totalBytesAcked); // implicit ack
+        EXPECT_EQ(
+            100,
+            ack->totalBytesAcked); // implicit ack doesn't add new acked bytes
         EXPECT_TRUE(ack->implicit);
         EXPECT_FALSE(ack->rttSample.has_value());
         EXPECT_EQ(srttBefore, conn.lossState.srtt);
