@@ -9,9 +9,9 @@
 
 #include <folly/Portability.h>
 #include <folly/io/IOBuf.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/Events.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -25,7 +25,7 @@ class BatchWriter {
   }
 
 #ifndef MVFST_USE_LIBEV
-  void setSock(folly::AsyncUDPSocket* sock) {
+  void setSock(QuicAsyncUDPSocketType* sock) {
     if (sock && !evb_.getBackingEventBase()) {
       fd_ = ::dup(sock->getNetworkSocket().toFd());
       evb_.setBackingEventBase(sock->getEventBase());
@@ -63,9 +63,9 @@ class BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t bufSize,
       const folly::SocketAddress& addr,
-      folly::AsyncUDPSocket* sock) = 0;
+      QuicAsyncUDPSocketType* sock) = 0;
   virtual ssize_t write(
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) = 0;
 
  protected:
@@ -100,9 +100,9 @@ class SinglePacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t /*unused*/,
       const folly::SocketAddress& /*unused*/,
-      folly::AsyncUDPSocket* /*unused*/) override;
+      QuicAsyncUDPSocketType* /*unused*/) override;
   ssize_t write(
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) override;
 };
 
@@ -117,9 +117,9 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      folly::AsyncUDPSocket* /*unused*/) override;
+      QuicAsyncUDPSocketType* /*unused*/) override;
   ssize_t write(
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) override;
 
  private:
@@ -144,9 +144,9 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& addr,
-      folly::AsyncUDPSocket* sock) override;
+      QuicAsyncUDPSocketType* sock) override;
   ssize_t write(
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) override;
   bool empty() const override;
   size_t size() const override;
@@ -182,9 +182,9 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      folly::AsyncUDPSocket* /*unused*/) override;
+      QuicAsyncUDPSocketType* /*unused*/) override;
   ssize_t write(
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) override;
 
  private:
@@ -211,9 +211,9 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& address,
-      folly::AsyncUDPSocket* sock) override;
+      QuicAsyncUDPSocketType* sock) override;
   ssize_t write(
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) override;
 
  private:

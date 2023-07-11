@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/io/async/AsyncUDPSocket.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/ConnectionIdAlgo.h>
@@ -94,7 +94,7 @@ class TakeoverPacketHandler {
   TakeoverProtocolVersion takeoverProtocol_{TakeoverProtocolVersion::V0};
 
  private:
-  std::unique_ptr<folly::AsyncUDPSocket> makeSocket(folly::EventBase* evb);
+  std::unique_ptr<QuicAsyncUDPSocketType> makeSocket(folly::EventBase* evb);
   void forwardPacket(Buf packet);
   // prevent copying
   TakeoverPacketHandler(const TakeoverPacketHandler&);
@@ -102,7 +102,7 @@ class TakeoverPacketHandler {
 
   QuicServerWorker* worker_;
   folly::SocketAddress pktForwardDestAddr_;
-  std::unique_ptr<folly::AsyncUDPSocket> pktForwardingSocket_;
+  std::unique_ptr<QuicAsyncUDPSocketType> pktForwardingSocket_;
   bool packetForwardingEnabled_{false};
   QuicUDPSocketFactory* socketFactory_{nullptr};
 };
@@ -110,14 +110,14 @@ class TakeoverPacketHandler {
 /**
  * Class for handling packets after the socket takeover has initiated
  */
-class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
+class TakeoverHandlerCallback : public QuicAsyncUDPSocketType::ReadCallback,
                                 private folly::DelayedDestruction {
  public:
   explicit TakeoverHandlerCallback(
       QuicServerWorker* worker,
       TakeoverPacketHandler& takeoverPktHandler,
       const TransportSettings& transportSettings,
-      std::unique_ptr<folly::AsyncUDPSocket> socket);
+      std::unique_ptr<QuicAsyncUDPSocketType> socket);
 
   // prevent copying
   TakeoverHandlerCallback(const TakeoverHandlerCallback&) = delete;
@@ -132,7 +132,7 @@ class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
    * Frees existing socket if any
    */
   void rebind(
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       const folly::SocketAddress& addr);
 
   void pause();
@@ -161,7 +161,7 @@ class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
   // QuicServerWorker owns the transport settings
   const TransportSettings& transportSettings_;
   folly::SocketAddress address_;
-  std::unique_ptr<folly::AsyncUDPSocket> socket_;
+  std::unique_ptr<QuicAsyncUDPSocketType> socket_;
   Buf readBuffer_;
 };
 } // namespace quic

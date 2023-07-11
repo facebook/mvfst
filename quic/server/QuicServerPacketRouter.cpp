@@ -23,7 +23,7 @@ TakeoverHandlerCallback::TakeoverHandlerCallback(
     QuicServerWorker* worker,
     TakeoverPacketHandler& takeoverPktHandler,
     const TransportSettings& transportSettings,
-    std::unique_ptr<folly::AsyncUDPSocket> socket)
+    std::unique_ptr<QuicAsyncUDPSocketType> socket)
     : worker_(worker),
       takeoverPktHandler_(takeoverPktHandler),
       transportSettings_(transportSettings),
@@ -44,7 +44,7 @@ void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
 }
 
 void TakeoverHandlerCallback::rebind(
-    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    std::unique_ptr<QuicAsyncUDPSocketType> socket,
     const folly::SocketAddress& addr) {
   if (socket_) {
     // first reset existing socket if any
@@ -170,10 +170,9 @@ void TakeoverPacketHandler::forwardPacket(Buf writeBuffer) {
   pktForwardingSocket_->write(pktForwardDestAddr_, std::move(writeBuffer));
 }
 
-std::unique_ptr<folly::AsyncUDPSocket> TakeoverPacketHandler::makeSocket(
+std::unique_ptr<QuicAsyncUDPSocketType> TakeoverPacketHandler::makeSocket(
     folly::EventBase* evb) {
-  auto sock = std::make_unique<folly::AsyncUDPSocket>(evb);
-  return sock;
+  return std::make_unique<QuicAsyncUDPSocketType>(evb);
 }
 
 void TakeoverPacketHandler::processForwardedPacket(

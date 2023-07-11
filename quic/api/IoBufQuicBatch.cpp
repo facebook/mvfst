@@ -14,7 +14,7 @@ namespace quic {
 IOBufQuicBatch::IOBufQuicBatch(
     BatchWriterPtr&& batchWriter,
     bool threadLocal,
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& peerAddress,
     QuicTransportStatsCallback* statsCallback,
     QuicClientConnectionState::HappyEyeballsState* happyEyeballsState)

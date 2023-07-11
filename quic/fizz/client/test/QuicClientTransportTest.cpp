@@ -15,6 +15,7 @@
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/test/MockQuicPskCache.h>
 #include <quic/fizz/client/test/QuicClientTransportTestUtil.h>
@@ -88,7 +89,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<TestingQuicClientTransport> createClient() {
     pskCache_ = std::make_shared<BasicQuicPskCache>();
 
-    auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventbase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketType>(&eventbase_);
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)

@@ -12,6 +12,7 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/common/Events.h>
 #include <quic/common/FunctionLooper.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/Copa.h>
@@ -20,7 +21,6 @@
 #include <quic/state/StateData.h>
 
 #include <folly/ExceptionWrapper.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/HHWheelTimer.h>
 
 namespace quic {
@@ -39,7 +39,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       bool useConnectionEndWithErrorCallback = false);
 
   ~QuicTransportBase() override;
@@ -841,7 +841,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   std::atomic<QuicEventBase*> qEvbPtr_;
-  std::unique_ptr<folly::AsyncUDPSocket> socket_;
+  std::unique_ptr<QuicAsyncUDPSocketType> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
   ConnectionCallback* connCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.

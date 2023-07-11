@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/state/StateData.h>
@@ -20,7 +21,7 @@ namespace quic {
 namespace testing {
 void RunTest(int numBatch) {
   folly::EventBase evb;
-  folly::AsyncUDPSocket sock(&evb);
+  QuicAsyncUDPSocketType sock(&evb);
 
   auto batchWriter = BatchWriterPtr(new test::TestPacketBatchWriter(numBatch));
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};

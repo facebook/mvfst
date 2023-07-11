@@ -73,7 +73,7 @@ class QuicServerTransport
 
   static QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::unique_ptr<QuicAsyncUDPSocketType> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -81,7 +81,7 @@ class QuicServerTransport
 
   QuicServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::unique_ptr<QuicAsyncUDPSocketType> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -91,7 +91,7 @@ class QuicServerTransport
   // Testing only API:
   QuicServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::unique_ptr<QuicAsyncUDPSocketType> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,

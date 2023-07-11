@@ -33,9 +33,9 @@
 
 #include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/DelayedDestruction.h>
 #include <folly/io/async/HHWheelTimer.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <chrono>
 #include <list>

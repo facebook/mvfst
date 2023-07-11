@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/io/async/AsyncUDPSocket.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 namespace quic {
 
@@ -15,7 +15,7 @@ class QuicUDPSocketFactory {
  public:
   virtual ~QuicUDPSocketFactory() {}
 
-  virtual std::unique_ptr<folly::AsyncUDPSocket> make(
+  virtual std::unique_ptr<QuicAsyncUDPSocketType> make(
       folly::EventBase* evb,
       int fd) = 0;
 };

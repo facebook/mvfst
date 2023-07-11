@@ -8,7 +8,7 @@
 #pragma once
 
 #include <fizz/server/FizzServerContext.h>
-#include <folly/io/async/AsyncUDPSocket.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/server/QuicServerTransport.h>
 
 namespace quic {
@@ -19,7 +19,7 @@ class QuicServerTransportFactory {
 
   virtual QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       const folly::SocketAddress& addr,
       QuicVersion quicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept = 0;

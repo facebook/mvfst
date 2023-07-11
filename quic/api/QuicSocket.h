@@ -14,6 +14,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Events.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/observer/SocketObserverContainer.h>
@@ -473,7 +474,7 @@ class QuicSocket {
    * @param socket The new socket that should be used by the transport.
    * If this is null then do not replace the underlying socket.
    */
-  virtual void onNetworkSwitch(std::unique_ptr<folly::AsyncUDPSocket>) {}
+  virtual void onNetworkSwitch(std::unique_ptr<QuicAsyncUDPSocketType>) {}
 
   /**
    * Get the flow control settings for the given stream (or connection flow

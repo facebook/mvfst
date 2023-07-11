@@ -16,6 +16,7 @@
 #include <quic/client/QuicClientTransport.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/Events.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
@@ -45,7 +46,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
 
   TestingQuicClientTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connIdSize = kDefaultConnectionIdSize,
       bool useConnectionEndWithErrorCallback = false)
@@ -150,7 +151,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
     onDataAvailable(addr, len, truncated, OnDataAvailableParams());
   }
 
-  void invokeOnNotifyDataAvailable(folly::AsyncUDPSocket& sock) {
+  void invokeOnNotifyDataAvailable(QuicAsyncUDPSocketType& sock) {
     onNotifyDataAvailable(sock);
   }
 
@@ -910,7 +911,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       destructionCallback;
   std::unique_ptr<folly::EventBase> eventbase_;
   folly::SocketAddress serverAddr{"127.0.0.1", 443};
-  folly::AsyncUDPSocket::ReadCallback* networkReadCallback{nullptr};
+  QuicAsyncUDPSocketWrapper::ReadCallback* networkReadCallback{nullptr};
   FakeOneRttHandshakeLayer* mockClientHandshake;
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzClientContext;
   std::shared_ptr<TestingQuicClientTransport> client;

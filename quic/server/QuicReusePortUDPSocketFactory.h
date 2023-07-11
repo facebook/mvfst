@@ -17,9 +17,9 @@ class QuicReusePortUDPSocketFactory : public QuicUDPSocketFactory {
   QuicReusePortUDPSocketFactory(bool reusePort = true, bool reuseAddr = false)
       : reusePort_(reusePort), reuseAddr_(reuseAddr) {}
 
-  std::unique_ptr<folly::AsyncUDPSocket> make(folly::EventBase* evb, int)
+  std::unique_ptr<QuicAsyncUDPSocketType> make(folly::EventBase* evb, int)
       override {
-    auto sock = std::make_unique<folly::AsyncUDPSocket>(evb);
+    auto sock = std::make_unique<QuicAsyncUDPSocketType>(evb);
     sock->setReusePort(reusePort_);
     sock->setReuseAddr(reuseAddr_);
     return sock;

@@ -23,7 +23,7 @@ namespace quic {
 
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    std::unique_ptr<QuicAsyncUDPSocketType> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallback* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -41,7 +41,7 @@ QuicServerTransport::QuicServerTransport(
 
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    std::unique_ptr<QuicAsyncUDPSocketType> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallback* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -83,7 +83,7 @@ QuicServerTransport::~QuicServerTransport() {
 
 QuicServerTransport::Ptr QuicServerTransport::make(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    std::unique_ptr<QuicAsyncUDPSocketType> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallback* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,

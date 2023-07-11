@@ -15,6 +15,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/Types.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/TransportKnobs.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
@@ -30,7 +31,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
  public:
   TestingQuicServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::unique_ptr<QuicAsyncUDPSocketType> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
@@ -53,7 +54,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
     return *dynamic_cast<QuicServerConnectionState*>(conn_.get());
   }
 
-  folly::AsyncUDPSocket& getSocket() {
+  QuicAsyncUDPSocketType& getSocket() {
     return *socket_;
   }
 

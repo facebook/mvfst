@@ -184,7 +184,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       uint64_t blockSize,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
-      folly::AsyncUDPSocket& sock,
+      QuicAsyncUDPSocketType& sock,
       bool dsrEnabled)
       : evb_(evbIn),
         blockSize_(blockSize),
@@ -357,7 +357,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   uint64_t maxBytesPerStream_;
   std::unordered_map<quic::StreamId, uint64_t> bytesPerStream_;
   std::set<quic::StreamId> streamsHavingDSRSender_;
-  folly::AsyncUDPSocket& udpSock_;
+  QuicAsyncUDPSocketType& udpSock_;
   bool dsrEnabled_;
 };
 
@@ -377,7 +377,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::unique_ptr<QuicAsyncUDPSocketType> sock,
       const folly::SocketAddress&,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
@@ -647,7 +647,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   void start() {
     folly::SocketAddress addr(host_.c_str(), port_);
 
-    auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventBase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketType>(&eventBase_);
     auto fizzClientContext =
         FizzClientQuicHandshakeContext::Builder()
             .setCertificateVerifier(test::createTestCertificateVerifier())

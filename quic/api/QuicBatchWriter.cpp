@@ -100,11 +100,11 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
       if (evb && evb->getBackingEventBase() && !socket_) {
         auto fd = writer->getAndResetFd();
         if (fd >= 0) {
-          socket_ = std::make_unique<folly::AsyncUDPSocket>(
+          socket_ = std::make_unique<quic::QuicAsyncUDPSocketType>(
               evb->getBackingEventBase());
           socket_->setFD(
               folly::NetworkSocket(fd),
-              folly::AsyncUDPSocket::FDOwnership::OWNS);
+              quic::QuicAsyncUDPSocketType::FDOwnership::OWNS);
         }
         attachTimeoutManager(evb->getBackingEventBase());
       }
@@ -131,7 +131,7 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
       quic::QuicBatchingMode::BATCHING_MODE_NONE};
   // this is just an  std::unique_ptr
   std::unique_ptr<quic::BatchWriter> batchWriter_;
-  std::unique_ptr<folly::AsyncUDPSocket> socket_;
+  std::unique_ptr<quic::QuicAsyncUDPSocketType> socket_;
 };
 #endif
 } // namespace
@@ -151,7 +151,7 @@ bool SinglePacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t /*unused*/,
     const folly::SocketAddress& /*unused*/,
-    folly::AsyncUDPSocket* /*unused*/) {
+    QuicAsyncUDPSocketType* /*unused*/) {
   buf_ = std::move(buf);
 
   // needs to be flushed
@@ -159,7 +159,7 @@ bool SinglePacketBatchWriter::append(
 }
 
 ssize_t SinglePacketBatchWriter::write(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& address) {
   return sock.write(address, buf_);
 }
@@ -184,7 +184,7 @@ bool GSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& /*unused*/,
-    folly::AsyncUDPSocket* /*unused*/) {
+    QuicAsyncUDPSocketType* /*unused*/) {
   // first buffer
   if (!buf_) {
     DCHECK_EQ(currBufs_, 0);
@@ -216,7 +216,7 @@ bool GSOPacketBatchWriter::append(
 }
 
 ssize_t GSOPacketBatchWriter::write(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& address) {
   return (currBufs_ > 1)
       ? sock.writeGSO(address, buf_, static_cast<int>(prevSize_))
@@ -247,7 +247,7 @@ bool GSOInplacePacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& /*buf*/,
     size_t size,
     const folly::SocketAddress& /* addr */,
-    folly::AsyncUDPSocket* /* sock */) {
+    QuicAsyncUDPSocketType* /* sock */) {
   CHECK(!needsFlush(size));
   ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   auto& buf = scopedBufAccessor.buf();
@@ -275,7 +275,7 @@ bool GSOInplacePacketBatchWriter::append(
  * conn_.bufAccessor.
  */
 ssize_t GSOInplacePacketBatchWriter::write(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& address) {
   ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   CHECK(lastPacketEnd_);
@@ -368,7 +368,7 @@ bool SendmmsgPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& /*unused*/,
-    folly::AsyncUDPSocket* /*unused*/) {
+    QuicAsyncUDPSocketType* /*unused*/) {
   CHECK_LT(bufs_.size(), maxBufs_);
   bufs_.emplace_back(std::move(buf));
   currSize_ += size;
@@ -383,7 +383,7 @@ bool SendmmsgPacketBatchWriter::append(
 }
 
 ssize_t SendmmsgPacketBatchWriter::write(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& address) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
@@ -435,7 +435,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& addr,
-    folly::AsyncUDPSocket* sock) {
+    QuicAsyncUDPSocketType* sock) {
   setSock(sock);
   currSize_ += size;
 
@@ -478,7 +478,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
 }
 
 ssize_t SendmmsgGSOPacketBatchWriter::write(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& /*unused*/) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {

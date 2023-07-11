@@ -37,7 +37,7 @@ namespace quic {
 
 QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    std::unique_ptr<QuicAsyncUDPSocketType> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     PacketNum startingPacketNum,
@@ -53,7 +53,7 @@ QuicClientTransport::QuicClientTransport(
 
 QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    std::unique_ptr<QuicAsyncUDPSocketType> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     bool useConnectionEndWithErrorCallback)
@@ -1230,7 +1230,7 @@ bool QuicClientTransport::shouldOnlyNotify() {
 }
 
 void QuicClientTransport::recvMsg(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     uint64_t readBufferSize,
     int numPackets,
     NetworkData& networkData,
@@ -1253,7 +1253,7 @@ void QuicClientTransport::recvMsg(
     }
 
     int flags = 0;
-    folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
+    QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams params;
     struct msghdr msg {};
     msg.msg_name = rawAddr;
     msg.msg_namelen = kAddrLen;
@@ -1262,8 +1262,8 @@ void QuicClientTransport::recvMsg(
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     bool useGRO = sock.getGRO() > 0;
     bool useTS = sock.getTimestamping() > 0;
-    char control[folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams::
-                     kCmsgSpace] = {};
+    char control[QuicAsyncUDPSocketWrapper::ReadCallback::
+                     OnDataAvailableParams::kCmsgSpace] = {};
 
     if (useGRO || useTS) {
       msg.msg_control = control;
@@ -1298,7 +1298,7 @@ void QuicClientTransport::recvMsg(
     }
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO) {
-      folly::AsyncUDPSocket::fromMsg(params, msg);
+      QuicAsyncUDPSocketType::fromMsg(params, msg);
 
       // truncated
       if ((size_t)ret > readBufferSize) {
@@ -1354,7 +1354,7 @@ void QuicClientTransport::recvMsg(
 }
 
 void QuicClientTransport::recvMmsg(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     uint64_t readBufferSize,
     uint16_t numPackets,
     NetworkData& networkData,
@@ -1367,7 +1367,8 @@ void QuicClientTransport::recvMmsg(
   bool useTS = sock.getTimestamping() > 0;
   std::vector<std::array<
       char,
-      folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace>>
+      QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams::
+          kCmsgSpace>>
       controlVec(useGRO ? numPackets : 0);
 
   // we need to consider MSG_TRUNC too
@@ -1438,10 +1439,10 @@ void QuicClientTransport::recvMmsg(
       // should ignore such datagrams.
       continue;
     }
-    folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
+    QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO || useTS) {
-      folly::AsyncUDPSocket::fromMsg(params, msg.msg_hdr);
+      QuicAsyncUDPSocketType::fromMsg(params, msg.msg_hdr);
 
       // truncated
       if (bytesRead > readBufferSize) {
@@ -1500,7 +1501,7 @@ void QuicClientTransport::recvMmsg(
 }
 
 void QuicClientTransport::onNotifyDataAvailable(
-    folly::AsyncUDPSocket& sock) noexcept {
+    QuicAsyncUDPSocketType& sock) noexcept {
   DCHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize =
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
@@ -1649,7 +1650,7 @@ void QuicClientTransport::setHappyEyeballsCachedFamily(
 }
 
 void QuicClientTransport::addNewSocket(
-    std::unique_ptr<folly::AsyncUDPSocket> socket) {
+    std::unique_ptr<QuicAsyncUDPSocketType> socket) {
   happyEyeballsAddSocket(*clientConn_, std::move(socket));
 }
 
@@ -1741,7 +1742,7 @@ void QuicClientTransport::setSupportedVersions(
 }
 
 void QuicClientTransport::onNetworkSwitch(
-    std::unique_ptr<folly::AsyncUDPSocket> newSock) {
+    std::unique_ptr<QuicAsyncUDPSocketType> newSock) {
   if (!conn_->oneRttWriteCipher) {
     return;
   }
@@ -1753,10 +1754,8 @@ void QuicClientTransport::onNetworkSwitch(
     sock->close();
 
     socket_ = std::move(newSock);
-    if (socket_) {
-      socket_->setAdditionalCmsgsFunc(
-          [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
-    }
+    socket_->setAdditionalCmsgsFunc(
+        [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
     happyEyeballsSetUpSocket(
         *socket_,
         conn_->localAddress,

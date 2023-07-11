@@ -27,7 +27,7 @@ namespace quic {
 
 QuicTransportBase::QuicTransportBase(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    std::unique_ptr<QuicAsyncUDPSocketType> socket,
     bool useConnectionEndWithErrorCallback)
     : socket_(std::move(socket)),
       useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),

@@ -185,7 +185,7 @@ struct RequestGroup {
 };
 
 BufQuicBatchResult writePacketsGroup(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider);
 

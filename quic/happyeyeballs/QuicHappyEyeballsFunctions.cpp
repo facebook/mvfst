@@ -13,10 +13,10 @@
 
 #include <folly/SocketAddress.h>
 #include <folly/io/SocketOptionMap.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/HHWheelTimer.h>
 #include <folly/net/NetOps.h>
 #include <folly/portability/Sockets.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <chrono>
 #include <memory>
@@ -58,7 +58,7 @@ void happyEyeballsAddPeerAddress(
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
-    std::unique_ptr<folly::AsyncUDPSocket> socket) {
+    std::unique_ptr<QuicAsyncUDPSocketType> socket) {
   connection.happyEyeballsState.secondSocket = std::move(socket);
 }
 
@@ -68,8 +68,8 @@ void startHappyEyeballs(
     sa_family_t cachedFamily,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttempDelay,
-    folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
   if (connection.happyEyeballsState.v6PeerAddress.isInitialized() &&
       connection.happyEyeballsState.v4PeerAddress.isInitialized()) {
@@ -123,12 +123,12 @@ void startHappyEyeballs(
 }
 
 void happyEyeballsSetUpSocket(
-    folly::AsyncUDPSocket& socket,
+    QuicAsyncUDPSocketType& socket,
     folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
-    folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
   auto sockFamily = localAddress.value_or(peerAddress).getFamily();
   socket.setReuseAddr(false);
@@ -189,7 +189,7 @@ void happyEyeballsStartSecondSocket(
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
-    std::unique_ptr<folly::AsyncUDPSocket>& socket,
+    std::unique_ptr<QuicAsyncUDPSocketType>& socket,
     const folly::SocketAddress& peerAddress) {
   if (connection.happyEyeballsState.finished) {
     return;
