@@ -76,7 +76,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 
   struct HappyEyeballsState {
     // Delay timer
-    folly::HHWheelTimer::Callback* connAttemptDelayTimeout{nullptr};
+    QuicTimerCallback* connAttemptDelayTimeout{nullptr};
 
     // IPv6 peer address
     folly::SocketAddress v6PeerAddress;

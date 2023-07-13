@@ -17,7 +17,7 @@ template <
     class LoopCallbackT,
     class BackingEventBaseT,
     class AsyncTimeoutT,
-    class TimerT>
+    class TimerCallbackT>
 class QuicEventBaseInterface {
  public:
   virtual ~QuicEventBaseInterface() = default;
@@ -42,8 +42,6 @@ class QuicEventBaseInterface {
       AsyncTimeoutT* obj,
       std::chrono::microseconds timeout) = 0;
 
-  virtual TimerT& timer() = 0;
-
   virtual bool loopOnce(int flags) = 0;
 
   virtual bool loop() = 0;
@@ -53,6 +51,13 @@ class QuicEventBaseInterface {
   virtual bool loopIgnoreKeepAlive() = 0;
 
   virtual void terminateLoopSoon() = 0;
+
+  virtual void scheduleTimeout(
+      TimerCallbackT* callback,
+      std::chrono::milliseconds timeout) = 0;
+
+  [[nodiscard]] virtual std::chrono::milliseconds getTimerTickInterval()
+      const = 0;
 };
 
 } // namespace quic

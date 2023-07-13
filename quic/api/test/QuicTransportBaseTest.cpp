@@ -1723,7 +1723,7 @@ TEST_P(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
 }
 
 TEST_P(QuicTransportImplTestBase, LossTimeoutNoLessThanTickInterval) {
-  auto tickInterval = evb->timer().getTickInterval();
+  auto tickInterval = evb->getTimerTickInterval();
   transport->scheduleLossTimeout(tickInterval - 1ms);
   EXPECT_NEAR(
       tickInterval.count(),

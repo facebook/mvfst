@@ -44,6 +44,10 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   ~QuicTransportBase() override;
 
+  void scheduleTimeout(
+      QuicTimerCallback* callback,
+      std::chrono::milliseconds timeout);
+
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
 
   folly::EventBase* getEventBase() const override;
@@ -447,7 +451,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void clearBackgroundModeParameters();
 
   // Timeout functions
-  class LossTimeout : public folly::HHWheelTimer::Callback {
+  class LossTimeout : public QuicTimerCallback {
    public:
     ~LossTimeout() override = default;
 
@@ -468,7 +472,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class AckTimeout : public folly::HHWheelTimer::Callback {
+  class AckTimeout : public QuicTimerCallback {
    public:
     ~AckTimeout() override = default;
 
@@ -488,7 +492,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class PingTimeout : public folly::HHWheelTimer::Callback {
+  class PingTimeout : public QuicTimerCallback {
    public:
     ~PingTimeout() override = default;
 
@@ -508,7 +512,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class PathValidationTimeout : public folly::HHWheelTimer::Callback {
+  class PathValidationTimeout : public QuicTimerCallback {
    public:
     ~PathValidationTimeout() override = default;
 
@@ -529,7 +533,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class IdleTimeout : public folly::HHWheelTimer::Callback {
+  class IdleTimeout : public QuicTimerCallback {
    public:
     ~IdleTimeout() override = default;
 
@@ -550,7 +554,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class KeepaliveTimeout : public folly::HHWheelTimer::Callback {
+  class KeepaliveTimeout : public QuicTimerCallback {
    public:
     ~KeepaliveTimeout() override = default;
 
@@ -571,7 +575,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   // DrainTimeout is a bit different from other timeouts. It needs to hold a
   // shared_ptr to the transport, since if a DrainTimeout is scheduled,
   // transport cannot die.
-  class DrainTimeout : public folly::HHWheelTimer::Callback {
+  class DrainTimeout : public QuicTimerCallback {
    public:
     ~DrainTimeout() override = default;
 

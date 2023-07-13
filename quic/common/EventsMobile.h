@@ -27,9 +27,18 @@ class QuicAsyncTimeout {
   QuicAsyncTimeout() = default;
 };
 
-class QuicHHWheelTimer {
+class QuicTimerCallback {
  public:
-  QuicHHWheelTimer() = default;
+  virtual ~QuicTimerCallback() = default;
+  virtual void timeoutExpired() noexcept = 0;
+  virtual void callbackCanceled() noexcept {
+    timeoutExpired();
+  }
+  bool isScheduled() const {
+    return false;
+  }
+
+  void cancelTimeout() {}
 };
 
 class QuicBackingEventBase {
@@ -52,9 +61,6 @@ class QuicBackingEventBase {
       std::chrono::microseconds /* timeout */) {
     return false;
   }
-  QuicHHWheelTimer& timer() {
-    return timer_;
-  }
   bool loopOnce(int /* flags */) {
     return false;
   }
@@ -66,6 +72,14 @@ class QuicBackingEventBase {
     return false;
   }
   void terminateLoopSoon() {}
+
+  void scheduleTimeout(
+      QuicTimerCallback* /* callback */,
+      std::chrono::milliseconds /* timeout */) {}
+
+  std::chrono::milliseconds getTimerTickInterval() const {
+    return std::chrono::milliseconds(0);
+  }
 
  private:
   QuicHHWheelTimer timer_;

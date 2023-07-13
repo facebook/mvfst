@@ -26,14 +26,14 @@ namespace quic {
 using QuicEventBaseLoopCallback = folly::EventBase::LoopCallback;
 using QuicBackingEventBase = folly::EventBase;
 using QuicAsyncTimeout = folly::AsyncTimeout;
-using QuicHHWheelTimer = folly::HHWheelTimer;
+using QuicTimerCallback = folly::HHWheelTimer::Callback;
 #endif
 
 class QuicEventBase : public QuicEventBaseInterface<
                           QuicEventBaseLoopCallback,
                           QuicBackingEventBase,
                           QuicAsyncTimeout,
-                          QuicHHWheelTimer> {
+                          QuicTimerCallback> {
  public:
   QuicEventBase() = default;
   explicit QuicEventBase(QuicBackingEventBase* evb) : backingEvb_(evb) {}
@@ -61,8 +61,6 @@ class QuicEventBase : public QuicEventBaseInterface<
       QuicAsyncTimeout* obj,
       std::chrono::microseconds timeout) override;
 
-  QuicHHWheelTimer& timer() override;
-
   bool loopOnce(int flags = 0) override;
 
   bool loop() override;
@@ -72,6 +70,12 @@ class QuicEventBase : public QuicEventBaseInterface<
   bool loopIgnoreKeepAlive() override;
 
   void terminateLoopSoon() override;
+
+  void scheduleTimeout(
+      QuicTimerCallback* callback,
+      std::chrono::milliseconds timeout) override;
+
+  [[nodiscard]] std::chrono::milliseconds getTimerTickInterval() const override;
 
  private:
   QuicBackingEventBase* backingEvb_{nullptr};

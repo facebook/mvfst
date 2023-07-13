@@ -50,10 +50,6 @@ bool QuicEventBase::scheduleTimeoutHighRes(
   return backingEvb_->scheduleTimeoutHighRes(obj, timeout);
 }
 
-QuicHHWheelTimer& QuicEventBase::timer() {
-  return backingEvb_->timer();
-}
-
 bool QuicEventBase::loopOnce(int flags) {
   return backingEvb_->loopOnce(flags);
 }
@@ -72,6 +68,16 @@ bool QuicEventBase::loopIgnoreKeepAlive() {
 
 void QuicEventBase::terminateLoopSoon() {
   return backingEvb_->terminateLoopSoon();
+}
+
+void QuicEventBase::scheduleTimeout(
+    QuicTimerCallback* callback,
+    std::chrono::milliseconds timeout) {
+  return backingEvb_->timer().scheduleTimeout(callback, timeout);
+}
+
+std::chrono::milliseconds QuicEventBase::getTimerTickInterval() const {
+  return backingEvb_->timer().getTickInterval();
 }
 
 } // namespace quic

@@ -64,6 +64,12 @@ QuicTransportBase::QuicTransportBase(
   }
 }
 
+void QuicTransportBase::scheduleTimeout(
+    QuicTimerCallback* callback,
+    std::chrono::milliseconds timeout) {
+  qEvb_.scheduleTimeout(callback, timeout);
+}
+
 void QuicTransportBase::setPacingTimer(
     TimerHighRes::SharedPtr pacingTimer) noexcept {
   if (pacingTimer) {
@@ -412,7 +418,7 @@ void QuicTransportBase::closeImpl(
   if (drainConnection) {
     // We ever drain once, and the object ever gets created once.
     DCHECK(!drainTimeout_.isScheduled());
-    getEventBase()->timer().scheduleTimeout(
+    scheduleTimeout(
         &drainTimeout_,
         folly::chrono::ceil<std::chrono::milliseconds>(
             kDrainFactor * calculatePTO(*conn_)));
@@ -1965,13 +1971,12 @@ void QuicTransportBase::setIdleTimer() {
   auto peerIdleTimeout =
       conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
   auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
-  getEventBase()->timer().scheduleTimeout(&idleTimeout_, idleTimeout);
+  scheduleTimeout(&idleTimeout_, idleTimeout);
   auto idleTimeoutCount = idleTimeout.count();
   if (conn_->transportSettings.enableKeepalive) {
     std::chrono::milliseconds keepaliveTimeout = std::chrono::milliseconds(
         idleTimeoutCount - static_cast<int64_t>(idleTimeoutCount * .15));
-    getEventBase()->timer().scheduleTimeout(
-        &keepaliveTimeout_, keepaliveTimeout);
+    scheduleTimeout(&keepaliveTimeout_, keepaliveTimeout);
   }
 }
 
@@ -2734,9 +2739,8 @@ void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
-  auto& wheelTimer = getEventBase()->timer();
-  timeout = timeMax(timeout, wheelTimer.getTickInterval());
-  wheelTimer.scheduleTimeout(&lossTimeout_, timeout);
+  timeout = timeMax(timeout, qEvb_.getTimerTickInterval());
+  scheduleTimeout(&lossTimeout_, timeout);
 }
 
 void QuicTransportBase::scheduleAckTimeout() {
@@ -2752,16 +2756,15 @@ void QuicTransportBase::scheduleAckTimeout() {
       if (conn_->ackStates.appDataAckState.ackFrequencySequenceNumber) {
         factoredRtt = conn_->ackStates.maxAckDelay;
       }
-      auto& wheelTimer = getEventBase()->timer();
       auto timeout = timeMax(
           std::chrono::duration_cast<std::chrono::microseconds>(
-              wheelTimer.getTickInterval()),
+              qEvb_.getTimerTickInterval()),
           timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
       auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
                << " factoredRtt=" << factoredRtt.count() << "us"
                << " " << *this;
-      wheelTimer.scheduleTimeout(&ackTimeout_, timeoutMs);
+      scheduleTimeout(&ackTimeout_, timeoutMs);
     }
   } else {
     if (ackTimeout_.isScheduled()) {
@@ -2780,8 +2783,7 @@ void QuicTransportBase::schedulePingTimeout(
   }
 
   pingCallback_ = pingCb;
-  auto& wheelTimer = getEventBase()->timer();
-  wheelTimer.scheduleTimeout(&pingTimeout_, timeout);
+  scheduleTimeout(&pingTimeout_, timeout);
 }
 
 void QuicTransportBase::schedulePathValidationTimeout() {
@@ -2805,7 +2807,7 @@ void QuicTransportBase::schedulePathValidationTimeout() {
     auto timeoutMs =
         folly::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
     VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;
-    getEventBase()->timer().scheduleTimeout(&pathValidationTimeout_, timeoutMs);
+    scheduleTimeout(&pathValidationTimeout_, timeoutMs);
   }
 }
 

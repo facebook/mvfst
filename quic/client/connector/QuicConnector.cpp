@@ -92,7 +92,7 @@ void QuicConnector::connect(
 
 void QuicConnector::doConnect(std::chrono::milliseconds connectTimeout) {
   connectStart_ = std::chrono::steady_clock::now();
-  quicClient_->getEventBase()->timer().scheduleTimeout(this, connectTimeout);
+  quicClient_->scheduleTimeout(this, connectTimeout);
   quicClient_->start(this, nullptr);
 }
 

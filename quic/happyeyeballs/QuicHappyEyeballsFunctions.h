@@ -37,7 +37,7 @@ void startHappyEyeballs(
     QuicClientConnectionState& connection,
     QuicEventBase* evb,
     sa_family_t cachedFamily,
-    folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
+    QuicTimerCallback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttemptDelay,
     QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
     QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
@@ -57,7 +57,7 @@ void happyEyeballsStartSecondSocket(
 
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
-    folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
+    QuicTimerCallback& connAttemptDelayTimeout,
     std::unique_ptr<QuicAsyncUDPSocketType>& socket,
     const folly::SocketAddress& peerAddress);
 } // namespace quic

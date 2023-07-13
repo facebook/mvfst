@@ -166,8 +166,7 @@ class QuicClientTransport
     clientConn_->newToken = std::move(token);
   }
 
-  class HappyEyeballsConnAttemptDelayTimeout
-      : public folly::HHWheelTimer::Callback {
+  class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(
         QuicClientTransport* transport)
