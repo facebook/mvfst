@@ -27,6 +27,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_transport
+  mvfst_async_udp_socket_wrapper
   mvfst_buf_accessor
   mvfst_bufutil
   mvfst_cc_algo

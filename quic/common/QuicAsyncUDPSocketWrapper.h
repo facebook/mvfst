@@ -17,6 +17,10 @@
 namespace quic {
 
 using QuicAsyncUDPSocketType = folly::AsyncUDPSocket;
+using NetworkFdType = folly::NetworkSocket;
+
+int getSocketFd(const QuicAsyncUDPSocketType& s);
+NetworkFdType toNetworkFdType(int fd);
 
 class QuicAsyncUDPSocketWrapper {
  public:

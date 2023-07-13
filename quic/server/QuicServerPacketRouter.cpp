@@ -69,7 +69,7 @@ const folly::SocketAddress& TakeoverHandlerCallback::getAddress() const {
 
 int TakeoverHandlerCallback::getSocketFD() {
   CHECK(socket_);
-  return socket_->getNetworkSocket().toFd();
+  return getSocketFd(*socket_);
 }
 
 void TakeoverHandlerCallback::getReadBuffer(void** buf, size_t* len) noexcept {

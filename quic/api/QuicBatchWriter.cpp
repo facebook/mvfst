@@ -103,7 +103,7 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
           socket_ = std::make_unique<quic::QuicAsyncUDPSocketType>(
               evb->getBackingEventBase());
           socket_->setFD(
-              folly::NetworkSocket(fd),
+              quic::toNetworkFdType(fd),
               quic::QuicAsyncUDPSocketType::FDOwnership::OWNS);
         }
         attachTimeoutManager(evb->getBackingEventBase());

@@ -167,7 +167,7 @@ void happyEyeballsSetUpSocket(
 #endif
 
   if (mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(socket.getNetworkSocket().toFd());
+    mvfst_hook_on_socket_create(getSocketFd(socket));
   }
 
   // never fragment, always turn off PMTU

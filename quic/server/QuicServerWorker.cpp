@@ -114,7 +114,7 @@ void QuicServerWorker::bind(
   socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
 
   if (mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(socket_->getNetworkSocket().toFd());
+    mvfst_hook_on_socket_create(getSocketFd(*socket_));
   }
 }
 
@@ -206,7 +206,7 @@ void QuicServerWorker::pauseRead() {
 
 int QuicServerWorker::getFD() {
   CHECK(socket_);
-  return socket_->getNetworkSocket().toFd();
+  return getSocketFd(*socket_);
 }
 
 const folly::SocketAddress& QuicServerWorker::getAddress() const {
@@ -1232,9 +1232,9 @@ void QuicServerWorker::setHealthCheckToken(
 std::unique_ptr<QuicAsyncUDPSocketType> QuicServerWorker::makeSocket(
     folly::EventBase* evb) const {
   CHECK(socket_);
-  auto sock = socketFactory_->make(evb, socket_->getNetworkSocket().toFd());
+  auto sock = socketFactory_->make(evb, getSocketFd(*socket_));
   if (sock && mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
+    mvfst_hook_on_socket_create(getSocketFd(*sock));
   }
   return sock;
 }
@@ -1244,7 +1244,7 @@ std::unique_ptr<QuicAsyncUDPSocketType> QuicServerWorker::makeSocket(
     int fd) const {
   auto sock = socketFactory_->make(evb, fd);
   if (sock && mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
+    mvfst_hook_on_socket_create(getSocketFd(*sock));
   }
   return sock;
 }

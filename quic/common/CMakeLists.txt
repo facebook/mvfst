@@ -136,6 +136,29 @@ target_link_libraries(
   Folly::folly
 )
 
+add_library(
+  mvfst_async_udp_socket_wrapper STATIC
+  QuicAsyncUDPSocketWrapper.cpp
+)
+
+target_include_directories(
+  mvfst_async_udp_socket_wrapper PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_async_udp_socket_wrapper
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_async_udp_socket_wrapper PUBLIC
+  Folly::folly
+  mvfst_events
+)
+
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -179,6 +202,12 @@ install(
 
 install(
   TARGETS mvfst_transport_knobs
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_async_udp_socket_wrapper
   EXPORT mvfst-exports
   DESTINATION lib
 )

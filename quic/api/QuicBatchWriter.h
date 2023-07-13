@@ -27,7 +27,7 @@ class BatchWriter {
 #ifndef MVFST_USE_LIBEV
   void setSock(QuicAsyncUDPSocketType* sock) {
     if (sock && !evb_.getBackingEventBase()) {
-      fd_ = ::dup(sock->getNetworkSocket().toFd());
+      fd_ = ::dup(getSocketFd(*sock));
       evb_.setBackingEventBase(sock->getEventBase());
     }
   }

@@ -22,12 +22,14 @@ target_compile_options(
 
 add_dependencies(
   mvfst_happyeyeballs
+  mvfst_async_udp_socket_wrapper
   mvfst_state_machine
 )
 
 target_link_libraries(
   mvfst_happyeyeballs PUBLIC
   Folly::folly
+  mvfst_async_udp_socket_wrapper
   mvfst_state_machine
 )
 
