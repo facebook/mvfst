@@ -9,6 +9,14 @@
 
 #ifdef MVFST_USE_LIBEV
 
+// The following macros are defined both in 'libev' and 'libevent'.
+// To avoid compilation errors, they should be undefined before including libev
+#undef EV_READ
+#undef EV_WRITE
+#undef EV_TIMEOUT
+#undef EV_SIGNAL
+#undef EVLOOP_NONBLOCK
+
 #include <ev.h>
 
 #include <quic/common/QuicEventBaseInterface.h>
@@ -20,6 +28,10 @@ class QuicEventBaseLoopCallback {
  public:
   virtual ~QuicEventBaseLoopCallback() = default;
   virtual void runLoopCallback() noexcept = 0;
+  void cancelLoopCallback() {}
+  bool isLoopCallbackScheduled() const {
+    return false;
+  }
 };
 
 class QuicAsyncTimeout {
@@ -41,14 +53,14 @@ class QuicTimerCallback {
   void cancelTimeout() {}
 };
 
-class QuicBackingEventBase {
+class QuicLibevEventBase {
  public:
-  QuicBackingEventBase() = default;
+  QuicLibevEventBase() = default;
 
   void runInLoop(folly::Function<void()> /* cb */, bool /* thisIteration */) {}
   void runInLoop(
       QuicEventBaseLoopCallback* /* callback */,
-      bool /* thisIteration */) {}
+      bool /* thisIteration */ = false) {}
   void runAfterDelay(
       folly::Function<void()> /* cb */,
       uint32_t /* milliseconds */) {}
@@ -82,7 +94,7 @@ class QuicBackingEventBase {
   }
 
  private:
-  QuicHHWheelTimer timer_;
+  // struct ev_loop* ev_loop_{nullptr};
 };
 
 } // namespace quic

@@ -28,7 +28,7 @@ class QuicClientTransport
       public std::enable_shared_from_this<QuicClientTransport> {
  public:
   QuicClientTransport(
-      folly::EventBase* evb,
+      QuicBackingEventBase* evb,
       std::unique_ptr<QuicAsyncUDPSocketType> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = 0,
@@ -36,7 +36,7 @@ class QuicClientTransport
 
   // Testing only API:
   QuicClientTransport(
-      folly::EventBase* evb,
+      QuicBackingEventBase* evb,
       std::unique_ptr<QuicAsyncUDPSocketType> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize,

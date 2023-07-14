@@ -22,6 +22,7 @@ FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
 namespace quic {
 
 #ifdef MVFST_USE_LIBEV
+using QuicBackingEventBase = QuicLibevEventBase;
 #else
 using QuicEventBaseLoopCallback = folly::EventBase::LoopCallback;
 using QuicBackingEventBase = folly::EventBase;

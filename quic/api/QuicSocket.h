@@ -411,7 +411,7 @@ class QuicSocket {
   /**
    * Returns the event base associated with this socket
    */
-  virtual folly::EventBase* getEventBase() const = 0;
+  [[nodiscard]] virtual QuicBackingEventBase* getEventBase() const = 0;
 
   /**
    * Returns the current offset already read or written by the application on
@@ -1260,7 +1260,7 @@ class QuicSocket {
    * eventbase that needs to be attached and the caller must make sure that
    * there is no eventbase already attached to the socket.
    */
-  virtual void attachEventBase(folly::EventBase* evb) = 0;
+  virtual void attachEventBase(QuicBackingEventBase* evb) = 0;
 
   /**
    * Returns whether or not the eventbase can currently be detached from the

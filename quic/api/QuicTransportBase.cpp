@@ -26,7 +26,7 @@
 namespace quic {
 
 QuicTransportBase::QuicTransportBase(
-    folly::EventBase* evb,
+    QuicBackingEventBase* evb,
     std::unique_ptr<QuicAsyncUDPSocketType> socket,
     bool useConnectionEndWithErrorCallback)
     : socket_(std::move(socket)),
@@ -85,7 +85,7 @@ void QuicTransportBase::setCongestionControllerFactory(
   conn_->congestionController.reset();
 }
 
-folly::EventBase* QuicTransportBase::getEventBase() const {
+QuicBackingEventBase* QuicTransportBase::getEventBase() const {
   return qEvb_.getBackingEventBase();
 }
 
@@ -3401,7 +3401,7 @@ bool QuicTransportBase::isDetachable() {
   return conn_->nodeType == QuicNodeType::Client;
 }
 
-void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
+void QuicTransportBase::attachEventBase(QuicBackingEventBase* evb) {
   VLOG(10) << __func__ << " " << *this;
   DCHECK(!getEventBase());
   DCHECK(evb && evb->isInEventBaseThread());

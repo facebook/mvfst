@@ -38,7 +38,7 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
 class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
-      folly::EventBase* evb,
+      QuicBackingEventBase* evb,
       std::unique_ptr<QuicAsyncUDPSocketType> socket,
       bool useConnectionEndWithErrorCallback = false);
 
@@ -50,7 +50,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
 
-  folly::EventBase* getEventBase() const override;
+  [[nodiscard]] QuicBackingEventBase* getEventBase() const override;
 
   folly::Optional<ConnectionId> getClientConnectionId() const override;
 
@@ -252,7 +252,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void detachEventBase() override;
 
-  void attachEventBase(folly::EventBase* evb) override;
+  void attachEventBase(QuicBackingEventBase* evb) override;
 
   folly::Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
