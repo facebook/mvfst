@@ -978,7 +978,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto val = std::get<std::string>(value);
-        BbrConfig::AckFrequencyConfig ackFrequencyConfig;
+        CongestionControlConfig::AckFrequencyConfig ackFrequencyConfig;
         bool parseSuccess = false;
         try {
           parseSuccess = folly::split(
@@ -1009,7 +1009,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               ackFrequencyConfig.minRttDivisor,
               ackFrequencyConfig.useSmallThresholdDuringStartup,
               val);
-          serverTransport->conn_->transportSettings.bbrConfig
+          serverTransport->conn_->transportSettings.ccaConfig
               .ackFrequencyConfig = ackFrequencyConfig;
         } else {
           auto errMsg = fmt::format(

@@ -36,7 +36,7 @@ constexpr uint8_t kBGNumOfCycles = 32;
 // During ProbeRtt, we need to stay in low inflight condition for at least
 // kProbeRttDuration.
 constexpr std::chrono::milliseconds kProbeRttDuration{200};
-// The cwnd gain to use when BbrConfig.largeProbeRttCwnd is set.
+// The cwnd gain to use when ccaConfig.largeProbeRttCwnd is set.
 constexpr float kLargeProbeRttCwndGain = 0.75f;
 // Bandwidth WindowFilter length, in unit of RTT. This value is from Chromium
 // code. I don't know why.

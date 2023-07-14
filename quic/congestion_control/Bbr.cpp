@@ -264,7 +264,7 @@ void BbrCongestionController::onPacketAcked(
   }
 
   const auto& ackFrequencyConfig =
-      conn_.transportSettings.bbrConfig.ackFrequencyConfig;
+      conn_.transportSettings.ccaConfig.ackFrequencyConfig;
   if (newRoundTrip && canSendAckControlFrames(conn_) && ackFrequencyConfig) {
     auto updatedMaxAckDelay =
         std::chrono::duration_cast<std::chrono::milliseconds>(clampMaxAckDelay(
@@ -365,7 +365,7 @@ void BbrCongestionController::handleAckInProbeBw(
     pacingCycleIndex_ = (pacingCycleIndex_ + 1) % numOfCycles_;
     cycleStart_ = ackTime;
     if (!isInBackgroundMode() &&
-        conn_.transportSettings.bbrConfig.drainToTarget && pacingGain_ < 1.0 &&
+        conn_.transportSettings.ccaConfig.drainToTarget && pacingGain_ < 1.0 &&
         pacingGainCycles_[pacingCycleIndex_] == 1.0) {
       auto drainTarget =
           targetCwndCache ? *targetCwndCache : calculateTargetCwnd(1.0);
@@ -390,7 +390,7 @@ bool BbrCongestionController::shouldExitDrain() noexcept {
 }
 
 bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
-  if (conn_.transportSettings.bbrConfig.probeRttDisabledIfAppLimited &&
+  if (conn_.transportSettings.ccaConfig.probeRttDisabledIfAppLimited &&
       appLimitedSinceProbeRtt_) {
     minRttSampler_->timestampMinRtt(ackTime);
     return false;
@@ -496,7 +496,7 @@ void BbrCongestionController::updateRecoveryWindowWithAck(
   }
 
   uint64_t recoveryIncrease =
-      conn_.transportSettings.bbrConfig.conservativeRecovery
+      conn_.transportSettings.ccaConfig.conservativeRecovery
       ? conn_.udpSendPacketLen
       : bytesAcked;
   recoveryWindow_ = std::max(
@@ -560,7 +560,7 @@ void BbrCongestionController::updateCwnd(
   auto targetCwnd = calculateTargetCwnd(cwndGain_);
   if (btlbwFound_) {
     targetCwnd += maxAckHeightFilter_.GetBest();
-  } else if (conn_.transportSettings.bbrConfig.enableAckAggregationInStartup) {
+  } else if (conn_.transportSettings.ccaConfig.enableAckAggregationInStartup) {
     targetCwnd += excessiveBytes;
   }
 
@@ -660,7 +660,7 @@ void BbrCongestionController::getStats(CongestionControllerStats& stats) const {
 
 uint64_t BbrCongestionController::getCongestionWindow() const noexcept {
   if (state_ == BbrCongestionController::BbrState::ProbeRtt) {
-    if (conn_.transportSettings.bbrConfig.largeProbeRttCwnd) {
+    if (conn_.transportSettings.ccaConfig.largeProbeRttCwnd) {
       return boundedCwnd(
           calculateTargetCwnd(kLargeProbeRttCwndGain),
           conn_.udpSendPacketLen,
