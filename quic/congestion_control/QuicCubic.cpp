@@ -449,7 +449,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
                        ? "cwnd > ssthresh"
                        : "found exit point");
       hystartState_.inRttRound = false;
-      if (!experimental_) {
+      if (!conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart) {
         ssthresh_ = cwndBytes_;
       }
       /* Now we exit slow start, reset currSampledRtt to be maximal value so
@@ -609,7 +609,8 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     }
   }
   uint64_t newCwnd = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
-  if (experimental_ && newCwnd < ssthresh_) {
+  if (conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart &&
+      newCwnd < ssthresh_) {
     auto delta = ack.ackedBytes / 10;
     if (newCwnd < cwndBytes_ + delta) {
       newCwnd = boundedCwnd(

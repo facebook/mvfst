@@ -37,6 +37,11 @@ struct CongestionControlConfig {
   // haven't reached the drain target.
   bool drainToTarget{false};
 
+  // Used by: Cubic
+  // If true, exiting hystart switches to additive increase rather than Cubic
+  // congestion avoidance, similar to Linux kernel behavior.
+  bool additiveIncreaseAfterHystart{false};
+
   // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
   //  The first controls how many ack eliciting packets have to be received
   //  to trigger an ACK.

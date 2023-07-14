@@ -111,7 +111,9 @@ class Cubic : public CongestionController {
   CongestionControlType type() const noexcept override;
 
   void setExperimental(bool experimental) override {
-    experimental_ = experimental;
+    // This is a transitional change. Experimental setting will be removed.
+    conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart =
+        experimental;
   }
 
  protected:
@@ -200,7 +202,6 @@ class Cubic : public CongestionController {
   HystartState hystartState_;
   SteadyState steadyState_;
   RecoveryState recoveryState_;
-  bool experimental_{false};
 };
 
 folly::StringPiece cubicStateToString(CubicStates state);
