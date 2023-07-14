@@ -44,9 +44,10 @@ CubicStates Cubic::state() const noexcept {
 }
 
 uint64_t Cubic::getWritableBytes() const noexcept {
-  return cwndBytes_ > conn_.lossState.inflightBytes
+  auto writableBytes = cwndBytes_ > conn_.lossState.inflightBytes
       ? cwndBytes_ - conn_.lossState.inflightBytes
       : 0;
+  return writableBytes;
 }
 
 void Cubic::handoff(
@@ -105,6 +106,8 @@ void Cubic::onPacketSent(const OutstandingPacketWrapper& packet) {
         LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
   }
   conn_.lossState.inflightBytes += packet.metadata.encodedSize;
+
+  isCwndBlocked_ = conn_.lossState.inflightBytes >= cwndBytes_;
 }
 
 void Cubic::onPacketLoss(const LossEvent& loss) {
@@ -417,6 +420,10 @@ float Cubic::pacingGain() const noexcept {
 }
 
 void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
+  if (conn_.transportSettings.ccaConfig.onlyGrowCwndWhenLimited &&
+      !isCwndBlocked_) {
+    return;
+  }
   if (!hystartState_.inRttRound) {
     startHystartRttRound(ack.ackTime);
   }
@@ -567,6 +574,10 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
           kAckInQuiescence,
           cubicStateToString(state_).str());
     }
+    return;
+  }
+  if (conn_.transportSettings.ccaConfig.onlyGrowCwndWhenLimited &&
+      !isCwndBlocked_) {
     return;
   }
   // TODO: There is a tradeoff between getting an accurate Cwnd by frequently

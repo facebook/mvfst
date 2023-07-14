@@ -42,6 +42,10 @@ struct CongestionControlConfig {
   // congestion avoidance, similar to Linux kernel behavior.
   bool additiveIncreaseAfterHystart{false};
 
+  // Used by: Cubic
+  // Whether to clamp the cwnd growth when the connection is not cwnd limited.
+  bool onlyGrowCwndWhenLimited{false};
+
   // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
   //  The first controls how many ack eliciting packets have to be received
   //  to trigger an ACK.

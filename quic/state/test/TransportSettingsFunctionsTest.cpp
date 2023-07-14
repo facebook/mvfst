@@ -37,6 +37,7 @@ TEST_F(TransportSettingsFunctionsTest, ParseDifferentBoolFormats) {
 TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   std::string testString =
       "{"
+      "\"onlyGrowCwndWhenLimited\": true,"
       "\"additiveIncreaseAfterHystart\": true, "
       "\"conservativeRecovery\": true, "
       "\"largeProbeRttCwnd\": 1, "
@@ -57,6 +58,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.probeRttDisabledIfAppLimited, true);
   EXPECT_EQ(config.drainToTarget, true);
   EXPECT_EQ(config.additiveIncreaseAfterHystart, true);
+  EXPECT_EQ(config.onlyGrowCwndWhenLimited, true);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(config.ackFrequencyConfig->ackElicitingThreshold, 99);

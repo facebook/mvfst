@@ -202,6 +202,7 @@ class Cubic : public CongestionController {
   HystartState hystartState_;
   SteadyState steadyState_;
   RecoveryState recoveryState_;
+  bool isCwndBlocked_{true};
 };
 
 folly::StringPiece cubicStateToString(CubicStates state);
