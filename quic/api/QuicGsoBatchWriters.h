@@ -6,6 +6,7 @@
  */
 
 #pragma once
+#ifndef MVFST_USE_LIBEV
 
 #include <quic/api/QuicBatchWriter.h>
 
@@ -125,3 +126,5 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
 };
 
 } // namespace quic
+
+#endif

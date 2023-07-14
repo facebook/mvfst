@@ -5,7 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "quic/api/QuicGsoBatchWriters.h"
+#ifndef MVFST_USE_LIBEV
+
+#include <quic/api/QuicGsoBatchWriters.h>
 
 namespace {
 // There is a known problem in the CloningScheduler that it may write a packet
@@ -297,3 +299,5 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
 }
 
 } // namespace quic
+
+#endif

@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#ifndef MVFST_USE_LIBEV
+
 #include <quic/api/QuicBatchWriterFactory.h>
 
 #if !FOLLY_MOBILE
@@ -143,6 +145,20 @@ void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
 #endif
 }
 
+BatchWriterPtr makeGsoBatchWriter(uint32_t batchSize) {
+  return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
+}
+
+BatchWriterPtr makeGsoInPlaceBatchWriter(
+    uint32_t batchSize,
+    QuicConnectionStateBase& conn) {
+  return BatchWriterPtr(new GSOInplacePacketBatchWriter(conn, batchSize));
+}
+
+BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t batchSize) {
+  return BatchWriterPtr(new SendmmsgGSOPacketBatchWriter(batchSize));
+}
+
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
@@ -170,32 +186,10 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
   (void)threadLocalDelay;
 #endif
 
-  switch (batchingMode) {
-    case quic::QuicBatchingMode::BATCHING_MODE_NONE:
-      return BatchWriterPtr(new SinglePacketBatchWriter());
-    case quic::QuicBatchingMode::BATCHING_MODE_GSO: {
-      if (gsoSupported) {
-        if (dataPathType == DataPathType::ChainedMemory) {
-          return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
-        }
-        return BatchWriterPtr(new GSOInplacePacketBatchWriter(conn, batchSize));
-      }
-
-      return BatchWriterPtr(new SinglePacketBatchWriter());
-    }
-    case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
-      return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
-    case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {
-      if (gsoSupported) {
-        return BatchWriterPtr(new SendmmsgGSOPacketBatchWriter(batchSize));
-      }
-
-      return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
-    }
-      // no default so we can catch missing case at compile time
-  }
-
-  folly::assume_unreachable();
+  return makeBatchWriterHelper(
+      batchingMode, batchSize, dataPathType, conn, gsoSupported);
 }
 
 } // namespace quic
+
+#endif
