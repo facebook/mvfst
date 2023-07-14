@@ -6,6 +6,8 @@
 add_library(
   mvfst_batch_writer STATIC
   QuicBatchWriter.cpp
+  QuicBatchWriterFactory.cpp
+  QuicGsoBatchWriters.cpp
 )
 
 target_include_directories(

@@ -7,6 +7,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>

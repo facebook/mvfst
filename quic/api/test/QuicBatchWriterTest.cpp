@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicBatchWriter.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <gtest/gtest.h>

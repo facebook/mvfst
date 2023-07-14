@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/IoBufQuicBatch.h>
+#include <quic/api/QuicGsoBatchWriters.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/dsr/backend/DSRPacketizer.h>
 
