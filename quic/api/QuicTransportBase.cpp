@@ -3422,6 +3422,7 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   updatePeekLooper();
   updateWriteLooper(false);
 
+#ifndef MVFST_USE_LIBEV
   if (getSocketObserverContainer() &&
       getSocketObserverContainer()
           ->hasObserversForEvent<
@@ -3432,6 +3433,7 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
               observer->evbAttach(observed, qEvb_.getBackingEventBase());
             });
   }
+#endif
 }
 
 void QuicTransportBase::detachEventBase() {
@@ -3452,6 +3454,7 @@ void QuicTransportBase::detachEventBase() {
   peekLooper_->detachEventBase();
   writeLooper_->detachEventBase();
 
+#ifndef MVFST_USE_LIBEV
   if (getSocketObserverContainer() &&
       getSocketObserverContainer()
           ->hasObserversForEvent<
@@ -3462,6 +3465,7 @@ void QuicTransportBase::detachEventBase() {
               observer->evbDetach(observed, qEvb_.getBackingEventBase());
             });
   }
+#endif
 
   qEvb_.setBackingEventBase(nullptr);
   qEvbPtr_ = nullptr;
