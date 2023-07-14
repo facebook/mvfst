@@ -83,6 +83,7 @@ add_dependencies(
   mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
+  mvfst_transport_settings_functions
 )
 
 add_library(
@@ -150,6 +151,7 @@ target_link_libraries(
   mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
+  mvfst_transport_settings_functions
 )
 
 target_link_libraries(

@@ -12,6 +12,7 @@
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/TransportSettingsFunctions.h>
 
 #include <folly/Optional.h>
 #include <quic/common/TransportKnobs.h>
@@ -1080,6 +1081,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverConn->transportSettings.priorityQueueWritesPerStream = val;
         serverConn->streamManager->writeQueue().setMaxNextsPerStream(val);
         VLOG(3) << "WRITES_PER_STREAM KnobParam received: " << val;
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<std::string>(value);
+        serverTransport->conn_->transportSettings.ccaConfig =
+            parseCongestionControlConfig(val);
+        VLOG(3) << "CC_CONFIG KnobParam received: " << val;
       });
 }
 

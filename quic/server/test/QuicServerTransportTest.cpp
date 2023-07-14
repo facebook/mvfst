@@ -4744,6 +4744,39 @@ TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
         uint64_t{0}}});
 }
 
+TEST_F(QuicServerTransportTest, TestCCConfigKnobHandler) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+        std::string("{\"conservativeRecovery\": true}")}});
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, true);
+  EXPECT_EQ(transportSettings.ccaConfig.ackFrequencyConfig.has_value(), false);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+        std::string(
+            R"({"drainToTarget": true, "ackFrequencyConfig":{"minRttDivisor": 77}})")}});
+
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
+  EXPECT_EQ(transportSettings.ccaConfig.drainToTarget, true);
+  ASSERT_EQ(transportSettings.ccaConfig.ackFrequencyConfig.has_value(), true);
+  EXPECT_EQ(transportSettings.ccaConfig.ackFrequencyConfig->minRttDivisor, 77);
+}
+
+TEST_F(QuicServerTransportTest, TestCCConfigKnobHandlerInvalidJSON) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+        std::string(R"({"conservativeRecovery": "blabla"})")}});
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
+}
+
 TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
   auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();
