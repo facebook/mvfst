@@ -10,8 +10,8 @@
 #include <folly/Portability.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
-#include <quic/common/Events.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/state/StateData.h>
 
 namespace quic {

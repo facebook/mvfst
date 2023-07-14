@@ -12,7 +12,7 @@
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/portability/Sockets.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 
 namespace quic {
 

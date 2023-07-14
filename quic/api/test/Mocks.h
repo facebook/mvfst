@@ -13,7 +13,7 @@
 #include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/codec/QuicConnectionId.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/common/Timers.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/state/StateData.h>

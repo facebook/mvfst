@@ -8,7 +8,7 @@
 #pragma once
 
 #ifdef MVFST_USE_LIBEV
-#include <quic/common/EventsMobile.h>
+#include <quic/common/QuicLibevEventBase.h>
 
 #include <ev.h>
 #else
@@ -30,6 +30,11 @@ using QuicAsyncTimeout = folly::AsyncTimeout;
 using QuicTimerCallback = folly::HHWheelTimer::Callback;
 #endif
 
+/**
+ * This is a default event base implementation of QuicEventBaseInterface that
+ * mvfst uses by default. It's using folly::EventBase as <QuicBackingEventBase>
+ * implementation underneath.
+ */
 class QuicEventBase : public QuicEventBaseInterface<
                           QuicEventBaseLoopCallback,
                           QuicBackingEventBase,

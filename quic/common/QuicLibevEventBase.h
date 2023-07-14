@@ -53,6 +53,10 @@ class QuicTimerCallback {
   void cancelTimeout() {}
 };
 
+/**
+ * An implementation of QuicBackingEventBase that uses libevent underneath.
+ * This is used in QuicEventBase class as a backend to drive events.
+ */
 class QuicLibevEventBase {
  public:
   QuicLibevEventBase() = default;

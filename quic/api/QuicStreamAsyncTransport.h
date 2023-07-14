@@ -9,7 +9,7 @@
 
 #include <folly/io/async/AsyncTransport.h>
 #include <quic/api/QuicSocket.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 
 namespace quic {
 

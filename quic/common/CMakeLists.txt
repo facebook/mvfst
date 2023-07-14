@@ -72,7 +72,7 @@ target_link_libraries(
 
 add_library(
   mvfst_events STATIC
-  Events.cpp
+  QuicEventBase.cpp
 )
 
 target_include_directories(

@@ -10,9 +10,9 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
-#include <quic/common/Events.h>
 #include <quic/common/FunctionLooper.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/Copa.h>

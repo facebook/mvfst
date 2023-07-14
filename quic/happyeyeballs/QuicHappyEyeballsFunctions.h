@@ -8,7 +8,7 @@
 #pragma once
 
 #include <quic/client/state/ClientStateMachine.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 
 #include <folly/io/SocketOptionMap.h>
 #include <folly/net/NetOps.h>

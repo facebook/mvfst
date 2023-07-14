@@ -13,6 +13,9 @@
 
 namespace quic {
 
+/**
+ * An interface mvfst expects from event base implementation.
+ */
 template <
     class LoopCallbackT,
     class BackingEventBaseT,

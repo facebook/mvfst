@@ -15,8 +15,8 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
-#include <quic/common/Events.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
