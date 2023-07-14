@@ -45,14 +45,14 @@ class QuicBackingEventBase {
  public:
   QuicBackingEventBase() = default;
 
-  void runInLoop(std::function<void()> /* cb */, bool /* thisIteration */) {}
+  void runInLoop(folly::Function<void()> /* cb */, bool /* thisIteration */) {}
   void runInLoop(
       QuicEventBaseLoopCallback* /* callback */,
       bool /* thisIteration */) {}
   void runAfterDelay(
-      std::function<void()> /* cb */,
+      folly::Function<void()> /* cb */,
       uint32_t /* milliseconds */) {}
-  void runInEventBaseThreadAndWait(std::function<void()> /* fn */) noexcept {}
+  void runInEventBaseThreadAndWait(folly::Function<void()> /* fn */) noexcept {}
   bool isInEventBaseThread() const {
     return false;
   }

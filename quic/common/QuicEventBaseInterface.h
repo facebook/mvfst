@@ -7,9 +7,9 @@
 
 #pragma once
 
+#include <folly/Function.h>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 
 namespace quic {
 
@@ -27,14 +27,14 @@ class QuicEventBaseInterface {
 
   virtual void runInLoop(LoopCallbackT* callback, bool thisIteration) = 0;
 
-  virtual void runInLoop(std::function<void()> cb, bool thisIteration) = 0;
+  virtual void runInLoop(folly::Function<void()> cb, bool thisIteration) = 0;
 
   virtual void runAfterDelay(
-      std::function<void()> cb,
+      folly::Function<void()> cb,
       uint32_t milliseconds) = 0;
 
   virtual void runInEventBaseThreadAndWait(
-      std::function<void()> fn) noexcept = 0;
+      folly::Function<void()> fn) noexcept = 0;
 
   virtual bool isInEventBaseThread() const = 0;
 

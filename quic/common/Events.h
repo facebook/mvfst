@@ -49,11 +49,14 @@ class QuicEventBase : public QuicEventBaseInterface<
       QuicEventBaseLoopCallback* callback,
       bool thisIteration = false) override;
 
-  void runInLoop(std::function<void()> cb, bool thisIteration = false) override;
+  void runInLoop(folly::Function<void()> cb, bool thisIteration = false)
+      override;
 
-  void runAfterDelay(std::function<void()> cb, uint32_t milliseconds) override;
+  void runAfterDelay(folly::Function<void()> cb, uint32_t milliseconds)
+      override;
 
-  void runInEventBaseThreadAndWait(std::function<void()> fn) noexcept override;
+  void runInEventBaseThreadAndWait(
+      folly::Function<void()> fn) noexcept override;
 
   [[nodiscard]] bool isInEventBaseThread() const override;
 

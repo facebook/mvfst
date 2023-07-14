@@ -11,11 +11,11 @@
 
 namespace quic {
 
-void QuicEventBase::setBackingEventBase(QuicBackingEventBase* evb) {
+void QuicEventBase::setBackingEventBase(QuicLibevEventBase* evb) {
   backingEvb_ = evb;
 }
 
-QuicBackingEventBase* QuicEventBase::getBackingEventBase() const {
+QuicLibevEventBase* QuicEventBase::getBackingEventBase() const {
   return backingEvb_;
 }
 
@@ -25,18 +25,18 @@ void QuicEventBase::runInLoop(
   return backingEvb_->runInLoop(callback, thisIteration);
 }
 
-void QuicEventBase::runInLoop(std::function<void()> cb, bool thisIteration) {
+void QuicEventBase::runInLoop(folly::Function<void()> cb, bool thisIteration) {
   return backingEvb_->runInLoop(std::move(cb), thisIteration);
 }
 
 void QuicEventBase::runAfterDelay(
-    std::function<void()> cb,
+    folly::Function<void()> cb,
     uint32_t milliseconds) {
   return backingEvb_->runAfterDelay(std::move(cb), milliseconds);
 }
 
 void QuicEventBase::runInEventBaseThreadAndWait(
-    std::function<void()> fn) noexcept {
+    folly::Function<void()> fn) noexcept {
   return backingEvb_->runInEventBaseThreadAndWait(std::move(fn));
 }
 
