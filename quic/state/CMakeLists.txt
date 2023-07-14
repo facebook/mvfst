@@ -291,6 +291,29 @@ target_link_libraries(
   mvfst_state_stream_functions
 )
 
+# transport settings functions
+add_library(
+  mvfst_transport_settings_functions STATIC
+  TransportSettingsFunctions.cpp
+)
+
+target_include_directories(
+  mvfst_transport_settings_functions PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_transport_settings_functions
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_transport_settings_functions PUBLIC
+  Folly::folly
+)
+
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -346,6 +369,12 @@ install(
 
 install(
   TARGETS mvfst_state_stream
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_transport_settings_functions
   EXPORT mvfst-exports
   DESTINATION lib
 )

@@ -70,3 +70,11 @@ quic_add_test(TARGET QuicPacingFunctionsTest
   DEPENDS
   mvfst_state_pacing_functions
 )
+
+quic_add_test(TARGET QuicTransportSettingsFunctionsTest
+  SOURCES
+  TransportSettingsFunctionsTest.cpp
+  DEPENDS
+  mvfst_test_utils
+  mvfst_transport_settings_functions
+)
