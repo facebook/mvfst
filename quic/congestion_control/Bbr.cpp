@@ -268,7 +268,7 @@ void BbrCongestionController::onPacketAcked(
   if (newRoundTrip && canSendAckControlFrames(conn_) && ackFrequencyConfig) {
     auto updatedMaxAckDelay =
         std::chrono::duration_cast<std::chrono::milliseconds>(clampMaxAckDelay(
-            conn_, minRtt() / ackFrequencyConfig->minRttDivisor));
+            conn_, conn_.lossState.srtt / ackFrequencyConfig->minRttDivisor));
     // If we are either in STARTUP or haven't sent enough packets, based on
     // config.
     bool shouldUseInitThreshold =
