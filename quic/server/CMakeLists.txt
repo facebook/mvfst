@@ -158,6 +158,7 @@ target_link_libraries(
   mvfst_server_async_tran PUBLIC
   Folly::folly
   ${LIBFIZZ_LIBRARY}
+  mvfst_server
   mvfst_buf_accessor
   mvfst_constants
   mvfst_codec
