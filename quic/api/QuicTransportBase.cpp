@@ -3645,6 +3645,13 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
     // Default to disabling opportunistic ACKing for DSR since it causes extra
     // writes and spurious losses.
     conn_->transportSettings.opportunisticAcking = false;
+    // Also turn on the default of 5 nexts per stream which has empirically
+    // shown good results.
+    if (conn_->transportSettings.priorityQueueWritesPerStream == 1) {
+      conn_->transportSettings.priorityQueueWritesPerStream = 5;
+      conn_->streamManager->writeQueue().setMaxNextsPerStream(5);
+    }
+
     // Fow now, no appLimited or appIdle update here since we are not writing
     // either BufferMetas yet. The first BufferMeta write will update it.
   } catch (const QuicTransportException& ex) {
