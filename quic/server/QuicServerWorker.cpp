@@ -22,6 +22,7 @@
 #endif
 
 #include <folly/Conv.h>
+#include <folly/Utility.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
@@ -698,7 +699,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
         "Dropping packet due to DCID parsing error={}, errorCode={},"
         "routingInfo = {} ",
         ex.what(),
-        ex.errorCode(),
+        folly::to_underlying(ex.errorCode()),
         logRoutingInfo(dstConnId));
     // TODO do we need to reset?
     return PacketDropReason::PARSE_ERROR_DCID;
