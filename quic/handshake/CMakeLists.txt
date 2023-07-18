@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_handshake STATIC
+  mvfst_handshake
   CryptoFactory.cpp
   HandshakeLayer.cpp
   TransportParameters.cpp

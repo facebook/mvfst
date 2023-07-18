@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_loss STATIC
+  mvfst_loss
   QuicLossFunctions.cpp
 )
 

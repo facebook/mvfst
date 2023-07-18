@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_fizz_handshake STATIC
+  mvfst_fizz_handshake
   FizzBridge.cpp
   FizzCryptoFactory.cpp
   FizzPacketNumberCipher.cpp
