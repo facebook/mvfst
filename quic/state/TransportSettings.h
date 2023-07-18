@@ -46,6 +46,11 @@ struct CongestionControlConfig {
   // Whether to clamp the cwnd growth when the connection is not cwnd limited.
   bool onlyGrowCwndWhenLimited{false};
 
+  // Used by: Cubic
+  // Whether to leave headroom when deciding that the connection is cwnd
+  // limited.
+  bool leaveHeadroomForCwndLimited{false};
+
   // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
   //  The first controls how many ack eliciting packets have to be received
   //  to trigger an ACK.
