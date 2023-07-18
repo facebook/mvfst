@@ -44,6 +44,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"enableAckAggregationInStartup\": \"true\", "
       "\"probeRttDisabledIfAppLimited\": 2, "
       "\"drainToTarget\": \"1\", "
+      "\"leaveHeadroomForCwndLimited\": \"1\", "
       "\"ackFrequencyConfig\": {"
       "\"ackElicitingThreshold\": 99, "
       "\"reorderingThreshold\": \"88\", "
@@ -59,6 +60,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.drainToTarget, true);
   EXPECT_EQ(config.additiveIncreaseAfterHystart, true);
   EXPECT_EQ(config.onlyGrowCwndWhenLimited, true);
+  EXPECT_EQ(config.leaveHeadroomForCwndLimited, true);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(config.ackFrequencyConfig->ackElicitingThreshold, 99);
