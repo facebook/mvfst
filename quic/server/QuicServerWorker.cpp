@@ -698,7 +698,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
         "Dropping packet due to DCID parsing error={}, errorCode={},"
         "routingInfo = {} ",
         ex.what(),
-        ex.errorCode(),
+        folly::to_underlying(ex.errorCode()),
         logRoutingInfo(dstConnId));
     // TODO do we need to reset?
     return PacketDropReason::PARSE_ERROR_DCID;
