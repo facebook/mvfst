@@ -254,7 +254,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_state_stream STATIC
+  mvfst_state_stream
   stream/StreamStateFunctions.cpp
   stream/StreamSendHandlers.cpp
   stream/StreamReceiveHandlers.cpp
@@ -293,7 +293,7 @@ target_link_libraries(
 
 # transport settings functions
 add_library(
-  mvfst_transport_settings_functions STATIC
+  mvfst_transport_settings_functions
   TransportSettingsFunctions.cpp
 )
 
