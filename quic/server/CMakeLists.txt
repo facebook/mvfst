@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_server_state STATIC
+  mvfst_server_state
   handshake/AppToken.cpp
   handshake/ServerHandshake.cpp
   handshake/StatelessResetGenerator.cpp
@@ -39,7 +39,7 @@ add_dependencies(
 
 
 add_library(
-  mvfst_server STATIC
+  mvfst_server
   QuicServer.cpp
   QuicServerBackend.cpp
   QuicServerPacketRouter.cpp
@@ -87,7 +87,7 @@ add_dependencies(
 )
 
 add_library(
-  mvfst_server_async_tran STATIC
+  mvfst_server_async_tran
   async_tran/QuicAsyncTransportAcceptor.cpp
   async_tran/QuicAsyncTransportServer.cpp
   async_tran/QuicServerAsyncTransport.cpp

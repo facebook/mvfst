@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_codec_types STATIC
+  mvfst_codec_types
   DefaultConnectionIdAlgo.cpp
   PacketNumber.cpp
   QuicConnectionId.cpp
@@ -41,7 +41,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_codec_decode STATIC
+  mvfst_codec_decode
   Decode.cpp
 )
 
@@ -71,7 +71,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_codec_packet_number_cipher STATIC
+  mvfst_codec_packet_number_cipher
   PacketNumberCipher.cpp
 )
 
@@ -101,7 +101,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_codec_pktbuilder STATIC
+  mvfst_codec_pktbuilder
   QuicPacketBuilder.cpp
 )
 
@@ -131,7 +131,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_codec_pktrebuilder STATIC
+  mvfst_codec_pktrebuilder
   QuicPacketRebuilder.cpp
 )
 
@@ -169,7 +169,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_codec STATIC
+  mvfst_codec
   QuicHeaderCodec.cpp
   QuicReadCodec.cpp
   QuicWriteCodec.cpp

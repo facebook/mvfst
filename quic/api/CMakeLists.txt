@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_batch_writer STATIC
+  mvfst_batch_writer
   QuicBatchWriter.cpp
   QuicBatchWriterFactory.cpp
   QuicBatchWriterFactoryMobile.cpp
@@ -41,7 +41,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_transport STATIC
+  mvfst_transport
   IoBufQuicBatch.cpp
   QuicPacketScheduler.cpp
   QuicStreamAsyncTransport.cpp

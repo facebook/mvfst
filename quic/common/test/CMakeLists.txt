@@ -8,7 +8,7 @@ if(NOT BUILD_TESTS)
 endif()
 
 add_library(
-  mvfst_test_utils STATIC
+  mvfst_test_utils
   TestPacketBuilders.cpp
   TestUtils.cpp
   AeadTestUtil.cpp
