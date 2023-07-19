@@ -28,7 +28,7 @@ namespace test {
 using PacketStreamDetails = OutstandingPacketMetadata::StreamDetails;
 
 uint64_t writeProbingDataToSocketForTest(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& conn,
     uint8_t probesToSend,
     const Aead& aead,
@@ -59,7 +59,7 @@ uint64_t writeProbingDataToSocketForTest(
 }
 
 void writeCryptoDataProbesToSocketForTest(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& conn,
     uint8_t probesToSend,
     const Aead& aead,

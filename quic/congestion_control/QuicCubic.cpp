@@ -44,9 +44,10 @@ CubicStates Cubic::state() const noexcept {
 }
 
 uint64_t Cubic::getWritableBytes() const noexcept {
-  return cwndBytes_ > conn_.lossState.inflightBytes
+  auto writableBytes = cwndBytes_ > conn_.lossState.inflightBytes
       ? cwndBytes_ - conn_.lossState.inflightBytes
       : 0;
+  return writableBytes;
 }
 
 void Cubic::handoff(
@@ -105,6 +106,14 @@ void Cubic::onPacketSent(const OutstandingPacketWrapper& packet) {
         LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
   }
   conn_.lossState.inflightBytes += packet.metadata.encodedSize;
+
+  if (conn_.transportSettings.ccaConfig.leaveHeadroomForCwndLimited) {
+    // Consider cwndBlocked if inflight bytes >= 0.75 * cwnd
+    isCwndBlocked_ =
+        conn_.lossState.inflightBytes >= (cwndBytes_ - (cwndBytes_ >> 2));
+  } else {
+    isCwndBlocked_ = conn_.lossState.inflightBytes >= cwndBytes_;
+  }
 }
 
 void Cubic::onPacketLoss(const LossEvent& loss) {
@@ -417,6 +426,10 @@ float Cubic::pacingGain() const noexcept {
 }
 
 void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
+  if (conn_.transportSettings.ccaConfig.onlyGrowCwndWhenLimited &&
+      !isCwndBlocked_) {
+    return;
+  }
   if (!hystartState_.inRttRound) {
     startHystartRttRound(ack.ackTime);
   }
@@ -449,7 +462,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
                        ? "cwnd > ssthresh"
                        : "found exit point");
       hystartState_.inRttRound = false;
-      if (!experimental_) {
+      if (!conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart) {
         ssthresh_ = cwndBytes_;
       }
       /* Now we exit slow start, reset currSampledRtt to be maximal value so
@@ -569,6 +582,10 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     }
     return;
   }
+  if (conn_.transportSettings.ccaConfig.onlyGrowCwndWhenLimited &&
+      !isCwndBlocked_) {
+    return;
+  }
   // TODO: There is a tradeoff between getting an accurate Cwnd by frequently
   // calculating it, and the CPU usage cost. This is worth experimenting. E.g.,
   // Chromium has an option to skips the cwnd calculation if it's configured to
@@ -609,7 +626,8 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     }
   }
   uint64_t newCwnd = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
-  if (experimental_ && newCwnd < ssthresh_) {
+  if (conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart &&
+      newCwnd < ssthresh_) {
     auto delta = ack.ackedBytes / 10;
     if (newCwnd < cwndBytes_ + delta) {
       newCwnd = boundedCwnd(

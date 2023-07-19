@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_cc_algo STATIC
+  mvfst_cc_algo
   Bandwidth.cpp
   Bbr.cpp
   BbrBandwidthSampler.cpp

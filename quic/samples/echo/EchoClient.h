@@ -196,7 +196,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     folly::SocketAddress addr(host_.c_str(), port_);
 
     evb->runInEventBaseThreadAndWait([&] {
-      auto sock = std::make_unique<folly::AsyncUDPSocket>(evb);
+      auto sock = std::make_unique<QuicAsyncUDPSocketType>(evb);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())

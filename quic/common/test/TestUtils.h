@@ -67,7 +67,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
 
 PacketNum rstStreamAndSendPacket(
     QuicServerConnectionState& conn,
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicStreamState& stream,
     ApplicationErrorCode errorCode);
 
@@ -365,10 +365,10 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& /*unused*/,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      folly::AsyncUDPSocket* /*unused*/) override;
+      QuicAsyncUDPSocketType* /*unused*/) override;
 
   ssize_t write(
-      folly::AsyncUDPSocket& /*unused*/,
+      QuicAsyncUDPSocketType& /*unused*/,
       const folly::SocketAddress& /*unused*/) override;
 
   size_t getBufSize() const {

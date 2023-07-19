@@ -8,11 +8,11 @@
 #pragma once
 
 #include <quic/client/state/ClientStateMachine.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 
 #include <folly/io/SocketOptionMap.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/net/NetOps.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <chrono>
 #include <memory>
@@ -31,25 +31,25 @@ void happyEyeballsAddPeerAddress(
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
-    std::unique_ptr<folly::AsyncUDPSocket> socket);
+    std::unique_ptr<QuicAsyncUDPSocketType> socket);
 
 void startHappyEyeballs(
     QuicClientConnectionState& connection,
     QuicEventBase* evb,
     sa_family_t cachedFamily,
-    folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
+    QuicTimerCallback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttemptDelay,
-    folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
 void happyEyeballsSetUpSocket(
-    folly::AsyncUDPSocket& socket,
+    QuicAsyncUDPSocketType& socket,
     folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
-    folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
 void happyEyeballsStartSecondSocket(
@@ -57,7 +57,7 @@ void happyEyeballsStartSecondSocket(
 
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
-    folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
-    std::unique_ptr<folly::AsyncUDPSocket>& socket,
+    QuicTimerCallback& connAttemptDelayTimeout,
+    std::unique_ptr<QuicAsyncUDPSocketType>& socket,
     const folly::SocketAddress& peerAddress);
 } // namespace quic

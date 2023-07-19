@@ -45,7 +45,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::unique_ptr<QuicAsyncUDPSocketType> sock,
       const folly::SocketAddress&,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept

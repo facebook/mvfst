@@ -31,7 +31,7 @@ using namespace testing;
 using namespace folly;
 
 using OnDataAvailableParams =
-    folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams;
+    quic::QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams;
 
 const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
 const folly::SocketAddress kClientAddr2("1.2.3.5", 1235);
@@ -1949,7 +1949,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
         takeoverWorker_->setProcessId(ProcessId::ZERO);
 
         // now invoke the Takeover Handler callback
-        folly::AsyncUDPSocket::ReadCallback* takeoverCb =
+        QuicAsyncUDPSocketWrapper::ReadCallback* takeoverCb =
             takeoverWorker_->getTakeoverHandlerCallback();
         uint8_t* workerBuf = nullptr;
         size_t workerBufLen = 0;
@@ -2008,13 +2008,13 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
 }
 
 TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverCbReadClose) {
-  folly::AsyncUDPSocket::ReadCallback* takeoverCb =
+  QuicAsyncUDPSocketWrapper::ReadCallback* takeoverCb =
       takeoverWorker_->getTakeoverHandlerCallback();
   takeoverCb->onReadClosed();
 }
 
 TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverCbReadError) {
-  folly::AsyncUDPSocket::ReadCallback* takeoverCb =
+  QuicAsyncUDPSocketWrapper::ReadCallback* takeoverCb =
       takeoverWorker_->getTakeoverHandlerCallback();
   EXPECT_CALL(*takeoverSocket_, pauseRead());
   folly::AsyncSocketException ex(
@@ -2093,7 +2093,7 @@ class QuicServerTest : public Test {
 
   std::shared_ptr<MockQuicTransport> createNewTransport(
       folly::EventBase* eventBase,
-      folly::AsyncUDPSocket& client,
+      QuicAsyncUDPSocketType& client,
       folly::SocketAddress serverAddr) {
     // create payload
     StreamId id = 1;
@@ -2127,7 +2127,7 @@ class QuicServerTest : public Test {
 
     auto makeTransport =
         [&](folly::EventBase* evb,
-            std::unique_ptr<folly::AsyncUDPSocket>& /* socket */,
+            std::unique_ptr<QuicAsyncUDPSocketType>& /* socket */,
             const folly::SocketAddress&,
             std::shared_ptr<const fizz::server::FizzServerContext>) noexcept {
           // set proper expectations for the transport after its creation
@@ -2184,18 +2184,18 @@ class QuicServerTest : public Test {
     return transport;
   }
 
-  std::unique_ptr<folly::AsyncUDPSocket> makeUdpClient() {
+  std::unique_ptr<QuicAsyncUDPSocketType> makeUdpClient() {
     folly::SocketAddress addr2("::1", 0);
-    std::unique_ptr<folly::AsyncUDPSocket> client;
+    std::unique_ptr<QuicAsyncUDPSocketType> client;
     evbThread_.getEventBase()->runInEventBaseThreadAndWait([&] {
       client =
-          std::make_unique<folly::AsyncUDPSocket>(evbThread_.getEventBase());
+          std::make_unique<QuicAsyncUDPSocketType>(evbThread_.getEventBase());
       client->bind(addr2);
     });
     return client;
   }
 
-  void closeUdpClient(std::unique_ptr<folly::AsyncUDPSocket> client) {
+  void closeUdpClient(std::unique_ptr<QuicAsyncUDPSocketType> client) {
     evbThread_.getEventBase()->runInEventBaseThreadAndWait(
         [&] { client->close(); });
   }
@@ -2396,7 +2396,7 @@ class QuicServerTakeoverTest : public Test {
     NiceMock<MockConnectionCallback> connCb;
     auto makeTransport =
         [&](folly::EventBase* eventBase,
-            std::unique_ptr<folly::AsyncUDPSocket>& socket,
+            std::unique_ptr<QuicAsyncUDPSocketType>& socket,
             const folly::SocketAddress&,
             std::shared_ptr<const fizz::server::FizzServerContext>
                 ctx) noexcept {
@@ -2470,10 +2470,10 @@ class QuicServerTakeoverTest : public Test {
     oldServer_->allowBeingTakenOver(takeoverAddr);
 
     folly::SocketAddress clientAddr("::1", 0);
-    std::unique_ptr<folly::AsyncUDPSocket> client;
+    std::unique_ptr<QuicAsyncUDPSocketType> client;
     evbThread_.getEventBase()->runInEventBaseThreadAndWait([&] {
       client =
-          std::make_unique<folly::AsyncUDPSocket>(evbThread_.getEventBase());
+          std::make_unique<QuicAsyncUDPSocketType>(evbThread_.getEventBase());
       client->bind(clientAddr);
     });
     // send packet to the server and wait
@@ -2609,7 +2609,7 @@ TEST_F(QuicServerTakeoverTest, TakeoverTest) {
   runTest(evbs1, evbs2);
 }
 
-struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
+struct UDPReader : public QuicAsyncUDPSocketWrapper::ReadCallback {
   UDPReader() {
     bufPromise_ =
         std::make_unique<folly::Promise<std::unique_ptr<folly::IOBuf>>>();
@@ -2620,7 +2620,7 @@ struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
   void start(EventBase* evb, SocketAddress addr) {
     evb_ = evb;
     evb_->runInEventBaseThreadAndWait([&] {
-      client = std::make_unique<folly::AsyncUDPSocket>(evb_);
+      client = std::make_unique<QuicAsyncUDPSocketType>(evb_);
       client->bind(addr);
       client->resumeRead(this);
     });
@@ -2680,7 +2680,7 @@ struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
   std::unique_ptr<folly::IOBuf> buf_;
   std::mutex bufLock_;
   std::unique_ptr<folly::Promise<std::unique_ptr<folly::IOBuf>>> bufPromise_;
-  std::unique_ptr<folly::AsyncUDPSocket> client;
+  std::unique_ptr<QuicAsyncUDPSocketType> client;
   EventBase* evb_;
 };
 
@@ -2975,7 +2975,7 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
 
   auto makeTransport =
       [&](folly::EventBase* eventBase,
-          std::unique_ptr<folly::AsyncUDPSocket>& socket,
+          std::unique_ptr<QuicAsyncUDPSocketType>& socket,
           const folly::SocketAddress&,
           std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
         transport = std::make_shared<MockQuicTransport>(
@@ -3071,7 +3071,7 @@ TEST_F(QuicServerTest, ZeroRttBeforeInitial) {
   std::vector<Buf> receivedData;
   auto makeTransport =
       [&](folly::EventBase* eventBase,
-          std::unique_ptr<folly::AsyncUDPSocket>& socket,
+          std::unique_ptr<QuicAsyncUDPSocketType>& socket,
           const folly::SocketAddress&,
           std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
         transport = std::make_shared<MockQuicTransport>(

@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 #include <quic/client/connector/QuicConnector.h>
 #include <quic/client/test/Mocks.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
@@ -31,7 +32,7 @@ class QuicConnectorTest : public Test {
     auto verifier = createTestCertificateVerifier();
     auto clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     auto pskCache = std::make_shared<BasicQuicPskCache>();
-    auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventBase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketType>(&eventBase_);
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)

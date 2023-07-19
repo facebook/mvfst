@@ -5,17 +5,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifndef MVFST_USE_LIBEV
+#ifdef MVFST_USE_LIBEV
 
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 
 namespace quic {
 
-void QuicEventBase::setBackingEventBase(QuicBackingEventBase* evb) {
+void QuicEventBase::setBackingEventBase(QuicLibevEventBase* evb) {
   backingEvb_ = evb;
 }
 
-QuicBackingEventBase* QuicEventBase::getBackingEventBase() const {
+QuicLibevEventBase* QuicEventBase::getBackingEventBase() const {
   return backingEvb_;
 }
 
@@ -25,18 +25,18 @@ void QuicEventBase::runInLoop(
   return backingEvb_->runInLoop(callback, thisIteration);
 }
 
-void QuicEventBase::runInLoop(std::function<void()> cb, bool thisIteration) {
+void QuicEventBase::runInLoop(folly::Function<void()> cb, bool thisIteration) {
   return backingEvb_->runInLoop(std::move(cb), thisIteration);
 }
 
 void QuicEventBase::runAfterDelay(
-    std::function<void()> cb,
+    folly::Function<void()> cb,
     uint32_t milliseconds) {
   return backingEvb_->runAfterDelay(std::move(cb), milliseconds);
 }
 
 void QuicEventBase::runInEventBaseThreadAndWait(
-    std::function<void()> fn) noexcept {
+    folly::Function<void()> fn) noexcept {
   return backingEvb_->runInEventBaseThreadAndWait(std::move(fn));
 }
 
@@ -48,10 +48,6 @@ bool QuicEventBase::scheduleTimeoutHighRes(
     QuicAsyncTimeout* obj,
     std::chrono::microseconds timeout) {
   return backingEvb_->scheduleTimeoutHighRes(obj, timeout);
-}
-
-QuicHHWheelTimer& QuicEventBase::timer() {
-  return backingEvb_->timer();
 }
 
 bool QuicEventBase::loopOnce(int flags) {
@@ -74,6 +70,16 @@ void QuicEventBase::terminateLoopSoon() {
   return backingEvb_->terminateLoopSoon();
 }
 
+void QuicEventBase::scheduleTimeout(
+    QuicTimerCallback* callback,
+    std::chrono::milliseconds timeout) {
+  return backingEvb_->scheduleTimeout(callback, timeout);
+}
+
+std::chrono::milliseconds QuicEventBase::getTimerTickInterval() const {
+  return backingEvb_->getTimerTickInterval();
+}
+
 } // namespace quic
 
-#endif // !MVFST_USE_LIBEV
+#endif // MVFST_USE_LIBEV

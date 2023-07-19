@@ -23,7 +23,7 @@ namespace quic {
  * drops the connection.
  */
 class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
-                      private folly::HHWheelTimer::Callback {
+                      private QuicTimerCallback {
  public:
   /**
    * Callback to report success/error and first packet processed.

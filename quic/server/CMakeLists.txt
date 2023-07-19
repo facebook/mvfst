@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_server_state STATIC
+  mvfst_server_state
   handshake/AppToken.cpp
   handshake/ServerHandshake.cpp
   handshake/StatelessResetGenerator.cpp
@@ -39,7 +39,7 @@ add_dependencies(
 
 
 add_library(
-  mvfst_server STATIC
+  mvfst_server
   QuicServer.cpp
   QuicServerBackend.cpp
   QuicServerPacketRouter.cpp
@@ -83,10 +83,11 @@ add_dependencies(
   mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
+  mvfst_transport_settings_functions
 )
 
 add_library(
-  mvfst_server_async_tran STATIC
+  mvfst_server_async_tran
   async_tran/QuicAsyncTransportAcceptor.cpp
   async_tran/QuicAsyncTransportServer.cpp
   async_tran/QuicServerAsyncTransport.cpp
@@ -150,12 +151,14 @@ target_link_libraries(
   mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
+  mvfst_transport_settings_functions
 )
 
 target_link_libraries(
   mvfst_server_async_tran PUBLIC
   Folly::folly
   ${LIBFIZZ_LIBRARY}
+  mvfst_server
   mvfst_buf_accessor
   mvfst_constants
   mvfst_codec

@@ -9,6 +9,7 @@
 
 #include <folly/portability/GMock.h>
 
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicServerWorker.h>
@@ -37,7 +38,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
   // wrapper for mocked make since gmock doesn't support methods with rvalue ref
   QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       const folly::SocketAddress& addr,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
@@ -49,7 +50,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       (QuicServerTransport::Ptr),
       _make,
       (folly::EventBase*,
-       std::unique_ptr<folly::AsyncUDPSocket>&,
+       std::unique_ptr<QuicAsyncUDPSocketType>&,
        const folly::SocketAddress&,
        std::shared_ptr<const fizz::server::FizzServerContext>),
       (noexcept));
@@ -99,10 +100,11 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
 class MockQuicUDPSocketFactory : public QuicUDPSocketFactory {
  public:
   ~MockQuicUDPSocketFactory() = default;
-  std::unique_ptr<folly::AsyncUDPSocket> make(folly::EventBase* evb, int fd) {
-    return std::unique_ptr<folly::AsyncUDPSocket>(_make(evb, fd));
+  std::unique_ptr<QuicAsyncUDPSocketType> make(folly::EventBase* evb, int fd)
+      override {
+    return std::unique_ptr<QuicAsyncUDPSocketType>(_make(evb, fd));
   }
-  MOCK_METHOD(folly::AsyncUDPSocket*, _make, (folly::EventBase*, int));
+  MOCK_METHOD(QuicAsyncUDPSocketType*, _make, (folly::EventBase*, int));
 };
 
 class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
@@ -146,7 +148,7 @@ class MockQuicServerTransport : public QuicServerTransport {
  public:
   MockQuicServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket)
+      std::unique_ptr<QuicAsyncUDPSocketType> socket)
       : QuicServerTransport(evb, std::move(socket), nullptr, nullptr, nullptr) {
   }
   MOCK_CONST_METHOD0(getOneRttCipherInfo, CipherInfo());

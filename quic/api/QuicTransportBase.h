@@ -10,8 +10,9 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
-#include <quic/common/Events.h>
 #include <quic/common/FunctionLooper.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/Copa.h>
@@ -20,7 +21,6 @@
 #include <quic/state/StateData.h>
 
 #include <folly/ExceptionWrapper.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/HHWheelTimer.h>
 
 namespace quic {
@@ -38,15 +38,19 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
 class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
-      folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      QuicBackingEventBase* evb,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       bool useConnectionEndWithErrorCallback = false);
 
   ~QuicTransportBase() override;
 
+  void scheduleTimeout(
+      QuicTimerCallback* callback,
+      std::chrono::milliseconds timeout);
+
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
 
-  folly::EventBase* getEventBase() const override;
+  [[nodiscard]] QuicBackingEventBase* getEventBase() const override;
 
   folly::Optional<ConnectionId> getClientConnectionId() const override;
 
@@ -248,7 +252,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void detachEventBase() override;
 
-  void attachEventBase(folly::EventBase* evb) override;
+  void attachEventBase(QuicBackingEventBase* evb) override;
 
   folly::Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
@@ -447,7 +451,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void clearBackgroundModeParameters();
 
   // Timeout functions
-  class LossTimeout : public folly::HHWheelTimer::Callback {
+  class LossTimeout : public QuicTimerCallback {
    public:
     ~LossTimeout() override = default;
 
@@ -468,7 +472,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class AckTimeout : public folly::HHWheelTimer::Callback {
+  class AckTimeout : public QuicTimerCallback {
    public:
     ~AckTimeout() override = default;
 
@@ -488,7 +492,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class PingTimeout : public folly::HHWheelTimer::Callback {
+  class PingTimeout : public QuicTimerCallback {
    public:
     ~PingTimeout() override = default;
 
@@ -508,7 +512,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class PathValidationTimeout : public folly::HHWheelTimer::Callback {
+  class PathValidationTimeout : public QuicTimerCallback {
    public:
     ~PathValidationTimeout() override = default;
 
@@ -529,7 +533,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class IdleTimeout : public folly::HHWheelTimer::Callback {
+  class IdleTimeout : public QuicTimerCallback {
    public:
     ~IdleTimeout() override = default;
 
@@ -550,7 +554,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
-  class KeepaliveTimeout : public folly::HHWheelTimer::Callback {
+  class KeepaliveTimeout : public QuicTimerCallback {
    public:
     ~KeepaliveTimeout() override = default;
 
@@ -571,7 +575,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   // DrainTimeout is a bit different from other timeouts. It needs to hold a
   // shared_ptr to the transport, since if a DrainTimeout is scheduled,
   // transport cannot die.
-  class DrainTimeout : public folly::HHWheelTimer::Callback {
+  class DrainTimeout : public QuicTimerCallback {
    public:
     ~DrainTimeout() override = default;
 
@@ -841,7 +845,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   std::atomic<QuicEventBase*> qEvbPtr_;
-  std::unique_ptr<folly::AsyncUDPSocket> socket_;
+  std::unique_ptr<QuicAsyncUDPSocketType> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
   ConnectionCallback* connCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.

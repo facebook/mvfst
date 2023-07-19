@@ -12,6 +12,7 @@
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/TransportSettingsFunctions.h>
 
 #include <folly/Optional.h>
 #include <quic/common/TransportKnobs.h>
@@ -23,7 +24,7 @@ namespace quic {
 
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    std::unique_ptr<QuicAsyncUDPSocketType> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallback* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -41,7 +42,7 @@ QuicServerTransport::QuicServerTransport(
 
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    std::unique_ptr<QuicAsyncUDPSocketType> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallback* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -83,7 +84,7 @@ QuicServerTransport::~QuicServerTransport() {
 
 QuicServerTransport::Ptr QuicServerTransport::make(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    std::unique_ptr<QuicAsyncUDPSocketType> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallback* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -978,7 +979,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto val = std::get<std::string>(value);
-        BbrConfig::AckFrequencyConfig ackFrequencyConfig;
+        CongestionControlConfig::AckFrequencyConfig ackFrequencyConfig;
         bool parseSuccess = false;
         try {
           parseSuccess = folly::split(
@@ -1009,7 +1010,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               ackFrequencyConfig.minRttDivisor,
               ackFrequencyConfig.useSmallThresholdDuringStartup,
               val);
-          serverTransport->conn_->transportSettings.bbrConfig
+          serverTransport->conn_->transportSettings.ccaConfig
               .ackFrequencyConfig = ackFrequencyConfig;
         } else {
           auto errMsg = fmt::format(
@@ -1080,6 +1081,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverConn->transportSettings.priorityQueueWritesPerStream = val;
         serverConn->streamManager->writeQueue().setMaxNextsPerStream(val);
         VLOG(3) << "WRITES_PER_STREAM KnobParam received: " << val;
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<std::string>(value);
+        serverTransport->conn_->transportSettings.ccaConfig =
+            parseCongestionControlConfig(val);
+        VLOG(3) << "CC_CONFIG KnobParam received: " << val;
       });
 }
 

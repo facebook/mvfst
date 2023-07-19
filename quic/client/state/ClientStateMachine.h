@@ -9,6 +9,7 @@
 
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -75,7 +76,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 
   struct HappyEyeballsState {
     // Delay timer
-    folly::HHWheelTimer::Callback* connAttemptDelayTimeout{nullptr};
+    QuicTimerCallback* connAttemptDelayTimeout{nullptr};
 
     // IPv6 peer address
     folly::SocketAddress v6PeerAddress;
@@ -88,7 +89,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     folly::SocketAddress secondPeerAddress;
 
     // The UDP socket that will be used for the second connection attempt
-    std::unique_ptr<folly::AsyncUDPSocket> secondSocket;
+    std::unique_ptr<QuicAsyncUDPSocketType> secondSocket;
 
     // Whether should write to the first UDP socket
     bool shouldWriteToFirstSocket{true};

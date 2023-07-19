@@ -14,6 +14,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientAsyncTransport.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
@@ -83,7 +84,7 @@ class QuicAsyncTransportServerTest : public Test {
     EXPECT_CALL(clientWriteCB_, writeSuccess_()).WillOnce(Return());
 
     clientEvb_.runInEventBaseThreadAndWait([&]() {
-      auto sock = std::make_unique<folly::AsyncUDPSocket>(&clientEvb_);
+      auto sock = std::make_unique<QuicAsyncUDPSocketType>(&clientEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())

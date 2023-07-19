@@ -7,17 +7,20 @@
 
 #pragma once
 
+#include <folly/Function.h>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 
 namespace quic {
 
+/**
+ * An interface mvfst expects from event base implementation.
+ */
 template <
     class LoopCallbackT,
     class BackingEventBaseT,
     class AsyncTimeoutT,
-    class TimerT>
+    class TimerCallbackT>
 class QuicEventBaseInterface {
  public:
   virtual ~QuicEventBaseInterface() = default;
@@ -27,22 +30,20 @@ class QuicEventBaseInterface {
 
   virtual void runInLoop(LoopCallbackT* callback, bool thisIteration) = 0;
 
-  virtual void runInLoop(std::function<void()> cb, bool thisIteration) = 0;
+  virtual void runInLoop(folly::Function<void()> cb, bool thisIteration) = 0;
 
   virtual void runAfterDelay(
-      std::function<void()> cb,
+      folly::Function<void()> cb,
       uint32_t milliseconds) = 0;
 
   virtual void runInEventBaseThreadAndWait(
-      std::function<void()> fn) noexcept = 0;
+      folly::Function<void()> fn) noexcept = 0;
 
   virtual bool isInEventBaseThread() const = 0;
 
   virtual bool scheduleTimeoutHighRes(
       AsyncTimeoutT* obj,
       std::chrono::microseconds timeout) = 0;
-
-  virtual TimerT& timer() = 0;
 
   virtual bool loopOnce(int flags) = 0;
 
@@ -53,6 +54,13 @@ class QuicEventBaseInterface {
   virtual bool loopIgnoreKeepAlive() = 0;
 
   virtual void terminateLoopSoon() = 0;
+
+  virtual void scheduleTimeout(
+      TimerCallbackT* callback,
+      std::chrono::milliseconds timeout) = 0;
+
+  [[nodiscard]] virtual std::chrono::milliseconds getTimerTickInterval()
+      const = 0;
 };
 
 } // namespace quic

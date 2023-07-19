@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_buf_accessor STATIC
+  mvfst_buf_accessor
   BufAccessor.cpp
 )
 
@@ -26,7 +26,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_looper STATIC
+  mvfst_looper
   FunctionLooper.cpp
   Timers.cpp
 )
@@ -49,7 +49,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_bufutil STATIC
+  mvfst_bufutil
   BufUtil.cpp
 )
 
@@ -71,8 +71,8 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_events STATIC
-  Events.cpp
+  mvfst_events
+  QuicEventBase.cpp
 )
 
 target_include_directories(
@@ -93,7 +93,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_socketutil STATIC
+  mvfst_socketutil
   SocketUtil.cpp
 )
 
@@ -115,7 +115,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_transport_knobs STATIC
+  mvfst_transport_knobs
   TransportKnobs.cpp
 )
 
@@ -134,6 +134,29 @@ target_compile_options(
 target_link_libraries(
   mvfst_transport_knobs PUBLIC
   Folly::folly
+)
+
+add_library(
+  mvfst_async_udp_socket_wrapper
+  QuicAsyncUDPSocketWrapper.cpp
+)
+
+target_include_directories(
+  mvfst_async_udp_socket_wrapper PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_async_udp_socket_wrapper
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_async_udp_socket_wrapper PUBLIC
+  Folly::folly
+  mvfst_events
 )
 
 file(
@@ -179,6 +202,12 @@ install(
 
 install(
   TARGETS mvfst_transport_knobs
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_async_udp_socket_wrapper
   EXPORT mvfst-exports
   DESTINATION lib
 )

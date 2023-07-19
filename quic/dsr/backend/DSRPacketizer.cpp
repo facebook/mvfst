@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/IoBufQuicBatch.h>
+#include <quic/api/QuicGsoBatchWriters.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/dsr/backend/DSRPacketizer.h>
 
@@ -130,7 +131,7 @@ static auto& getThreadLocalConn(size_t maxPackets = 44) {
 }
 
 BufQuicBatchResult writePacketsGroup(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
   if (reqGroup.requests.empty()) {

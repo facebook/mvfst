@@ -26,8 +26,8 @@
 namespace quic {
 
 QuicTransportBase::QuicTransportBase(
-    folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    QuicBackingEventBase* evb,
+    std::unique_ptr<QuicAsyncUDPSocketType> socket,
     bool useConnectionEndWithErrorCallback)
     : socket_(std::move(socket)),
       useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),
@@ -64,6 +64,12 @@ QuicTransportBase::QuicTransportBase(
   }
 }
 
+void QuicTransportBase::scheduleTimeout(
+    QuicTimerCallback* callback,
+    std::chrono::milliseconds timeout) {
+  qEvb_.scheduleTimeout(callback, timeout);
+}
+
 void QuicTransportBase::setPacingTimer(
     TimerHighRes::SharedPtr pacingTimer) noexcept {
   if (pacingTimer) {
@@ -79,7 +85,7 @@ void QuicTransportBase::setCongestionControllerFactory(
   conn_->congestionController.reset();
 }
 
-folly::EventBase* QuicTransportBase::getEventBase() const {
+QuicBackingEventBase* QuicTransportBase::getEventBase() const {
   return qEvb_.getBackingEventBase();
 }
 
@@ -412,7 +418,7 @@ void QuicTransportBase::closeImpl(
   if (drainConnection) {
     // We ever drain once, and the object ever gets created once.
     DCHECK(!drainTimeout_.isScheduled());
-    getEventBase()->timer().scheduleTimeout(
+    scheduleTimeout(
         &drainTimeout_,
         folly::chrono::ceil<std::chrono::milliseconds>(
             kDrainFactor * calculatePTO(*conn_)));
@@ -1965,13 +1971,12 @@ void QuicTransportBase::setIdleTimer() {
   auto peerIdleTimeout =
       conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
   auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
-  getEventBase()->timer().scheduleTimeout(&idleTimeout_, idleTimeout);
+  scheduleTimeout(&idleTimeout_, idleTimeout);
   auto idleTimeoutCount = idleTimeout.count();
   if (conn_->transportSettings.enableKeepalive) {
     std::chrono::milliseconds keepaliveTimeout = std::chrono::milliseconds(
         idleTimeoutCount - static_cast<int64_t>(idleTimeoutCount * .15));
-    getEventBase()->timer().scheduleTimeout(
-        &keepaliveTimeout_, keepaliveTimeout);
+    scheduleTimeout(&keepaliveTimeout_, keepaliveTimeout);
   }
 }
 
@@ -2734,9 +2739,8 @@ void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
-  auto& wheelTimer = getEventBase()->timer();
-  timeout = timeMax(timeout, wheelTimer.getTickInterval());
-  wheelTimer.scheduleTimeout(&lossTimeout_, timeout);
+  timeout = timeMax(timeout, qEvb_.getTimerTickInterval());
+  scheduleTimeout(&lossTimeout_, timeout);
 }
 
 void QuicTransportBase::scheduleAckTimeout() {
@@ -2752,16 +2756,15 @@ void QuicTransportBase::scheduleAckTimeout() {
       if (conn_->ackStates.appDataAckState.ackFrequencySequenceNumber) {
         factoredRtt = conn_->ackStates.maxAckDelay;
       }
-      auto& wheelTimer = getEventBase()->timer();
       auto timeout = timeMax(
           std::chrono::duration_cast<std::chrono::microseconds>(
-              wheelTimer.getTickInterval()),
+              qEvb_.getTimerTickInterval()),
           timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
       auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
                << " factoredRtt=" << factoredRtt.count() << "us"
                << " " << *this;
-      wheelTimer.scheduleTimeout(&ackTimeout_, timeoutMs);
+      scheduleTimeout(&ackTimeout_, timeoutMs);
     }
   } else {
     if (ackTimeout_.isScheduled()) {
@@ -2780,8 +2783,7 @@ void QuicTransportBase::schedulePingTimeout(
   }
 
   pingCallback_ = pingCb;
-  auto& wheelTimer = getEventBase()->timer();
-  wheelTimer.scheduleTimeout(&pingTimeout_, timeout);
+  scheduleTimeout(&pingTimeout_, timeout);
 }
 
 void QuicTransportBase::schedulePathValidationTimeout() {
@@ -2805,7 +2807,7 @@ void QuicTransportBase::schedulePathValidationTimeout() {
     auto timeoutMs =
         folly::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
     VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;
-    getEventBase()->timer().scheduleTimeout(&pathValidationTimeout_, timeoutMs);
+    scheduleTimeout(&pathValidationTimeout_, timeoutMs);
   }
 }
 
@@ -3399,7 +3401,7 @@ bool QuicTransportBase::isDetachable() {
   return conn_->nodeType == QuicNodeType::Client;
 }
 
-void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
+void QuicTransportBase::attachEventBase(QuicBackingEventBase* evb) {
   VLOG(10) << __func__ << " " << *this;
   DCHECK(!getEventBase());
   DCHECK(evb && evb->isInEventBaseThread());
@@ -3420,6 +3422,7 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   updatePeekLooper();
   updateWriteLooper(false);
 
+#ifndef MVFST_USE_LIBEV
   if (getSocketObserverContainer() &&
       getSocketObserverContainer()
           ->hasObserversForEvent<
@@ -3430,6 +3433,7 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
               observer->evbAttach(observed, qEvb_.getBackingEventBase());
             });
   }
+#endif
 }
 
 void QuicTransportBase::detachEventBase() {
@@ -3450,6 +3454,7 @@ void QuicTransportBase::detachEventBase() {
   peekLooper_->detachEventBase();
   writeLooper_->detachEventBase();
 
+#ifndef MVFST_USE_LIBEV
   if (getSocketObserverContainer() &&
       getSocketObserverContainer()
           ->hasObserversForEvent<
@@ -3460,6 +3465,7 @@ void QuicTransportBase::detachEventBase() {
               observer->evbDetach(observed, qEvb_.getBackingEventBase());
             });
   }
+#endif
 
   qEvb_.setBackingEventBase(nullptr);
   qEvbPtr_ = nullptr;
@@ -3639,6 +3645,13 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
     // Default to disabling opportunistic ACKing for DSR since it causes extra
     // writes and spurious losses.
     conn_->transportSettings.opportunisticAcking = false;
+    // Also turn on the default of 5 nexts per stream which has empirically
+    // shown good results.
+    if (conn_->transportSettings.priorityQueueWritesPerStream == 1) {
+      conn_->transportSettings.priorityQueueWritesPerStream = 5;
+      conn_->streamManager->writeQueue().setMaxNextsPerStream(5);
+    }
+
     // Fow now, no appLimited or appIdle update here since we are not writing
     // either BufferMetas yet. The first BufferMeta write will update it.
   } catch (const QuicTransportException& ex) {

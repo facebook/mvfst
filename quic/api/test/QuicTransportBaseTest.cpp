@@ -227,7 +227,7 @@ class TestQuicTransport
  public:
   TestQuicTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
       : QuicTransportBase(evb, std::move(socket)),
@@ -1723,7 +1723,7 @@ TEST_P(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
 }
 
 TEST_P(QuicTransportImplTestBase, LossTimeoutNoLessThanTickInterval) {
-  auto tickInterval = evb->timer().getTickInterval();
+  auto tickInterval = evb->getTimerTickInterval();
   transport->scheduleLossTimeout(tickInterval - 1ms);
   EXPECT_NEAR(
       tickInterval.count(),

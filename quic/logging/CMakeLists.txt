@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_qlogger STATIC
+  mvfst_qlogger
   BaseQLogger.cpp
   FileQLogger.cpp
   QLogger.cpp

@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_fizz_client STATIC
+  mvfst_fizz_client
   handshake/FizzClientQuicHandshakeContext.cpp
   handshake/FizzClientHandshake.cpp
 )

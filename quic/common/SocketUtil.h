@@ -8,15 +8,15 @@
 #pragma once
 
 #include <folly/io/SocketOptionMap.h>
-#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/net/NetOps.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 namespace quic {
 
 bool isNetworkUnreachable(int err);
 
 void applySocketOptions(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     const folly::SocketOptionMap& options,
     sa_family_t family,
     folly::SocketOptionKey::ApplyPos pos) noexcept;

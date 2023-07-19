@@ -15,36 +15,48 @@
 
 namespace quic {
 
-struct BbrConfig {
+struct CongestionControlConfig {
+  // Used by: BBR1
   bool conservativeRecovery{false};
 
-  /**
-   * When largeProbeRttCwnd is true, kLargeProbeRttCwndGain * BDP will be used
-   * as cwnd during ProbeRtt state, otherwise, 4MSS will be the ProbeRtt cwnd.
-   */
+  // Used by: BBR1
+  // When largeProbeRttCwnd is true, kLargeProbeRttCwndGain * BDP will be used
+  // as cwnd during ProbeRtt state, otherwise, 4MSS will be the ProbeRtt cwnd.
   bool largeProbeRttCwnd{false};
 
   // Whether ack aggregation is also calculated during Startup phase
   bool enableAckAggregationInStartup{false};
 
-  /**
-   * Whether we should enter ProbeRtt if connection has been app-limited since
-   * last time we ProbeRtt.
-   */
+  // Used by: BBR1
+  // Whether we should enter ProbeRtt if connection has been app-limited since
+  // last time we ProbeRtt.
   bool probeRttDisabledIfAppLimited{false};
 
-  /**
-   * Whether BBR should advance pacing gain cycle when BBR is draining and we
-   * haven't reached the drain target.
-   */
+  // Used by: BBR1
+  // Whether BBR should advance pacing gain cycle when BBR is draining and we
+  // haven't reached the drain target.
   bool drainToTarget{false};
 
+  // Used by: Cubic
+  // If true, exiting hystart switches to additive increase rather than Cubic
+  // congestion avoidance, similar to Linux kernel behavior.
+  bool additiveIncreaseAfterHystart{false};
+
+  // Used by: Cubic
+  // Whether to clamp the cwnd growth when the connection is not cwnd limited.
+  bool onlyGrowCwndWhenLimited{false};
+
+  // Used by: Cubic
+  // Whether to leave headroom when deciding that the connection is cwnd
+  // limited.
+  bool leaveHeadroomForCwndLimited{false};
+
   // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
-  // The first controls how many ack eliciting packets have to be received
-  // to trigger an ACK.
-  // The second controls how often, in terms of min RTT, the peer should ACK.
-  // The third controls the reordering threshold they should use when
-  // delaying an ACK.
+  //  The first controls how many ack eliciting packets have to be received
+  //  to trigger an ACK.
+  //  The second controls how often, in terms of min RTT, the peer should ACK.
+  //  The third controls the reordering threshold they should use when
+  //  delaying an ACK.
   struct AckFrequencyConfig {
     uint64_t ackElicitingThreshold{kDefaultRxPacketsBeforeAckAfterInit};
     uint64_t reorderingThreshold{kReorderingThreshold};
@@ -52,6 +64,8 @@ struct BbrConfig {
     // Threshold to use early in the connection.
     bool useSmallThresholdDuringStartup{false};
   };
+
+  // Used by: BBR1
   folly::Optional<AckFrequencyConfig> ackFrequencyConfig;
 };
 
@@ -206,8 +220,8 @@ struct TransportSettings {
   bool shouldRecvBatch{false};
   // Whether or not use recvmmsg when shouldRecvBatch is true.
   bool shouldUseRecvmmsgForBatchRecv{false};
-  // Config struct for BBR
-  BbrConfig bbrConfig;
+  // Config struct for congestion controllers
+  CongestionControlConfig ccaConfig;
   // A packet is considered loss when a packet that's sent later by at least
   // timeReorderingThreshold * RTT is acked by peer.
   DurationRep timeReorderingThreshDividend{

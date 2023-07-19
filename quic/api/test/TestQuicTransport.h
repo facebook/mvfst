@@ -9,7 +9,7 @@
 
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -22,7 +22,7 @@ class TestQuicTransport
  public:
   TestQuicTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
       : QuicTransportBase(evb, std::move(socket)),

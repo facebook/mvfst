@@ -4,9 +4,45 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_transport STATIC
-  IoBufQuicBatch.cpp
+  mvfst_batch_writer
   QuicBatchWriter.cpp
+  QuicBatchWriterFactory.cpp
+  QuicBatchWriterFactoryMobile.cpp
+  QuicGsoBatchWriters.cpp
+)
+
+target_include_directories(
+  mvfst_batch_writer PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_batch_writer
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+add_dependencies(
+  mvfst_batch_writer
+  mvfst_async_udp_socket_wrapper
+  mvfst_events
+  mvfst_constants
+  mvfst_state_machine
+)
+
+target_link_libraries(
+  mvfst_batch_writer PUBLIC
+  Folly::folly
+  mvfst_async_udp_socket_wrapper
+  mvfst_events
+  mvfst_constants
+  mvfst_state_machine
+)
+
+add_library(
+  mvfst_transport
+  IoBufQuicBatch.cpp
   QuicPacketScheduler.cpp
   QuicStreamAsyncTransport.cpp
   QuicTransportBase.cpp
@@ -27,6 +63,8 @@ target_compile_options(
 
 add_dependencies(
   mvfst_transport
+  mvfst_async_udp_socket_wrapper
+  mvfst_batch_writer
   mvfst_buf_accessor
   mvfst_bufutil
   mvfst_cc_algo
@@ -57,6 +95,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_transport PUBLIC
   Folly::folly
+  mvfst_batch_writer
   mvfst_buf_accessor
   mvfst_bufutil
   mvfst_cc_algo
@@ -99,6 +138,12 @@ endforeach()
 
 install(
   TARGETS mvfst_transport
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_batch_writer
   EXPORT mvfst-exports
   DESTINATION lib
 )

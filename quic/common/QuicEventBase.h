@@ -8,9 +8,8 @@
 #pragma once
 
 #ifdef MVFST_USE_LIBEV
-#include <quic/common/EventsMobile.h>
+#include <quic/common/QuicLibevEventBase.h>
 
-#include <ev.h>
 #else
 #include <folly/io/async/EventBase.h>
 FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
@@ -22,18 +21,24 @@ FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
 namespace quic {
 
 #ifdef MVFST_USE_LIBEV
+using QuicBackingEventBase = QuicLibevEventBase;
 #else
 using QuicEventBaseLoopCallback = folly::EventBase::LoopCallback;
 using QuicBackingEventBase = folly::EventBase;
 using QuicAsyncTimeout = folly::AsyncTimeout;
-using QuicHHWheelTimer = folly::HHWheelTimer;
+using QuicTimerCallback = folly::HHWheelTimer::Callback;
 #endif
 
+/**
+ * This is a default event base implementation of QuicEventBaseInterface that
+ * mvfst uses by default. It's using folly::EventBase as <QuicBackingEventBase>
+ * implementation underneath.
+ */
 class QuicEventBase : public QuicEventBaseInterface<
                           QuicEventBaseLoopCallback,
                           QuicBackingEventBase,
                           QuicAsyncTimeout,
-                          QuicHHWheelTimer> {
+                          QuicTimerCallback> {
  public:
   QuicEventBase() = default;
   explicit QuicEventBase(QuicBackingEventBase* evb) : backingEvb_(evb) {}
@@ -49,19 +54,20 @@ class QuicEventBase : public QuicEventBaseInterface<
       QuicEventBaseLoopCallback* callback,
       bool thisIteration = false) override;
 
-  void runInLoop(std::function<void()> cb, bool thisIteration = false) override;
+  void runInLoop(folly::Function<void()> cb, bool thisIteration = false)
+      override;
 
-  void runAfterDelay(std::function<void()> cb, uint32_t milliseconds) override;
+  void runAfterDelay(folly::Function<void()> cb, uint32_t milliseconds)
+      override;
 
-  void runInEventBaseThreadAndWait(std::function<void()> fn) noexcept override;
+  void runInEventBaseThreadAndWait(
+      folly::Function<void()> fn) noexcept override;
 
   [[nodiscard]] bool isInEventBaseThread() const override;
 
   bool scheduleTimeoutHighRes(
       QuicAsyncTimeout* obj,
       std::chrono::microseconds timeout) override;
-
-  QuicHHWheelTimer& timer() override;
 
   bool loopOnce(int flags = 0) override;
 
@@ -72,6 +78,12 @@ class QuicEventBase : public QuicEventBaseInterface<
   bool loopIgnoreKeepAlive() override;
 
   void terminateLoopSoon() override;
+
+  void scheduleTimeout(
+      QuicTimerCallback* callback,
+      std::chrono::milliseconds timeout) override;
+
+  [[nodiscard]] std::chrono::milliseconds getTimerTickInterval() const override;
 
  private:
   QuicBackingEventBase* backingEvb_{nullptr};

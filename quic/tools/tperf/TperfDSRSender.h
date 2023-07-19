@@ -6,7 +6,7 @@
  */
 
 #include <folly/SocketAddress.h>
-#include <folly/io/async/AsyncUDPSocket.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/dsr/Types.h>
 #include <quic/dsr/backend/DSRPacketizer.h>
@@ -29,7 +29,7 @@ namespace quic {
  */
 class TperfDSRSender : public DSRPacketizationRequestSender {
  public:
-  TperfDSRSender(Buf sendBuf, folly::AsyncUDPSocket& sock);
+  TperfDSRSender(Buf sendBuf, QuicAsyncUDPSocketType& sock);
 
   bool addSendInstruction(const SendInstruction&) override;
 
@@ -41,7 +41,7 @@ class TperfDSRSender : public DSRPacketizationRequestSender {
 
  private:
   std::vector<SendInstruction> instructions_;
-  folly::AsyncUDPSocket& sock_;
+  QuicAsyncUDPSocketType& sock_;
   CipherPair cipherPair_;
   Buf buf_;
 };

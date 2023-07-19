@@ -8,7 +8,7 @@
 #pragma once
 
 #include <folly/Expected.h>
-#include <folly/io/async/AsyncUDPSocket.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <quic/QuicException.h>
 #include <quic/api/IoBufQuicBatch.h>
@@ -91,7 +91,7 @@ struct WriteQuicDataResult {
  * socket supplied with the aead and the headerCipher.
  */
 WriteQuicDataResult writeQuicDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -107,7 +107,7 @@ WriteQuicDataResult writeQuicDataToSocket(
  * return the number of packets written to socket.
  */
 WriteQuicDataResult writeCryptoAndAckDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -124,7 +124,7 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
  * packets and cannot use the encryption of the data key.
  */
 WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
-    folly::AsyncUDPSocket& socket,
+    QuicAsyncUDPSocketType& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -138,7 +138,7 @@ WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
  * zero rtt cipher.
  */
 uint64_t writeZeroRttDataToSocket(
-    folly::AsyncUDPSocket& socket,
+    QuicAsyncUDPSocketType& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -225,7 +225,7 @@ uint64_t congestionControlWritableBytes(QuicConnectionStateBase& conn);
 uint64_t unlimitedWritableBytes(QuicConnectionStateBase&);
 
 void writeCloseCommon(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
     folly::Optional<QuicError> closeDetails,
@@ -237,7 +237,7 @@ void writeCloseCommon(
  * The close frame type written depends on the type of error in closeDetails.
  */
 void writeLongClose(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -252,7 +252,7 @@ void writeLongClose(
  * The close frame type written depends on the type of error in closeDetails.
  */
 void writeShortClose(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
     folly::Optional<QuicError> closeDetails,
@@ -280,7 +280,7 @@ void encryptPacketHeader(
  * number of packetLimit packets at each invocation.
  */
 WriteQuicDataResult writeConnectionDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -296,7 +296,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
     const std::string& token = std::string());
 
 WriteQuicDataResult writeProbingDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,

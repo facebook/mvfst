@@ -10,7 +10,7 @@
 
 #include <folly/Function.h>
 #include <quic/QuicConstants.h>
-#include <quic/common/Events.h>
+#include <quic/common/QuicEventBase.h>
 #include <quic/common/Timers.h>
 
 namespace quic {

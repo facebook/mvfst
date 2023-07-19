@@ -13,6 +13,7 @@
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
+#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 
@@ -91,7 +92,7 @@ class MockQuicClientTransport : public quic::QuicClientTransport {
   explicit MockQuicClientTransport(
       TestType testType,
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::unique_ptr<QuicAsyncUDPSocketType> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory)
       : QuicClientTransport(
             evb,

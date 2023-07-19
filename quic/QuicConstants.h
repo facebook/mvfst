@@ -140,6 +140,8 @@ BETTER_ENUM(
     CC_AGRESSIVENESS_KNOB = 0xccab,
     // Enable experimental CC settings
     CC_EXPERIMENTAL = 0xccac,
+    // Change congestion control config struct
+    CC_CONFIG = 0xccad,
     // Set pacing rtt factor used only during startup phase
     STARTUP_RTT_FACTOR_KNOB = 0x1111,
     // Set pacing rtt factor used when not in startup

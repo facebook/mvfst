@@ -254,7 +254,7 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_state_stream STATIC
+  mvfst_state_stream
   stream/StreamStateFunctions.cpp
   stream/StreamSendHandlers.cpp
   stream/StreamReceiveHandlers.cpp
@@ -289,6 +289,29 @@ target_link_libraries(
   mvfst_flowcontrol
   mvfst_state_machine
   mvfst_state_stream_functions
+)
+
+# transport settings functions
+add_library(
+  mvfst_transport_settings_functions
+  TransportSettingsFunctions.cpp
+)
+
+target_include_directories(
+  mvfst_transport_settings_functions PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_transport_settings_functions
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_transport_settings_functions PUBLIC
+  Folly::folly
 )
 
 file(
@@ -346,6 +369,12 @@ install(
 
 install(
   TARGETS mvfst_state_stream
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_transport_settings_functions
   EXPORT mvfst-exports
   DESTINATION lib
 )

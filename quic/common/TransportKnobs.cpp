@@ -58,6 +58,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             case TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB:
             case TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB:
             case TransportKnobParamId::ACK_FREQUENCY_POLICY:
+            case TransportKnobParamId::CC_CONFIG:
             case TransportKnobParamId::NO_OP:
               break;
             default:
@@ -169,6 +170,8 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             VLOG(4) << "Skipping over noop transport knob";
             continue;
           } else if (paramId == TransportKnobParamId::ACK_FREQUENCY_POLICY) {
+            knobParams.push_back({paramId, val.asString()});
+          } else if (paramId == TransportKnobParamId::CC_CONFIG) {
             knobParams.push_back({paramId, val.asString()});
           } else {
             LOG(ERROR)

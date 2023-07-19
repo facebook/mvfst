@@ -7,6 +7,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
@@ -115,7 +116,7 @@ uint64_t maybeUnvalidatedClientWritableBytes(
 }
 
 WriteQuicDataResult writeQuicDataToSocketImpl(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1007,7 +1008,7 @@ HeaderBuilder ShortHeaderBuilder() {
 }
 
 WriteQuicDataResult writeCryptoAndAckDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1090,7 +1091,7 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
 }
 
 WriteQuicDataResult writeQuicDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1113,7 +1114,7 @@ WriteQuicDataResult writeQuicDataToSocket(
 }
 
 WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
-    folly::AsyncUDPSocket& socket,
+    QuicAsyncUDPSocketType& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1135,7 +1136,7 @@ WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
 }
 
 uint64_t writeZeroRttDataToSocket(
-    folly::AsyncUDPSocket& socket,
+    QuicAsyncUDPSocketType& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1184,7 +1185,7 @@ uint64_t writeZeroRttDataToSocket(
 }
 
 void writeCloseCommon(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
     folly::Optional<QuicError> closeDetails,
@@ -1284,7 +1285,7 @@ void writeCloseCommon(
 }
 
 void writeLongClose(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1315,7 +1316,7 @@ void writeLongClose(
 }
 
 void writeShortClose(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
     folly::Optional<QuicError> closeDetails,
@@ -1364,7 +1365,7 @@ void encryptPacketHeader(
 }
 
 WriteQuicDataResult writeConnectionDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -1512,7 +1513,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
 }
 
 WriteQuicDataResult writeProbingDataToSocket(
-    folly::AsyncUDPSocket& sock,
+    QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
