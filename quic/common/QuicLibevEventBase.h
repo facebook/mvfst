@@ -17,8 +17,6 @@
 #undef EV_SIGNAL
 #undef EVLOOP_NONBLOCK
 
-#include <ev.h>
-
 #include <quic/common/QuicEventBaseInterface.h>
 #include <functional>
 

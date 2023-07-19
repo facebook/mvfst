@@ -10,7 +10,6 @@
 #ifdef MVFST_USE_LIBEV
 #include <quic/common/QuicLibevEventBase.h>
 
-#include <ev.h>
 #else
 #include <folly/io/async/EventBase.h>
 FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
