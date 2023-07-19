@@ -223,7 +223,7 @@ struct QuicStreamLike {
           (lossStartOffset >= removedStartOffset &&
            lossEndOffset <= removedEndOffset)) {
         size_t amountToSplit = removedStartOffset > lossStartOffset
-            ? removedStartOffset - lossStartOffset
+            ? static_cast<size_t>(removedStartOffset - lossStartOffset)
             : 0;
         Buf splitBuf = nullptr;
         if (amountToSplit > 0) {
