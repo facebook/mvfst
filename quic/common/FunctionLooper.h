@@ -9,6 +9,8 @@
 #include <ostream>
 
 #include <folly/Function.h>
+#include <folly/Optional.h>
+#include <folly/io/async/DelayedDestruction.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/QuicEventBase.h>
 #include <quic/common/Timers.h>

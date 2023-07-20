@@ -5,9 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <quic/common/FunctionLooper.h>
-
 #include <folly/ScopeGuard.h>
+#include <glog/logging.h>
+#include <quic/common/FunctionLooper.h>
 
 namespace quic {
 using namespace std::chrono_literals;

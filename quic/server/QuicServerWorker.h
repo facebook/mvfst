@@ -40,7 +40,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
                          public ServerConnectionIdRejector,
                          public folly::EventRecvmsgCallback,
                          public folly::EventRecvmsgMultishotCallback,
-                         public folly::HHWheelTimer::Callback {
+                         public QuicTimerCallback {
  private:
   struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
     static auto constexpr kBuffSize = 1024;

@@ -11,7 +11,7 @@
 #include <quic/common/QuicLibevEventBase.h>
 
 #else
-#include <folly/io/async/EventBase.h>
+#include <folly/io/async/EventBase.h> // @manual
 FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
 #endif
 
@@ -22,6 +22,7 @@ namespace quic {
 
 #ifdef MVFST_USE_LIBEV
 using QuicBackingEventBase = QuicLibevEventBase;
+using QuicTimerCallback = QuicTimer::Callback;
 #else
 using QuicEventBaseLoopCallback = folly::EventBase::LoopCallback;
 using QuicBackingEventBase = folly::EventBase;

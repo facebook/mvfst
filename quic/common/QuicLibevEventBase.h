@@ -17,6 +17,8 @@
 #undef EV_SIGNAL
 #undef EVLOOP_NONBLOCK
 
+#include <memory>
+
 #include <quic/common/QuicEventBaseInterface.h>
 #include <functional>
 
@@ -37,18 +39,29 @@ class QuicAsyncTimeout {
   QuicAsyncTimeout() = default;
 };
 
-class QuicTimerCallback {
+class QuicTimer {
  public:
-  virtual ~QuicTimerCallback() = default;
-  virtual void timeoutExpired() noexcept = 0;
-  virtual void callbackCanceled() noexcept {
-    timeoutExpired();
-  }
-  bool isScheduled() const {
-    return false;
+  using SharedPtr = std::shared_ptr<QuicTimer>;
+  class Callback {
+   public:
+    virtual ~Callback() = default;
+    virtual void timeoutExpired() noexcept = 0;
+    virtual void callbackCanceled() noexcept {
+      timeoutExpired();
+    }
+    bool isScheduled() const {
+      return false;
+    }
+    void cancelTimeout() {}
+  };
+
+  std::chrono::microseconds getTickInterval() const {
+    return std::chrono::microseconds(0);
   }
 
-  void cancelTimeout() {}
+  void scheduleTimeout(
+      Callback* /* callback */,
+      std::chrono::microseconds /* timeout */) {}
 };
 
 /**
@@ -88,7 +101,7 @@ class QuicLibevEventBase {
   void terminateLoopSoon() {}
 
   void scheduleTimeout(
-      QuicTimerCallback* /* callback */,
+      QuicTimer::Callback* /* callback */,
       std::chrono::milliseconds /* timeout */) {}
 
   std::chrono::milliseconds getTimerTickInterval() const {
