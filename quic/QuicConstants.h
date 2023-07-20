@@ -363,7 +363,7 @@ constexpr int kRttBeta = 4;
 // recommendation. This is not a bug.
 constexpr std::chrono::microseconds kDefaultInitialRtt = 50000us;
 
-// HHWheelTimer tick interval
+// Timer tick interval
 constexpr std::chrono::microseconds kGranularity = 10000us;
 
 constexpr uint32_t kReorderingThreshold = 3;

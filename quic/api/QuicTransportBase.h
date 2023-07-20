@@ -21,7 +21,6 @@
 #include <quic/state/StateData.h>
 
 #include <folly/ExceptionWrapper.h>
-#include <folly/io/async/HHWheelTimer.h>
 
 namespace quic {
 

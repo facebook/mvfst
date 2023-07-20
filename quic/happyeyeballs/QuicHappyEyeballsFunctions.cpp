@@ -13,7 +13,6 @@
 
 #include <folly/SocketAddress.h>
 #include <folly/io/SocketOptionMap.h>
-#include <folly/io/async/HHWheelTimer.h>
 #include <folly/net/NetOps.h>
 #include <folly/portability/Sockets.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>

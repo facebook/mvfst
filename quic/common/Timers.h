@@ -6,6 +6,8 @@
  */
 
 #pragma once
+
+#if !MVFST_USE_LIBEV
 #include <folly/io/async/HHWheelTimer.h>
 
 #if !FOLLY_MOBILE
@@ -47,5 +49,14 @@ class TimerFDTimerHighRes : public folly::DelayedDestruction {
 using TimerHighRes = TimerFDTimerHighRes;
 #else
 using TimerHighRes = folly::HHWheelTimerHighRes;
-#endif
+#endif //! FOLLY_MOBILE
 } // namespace quic
+
+#else // MVFST_USE_LIBEV
+
+#include <quic/common/QuicLibevEventBase.h>
+
+namespace quic {
+using TimerHighRes = quic::QuicTimer;
+} // namespace quic
+#endif //! MVFST_USE_LIBEV

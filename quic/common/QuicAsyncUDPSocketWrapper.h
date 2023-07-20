@@ -10,9 +10,14 @@
 #include <folly/Range.h>
 #include <folly/SocketAddress.h>
 #include <folly/io/IOBuf.h>
-#include <folly/io/async/AsyncUDPSocket.h>
+#include <folly/io/SocketOptionMap.h>
+#include <folly/io/async/AsyncSocketException.h>
 #include <folly/portability/Sockets.h>
 #include <quic/common/QuicEventBase.h>
+
+#ifndef MVFST_USE_LIBEV
+#include <folly/io/async/AsyncUDPSocket.h>
+#endif
 
 namespace quic {
 
