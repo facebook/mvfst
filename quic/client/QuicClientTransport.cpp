@@ -1502,7 +1502,7 @@ void QuicClientTransport::recvMmsg(
 
 void QuicClientTransport::onNotifyDataAvailable(
     QuicAsyncUDPSocketType& sock) noexcept {
-  DCHECK(conn_) << "trying to receive packets without a connection";
+  CHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize =
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
   const uint16_t numPackets = conn_->transportSettings.maxRecvBatchSize;
