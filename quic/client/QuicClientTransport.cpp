@@ -1392,7 +1392,7 @@ void QuicClientTransport::recvMmsg(
     CHECK(readBuffer != nullptr);
 
     auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
-    rawAddr->sa_family = socket_->address().getFamily();
+    rawAddr->sa_family = sock.address().getFamily();
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
