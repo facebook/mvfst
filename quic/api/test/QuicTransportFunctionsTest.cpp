@@ -672,7 +672,7 @@ TEST_F(
   auto buf2 = IOBuf::copyBuffer("?");
   writeDataToQuicStream(*stream3, buf->clone(), true /* eof */);
 
-  // packet2 contains orignally transmitted frames + new data frames
+  // packet2 contains originally transmitted frames + new data frames
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet2.packet.frames.push_back(writeStreamFrame1);
   packet2.packet.frames.push_back(writeStreamFrame2);

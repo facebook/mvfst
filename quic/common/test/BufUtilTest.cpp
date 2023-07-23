@@ -490,7 +490,7 @@ TEST(BufWriterTest, IOBufChainCopyTooLargeLimit) {
       folly::IOBuf::copyBuffer("Think I'll take a turn from the known road. "));
   inputBuffer->prependChain(
       folly::IOBuf::copyBuffer("Think I'll write a tale of my own."));
-  // Use a limit thats larger than input size
+  // Use a limit that's larger than input size
   bufWriter.insert(
       inputBuffer.get(), inputBuffer->computeChainDataLength() * 3);
   folly::io::Cursor reader(outputBuffer.get());

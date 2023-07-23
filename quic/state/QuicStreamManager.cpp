@@ -44,7 +44,7 @@ static void updateHolBlockedTime(QuicStreamState& stream) {
     return;
   }
 
-  // No HOL unblocking event has occured. If we are already HOL bloked,
+  // No HOL unblocking event has occurred. If we are already HOL blocked,
   // we remain HOL blocked.
   if (stream.lastHolbTime) {
     return;

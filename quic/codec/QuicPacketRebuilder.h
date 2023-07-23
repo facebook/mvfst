@@ -17,7 +17,7 @@ namespace quic {
  * pass them onto a wrapped builder to rebuild the packet. Note that you still
  * buildPacket() from the wrapped in builder.
  * TODO: The cloning builder only clones stream data that has not already been
- * resset or closed. It is possible that a packet may have contained data for
+ * reset or closed. It is possible that a packet may have contained data for
  * only closed streams. In that case we would only write out the header.
  * This is a waste, so we should do something about this in the future.
  */

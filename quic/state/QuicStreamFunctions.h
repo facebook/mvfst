@@ -90,7 +90,7 @@ bool allBytesTillFinAcked(const QuicStreamState& state);
 
 /**
  * Add a pending reset for stream into conn's pendingEvents if the stream isn't
- * in WaitingForRstAck or Closed state alraedy
+ * in WaitingForRstAck or Closed state already
  */
 void appendPendingStreamReset(
     QuicConnectionStateBase& conn,
