@@ -473,9 +473,8 @@ class TPerfServer {
     if (FLAGS_use_ack_receive_timestamps) {
       LOG(INFO) << " Using ACK receive timestamps on server";
       settings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
-          {.maxReceiveTimestampsPerAck =
-               FLAGS_max_ack_receive_timestamps_to_send,
-           .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent});
+          {FLAGS_max_ack_receive_timestamps_to_send,
+           kDefaultReceiveTimestampsExponent});
     }
 
     server_->setCongestionControllerFactory(
@@ -691,9 +690,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       LOG(INFO) << " Using ACK receive timestamps on client";
 
       settings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
-          {.maxReceiveTimestampsPerAck =
-               FLAGS_max_ack_receive_timestamps_to_send,
-           .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent});
+          {FLAGS_max_ack_receive_timestamps_to_send,
+           kDefaultReceiveTimestampsExponent});
     }
     quicClient_->setTransportSettings(settings);
 
