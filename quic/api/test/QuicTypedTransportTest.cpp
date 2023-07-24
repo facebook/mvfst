@@ -744,6 +744,12 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   this->ackAllOutstandingPackets();
   EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
 
+  // prevent packets from being marked as lost for at least 100ms, regardless
+  // of the RTT measured by the test
+  this->getNonConstConn().transportSettings.timeReorderingThreshDividend =
+      100000000;
+  this->getNonConstConn().transportSettings.timeReorderingThreshDivisor = 1;
+
   // install StaticCwndCongestionController
   const auto cwndInBytes = 7000;
   this->getNonConstConn().congestionController =
@@ -793,12 +799,21 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
     EXPECT_EQ(2, lastPacketNum - firstPacketNum + 1);
   }
 
-  // now we're going to be application limited for 10ms (or more)
+  // next, we wait for 10ms to get 10ms (or more) of app limited time.
+  //
+  // TODO(bschlinker): We should accomplish this by advancing a mock clock, but
+  // this will also require being able to mock the timers set up on the
+  // EventBase so that they are aligned with the mock clock.
+  //
+  // A loss detection alarm was scheduled for the previous write but even if
+  // the machine running this test is slow, the following operation should be
+  // executed before the loss alarm given that we've inflated the loss timeout
+  // so that the alarm timeout is >= 100ms
   std::this_thread::sleep_for(10ms);
 
   // write 10000 bytes to stream to generate multiple packets back to back
-  // not all will be sent at once because our CWND is only 7000 bytes, and we
-  // already used 1700 bytes+ in previous send
+  // not all will be sent at once because our CWND is only 7000 bytes, and
+  // we already used 1700 bytes+ in previous send
   //
   // when (eventually) sent, all packets should have
   //   - the same app limited time
@@ -807,37 +822,50 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   {
     EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
         .Times(4)
-        .WillOnce(Invoke([&](auto& outstandingPacket) {
-          EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
-          EXPECT_LE(
-              firstPacketTotalAppLimitedTimeUsecs + 10ms,
-              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
-          thirdPacketTotalAppLimitedTimeUsecs =
-              outstandingPacket.metadata.totalAppLimitedTimeUsecs;
-        }))
-        .WillRepeatedly(Invoke([&](auto& outstandingPacket) {
-          EXPECT_EQ(
-              thirdPacketTotalAppLimitedTimeUsecs,
-              outstandingPacket.metadata.totalAppLimitedTimeUsecs);
-        }));
+        .WillOnce(Invoke(
+            [&firstPacketTotalAppLimitedTimeUsecs,
+             &thirdPacketTotalAppLimitedTimeUsecs](auto& outstandingPacket) {
+              EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
+              EXPECT_LE(
+                  firstPacketTotalAppLimitedTimeUsecs + 10ms,
+                  outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+              thirdPacketTotalAppLimitedTimeUsecs =
+                  outstandingPacket.metadata.totalAppLimitedTimeUsecs;
+            }))
+        .WillRepeatedly(Invoke(
+            [&thirdPacketTotalAppLimitedTimeUsecs](auto& outstandingPacket) {
+              EXPECT_EQ(
+                  thirdPacketTotalAppLimitedTimeUsecs,
+                  outstandingPacket.metadata.totalAppLimitedTimeUsecs);
+            }));
 
     const auto bufLength = 10000;
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    this->getTransport()->writeChain(streamId, std::move(buf), false /* eof */);
+
     const auto maybeWrittenPackets = this->loopForWrites();
 
-    // should have sent five packets
+    // should have sent four or five packets
+    //
+    // we allow five packets in the case where a loss detection alarm fires and
+    // probe packets are sent (would only happen if test execution is slow)
     ASSERT_TRUE(maybeWrittenPackets.has_value());
     quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
     quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
-    EXPECT_EQ(4, lastPacketNum - firstPacketNum + 1);
+    const auto packetsSent = lastPacketNum - firstPacketNum + 1;
+
+    EXPECT_THAT(packetsSent, AnyOf(Eq(4), Eq(5)));
   }
 
   // deliver an ACK for all of the outstanding packets
   this->ackAllOutstandingPackets();
 
-  // finish sending the rest of the packets
-  // they should have the same app limited time as packet #3
+  // after the ACK, we'll be able to send the rest of the data
+  // all sent packets should have the same app limited time as packet #3
+  //
+  // regardless of whether we sent four or five packets above, we will end up
+  // sending three packets here, as the amount of outstanding data remains the
+  // same (when we send probe packets, two packets contain same new data)
   {
     EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
         .Times(3)
@@ -858,6 +886,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   this->ackAllOutstandingPackets();
 
   // now we're going to be application limited again for 10ms (or more)
+  // there's no packets in flight, so no need to worry about loss detection
   std::this_thread::sleep_for(10ms);
 
   // finally, write 1700 bytes again, and verify we see a new app limited time
