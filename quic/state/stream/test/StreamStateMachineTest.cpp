@@ -118,7 +118,7 @@ TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithFINReadbuffHole) {
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   stream->currentReadOffset = 100;
 
-  // We received FIN, but we havn't received anything between 100 and 200:
+  // We received FIN, but we haven't received anything between 100 and 200:
   ReadStreamFrame receivedStreamFrame(stream->id, 200, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
@@ -341,7 +341,7 @@ TEST_F(QuicHalfClosedLocalStateTest, ReceiveStreamFrameWithFINReadbuffHole) {
   stream->recvState = StreamRecvState::Open;
   stream->currentReadOffset = 100;
 
-  // We received FIN, but we havn't received anything between 100 and 200:
+  // We received FIN, but we haven't received anything between 100 and 200:
   ReadStreamFrame receivedStreamFrame(stream->id, 200, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);

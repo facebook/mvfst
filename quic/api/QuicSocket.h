@@ -57,7 +57,7 @@ class QuicSocket {
 
     /**
      * Called when the transport is ready to send/receive data.
-     * This can be potentially triggerred immidiately when using 0-RTT.
+     * This can be potentially triggered immediately when using 0-RTT.
      */
     virtual void onTransportReady() noexcept {}
 
@@ -698,8 +698,8 @@ class QuicSocket {
    * will return all available bytes.
    *
    * The return value is Expected.  If the value hasError(), then a read error
-   * occured and it can be obtained with error().  If the value hasValue(), then
-   * value() returns a pair of the data (if any) and the EOF marker.
+   * occurred and it can be obtained with error().  If the value hasValue(),
+   * then value() returns a pair of the data (if any) and the EOF marker.
    *
    * Calling read() when there is no data/eof to deliver will return an
    * EAGAIN-like error code.
@@ -769,7 +769,7 @@ class QuicSocket {
    * Peek at the given stream.
    *
    * The return value is Expected.  If the value hasError(), then a read error
-   * occured and it can be obtained with error().  If the value hasValue(),
+   * occurred and it can be obtained with error().  If the value hasValue(),
    * indicates that peekCallback has been called.
    *
    * The range that is passed to callback is only valid until callback returns,
@@ -788,7 +788,7 @@ class QuicSocket {
    * Consumes data on the given stream, starting from currentReadOffset
    *
    * The return value is Expected.  If the value hasError(), then a read error
-   * occured and it can be obtained with error().
+   * occurred and it can be obtained with error().
    *
    * @offset - represents start of consumed range.
    * Current implementation returns error and currentReadOffset if offset !=

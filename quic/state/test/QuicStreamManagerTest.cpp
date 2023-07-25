@@ -777,7 +777,7 @@ class QuicStreamManagerGroupsTest : public QuicStreamManagerTest {
 TEST_P(QuicStreamManagerGroupsTest, TestStreamGroupLimits) {
   auto& manager = *conn.streamManager;
 
-  // By default, no group creation hapenning.
+  // By default, no group creation happening.
   auto groupId = createNextStreamGroup();
   EXPECT_FALSE(groupId.hasValue());
   EXPECT_EQ(getNumGroups(), 0);

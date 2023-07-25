@@ -2056,7 +2056,7 @@ TEST_P(
   streamState->ackedIntervals.insert(0, 6);
 
   // Have 2 different recipients register for a callback on the same stream ID
-  // and offset that is before the curernt write offset, they will both be
+  // and offset that is before the current write offset, they will both be
   // scheduled for immediate delivery.
   EXPECT_CALL(txcb1, onByteEventRegistered(getTxMatcher(stream, 3)));
   EXPECT_CALL(txcb2, onByteEventRegistered(getTxMatcher(stream, 3)));
@@ -2092,7 +2092,7 @@ TEST_F(
   streamState->ackedIntervals.insert(0, 6);
 
   // Have 2 different recipients register for a callback on the same stream ID
-  // and offset that is before the curernt write offset, they will both be
+  // and offset that is before the current write offset, they will both be
   // scheduled for immediate delivery.
   EXPECT_CALL(txcb1, onByteEventRegistered(getAckMatcher(stream, 3)));
   EXPECT_CALL(txcb2, onByteEventRegistered(getAckMatcher(stream, 3)));
@@ -4234,7 +4234,7 @@ TEST_P(QuicTransportImplTestBase, BackgroundModeChangeWithStreamChanges) {
   conn.congestionController = std::move(mockCongestionController);
   auto& manager = *conn.streamManager;
   EXPECT_CALL(*rawCongestionController, setBandwidthUtilizationFactor(_))
-      .Times(0); // Backgound params not set
+      .Times(0); // Background params not set
   auto stream = manager.createNextUnidirectionalStream().value();
   manager.setStreamPriority(stream->id, Priority(1, false));
 

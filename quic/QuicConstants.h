@@ -353,7 +353,7 @@ constexpr std::chrono::microseconds kDefaultThreadLocalDelay = 1ms;
 constexpr int kRttAlpha = 8;
 constexpr int kRttBeta = 4;
 
-// Draft-17 recommends 100ms as initial RTT. We delibrately ignore that
+// Draft-17 recommends 100ms as initial RTT. We deliberately ignore that
 // recommendation. This is not a bug.
 constexpr std::chrono::microseconds kDefaultInitialRtt = 50000us;
 

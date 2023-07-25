@@ -297,7 +297,7 @@ static size_t fillPacketReceiveTimestamps(
   }
   auto recvdPacketInfos = ackFrameMetaData.ackState.recvdPacketInfos;
   // Insert all received packet timestamps into an interval set, to identify
-  // continguous ranges
+  // contiguous ranges
 
   uint64_t pktsAdded = 0;
   IntervalSet<PacketNum> receivedPktNumsIntervalSet;
@@ -325,7 +325,7 @@ static size_t fillPacketReceiveTimestamps(
     } else {
       nextTimestampRange.gap = prevPktNum - 2 - timestampIntervalsIt->end;
     }
-    // Intialize spaced used by the next candidate time-stamp range
+    // Initialize spaced used by the next candidate time-stamp range
     nextTimestampRangeUsedSpace +=
         getQuicIntegerSizeThrows(nextTimestampRange.gap);
 

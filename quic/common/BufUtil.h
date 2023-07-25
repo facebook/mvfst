@@ -109,7 +109,7 @@ class BufWriter {
   void push(const uint8_t* data, size_t len);
 
   /**
-   * Push len amound from data into the IOBuf, starting at IOBuf's destOffset
+   * Push len amount from data into the IOBuf, starting at IOBuf's destOffset
    * position. Given this is a back fill, we don't increase the written bytes
    * count for this API, since they should be already counted in a previous
    * append() call.

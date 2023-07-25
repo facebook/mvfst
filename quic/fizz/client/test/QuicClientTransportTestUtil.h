@@ -510,7 +510,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   virtual void setupCryptoLayer() {
-    // Fake that the handshake has already occured and fix the keys.
+    // Fake that the handshake has already occurred and fix the keys.
     mockClientHandshake = new FakeOneRttHandshakeLayer(
         &client->getNonConstConn(), getFizzClientContext());
     client->getNonConstConn().clientHandshakeLayer = mockClientHandshake;

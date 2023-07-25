@@ -338,8 +338,8 @@ class FrameScheduler : public QuicPacketScheduler {
  * exiting packets that are still outstanding. A CloningScheduler first tries to
  * write new frames with new data into a packet. If that fails due to the lack
  * of new data, it falls back to cloning one inflight packet from a connection's
- * oustanding packets if there is at least one outstanding packet that's smaller
- * than the writableBytes limit.
+ * outstanding packets if there is at least one outstanding packet that's
+ * smaller than the writableBytes limit.
  */
 class CloningScheduler : public QuicPacketScheduler {
  public:

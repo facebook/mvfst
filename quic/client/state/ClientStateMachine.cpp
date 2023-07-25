@@ -68,8 +68,8 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   if (conn->congestionControllerFactory) {
     newConn->congestionControllerFactory = conn->congestionControllerFactory;
     if (conn->congestionController) {
-      // we have to recreate congestion controler
-      // because it holds referencs to the old state
+      // we have to recreate congestion controller
+      // because it holds references to the old state
       newConn->congestionController =
           newConn->congestionControllerFactory->makeCongestionController(
               *newConn, conn->congestionController->type());

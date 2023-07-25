@@ -29,7 +29,7 @@ Buf packetToBuf(
     RegularQuicPacketBuilder::Packet& packet,
     Aead* aead = nullptr) {
   auto buf = folly::IOBuf::create(0);
-  // This doesnt matter.
+  // This does not matter.
   PacketNum num = 10;
   if (packet.header) {
     buf->prependChain(packet.header->clone());

@@ -45,7 +45,7 @@ struct OutstandingPacketMetadata {
   // Cmsgs added by the QuicSocket when this packet was written
   folly::Optional<folly::SocketOptionMap> cmsgs;
 
-  // Has value if the packet is lost by timout. The value is the loss timeout
+  // Has value if the packet is lost by timeout. The value is the loss timeout
   // dividend that was used to declare this packet.
   folly::Optional<DurationRep> lossTimeoutDividend;
 

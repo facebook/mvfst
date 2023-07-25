@@ -1385,7 +1385,7 @@ void onServerReadDataFromClosed(
   }
 
   if (conn.peerConnectionError) {
-    // We already got a peer error. We can ignore any futher peer errors.
+    // We already got a peer error. We can ignore any further peer errors.
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
           packetSize,

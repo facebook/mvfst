@@ -1761,7 +1761,7 @@ void implicitAckCryptoStream(
         LOG(FATAL) << "Got loss from implicit crypto ACK.";
       },
       implicitAckTime);
-  // Clear our the loss buffer explicity. The implicit ACK itself will not
+  // Clear our the loss buffer explicitly. The implicit ACK itself will not
   // remove data already in the loss buffer.
   auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
   cryptoStream->lossBuffer.clear();

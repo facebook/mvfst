@@ -181,7 +181,7 @@ void updateAckSendStateOnSentPacketWithAcks(
   // When we send an ack we're most likely going to ack the largest received
   // packet, so reset the counters for numRxPacketsRecvd and
   // numNonRxPacketsRecvd. Since our ack threshold is quite small, we make the
-  // critical assumtion here that that all the needed acks can fit into one
+  // critical assumption here that that all the needed acks can fit into one
   // packet if needed. If this is not the case, then some packets may not get
   // acked as a result and the receiver might retransmit them.
   ackState.numRxPacketsRecvd = 0;

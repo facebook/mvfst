@@ -339,9 +339,9 @@ struct QuicStreamState : public QuicStreamLike {
 
   StreamFlowControlState flowControlState;
 
-  // Stream level read error occured.
+  // Stream level read error occurred.
   folly::Optional<QuicErrorCode> streamReadError;
-  // Stream level write error occured.
+  // Stream level write error occurred.
   folly::Optional<QuicErrorCode> streamWriteError;
 
   // State machine data
@@ -471,7 +471,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   std::unique_ptr<DSRPacketizationRequestSender> dsrSender;
 
-  // BufferMeta that has been writen to the QUIC layer.
+  // BufferMeta that has been written to the QUIC layer.
   // When offset is 0, nothing has been written to it. On first write, its
   // starting offset will be currentWriteOffset + writeBuffer.chainLength().
   WriteBufferMeta writeBufMeta;
