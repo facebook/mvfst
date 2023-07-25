@@ -185,26 +185,6 @@ TEST(QuicKnobsParsingTest, ValidFractionParamDefault) {
   run(fixture);
 }
 
-TEST(QuicKnobsParsingTest, ValidNotSentBufferSize) {
-  auto key =
-      static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
-  uint64_t val = 111;
-  std::string args = fmt::format(R"({{"{}" : {}}})", key, val);
-  QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = val}}};
-  run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, ValidNotSentBufferSizeAsString) {
-  auto key =
-      static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
-  uint64_t val = 111;
-  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
-  QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = val}}};
-  run(fixture);
-}
-
 TEST(QuicKnobsParsingTest, ValidMaxPacingRate) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   uint64_t val = 111;
@@ -240,47 +220,6 @@ TEST(QuicKnobsParsingTest, MaxPacingRateWithSequenceNumber) {
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = val}}};
   run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7, 25");
-  uint64_t expectedCombinedVal = 7 * kPriorityThresholdKnobMultiplier + 25;
-  QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = expectedCombinedVal}}};
-  run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeBadFormat) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7/25");
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
-  run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeExtraValues) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7,25,25");
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
-  run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, InvalidAutoBackgroundPriorityOutOfBounds) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "8,50");
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
-  run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, InvalidAutoBackgroundUtilizationPercentOutOfBounds) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "0,101");
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
-  run(fixture);
-
-  std::string args2 = fmt::format(R"({{"{}" : "{}"}})", key, "0,24");
-  QuicKnobsParsingTestFixture fixture2 = {args2, true, {}};
-  run(fixture2);
 }
 
 TEST(QuicKnobsParsingTest, NonStringKey) {

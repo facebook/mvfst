@@ -721,26 +721,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
 
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::CC_AGRESSIVENESS_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
-        auto val = std::get<uint64_t>(value);
-        if (val < 25 || val > 100) {
-          LOG(ERROR)
-              << "Invalid CC_AGRESSIVENESS_KNOB value received from client, value = "
-              << val << ". Supported values are between 25,100 (inclusive)";
-          return;
-        }
-        float targetFactor = val / 100.0f;
-        VLOG(3)
-            << "CC_AGRESSIVENESS_KNOB KnobParam received from client, setting congestion control aggressiveness to "
-            << targetFactor;
-        server_conn->congestionController->setBandwidthUtilizationFactor(
-            targetFactor);
-      });
-
-  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB),
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
@@ -766,17 +746,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << unsigned(numerator) << "," << unsigned(denominator) << ")";
         server_conn->transportSettings.defaultRttFactor =
             std::make_pair(numerator, denominator);
-      });
-
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
-        auto val = std::get<uint64_t>(value);
-        VLOG(3) << "Knob param received, set total buffer space available to ("
-                << unsigned(val) << ")";
-        server_conn->transportSettings.totalBufferSpaceAvailable = val;
       });
 
   registerTransportKnobParamHandler(
@@ -879,23 +848,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverTransport->setMaxPacingRate(maybeRateBytesPerSec.value());
         serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum =
             expectedSeqNum.value();
-      });
-
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
-        CHECK(serverTransport);
-        auto val = std::get<uint64_t>(value);
-        uint64_t priorityThreshold = val / kPriorityThresholdKnobMultiplier;
-        uint64_t utilizationPercent = val % kPriorityThresholdKnobMultiplier;
-        float utilizationFactor = float(utilizationPercent) / 100.0f;
-        VLOG(3) << fmt::format(
-            "AUTO_BACKGROUND_MODE KnobParam received, enabling auto background mode "
-            "with Priority Threshold={}, Utilization Factor={}",
-            priorityThreshold,
-            utilizationFactor);
-        serverTransport->setBackgroundModeParameters(
-            PriorityLevel(priorityThreshold), utilizationFactor);
       });
 
   registerTransportKnobParamHandler(

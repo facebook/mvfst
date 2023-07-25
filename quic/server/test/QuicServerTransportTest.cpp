@@ -1599,39 +1599,6 @@ TEST_F(QuicServerTransportTest, SetCongestionControl) {
   EXPECT_EQ(CongestionControlType::Cubic, cc->type());
 }
 
-TEST_F(QuicServerTransportTest, CongestionControlAggressivenessKnob) {
-  // Congestion controller is Cubic as default
-  auto cc = server->getConn().congestionController.get();
-  EXPECT_EQ(CongestionControlType::Cubic, cc->type());
-
-  // Set to background mode will no have an effect. It only works on BBR.
-  server->handleKnobParams({
-      {52395, uint64_t{75}},
-  });
-
-  // Switch to BBR congestion control
-  server->writeLooper()->setPacingTimer(TimerHighRes::newTimer(&evb, 1ms));
-  server->getNonConstConn().transportSettings.pacingEnabled = true;
-  server->setCongestionControl(CongestionControlType::BBR);
-  cc = server->getConn().congestionController.get();
-  EXPECT_EQ(CongestionControlType::BBR, cc->type());
-  // BBR is not in background mode initially
-  EXPECT_FALSE(cc->isInBackgroundMode());
-
-  // Set to background mode.
-  server->handleKnobParams({
-      {52395, uint64_t{75}},
-  });
-  // BBR should now be in background mode
-  EXPECT_TRUE(cc->isInBackgroundMode());
-
-  // Turn off background mode and verify it
-  server->handleKnobParams({
-      {52395, uint64_t{100}},
-  });
-  EXPECT_FALSE(cc->isInBackgroundMode());
-}
-
 TEST_F(QuicServerTransportTest, TestServerNotDetachable) {
   EXPECT_FALSE(server->isDetachable());
 }

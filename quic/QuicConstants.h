@@ -136,8 +136,6 @@ BETTER_ENUM(
     FORCIBLY_SET_UDP_PAYLOAD_SIZE = 0xba92,
     // Set congestion control algorithm
     CC_ALGORITHM_KNOB = 0xccaa,
-    // Set congestion control aggressiveness (experimental)
-    CC_AGRESSIVENESS_KNOB = 0xccab,
     // Enable experimental CC settings
     CC_EXPERIMENTAL = 0xccac,
     // Change congestion control config struct
@@ -146,12 +144,8 @@ BETTER_ENUM(
     STARTUP_RTT_FACTOR_KNOB = 0x1111,
     // Set pacing rtt factor used when not in startup
     DEFAULT_RTT_FACTOR_KNOB = 0x2222,
-    // Set total buffer size (in bytes) for not yet sent packets
-    NOTSENT_BUFFER_SIZE_KNOB = 0x3333,
     // Set max pacing rate in bytes per second to be used if pacing is enabled
     MAX_PACING_RATE_KNOB = 0x4444,
-    // Set auto background mode (experimental)
-    AUTO_BACKGROUND_MODE = 0x5555,
     // Use adaptive loss detection thresholds for reordering and timeout
     ADAPTIVE_LOSS_DETECTION = 0x5556,
     // Enable experimental pacer settings
