@@ -40,6 +40,7 @@ class QuicClientAsyncTransport : public QuicStreamAsyncTransport,
     onConnectionError(std::move(code));
   }
   void onConnectionError(QuicError code) noexcept override;
+  void onConnectionEnd(QuicError /* error */) noexcept override {}
   void onTransportReady() noexcept override;
 };
 } // namespace quic
