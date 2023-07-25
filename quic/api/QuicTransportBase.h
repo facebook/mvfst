@@ -438,7 +438,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * factor to use when in background mode.
    *
    * If all streams have equal or lower priority compares to the threshold
-   * (value >= threshold), the connection is considered to be in backround mode.
+   * (value >= threshold), the connection is considered to be in background
+   * mode.
    */
   void setBackgroundModeParameters(
       PriorityLevel maxBackgroundPriority,
@@ -905,7 +906,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   // Priority level threshold for background streams
   // If all streams have equal or lower priority to the threshold
-  // (value >= threshold), the connection is considered to be in backround mode.
+  // (value >= threshold), the connection is considered to be in background
+  // mode.
   folly::Optional<PriorityLevel> backgroundPriorityThreshold_;
   folly::Optional<float> backgroundUtilizationFactor_;
 
@@ -967,7 +969,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
  private:
   /**
-   * Helper funtions to handle new streams.
+   * Helper functions to handle new streams.
    */
   void handleNewStreams(std::vector<StreamId>& newPeerStreams);
   void handleNewGroupedStreams(std::vector<StreamId>& newPeerStreams);

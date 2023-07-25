@@ -377,7 +377,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
 
   // Routing callback
   /**
-   * Called when a connecton id is available for a new connection (i.e flow)
+   * Called when a connection id is available for a new connection (i.e flow)
    * The connection-id here is chosen by this server
    */
   void onConnectionIdAvailable(
@@ -393,7 +393,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
       ConnectionId id) noexcept override;
 
   /**
-   * Called when a connecton id is bound and ip address should not
+   * Called when a connection id is bound and ip address should not
    * be used any more for routing.
    */
   void onConnectionIdBound(

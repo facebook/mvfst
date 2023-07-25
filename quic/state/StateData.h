@@ -165,7 +165,7 @@ class AppLimitedTracker {
   }
 
   /**
-   * Returns whether the connection has been marked as appplication limited.
+   * Returns whether the connection has been marked as application limited.
    */
   bool isAppLimited() {
     return isAppLimited_;
@@ -222,7 +222,7 @@ struct Pacer {
    * - If the pacer is currently using a faster pace, it will be brought down to
    *   maxRateBytesPerSec.
    * - If refreshPacingRate or setPacingRate are called with a value
-   * greated than maxRateBytesPerSec, maxRateBytesPerSec will be used instead.
+   * greater than maxRateBytesPerSec, maxRateBytesPerSec will be used instead.
    */
   virtual void setMaxPacingRate(uint64_t maxRateBytesPerSec) = 0;
 
@@ -618,12 +618,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
 
-  // Measure rtt betwen pathchallenge & path response frame
+  // Measure rtt between pathchallenge & path response frame
   // Use this measured rtt as init rtt (from Transport Settings)
   TimePoint pathChallengeStartTime;
 
   /**
-   * Eary data app params functions.
+   * Eerie data app params functions.
    */
   folly::Function<bool(const folly::Optional<std::string>&, const Buf&) const>
       earlyDataAppParamsValidator;

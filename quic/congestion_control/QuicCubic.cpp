@@ -334,7 +334,7 @@ void Cubic::onPacketAckOrLoss(
   // TODO: current code in detectLossPackets only gives back a loss event when
   // largestLostPacketNum isn't a folly::none. But we should probably also check
   // against it here anyway just in case the loss code is changed in the
-  // furture.
+  // future.
   if (lossEvent) {
     onPacketLoss(*lossEvent);
     if (conn_.pacer) {
@@ -565,7 +565,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
  * algorithm as well, "time to origin" is the time it takes to grow cwnd back to
  * Wmax from its current value. Chromium follows Linux implementation. It
  * affects timeElapsed as well. If we want to follow the Linux/Chromium
- * implemetation, then
+ * implementation, then
  *    timeElapsed = now() - time of the first Ack since last window reduction.
  * Alternatively, the paper's definition,
  *    timeElapsed = now() - time of last window reduction.

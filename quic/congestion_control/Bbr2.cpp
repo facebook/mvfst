@@ -588,7 +588,7 @@ bool Bbr2CongestionController::hasElapsedInPhase(
   return Clock::now() > probeBWCycleStart_ + interval;
 }
 
-// Was the loss percent too hight for the last ack received?
+// Was the loss percent too high for the last ack received?
 bool Bbr2CongestionController::checkInflightTooHigh(
     uint64_t inflightBytesAtLargestAckedPacket,
     uint64_t lostBytes) {

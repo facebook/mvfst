@@ -41,7 +41,7 @@ struct AckState : WriteAckFrameState {
   // ack for the first time.
   // - the peer has requested it through an immediate ack frame.
   bool needsToSendAckImmediately{false};
-  // Count of oustanding packets received with retransmittable data.
+  // Count of outstanding packets received with retransmittable data.
   uint8_t numRxPacketsRecvd{0};
   // Receive time of the latest packet
   folly::Optional<TimePoint> latestRecvdPacketTime;
