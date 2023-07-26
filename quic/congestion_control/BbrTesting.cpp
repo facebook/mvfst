@@ -32,7 +32,7 @@ BbrTestingCongestionController::BbrTestingCongestionController(
 
 // Limit the bandwidth based upon the measured TBF data.
 // If we have a simulated token bucket with probability>kProbabilityThreshold,
-// bandwidth estimate =
+// bandwdith estimate =
 // max(min(tbf_rate,long_term_bw_sampler_rate),short_term_sampler_rate)
 // This allows the returned bandwidth value to:
 // - Continue working normally when probability is low in any Token Bucket

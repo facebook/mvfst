@@ -4659,7 +4659,7 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
 
   EXPECT_EQ(flag, 1);
 
-  // overwrite will fail, the new handler won't be called
+  // ovewrite will fail, the new handler won't be called
   server->registerKnobParamHandler(
       199,
       [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {

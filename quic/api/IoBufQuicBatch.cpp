@@ -92,7 +92,7 @@ bool IOBufQuicBatch::flushInternal() {
     }
   }
 
-  // If error occurred on first socket, kick off second socket immediately
+  // If error occured on first socket, kick off second socket immediately
   if (!written && happyEyeballsState_ &&
       happyEyeballsState_->connAttemptDelayTimeout &&
       happyEyeballsState_->connAttemptDelayTimeout->isScheduled()) {

@@ -462,7 +462,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   QuicAsyncUDPSocketType::BindOptions bindOptions_;
 
   // set by getEventBaseBackend if multishot callback is
-  // supported
+  // supprted
   bool backendSupportsMultishotCallback_{false};
 };
 

@@ -42,7 +42,7 @@ class PacketBuilderInterface {
  public:
   virtual ~PacketBuilderInterface() = default;
 
-  // TODO: Temporarily let this interface be reusable across different concrete
+  // TODO: Temporarly let this interface be reusable across different concrete
   // builder types. But this isn't optimized for builder that writes both header
   // and body into a continuous memory.
   struct Packet {

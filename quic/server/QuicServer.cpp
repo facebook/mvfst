@@ -478,7 +478,7 @@ void QuicServer::shutdown(LocalErrorCode error) {
       workerPtr_.reset();
     });
     // protecting the erase in map with the mutex since
-    // the erase could potentially affect concurrent accesses from other threads
+    // the erase could potentally affect concurrent accesses from other threads
     std::lock_guard<std::mutex> guard(startMutex_);
     evbToWorkers_.erase(worker->getEventBase());
   }

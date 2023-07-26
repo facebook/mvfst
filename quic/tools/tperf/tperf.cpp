@@ -48,7 +48,7 @@ DEFINE_bool(gso, true, "Enable GSO writes to the socket");
 DEFINE_uint32(
     client_transport_timer_resolution_ms,
     1,
-    "Timer resolution for Ack and Loss timeout in client transport");
+    "Timer resolution for Ack and Loss tiemout in client transport");
 DEFINE_string(
     server_qlogger_path,
     "",

@@ -580,7 +580,7 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
   auto ackingTime = Clock::now();
   DCHECK(ackState_.largestRecvdPacketTime.hasValue())
       << "Missing received time for the largest acked packet";
-  // assuming that we're going to ack the largest received with highest pri
+  // assuming that we're going to ack the largest received with hightest pri
   auto receivedTime = *ackState_.largestRecvdPacketTime;
   std::chrono::microseconds ackDelay =
       (ackingTime > receivedTime
@@ -771,7 +771,7 @@ void BlockedScheduler::writeBlockedFrames(PacketBuilderInterface& builder) {
     auto result = writeFrame(blockedFrame, builder);
     if (!result) {
       // If there is not enough room to write data blocked frame in the
-      // current packet, we won't be able to write stream blocked frames either
+      // curretn packet, we won't be able to write stream blocked frames either
       // so just return.
       return;
     }

@@ -522,7 +522,7 @@ void QuicServerTransport::processPendingData(bool async) {
         }
         // The app could have triggered a graceful close from the callbacks,
         // in which case we should continue with the handshake and processing
-        // the remaining data because it could potentially have a FIN which
+        // the reamining data because it could potentially have a FIN which
         // could end the graceful close.
       }
     };
@@ -753,7 +753,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto val = std::get<uint64_t>(value);
 
         // Check if the server should process this knob, i.e should set the max
-        // pacing rate to the given value. Currently there is a possibility that
+        // pacing rate to the given value. Currently there is a possiblity that
         // MAX_PACING_RATE_KNOB frames arrive out of order, causing incorrect
         // max pacing rate to be set on the transport, i.e. the rate is set to a
         // low value when it should be set to max value (i.e. disabled pacing).
