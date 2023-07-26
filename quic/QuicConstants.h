@@ -317,13 +317,9 @@ enum class QuicVersion : uint32_t {
   QUIC_DRAFT = 0xff00001d, // Draft-29
   QUIC_V1 = 0x00000001,
   QUIC_V1_ALIAS = 0xfaceb003,
-  // MVFST_EXPERIMENTAL currently populates zeroRttRejected on every crypto data
-  // received in QuicClientTransport.cpp
   MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST
   MVFST_ALIAS = 0xfaceb010,
   MVFST_INVALID = 0xfaceb00f,
-  // MVFST_EXPERIMENTAL2 currently turns on experimental CC and pacer for the
-  // client only.
   MVFST_EXPERIMENTAL2 = 0xfaceb011, // Experimental alias for MVFST
   MVFST_EXPERIMENTAL3 = 0xfaceb013, // Experimental alias for MVFST
 };
