@@ -806,7 +806,7 @@ void QuicClientTransport::onReadData(
     const folly::SocketAddress& peer,
     NetworkDataSingle&& networkData) {
   if (closeState_ == CloseState::CLOSED) {
-    // If we are closed, then we shouldn't process new network data.
+    // If we are closed, then we shoudn't process new network data.
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::CLIENT_STATE_CLOSED);
     if (conn_->qLogger) {

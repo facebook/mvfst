@@ -127,7 +127,7 @@ void SocketObserverInterface::PacketsWrittenEvent::
   }
 
   // The packets in the OutstandingPackets deque are sorted by their sequence
-  // number in their packet number space. As a result, the N packets at the end
+  // nunber in their packet number space. As a result, the N packets at the end
   // of the deque may not be the N most recently sent OutstandingPacketss.
   // Furthermore, adjacent OutstandingPackets may have the same sequence
   // number because they belong to different packet number spaces. Because

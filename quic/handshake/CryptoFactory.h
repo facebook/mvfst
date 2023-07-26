@@ -49,7 +49,7 @@ class CryptoFactory {
       QuicVersion version) const;
 
   /**
-   * Crypto layer specific methods.
+   * Crypto layer specifc methods.
    */
   virtual Buf makeInitialTrafficSecret(
       folly::StringPiece label,

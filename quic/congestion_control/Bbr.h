@@ -22,7 +22,7 @@ constexpr float kStartupGain = 2.885f; // 2/ln(2)
 constexpr float kProbeBwGain = 2.0f;
 // The expected of bandwidth growth in each round trip time during STARTUP
 constexpr float kExpectedStartupGrowth = 1.25f;
-// How many rounds of rtt to stay in STARTUP when the bandwidth isn't growing as
+// How many rounds of rtt to stay in STARUP when the bandwidth isn't growing as
 // fast as kExpectedStartupGrowth
 constexpr uint8_t kStartupSlowGrowRoundLimit = 3;
 // Default number of pacing cycles

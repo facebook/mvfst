@@ -102,7 +102,7 @@ class ServerHandshake : public Handshake {
   virtual void writeNewSessionTicket(const AppToken& appToken);
 
   /**
-   * Returns a reference to the CryptoFactory used internally.
+   * Returns a reference to the CryptoFactory used internaly.
    */
   virtual const CryptoFactory& getCryptoFactory() const = 0;
 
@@ -178,7 +178,7 @@ class ServerHandshake : public Handshake {
   const fizz::server::State& getState() const;
 
   /**
-   * Returns the negotiated ALPN from the handshake.
+   * Retuns the negotiated ALPN from the handshake.
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
 

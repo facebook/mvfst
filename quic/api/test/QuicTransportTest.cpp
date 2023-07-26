@@ -1798,7 +1798,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       conn.transportSettings.writeConnectionDataPacketsLimit);
   verifyCorrectness(conn, 100, streamId, *buf1, false, false);
 
-  // Connection flow controlled
+  // Connection flow controled
   auto num_outstandings = conn.outstandings.packets.size();
   stream->flowControlState.peerAdvertisedMaxOffset = 300;
   conn.streamManager->updateWritableStreams(*stream);
@@ -4650,7 +4650,7 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultipleBytes) {
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
 
-  // when first and last byte TX callback fired, numPacketsTxWithNewData should
+  // when first and last byte TX callbacsk fired, numPacketsTxWithNewData should
   // be 1
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
       .Times(1)

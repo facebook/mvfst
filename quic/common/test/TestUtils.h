@@ -148,7 +148,7 @@ QuicCachedPsk setupZeroRttOnClientCtx(
 
 template <class T>
 std::unique_ptr<T> createNoOpAeadImpl(uint64_t cipherOverhead = 0) {
-  // Fake that the handshake has already occurred
+  // Fake that the handshake has already occured
   auto aead = std::make_unique<testing::NiceMock<T>>();
   ON_CALL(*aead, _inplaceEncrypt(testing::_, testing::_, testing::_))
       .WillByDefault(testing::Invoke([&](auto& buf, auto, auto) {
@@ -158,7 +158,7 @@ std::unique_ptr<T> createNoOpAeadImpl(uint64_t cipherOverhead = 0) {
           return folly::IOBuf::create(0);
         }
       }));
-  // Fake that the handshake has already occurred and fix the keys.
+  // Fake that the handshake has already occured and fix the keys.
   ON_CALL(*aead, _decrypt(testing::_, testing::_, testing::_))
       .WillByDefault(
           testing::Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));

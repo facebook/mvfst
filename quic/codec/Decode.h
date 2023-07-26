@@ -169,7 +169,7 @@ folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
 parseLongHeaderInvariant(uint8_t initalByte, folly::io::Cursor& cursor);
 
 struct PacketLength {
-  // The length of the packet payload (including packet number)
+  // The length of the packet payload (inlcuding packet number)
   uint64_t packetLength;
   // Length of the length field.
   size_t lengthLength;

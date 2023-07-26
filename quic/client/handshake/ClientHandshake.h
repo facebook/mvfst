@@ -53,7 +53,7 @@ class ClientHandshake : public Handshake {
   virtual void removePsk(const folly::Optional<std::string>& /* hostname */) {}
 
   /**
-   * Returns a reference to the CryptoFactory used internally.
+   * Returns a reference to the CryptoFactory used internaly.
    */
   virtual const CryptoFactory& getCryptoFactory() const = 0;
 
