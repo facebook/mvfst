@@ -347,17 +347,6 @@ void QuicClientTransport::processPacketData(
   // that the version is now bound to the new packet.
   if (!conn_->version) {
     conn_->version = conn_->originalVersion;
-
-    if (conn_->version == QuicVersion::MVFST_EXPERIMENTAL2) {
-      // MVFST_EXPERIMENTAL2 currently enables experimental congestion control
-      // and experimental pacer
-      if (conn_->congestionController) {
-        conn_->congestionController->setExperimental(true);
-      }
-      if (conn_->pacer) {
-        conn_->pacer->setExperimental(true);
-      }
-    }
   }
 
   if (!conn_->serverConnectionId && longHeader) {
@@ -674,9 +663,7 @@ void QuicClientTransport::processPacketData(
       clientConn_->zeroRttWriteCipher.reset();
       clientConn_->zeroRttWriteHeaderCipher.reset();
     }
-    if (!clientConn_->zeroRttRejected.has_value() ||
-        (conn_->version.has_value() &&
-         conn_->version.value() == QuicVersion::MVFST_EXPERIMENTAL)) {
+    if (!clientConn_->zeroRttRejected.has_value()) {
       clientConn_->zeroRttRejected = handshakeLayer->getZeroRttRejected();
       if (clientConn_->zeroRttRejected.has_value() &&
           *clientConn_->zeroRttRejected) {
