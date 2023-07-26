@@ -3256,16 +3256,6 @@ void QuicTransportBase::setTransportSettings(
       conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
       conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
       conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
-      if (conn_->transportSettings.defaultCongestionController ==
-          CongestionControlType::BBR2) {
-        // We need to have the pacer rate be as accurate as possible for BBR2.
-        // The current BBR behavior is dependent on the existing pacing behavior
-        // so the override is only for BBR2.
-        // TODO: This should be removed once the pacer changes are adopted as
-        // the defaults or the pacer is fixed in another way.
-        conn_->pacer->setExperimental(true);
-        writeLooper_->setFireLoopEarly(true);
-      }
     } else {
       LOG(ERROR) << "Pacing cannot be enabled without a timer";
       conn_->transportSettings.pacingEnabled = false;
@@ -3375,6 +3365,16 @@ void QuicTransportBase::validateCongestionAndPacing(
        !writeLooper_->hasPacingTimer())) {
     LOG(ERROR) << "Unpaced BBR isn't supported";
     type = CongestionControlType::Cubic;
+  }
+
+  if (type == CongestionControlType::BBR2) {
+    // We need to have the pacer rate be as accurate as possible for BBR2.
+    // The current BBR behavior is dependent on the existing pacing behavior
+    // so the override is only for BBR2.
+    // TODO: This should be removed once the pacer changes are adopted as
+    // the defaults or the pacer is fixed in another way.
+    conn_->pacer->setExperimental(true);
+    writeLooper_->setFireLoopEarly(true);
   }
 }
 

@@ -715,9 +715,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         if (cctype == server_conn->congestionController->type()) {
           return;
         }
-        server_conn->congestionController =
-            server_conn->congestionControllerFactory->makeCongestionController(
-                *server_conn, cctype);
+        serverTransport->setCongestionControl(cctype);
       });
 
   registerTransportKnobParamHandler(
