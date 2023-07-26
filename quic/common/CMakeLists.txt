@@ -133,6 +133,7 @@ target_compile_options(
 
 target_link_libraries(
   mvfst_transport_knobs PUBLIC
+  mvfst_constants
   Folly::folly
 )
 
