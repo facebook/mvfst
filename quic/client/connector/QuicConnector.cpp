@@ -30,6 +30,7 @@ void QuicConnector::onReplaySafe() noexcept {
   if (cb_) {
     cb_->onConnectSuccess();
   }
+  cancelTimeout();
   cleanUpAndCloseSocket();
 }
 
