@@ -471,7 +471,7 @@ class SocketObserverInterface {
       folly::EventBase* /* evb */) noexcept {}
 
   /**
-   * startWritingFromAppLimited() is invoked when the socket is currenty
+   * startWritingFromAppLimited() is invoked when the socket is currently
    * app rate limited and is being given an opportunity to write packets.
    *
    * @param socket   Socket that is starting to write from an app limited state.

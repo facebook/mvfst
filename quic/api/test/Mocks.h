@@ -192,7 +192,7 @@ class MockQuicTransport : public QuicServerTransport {
         QuicServerTransport::Ptr transport,
         ConnectionId id) noexcept = 0;
 
-    // Called when a connecton id is bound and ip address should not
+    // Called when a connection id is bound and ip address should not
     // be used any more for routing.
     virtual void onConnectionIdBound(
         QuicServerTransport::Ptr transport) noexcept = 0;

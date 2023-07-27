@@ -1062,7 +1062,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
       folly::chrono::ceil<std::chrono::milliseconds>(expectedDelayUntilLost),
       alarm.first);
   EXPECT_EQ(LossState::AlarmMethod::EarlyRetransmitOrReordering, alarm.second);
-  // Manual set lossState. Calling setLossDetectionAlarm requries a Timeout
+  // Manual set lossState. Calling setLossDetectionAlarm requires a Timeout
   conn->lossState.currentAlarmMethod = alarm.second;
 
   // Second packet gets acked:
@@ -2444,7 +2444,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
   EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
 
-  // Lose the 3nd dsr packet, it should be merged together with the first
+  // Lose the 3rd dsr packet, it should be merged together with the first
   // element in the lossBufMetas:
   RegularQuicWritePacket packet2(PacketHeader(ShortHeader(
       ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 2)));

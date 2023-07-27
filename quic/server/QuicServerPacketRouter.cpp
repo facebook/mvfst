@@ -118,7 +118,7 @@ void TakeoverHandlerCallback::onReadClosed() noexcept {
   //  If we delete the socket in the callback of close, then this might cause
   //  some reentrancy in deletion, since close() in AsyncUDPSocket doesn't
   //  guard itself against deletion in the onReadClosed() callback.
-  //  Doing nothing since the ASyncUDPSocket will implictly pause the reads.
+  //  Doing nothing since the ASyncUDPSocket will implicitly pause the reads.
 }
 
 void TakeoverPacketHandler::setDestination(

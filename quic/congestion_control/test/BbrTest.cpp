@@ -72,7 +72,7 @@ TEST_F(BbrTest, Recovery) {
   inflightBytes -= (loss.lostBytes + ackedBytes);
   uint64_t expectedRecoveryWindow = std::max(
       inflightBytes + ackedBytes - loss.lostBytes, inflightBytes + ackedBytes);
-  // This sets the connectin to recovery state, also sets both the
+  // This sets the connection to recovery state, also sets both the
   // endOfRoundTrip_ and endOfRecovery_ to Clock::now()
   bbr.onPacketAckOrLoss(
       makeAck(0, ackedBytes, Clock::now(), Clock::now() - 5ms), loss);

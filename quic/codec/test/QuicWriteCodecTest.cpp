@@ -579,7 +579,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   bool fin = false;
   // 1 byte for type
   // 1 byte for stream id
-  // 1 byte for offet
+  // 1 byte for offset
   // => 3 bytes
   auto dataLen = writeStreamFrameHeader(
       pktBuilder,

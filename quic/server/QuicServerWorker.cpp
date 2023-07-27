@@ -581,7 +581,7 @@ void QuicServerWorker::forwardNetworkData(
     folly::Optional<QuicVersion> quicVersion,
     bool isForwardedData) {
   // if it's not Client initial or ZeroRtt, AND if the connectionId version
-  // mismatches: foward if pktForwarding is enabled else dropPacket
+  // mismatches: forward if pktForwarding is enabled else dropPacket
   if (!routingData.clientChosenDcid &&
       !connIdAlgo_->canParse(routingData.destinationConnId)) {
     if (packetForwardingEnabled_ && !isForwardedData) {
@@ -1014,7 +1014,7 @@ bool QuicServerWorker::validRetryToken(
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
-  // Create a psuedo token to generate the assoc data.
+  // Create a pseudo token to generate the assoc data.
   RetryToken token(dstConnId, clientIp, 0);
 
   auto maybeDecryptedRetryTokenMs = tokenGenerator.decryptToken(
@@ -1031,7 +1031,7 @@ bool QuicServerWorker::validNewToken(
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
-  // Create a psuedo token to generate the assoc data.
+  // Create a pseudo token to generate the assoc data.
   NewToken token(clientIp);
 
   auto maybeDecryptedNewTokenMs = tokenGenerator.decryptToken(
@@ -1074,7 +1074,7 @@ void QuicServerWorker::sendRetryPacket(
       initialByte,
       dstConnId, /* src conn id */
       srcConnId, /* dst conn id */
-      dstConnId, /* orginal dst conn id */
+      dstConnId, /* original dst conn id */
       QuicVersion::MVFST_INVALID,
       folly::IOBuf::copyBuffer(encryptedTokenStr));
   Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
