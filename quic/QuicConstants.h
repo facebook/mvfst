@@ -692,7 +692,7 @@ constexpr uint8_t kDefaultMaxPriority = 7;
 constexpr size_t kShortHeaderPaddingModulo = 32;
 
 // Maximum packet receive timestamps stored.
-constexpr uint8_t kMaxReceivedPktsTimestampsStored = 25;
+constexpr uint8_t kMaxReceivedPktsTimestampsStored = 10;
 constexpr uint8_t kDefaultReceiveTimestampsExponent = 3;
 
 } // namespace quic

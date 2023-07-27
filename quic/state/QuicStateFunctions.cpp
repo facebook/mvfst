@@ -427,7 +427,8 @@ uint64_t updateLargestReceivedPacketNum(
   ackState.lastRecvdPacketInfo.assign({packetNum, receivedTime});
 
   if (packetNum >= expectedNextPacket) {
-    if (ackState.recvdPacketInfos.size() == kMaxReceivedPktsTimestampsStored) {
+    if (ackState.recvdPacketInfos.size() ==
+        conn.transportSettings.maxReceiveTimestampsPerAckStored) {
       ackState.recvdPacketInfos.pop_front();
     }
     ackState.recvdPacketInfos.emplace_back(

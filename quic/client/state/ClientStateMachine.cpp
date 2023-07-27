@@ -262,7 +262,8 @@ void processServerInitialParams(
       conn.maybePeerAckReceiveTimestampsConfig.assign(
           {std::min(
                static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
-               kMaxReceivedPktsTimestampsStored),
+               static_cast<uint8_t>(
+                   conn.transportSettings.maxReceiveTimestampsPerAckStored)),
            std::max(
                static_cast<uint8_t>(receiveTimestampsExponent.value()),
                static_cast<uint8_t>(0))});

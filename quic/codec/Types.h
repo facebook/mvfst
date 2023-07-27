@@ -241,7 +241,7 @@ struct WriteAckFrameState {
   // Packet number and timestamp of recently received packets.
   //
   // The maximum number of packets stored in pktsReceivedTimestamps is
-  // controlled by kMaxReceivedPktsTimestampsStored.
+  // controlled by maxReceivedPktsTimestampsStored.
   //
   // The packet number of entries in the deque is guaranteed to increase
   // monotonically because an entry is only added for a received packet

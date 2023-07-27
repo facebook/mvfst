@@ -150,7 +150,9 @@ TEST_P(UpdateReceivedPacketTimestampsTest, TestUpdatePktReceiveTimestamps) {
   PacketNum nextPacketNum = 0;
   TimePoint latestTimeStamp = Clock::now();
   conn.ackStates = AckStates(nextPacketNum);
-  for (int i = 0; i < kMaxReceivedPktsTimestampsStored + 2; i++) {
+  for (uint64_t i = 0;
+       i < conn.transportSettings.maxReceiveTimestampsPerAckStored + 2;
+       i++) {
     updateAckState(
         conn,
         PacketNumberSpace::AppData,
@@ -161,7 +163,9 @@ TEST_P(UpdateReceivedPacketTimestampsTest, TestUpdatePktReceiveTimestamps) {
     latestTimeStamp += 1ms;
   }
   auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
-  EXPECT_EQ(ackState.recvdPacketInfos.size(), kMaxReceivedPktsTimestampsStored);
+  EXPECT_EQ(
+      ackState.recvdPacketInfos.size(),
+      conn.transportSettings.maxReceiveTimestampsPerAckStored);
   // First 2 packets (0, 1) should be popped.
   EXPECT_EQ(ackState.recvdPacketInfos.front().pktNum, 2);
   EXPECT_TRUE(ackState.largestRecvdPacketNum.has_value());
@@ -169,10 +173,10 @@ TEST_P(UpdateReceivedPacketTimestampsTest, TestUpdatePktReceiveTimestamps) {
 
   EXPECT_EQ(
       ackState.largestRecvdPacketNum.value(),
-      kMaxReceivedPktsTimestampsStored + 1);
+      conn.transportSettings.maxReceiveTimestampsPerAckStored + 1);
   EXPECT_EQ(
       ackState.lastRecvdPacketInfo.value().pktNum,
-      kMaxReceivedPktsTimestampsStored + 1);
+      conn.transportSettings.maxReceiveTimestampsPerAckStored + 1);
 }
 
 TEST_P(

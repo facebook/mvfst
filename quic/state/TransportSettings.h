@@ -300,6 +300,13 @@ struct TransportSettings {
   // supports them.
   folly::Optional<AckReceiveTimestampsConfig>
       maybeAckReceiveTimestampsConfigSentToPeer;
+
+  // Maximum number of received packet timestamps stored per ACK. This will be
+  // controlled by a MC and will be dependent on device capabilities and
+  // resources. Hence, this isn't contigent on whether ACK receive timestamps
+  // are enabled or not and should not a part of
+  //  maybeAckReceiveTimestampsConfigSentToPeer optional.
+  uint64_t maxReceiveTimestampsPerAckStored{kMaxReceivedPktsTimestampsStored};
 };
 
 } // namespace quic
