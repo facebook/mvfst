@@ -1397,14 +1397,19 @@ WriteQuicDataResult writeConnectionDataToSocket(
 
   if (!connection.gsoSupported.hasValue()) {
     connection.gsoSupported = sock.getGSO() >= 0;
-    if (!*connection.gsoSupported &&
-        (connection.transportSettings.dataPathType ==
-         DataPathType::ContinuousMemory)) {
-      // Change data path type to DataPathType::ChainedMemory.
-      // Continuous memory data path is only supported with working GSO.
-      LOG(ERROR) << "Switching data path to ChainedMemory as "
-                 << "GSO is not supported on the socket";
-      connection.transportSettings.dataPathType = DataPathType::ChainedMemory;
+    if (!*connection.gsoSupported) {
+      if (!useSinglePacketInplaceBatchWriter(
+              connection.transportSettings.maxBatchSize,
+              connection.transportSettings.dataPathType) &&
+          (connection.transportSettings.dataPathType ==
+           DataPathType::ContinuousMemory)) {
+        // Change data path type to DataPathType::ChainedMemory.
+        // Continuous memory data path is only supported with working GSO or
+        // SinglePacketInplaceBatchWriter.
+        LOG(ERROR) << "Switching data path to ChainedMemory as "
+                   << "GSO is not supported on the socket";
+        connection.transportSettings.dataPathType = DataPathType::ChainedMemory;
+      }
     }
   }
 
@@ -1496,6 +1501,16 @@ WriteQuicDataResult writeConnectionDataToSocket(
             NoWriteReason::SOCKET_FAILURE;
       }
       return {ioBufBatch.getPktSent(), 0, bytesWritten};
+    }
+
+    if ((connection.transportSettings.batchingMode ==
+         QuicBatchingMode::BATCHING_MODE_NONE) &&
+        useSinglePacketInplaceBatchWriter(
+            connection.transportSettings.maxBatchSize,
+            connection.transportSettings.dataPathType)) {
+      // With SinglePacketInplaceBatchWriter we always write one packet, and so
+      // ioBufBatch needs a flush.
+      ioBufBatch.flush();
     }
   }
 
