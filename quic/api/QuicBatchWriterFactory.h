@@ -12,6 +12,10 @@
 
 namespace quic {
 
+bool useSinglePacketInplaceBatchWriter(
+    uint32_t maxBatchSize,
+    quic::DataPathType dataPathType);
+
 BatchWriterPtr makeGsoBatchWriter(uint32_t batchSize);
 BatchWriterPtr makeGsoInPlaceBatchWriter(
     uint32_t batchSize,
@@ -38,6 +42,9 @@ class BatchWriterFactory {
       bool gsoSupported) {
     switch (batchingMode) {
       case quic::QuicBatchingMode::BATCHING_MODE_NONE:
+        if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
+          return BatchWriterPtr(new SinglePacketInplaceBatchWriter(conn));
+        }
         return BatchWriterPtr(new SinglePacketBatchWriter());
       case quic::QuicBatchingMode::BATCHING_MODE_GSO: {
         if (gsoSupported) {

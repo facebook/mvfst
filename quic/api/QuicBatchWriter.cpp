@@ -53,6 +53,39 @@ ssize_t SinglePacketBatchWriter::write(
   return sock.write(address, buf_);
 }
 
+// SinglePacketInplaceBatchWriter
+void SinglePacketInplaceBatchWriter::reset() {
+  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+  auto& buf = scopedBufAccessor.buf();
+  buf->clear();
+}
+
+bool SinglePacketInplaceBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& /* buf */,
+    size_t /*unused*/,
+    const folly::SocketAddress& /*unused*/,
+    QuicAsyncUDPSocketType* /*unused*/) {
+  // Always flush. This should trigger a write afterwards.
+  return true;
+}
+
+ssize_t SinglePacketInplaceBatchWriter::write(
+    QuicAsyncUDPSocketType& sock,
+    const folly::SocketAddress& address) {
+  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+  auto& buf = scopedBufAccessor.buf();
+  CHECK(!buf->isChained());
+  auto ret = sock.write(address, buf);
+  buf->clear();
+  return ret;
+}
+
+bool SinglePacketInplaceBatchWriter::empty() const {
+  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+  auto& buf = scopedBufAccessor.buf();
+  return buf->length() == 0;
+}
+
 // SendmmsgPacketBatchWriter
 SendmmsgPacketBatchWriter::SendmmsgPacketBatchWriter(size_t maxBufs)
     : maxBufs_(maxBufs) {

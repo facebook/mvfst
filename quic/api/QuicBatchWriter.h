@@ -92,6 +92,32 @@ class SinglePacketBatchWriter : public IOBufBatchWriter {
       const folly::SocketAddress& address) override;
 };
 
+/**
+ * This writer allows for single buf inplace writes.
+ * The buffer is owned by the conn/accessor, and every append will trigger a
+ * flush/write.
+ */
+class SinglePacketInplaceBatchWriter : public IOBufBatchWriter {
+ public:
+  explicit SinglePacketInplaceBatchWriter(QuicConnectionStateBase& conn)
+      : conn_(conn) {}
+  ~SinglePacketInplaceBatchWriter() override = default;
+
+  void reset() override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& /* buf */,
+      size_t /*unused*/,
+      const folly::SocketAddress& /*unused*/,
+      QuicAsyncUDPSocketType* /*unused*/) override;
+  ssize_t write(
+      QuicAsyncUDPSocketType& sock,
+      const folly::SocketAddress& address) override;
+  [[nodiscard]] bool empty() const override;
+
+ private:
+  QuicConnectionStateBase& conn_;
+};
+
 class SendmmsgPacketBatchWriter : public BatchWriter {
  public:
   explicit SendmmsgPacketBatchWriter(size_t maxBufs);

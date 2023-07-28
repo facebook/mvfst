@@ -624,5 +624,155 @@ INSTANTIATE_TEST_SUITE_P(
     QuicBatchWriterTest,
     ::testing::Values(false, true));
 
+class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
+ public:
+  SinglePacketInplaceBatchWriterTest()
+      : conn_(FizzServerQuicHandshakeContext::Builder().build()) {}
+
+  void SetUp() override {
+    bufAccessor_ =
+        std::make_unique<quic::SimpleBufAccessor>(conn_.udpSendPacketLen);
+    conn_.bufAccessor = bufAccessor_.get();
+  }
+
+  quic::BatchWriterPtr makeBatchWriter(
+      quic::QuicBatchingMode batchingMode =
+          quic::QuicBatchingMode::BATCHING_MODE_NONE) {
+    return quic::BatchWriterFactory::makeBatchWriter(
+        batchingMode,
+        conn_.transportSettings.maxBatchSize,
+        false /* useThreadLocal */,
+        quic::kDefaultThreadLocalDelay,
+        conn_.transportSettings.dataPathType,
+        conn_,
+        false /* gsoSupported_ */);
+  }
+
+  void enableSinglePacketInplaceBatchWriter() {
+    conn_.transportSettings.maxBatchSize = 1;
+    conn_.transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  }
+
+ protected:
+  std::unique_ptr<quic::SimpleBufAccessor> bufAccessor_;
+  QuicServerConnectionState conn_;
+};
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestFactorySuccess) {
+  enableSinglePacketInplaceBatchWriter();
+
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()));
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestFactoryNoTransportSetting) {
+  conn_.transportSettings.maxBatchSize = 1;
+  conn_.transportSettings.dataPathType = DataPathType::ChainedMemory;
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  EXPECT_EQ(
+      dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()),
+      nullptr);
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestFactoryNoTransportSetting2) {
+  conn_.transportSettings.maxBatchSize = 16;
+  conn_.transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  EXPECT_EQ(
+      dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()),
+      nullptr);
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestFactoryWrongBatchingMode) {
+  enableSinglePacketInplaceBatchWriter();
+
+  auto batchWriter = makeBatchWriter(quic::QuicBatchingMode::BATCHING_MODE_GSO);
+  CHECK(batchWriter);
+  EXPECT_EQ(
+      dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()),
+      nullptr);
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestReset) {
+  enableSinglePacketInplaceBatchWriter();
+
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()));
+
+  auto buf = bufAccessor_->obtain();
+  folly::IOBuf* rawBuf = buf.get();
+  bufAccessor_->release(std::move(buf));
+  rawBuf->append(700);
+
+  EXPECT_EQ(rawBuf->computeChainDataLength(), 700);
+  batchWriter->reset();
+  EXPECT_EQ(rawBuf->computeChainDataLength(), 0);
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestAppend) {
+  enableSinglePacketInplaceBatchWriter();
+
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()));
+
+  EXPECT_EQ(
+      true, batchWriter->append(nullptr, 0, folly::SocketAddress(), nullptr));
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestEmpty) {
+  enableSinglePacketInplaceBatchWriter();
+
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()));
+  EXPECT_TRUE(batchWriter->empty());
+
+  auto buf = bufAccessor_->obtain();
+  folly::IOBuf* rawBuf = buf.get();
+  bufAccessor_->release(std::move(buf));
+  rawBuf->append(700);
+
+  EXPECT_EQ(rawBuf->computeChainDataLength(), 700);
+  EXPECT_FALSE(batchWriter->empty());
+
+  batchWriter->reset();
+  EXPECT_TRUE(batchWriter->empty());
+}
+
+TEST_F(SinglePacketInplaceBatchWriterTest, TestWrite) {
+  enableSinglePacketInplaceBatchWriter();
+
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()));
+  EXPECT_TRUE(batchWriter->empty());
+
+  auto buf = bufAccessor_->obtain();
+  folly::IOBuf* rawBuf = buf.get();
+  bufAccessor_->release(std::move(buf));
+  const auto appendSize = conn_.udpSendPacketLen - 200;
+  rawBuf->append(appendSize);
+
+  EXPECT_EQ(rawBuf->computeChainDataLength(), appendSize);
+  EXPECT_FALSE(batchWriter->empty());
+
+  folly::EventBase evb;
+  folly::test::MockAsyncUDPSocket sock(&evb);
+  EXPECT_CALL(sock, write(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const auto& /* addr */,
+                           const std::unique_ptr<folly::IOBuf>& buf) {
+        EXPECT_EQ(appendSize, buf->length());
+        return appendSize;
+      }));
+  EXPECT_EQ(appendSize, batchWriter->write(sock, folly::SocketAddress()));
+  EXPECT_TRUE(batchWriter->empty());
+}
+
 } // namespace testing
 } // namespace quic
