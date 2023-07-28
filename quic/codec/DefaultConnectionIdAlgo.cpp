@@ -357,7 +357,8 @@ bool DefaultConnectionIdAlgo::canParse(const ConnectionId& id) const noexcept {
 }
 
 folly::Expected<ServerConnectionIdParams, QuicInternalException>
-DefaultConnectionIdAlgo::parseConnectionId(const ConnectionId& id) noexcept {
+DefaultConnectionIdAlgo::parseConnectionIdDefault(
+    const ConnectionId& id) noexcept {
   auto expectingVersion = getVersionBitsFromConnId(id);
   if (UNLIKELY(!expectingVersion)) {
     return folly::makeUnexpected(expectingVersion.error());
@@ -377,6 +378,11 @@ DefaultConnectionIdAlgo::parseConnectionId(const ConnectionId& id) noexcept {
   ServerConnectionIdParams serverConnIdParams(
       *expectingVersion, *expectingHost, *expectingProcess, *expectingWorker);
   return serverConnIdParams;
+}
+
+folly::Expected<ServerConnectionIdParams, QuicInternalException>
+DefaultConnectionIdAlgo::parseConnectionId(const ConnectionId& id) noexcept {
+  return parseConnectionIdDefault(id);
 }
 
 folly::Expected<ConnectionId, QuicInternalException>

@@ -54,6 +54,9 @@ class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
  public:
   ~DefaultConnectionIdAlgo() override = default;
 
+  static folly::Expected<ServerConnectionIdParams, QuicInternalException>
+  parseConnectionIdDefault(const ConnectionId& id) noexcept;
+
   /**
    * Check if this implementation of algorithm can parse the given ConnectionId
    */
