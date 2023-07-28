@@ -450,6 +450,11 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    */
   void clearBackgroundModeParameters();
 
+  /*
+   * Creates buf accessor for use with in-place batch writer.
+   */
+  virtual void createBufAccessor(size_t /* capacity */) {}
+
   // Timeout functions
   class LossTimeout : public QuicTimerCallback {
    public:

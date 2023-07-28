@@ -13,6 +13,7 @@
 #include <folly/net/NetOps.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/state/QuicConnectionStats.h>
@@ -166,6 +167,11 @@ class QuicClientTransport
     clientConn_->newToken = std::move(token);
   }
 
+  void createBufAccessor(size_t capacity) override {
+    bufAccessor_ = std::make_unique<SimpleBufAccessor>(capacity);
+    conn_->bufAccessor = bufAccessor_.get();
+  }
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(
@@ -288,5 +294,7 @@ class QuicClientTransport
   // can inspect any socket / transport state available through public methods
   // when destruction of the transport begins.
   const WrappedSocketObserverContainer wrappedObserverContainer_;
+  // Output buf/accessor to be used for continuous memory writes.
+  std::unique_ptr<BufAccessor> bufAccessor_;
 };
 } // namespace quic

@@ -10,6 +10,7 @@
 #include <folly/Chrono.h>
 #include <folly/ScopeGuard.h>
 #include <quic/api/LoopDetectorCallback.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/Pacer.h>
@@ -3210,8 +3211,16 @@ void QuicTransportBase::writeSocketDataAndCatch() {
 void QuicTransportBase::setTransportSettings(
     TransportSettings transportSettings) {
   if (conn_->nodeType == QuicNodeType::Client) {
-    conn_->transportSettings.dataPathType = DataPathType::ChainedMemory;
+    if (useSinglePacketInplaceBatchWriter(
+            transportSettings.maxBatchSize, transportSettings.dataPathType)) {
+      createBufAccessor(conn_->udpSendPacketLen);
+    } else {
+      // Reset client's batching mode only if SinglePacketInplaceBatchWriter is
+      // not in use.
+      conn_->transportSettings.dataPathType = DataPathType::ChainedMemory;
+    }
   }
+
   // If transport parameters are encoded, we can only update congestion control
   // related params. Setting other transport settings again would be buggy.
   // TODO should we throw or return Expected here?
