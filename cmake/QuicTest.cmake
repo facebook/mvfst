@@ -53,7 +53,7 @@ function(quic_add_test)
     ${GLOG_LIBRARY}
   )
 
-  # Per https://github.com/facebookincubator/mvfst/pull/9, disable some warnings
+  # Per https://github.com/facebook/mvfst/pull/9, disable some warnings
   # in the tests that come from -Wextra in _QUIC_BASE_COMPILE_OPTIONS.
   target_compile_options(
     ${QUIC_TEST_TARGET} PRIVATE

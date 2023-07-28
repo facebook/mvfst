@@ -1,8 +1,8 @@
 ![alt text](logo.png "MVFST")
 
-[![Linux Build Status](https://github.com/facebookincubator/mvfst/workflows/linux/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=linux)
-[![macOS Build Status](https://github.com/facebookincubator/mvfst/workflows/mac/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=mac)
-[![Windows Build Status](https://github.com/facebookincubator/mvfst/workflows/windows/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=windows)
+[![Linux Build Status](https://github.com/facebook/mvfst/workflows/linux/badge.svg)](https://github.com/facebook/mvfst/actions?workflow=linux)
+[![macOS Build Status](https://github.com/facebook/mvfst/workflows/mac/badge.svg)](https://github.com/facebook/mvfst/actions?workflow=mac)
+[![Windows Build Status](https://github.com/facebook/mvfst/workflows/windows/badge.svg)](https://github.com/facebook/mvfst/actions?workflow=windows)
 
 ## Introduction
 `mvfst` (Pronounced *move fast*) is a client and server implementation of [IETF QUIC](https://quicwg.org/) protocol in C++ by Facebook. QUIC is a UDP based reliable, multiplexed transport protocol that will become an internet standard. The goal of `mvfst` is to build a performant implementation of the QUIC transport protocol that applications could adapt for use cases on both the internet and the data-center. `mvfst` has been tested at scale on android, iOS apps, as well as servers and has several features to support large scale deployments.
@@ -55,7 +55,7 @@ The settings for mvfst's cmake build are held in its getdeps manifest `build/fbc
 If on Linux or MacOS (with homebrew installed) you can install system dependencies to save building them:
 
     # Clone the repo
-    git clone https://github.com/facebookincubator/mvfst.git
+    git clone https://github.com/facebook/mvfst.git
     # Install dependencies
     cd mvfst
     sudo ./build/fbcode_builder/getdeps.py install-system-deps --recursive --install-prefix=$(pwd)/_build mvfst
@@ -72,7 +72,7 @@ On other platforms or if on Linux and without system dependencies `getdeps.py` w
 For a simplified build, you can use the `getdeps.sh` wrapper script. This will download and build all the required dependencies, then build mvfst. It will use the default scratch path for building and install the result in _build.
 
     # Clone the repo
-    git clone https://github.com/facebookincubator/mvfst.git
+    git clone https://github.com/facebook/mvfst.git
     # Build using the wrapper script
     cd mvfst
     ./getdeps.sh

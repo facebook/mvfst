@@ -34,7 +34,7 @@ module.exports = {
             internal:
               'https://www.internalfb.com/code/fbsource/fbcode/quic/docs/docsite',
             external:
-              'https://github.com/facebookincubator/mvfst/tree/main/quic/docs/docsite',
+              'https://github.com/facebook/mvfst/tree/main/quic/docs/docsite',
           }),
         },
 //        theme: {
