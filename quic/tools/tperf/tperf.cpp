@@ -518,7 +518,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       bool autotuneWindow,
       bool gso,
       quic::CongestionControlType congestionControlType,
-      uint32_t maxReceivePacketSize)
+      uint32_t maxReceivePacketSize,
+      bool useInplaceWrite)
       : host_(host),
         port_(port),
         eventBase_(transportTimerResolution),
@@ -527,7 +528,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
         autotuneWindow_(autotuneWindow),
         gso_(gso),
         congestionControlType_(congestionControlType),
-        maxReceivePacketSize_(maxReceivePacketSize) {
+        maxReceivePacketSize_(maxReceivePacketSize),
+        useInplaceWrite_(useInplaceWrite) {
     eventBase_.setName("tperf_client");
   }
 
@@ -693,6 +695,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
           {FLAGS_max_ack_receive_timestamps_to_send,
            kDefaultReceiveTimestampsExponent});
     }
+    if (useInplaceWrite_) {
+      settings.maxBatchSize = 1;
+      settings.dataPathType = DataPathType::ContinuousMemory;
+    }
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
@@ -721,6 +727,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   bool gso_;
   quic::CongestionControlType congestionControlType_;
   uint32_t maxReceivePacketSize_;
+  bool useInplaceWrite_{false};
 };
 
 } // namespace tperf
@@ -783,7 +790,8 @@ int main(int argc, char* argv[]) {
         FLAGS_autotune_window,
         FLAGS_gso,
         flagsToCongestionControlType(FLAGS_congestion),
-        FLAGS_max_receive_packet_size);
+        FLAGS_max_receive_packet_size,
+        FLAGS_use_inplace_write);
     client.start();
   }
   return 0;
