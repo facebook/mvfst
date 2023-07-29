@@ -3382,7 +3382,10 @@ void QuicTransportBase::validateCongestionAndPacing(
     // so the override is only for BBR2.
     // TODO: This should be removed once the pacer changes are adopted as
     // the defaults or the pacer is fixed in another way.
-    conn_->pacer->setExperimental(true);
+    conn_->transportSettings.experimentalPacer = true;
+    if (conn_->pacer) {
+      conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
+    }
     writeLooper_->setFireLoopEarly(true);
   }
 }
