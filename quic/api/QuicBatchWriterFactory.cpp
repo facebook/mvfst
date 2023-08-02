@@ -135,13 +135,6 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
 
 namespace quic {
 
-bool useSinglePacketInplaceBatchWriter(
-    uint32_t maxBatchSize,
-    quic::DataPathType dataPathType) {
-  return maxBatchSize == 1 &&
-      dataPathType == quic::DataPathType::ContinuousMemory;
-}
-
 // BatchWriterDeleter
 void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
 #if USE_THREAD_LOCAL_BATCH_WRITER

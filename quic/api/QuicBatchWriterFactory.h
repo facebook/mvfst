@@ -12,10 +12,6 @@
 
 namespace quic {
 
-bool useSinglePacketInplaceBatchWriter(
-    uint32_t maxBatchSize,
-    quic::DataPathType dataPathType);
-
 BatchWriterPtr makeGsoBatchWriter(uint32_t batchSize);
 BatchWriterPtr makeGsoInPlaceBatchWriter(
     uint32_t batchSize,

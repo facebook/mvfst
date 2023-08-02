@@ -147,4 +147,11 @@ ssize_t SendmmsgPacketBatchWriter::write(
   return 0;
 }
 
+bool useSinglePacketInplaceBatchWriter(
+    uint32_t maxBatchSize,
+    quic::DataPathType dataPathType) {
+  return maxBatchSize == 1 &&
+      dataPathType == quic::DataPathType::ContinuousMemory;
+}
+
 } // namespace quic
