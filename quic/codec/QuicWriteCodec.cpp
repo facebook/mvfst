@@ -17,8 +17,6 @@
 
 namespace {
 
-bool packetSpaceCheck(uint64_t limit, size_t require);
-
 /**
  * A helper function to check if there are enough space to write in the packet.
  * Return: true if there is enough space, false otherwise
