@@ -17,6 +17,8 @@
 #undef EV_SIGNAL
 #undef EVLOOP_NONBLOCK
 
+#include <ev.h>
+
 #include <memory>
 
 #include <quic/common/QuicEventBaseInterface.h>
@@ -70,7 +72,7 @@ class QuicTimer {
  */
 class QuicLibevEventBase {
  public:
-  QuicLibevEventBase() = default;
+  QuicLibevEventBase() {}
 
   void runInLoop(folly::Function<void()> /* cb */, bool /* thisIteration */) {}
   void runInLoop(
@@ -92,7 +94,7 @@ class QuicLibevEventBase {
     return false;
   }
   bool loop() {
-    return false;
+    return ev_run(ev_loop_, 0);
   }
   void loopForever() {}
   bool loopIgnoreKeepAlive() {
@@ -108,8 +110,12 @@ class QuicLibevEventBase {
     return std::chrono::milliseconds(0);
   }
 
+  struct ev_loop* getLibevLoop() {
+    return ev_loop_;
+  }
+
  private:
-  // struct ev_loop* ev_loop_{nullptr};
+  struct ev_loop* ev_loop_{EV_DEFAULT};
 };
 
 } // namespace quic
