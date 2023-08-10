@@ -23,6 +23,8 @@ using TimePoint = std::chrono::time_point<Clock>;
 using DurationRep = std::chrono::microseconds::rep;
 using namespace std::chrono_literals;
 
+constexpr uint64_t kMaxVarInt = (1ull << 62) - 1;
+
 // Default QUIC packet size for both read and write.
 // TODO(xtt): make them configurable
 constexpr uint64_t kDefaultV4UDPSendPacketLen = 1252;
@@ -227,7 +229,7 @@ inline constexpr uint16_t toFrameError(FrameType frame) {
   return 0x0100 | static_cast<uint8_t>(frame);
 }
 
-enum class TransportErrorCode : uint16_t {
+enum class TransportErrorCode : uint64_t {
   NO_ERROR = 0x0000,
   INTERNAL_ERROR = 0x0001,
   SERVER_BUSY = 0x0002,
@@ -248,7 +250,7 @@ enum class TransportErrorCode : uint16_t {
  * Application error codes are opaque to QUIC transport.  Each application
  * protocol can define its own error codes.
  */
-using ApplicationErrorCode = uint16_t;
+using ApplicationErrorCode = uint64_t;
 
 /**
  * Example application error codes, or codes that can be used by very simple
@@ -259,13 +261,13 @@ using ApplicationErrorCode = uint16_t;
  * namespace of the same name.
  */
 namespace GenericApplicationErrorCode {
-enum GenericApplicationErrorCode : uint16_t {
-  NO_ERROR = 0x0000,
-  UNKNOWN = 0xFFFF
+enum GenericApplicationErrorCode : uint64_t {
+  NO_ERROR = 0,
+  UNKNOWN = kMaxVarInt,
 };
 }
 
-enum class LocalErrorCode : uint32_t {
+enum class LocalErrorCode : uint64_t {
   // Local errors
   NO_ERROR = 0x00000000,
   CONNECT_FAILED = 0x40000000,
@@ -463,7 +465,7 @@ constexpr uint64_t kDefaultConnectionWindowSize = 1024 * 1024;
 /* Stream Limits */
 constexpr uint64_t kDefaultMaxStreamsBidirectional = 2048;
 constexpr uint64_t kDefaultMaxStreamsUnidirectional = 2048;
-constexpr uint64_t kMaxStreamId = (1ull << 62) - 1;
+constexpr uint64_t kMaxStreamId = kMaxVarInt;
 constexpr uint64_t kInvalidStreamId = kMaxStreamId + 1;
 constexpr uint64_t kMaxMaxStreams = 1ull << 60;
 

@@ -2071,7 +2071,7 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(13, rstStreamBytesWritten);
+  EXPECT_EQ(17, rstStreamBytesWritten);
   auto& resultRstStreamFrame = *regularPacket.frames[0].asRstStreamFrame();
   EXPECT_EQ(errorCode, resultRstStreamFrame.errorCode);
   EXPECT_EQ(id, resultRstStreamFrame.streamId);
@@ -2229,7 +2229,7 @@ TEST_F(QuicWriteCodecTest, WriteStopSending) {
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(bytesWritten, 6);
+  EXPECT_EQ(bytesWritten, 10);
 
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
