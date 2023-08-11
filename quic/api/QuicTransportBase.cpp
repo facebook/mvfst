@@ -3376,10 +3376,12 @@ void QuicTransportBase::validateCongestionAndPacing(
     type = CongestionControlType::Cubic;
   }
 
-  if (type == CongestionControlType::BBR2) {
-    // We need to have the pacer rate be as accurate as possible for BBR2.
-    // The current BBR behavior is dependent on the existing pacing behavior
-    // so the override is only for BBR2.
+  if (type == CongestionControlType::BBR2 ||
+      type == CongestionControlType::BBRTesting) {
+    // We need to have the pacer rate be as accurate as possible for BBR2 and
+    // BBRTesting.
+    // The current BBR behavior is dependent on the existing pacing
+    // behavior so the override is only for BBR2.
     // TODO: This should be removed once the pacer changes are adopted as
     // the defaults or the pacer is fixed in another way.
     conn_->transportSettings.experimentalPacer = true;
