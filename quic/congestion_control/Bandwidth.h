@@ -55,12 +55,12 @@ struct Bandwidth {
       typename T,
       typename = std::enable_if_t<std::is_arithmetic<T>::value>>
   const Bandwidth operator*(T t) const noexcept {
-    return Bandwidth(std::ceil(units * t), interval, unitType);
+    return Bandwidth(std::ceil(units * t), interval, unitType, isAppLimited);
   }
 
   template <typename T, typename = std::enable_if_t<std::is_integral<T>::value>>
   const Bandwidth operator/(T t) const noexcept {
-    return Bandwidth(units / t, interval, unitType);
+    return Bandwidth(units / t, interval, unitType, isAppLimited);
   }
 
   uint64_t operator*(std::chrono::microseconds delay) const noexcept {
@@ -79,12 +79,14 @@ struct Bandwidth {
   Bandwidth& operator+=(const Bandwidth& other) {
     units = normalize() + other.normalize();
     interval = 1s;
+    isAppLimited |= other.isAppLimited;
     return *this;
   }
 
   Bandwidth operator+(const Bandwidth& other) {
-    Bandwidth result(normalize(), 1s, unitType);
+    Bandwidth result(normalize(), 1s, unitType, isAppLimited);
     result.units += other.normalize();
+    isAppLimited |= other.isAppLimited;
     return result;
   }
 

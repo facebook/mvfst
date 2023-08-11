@@ -74,16 +74,27 @@ TEST_F(BandwidthTest, Arithmetics) {
   EXPECT_EQ(666, testBandwidth / 3 * longRtt);
 }
 
+TEST_F(BandwidthTest, ArithmeticsNumeric) {
+  Bandwidth testBandwidth(1000, 10us, true);
+  ASSERT_TRUE(testBandwidth.isAppLimited);
+  EXPECT_TRUE((testBandwidth / 3).isAppLimited);
+  EXPECT_TRUE((testBandwidth * 3).isAppLimited);
+}
+
 TEST_F(BandwidthTest, Normalize) {
   Bandwidth testBandwidth(300, 20us);
   EXPECT_EQ(15000000, testBandwidth.normalize());
 }
 
 TEST_F(BandwidthTest, Addition) {
-  Bandwidth first(600, 20us), second(300, 20us);
+  Bandwidth first(600, 20us), second(300, 20us, true);
+  ASSERT_FALSE(first.isAppLimited);
+  ASSERT_TRUE(second.isAppLimited);
   EXPECT_EQ(Bandwidth(45000000, 1s), first + second);
+  EXPECT_TRUE((first + second).isAppLimited);
   first += second;
   EXPECT_EQ(Bandwidth(45000000, 1s), first);
+  EXPECT_TRUE(first.isAppLimited);
 }
 } // namespace test
 } // namespace quic
