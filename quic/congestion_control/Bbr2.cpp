@@ -23,7 +23,7 @@ constexpr std::chrono::microseconds kProbeRttDuration = 200ms;
 constexpr uint64_t kMaxExtraAckedFilterLen =
     10; // Measured in packet-timed round trips
 
-constexpr float kStartupPacingGain = 2.77; // 4 * ln(2)
+constexpr float kStartupPacingGain = 2.89; // 2 / ln(2)
 constexpr float kDrainPacingGain = 1 / kStartupPacingGain;
 constexpr float kProbeBwDownPacingGain = 0.9;
 constexpr float kProbeBwCruisePacingGain = 1.0;
@@ -31,7 +31,7 @@ constexpr float kProbeBwRefillPacingGain = 1.0;
 constexpr float kProbeBwUpPacingGain = 1.25;
 constexpr float kProbeRttPacingGain = 1.0;
 
-constexpr float kStartupCwndGain = 2.0;
+constexpr float kStartupCwndGain = 2.89;
 constexpr float kProbeBwCwndGain = 2.0;
 constexpr float kProbeRttCwndGain = 0.5;
 
@@ -229,16 +229,22 @@ void Bbr2CongestionController::enterStartup() {
 }
 
 void Bbr2CongestionController::setPacing() {
-  auto rate = bandwidth_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
+  uint64_t pacingWindow =
+      bandwidth_ * minRtt_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
   VLOG(6) << fmt::format(
       "Setting pacing to {}. From bandwdith_={} pacingGain_={} kPacingMarginPercent={} units={} interval={}",
-      rate.normalizedDescribe(),
+      Bandwidth(pacingWindow, minRtt_).normalizedDescribe(),
       bandwidth_.normalizedDescribe(),
       pacingGain_,
       kPacingMarginPercent,
-      rate.units,
-      rate.interval.count());
-  conn_.pacer->refreshPacingRate(rate.units, rate.interval);
+      pacingWindow,
+      minRtt_.count());
+  if (state_ == State::Startup && !filledPipe_) {
+    pacingWindow = std::max(
+        pacingWindow,
+        conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss);
+  }
+  conn_.pacer->refreshPacingRate(pacingWindow, minRtt_);
 }
 
 void Bbr2CongestionController::setSendQuantum() {
@@ -857,30 +863,36 @@ bool Bbr2CongestionController::isProbeBwState(
 Bandwidth Bbr2CongestionController::getBandwidthSampleFromAck(
     const AckEvent& ackEvent) {
   auto ackTime = ackEvent.adjustedAckTime;
-  auto pkt = ackEvent.getLargestNewlyAckedPacket();
-  if (!pkt) {
-    return Bandwidth();
-  }
-  auto& lastAckedPacket = pkt->lastAckedPacketInfo;
-  auto lastSentTime =
-      lastAckedPacket ? lastAckedPacket->sentTime : conn_.connectionTime;
+  auto bwSample = Bandwidth();
+  for (auto const& ackedPacket : ackEvent.ackedPackets) {
+    auto pkt = &ackedPacket;
+    if (ackedPacket.outstandingPacketMetadata.encodedSize == 0) {
+      continue;
+    }
+    auto& lastAckedPacket = pkt->lastAckedPacketInfo;
+    auto lastSentTime =
+        lastAckedPacket ? lastAckedPacket->sentTime : conn_.connectionTime;
 
-  auto sendElapsed = pkt->outstandingPacketMetadata.time - lastSentTime;
+    auto sendElapsed = pkt->outstandingPacketMetadata.time - lastSentTime;
 
-  auto lastAckTime =
-      lastAckedPacket ? lastAckedPacket->adjustedAckTime : conn_.connectionTime;
-  auto ackElapsed = ackTime - lastAckTime;
-  auto interval = std::max(ackElapsed, sendElapsed);
-  if (interval == 0us) {
-    return Bandwidth();
+    auto lastAckTime = lastAckedPacket ? lastAckedPacket->adjustedAckTime
+                                       : conn_.connectionTime;
+    auto ackElapsed = ackTime - lastAckTime;
+    auto interval = std::max(ackElapsed, sendElapsed);
+    if (interval == 0us) {
+      return Bandwidth();
+    }
+    auto lastBytesDelivered =
+        lastAckedPacket ? lastAckedPacket->totalBytesAcked : 0;
+    auto bytesDelivered = ackEvent.totalBytesAcked - lastBytesDelivered;
+    Bandwidth bw(
+        bytesDelivered,
+        std::chrono::duration_cast<std::chrono::microseconds>(interval),
+        pkt->isAppLimited || lastSentTime < appLimitedLastSendTime_);
+    if (bw > bwSample) {
+      bwSample = bw;
+    }
   }
-  auto lastBytesDelivered =
-      lastAckedPacket ? lastAckedPacket->totalBytesAcked : 0;
-  auto bytesDelivered = ackEvent.totalBytesAcked - lastBytesDelivered;
-  Bandwidth bwSample(
-      bytesDelivered,
-      std::chrono::duration_cast<std::chrono::microseconds>(interval),
-      pkt->isAppLimited || lastSentTime < appLimitedLastSendTime_);
   return bwSample;
 }
 
