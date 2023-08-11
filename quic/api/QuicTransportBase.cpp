@@ -23,6 +23,7 @@
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <sstream>
 
 namespace quic {
 
@@ -3401,6 +3402,11 @@ void QuicTransportBase::setCongestionControl(CongestionControlType type) {
     conn_->congestionController =
         conn_->congestionControllerFactory->makeCongestionController(
             *conn_, type);
+    if (conn_->qLogger) {
+      std::stringstream s;
+      s << "CCA set to " << congestionControlTypeToString(type);
+      conn_->qLogger->addTransportStateUpdate(s.str());
+    }
   }
 }
 
