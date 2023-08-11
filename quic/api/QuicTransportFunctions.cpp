@@ -1364,6 +1364,64 @@ void encryptPacketHeader(
   }
 }
 
+/**
+ * Writes packets to the socket. The is the function that is called by all
+ * the other write*ToSocket() functions.
+ *
+ * The number of packets written is limited by:
+ *   - the maximum batch size supported by the underlying writer
+ *     (`maxBatchSize`)
+ *   - the `packetLimit` input parameter
+ *   - the value returned by the `writableBytesFunc` which usually is either the
+ *     congestion control writable bytes or unlimited writable bytes (if the
+ *     output of the given scheduler should not be subject to congestion
+ *     control)
+ *   - the maximum time to spend in a write loop as specified by
+ *     `transportSettings.writeLimitRttFraction`
+ *   - the amount of data available in the provided scheduler.
+ *
+ * Writing the packets involves:
+ *   1. The scheduler which decides the data to write in each packet
+ *   2. The IOBufQuicBatch which holds the data output by the scheduler
+ *   3. The BatchWriter which writes the data from the IOBufQuicBatch to
+ *      the socket
+ *
+ * The IOBufQuicBatch can hold packets either as a chain of IOBufs or as a
+ * single contiguous buffer (continuous vs. chained memory datapaths). This also
+ * affects the type of BatchWriter used to read the IOBufQuicBatch and write it
+ * to the socket.
+ *
+ * A rough outline of this function is as follows:
+ * 1. Make a BatchWriter for the requested batching mode and datapath type.
+ * 2. Make an IOBufQuicBatch to hold the data. This owns the BatchWriter created
+ *    above which it will use to write its data to the socket later.
+ * 3. Based upon the selected datapathType, the dataplaneFunc is chosen.
+ * 4. The dataplaneFunc is responsible for writing the scheduler's data into the
+ *    IOBufQuicBatch in the desired format, and calling the IOBufQuicBatch's
+ *    write() function which wraps around the BatchWriter it owns.
+ * 5. Each dataplaneFunc call writes one packet to the IOBufQuicBatch. It is
+ *    called repeatedly until one of the limits described above is hit.
+ * 6. After each packet is written, the connection state is updated to reflect a
+ *    packet being sent.
+ * 7. Once the limit is hit, the IOBufQuicBatch is flushed to give it another
+ *    chance to write any remaining data to the socket that hasn't already been
+ *    written in the loop.
+ *
+ * Note that:
+ * - This function does not guarantee that the data is written to the underlying
+ *   UDP socket buffer.
+ * - It only guarantees that packets will be scheduled and written to a
+ *   IOBufQuicBatch and that the IOBufQuicBatch will get a chance to write to
+ *   the socket.
+ * - Step 6 above updates the connection state when the packet is written to the
+ *   buffer, but not necessarily when it is written to the socket. This decision
+ *   is made by the IOBufQuicBatch and its BatchWriter.
+ * - This function attempts to flush the IOBufQuicBatch before returning
+ *   to try to ensure that all scheduled data is written into the socket.
+ * - If that flush still fails, the packets are considered written to the
+ *   network, since currently there is no way to rewind scheduler and connection
+ *   state after the packets have been written to a batch.
+ */
 WriteQuicDataResult writeConnectionDataToSocket(
     QuicAsyncUDPSocketType& sock,
     QuicConnectionStateBase& connection,
