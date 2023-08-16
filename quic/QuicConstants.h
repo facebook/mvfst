@@ -171,7 +171,9 @@ BETTER_ENUM(
     // Controls write loop time fraction in terms of srtt
     WRITE_LOOP_TIME_FRACTION = 0x10004,
     // Controls number of times a stream gets a write in incremental mode
-    WRITES_PER_STREAM = 0x10005)
+    WRITES_PER_STREAM = 0x10005,
+    // Control connection migration
+    CONNECTION_MIGRATION = 0x10006)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

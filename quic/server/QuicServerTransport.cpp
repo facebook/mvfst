@@ -1041,6 +1041,17 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             parseCongestionControlConfig(val);
         VLOG(3) << "CC_CONFIG KnobParam received: " << val;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.disableMigration =
+            !static_cast<bool>(val);
+        VLOG(3) << "CONNECTION_MIGRATION KnobParam received: "
+                << static_cast<bool>(val);
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

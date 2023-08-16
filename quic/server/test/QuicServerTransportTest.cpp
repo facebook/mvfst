@@ -4785,6 +4785,23 @@ TEST_F(QuicServerTransportTest, TestCCConfigKnobHandlerInvalidJSON) {
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
 }
 
+TEST_F(QuicServerTransportTest, TestConnMigrationKnobHandler) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  // Migration is disabled by default
+  ASSERT_EQ(transportSettings.disableMigration, true);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
+        uint64_t(1)}});
+  EXPECT_EQ(transportSettings.disableMigration, false);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
+        uint64_t(0)}});
+  EXPECT_EQ(transportSettings.disableMigration, true);
+}
+
 TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
   auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();
