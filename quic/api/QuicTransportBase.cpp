@@ -1520,6 +1520,12 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
 }
 
 void QuicTransportBase::handleKnobCallbacks() {
+  if (!conn_->transportSettings.advertisedKnobFrameSupport) {
+    VLOG(4) << "Received knob frames without advertising support";
+    conn_->pendingEvents.knobs.clear();
+    return;
+  }
+
   for (auto& knobFrame : conn_->pendingEvents.knobs) {
     if (knobFrame.knobSpace != kDefaultQuicTransportKnobSpace) {
       if (getSocketObserverContainer() &&

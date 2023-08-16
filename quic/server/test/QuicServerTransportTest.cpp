@@ -4690,6 +4690,47 @@ TEST_F(
   server->handleKnobParams({{knobParamId, uint64_t{1234}}});
 }
 
+TEST_F(QuicServerTransportTest, TestSkipKnobsWhenNotAdvertisingSupport) {
+  auto& conn = server->getNonConstConn();
+  auto& transportSettings = conn.transportSettings;
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
+
+  transportSettings.advertisedKnobFrameSupport = true;
+
+  // Start with advertising knob support to make sure the knob works
+  conn.pendingEvents.knobs.emplace_back(
+      quic::kDefaultQuicTransportKnobSpace,
+      TransportKnobParamId::CC_CONFIG,
+      folly::IOBuf::copyBuffer(
+          R"({"52397": "{ \"conservativeRecovery\": true}"})"));
+
+  server->triggerKnobCallbacks();
+
+  // The value should change.
+  ASSERT_EQ(transportSettings.ccaConfig.conservativeRecovery, true);
+  // The pending knobs should be cleared
+  ASSERT_TRUE(server->getConn().pendingEvents.knobs.empty());
+
+  // Reset the config and disable advertising knob support, then retry
+
+  transportSettings.ccaConfig.conservativeRecovery = false;
+  transportSettings.advertisedKnobFrameSupport = false;
+
+  // Start with advertising knob support to make sure the knob works
+  conn.pendingEvents.knobs.emplace_back(
+      quic::kDefaultQuicTransportKnobSpace,
+      TransportKnobParamId::CC_CONFIG,
+      folly::IOBuf::copyBuffer(
+          R"({"52397": "{ \"conservativeRecovery\": true}"})"));
+
+  server->triggerKnobCallbacks();
+
+  // The value should not change.
+  EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
+  // The pending knobs should be cleared
+  EXPECT_TRUE(server->getConn().pendingEvents.knobs.empty());
+}
+
 TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();

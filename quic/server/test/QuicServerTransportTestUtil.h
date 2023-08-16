@@ -112,6 +112,10 @@ class TestingQuicServerTransport : public QuicServerTransport {
   void handleKnobParams(const TransportKnobParams& params) {
     handleTransportKnobParams(params);
   }
+
+  void triggerKnobCallbacks() {
+    handleKnobCallbacks();
+  }
 };
 
 class QuicServerTransportTestBase : public virtual testing::Test {
