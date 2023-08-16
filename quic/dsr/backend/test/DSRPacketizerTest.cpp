@@ -176,7 +176,7 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   EXPECT_CALL(*sock, writeGSO(conn_.peerAddress, _, _))
       .WillRepeatedly(Invoke([&](const folly::SocketAddress&,
                                  const std::unique_ptr<folly::IOBuf>& buf,
-                                 int) {
+                                 folly::AsyncUDPSocket::WriteOptions) {
         sentData.push_back(buf->clone());
         return buf->computeChainDataLength();
       }));

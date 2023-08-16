@@ -102,7 +102,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   size_t currSize_{0};
   // array of IOBufs
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
-  std::vector<int> gso_;
+  std::vector<folly::AsyncUDPSocket::WriteOptions> options_;
   std::vector<size_t> prevSize_;
   std::vector<folly::SocketAddress> addrs_;
 

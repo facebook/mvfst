@@ -73,7 +73,11 @@ ssize_t GSOPacketBatchWriter::write(
     QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& address) {
   return (currBufs_ > 1)
-      ? sock.writeGSO(address, buf_, static_cast<int>(prevSize_))
+      ? sock.writeGSO(
+            address,
+            buf_,
+            folly::AsyncUDPSocket::WriteOptions(
+                static_cast<int>(prevSize_) /*gsoVal*/, false /* zerocopyVal*/))
       : sock.write(address, buf_);
 }
 
@@ -152,7 +156,11 @@ ssize_t GSOInplacePacketBatchWriter::write(
   uint64_t diffToStart = lastPacketEnd_ - buf->data();
   buf->trimEnd(diffToEnd);
   auto bytesWritten = (numPackets_ > 1)
-      ? sock.writeGSO(address, buf, static_cast<int>(prevSize_))
+      ? sock.writeGSO(
+            address,
+            buf,
+            folly::AsyncUDPSocket::WriteOptions(
+                static_cast<int>(prevSize_) /*gsoVal*/, false /* zerocopyVal*/))
       : sock.write(address, buf);
   /**
    * If there is one more bytes after lastPacketEnd_, that means there is a
@@ -215,7 +223,7 @@ size_t SendmmsgGSOPacketBatchWriter::size() const {
 
 void SendmmsgGSOPacketBatchWriter::reset() {
   bufs_.clear();
-  gso_.clear();
+  options_.clear();
   prevSize_.clear();
   addrs_.clear();
   addrMap_.clear();
@@ -238,10 +246,10 @@ bool SendmmsgGSOPacketBatchWriter::append(
   // try to see if we can append
   if (idx.valid()) {
     if (size <= prevSize_[idx]) {
-      if ((gso_[idx] == 0) ||
-          (static_cast<size_t>(gso_[idx]) == prevSize_[idx])) {
+      if ((options_[idx].gso == 0) ||
+          (static_cast<size_t>(options_[idx].gso) == prevSize_[idx])) {
         // we can append
-        gso_[idx] = prevSize_[idx];
+        options_[idx].gso = prevSize_[idx];
         prevSize_[idx] = size;
         bufs_[idx]->prependChain(std::move(buf));
         currBufs_++;
@@ -260,7 +268,8 @@ bool SendmmsgGSOPacketBatchWriter::append(
 
   // set the gso_ value to 0 for now
   // this will change if we append to this chain
-  gso_.emplace_back(0);
+  folly::AsyncUDPSocket::WriteOptions options(0, false);
+  options_.emplace_back(options);
   prevSize_.emplace_back(size);
   addrs_.emplace_back(addr);
 
@@ -275,7 +284,7 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
     const folly::SocketAddress& /*unused*/) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
-    return (currBufs_ > 1) ? sock.writeGSO(addrs_[0], bufs_[0], gso_[0])
+    return (currBufs_ > 1) ? sock.writeGSO(addrs_[0], bufs_[0], options_[0])
                            : sock.write(addrs_[0], bufs_[0]);
   }
 
@@ -283,7 +292,7 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
       folly::range(addrs_.data(), addrs_.data() + addrs_.size()),
       bufs_.data(),
       bufs_.size(),
-      gso_.data());
+      options_.data());
 
   if (ret <= 0) {
     return ret;

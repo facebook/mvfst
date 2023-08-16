@@ -4422,8 +4422,8 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
                            const std::unique_ptr<folly::IOBuf>& sockBuf,
-                           int gso) {
-        EXPECT_LE(gso, conn->udpSendPacketLen);
+                           folly::AsyncUDPSocket::WriteOptions options) {
+        EXPECT_LE(options.gso, conn->udpSendPacketLen);
         EXPECT_GT(bufPtr->length(), 0);
         EXPECT_EQ(sockBuf.get(), bufPtr);
         EXPECT_TRUE(folly::IOBufEqualTo()(*sockBuf, *bufPtr));
@@ -4467,8 +4467,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
                            const std::unique_ptr<folly::IOBuf>& sockBuf,
-                           int gso) {
-        EXPECT_LE(gso, conn->udpSendPacketLen);
+                           folly::AsyncUDPSocket::WriteOptions options) {
+        EXPECT_LE(options.gso, conn->udpSendPacketLen);
         EXPECT_GE(
             bufPtr->length(),
             conn->udpSendPacketLen *
@@ -4523,9 +4523,9 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
                            const std::unique_ptr<folly::IOBuf>& buf,
-                           int gso) {
+                           folly::AsyncUDPSocket::WriteOptions options) {
         EXPECT_FALSE(buf->isChained());
-        EXPECT_EQ(conn->udpSendPacketLen, gso);
+        EXPECT_EQ(conn->udpSendPacketLen, options.gso);
         EXPECT_EQ(buf->length(), conn->udpSendPacketLen * 2);
         return buf->length();
       }));

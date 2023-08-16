@@ -477,9 +477,9 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
                            const std::unique_ptr<folly::IOBuf>& buf,
-                           int gso) {
+                           folly::AsyncUDPSocket::WriteOptions options) {
         EXPECT_EQ(1000 * 5 + 700, buf->length());
-        EXPECT_EQ(1000, gso);
+        EXPECT_EQ(1000, options.gso);
         return 1000 * 5 + 700;
       }));
   EXPECT_EQ(1000 * 5 + 700, batchWriter->write(sock, folly::SocketAddress()));
@@ -562,9 +562,9 @@ TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
                            const std::unique_ptr<folly::IOBuf>& buf,
-                           int gso) {
+                           folly::AsyncUDPSocket::WriteOptions options) {
         EXPECT_EQ(5 * 700, buf->length());
-        EXPECT_EQ(700, gso);
+        EXPECT_EQ(700, options.gso);
         return 700 * 5;
       }));
   EXPECT_EQ(5 * 700, batchWriter->write(sock, folly::SocketAddress()));
