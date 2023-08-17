@@ -20,11 +20,14 @@
 
 namespace quic {
 
-QuicAsyncUDPSocketImpl::QuicAsyncUDPSocketImpl(QuicBackingEventBase* evb)
-    : eventBase_(evb) {
-  if (eventBase_) {
-    // TODO: Enable this when this an event base?
-    // DCHECK(eventBase_->isInEventBaseThread());
+QuicAsyncUDPSocketImpl::QuicAsyncUDPSocketImpl(QuicBackingEventBase* evb) {
+  if (evb) {
+    eventBase_ = dynamic_cast<QuicLibevEventBase*>(evb);
+    CHECK(eventBase_) << "EventBase must be QuicLibevEventBase";
+    CHECK(eventBase_->isInEventBaseThread());
+
+    ev_init(&readWatcher_, QuicAsyncUDPSocketImpl::readWatcherCallback);
+    readWatcher_.data = this;
   }
 }
 
@@ -32,16 +35,27 @@ QuicAsyncUDPSocketImpl::~QuicAsyncUDPSocketImpl() {
   if (fd_ != -1) {
     close();
   }
+  if (eventBase_) {
+    ev_io_stop(eventBase_->getLibevLoop(), &readWatcher_);
+  }
 }
 
 void QuicAsyncUDPSocketImpl::pauseRead() {
   LOG(INFO) << __func__;
   readCallback_ = nullptr;
+
+  updateReadWatcher();
 }
 
 void QuicAsyncUDPSocketImpl::resumeRead(ReadCallback* cb) {
   LOG(INFO) << __func__;
+  CHECK(!readCallback_) << "A read callback is already installed";
+  CHECK(fd_ != -1)
+      << "Socket must be initialized before a read callback is attached";
+  CHECK(cb) << "A non-null callback is required to resume read";
   readCallback_ = cb;
+
+  updateReadWatcher();
 }
 
 ssize_t QuicAsyncUDPSocketImpl::write(
@@ -277,11 +291,8 @@ int QuicAsyncUDPSocketImpl::getGRO() {
   return -1;
 }
 
-ssize_t QuicAsyncUDPSocketImpl::recvmsg(
-    struct msghdr* /* msg */,
-    int /* flags */) {
-  LOG(INFO) << __func__;
-  return -1;
+ssize_t QuicAsyncUDPSocketImpl::recvmsg(struct msghdr* msg, int flags) {
+  return ::recvmsg(fd_, msg, flags);
 }
 
 int QuicAsyncUDPSocketImpl::recvmmsg(
@@ -289,7 +300,6 @@ int QuicAsyncUDPSocketImpl::recvmmsg(
     unsigned int vlen,
     unsigned int flags,
     struct timespec* timeout) {
-  LOG(INFO) << __func__;
   return ::recvmmsg(fd_, msgvec, vlen, (int)flags, timeout);
 }
 
@@ -324,6 +334,25 @@ void QuicAsyncUDPSocketImpl::setFD(NetworkFdType fd, FDOwnership ownership) {
   LOG(INFO) << __func__;
   fd_ = fd;
   ownership_ = ownership;
+
+  updateReadWatcher();
+}
+
+// PRIVATE
+void QuicAsyncUDPSocketImpl::evHandleSocketRead() {
+  CHECK(readCallback_);
+  CHECK(readCallback_->shouldOnlyNotify());
+  readCallback_->onNotifyDataAvailable(*this);
+}
+
+void QuicAsyncUDPSocketImpl::updateReadWatcher() {
+  CHECK(eventBase_) << "EventBase not initialized";
+  ev_io_stop(eventBase_->getLibevLoop(), &readWatcher_);
+
+  if (readCallback_) {
+    ev_io_set(&readWatcher_, fd_, EV_READ);
+    ev_io_start(eventBase_->getLibevLoop(), &readWatcher_);
+  }
 }
 
 // STATIC
@@ -343,6 +372,20 @@ std::string QuicAsyncUDPSocketException::getMessage(
   return msgStream.str();
 }
 
+// STATIC PRIVATE
+void QuicAsyncUDPSocketImpl::readWatcherCallback(
+    struct ev_loop* /*loop*/,
+    ev_io* w,
+    int /*revents*/) {
+  auto sock = static_cast<QuicAsyncUDPSocketImpl*>(w->data);
+  CHECK(sock)
+      << "Watcher callback does not have a valid QuicAsyncUDPSocketImpl pointer";
+  CHECK(sock->getEventBase()) << "Socket does not have an event base attached";
+  CHECK(sock->getEventBase()->isInEventBaseThread())
+      << "Watcher callback on wrong event base";
+  sock->evHandleSocketRead();
+}
+
 } // namespace quic
 
-#endif
+#endif // MVFST_USE_LIBEV

@@ -243,12 +243,18 @@ class QuicAsyncUDPSocketImpl {
   void setFD(NetworkFdType /* fd */, FDOwnership /* ownership */);
 
  private:
+  static void readWatcherCallback(struct ev_loop* loop, ev_io* w, int revents);
+
+  void updateReadWatcher();
+  void evHandleSocketRead();
+
   NetworkFdType fd_{-1};
   folly::SocketAddress localAddress_;
   folly::SocketAddress connectedAddress_;
   FDOwnership ownership_;
 
-  QuicBackingEventBase* eventBase_{nullptr};
+  QuicLibevEventBase* eventBase_{nullptr};
+  ev_io readWatcher_;
 
   bool bound_{false};
   bool connected_{false};
