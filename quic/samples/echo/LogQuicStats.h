@@ -249,6 +249,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
+  void onPeerMaxUniStreamsLimitSaturated() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
   void onPeerMaxBidiStreamsLimitSaturated() override {
     VLOG(2) << prefix_ << __func__;
   }

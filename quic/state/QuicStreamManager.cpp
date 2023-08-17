@@ -465,10 +465,13 @@ QuicStreamState* FOLLY_NULLABLE QuicStreamManager::getOrCreatePeerStream(
       maxStreamId,
       (transportSettings_->notifyOnNewStreamsExplicitly ? nullptr
                                                         : newPeerStreams));
-  if (isBidirectionalStream(streamId) &&
-      nextAcceptableStreamId == maxStreamId) {
-    // peer has reached stream limit
-    QUIC_STATS(conn_.statsCallback, onPeerMaxBidiStreamsLimitSaturated);
+
+  // check if limit has been saturated by peer
+  if (nextAcceptableStreamId == maxStreamId && conn_.statsCallback) {
+    auto limitSaturatedFn = isBidirectionalStream(streamId)
+        ? &QuicTransportStatsCallback::onPeerMaxBidiStreamsLimitSaturated
+        : &QuicTransportStatsCallback::onPeerMaxUniStreamsLimitSaturated;
+    folly::invoke(limitSaturatedFn, conn_.statsCallback);
   }
 
   if (openedResult == LocalErrorCode::CREATING_EXISTING_STREAM) {

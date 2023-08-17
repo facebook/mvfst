@@ -212,7 +212,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   EXPECT_TRUE(manager.isAppIdle());
 }
 
-TEST_P(QuicStreamManagerTest, PeerMaxBidiStreamsLimitSaturated) {
+TEST_P(QuicStreamManagerTest, PeerMaxStreamsLimitSaturated) {
   MockQuicStats mockStats;
   conn.statsCallback = &mockStats;
   auto& manager = *conn.streamManager;
@@ -221,33 +221,42 @@ TEST_P(QuicStreamManagerTest, PeerMaxBidiStreamsLimitSaturated) {
   manager.refreshTransportSettings(conn.transportSettings);
   manager.setStreamLimitWindowingFraction(1);
 
-  // peer saturating all bidi streams should invoke callback
-  EXPECT_CALL(mockStats, onPeerMaxBidiStreamsLimitSaturated).Times(1);
-  for (int i = 0; i < 10; i++) {
-    manager.getStream(i * detail::kStreamIncrement);
-    manager.getStream(2 + i * detail::kStreamIncrement);
+  // open 9 streams which is just below the limit, should not invoke callback
+  EXPECT_CALL(mockStats, onPeerMaxBidiStreamsLimitSaturated).Times(0);
+  EXPECT_CALL(mockStats, onPeerMaxUniStreamsLimitSaturated).Times(0);
+  uint8_t idx = 0;
+  for (idx = 0; idx < 9; idx++) {
+    manager.getStream(idx * detail::kStreamIncrement);
+    manager.getStream(2 + idx * detail::kStreamIncrement);
   }
+  // peer saturating all bidi & uni streams should invoke callback
+  EXPECT_CALL(mockStats, onPeerMaxBidiStreamsLimitSaturated).Times(1);
+  EXPECT_CALL(mockStats, onPeerMaxUniStreamsLimitSaturated).Times(1);
+  // create last stream that will saturate the limit
+  manager.getStream(idx * detail::kStreamIncrement);
+  manager.getStream(2 + idx * detail::kStreamIncrement);
 
   // close all opened streams will send peer max streams credit
-  for (int i = 0; i < 10; i++) {
-    auto stream = manager.getStream(i * detail::kStreamIncrement);
+  for (idx = 0; idx < 10; idx++) {
+    auto stream = manager.getStream(idx * detail::kStreamIncrement);
     stream->sendState = StreamSendState::Closed;
     stream->recvState = StreamRecvState::Closed;
     manager.removeClosedStream(stream->id);
-    stream = manager.getStream(2 + i * detail::kStreamIncrement);
+    stream = manager.getStream(2 + idx * detail::kStreamIncrement);
     stream->sendState = StreamSendState::Closed;
     stream->recvState = StreamRecvState::Closed;
     manager.removeClosedStream(stream->id);
   }
 
-  auto update = manager.remoteBidirectionalStreamLimitUpdate();
-  ASSERT_TRUE(update);
-  EXPECT_EQ(update.value(), 20);
-  EXPECT_FALSE(manager.remoteBidirectionalStreamLimitUpdate());
+  // validate transport will advertise an update
+  auto bidiUpdate = manager.remoteBidirectionalStreamLimitUpdate();
+  auto uniUpdate = manager.remoteUnidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(bidiUpdate && uniUpdate);
+  EXPECT_EQ(bidiUpdate.value(), 20);
+  EXPECT_EQ(uniUpdate.value(), 20);
 
-  update = manager.remoteUnidirectionalStreamLimitUpdate();
-  ASSERT_TRUE(update);
-  EXPECT_EQ(update.value(), 20);
+  // should not advertise again since no streams were consumed
+  EXPECT_FALSE(manager.remoteBidirectionalStreamLimitUpdate());
   EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
 }
 

@@ -155,6 +155,8 @@ class QuicTransportStatsCallback {
 
   virtual void onPacerTimerLagged() = 0;
 
+  virtual void onPeerMaxUniStreamsLimitSaturated() = 0;
+
   virtual void onPeerMaxBidiStreamsLimitSaturated() = 0;
 
   virtual void onConnectionIdCreated(size_t encodedTimes) = 0;
