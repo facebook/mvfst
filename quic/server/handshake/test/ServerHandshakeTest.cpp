@@ -123,6 +123,7 @@ class ServerHandshakeTest : public Test {
         initialMaxStreamDataUni,
         initialMaxStreamsBidi,
         initialMaxStreamsUni,
+        /*disableMigration=*/true,
         kDefaultIdleTimeout,
         kDefaultAckDelayExponent,
         kDefaultUDPSendPacketLen,

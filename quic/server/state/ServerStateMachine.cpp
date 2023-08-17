@@ -810,6 +810,7 @@ void onServerReadDataFromOpen(
             conn.transportSettings.advertisedInitialUniStreamWindowSize,
             conn.transportSettings.advertisedInitialMaxStreamsBidi,
             conn.transportSettings.advertisedInitialMaxStreamsUni,
+            conn.transportSettings.disableMigration,
             conn.transportSettings.idleTimeout,
             conn.transportSettings.ackDelayExponent,
             conn.transportSettings.maxRecvPacketSize,

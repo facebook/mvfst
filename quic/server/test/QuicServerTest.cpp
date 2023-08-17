@@ -3293,5 +3293,26 @@ TEST_F(ServerTransportParameters, DatagramTest) {
   }
 }
 
+TEST_F(ServerTransportParameters, disableMigrationParam) {
+  // turn off migration
+  serverTs_.disableMigration = true;
+  startServer();
+
+  // create & connect client
+  client_ = createQuicClient();
+  clientConnect();
+  auto clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+
+  const auto& serverTransportParams =
+      clientConn->clientHandshakeLayer->getServerTransportParams();
+  CHECK(serverTransportParams.has_value());
+
+  // validate disable_migration parameter was rx'd
+  auto it = findParameter(
+      serverTransportParams->parameters,
+      TransportParameterId::disable_migration);
+  EXPECT_NE(it, serverTransportParams->parameters.end());
+}
 } // namespace test
 } // namespace quic

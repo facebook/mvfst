@@ -23,6 +23,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       uint64_t initialMaxStreamDataUni,
       uint64_t initialMaxStreamsBidi,
       uint64_t initialMaxStreamsUni,
+      bool disableMigration,
       std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
@@ -38,6 +39,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         initialMaxStreamDataUni_(initialMaxStreamDataUni),
         initialMaxStreamsBidi_(initialMaxStreamsBidi),
         initialMaxStreamsUni_(initialMaxStreamsUni),
+        disableMigration_(disableMigration),
         idleTimeout_(idleTimeout),
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
@@ -64,6 +66,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     std::vector<fizz::Extension> exts;
 
     ServerTransportParameters params;
+    params.parameters.reserve(10);
     if (encodingVersion_ == QuicVersion::QUIC_DRAFT ||
         encodingVersion_ == QuicVersion::QUIC_V1 ||
         encodingVersion_ == QuicVersion::QUIC_V1_ALIAS) {
@@ -93,10 +96,16 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         TransportParameterId::ack_delay_exponent, ackDelayExponent_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::max_packet_size, maxRecvPacketSize_));
-    TransportParameter statelessReset;
-    statelessReset.parameter = TransportParameterId::stateless_reset_token;
-    statelessReset.value = folly::IOBuf::copyBuffer(token_);
-    params.parameters.push_back(std::move(statelessReset));
+
+    // stateless reset token
+    params.parameters.push_back(TransportParameter(
+        TransportParameterId::stateless_reset_token,
+        folly::IOBuf::copyBuffer(token_)));
+
+    if (disableMigration_) {
+      params.parameters.push_back(
+          encodeEmptyParameter(TransportParameterId::disable_migration));
+    }
 
     if (encodingVersion_ == QuicVersion::QUIC_DRAFT ||
         encodingVersion_ == QuicVersion::QUIC_V1 ||
@@ -126,6 +135,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   uint64_t initialMaxStreamDataUni_;
   uint64_t initialMaxStreamsBidi_;
   uint64_t initialMaxStreamsUni_;
+  bool disableMigration_;
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
