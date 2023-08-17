@@ -87,7 +87,8 @@ class ClientHandshake : public Handshake {
   /**
    * Returns the negotiated transport parameters chosen by the server
    */
-  virtual folly::Optional<ServerTransportParameters> getServerTransportParams();
+  virtual const folly::Optional<ServerTransportParameters>&
+  getServerTransportParams();
 
   ~ClientHandshake() override = default;
 

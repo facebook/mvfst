@@ -101,7 +101,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
 
 void processServerInitialParams(
     QuicClientConnectionState& conn,
-    ServerTransportParameters serverParams,
+    const ServerTransportParameters& serverParams,
     PacketNum packetNum) {
   auto maxData = getIntegerParameter(
       TransportParameterId::initial_max_data, serverParams.parameters);

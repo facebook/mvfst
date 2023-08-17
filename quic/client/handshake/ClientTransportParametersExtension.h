@@ -41,8 +41,8 @@ struct ClientTransportParametersExtension {
         initialSourceCid_(initialSourceCid),
         customTransportParameters_(std::move(customTransportParameters)) {}
 
-  folly::Optional<ServerTransportParameters> getServerTransportParams() {
-    return std::move(serverTransportParameters_);
+  const folly::Optional<ServerTransportParameters>& getServerTransportParams() {
+    return serverTransportParameters_;
   }
 
   QuicVersion encodingVersion_;

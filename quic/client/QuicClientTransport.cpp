@@ -684,7 +684,7 @@ void QuicClientTransport::processPacketData(
     // was rejected, or we have derived 1-rtt keys and 0-rtt was never
     // attempted.
     if (oneRttKeyDerivationTriggered) {
-      auto serverParams = handshakeLayer->getServerTransportParams();
+      const auto& serverParams = handshakeLayer->getServerTransportParams();
       if (!serverParams) {
         throw QuicTransportException(
             "No server transport params",
@@ -711,7 +711,7 @@ void QuicClientTransport::processPacketData(
             TransportParameterId::initial_max_streams_uni,
             serverParams->parameters);
         processServerInitialParams(
-            *clientConn_, std::move(*serverParams), packetNum);
+            *clientConn_, serverParams.value(), packetNum);
 
         cacheServerInitialParams(
             *clientConn_,

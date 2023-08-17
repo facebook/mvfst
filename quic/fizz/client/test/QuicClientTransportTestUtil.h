@@ -316,7 +316,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return connected_;
   }
 
-  folly::Optional<ServerTransportParameters> getServerTransportParams()
+  const folly::Optional<ServerTransportParameters>& getServerTransportParams()
       override {
     return params_;
   }

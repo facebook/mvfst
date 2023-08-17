@@ -109,7 +109,7 @@ ClientHandshake::Phase ClientHandshake::getPhase() const {
   return phase_;
 }
 
-folly::Optional<ServerTransportParameters>
+const folly::Optional<ServerTransportParameters>&
 ClientHandshake::getServerTransportParams() {
   return transportParams_->getServerTransportParams();
 }

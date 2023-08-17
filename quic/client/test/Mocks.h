@@ -56,7 +56,7 @@ class MockClientHandshake : public ClientHandshake {
   MOCK_METHOD(bool, isTLSResumed, (), (const));
   MOCK_METHOD(folly::Optional<bool>, getZeroRttRejected, ());
   MOCK_METHOD(
-      folly::Optional<ServerTransportParameters>,
+      const folly::Optional<ServerTransportParameters>&,
       getServerTransportParams,
       ());
   MOCK_METHOD(void, destroy, ());
