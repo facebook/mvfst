@@ -14,12 +14,15 @@
 #include <folly/portability/GTest.h>
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/api/test/Mocks.h>
+#include <quic/client/QuicClientTransport.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/codec/test/Mocks.h>
+#include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
@@ -3151,6 +3154,143 @@ TEST_F(QuicServerTest, OneEVB) {
   server_->waitUntilInitialized();
   evb.runAfterDelay([this] { server_->shutdown(); }, 100);
   evb.loop();
+}
+
+/**
+ * used for testing / observer transport parameters advertised by the server
+ */
+class MockMergedConnectionCallbacks : public MockConnectionSetupCallback,
+                                      public MockConnectionCallback {};
+
+class QuicTransportFactory : public quic::QuicServerTransportFactory {
+  // no-op quic server transport factory
+  quic::QuicServerTransport::Ptr make(
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      const folly::SocketAddress& /* peerAddr */,
+      quic::QuicVersion /*quicVersion*/,
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
+      override {
+    // delete mocked object as soon as terminal callback is rx'd
+    auto noopCb = new MockMergedConnectionCallbacks();
+    EXPECT_CALL(*noopCb, onConnectionEnd())
+        .Times(AtMost(1))
+        .WillRepeatedly([noopCb] { delete noopCb; });
+    EXPECT_CALL(*noopCb, onConnectionError(_))
+        .Times(AtMost(1))
+        .WillRepeatedly([noopCb] { delete noopCb; });
+    return quic::QuicServerTransport::make(
+        evb, std::move(socket), noopCb, noopCb, ctx);
+  }
+};
+
+class ServerTransportParameters : public testing::Test {
+ public:
+  void TearDown() override {
+    if (client_) {
+      client_->close(folly::none);
+    }
+    evb_.loop();
+  }
+
+  void clientConnect() {
+    CHECK(client_) << "client not initialized";
+    MockConnectionSetupCallback setupCb;
+    MockConnectionCallback connCb;
+    EXPECT_CALL(setupCb, onReplaySafe()).WillOnce(Invoke([&] {
+      evb_.terminateLoopSoon();
+    }));
+    client_->start(&setupCb, &connCb);
+
+    evb_.loopForever();
+  }
+
+  // start server with the transport settings that unit test can set accordingly
+  void startServer() {
+    server_ = QuicServer::createQuicServer();
+    // set server configs
+    server_->setFizzContext(quic::test::createServerCtx());
+    serverTs_.statelessResetTokenSecret = getRandSecret();
+    server_->setTransportSettings(serverTs_);
+    server_->setQuicServerTransportFactory(
+        std::make_unique<QuicTransportFactory>());
+    // start server
+    server_->start(folly::SocketAddress("::1", 0), 1);
+    server_->waitUntilInitialized();
+  }
+
+  // create new quic client
+  std::shared_ptr<QuicClientTransport> createQuicClient() {
+    // server must be already started
+    CHECK(server_)
+        << "::startServer() must be invoked prior to ::createQuicClient()";
+    auto fizzClientContext =
+        FizzClientQuicHandshakeContext::Builder()
+            .setCertificateVerifier(createTestCertificateVerifier())
+            .build();
+    auto client = std::make_shared<QuicClientTransport>(
+        &evb_,
+        std::make_unique<QuicAsyncUDPSocketType>(&evb_),
+        std::move(fizzClientContext));
+    client->addNewPeerAddress(server_->getAddress());
+    client->setHostname("::1");
+    client->setSupportedVersions({QuicVersion::MVFST});
+    return client;
+  }
+
+  std::shared_ptr<QuicClientTransport> client_;
+  std::shared_ptr<QuicServer> server_;
+  TransportSettings serverTs_{};
+  folly::EventBase evb_;
+};
+
+TEST_F(ServerTransportParameters, DatagramTest) {
+  // turn off datagram support to begin with
+  serverTs_.datagramConfig.enabled = false;
+  startServer();
+
+  {
+    // create & connect client
+    client_ = createQuicClient();
+    clientConnect();
+
+    // validate no datagram support was advertised by server
+    auto clientConn =
+        dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+    const auto& serverTransportParams =
+        clientConn->clientHandshakeLayer->getServerTransportParams();
+    CHECK(serverTransportParams.has_value());
+
+    auto param = getIntegerParameter(
+        TransportParameterId::max_datagram_frame_size,
+        serverTransportParams->parameters);
+    EXPECT_FALSE(param.has_value());
+    client_.reset();
+  }
+
+  {
+    // now enable datagram support
+    serverTs_.datagramConfig.enabled = true;
+    server_->setTransportSettings(serverTs_);
+
+    // create & connect client
+    client_ = createQuicClient();
+    clientConnect();
+
+    // validate datagram support was advertised by server
+    auto clientConn =
+        dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+    const auto& serverTransportParams =
+        clientConn->clientHandshakeLayer->getServerTransportParams();
+    CHECK(serverTransportParams.has_value());
+
+    auto param = getIntegerParameter(
+        TransportParameterId::max_datagram_frame_size,
+        serverTransportParams->parameters);
+    CHECK(param.has_value());
+    // also validate value because why not
+    EXPECT_EQ(param.value(), kMaxDatagramFrameSize);
+  }
 }
 
 } // namespace test
