@@ -285,12 +285,12 @@ ssize_t QuicAsyncUDPSocketImpl::recvmsg(
 }
 
 int QuicAsyncUDPSocketImpl::recvmmsg(
-    struct mmsghdr* /* msgvec */,
-    unsigned int /* vlen */,
-    unsigned int /* flags */,
-    struct timespec* /* timeout */) {
+    struct mmsghdr* msgvec,
+    unsigned int vlen,
+    unsigned int flags,
+    struct timespec* timeout) {
   LOG(INFO) << __func__;
-  return -1;
+  return ::recvmmsg(fd_, msgvec, vlen, (int)flags, timeout);
 }
 
 bool QuicAsyncUDPSocketImpl::setGRO(bool /* bVal */) {
