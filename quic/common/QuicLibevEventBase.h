@@ -83,7 +83,7 @@ class QuicLibevEventBase {
       uint32_t /* milliseconds */) {}
   void runInEventBaseThreadAndWait(folly::Function<void()> /* fn */) noexcept {}
   bool isInEventBaseThread() const {
-    return false;
+    return true;
   }
   bool scheduleTimeoutHighRes(
       QuicAsyncTimeout* /* obj */,
