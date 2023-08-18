@@ -232,15 +232,17 @@ void processServerInitialParams(
   conn.statelessResetToken = std::move(statelessResetToken);
   // Update the existing streams, because we allow streams to be created before
   // the connection is established.
-  conn.streamManager->streamStateForEach([&conn,
-                                          &packetNum](QuicStreamState& s) {
-    auto windowSize = isUnidirectionalStream(s.id)
-        ? conn.transportSettings.advertisedInitialUniStreamWindowSize
-        : isLocalStream(conn.nodeType, s.id)
-        ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
-        : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
-    handleStreamWindowUpdate(s, windowSize, packetNum);
-  });
+  conn.streamManager->streamStateForEach(
+      [&conn, &packetNum](QuicStreamState& s) {
+        auto windowSize = isUnidirectionalStream(s.id)
+            ? conn.transportSettings.advertisedInitialUniStreamFlowControlWindow
+            : isLocalStream(conn.nodeType, s.id)
+            ? conn.transportSettings
+                  .advertisedInitialBidiLocalStreamFlowControlWindow
+            : conn.transportSettings
+                  .advertisedInitialBidiRemoteStreamFlowControlWindow;
+        handleStreamWindowUpdate(s, windowSize, packetNum);
+      });
   if (maxDatagramFrameSize.has_value()) {
     if (maxDatagramFrameSize.value() > 0 &&
         maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {

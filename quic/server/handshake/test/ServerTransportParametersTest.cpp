@@ -37,10 +37,10 @@ static ClientHello getClientHello(QuicVersion version) {
 TEST(ServerTransportParametersTest, TestGetExtensions) {
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       /*disableMigration=*/true,
@@ -60,10 +60,10 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       /*disableMigration=*/true,
@@ -78,10 +78,10 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
 TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       /*disableMigration=*/true,
@@ -100,10 +100,10 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
 TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       /*disableMigration=*/true,
@@ -126,10 +126,10 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
 TEST(ServerTransportParametersTest, TestQuicV1Fields) {
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       /*disableMigration=*/true,
@@ -166,10 +166,10 @@ TEST(ServerTransportParametersTest, TestQuicV1Fields) {
 TEST(ServerTransportParametersTest, TestMvfstFields) {
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       /*disableMigration=*/true,

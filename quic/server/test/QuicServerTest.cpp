@@ -2036,14 +2036,14 @@ class QuicServerTest : public Test {
     server_->setFizzContext(quic::test::createServerCtx());
     server_->setHostId(serverHostId_);
     server_->setConnectionIdVersion(quic::ConnectionIdVersion::V2);
-    transportSettings_.advertisedInitialConnectionWindowSize =
-        kDefaultConnectionWindowSize * 2;
-    transportSettings_.advertisedInitialBidiLocalStreamWindowSize =
-        kDefaultStreamWindowSize * 2;
-    transportSettings_.advertisedInitialBidiRemoteStreamWindowSize =
-        kDefaultStreamWindowSize * 2;
-    transportSettings_.advertisedInitialUniStreamWindowSize =
-        kDefaultStreamWindowSize * 2;
+    transportSettings_.advertisedInitialConnectionFlowControlWindow =
+        kDefaultConnectionFlowControlWindow * 2;
+    transportSettings_.advertisedInitialBidiLocalStreamFlowControlWindow =
+        kDefaultStreamFlowControlWindow * 2;
+    transportSettings_.advertisedInitialBidiRemoteStreamFlowControlWindow =
+        kDefaultStreamFlowControlWindow * 2;
+    transportSettings_.advertisedInitialUniStreamFlowControlWindow =
+        kDefaultStreamFlowControlWindow * 2;
     transportSettings_.statelessResetTokenSecret = getRandSecret();
     server_->setTransportSettings(transportSettings_);
     server_->setConnectionIdAlgoFactory(
@@ -2143,20 +2143,24 @@ class QuicServerTest : public Test {
               .WillRepeatedly(Invoke([&](auto transportSettings) {
                 EXPECT_EQ(
                     transportSettings_
-                        .advertisedInitialBidiLocalStreamWindowSize,
+                        .advertisedInitialBidiLocalStreamFlowControlWindow,
                     transportSettings
-                        .advertisedInitialBidiLocalStreamWindowSize);
+                        .advertisedInitialBidiLocalStreamFlowControlWindow);
                 EXPECT_EQ(
                     transportSettings_
-                        .advertisedInitialBidiRemoteStreamWindowSize,
+                        .advertisedInitialBidiRemoteStreamFlowControlWindow,
                     transportSettings
-                        .advertisedInitialBidiRemoteStreamWindowSize);
+                        .advertisedInitialBidiRemoteStreamFlowControlWindow);
                 EXPECT_EQ(
-                    transportSettings_.advertisedInitialUniStreamWindowSize,
-                    transportSettings.advertisedInitialUniStreamWindowSize);
+                    transportSettings_
+                        .advertisedInitialUniStreamFlowControlWindow,
+                    transportSettings
+                        .advertisedInitialUniStreamFlowControlWindow);
                 EXPECT_EQ(
-                    transportSettings_.advertisedInitialConnectionWindowSize,
-                    transportSettings.advertisedInitialConnectionWindowSize);
+                    transportSettings_
+                        .advertisedInitialConnectionFlowControlWindow,
+                    transportSettings
+                        .advertisedInitialConnectionFlowControlWindow);
               }));
           ON_CALL(*transport, onNetworkData(_, _))
               .WillByDefault(Invoke(
@@ -2363,14 +2367,14 @@ TEST_F(QuicServerTest, OverrideTakeoverAddressTest) {
 class QuicServerTakeoverTest : public Test {
  public:
   void SetUp() override {
-    transportSettings_.advertisedInitialConnectionWindowSize =
-        kDefaultConnectionWindowSize * 2;
-    transportSettings_.advertisedInitialBidiLocalStreamWindowSize =
-        kDefaultStreamWindowSize * 2;
-    transportSettings_.advertisedInitialBidiRemoteStreamWindowSize =
-        kDefaultStreamWindowSize * 2;
-    transportSettings_.advertisedInitialUniStreamWindowSize =
-        kDefaultStreamWindowSize * 2;
+    transportSettings_.advertisedInitialConnectionFlowControlWindow =
+        kDefaultConnectionFlowControlWindow * 2;
+    transportSettings_.advertisedInitialBidiLocalStreamFlowControlWindow =
+        kDefaultStreamFlowControlWindow * 2;
+    transportSettings_.advertisedInitialBidiRemoteStreamFlowControlWindow =
+        kDefaultStreamFlowControlWindow * 2;
+    transportSettings_.advertisedInitialUniStreamFlowControlWindow =
+        kDefaultStreamFlowControlWindow * 2;
     setUpServer(oldServer_, ProcessId::ZERO);
     setUpServer(newServer_, ProcessId::ONE);
   }

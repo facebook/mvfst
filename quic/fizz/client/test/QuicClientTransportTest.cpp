@@ -493,16 +493,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+      client->peerAdvertisedInitialMaxData(),
+      kDefaultConnectionFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
     CHECK(client->getConn().zeroRttWriteCipher);
@@ -570,16 +571,17 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+      client->peerAdvertisedInitialMaxData(),
+      kDefaultConnectionFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
     CHECK(client->getConn().zeroRttWriteCipher);
@@ -709,16 +711,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+      client->peerAdvertisedInitialMaxData(),
+      kDefaultConnectionFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   client->serverInitialParamsSet() = false;
 
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
@@ -741,16 +744,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+      client->peerAdvertisedInitialMaxData(),
+      kDefaultConnectionFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
 }
 
@@ -783,16 +787,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+      client->peerAdvertisedInitialMaxData(),
+      kDefaultConnectionFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
@@ -825,16 +830,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+      client->peerAdvertisedInitialMaxData(),
+      kDefaultConnectionFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
+      kDefaultStreamFlowControlWindow);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
@@ -2220,15 +2226,15 @@ class QuicClientTransportVersionAndRetryTest
     // 0-rtt support exists, remove this.
     client->getNonConstConn()
         .flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     client->getNonConstConn()
         .flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     client->getNonConstConn()
         .flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     client->getNonConstConn().flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
   }
 };
 
@@ -4920,12 +4926,15 @@ TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
-        EXPECT_EQ(params.initialMaxData, kDefaultConnectionWindowSize);
+        EXPECT_EQ(params.initialMaxData, kDefaultConnectionFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiLocal, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiLocal,
+            kDefaultStreamFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiRemote, kDefaultStreamWindowSize);
-        EXPECT_EQ(params.initialMaxStreamDataUni, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiRemote,
+            kDefaultStreamFlowControlWindow);
+        EXPECT_EQ(
+            params.initialMaxStreamDataUni, kDefaultStreamFlowControlWindow);
         EXPECT_EQ(psk.appParams, appParams1);
       }));
   mockClientHandshake->triggerOnNewCachedPsk();
@@ -4945,12 +4954,15 @@ TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
-        EXPECT_EQ(params.initialMaxData, kDefaultConnectionWindowSize);
+        EXPECT_EQ(params.initialMaxData, kDefaultConnectionFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiLocal, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiLocal,
+            kDefaultStreamFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiRemote, kDefaultStreamWindowSize);
-        EXPECT_EQ(params.initialMaxStreamDataUni, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiRemote,
+            kDefaultStreamFlowControlWindow);
+        EXPECT_EQ(
+            params.initialMaxStreamDataUni, kDefaultStreamFlowControlWindow);
         EXPECT_EQ(psk.appParams, appParams2);
       }));
   mockClientHandshake->triggerOnNewCachedPsk();
@@ -5029,13 +5041,13 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
+            kDefaultConnectionFlowControlWindow;
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
@@ -5072,8 +5084,8 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   // Transport parameters did not change since zero rtt was accepted.
   // Except for max packet size.
   verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultMaxUDPPayload);
@@ -5081,12 +5093,15 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   EXPECT_CALL(*mockQuicPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
-        EXPECT_EQ(params.initialMaxData, kDefaultConnectionWindowSize);
+        EXPECT_EQ(params.initialMaxData, kDefaultConnectionFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiLocal, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiLocal,
+            kDefaultStreamFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiRemote, kDefaultStreamWindowSize);
-        EXPECT_EQ(params.initialMaxStreamDataUni, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiRemote,
+            kDefaultStreamFlowControlWindow);
+        EXPECT_EQ(
+            params.initialMaxStreamDataUni, kDefaultStreamFlowControlWindow);
         EXPECT_EQ(
             params.initialMaxStreamsBidi, std::numeric_limits<uint32_t>::max());
         EXPECT_EQ(
@@ -5100,13 +5115,13 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
+            kDefaultConnectionFlowControlWindow;
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
@@ -5151,8 +5166,8 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   // Transport parameters did not change since zero rtt was accepted.
   // Except for max packet size.
   verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultMaxUDPPayload);
@@ -5160,12 +5175,15 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   EXPECT_CALL(*mockQuicPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
-        EXPECT_EQ(params.initialMaxData, kDefaultConnectionWindowSize);
+        EXPECT_EQ(params.initialMaxData, kDefaultConnectionFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiLocal, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiLocal,
+            kDefaultStreamFlowControlWindow);
         EXPECT_EQ(
-            params.initialMaxStreamDataBidiRemote, kDefaultStreamWindowSize);
-        EXPECT_EQ(params.initialMaxStreamDataUni, kDefaultStreamWindowSize);
+            params.initialMaxStreamDataBidiRemote,
+            kDefaultStreamFlowControlWindow);
+        EXPECT_EQ(
+            params.initialMaxStreamDataUni, kDefaultStreamFlowControlWindow);
         EXPECT_EQ(
             params.initialMaxStreamsBidi, std::numeric_limits<uint32_t>::max());
         EXPECT_EQ(
@@ -5179,13 +5197,13 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
+            kDefaultConnectionFlowControlWindow;
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
@@ -5215,8 +5233,8 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   recvServerHello();
   verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       mockClientHandshake->maxRecvPacketSize);
@@ -5230,13 +5248,13 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
+            kDefaultConnectionFlowControlWindow;
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
@@ -5310,13 +5328,13 @@ TEST_F(
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
+            kDefaultConnectionFlowControlWindow;
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
@@ -5399,13 +5417,13 @@ TEST_F(
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
+            kDefaultStreamFlowControlWindow;
         quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
+            kDefaultConnectionFlowControlWindow;
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
@@ -5510,8 +5528,8 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   packetData->prependChain(IOBuf::copyBuffer("garbage in"));
   deliverData(serverAddr, packetData->coalesce());
   verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       mockClientHandshake->maxRecvPacketSize);
@@ -5548,8 +5566,8 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       packet, aead, getInitialHeaderCipher(), nextPacketNum);
   deliverData(serverAddr, packetData->coalesce());
   verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       mockClientHandshake->maxRecvPacketSize);
@@ -5657,8 +5675,8 @@ TEST_F(QuicProcessDataTest, ProcessPendingDataBufferLimit) {
       packet, aead, getInitialHeaderCipher(), nextPacketNum);
   deliverData(serverAddr, packetData->coalesce());
   verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       mockClientHandshake->maxRecvPacketSize);

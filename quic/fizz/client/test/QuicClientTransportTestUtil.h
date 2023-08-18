@@ -331,8 +331,8 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   bool connected_{false};
   QuicVersion negotiatedVersion{QuicVersion::MVFST};
   uint64_t maxRecvPacketSize{kDefaultMaxUDPPayload};
-  uint64_t maxInitialStreamData{kDefaultStreamWindowSize};
-  uint64_t connWindowSize{kDefaultConnectionWindowSize};
+  uint64_t maxInitialStreamData{kDefaultStreamFlowControlWindow};
+  uint64_t connWindowSize{kDefaultConnectionFlowControlWindow};
   uint64_t maxInitialStreamsBidi{std::numeric_limits<uint32_t>::max()};
   uint64_t maxInitialStreamsUni{std::numeric_limits<uint32_t>::max()};
   folly::Optional<ServerTransportParameters> params_;
@@ -647,8 +647,8 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     assertWritten(false, LongHeader::Types::Handshake);
 
     verifyTransportParameters(
-        kDefaultConnectionWindowSize,
-        kDefaultStreamWindowSize,
+        kDefaultConnectionFlowControlWindow,
+        kDefaultStreamFlowControlWindow,
         kDefaultIdleTimeout,
         kDefaultAckDelayExponent,
         mockClientHandshake->maxRecvPacketSize);

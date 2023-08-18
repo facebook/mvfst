@@ -91,13 +91,17 @@ struct SerializedKnob {
 };
 
 struct TransportSettings {
-  // The initial connection window advertised to the peer.
-  uint64_t advertisedInitialConnectionWindowSize{kDefaultConnectionWindowSize};
-  // The initial window size of the stream advertised to the peer.
-  uint64_t advertisedInitialBidiLocalStreamWindowSize{kDefaultStreamWindowSize};
-  uint64_t advertisedInitialBidiRemoteStreamWindowSize{
-      kDefaultStreamWindowSize};
-  uint64_t advertisedInitialUniStreamWindowSize{kDefaultStreamWindowSize};
+  // The initial flow control window for the whole connection advertised to the
+  // peer.
+  uint64_t advertisedInitialConnectionFlowControlWindow{
+      kDefaultConnectionFlowControlWindow};
+  // The initial flow control window size of a stream advertised to the peer.
+  uint64_t advertisedInitialBidiLocalStreamFlowControlWindow{
+      kDefaultStreamFlowControlWindow};
+  uint64_t advertisedInitialBidiRemoteStreamFlowControlWindow{
+      kDefaultStreamFlowControlWindow};
+  uint64_t advertisedInitialUniStreamFlowControlWindow{
+      kDefaultStreamFlowControlWindow};
   uint64_t advertisedInitialMaxStreamsBidi{kDefaultMaxStreamsBidirectional};
   uint64_t advertisedInitialMaxStreamsUni{kDefaultMaxStreamsUnidirectional};
   // Maximum number of packets to buffer while cipher is unavailable.

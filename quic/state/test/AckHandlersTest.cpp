@@ -4212,13 +4212,13 @@ class AckEventForAppDataTest : public Test {
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();
     conn->streamManager->setMaxLocalBidirectionalStreams(

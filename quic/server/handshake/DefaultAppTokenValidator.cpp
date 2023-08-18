@@ -89,7 +89,7 @@ bool DefaultAppTokenValidator::validate(
   auto ticketMaxData =
       getIntegerParameter(TransportParameterId::initial_max_data, params);
   if (!ticketMaxData ||
-      conn_->transportSettings.advertisedInitialConnectionWindowSize <
+      conn_->transportSettings.advertisedInitialConnectionFlowControlWindow <
           *ticketMaxData) {
     VLOG(10) << "Decreased max data";
     return validated = false;
@@ -102,13 +102,15 @@ bool DefaultAppTokenValidator::validate(
   auto ticketMaxStreamDataUni = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_uni, params);
   if (!ticketMaxStreamDataBidiLocal ||
-      conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize <
+      conn_->transportSettings
+              .advertisedInitialBidiLocalStreamFlowControlWindow <
           *ticketMaxStreamDataBidiLocal ||
       !ticketMaxStreamDataBidiRemote ||
-      conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize <
+      conn_->transportSettings
+              .advertisedInitialBidiRemoteStreamFlowControlWindow <
           *ticketMaxStreamDataBidiRemote ||
       !ticketMaxStreamDataUni ||
-      conn_->transportSettings.advertisedInitialUniStreamWindowSize <
+      conn_->transportSettings.advertisedInitialUniStreamFlowControlWindow <
           *ticketMaxStreamDataUni) {
     VLOG(10) << "Decreased max stream data";
     return validated = false;

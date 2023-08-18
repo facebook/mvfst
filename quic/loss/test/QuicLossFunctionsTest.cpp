@@ -111,13 +111,13 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     conn->ackStates.appDataAckState.nextPacketNum = 1;
     conn->ackStates.appDataAckState.nonDsrPacketSequenceNumber = 1;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
     conn->streamManager->setMaxLocalBidirectionalStreams(
         kDefaultMaxStreamsBidirectional);
     conn->streamManager->setMaxLocalUnidirectionalStreams(
@@ -143,13 +143,13 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     conn->ackStates.handshakeAckState->nextPacketNum = 1;
     conn->ackStates.appDataAckState.nextPacketNum = 1;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
     conn->statsCallback = quicStats_.get();
     // create a serverConnectionId that is different from the client connId
     // with bits for processId and workerId set to 0

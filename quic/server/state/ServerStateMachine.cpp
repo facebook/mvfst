@@ -549,12 +549,13 @@ void updateTransportParamsFromTicket(
   conn.transportSettings.idleTimeout = std::chrono::milliseconds(idleTimeout);
   conn.transportSettings.maxRecvPacketSize = maxRecvPacketSize;
 
-  conn.transportSettings.advertisedInitialConnectionWindowSize = initialMaxData;
-  conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize =
+  conn.transportSettings.advertisedInitialConnectionFlowControlWindow =
+      initialMaxData;
+  conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow =
       initialMaxStreamDataBidiLocal;
-  conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize =
+  conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow =
       initialMaxStreamDataBidiRemote;
-  conn.transportSettings.advertisedInitialUniStreamWindowSize =
+  conn.transportSettings.advertisedInitialUniStreamFlowControlWindow =
       initialMaxStreamDataUni;
   updateFlowControlStateWithSettings(
       conn.flowControlState, conn.transportSettings);
@@ -804,10 +805,12 @@ void onServerReadDataFromOpen(
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
             version,
-            conn.transportSettings.advertisedInitialConnectionWindowSize,
-            conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-            conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-            conn.transportSettings.advertisedInitialUniStreamWindowSize,
+            conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+            conn.transportSettings
+                .advertisedInitialBidiLocalStreamFlowControlWindow,
+            conn.transportSettings
+                .advertisedInitialBidiRemoteStreamFlowControlWindow,
+            conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
             conn.transportSettings.advertisedInitialMaxStreamsBidi,
             conn.transportSettings.advertisedInitialMaxStreamsUni,
             conn.transportSettings.disableMigration,

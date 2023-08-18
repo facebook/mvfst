@@ -474,13 +474,13 @@ class FakeServerHandshake : public FizzServerHandshake {
     std::vector<TransportParameter> transportParams;
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
-        kDefaultStreamWindowSize));
+        kDefaultStreamFlowControlWindow));
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_remote,
-        kDefaultStreamWindowSize));
+        kDefaultStreamFlowControlWindow));
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_uni,
-        kDefaultStreamWindowSize));
+        kDefaultStreamFlowControlWindow));
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_streams_bidi,
         kDefaultMaxStreamsBidirectional));
@@ -488,7 +488,8 @@ class FakeServerHandshake : public FizzServerHandshake {
         TransportParameterId::initial_max_streams_uni,
         kDefaultMaxStreamsUnidirectional));
     transportParams.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_data, kDefaultConnectionWindowSize));
+        TransportParameterId::initial_max_data,
+        kDefaultConnectionFlowControlWindow));
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::idle_timeout, kDefaultIdleTimeout.count()));
     transportParams.push_back(encodeIntegerParameter(

@@ -93,10 +93,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.version = QuicVersion::MVFST;
@@ -110,10 +110,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {
@@ -129,10 +129,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {
@@ -150,10 +150,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {folly::IPAddress("1.2.3.4")};
@@ -168,10 +168,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {
@@ -189,10 +189,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {
@@ -210,10 +210,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
@@ -228,10 +228,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
   appToken.transportParams = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {

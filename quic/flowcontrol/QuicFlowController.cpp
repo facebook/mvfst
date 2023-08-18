@@ -422,9 +422,9 @@ void updateFlowControlStateWithSettings(
     QuicConnectionStateBase::ConnectionFlowControlState& flowControlState,
     const TransportSettings& transportSettings) {
   flowControlState.windowSize =
-      transportSettings.advertisedInitialConnectionWindowSize;
+      transportSettings.advertisedInitialConnectionFlowControlWindow;
   flowControlState.advertisedMaxOffset =
-      transportSettings.advertisedInitialConnectionWindowSize;
+      transportSettings.advertisedInitialConnectionFlowControlWindow;
 }
 
 MaxDataFrame generateMaxDataFrame(const QuicConnectionStateBase& conn) {

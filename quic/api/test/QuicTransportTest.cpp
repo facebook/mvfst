@@ -90,15 +90,15 @@ class QuicTransportTest : public Test {
         std::move(tempHeaderCipher);
     transport_->getConnectionState()
         .flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     transport_->getConnectionState()
         .flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     transport_->getConnectionState()
         .flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     transport_->getConnectionState().flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
     transport_->getConnectionState()
         .streamManager->setMaxLocalBidirectionalStreams(
             kDefaultMaxStreamsBidirectional);

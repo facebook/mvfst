@@ -23,10 +23,12 @@ namespace {
 // Use non-default values to test for nops
 constexpr auto idleTimeout = kDefaultIdleTimeout + 1s;
 constexpr auto maxRecvPacketSize = 1420;
-constexpr auto initialMaxData = kDefaultConnectionWindowSize + 2;
-constexpr auto initialMaxStreamDataBidiLocal = kDefaultStreamWindowSize + 3;
-constexpr auto initialMaxStreamDataBidiRemote = kDefaultStreamWindowSize + 4;
-constexpr auto initialMaxStreamDataUni = kDefaultStreamWindowSize + 5;
+constexpr auto initialMaxData = kDefaultConnectionFlowControlWindow + 2;
+constexpr auto initialMaxStreamDataBidiLocal =
+    kDefaultStreamFlowControlWindow + 3;
+constexpr auto initialMaxStreamDataBidiRemote =
+    kDefaultStreamFlowControlWindow + 4;
+constexpr auto initialMaxStreamDataUni = kDefaultStreamFlowControlWindow + 5;
 constexpr auto initialMaxStreamsBidi = kDefaultMaxStreamsBidirectional + 6;
 constexpr auto initialMaxStreamsUni = kDefaultMaxStreamsUnidirectional + 7;
 constexpr auto knobFrameSupport = true;

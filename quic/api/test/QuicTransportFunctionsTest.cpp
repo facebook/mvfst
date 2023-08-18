@@ -178,13 +178,13 @@ class QuicTransportFunctionsTest : public Test {
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize * 1000;
+        kDefaultStreamFlowControlWindow * 1000;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize * 1000;
+        kDefaultStreamFlowControlWindow * 1000;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize * 1000;
+        kDefaultStreamFlowControlWindow * 1000;
     conn->flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize * 1000;
+        kDefaultConnectionFlowControlWindow * 1000;
     conn->statsCallback = quicStats_.get();
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();

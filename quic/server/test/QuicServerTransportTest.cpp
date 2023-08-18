@@ -4509,7 +4509,8 @@ class QuicServerTransportHandshakeTest
           EXPECT_EQ(
               initialMaxData,
               server->getConn()
-                  .transportSettings.advertisedInitialConnectionWindowSize);
+                  .transportSettings
+                  .advertisedInitialConnectionFlowControlWindow);
 
           auto initialMaxStreamDataBidiLocal = *getIntegerParameter(
               TransportParameterId::initial_max_stream_data_bidi_local, params);
@@ -4523,16 +4524,17 @@ class QuicServerTransportHandshakeTest
               initialMaxStreamDataBidiLocal,
               server->getConn()
                   .transportSettings
-                  .advertisedInitialBidiLocalStreamWindowSize);
+                  .advertisedInitialBidiLocalStreamFlowControlWindow);
           EXPECT_EQ(
               initialMaxStreamDataBidiRemote,
               server->getConn()
                   .transportSettings
-                  .advertisedInitialBidiRemoteStreamWindowSize);
+                  .advertisedInitialBidiRemoteStreamFlowControlWindow);
           EXPECT_EQ(
               initialMaxStreamDataUni,
               server->getConn()
-                  .transportSettings.advertisedInitialUniStreamWindowSize);
+                  .transportSettings
+                  .advertisedInitialUniStreamFlowControlWindow);
 
           auto initialMaxStreamsBidi = *getIntegerParameter(
               TransportParameterId::initial_max_streams_bidi, params);

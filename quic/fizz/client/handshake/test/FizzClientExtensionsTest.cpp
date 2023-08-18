@@ -28,10 +28,10 @@ static EncryptedExtensions getEncryptedExtensions() {
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::MVFST,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -51,10 +51,10 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
 TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_DRAFT,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -73,10 +73,10 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -95,10 +95,10 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1_ALIAS,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -118,10 +118,10 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
 TEST(FizzClientHandshakeTest, TestOnEE) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::MVFST,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -136,10 +136,10 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
 TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -167,10 +167,10 @@ TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
 TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::MVFST,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,
@@ -205,10 +205,10 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
 
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1,
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
       kDefaultMaxStreamsBidirectional,
       kDefaultMaxStreamsUnidirectional,
       kDefaultIdleTimeout,

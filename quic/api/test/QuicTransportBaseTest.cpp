@@ -580,13 +580,13 @@ class QuicTransportImplTest : public Test {
         &connCallback);
     auto& conn = *transport->transportConn;
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn.flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
     conn.streamManager->setMaxLocalBidirectionalStreams(
         kDefaultMaxStreamsBidirectional);
     conn.streamManager->setMaxLocalUnidirectionalStreams(

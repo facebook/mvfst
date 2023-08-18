@@ -39,12 +39,13 @@ std::unique_ptr<QuicServerConnectionState> createConn() {
   conn->ackStates.handshakeAckState->nextPacketNum = 1;
   conn->ackStates.appDataAckState.nextPacketNum = 1;
   conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-      kDefaultStreamWindowSize;
+      kDefaultStreamFlowControlWindow;
   conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-      kDefaultStreamWindowSize;
+      kDefaultStreamFlowControlWindow;
   conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-      kDefaultStreamWindowSize;
-  conn->flowControlState.peerAdvertisedMaxOffset = kDefaultConnectionWindowSize;
+      kDefaultStreamFlowControlWindow;
+  conn->flowControlState.peerAdvertisedMaxOffset =
+      kDefaultConnectionFlowControlWindow;
   conn->streamManager->setMaxLocalBidirectionalStreams(
       kDefaultMaxStreamsBidirectional);
   conn->streamManager->setMaxLocalUnidirectionalStreams(

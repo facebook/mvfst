@@ -660,9 +660,9 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     quicClient_->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
     auto settings = quicClient_->getTransportSettings();
-    settings.advertisedInitialUniStreamWindowSize =
+    settings.advertisedInitialUniStreamFlowControlWindow =
         std::numeric_limits<uint32_t>::max();
-    settings.advertisedInitialConnectionWindowSize = window_;
+    settings.advertisedInitialConnectionFlowControlWindow = window_;
     settings.autotuneReceiveConnFlowControl = autotuneWindow_;
     settings.connectUDP = true;
     settings.shouldRecvBatch = true;

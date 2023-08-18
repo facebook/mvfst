@@ -90,10 +90,10 @@ class ServerHandshakeTest : public Test {
     hostname = kTestHostname.str();
     verifier = std::make_shared<fizz::test::MockCertificateVerifier>();
 
-    uint64_t initialMaxData = kDefaultConnectionWindowSize;
-    uint64_t initialMaxStreamDataBidiLocal = kDefaultStreamWindowSize;
-    uint64_t initialMaxStreamDataBidiRemote = kDefaultStreamWindowSize;
-    uint64_t initialMaxStreamDataUni = kDefaultStreamWindowSize;
+    uint64_t initialMaxData = kDefaultConnectionFlowControlWindow;
+    uint64_t initialMaxStreamDataBidiLocal = kDefaultStreamFlowControlWindow;
+    uint64_t initialMaxStreamDataBidiRemote = kDefaultStreamFlowControlWindow;
+    uint64_t initialMaxStreamDataUni = kDefaultStreamFlowControlWindow;
     uint64_t initialMaxStreamsBidi = kDefaultMaxStreamsBidirectional;
     uint64_t initialMaxStreamsUni = kDefaultMaxStreamsUnidirectional;
     auto clientExtensions =

@@ -461,8 +461,8 @@ constexpr float kCubicTCPFriendlyEstimateIncreaseFactor =
 
 /* Flow Control */
 // Default flow control window for HTTP/2 + 1K for headers
-constexpr uint64_t kDefaultStreamWindowSize = (64 + 1) * 1024;
-constexpr uint64_t kDefaultConnectionWindowSize = 1024 * 1024;
+constexpr uint64_t kDefaultStreamFlowControlWindow = (64 + 1) * 1024;
+constexpr uint64_t kDefaultConnectionFlowControlWindow = 1024 * 1024;
 
 /* Stream Limits */
 constexpr uint64_t kDefaultMaxStreamsBidirectional = 2048;

@@ -47,13 +47,13 @@ class DSRCommonTestFixture : public testing::Test {
  protected:
   void prepareFlowControlAndStreamLimit() {
     conn_.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn_.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn_.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamFlowControlWindow;
     conn_.flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionFlowControlWindow;
     conn_.streamManager->setMaxLocalBidirectionalStreams(
         kDefaultMaxStreamsBidirectional);
     conn_.streamManager->setMaxLocalUnidirectionalStreams(

@@ -40,10 +40,10 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
@@ -71,10 +71,10 @@ TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   appToken.transportParams.parameters.push_back(
@@ -103,15 +103,15 @@ TEST(
   conn.statsCallback = quicStats.get();
 
   auto initialMaxData =
-      conn.transportSettings.advertisedInitialConnectionWindowSize;
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow;
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       initialMaxData - 1,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
@@ -125,7 +125,7 @@ TEST(
   EXPECT_TRUE(validator.validate(resState));
 
   EXPECT_EQ(
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
       initialMaxData - 1);
   EXPECT_EQ(conn.flowControlState.windowSize, initialMaxData - 1);
   EXPECT_EQ(conn.flowControlState.advertisedMaxOffset, initialMaxData - 1);
@@ -182,13 +182,15 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   auto& params = appToken.transportParams;
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize));
+      conn.transportSettings
+          .advertisedInitialBidiLocalStreamFlowControlWindow));
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_remote,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize));
+      conn.transportSettings
+          .advertisedInitialBidiRemoteStreamFlowControlWindow));
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_uni,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize));
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow));
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::ack_delay_exponent,
       conn.transportSettings.ackDelayExponent));
@@ -222,10 +224,10 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   appToken.transportParams.parameters.push_back(
@@ -256,10 +258,13 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize + 1,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize + 1,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize + 1,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow +
+          1,
+      conn.transportSettings
+              .advertisedInitialBidiRemoteStreamFlowControlWindow +
+          1,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow + 1,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
@@ -286,10 +291,10 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count() + 100,
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
@@ -318,10 +323,10 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi + 1,
       conn.transportSettings.advertisedInitialMaxStreamsUni + 1);
   ResumptionState resState;
@@ -353,10 +358,10 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   appToken.transportParams = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
@@ -380,10 +385,12 @@ class SourceAddressTokenTest : public Test {
     appToken_.transportParams = createTicketTransportParameters(
         conn_.transportSettings.idleTimeout.count(),
         conn_.transportSettings.maxRecvPacketSize,
-        conn_.transportSettings.advertisedInitialConnectionWindowSize,
-        conn_.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-        conn_.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-        conn_.transportSettings.advertisedInitialUniStreamWindowSize,
+        conn_.transportSettings.advertisedInitialConnectionFlowControlWindow,
+        conn_.transportSettings
+            .advertisedInitialBidiLocalStreamFlowControlWindow,
+        conn_.transportSettings
+            .advertisedInitialBidiRemoteStreamFlowControlWindow,
+        conn_.transportSettings.advertisedInitialUniStreamFlowControlWindow,
         conn_.transportSettings.advertisedInitialMaxStreamsBidi,
         conn_.transportSettings.advertisedInitialMaxStreamsUni);
   }

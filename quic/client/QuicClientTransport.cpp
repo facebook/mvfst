@@ -1019,10 +1019,12 @@ void QuicClientTransport::startCryptoHandshake() {
   maybeEnableStreamGroups();
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
-      conn_->transportSettings.advertisedInitialConnectionWindowSize,
-      conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn_->transportSettings.advertisedInitialUniStreamWindowSize,
+      conn_->transportSettings.advertisedInitialConnectionFlowControlWindow,
+      conn_->transportSettings
+          .advertisedInitialBidiLocalStreamFlowControlWindow,
+      conn_->transportSettings
+          .advertisedInitialBidiRemoteStreamFlowControlWindow,
+      conn_->transportSettings.advertisedInitialUniStreamFlowControlWindow,
       conn_->transportSettings.advertisedInitialMaxStreamsBidi,
       conn_->transportSettings.advertisedInitialMaxStreamsUni,
       conn_->transportSettings.idleTimeout,

@@ -545,10 +545,12 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     appToken.transportParams = createTicketTransportParameters(
         conn_->transportSettings.idleTimeout.count(),
         conn_->transportSettings.maxRecvPacketSize,
-        conn_->transportSettings.advertisedInitialConnectionWindowSize,
-        conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-        conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-        conn_->transportSettings.advertisedInitialUniStreamWindowSize,
+        conn_->transportSettings.advertisedInitialConnectionFlowControlWindow,
+        conn_->transportSettings
+            .advertisedInitialBidiLocalStreamFlowControlWindow,
+        conn_->transportSettings
+            .advertisedInitialBidiRemoteStreamFlowControlWindow,
+        conn_->transportSettings.advertisedInitialUniStreamFlowControlWindow,
         conn_->transportSettings.advertisedInitialMaxStreamsBidi,
         conn_->transportSettings.advertisedInitialMaxStreamsUni);
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;

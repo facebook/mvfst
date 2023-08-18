@@ -161,10 +161,10 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     appToken.transportParams = createTicketTransportParameters(
         kDefaultIdleTimeout.count(),
         kDefaultUDPReadBufferSize,
-        kDefaultConnectionWindowSize,
-        kDefaultStreamWindowSize,
-        kDefaultStreamWindowSize,
-        kDefaultStreamWindowSize,
+        kDefaultConnectionFlowControlWindow,
+        kDefaultStreamFlowControlWindow,
+        kDefaultStreamFlowControlWindow,
+        kDefaultStreamFlowControlWindow,
         kDefaultMaxStreamsBidirectional,
         kDefaultMaxStreamsUnidirectional);
     appToken.version = QuicVersion::MVFST;
@@ -220,13 +220,14 @@ QuicCachedPsk setupZeroRttOnClientCtx(
 
   quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
   quicCachedPsk.transportParams.maxRecvPacketSize = kDefaultUDPReadBufferSize;
-  quicCachedPsk.transportParams.initialMaxData = kDefaultConnectionWindowSize;
+  quicCachedPsk.transportParams.initialMaxData =
+      kDefaultConnectionFlowControlWindow;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-      kDefaultStreamWindowSize;
+      kDefaultStreamFlowControlWindow;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-      kDefaultStreamWindowSize;
+      kDefaultStreamFlowControlWindow;
   quicCachedPsk.transportParams.initialMaxStreamDataUni =
-      kDefaultStreamWindowSize;
+      kDefaultStreamFlowControlWindow;
   quicCachedPsk.transportParams.initialMaxStreamsBidi =
       kDefaultMaxStreamsBidirectional;
   quicCachedPsk.transportParams.initialMaxStreamsUni =
