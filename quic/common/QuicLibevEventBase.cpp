@@ -80,6 +80,8 @@ std::chrono::milliseconds QuicEventBase::getTimerTickInterval() const {
   return backingEvb_->getTimerTickInterval();
 }
 
+QuicLibevEventBase::QuicLibevEventBase(struct ev_loop* loop) : ev_loop_(loop) {}
+
 } // namespace quic
 
 #endif // MVFST_USE_LIBEV

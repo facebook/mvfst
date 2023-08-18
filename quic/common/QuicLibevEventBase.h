@@ -72,7 +72,7 @@ class QuicTimer {
  */
 class QuicLibevEventBase {
  public:
-  QuicLibevEventBase() {}
+  explicit QuicLibevEventBase(struct ev_loop* loop);
 
   void runInLoop(folly::Function<void()> /* cb */, bool /* thisIteration */) {}
   void runInLoop(
