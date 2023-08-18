@@ -74,14 +74,14 @@ class QuicLibevEventBase {
  public:
   explicit QuicLibevEventBase(struct ev_loop* loop);
 
-  void runInLoop(folly::Function<void()> /* cb */, bool /* thisIteration */) {}
+  void runInLoop(folly::Function<void()> cb, bool thisIteration);
   void runInLoop(
-      QuicEventBaseLoopCallback* /* callback */,
-      bool /* thisIteration */ = false) {}
+      QuicEventBaseLoopCallback* callback,
+      bool thisIteration = false);
   void runAfterDelay(
       folly::Function<void()> /* cb */,
       uint32_t /* milliseconds */) {}
-  void runInEventBaseThreadAndWait(folly::Function<void()> /* fn */) noexcept {}
+  void runInEventBaseThreadAndWait(folly::Function<void()> fn) noexcept;
   bool isInEventBaseThread() const {
     return true;
   }

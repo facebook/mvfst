@@ -82,6 +82,22 @@ std::chrono::milliseconds QuicEventBase::getTimerTickInterval() const {
 
 QuicLibevEventBase::QuicLibevEventBase(struct ev_loop* loop) : ev_loop_(loop) {}
 
+void QuicLibevEventBase::runInLoop(
+    folly::Function<void()> cb,
+    bool /* thisIteration */) {
+  cb();
+}
+
+void QuicLibevEventBase::runInLoop(
+    QuicEventBaseLoopCallback* callback,
+    bool /* thisIteration */) {
+  callback->runLoopCallback();
+}
+
+void QuicLibevEventBase::runInEventBaseThreadAndWait(
+    folly::Function<void()> fn) noexcept {
+  fn();
+}
 } // namespace quic
 
 #endif // MVFST_USE_LIBEV
