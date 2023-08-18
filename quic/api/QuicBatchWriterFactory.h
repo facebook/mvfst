@@ -49,8 +49,7 @@ class BatchWriterFactory {
           }
           return makeGsoInPlaceBatchWriter(batchSize, conn);
         }
-
-        return BatchWriterPtr(new SinglePacketBatchWriter());
+        // Fall through to Sendmmsg batching if gso is not supported.
       }
       case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
         return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
