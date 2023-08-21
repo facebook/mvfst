@@ -42,6 +42,11 @@ class BatchWriter {
   // returns true if we need to flush before adding a new packet
   virtual bool needsFlush(size_t /*unused*/);
 
+  virtual void setTxTime(std::chrono::microseconds) {
+    throw QuicInternalException(
+        "setTxTime not supported", LocalErrorCode::INTERNAL_ERROR);
+  }
+
   /* append returns true if the
    * writer needs to be flushed
    */

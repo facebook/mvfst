@@ -27,6 +27,9 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
   ssize_t write(
       QuicAsyncUDPSocketType& sock,
       const folly::SocketAddress& address) override;
+  void setTxTime(std::chrono::microseconds txTime) override {
+    txTime_ = txTime;
+  }
 
  private:
   // max number of buffer chains we can accumulate before we need to flush
@@ -35,6 +38,8 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
   size_t currBufs_{0};
   // size of the previous buffer chain appended to the buf_
   size_t prevSize_{0};
+  // tx time to use for the socket write
+  std::chrono::microseconds txTime_{0us};
 };
 
 class GSOInplacePacketBatchWriter : public BatchWriter {
@@ -57,12 +62,17 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
   bool empty() const override;
   size_t size() const override;
 
+  void setTxTime(std::chrono::microseconds txTime) override {
+    txTime_ = txTime;
+  }
+
  private:
   QuicConnectionStateBase& conn_;
   size_t maxPackets_;
   const uint8_t* lastPacketEnd_{nullptr};
   size_t prevSize_{0};
   size_t numPackets_{0};
+  std::chrono::microseconds txTime_{0us};
 
   /**
    * If we flush the batch due to the next packet being larger than current GSO
