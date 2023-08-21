@@ -52,52 +52,49 @@ Buf BufQueue::splitAtMost(size_t len) {
     }
   }
   // update chain_
-  chain_.release();
+  (void)chain_.release();
   chain_ = std::unique_ptr<folly::IOBuf>(current);
   DCHECK_EQ(chainLength_, chain_ ? chain_->computeChainDataLength() : 0);
   return result;
 }
 
 size_t BufQueue::trimStartAtMost(size_t amount) {
-  auto original = amount;
   folly::IOBuf* current = chain_.get();
+  // empty queue / requested 0 bytes
   if (current == nullptr || amount == 0) {
     return 0;
   }
+  // requested *strictly more* than entire chain, free chain_
+  if (amount > chainLength_) {
+    size_t result = chainLength_;
+    move();
+    return result;
+  }
+
+  const size_t originalAmount = amount;
+  // find last IOBuf within the range requested
   while (amount > 0) {
     if (current->length() >= amount) {
-      current->trimStart(amount);
-      amount = 0;
       break;
     }
     amount -= current->length();
     current = current->next();
-    if (current == chain_.get()) {
-      break;
-    }
   }
-  auto prev = current->prev();
-  /** We are potentially in 2 states here,
-   * 1. we found the entire amount
-   * 2. or we did not.
-   * If we did not find the entire amount, then current ==
-   * chain and we can remove the entire chain.
-   * If we did, then we can split from the chain head to the previous buffer and
-   * then keep the current buffer.
-   */
-  if (prev != current && current != chain_.get()) {
-    auto chain = chain_.release();
-    current->separateChain(chain, prev);
-    chain_ = std::unique_ptr<folly::IOBuf>(current);
-  } else if (amount > 0) {
-    DCHECK_EQ(current, chain_.get());
-    chain_ = nullptr;
+  // only trim last buf in range, the prior bufs will be deleted
+  current->trimStart(amount);
+
+  // if current isn't head node, destruct all prior nodes
+  if (current != chain_.get()) {
+    current->separateChain(chain_.get(), current->prev());
   }
-  size_t trimmed = original - amount;
-  DCHECK_GE(chainLength_, trimmed);
-  chainLength_ -= trimmed;
-  DCHECK(chainLength_ == 0 || !chain_->empty());
-  return trimmed;
+
+  // update chain_ to current
+  (void)chain_.release();
+  chain_.reset(current);
+  // adjust chainLength_
+  chainLength_ -= originalAmount;
+
+  return originalAmount;
 }
 
 // TODO replace users with trimStartAtMost

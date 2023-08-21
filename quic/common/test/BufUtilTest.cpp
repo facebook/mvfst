@@ -187,6 +187,31 @@ TEST(BufQueue, TrimStartAtMost) {
   checkConsistency(queue);
 }
 
+TEST(BufQueue, TrimStartOneByte) {
+  BufQueue queue;
+  queue.append(IOBuf::copyBuffer(SCL("H")));
+  checkConsistency(queue);
+  queue.trimStart(1);
+  checkConsistency(queue);
+  // trimStart(queue.chainLength()) should not free the buffer
+  EXPECT_NE(queue.front(), nullptr);
+}
+
+TEST(BufQueue, TrimStartClearChain) {
+  BufQueue queue;
+  constexpr string_view alphabet = "abcdefghijklmnopqrstuvwxyz";
+  queue.append(IOBuf::copyBuffer(alphabet));
+  queue.append(IOBuf::copyBuffer(alphabet));
+  // validate chain length
+  const size_t expectedChainLength = alphabet.size() * 2;
+  EXPECT_EQ(queue.chainLength(), expectedChainLength);
+  checkConsistency(queue);
+  // attempt to trim more than chainLength
+  queue.trimStartAtMost(expectedChainLength + 1);
+  checkConsistency(queue);
+  EXPECT_EQ(queue.front(), nullptr);
+}
+
 TEST(BufQueue, CloneBufNull) {
   BufQueue queue;
   auto buf = queue.clone();
