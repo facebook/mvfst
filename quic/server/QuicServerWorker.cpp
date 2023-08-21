@@ -112,6 +112,7 @@ void QuicServerWorker::bind(
     }
   }
   socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
+  socket_->setTXTime({CLOCK_MONOTONIC, /*deadline=*/false});
 
   if (mvfst_hook_on_socket_create) {
     mvfst_hook_on_socket_create(getSocketFd(*socket_));
