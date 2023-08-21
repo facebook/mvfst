@@ -4351,10 +4351,11 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Andante in C minor");
   writeDataToQuicStream(*stream, buf->clone(), true);
-  EXPECT_CALL(mockSock, write(_, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& sockBuf) {
+                           const std::unique_ptr<folly::IOBuf>& sockBuf,
+                           auto) {
         EXPECT_GT(bufPtr->length(), 0);
         EXPECT_GE(sockBuf->length(), buf->length());
         EXPECT_EQ(sockBuf.get(), bufPtr);
@@ -4499,10 +4500,11 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
       conn->outstandings.packets.front().metadata.encodedSize;
   auto outstandingPacketsCount = conn->outstandings.packets.size();
   ASSERT_EQ(firstPacketSize, conn->udpSendPacketLen);
-  EXPECT_CALL(mockSock, write(_, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& buf) {
+                           const std::unique_ptr<folly::IOBuf>& buf,
+                           auto) {
         EXPECT_FALSE(buf->isChained());
         EXPECT_EQ(buf->length(), firstPacketSize);
         return buf->length();

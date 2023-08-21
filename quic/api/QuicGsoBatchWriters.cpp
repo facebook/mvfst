@@ -72,13 +72,13 @@ bool GSOPacketBatchWriter::append(
 ssize_t GSOPacketBatchWriter::write(
     QuicAsyncUDPSocketType& sock,
     const folly::SocketAddress& address) {
-  return (currBufs_ > 1)
-      ? sock.writeGSO(
-            address,
-            buf_,
-            folly::AsyncUDPSocket::WriteOptions(
-                static_cast<int>(prevSize_) /*gsoVal*/, false /* zerocopyVal*/))
-      : sock.write(address, buf_);
+  // Even though it's called writeGSO, it can handle individual writes by
+  // setting gsoVal = 0.
+  int gsoVal = currBufs_ > 1 ? static_cast<int>(prevSize_) : 0;
+  return sock.writeGSO(
+      address,
+      buf_,
+      folly::AsyncUDPSocket::WriteOptions(gsoVal, false /* zerocopyVal */));
 }
 
 GSOInplacePacketBatchWriter::GSOInplacePacketBatchWriter(
@@ -155,13 +155,13 @@ ssize_t GSOInplacePacketBatchWriter::write(
   }
   uint64_t diffToStart = lastPacketEnd_ - buf->data();
   buf->trimEnd(diffToEnd);
-  auto bytesWritten = (numPackets_ > 1)
-      ? sock.writeGSO(
-            address,
-            buf,
-            folly::AsyncUDPSocket::WriteOptions(
-                static_cast<int>(prevSize_) /*gsoVal*/, false /* zerocopyVal*/))
-      : sock.write(address, buf);
+  // Even though it's called writeGSO, it can handle individual writes by
+  // setting gsoVal = 0.
+  int gsoVal = numPackets_ > 1 ? static_cast<int>(prevSize_) : 0;
+  auto bytesWritten = sock.writeGSO(
+      address,
+      buf,
+      folly::AsyncUDPSocket::WriteOptions(gsoVal, false /* zerocopyVal */));
   /**
    * If there is one more bytes after lastPacketEnd_, that means there is a
    * packet we choose not to write in this batch (e.g., it has a size larger

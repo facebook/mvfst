@@ -515,10 +515,11 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
   ASSERT_FALSE(
       batchWriter->append(nullptr, 1000, folly::SocketAddress(), nullptr));
 
-  EXPECT_CALL(sock, write(_, _))
+  EXPECT_CALL(sock, writeGSO(_, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf) {
+                           const std::unique_ptr<folly::IOBuf>& buf,
+                           auto) {
         EXPECT_EQ(1000, buf->length());
         return 1000;
       }));
@@ -606,10 +607,11 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   rawBuf->append(packetSizeBig);
   EXPECT_TRUE(batchWriter->needsFlush(packetSizeBig));
 
-  EXPECT_CALL(sock, write(_, _))
+  EXPECT_CALL(sock, writeGSO(_, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf) {
+                           const std::unique_ptr<folly::IOBuf>& buf,
+                           auto) {
         EXPECT_EQ(700, buf->length());
         return 700;
       }));
