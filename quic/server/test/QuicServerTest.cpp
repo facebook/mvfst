@@ -3248,6 +3248,40 @@ class ServerTransportParameters : public testing::Test {
   folly::EventBase evb_;
 };
 
+TEST_F(ServerTransportParameters, InvariantlyAdvertisedParameters) {
+  startServer();
+
+  // create & connect client
+  client_ = createQuicClient();
+  clientConnect();
+
+  // validate all the parameters we unconditionally advertise
+  auto clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+  const auto& serverTransportParams =
+      clientConn->clientHandshakeLayer->getServerTransportParams();
+  CHECK(serverTransportParams.has_value());
+
+  using _id = TransportParameterId;
+  for (auto paramId :
+       {_id::initial_max_stream_data_bidi_local,
+        _id::initial_max_stream_data_bidi_remote,
+        _id::initial_max_stream_data_uni,
+        _id::initial_max_data,
+        _id::initial_max_streams_bidi,
+        _id::initial_max_streams_uni,
+        _id::idle_timeout,
+        _id::ack_delay_exponent,
+        _id::max_packet_size,
+        _id::stateless_reset_token}) {
+    auto param =
+        getIntegerParameter(paramId, serverTransportParams->parameters);
+    EXPECT_TRUE(param.has_value());
+  }
+
+  client_.reset();
+}
+
 TEST_F(ServerTransportParameters, DatagramTest) {
   // turn off datagram support to begin with
   serverTs_.datagramConfig.enabled = false;
