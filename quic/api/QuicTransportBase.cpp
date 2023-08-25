@@ -3392,8 +3392,13 @@ void QuicTransportBase::validateCongestionAndPacing(
     // TODO: This should be removed once the pacer changes are adopted as
     // the defaults or the pacer is fixed in another way.
     conn_->transportSettings.experimentalPacer = true;
+    conn_->transportSettings.defaultRttFactor = {1, 1};
+    conn_->transportSettings.startupRttFactor = {1, 1};
     if (conn_->pacer) {
       conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
+      conn_->pacer->setRttFactor(
+          conn_->transportSettings.defaultRttFactor.first,
+          conn_->transportSettings.defaultRttFactor.second);
     }
     writeLooper_->setFireLoopEarly(true);
   }

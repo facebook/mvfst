@@ -12,7 +12,8 @@ namespace quic {
 BbrTestingCongestionController::BbrTestingCongestionController(
     QuicConnectionStateBase& conn)
     : BbrCongestionController(conn) {
-  conn.transportSettings.defaultRttFactor = {1, 1};
-  conn.transportSettings.startupRttFactor = {1, 1};
+  // These are now set in QuicTransportBase.cpp in validateCongestionAndPacing()
+  // conn.transportSettings.defaultRttFactor = {1, 1};
+  // conn.transportSettings.startupRttFactor = {1, 1};
 }
 } // namespace quic
