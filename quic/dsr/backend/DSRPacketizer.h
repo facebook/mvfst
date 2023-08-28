@@ -41,42 +41,12 @@ namespace quic {
  *    DCID, Client addr, Packet Number, Stream Id, Stream offset, Stream data
  *    length, Stream data EOF.
  *
- * Then the extra info to look up Cipher from CipherMap:
- *    SCID
  */
-
-struct CipherKey {
-  ConnectionId scid;
-  ConnectionId dcid;
-  folly::SocketAddress clientAddress;
-};
-
-struct CipherKeyHash {
-  std::size_t operator()(const CipherKey& key) const {
-    return folly::hash::hash_combine(
-        ConnectionIdHash()(key.scid),
-        ConnectionIdHash()(key.dcid),
-        key.clientAddress.hash());
-  }
-};
-
-struct CipherKeyEq {
-  bool operator()(const CipherKey& first, const CipherKey& second) const {
-    return first.scid == second.scid && first.dcid == second.dcid &&
-        first.clientAddress == second.clientAddress;
-  }
-};
 
 struct CipherPair {
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
 };
-
-// This is supposed to be per-thread. If two packetization requests for the
-// same connection wind up on two threads, they both will have to build the
-// same CipherPairs, and keep them in their own map.
-using CipherMap =
-    folly::EvictingCacheMap<CipherKey, CipherPair, CipherKeyHash, CipherKeyEq>;
 
 class CipherBuilder {
  public:
@@ -108,9 +78,6 @@ class CipherBuilder {
   FizzCryptoFactory quicFizzCryptoFactory_;
 };
 
-// TODO: it needs to be able to get the cache data.
-// TODO: We are not going to maintain any QUIC related states. So if the cache
-// data can be just passed in, we can make this into a free function.
 class QuicPacketizer {
  public:
   virtual ~QuicPacketizer() = default;
