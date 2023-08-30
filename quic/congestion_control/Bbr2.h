@@ -153,9 +153,10 @@ class Bbr2CongestionController : public CongestionController {
 
   bool probeRttExpired_{false};
 
-  uint64_t sendQuantum_, inflightMax_, inflightHi_, inflightLo_;
+  uint64_t sendQuantum_{64 * 1024};
+  folly::Optional<uint64_t> inflightLo_, inflightHi_;
   folly::Optional<TimePoint> extraAckedStartTimestamp_;
-  uint64_t extraAckedDelivered_;
+  uint64_t extraAckedDelivered_{0};
   WindowedFilter<uint64_t, MaxFilter<uint64_t>, uint64_t, uint64_t>
       maxExtraAckedFilter_;
 
@@ -195,7 +196,7 @@ class Bbr2CongestionController : public CongestionController {
   TimePoint probeBWCycleStart_;
   uint64_t roundsSinceBwProbe_;
   std::chrono::milliseconds bwProbeWait_;
-  uint64_t bwProbeSamples_;
+  bool bwProbeShouldHandleLoss_{false};
   uint64_t probeUpRounds_{0};
   uint64_t probeUpAcks_{0};
 };

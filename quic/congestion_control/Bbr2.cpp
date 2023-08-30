@@ -220,7 +220,7 @@ void Bbr2CongestionController::resetCongestionSignals() {
 
 void Bbr2CongestionController::resetLowerBounds() {
   bandwidthLo_ = Bandwidth(std::numeric_limits<uint64_t>::max(), 1us);
-  inflightLo_ = std::numeric_limits<uint64_t>::max();
+  inflightLo_.reset();
 }
 void Bbr2CongestionController::enterStartup() {
   state_ = State::Startup;
@@ -262,7 +262,7 @@ void Bbr2CongestionController::setCwnd(
     uint64_t ackedBytes,
     uint64_t lostBytes) {
   // BBRUpdateMaxInflight()
-  inflightMax_ = addQuantizationBudget(
+  auto inflightMax = addQuantizationBudget(
       getBDPWithGain(cwndGain_) + maxExtraAckedFilter_.GetBest());
   // BBRModulateCwndForRecovery()
   if (lostBytes > 0) {
@@ -277,9 +277,9 @@ void Bbr2CongestionController::setCwnd(
 
   if (!inPacketConservation_) {
     if (filledPipe_) {
-      cwndBytes_ = std::min(cwndBytes_ + ackedBytes, inflightMax_);
+      cwndBytes_ = std::min(cwndBytes_ + ackedBytes, inflightMax);
     } else if (
-        cwndBytes_ < inflightMax_ ||
+        cwndBytes_ < inflightMax ||
         conn_.lossState.totalBytesAcked <
             conn_.transportSettings.initCwndInMss * conn_.udpSendPacketLen) {
       cwndBytes_ += ackedBytes;
@@ -295,12 +295,16 @@ void Bbr2CongestionController::setCwnd(
 
   // BBRBoundCwndForModel()
   auto cap = std::numeric_limits<uint64_t>::max();
-  if (isProbeBwState(state_) && state_ != State::ProbeBw_Cruise) {
-    cap = inflightHi_;
-  } else if (state_ == State::ProbeRTT || state_ == State::ProbeBw_Cruise) {
-    cap = getTargetInflightWithHeadroom();
+  if (inflightHi_.has_value()) {
+    if (isProbeBwState(state_) && state_ != State::ProbeBw_Cruise) {
+      cap = *inflightHi_;
+    } else if (state_ == State::ProbeRTT || state_ == State::ProbeBw_Cruise) {
+      cap = getTargetInflightWithHeadroom();
+    }
   }
-  cap = std::min(cap, inflightLo_);
+  if (inflightLo_.has_value()) {
+    cap = std::min(cap, *inflightLo_);
+  }
   cap = std::max(cap, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
   cwndBytes_ = std::min(cwndBytes_, cap);
 }
@@ -385,14 +389,14 @@ void Bbr2CongestionController::updateCongestionSignals(
     if (!bandwidthLo_) {
       bandwidthLo_ = maxBwFilter_.GetBest();
     }
-    if (!inflightLo_) {
+    if (!inflightLo_.has_value()) {
       inflightLo_ = cwndBytes_;
     }
 
     // LossLowerBounds
     bandwidthLo_ = std::max(bandwidthLatest_, bandwidthLo_ * kBeta);
     inflightLo_ =
-        std::max(inflightLatest_, static_cast<uint64_t>(inflightLo_ * kBeta));
+        std::max(inflightLatest_, static_cast<uint64_t>(*inflightLo_ * kBeta));
   }
 
   lossBytesInRound_ = 0;
@@ -500,16 +504,13 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
   }
   switch (state_) {
     case State::ProbeBw_Down:
-
       if (checkTimeToProbeBW()) {
         return; /* already decided state transition */
       }
       if (checkTimeToCruise()) {
         startProbeBwCruise();
       }
-
       break;
-
     case State::ProbeBw_Cruise:
       if (checkTimeToProbeBW()) {
         return; /* already decided state transition */
@@ -518,7 +519,8 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
     case State::ProbeBw_Refill:
       /* After one round of REFILL, start UP */
       if (roundStart_) {
-        bwProbeSamples_ = 1;
+        // Enable one reaction to loss per probe bw cycle.
+        bwProbeShouldHandleLoss_ = true;
         startProbeBwUp();
       }
       break;
@@ -551,14 +553,9 @@ void Bbr2CongestionController::adaptUpperBounds(
   }
 
   if (!checkInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
-    /* Loss rate is safe. Adjust upper bounds
-                                    upward. */
-    if (inflightHi_ == std::numeric_limits<uint64_t>::max() ||
-        bandwidthHi_.units == std::numeric_limits<uint64_t>::max()) {
-      return; /* no upper bounds to raise */
-    }
-
-    if (inflightBytesAtLargestAckedPacket > inflightHi_) {
+    /* Loss rate is safe. Adjust upper bounds upward. */
+    if (!inflightHi_.has_value() ||
+        inflightBytesAtLargestAckedPacket > *inflightHi_) {
       inflightHi_ = inflightBytesAtLargestAckedPacket;
     }
     if (bandwidthLatest_ > bandwidthHi_) {
@@ -599,7 +596,7 @@ bool Bbr2CongestionController::checkInflightTooHigh(
     uint64_t inflightBytesAtLargestAckedPacket,
     uint64_t lostBytes) {
   if (isInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
-    if (bwProbeSamples_) {
+    if (bwProbeShouldHandleLoss_) {
       handleInFlightTooHigh(inflightBytesAtLargestAckedPacket);
     }
     return true;
@@ -617,7 +614,7 @@ bool Bbr2CongestionController::isInflightTooHigh(
 
 void Bbr2CongestionController::handleInFlightTooHigh(
     uint64_t inflightBytesAtLargestAckedPacket) {
-  bwProbeSamples_ = 0;
+  bwProbeShouldHandleLoss_ = false;
   // TODO: Should this be the app limited state of the largest acknowledged
   // packet?
   if (!isAppLimited()) {
@@ -636,25 +633,27 @@ uint64_t Bbr2CongestionController::getTargetInflightWithHeadroom() const {
    * headroom in the bottleneck buffer or link for
    * other flows, for fairness convergence and lower
    * RTTs and loss */
-  if (inflightHi_ == std::numeric_limits<uint64_t>::max()) {
-    return inflightHi_;
+  if (!inflightHi_.has_value()) {
+    return std::numeric_limits<uint64_t>::max();
+  } else {
+    auto headroom = static_cast<uint64_t>(
+        std::max(1.0f, kHeadroomFactor * static_cast<float>(*inflightHi_)));
+    return std::max(
+        *inflightHi_ - headroom,
+        quic::kMinCwndInMssForBbr * conn_.udpSendPacketLen);
   }
-  auto headroom = static_cast<uint64_t>(
-      std::max(1.0f, kHeadroomFactor * static_cast<float>(inflightHi_)));
-  return std::max(
-      inflightHi_ - headroom,
-      quic::kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 }
 
 void Bbr2CongestionController::probeInflightHiUpward(uint64_t ackedBytes) {
-  if (!cwndLimitedInRound_ || cwndBytes_ < inflightHi_) {
+  CHECK(inflightHi_.has_value()) << "probing inflight high before it's set";
+  if (!cwndLimitedInRound_ || cwndBytes_ < *inflightHi_) {
     return; /* not fully using inflight_hi, so don't grow it */
   }
   probeUpAcks_ += ackedBytes;
   if (probeUpAcks_ >= probeUpCount_) {
     auto delta = probeUpAcks_ / probeUpCount_;
     probeUpAcks_ -= delta * probeUpCount_;
-    inflightHi_ += delta;
+    addAndCheckOverflow(*inflightHi_, delta);
   }
   if (roundStart_) {
     raiseInflightHiSlope();
