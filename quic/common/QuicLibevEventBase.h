@@ -36,25 +36,46 @@ class QuicEventBaseLoopCallback {
   }
 };
 
+class QuicLibevEventBase;
+
 class QuicAsyncTimeout {
  public:
-  QuicAsyncTimeout() = default;
+  explicit QuicAsyncTimeout(QuicLibevEventBase* evb);
+
+  virtual ~QuicAsyncTimeout();
+
+  void scheduleTimeout(double seconds);
+
+  void cancelTimeout();
+
+  virtual void timeoutExpired() noexcept = 0;
+
+ private:
+  ev_timer timeoutWatcher_;
+
+  QuicLibevEventBase* eventBase_{nullptr};
 };
 
 class QuicTimer {
  public:
   using SharedPtr = std::shared_ptr<QuicTimer>;
   class Callback {
+    std::unique_ptr<QuicAsyncTimeout> asyncTimeout_;
+
    public:
     virtual ~Callback() = default;
+
     virtual void timeoutExpired() noexcept = 0;
+
     virtual void callbackCanceled() noexcept {
       timeoutExpired();
     }
-    bool isScheduled() const {
-      return false;
-    }
-    void cancelTimeout() {}
+
+    bool isScheduled() const;
+
+    void cancelTimeout();
+
+    void setAsyncTimeout(std::unique_ptr<QuicAsyncTimeout> asyncTimeout);
   };
 
   std::chrono::microseconds getTickInterval() const {
@@ -103,8 +124,8 @@ class QuicLibevEventBase {
   void terminateLoopSoon() {}
 
   void scheduleTimeout(
-      QuicTimer::Callback* /* callback */,
-      std::chrono::milliseconds /* timeout */) {}
+      QuicTimer::Callback* callback,
+      std::chrono::milliseconds timeout);
 
   std::chrono::milliseconds getTimerTickInterval() const {
     return std::chrono::milliseconds(0);
