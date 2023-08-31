@@ -41,14 +41,12 @@ QuicAsyncUDPSocketImpl::~QuicAsyncUDPSocketImpl() {
 }
 
 void QuicAsyncUDPSocketImpl::pauseRead() {
-  LOG(INFO) << __func__;
   readCallback_ = nullptr;
 
   updateReadWatcher();
 }
 
 void QuicAsyncUDPSocketImpl::resumeRead(ReadCallback* cb) {
-  LOG(INFO) << __func__;
   CHECK(!readCallback_) << "A read callback is already installed";
   CHECK(fd_ != -1)
       << "Socket must be initialized before a read callback is attached";
@@ -136,7 +134,22 @@ void QuicAsyncUDPSocketImpl::attachEventBase(QuicBackingEventBase* /* evb */) {
 }
 
 void QuicAsyncUDPSocketImpl::close() {
-  LOG(INFO) << __func__;
+  CHECK(eventBase_->isInEventBaseThread());
+
+  if (readCallback_) {
+    auto cob = readCallback_;
+    readCallback_ = nullptr;
+
+    cob->onReadClosed();
+  }
+
+  updateReadWatcher();
+
+  if (fd_ != -1 && ownership_ == FDOwnership::OWNS) {
+    ::close(fd_);
+  }
+
+  fd_ = -1;
 }
 
 void QuicAsyncUDPSocketImpl::detachEventBase() {
@@ -331,7 +344,6 @@ QuicBackingEventBase* QuicAsyncUDPSocketImpl::getEventBase() const {
 }
 
 void QuicAsyncUDPSocketImpl::setFD(NetworkFdType fd, FDOwnership ownership) {
-  LOG(INFO) << __func__;
   fd_ = fd;
   ownership_ = ownership;
 
