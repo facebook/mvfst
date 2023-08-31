@@ -4761,5 +4761,36 @@ TEST_F(QuicTransportFunctionsTest, CustomTransportParamTest) {
   EXPECT_EQ(customTransportParameters.size(), 2);
 }
 
+TEST_F(
+    QuicTransportFunctionsTest,
+    StaticCapOnWritableBytesFromThrottlingSignalProvider) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = 2000;
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+
+  auto mockThrottlingSignalProvider =
+      std::make_shared<MockThrottlingSignalProvider>();
+  ThrottlingSignalProvider::ThrottlingSignal expectedSignal;
+  expectedSignal.state =
+      ThrottlingSignalProvider::ThrottlingSignal::State::Throttled;
+  expectedSignal.maybeBytesToSend = 16000;
+  mockThrottlingSignalProvider->useFakeThrottlingSignal(expectedSignal);
+  conn->throttlingSignalProvider = mockThrottlingSignalProvider;
+
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(10000));
+  EXPECT_EQ(10000, congestionControlWritableBytes(*conn));
+
+  // Since cwnd is larger than available tokens, the writable bytes is capped by
+  // the available tokens
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(20000));
+  EXPECT_EQ(
+      expectedSignal.maybeBytesToSend, congestionControlWritableBytes(*conn));
+}
+
 } // namespace test
 } // namespace quic

@@ -969,6 +969,19 @@ uint64_t congestionControlWritableBytes(QuicConnectionStateBase& conn) {
   if (conn.congestionController) {
     writableBytes = std::min<uint64_t>(
         writableBytes, conn.congestionController->getWritableBytes());
+
+    if (conn.throttlingSignalProvider &&
+        conn.throttlingSignalProvider->getCurrentThrottlingSignal()
+            .has_value()) {
+      const auto& throttlingSignal =
+          conn.throttlingSignalProvider->getCurrentThrottlingSignal();
+      if (throttlingSignal.value().maybeBytesToSend.has_value()) {
+        // Cap the writable bytes by the amount of tokens available in the
+        // throttler's bucket if one found to be throttling the connection.
+        writableBytes = std::min(
+            throttlingSignal.value().maybeBytesToSend.value(), writableBytes);
+      }
+    }
   }
 
   if (writableBytes == std::numeric_limits<uint64_t>::max()) {
