@@ -3427,6 +3427,12 @@ void QuicTransportBase::addPacketProcessor(
   conn_->packetProcessors.push_back(std::move(packetProcessor));
 }
 
+void QuicTransportBase::setThrottlingSignalProvider(
+    std::shared_ptr<ThrottlingSignalProvider> throttlingSignalProvider) {
+  DCHECK(conn_);
+  conn_->throttlingSignalProvider = throttlingSignalProvider;
+}
+
 bool QuicTransportBase::isDetachable() {
   // only the client is detachable.
   return conn_->nodeType == QuicNodeType::Client;

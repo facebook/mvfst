@@ -15,6 +15,7 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
+#include <quic/congestion_control/ThrottlingSignalProvider.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
 #include <quic/observer/SocketObserverTypes.h>
@@ -366,6 +367,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   std::unique_ptr<CongestionController> congestionController;
 
   std::vector<std::shared_ptr<PacketProcessor>> packetProcessors;
+
+  std::shared_ptr<ThrottlingSignalProvider> throttlingSignalProvider;
 
   // Pacer
   std::unique_ptr<Pacer> pacer;

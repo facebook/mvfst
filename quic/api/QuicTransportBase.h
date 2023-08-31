@@ -604,6 +604,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void addPacketProcessor(
       std::shared_ptr<PacketProcessor> packetProcessor) override;
+  void setThrottlingSignalProvider(
+      std::shared_ptr<ThrottlingSignalProvider>) override;
 
   void describe(std::ostream& os) const;
 

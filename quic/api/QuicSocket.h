@@ -1288,6 +1288,12 @@ class QuicSocket {
   virtual void addPacketProcessor(
       std::shared_ptr<PacketProcessor> packetProcessor) = 0;
 
+  /**
+   * Set a throttling signal provider
+   */
+  virtual void setThrottlingSignalProvider(
+      std::shared_ptr<ThrottlingSignalProvider>) = 0;
+
   using Observer = SocketObserverContainer::Observer;
   using ManagedObserver = SocketObserverContainer::ManagedObserver;
 

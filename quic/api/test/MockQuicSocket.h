@@ -311,6 +311,11 @@ class MockQuicSocket : public QuicSocket {
 
   MOCK_METHOD(void, addPacketProcessor, (std::shared_ptr<PacketProcessor>));
 
+  MOCK_METHOD(
+      void,
+      setThrottlingSignalProvider,
+      (std::shared_ptr<ThrottlingSignalProvider>));
+
   ConnectionSetupCallback* setupCb_{nullptr};
   ConnectionCallback* connCb_{nullptr};
 

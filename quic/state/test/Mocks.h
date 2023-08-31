@@ -63,6 +63,22 @@ class MockPacketProcessor : public PacketProcessor {
   MOCK_METHOD(folly::Optional<PrewriteRequest>, prewrite, (), (override));
 };
 
+class MockThrottlingSignalProvider : public ThrottlingSignalProvider {
+ public:
+  ~MockThrottlingSignalProvider() override = default;
+  MOCK_METHOD(
+      folly::Optional<ThrottlingSignalProvider::ThrottlingSignal>,
+      getCurrentThrottlingSignal,
+      (),
+      (override));
+
+  void useFakeThrottlingSignal(
+      ThrottlingSignalProvider::ThrottlingSignal signal) {
+    ON_CALL(*this, getCurrentThrottlingSignal)
+        .WillByDefault(::testing::Return(std::move(signal)));
+  }
+};
+
 class MockPacer : public Pacer {
  public:
   MOCK_METHOD(
