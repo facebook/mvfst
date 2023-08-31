@@ -15,7 +15,45 @@ BbrBandwidthSampler::BbrBandwidthSampler(QuicConnectionStateBase& conn)
       windowedFilter_(bandwidthWindowLength(kNumOfCycles), Bandwidth(), 0) {}
 
 Bandwidth BbrBandwidthSampler::getBandwidth() const noexcept {
-  return windowedFilter_.GetBest();
+  auto bandwidth = windowedFilter_.GetBest();
+
+  // Override the bandwidth value if the connection is being throttled and
+  // throttling signal is present.
+  if (!conn_.throttlingSignalProvider) {
+    return bandwidth;
+  }
+
+  const auto& maybeThrottlingSignal =
+      conn_.throttlingSignalProvider->getCurrentThrottlingSignal();
+  if (!maybeThrottlingSignal.has_value()) {
+    return bandwidth;
+  }
+  if (maybeThrottlingSignal.value().state ==
+          ThrottlingSignalProvider::ThrottlingSignal::State::Unthrottled &&
+      maybeThrottlingSignal.value()
+          .maybeUnthrottledRateBytesPerSecond.has_value()) {
+    return std::max(
+        Bandwidth(
+            maybeThrottlingSignal.value()
+                .maybeUnthrottledRateBytesPerSecond.value(),
+            1s,
+            Bandwidth::UnitType::BYTES),
+        bandwidth);
+  }
+
+  if (maybeThrottlingSignal.value().state ==
+          ThrottlingSignalProvider::ThrottlingSignal::State::Throttled &&
+      maybeThrottlingSignal.value()
+          .maybeThrottledRateBytesPerSecond.has_value()) {
+    return std::min(
+        Bandwidth(
+            maybeThrottlingSignal.value()
+                .maybeThrottledRateBytesPerSecond.value(),
+            1s,
+            Bandwidth::UnitType::BYTES),
+        bandwidth);
+  }
+  return bandwidth;
 }
 
 Bandwidth BbrBandwidthSampler::getLatestSample() const noexcept {

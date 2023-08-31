@@ -8,6 +8,8 @@
 #include <gtest/gtest.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/Bbr.h>
+#include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/SimulatedTBF.h>
 #include <quic/congestion_control/ThrottlingSignalProvider.h>
 #include <quic/state/test/Mocks.h>
@@ -21,8 +23,12 @@ namespace quic::test {
 class SimpleThrottlingSignalProvider : public PacketProcessor,
                                        public ThrottlingSignalProvider {
  public:
-  explicit SimpleThrottlingSignalProvider(SimulatedTBF::Config config)
-      : stbf_(std::move(config)) {}
+  explicit SimpleThrottlingSignalProvider(
+      SimulatedTBF::Config config,
+      folly::Optional<uint64_t> unthrottledRateBytesPerSecond = folly::none)
+      : stbf_(std::move(config)),
+        unthrottledRateBytesPerSecond_(
+            std::move(unthrottledRateBytesPerSecond)) {}
   ~SimpleThrottlingSignalProvider() override = default;
   void onPacketSent(const quic::OutstandingPacketWrapper& packet) override {
     stbf_.consumeWithBorrowNonBlockingAndUpdateState(
@@ -38,11 +44,14 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
     signal.maybeBytesToSend.assign((uint64_t)availTokens);
     signal.maybeThrottledRateBytesPerSecond.assign(
         (uint64_t)stbf_.getRateBytesPerSecond());
+    signal.maybeUnthrottledRateBytesPerSecond.assign(
+        unthrottledRateBytesPerSecond_);
     return signal;
   }
 
  private:
   SimulatedTBF stbf_;
+  folly::Optional<uint64_t> unthrottledRateBytesPerSecond_;
 };
 
 TEST(ThrottlingSignalProviderTest, BasicInitSetGetTest) {
@@ -117,4 +126,59 @@ TEST(ThrottlingSignalProviderTest, TokenBasedDynamicCapOnWritableBytes) {
   }
 }
 
+TEST(
+    ThrottlingSignalProviderTest,
+    OverrideBbrBwWithThrottlingSignalProviderRates) {
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+
+  // enforce an unthrottled rate of 400KBps and throttledRate of 100KBps
+  const uint64_t unthrottledRateBytesPerSecond = 400 * 1000;
+  const uint64_t throttledRateBytesPerSecond = 100 * 1000;
+  auto signalProvider = std::make_shared<SimpleThrottlingSignalProvider>(
+      SimulatedTBF::Config{
+          .rateBytesPerSecond = throttledRateBytesPerSecond,
+          .burstSizeBytes = 500 * 1000,
+          .maybeMaxDebtQueueSizeBytes = 50 * 1000,
+          .trackEmptyIntervals = false},
+      unthrottledRateBytesPerSecond);
+  conn.throttlingSignalProvider = signalProvider;
+  BbrCongestionController bbr(conn);
+  bbr.setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));
+
+  auto now = Clock::now();
+  uint64_t totalBytesSent = 0;
+  // Send 1000 packets, each with 2000 bytes every 10ms = 200KBps, which is
+  // enough to consume the SimTBF burst.
+  for (PacketNum pn = 0; pn < 1000; pn++) {
+    auto packet = makeTestingWritePacket(pn, 2000, totalBytesSent, now);
+    signalProvider->onPacketSent(packet);
+    bbr.onPacketSent(packet);
+    totalBytesSent += 2000;
+    // Ack each sent packet after 5ms
+    bbr.onPacketAckOrLoss(
+        makeAck(
+            pn, 2000, now + std::chrono::milliseconds{5}, packet.metadata.time),
+        folly::none);
+    auto maybeSignal = signalProvider->getCurrentThrottlingSignal();
+    ASSERT_TRUE(maybeSignal.has_value());
+    ASSERT_TRUE(bbr.getBandwidth().has_value());
+    if (maybeSignal.value().state ==
+        ThrottlingSignalProvider::ThrottlingSignal::State::Unthrottled) {
+      // unthrottledRateBytesPerSecond is set to 400KBps during burst, which is
+      // larger than send/ack rate, which is 200KBps.
+      EXPECT_EQ(
+          bbr.getBandwidth().value().normalize(),
+          unthrottledRateBytesPerSecond);
+    } else if (
+        maybeSignal.value().state ==
+        ThrottlingSignalProvider::ThrottlingSignal::State::Throttled) {
+      // throttledRate is set to 100KBps, which is smaller than
+      // send/ack rate, which is 200KBps.
+      EXPECT_EQ(
+          bbr.getBandwidth().value().normalize(), throttledRateBytesPerSecond);
+    }
+
+    now += std::chrono::milliseconds{10};
+  }
+}
 } // namespace quic::test
