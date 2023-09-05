@@ -18,9 +18,8 @@ void libEvTimeoutCallback(
     ev_timer* w,
     int /* revents */) {
   auto asyncTimeout = static_cast<QuicAsyncTimeout*>(w->data);
-  if (asyncTimeout) {
-    asyncTimeout->timeoutExpired();
-  }
+  CHECK(asyncTimeout != nullptr);
+  asyncTimeout->timeoutExpired();
 }
 } // namespace
 
