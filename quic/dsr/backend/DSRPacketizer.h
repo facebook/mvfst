@@ -149,6 +149,7 @@ struct RequestGroup {
   folly::SocketAddress clientAddress;
   const CipherPair* cipherPair{nullptr};
   SmallVec<PacketizationRequest, 64> requests;
+  std::chrono::microseconds writeOffset{0us};
 };
 
 BufQuicBatchResult writePacketsGroup(

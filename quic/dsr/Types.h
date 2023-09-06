@@ -59,6 +59,7 @@ struct SendInstruction {
         clientAddress(other.clientAddress),
         packetNum(other.packetNum),
         largestAckedPacketNum(other.largestAckedPacketNum),
+        writeOffset(other.writeOffset),
         largestAckedStreamOffset(other.largestAckedStreamOffset),
         streamId(other.streamId),
         streamOffset(other.streamOffset),
@@ -72,6 +73,7 @@ struct SendInstruction {
         clientAddress(other.clientAddress),
         packetNum(other.packetNum),
         largestAckedPacketNum(other.largestAckedPacketNum),
+        writeOffset(other.writeOffset),
         largestAckedStreamOffset(other.largestAckedStreamOffset),
         streamId(other.streamId),
         streamOffset(other.streamOffset),
@@ -85,6 +87,7 @@ struct SendInstruction {
   const folly::SocketAddress& clientAddress;
   PacketNum packetNum{0};
   PacketNum largestAckedPacketNum{0};
+  std::chrono::microseconds writeOffset{0us};
 
   // QUIC Stream info
   folly::Optional<uint64_t> largestAckedStreamOffset;
@@ -108,6 +111,7 @@ struct SendInstruction {
           clientAddr,
           packetNum,
           largestAckedPacketNum,
+          writeOffset,
           largestAckedStreamOffset,
           streamId,
           *streamOffset,
@@ -123,6 +127,11 @@ struct SendInstruction {
 
     Builder& setLargestAckedPacketNum(PacketNum val) {
       largestAckedPacketNum = val;
+      return *this;
+    }
+
+    Builder& setWriteOffset(std::chrono::microseconds val) {
+      writeOffset = val;
       return *this;
     }
 
@@ -158,6 +167,7 @@ struct SendInstruction {
     PacketNum packetNum{0};
     PacketNum largestAckedPacketNum{0};
     folly::Optional<uint64_t> largestAckedStreamOffset;
+    std::chrono::microseconds writeOffset{0us};
     StreamId streamId;
     folly::Optional<uint64_t> streamOffset;
     folly::Optional<uint64_t> len;
@@ -172,6 +182,7 @@ struct SendInstruction {
       const folly::SocketAddress& clientAddrIn,
       PacketNum packetNumIn,
       PacketNum largestAckedPacketNumIn,
+      std::chrono::microseconds writeOffsetIn,
       folly::Optional<uint64_t> largestAckedStreamOffsetIn,
       StreamId idIn,
       uint64_t streamOffsetIn,
@@ -183,6 +194,7 @@ struct SendInstruction {
         clientAddress(clientAddrIn),
         packetNum(packetNumIn),
         largestAckedPacketNum(largestAckedPacketNumIn),
+        writeOffset(writeOffsetIn),
         largestAckedStreamOffset(largestAckedStreamOffsetIn),
         streamId(idIn),
         streamOffset(streamOffsetIn),

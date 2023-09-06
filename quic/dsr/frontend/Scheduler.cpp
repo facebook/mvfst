@@ -159,6 +159,8 @@ void DSRStreamFrameScheduler::enrichInstruction(
   if (largestDeliverableOffset) {
     builder.setLargestAckedStreamOffset(*largestDeliverableOffset);
   }
+  // TODO set to actual write delay.
+  builder.setWriteOffset(0us);
 }
 
 } // namespace quic
