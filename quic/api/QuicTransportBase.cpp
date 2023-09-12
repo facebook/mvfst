@@ -2833,6 +2833,13 @@ void QuicTransportBase::setSupportedVersions(
   conn_->supportedVersions = versions;
 }
 
+void QuicTransportBase::setAckRxTimestampsDisabled(
+    bool disableAckRxTimestamps) {
+  if (disableAckRxTimestamps) {
+    conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.clear();
+  }
+}
+
 void QuicTransportBase::setConnectionSetupCallback(
     ConnectionSetupCallback* callback) {
   connSetupCallback_ = callback;

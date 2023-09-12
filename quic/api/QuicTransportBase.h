@@ -238,6 +238,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
 
+  virtual void setAckRxTimestampsDisabled(bool disableAckRxTimestamps);
+
   void setConnectionSetupCallback(ConnectionSetupCallback* callback) final;
 
   void setConnectionCallback(ConnectionCallback* callback) final;
