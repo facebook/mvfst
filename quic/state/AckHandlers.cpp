@@ -663,17 +663,50 @@ void parseAckReceiveTimestamps(
 void commonAckVisitorForAckFrame(
     AckState& ackState,
     const WriteAckFrame& frame) {
-  // Remove ack interval from ackState if an outstandingPacket with a AckFrame
-  // is acked.
-  // We may remove the current largest acked packet here, but keep its receive
-  // time behind. But then right after this updateLargestReceivedPacketNum will
-  // update that time stamp. Please note that this assume the peer isn't buggy
-  // in the sense that packet numbers it issues are only increasing.
+  /**
+   * Purge old timestamps to avoid sending duplicate timestamps in the next ACK.
+   * We use ACKs received for the WriteAck we sent earlier to the peer to enable
+   * this purge.
+   */
+  auto purgeAckReceiveTimestamps = [&](AckState& ackState) {
+    if (ackState.recvdPacketInfos.empty()) {
+      return;
+    }
+    // No ACKs tracked locally, which means all were confirmed to be received.
+    // Clear all the timestamps.
+    if (ackState.acks.empty()) {
+      ackState.recvdPacketInfos.clear();
+      return;
+    }
+
+    for (auto recvdPacketInfoIt = ackState.recvdPacketInfos.begin();
+         recvdPacketInfoIt != ackState.recvdPacketInfos.end();) {
+      if (!ackState.acks.contains(
+              recvdPacketInfoIt->pktNum, recvdPacketInfoIt->pktNum)) {
+        recvdPacketInfoIt = ackState.recvdPacketInfos.erase(recvdPacketInfoIt);
+      } else {
+        ++recvdPacketInfoIt;
+      }
+    }
+  };
+
+  // Remove ack interval from ackState if an outstandingPacket with a
+  // AckFrame is acked. We may remove the current largest acked packet
+  // here, but keep its receive time behind. But then right after this
+  // updateLargestReceivedPacketNum will update that time stamp. Please
+  // note that this assume the peer isn't buggy in the sense that packet
+  // numbers it issues are only increasing.
   auto iter = frame.ackBlocks.crbegin();
   while (iter != frame.ackBlocks.crend()) {
     ackState.acks.withdraw(*iter);
     iter++;
   }
+  // Purge all received timestamps sent in ACKs that have been received by
+  // the peer. We don't want to purge using kAckPurgingThresh as the latest
+  // timestamps may not have been received by the peer yet. Also max
+  // timestamps is limited already by its own config.
+  purgeAckReceiveTimestamps(ackState);
+
   if (!frame.ackBlocks.empty()) {
     auto largestAcked = frame.ackBlocks.front().end;
     if (largestAcked > kAckPurgingThresh) {

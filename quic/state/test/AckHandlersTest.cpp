@@ -1605,6 +1605,112 @@ TEST_P(AckHandlersTest, PurgeAcks) {
       expectedTime, *conn.ackStates.initialAckState->largestRecvdPacketTime);
 }
 
+TEST_P(AckHandlersTest, purgeAckReceiveTimestamps) {
+  // Case 1: No timestamps
+  {
+    QuicServerConnectionState conn(
+        FizzServerQuicHandshakeContext::Builder().build());
+    WriteAckFrame ackFrame;
+    ackFrame.ackBlocks.emplace_back(15, 40);
+    conn.ackStates.initialAckState->acks.insert(15, 40);
+
+    auto expectedTime = Clock::now();
+    conn.ackStates.initialAckState->largestRecvdPacketTime = expectedTime;
+
+    commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
+    EXPECT_EQ(conn.ackStates.initialAckState->acks.size(), 0);
+    EXPECT_EQ(conn.ackStates.initialAckState->recvdPacketInfos.size(), 0);
+  }
+
+  // Case 2: purge all receive timestamps
+  {
+    QuicServerConnectionState conn(
+        FizzServerQuicHandshakeContext::Builder().build());
+    WriteAckFrame ackFrame;
+    ackFrame.ackBlocks.emplace_back(15, 40);
+    conn.ackStates.initialAckState->acks.insert(15, 40);
+
+    auto expectedTime = Clock::now();
+    conn.ackStates.initialAckState->largestRecvdPacketTime = expectedTime;
+    // Fill up the last 25 timestamps ending at PN 40.
+    for (PacketNum pktNum = 15; pktNum <= 40; ++pktNum) {
+      conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
+          RecvdPacketInfo{pktNum, expectedTime});
+    }
+
+    commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
+    EXPECT_EQ(conn.ackStates.initialAckState->acks.size(), 0);
+    EXPECT_EQ(conn.ackStates.initialAckState->recvdPacketInfos.size(), 0);
+  }
+  // Case 3: Purge only some old timestamps in the front.
+  {
+    QuicServerConnectionState conn(
+        FizzServerQuicHandshakeContext::Builder().build());
+    WriteAckFrame ackFrame;
+    // Local ACK state has ACKs for {1, 20}, {25, 40}
+    conn.ackStates.initialAckState->acks.insert(25, 40);
+    conn.ackStates.initialAckState->acks.insert(1, 20);
+    auto expectedTime = Clock::now();
+    conn.ackStates.initialAckState->largestRecvdPacketTime = expectedTime;
+
+    // Local ACK state has timestamps for {15, 40}
+    for (PacketNum pktNum = 15; pktNum <= 40; ++pktNum) {
+      conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
+          RecvdPacketInfo{pktNum, expectedTime});
+    }
+    // ACK frame in the ACKed packet has ACKs for {10, 20}, {25, 35}
+    ackFrame.ackBlocks.emplace_back(10, 20);
+    ackFrame.ackBlocks.emplace_back(25, 35);
+
+    commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
+    // We should have purged old packets in ack state
+    ASSERT_EQ(conn.ackStates.initialAckState->acks.size(), 1);
+    EXPECT_EQ(conn.ackStates.initialAckState->acks.front().start, 36);
+    EXPECT_EQ(conn.ackStates.initialAckState->acks.front().end, 40);
+    // Should have purged all timestamps that are purged in ackState and only
+    // (36,40) remain.
+    ASSERT_EQ(conn.ackStates.initialAckState->recvdPacketInfos.size(), 5);
+    EXPECT_EQ(
+        conn.ackStates.initialAckState->recvdPacketInfos.front().pktNum, 36);
+    EXPECT_EQ(
+        conn.ackStates.initialAckState->recvdPacketInfos.back().pktNum, 40);
+  }
+
+  // Case 4: Purge some timestamps in the middle.
+  {
+    QuicServerConnectionState conn(
+        FizzServerQuicHandshakeContext::Builder().build());
+    WriteAckFrame ackFrame;
+    // Local ACK state has ACKs for {1, 20}, {25, 40}
+    conn.ackStates.initialAckState->acks.insert(25, 40);
+    conn.ackStates.initialAckState->acks.insert(10, 20);
+
+    auto expectedTime = Clock::now();
+    conn.ackStates.initialAckState->largestRecvdPacketTime = expectedTime;
+
+    // Local ACK state has timestamps for {15, 40}
+    for (PacketNum pktNum = 15; pktNum <= 40; ++pktNum) {
+      conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
+          RecvdPacketInfo{pktNum, expectedTime});
+    }
+    // Selectively ACK some packets in the middle - {18, 20}, {25, 35}
+    ackFrame.ackBlocks.emplace_back(25, 35);
+    ackFrame.ackBlocks.emplace_back(18, 20);
+
+    commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
+    // We should have purged old packets in ack state
+    ASSERT_EQ(conn.ackStates.initialAckState->acks.size(), 1);
+    EXPECT_EQ(conn.ackStates.initialAckState->acks.front().start, 36);
+    EXPECT_EQ(conn.ackStates.initialAckState->acks.front().end, 40);
+    // Should have purged some timestamps in the middle of recvdPacketInfos.
+    ASSERT_EQ(conn.ackStates.initialAckState->recvdPacketInfos.size(), 8);
+    EXPECT_EQ(
+        conn.ackStates.initialAckState->recvdPacketInfos.front().pktNum, 15);
+    EXPECT_EQ(
+        conn.ackStates.initialAckState->recvdPacketInfos.back().pktNum, 40);
+  }
+}
+
 TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
