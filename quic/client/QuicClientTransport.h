@@ -105,6 +105,22 @@ class QuicClientTransport
    */
   bool isTLSResumed() const;
 
+  enum class ZeroRttAttemptState : uint8_t {
+    NotAttempted = 0,
+    Accepted,
+    Rejected
+  };
+  /**
+   * Returns the state of the 0RTT attempt if there was one.
+   */
+  ZeroRttAttemptState getZeroRttState() {
+    if (!clientConn_->zeroRttRejected.has_value()) {
+      return ZeroRttAttemptState::NotAttempted;
+    }
+    return *clientConn_->zeroRttRejected ? ZeroRttAttemptState::Rejected
+                                         : ZeroRttAttemptState::Accepted;
+  }
+
   // From QuicTransportBase
   void onReadData(
       const folly::SocketAddress& peer,
