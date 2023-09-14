@@ -134,12 +134,14 @@ QuicLibevEventBase::QuicLibevEventBase(struct ev_loop* loop) : ev_loop_(loop) {
 void QuicLibevEventBase::runInLoop(
     folly::Function<void()> cb,
     bool /* thisIteration */) {
+  CHECK(isInEventBaseThread());
   cb();
 }
 
 void QuicLibevEventBase::runInLoop(
     QuicEventBaseLoopCallback* callback,
     bool /* thisIteration */) {
+  CHECK(isInEventBaseThread());
   callbacks_.push_back(callback);
 }
 
