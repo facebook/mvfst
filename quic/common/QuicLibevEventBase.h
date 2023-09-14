@@ -20,6 +20,7 @@
 #include <ev.h> // @manual
 
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include <quic/common/QuicEventBaseInterface.h>
@@ -104,9 +105,7 @@ class QuicLibevEventBase {
       folly::Function<void()> /* cb */,
       uint32_t /* milliseconds */) {}
   void runInEventBaseThreadAndWait(folly::Function<void()> fn) noexcept;
-  bool isInEventBaseThread() const {
-    return true;
-  }
+  bool isInEventBaseThread() const;
   bool scheduleTimeoutHighRes(
       QuicAsyncTimeout* /* obj */,
       std::chrono::microseconds /* timeout */) {
@@ -146,6 +145,8 @@ class QuicLibevEventBase {
   std::vector<QuicEventBaseLoopCallback*> callbacks_;
 
   ev_check checkWatcher_;
+
+  std::atomic<std::thread::id> loopThreadId_;
 };
 
 } // namespace quic

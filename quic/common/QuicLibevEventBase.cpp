@@ -125,6 +125,7 @@ std::chrono::milliseconds QuicEventBase::getTimerTickInterval() const {
 }
 
 QuicLibevEventBase::QuicLibevEventBase(struct ev_loop* loop) : ev_loop_(loop) {
+  loopThreadId_.store(std::this_thread::get_id(), std::memory_order_release);
   ev_check_init(&checkWatcher_, libEvCheckCallback);
   checkWatcher_.data = this;
   ev_check_start(ev_loop_, &checkWatcher_);
@@ -191,6 +192,11 @@ void QuicLibevEventBase::checkCallbacks() {
   for (auto cb : callbacks) {
     cb->runLoopCallback();
   }
+}
+
+bool QuicLibevEventBase::isInEventBaseThread() const {
+  auto tid = loopThreadId_.load(std::memory_order_relaxed);
+  return tid == std::this_thread::get_id();
 }
 
 QuicLibevEventBase::~QuicLibevEventBase() {
