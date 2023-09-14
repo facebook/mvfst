@@ -21,6 +21,15 @@ void libEvTimeoutCallback(
   CHECK(asyncTimeout != nullptr);
   asyncTimeout->timeoutExpired();
 }
+
+void libEvCheckCallback(
+    struct ev_loop* /* loop */,
+    ev_check* w,
+    int /* revents */) {
+  auto self = static_cast<QuicLibevEventBase*>(w->data);
+  CHECK(self != nullptr);
+  self->checkCallbacks();
+}
 } // namespace
 
 QuicAsyncTimeout::QuicAsyncTimeout(QuicLibevEventBase* evb) {
@@ -115,7 +124,11 @@ std::chrono::milliseconds QuicEventBase::getTimerTickInterval() const {
   return backingEvb_->getTimerTickInterval();
 }
 
-QuicLibevEventBase::QuicLibevEventBase(struct ev_loop* loop) : ev_loop_(loop) {}
+QuicLibevEventBase::QuicLibevEventBase(struct ev_loop* loop) : ev_loop_(loop) {
+  ev_check_init(&checkWatcher_, libEvCheckCallback);
+  checkWatcher_.data = this;
+  ev_check_start(ev_loop_, &checkWatcher_);
+}
 
 void QuicLibevEventBase::runInLoop(
     folly::Function<void()> cb,
@@ -126,7 +139,7 @@ void QuicLibevEventBase::runInLoop(
 void QuicLibevEventBase::runInLoop(
     QuicEventBaseLoopCallback* callback,
     bool /* thisIteration */) {
-  callback->runLoopCallback();
+  callbacks_.push_back(callback);
 }
 
 void QuicLibevEventBase::runInEventBaseThreadAndWait(
@@ -170,6 +183,18 @@ void QuicLibevEventBase::scheduleTimeout(
   auto evTimer = std::make_unique<EvTimer>(this, callback);
   evTimer->scheduleTimeout(timeout.count() / 10000.);
   callback->setAsyncTimeout(std::move(evTimer));
+}
+
+void QuicLibevEventBase::checkCallbacks() {
+  std::vector<QuicEventBaseLoopCallback*> callbacks;
+  std::swap(callbacks, callbacks_);
+  for (auto cb : callbacks) {
+    cb->runLoopCallback();
+  }
+}
+
+QuicLibevEventBase::~QuicLibevEventBase() {
+  ev_check_stop(ev_loop_, &checkWatcher_);
 }
 } // namespace quic
 

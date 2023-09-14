@@ -20,6 +20,7 @@
 #include <ev.h> // @manual
 
 #include <memory>
+#include <vector>
 
 #include <quic/common/QuicEventBaseInterface.h>
 #include <functional>
@@ -135,8 +136,16 @@ class QuicLibevEventBase {
     return ev_loop_;
   }
 
+  ~QuicLibevEventBase();
+
+  void checkCallbacks();
+
  private:
   struct ev_loop* ev_loop_{EV_DEFAULT};
+
+  std::vector<QuicEventBaseLoopCallback*> callbacks_;
+
+  ev_check checkWatcher_;
 };
 
 } // namespace quic
