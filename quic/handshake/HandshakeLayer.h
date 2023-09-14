@@ -44,4 +44,6 @@ constexpr folly::StringPiece kServerInitialLabel = "server in";
  */
 EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type);
 
+folly::StringPiece getQuicVersionSalt(QuicVersion version);
+
 } // namespace quic
