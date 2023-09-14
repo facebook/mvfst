@@ -62,11 +62,6 @@ class FizzAead final : public Aead {
     return fizzAead->getCipherOverhead();
   }
 
-  // For testing.
-  const fizz::Aead* getFizzAead() const {
-    return fizzAead.get();
-  }
-
  private:
   std::unique_ptr<fizz::Aead> fizzAead;
   explicit FizzAead(std::unique_ptr<fizz::Aead> fizzAeadIn)
