@@ -70,6 +70,7 @@ void Bbr2CongestionController::onPacketSent(
   if (conn_.lossState.inflightBytes == 0 && isAppLimited()) {
     idleRestart_ = true;
     extraAckedStartTimestamp_ = Clock::now();
+    extraAckedDelivered_ = 0;
 
     if (isProbeBwState(state_)) {
       setPacing();
