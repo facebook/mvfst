@@ -23,6 +23,8 @@ add_library(
   TokenlessPacer.cpp
 )
 
+set_property(TARGET mvfst_cc_algo PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_cc_algo PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

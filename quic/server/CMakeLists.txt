@@ -11,6 +11,8 @@ add_library(
   handshake/TokenGenerator.cpp
   state/ServerStateMachine.cpp)
 
+set_property(TARGET mvfst_server_state PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_server_state PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -55,6 +57,8 @@ add_library(
   ../fizz/server/handshake/FizzServerHandshake.cpp
 )
 
+set_property(TARGET mvfst_server PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_server PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -92,6 +96,8 @@ add_library(
   async_tran/QuicAsyncTransportServer.cpp
   async_tran/QuicServerAsyncTransport.cpp
   )
+
+set_property(TARGET mvfst_server_async_tran PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_server_async_tran PUBLIC

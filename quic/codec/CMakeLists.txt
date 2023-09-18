@@ -12,6 +12,8 @@ add_library(
   Types.cpp
 )
 
+set_property(TARGET mvfst_codec_types PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_codec_types PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -45,6 +47,8 @@ add_library(
   Decode.cpp
 )
 
+set_property(TARGET mvfst_codec_decode PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_codec_decode PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -74,6 +78,8 @@ add_library(
   mvfst_codec_packet_number_cipher
   PacketNumberCipher.cpp
 )
+
+set_property(TARGET mvfst_codec_packet_number_cipher PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_codec_packet_number_cipher PUBLIC
@@ -105,6 +111,8 @@ add_library(
   QuicPacketBuilder.cpp
 )
 
+set_property(TARGET mvfst_codec_pktbuilder PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_codec_pktbuilder PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -134,6 +142,8 @@ add_library(
   mvfst_codec_pktrebuilder
   QuicPacketRebuilder.cpp
 )
+
+set_property(TARGET mvfst_codec_pktrebuilder PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_codec_pktrebuilder PUBLIC
@@ -174,6 +184,8 @@ add_library(
   QuicReadCodec.cpp
   QuicWriteCodec.cpp
 )
+
+set_property(TARGET mvfst_codec PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_codec PUBLIC

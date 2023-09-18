@@ -15,6 +15,8 @@ add_library(
   CryptoTestUtil.cpp
 )
 
+set_property(TARGET mvfst_test_utils PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_test_utils PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>

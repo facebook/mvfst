@@ -7,6 +7,8 @@ add_library(
   mvfst_dsr_sender INTERFACE
 )
 
+set_property(TARGET mvfst_dsr_sender PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_dsr_sender INTERFACE
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -17,6 +19,8 @@ add_library(
   mvfst_dsr_types
   Types.cpp
 )
+
+set_property(TARGET mvfst_dsr_types PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_dsr_types PUBLIC
@@ -47,6 +51,8 @@ add_library(
   frontend/WriteCodec.cpp
   frontend/WriteFunctions.cpp)
 
+set_property(TARGET mvfst_dsr_frontend PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_dsr_frontend PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -75,6 +81,8 @@ target_compile_options(
 add_library(
   mvfst_dsr_backend
   backend/DSRPacketizer.cpp)
+
+set_property(TARGET mvfst_dsr_backend PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_dsr_backend PUBLIC

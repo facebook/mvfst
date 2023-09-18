@@ -12,6 +12,8 @@ add_library(
   QuicFizzFactory.cpp
 )
 
+set_property(TARGET mvfst_fizz_handshake PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_fizz_handshake PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

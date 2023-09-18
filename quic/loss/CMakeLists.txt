@@ -8,6 +8,8 @@ add_library(
   QuicLossFunctions.cpp
 )
 
+set_property(TARGET mvfst_loss PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_loss PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

@@ -8,6 +8,8 @@ add_library(
   BufAccessor.cpp
 )
 
+set_property(TARGET mvfst_buf_accessor PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_buf_accessor PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -31,6 +33,8 @@ add_library(
   Timers.cpp
 )
 
+set_property(TARGET mvfst_looper PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_looper PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -52,6 +56,8 @@ add_library(
   mvfst_bufutil
   BufUtil.cpp
 )
+
+set_property(TARGET mvfst_bufutil PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_bufutil PUBLIC
@@ -75,6 +81,8 @@ add_library(
   QuicEventBase.cpp
 )
 
+set_property(TARGET mvfst_events PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_events PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -96,6 +104,8 @@ add_library(
   mvfst_socketutil
   SocketUtil.cpp
 )
+
+set_property(TARGET mvfst_socketutil PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_socketutil PUBLIC
@@ -119,6 +129,8 @@ add_library(
   TransportKnobs.cpp
 )
 
+set_property(TARGET mvfst_transport_knobs PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_transport_knobs PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -141,6 +153,8 @@ add_library(
   mvfst_async_udp_socket_wrapper
   QuicAsyncUDPSocketWrapper.cpp
 )
+
+set_property(TARGET mvfst_async_udp_socket_wrapper PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_async_udp_socket_wrapper PUBLIC

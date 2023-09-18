@@ -9,6 +9,8 @@ add_library(
   handshake/FizzClientHandshake.cpp
 )
 
+set_property(TARGET mvfst_fizz_client PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_fizz_client PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

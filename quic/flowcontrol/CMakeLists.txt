@@ -8,6 +8,8 @@ add_library(
   QuicFlowController.cpp
 )
 
+set_property(TARGET mvfst_flowcontrol PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_flowcontrol PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

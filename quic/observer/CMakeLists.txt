@@ -8,6 +8,8 @@ add_library(
   SocketObserverInterface.cpp
 )
 
+set_property(TARGET mvfst_observer PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_observer PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

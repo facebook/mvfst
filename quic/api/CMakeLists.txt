@@ -11,6 +11,8 @@ add_library(
   QuicGsoBatchWriters.cpp
 )
 
+set_property(TARGET mvfst_batch_writer PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_batch_writer PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -48,6 +50,8 @@ add_library(
   QuicTransportBase.cpp
   QuicTransportFunctions.cpp
 )
+
+set_property(TARGET mvfst_transport PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_transport PUBLIC

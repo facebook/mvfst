@@ -8,6 +8,8 @@ add_library(
   QuicHappyEyeballsFunctions.cpp
 )
 
+set_property(TARGET mvfst_happyeyeballs PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_happyeyeballs PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

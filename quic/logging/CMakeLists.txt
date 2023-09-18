@@ -12,6 +12,8 @@ add_library(
   QLoggerTypes.cpp
 )
 
+set_property(TARGET mvfst_qlogger PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_qlogger PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

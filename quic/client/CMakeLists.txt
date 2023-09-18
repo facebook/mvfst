@@ -12,6 +12,8 @@ add_library(
   connector/QuicConnector.cpp
 )
 
+set_property(TARGET mvfst_client PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_client PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>

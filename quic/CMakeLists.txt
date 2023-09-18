@@ -8,6 +8,8 @@ add_library(
   QuicConstants.cpp
 )
 
+set_property(TARGET mvfst_constants PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_constants PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -40,6 +42,8 @@ add_library(
   mvfst_exception
   QuicException.cpp
 )
+
+set_property(TARGET mvfst_exception PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_exception PUBLIC

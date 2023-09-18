@@ -14,6 +14,8 @@ add_library(
   QuicPriorityQueue.cpp
 )
 
+set_property(TARGET mvfst_state_machine PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_state_machine PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -55,6 +57,8 @@ add_library(
   AckHandlers.cpp
 )
 
+set_property(TARGET mvfst_state_ack_handler PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_state_ack_handler PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -91,6 +95,8 @@ add_library(
   DatagramHandlers.cpp
 )
 
+set_property(TARGET mvfst_state_datagram_handler PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_state_datagram_handler PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -124,6 +130,8 @@ add_library(
   mvfst_state_stream_functions
   QuicStreamFunctions.cpp
 )
+
+set_property(TARGET mvfst_state_stream_functions PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_state_stream_functions PUBLIC
@@ -161,6 +169,8 @@ add_library(
   QuicStateFunctions.cpp
 )
 
+set_property(TARGET mvfst_state_functions PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_state_functions PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -196,6 +206,8 @@ add_library(
   QuicPacingFunctions.cpp
 )
 
+set_property(TARGET mvfst_state_pacing_functions PROPERTY VERSION ${PACKAGE_VERSION})
+
 target_include_directories(
   mvfst_state_pacing_functions PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -225,6 +237,8 @@ add_library(
   mvfst_state_simple_frame_functions
   SimpleFrameFunctions.cpp
 )
+
+set_property(TARGET mvfst_state_simple_frame_functions PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_state_simple_frame_functions PUBLIC
@@ -259,6 +273,8 @@ add_library(
   stream/StreamSendHandlers.cpp
   stream/StreamReceiveHandlers.cpp
 )
+
+set_property(TARGET mvfst_state_stream PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_state_stream PUBLIC
@@ -296,6 +312,8 @@ add_library(
   mvfst_transport_settings_functions
   TransportSettingsFunctions.cpp
 )
+
+set_property(TARGET mvfst_transport_settings_functions PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
   mvfst_transport_settings_functions PUBLIC
