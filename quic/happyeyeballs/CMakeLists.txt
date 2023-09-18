@@ -47,5 +47,5 @@ endforeach()
 install(
   TARGETS mvfst_happyeyeballs
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

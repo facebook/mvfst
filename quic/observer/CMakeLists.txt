@@ -53,5 +53,5 @@ endforeach()
 install(
   TARGETS mvfst_observer
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

@@ -57,7 +57,7 @@ endforeach()
 install(
   TARGETS mvfst_loss
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 add_subdirectory(test)

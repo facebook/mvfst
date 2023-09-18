@@ -66,7 +66,7 @@ endforeach()
 install(
   TARGETS mvfst_cc_algo
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 add_subdirectory(test)

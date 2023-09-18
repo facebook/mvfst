@@ -50,7 +50,7 @@ endforeach()
 install(
   TARGETS mvfst_qlogger
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 add_subdirectory(test)

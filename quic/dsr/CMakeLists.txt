@@ -121,13 +121,13 @@ install(
 install(
   TARGETS mvfst_dsr_types
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 install(
   TARGETS mvfst_dsr_frontend
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 add_subdirectory(test)

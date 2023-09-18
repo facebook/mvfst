@@ -33,7 +33,7 @@ install(FILES QuicConstants.h DESTINATION include/quic/)
 install(
   TARGETS mvfst_constants
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 add_library(
@@ -65,7 +65,7 @@ install(FILES QuicException.h DESTINATION include/quic/)
 install(
   TARGETS mvfst_exception
   EXPORT mvfst-exports
-  DESTINATION lib
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 add_subdirectory(api)
 add_subdirectory(client)
