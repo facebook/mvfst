@@ -19,6 +19,9 @@ set(CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/build/fbcode_builder/CMake"
   ${CMAKE_MODULE_PATH})
 
+set(CMAKE_INSTALL_MODULE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/mvfst CACHE STRING
+    "The subdirectory where CMake module files should be installed")
+
 include(FBBuildOptions)
 fb_activate_static_library_option()
 
@@ -105,16 +108,16 @@ install(
   EXPORT mvfst-exports
   FILE mvfst-targets.cmake
   NAMESPACE mvfst::
-  DESTINATION lib/cmake/mvfst/
+  DESTINATION ${CMAKE_INSTALL_MODULE_DIR}
 )
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
   cmake/mvfst-config.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/mvfst-config.cmake
-  INSTALL_DESTINATION lib/cmake/mvfst/
+  INSTALL_DESTINATION ${CMAKE_INSTALL_MODULE_DIR}
 )
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/mvfst-config.cmake
-  DESTINATION lib/cmake/mvfst/
+  DESTINATION ${CMAKE_INSTALL_MODULE_DIR}
 )
