@@ -23,6 +23,9 @@ set(CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/build/fbcode_builder/CMake"
   ${CMAKE_MODULE_PATH})
 
+if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
+  set(CMAKE_INSTALL_LIBDIR "lib")
+endif()
 set(CMAKE_INSTALL_MODULE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/mvfst CACHE STRING
     "The subdirectory where CMake module files should be installed")
 
