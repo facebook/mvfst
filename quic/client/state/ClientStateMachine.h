@@ -9,6 +9,7 @@
 
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
+#include <quic/common/NetworkData.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>

@@ -11,6 +11,7 @@
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/common/FunctionLooper.h>
+#include <quic/common/NetworkData.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/QuicEventBase.h>
 #include <quic/common/Timers.h>

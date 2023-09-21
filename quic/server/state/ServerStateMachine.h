@@ -13,6 +13,7 @@
 
 #include <quic/QuicException.h>
 #include <quic/codec/Types.h>
+#include <quic/common/NetworkData.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
