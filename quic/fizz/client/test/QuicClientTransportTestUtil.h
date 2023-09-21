@@ -904,7 +904,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       destructionCallback;
   std::unique_ptr<folly::EventBase> eventbase_;
   folly::SocketAddress serverAddr{"127.0.0.1", 443};
-  QuicAsyncUDPSocketWrapper::ReadCallback* networkReadCallback{nullptr};
+  QuicAsyncUDPSocketType::ReadCallback* networkReadCallback{nullptr};
   FakeOneRttHandshakeLayer* mockClientHandshake;
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzClientContext;
   std::shared_ptr<TestingQuicClientTransport> client;

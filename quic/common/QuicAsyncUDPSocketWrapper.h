@@ -28,8 +28,23 @@ class QuicAsyncUDPSocketWrapper : public QuicAsyncUDPSocketType {
  public:
   using QuicAsyncUDPSocketType::QuicAsyncUDPSocketType;
   ~QuicAsyncUDPSocketWrapper() override = default;
-  using ReadCallback = QuicAsyncUDPSocketType::ReadCallback;
+
+  class ReadCallback : public QuicAsyncUDPSocketType::ReadCallback {
+   public:
+    ~ReadCallback() override = default;
+
+    virtual void onNotifyDataAvailable(
+        QuicAsyncUDPSocketWrapper& /* sock */) noexcept {}
+
+   private:
+    void onNotifyDataAvailable(QuicAsyncUDPSocketType& sock) noexcept final {
+      onNotifyDataAvailable(static_cast<QuicAsyncUDPSocketWrapper&>(sock));
+    }
+  };
+
   using ErrMessageCallback = QuicAsyncUDPSocketType::ErrMessageCallback;
+
+ private:
 };
 
 class QuicAsyncUDPSocketWrapperImpl : public QuicAsyncUDPSocketWrapper {

@@ -5776,7 +5776,7 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
 }
 
 TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
-  class EmptyReadCallback : public AsyncUDPSocket::ReadCallback {
+  class EmptyReadCallback : public QuicAsyncUDPSocketWrapper::ReadCallback {
    public:
     void getReadBuffer(void**, size_t*) noexcept override {}
     void onDataAvailable(

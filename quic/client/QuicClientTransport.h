@@ -218,7 +218,7 @@ class QuicClientTransport
       bool truncated,
       OnDataAvailableParams params) noexcept override;
   bool shouldOnlyNotify() override;
-  void onNotifyDataAvailable(QuicAsyncUDPSocketType& sock) noexcept override;
+  void onNotifyDataAvailable(QuicAsyncUDPSocketWrapper& sock) noexcept override;
 
   void recvMsg(
       QuicAsyncUDPSocketType& sock,
