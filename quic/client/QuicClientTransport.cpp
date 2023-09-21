@@ -1126,13 +1126,10 @@ void QuicClientTransport::onReadError(
   }
 }
 
-void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
-  DCHECK(conn_) << "trying to receive packets without a connection";
-  auto readBufferSize =
-      conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
-  readBuffer_ = folly::IOBuf::createCombined(readBufferSize);
-  *buf = readBuffer_->writableData();
-  *len = readBufferSize;
+void QuicClientTransport::getReadBuffer(
+    void** /* buf */,
+    size_t* /* len */) noexcept {
+  folly::terminate_with<std::runtime_error>("getReadBuffer unsupported");
 }
 
 void QuicClientTransport::onDataAvailable(
