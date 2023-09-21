@@ -1888,7 +1888,7 @@ void QuicTransportBase::onNetworkData(
             SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
                 Builder()
                     .setPacketReceiveTime(networkData.receiveTimePoint)
-                    .setPacketNumBytes(packet->computeChainDataLength())
+                    .setPacketNumBytes(packet.buf->computeChainDataLength())
                     .build());
       }
 
@@ -1904,7 +1904,8 @@ void QuicTransportBase::onNetworkData(
     for (auto& packet : networkData.packets) {
       onReadData(
           peer,
-          NetworkDataSingle(std::move(packet), networkData.receiveTimePoint));
+          NetworkDataSingle(
+              std::move(packet.buf), networkData.receiveTimePoint));
       if (conn_->peerConnectionError) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));

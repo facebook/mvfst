@@ -885,7 +885,7 @@ void QuicServerWorker::dispatchPacketData(
 
   // If there is a token present, decrypt it (could be either a retry
   // token or a new token)
-  folly::io::Cursor cursor(networkData.packets.front().get());
+  folly::io::Cursor cursor(networkData.packets.front().buf.get());
   auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
   bool hasTokenSecret = transportSettings_.retryTokenSecret.hasValue();
 

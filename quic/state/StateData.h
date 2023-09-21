@@ -43,9 +43,17 @@
 #include <queue>
 
 namespace quic {
+
+struct ReceivedPacket {
+  explicit ReceivedPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
+
+  // data
+  Buf buf;
+};
+
 struct NetworkData {
   TimePoint receiveTimePoint;
-  std::vector<Buf> packets;
+  std::vector<ReceivedPacket> packets;
   size_t totalData{0};
 
   NetworkData() = default;
@@ -59,20 +67,29 @@ struct NetworkData {
 
   NetworkData(std::vector<Buf>&& packetBufs, const TimePoint& receiveTime)
       : receiveTimePoint(receiveTime),
-        packets(std::move(packetBufs)),
-        totalData(0) {
-    for (const auto& buf : packets) {
-      totalData += buf->computeChainDataLength();
-    }
-  }
+        packets([&packetBufs]() {
+          std::vector<ReceivedPacket> result;
+          result.reserve(packetBufs.size());
+          for (auto& packetBuf : packetBufs) {
+            result.emplace_back(std::move(packetBuf));
+          }
+          return result;
+        }()),
+        totalData([this]() {
+          size_t result = 0;
+          for (const auto& packet : packets) {
+            result += packet.buf->computeChainDataLength();
+          }
+          return result;
+        }()) {}
 
   std::unique_ptr<folly::IOBuf> moveAllData() && {
     std::unique_ptr<folly::IOBuf> buf;
-    for (size_t i = 0; i < packets.size(); ++i) {
+    for (auto& packet : packets) {
       if (buf) {
-        buf->prependChain(std::move(packets[i]));
+        buf->prependChain(std::move(packet.buf));
       } else {
-        buf = std::move(packets[i]);
+        buf = std::move(packet.buf);
       }
     }
     return buf;
