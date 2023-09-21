@@ -1246,7 +1246,7 @@ void QuicClientTransport::recvMsg(
     QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams params;
     struct msghdr msg {};
     msg.msg_name = rawAddr;
-    msg.msg_namelen = kAddrLen;
+    msg.msg_namelen = rawAddr ? kAddrLen : 0;
     msg.msg_iov = &vec;
     msg.msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
