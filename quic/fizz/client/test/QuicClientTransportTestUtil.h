@@ -144,13 +144,6 @@ class TestingQuicClientTransport : public QuicClientTransport {
     destructionCallback_ = std::move(destructionCallback);
   }
 
-  void invokeOnDataAvailable(
-      const folly::SocketAddress& addr,
-      size_t len,
-      bool truncated) {
-    onDataAvailable(addr, len, truncated, OnDataAvailableParams());
-  }
-
   void invokeOnNotifyDataAvailable(QuicAsyncUDPSocketType& sock) {
     onNotifyDataAvailable(sock);
   }

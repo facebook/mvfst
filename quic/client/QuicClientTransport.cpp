@@ -1136,87 +1136,15 @@ void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
 }
 
 void QuicClientTransport::onDataAvailable(
-    const folly::SocketAddress& server,
-    size_t len,
-    bool truncated,
-    OnDataAvailableParams params) noexcept {
-  VLOG(10) << "Got data from socket peer=" << server << " len=" << len;
-  auto packetReceiveTime = Clock::now();
-  Buf data = std::move(readBuffer_);
-
-  if (params.gro <= 0) {
-    if (truncated) {
-      // This is an error, drop the packet.
-      QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::UDP_TRUNCATED);
-      if (conn_->qLogger) {
-        conn_->qLogger->addPacketDrop(len, kUdpTruncated);
-      }
-      if (conn_->loopDetectorCallback) {
-        conn_->readDebugState.noReadReason = NoReadReason::TRUNCATED;
-        conn_->loopDetectorCallback->onSuspiciousReadLoops(
-            ++conn_->readDebugState.loopCount,
-            conn_->readDebugState.noReadReason);
-      }
-      return;
-    }
-    data->append(len);
-    trackDatagramReceived(len);
-    NetworkData networkData(std::move(data), packetReceiveTime);
-    onNetworkData(server, std::move(networkData));
-  } else {
-    // if we receive a truncated packet
-    // we still need to consider the prev valid ones
-    // AsyncUDPSocket::handleRead() sets the len to be the
-    // buffer size in case the data is truncated
-    if (truncated) {
-      auto delta = len % params.gro;
-      len -= delta;
-
-      QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::UDP_TRUNCATED);
-      if (conn_->qLogger) {
-        conn_->qLogger->addPacketDrop(delta, kUdpTruncated);
-      }
-    }
-
-    data->append(len);
-    trackDatagramReceived(len);
-
-    NetworkData networkData;
-    networkData.receiveTimePoint = packetReceiveTime;
-    networkData.packets.reserve((len + params.gro - 1) / params.gro);
-    size_t remaining = len;
-    size_t offset = 0;
-    while (remaining) {
-      if (static_cast<int>(remaining) > params.gro) {
-        auto tmp = data->cloneOne();
-        // start at offset
-        tmp->trimStart(offset);
-        // the actual len is len - offset now
-        // leave params.gro bytes
-        tmp->trimEnd(len - offset - params.gro);
-        DCHECK_EQ(tmp->length(), params.gro);
-
-        offset += params.gro;
-        remaining -= params.gro;
-        networkData.packets.emplace_back(std::move(tmp));
-      } else {
-        // do not clone the last packet
-        // start at offset, use all the remaining data
-        data->trimStart(offset);
-        DCHECK_EQ(data->length(), remaining);
-        remaining = 0;
-        networkData.packets.emplace_back(std::move(data));
-      }
-    }
-
-    onNetworkData(server, std::move(networkData));
-  }
+    const folly::SocketAddress& /* server */,
+    size_t /* len */,
+    bool /* truncated */,
+    OnDataAvailableParams /* params */) noexcept {
+  folly::terminate_with<std::runtime_error>("onDataAvailable unsupported");
 }
 
 bool QuicClientTransport::shouldOnlyNotify() {
-  return conn_->transportSettings.shouldRecvBatch;
+  return true;
 }
 
 void QuicClientTransport::recvMsg(
