@@ -37,7 +37,7 @@ namespace quic {
 
 QuicClientTransport::QuicClientTransport(
     QuicBackingEventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketType> socket,
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     PacketNum startingPacketNum,
@@ -53,7 +53,7 @@ QuicClientTransport::QuicClientTransport(
 
 QuicClientTransport::QuicClientTransport(
     QuicBackingEventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketType> socket,
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     bool useConnectionEndWithErrorCallback)
@@ -1213,7 +1213,7 @@ void QuicClientTransport::recvMsg(
     }
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO) {
-      QuicAsyncUDPSocketType::fromMsg(params, msg);
+      QuicAsyncUDPSocketWrapper::fromMsg(params, msg);
 
       // truncated
       if ((size_t)ret > readBufferSize) {
@@ -1357,7 +1357,7 @@ void QuicClientTransport::recvMmsg(
     QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO || useTS) {
-      QuicAsyncUDPSocketType::fromMsg(params, msg.msg_hdr);
+      QuicAsyncUDPSocketWrapper::fromMsg(params, msg.msg_hdr);
 
       // truncated
       if (bytesRead > readBufferSize) {
@@ -1565,7 +1565,7 @@ void QuicClientTransport::setHappyEyeballsCachedFamily(
 }
 
 void QuicClientTransport::addNewSocket(
-    std::unique_ptr<QuicAsyncUDPSocketType> socket) {
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket) {
   happyEyeballsAddSocket(*clientConn_, std::move(socket));
 }
 
@@ -1657,7 +1657,7 @@ void QuicClientTransport::setSupportedVersions(
 }
 
 void QuicClientTransport::onNetworkSwitch(
-    std::unique_ptr<QuicAsyncUDPSocketType> newSock) {
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> newSock) {
   if (!conn_->oneRttWriteCipher) {
     return;
   }

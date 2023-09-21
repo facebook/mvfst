@@ -10,7 +10,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
@@ -18,6 +17,7 @@
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/TransportKnobs.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/QuicServerTransport.h>
@@ -31,7 +31,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
  public:
   TestingQuicServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> sock,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
@@ -54,7 +54,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
     return *dynamic_cast<QuicServerConnectionState*>(conn_.get());
   }
 
-  QuicAsyncUDPSocketType& getSocket() {
+  QuicAsyncUDPSocketWrapper& getSocket() {
     return *socket_;
   }
 
@@ -134,7 +134,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     // set server chosen connId with processId = 0 and workerId = 1
     ServerConnectionIdParams params(0, 0, 1);
     auto sock =
-        std::make_unique<testing::NiceMock<folly::test::MockAsyncUDPSocket>>(
+        std::make_unique<testing::NiceMock<quic::test::MockAsyncUDPSocket>>(
             &evb);
     socket = sock.get();
     EXPECT_CALL(*sock, write(testing::_, testing::_))
@@ -598,7 +598,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   std::shared_ptr<CongestionControllerFactory> ccFactory_;
   std::shared_ptr<TestingQuicServerTransport> server;
-  folly::test::MockAsyncUDPSocket* socket;
+  quic::test::MockAsyncUDPSocket* socket;
   FakeServerHandshake* fakeHandshake{nullptr};
   std::shared_ptr<FizzServerQuicHandshakeContext> fizzServerContext;
   PacketNum clientNextInitialPacketNum{0}, clientNextHandshakePacketNum{0},

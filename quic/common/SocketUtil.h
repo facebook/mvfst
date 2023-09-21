@@ -16,7 +16,7 @@ namespace quic {
 bool isNetworkUnreachable(int err);
 
 void applySocketOptions(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     const folly::SocketOptionMap& options,
     sa_family_t family,
     folly::SocketOptionKey::ApplyPos pos) noexcept;

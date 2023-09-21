@@ -32,7 +32,7 @@ class QuicConnectorTest : public Test {
     auto verifier = createTestCertificateVerifier();
     auto clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     auto pskCache = std::make_shared<BasicQuicPskCache>();
-    auto sock = std::make_unique<QuicAsyncUDPSocketType>(&eventBase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&eventBase_);
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)

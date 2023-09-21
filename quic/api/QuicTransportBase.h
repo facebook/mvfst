@@ -38,7 +38,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
       QuicBackingEventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       bool useConnectionEndWithErrorCallback = false);
 
   ~QuicTransportBase() override;
@@ -854,7 +854,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   std::atomic<QuicEventBase*> qEvbPtr_;
-  std::unique_ptr<QuicAsyncUDPSocketType> socket_;
+  std::unique_ptr<QuicAsyncUDPSocketWrapper> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
   ConnectionCallback* connCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.

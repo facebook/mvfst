@@ -206,7 +206,7 @@ class MockQuicTransport : public QuicServerTransport {
 
   MockQuicTransport(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> sock,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)

@@ -97,11 +97,11 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
       if (evb && evb->getBackingEventBase() && !socket_) {
         auto fd = writer->getAndResetFd();
         if (fd >= 0) {
-          socket_ = std::make_unique<quic::QuicAsyncUDPSocketType>(
+          socket_ = std::make_unique<quic::QuicAsyncUDPSocketWrapper>(
               evb->getBackingEventBase());
           socket_->setFD(
               quic::toNetworkFdType(fd),
-              quic::QuicAsyncUDPSocketType::FDOwnership::OWNS);
+              quic::QuicAsyncUDPSocketWrapper::FDOwnership::OWNS);
         }
         attachTimeoutManager(evb->getBackingEventBase());
       }
@@ -128,7 +128,7 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
       quic::QuicBatchingMode::BATCHING_MODE_NONE};
   // this is just an  std::unique_ptr
   std::unique_ptr<quic::BatchWriter> batchWriter_;
-  std::unique_ptr<quic::QuicAsyncUDPSocketType> socket_;
+  std::unique_ptr<quic::QuicAsyncUDPSocketWrapper> socket_;
 };
 #endif
 } // namespace

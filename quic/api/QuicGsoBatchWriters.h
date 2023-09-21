@@ -23,9 +23,9 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      QuicAsyncUDPSocketType* /*unused*/) override;
+      QuicAsyncUDPSocketWrapper* /*unused*/) override;
   ssize_t write(
-      QuicAsyncUDPSocketType& sock,
+      QuicAsyncUDPSocketWrapper& sock,
       const folly::SocketAddress& address) override;
   void setTxTime(std::chrono::microseconds txTime) override {
     txTime_ = txTime;
@@ -55,9 +55,9 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& addr,
-      QuicAsyncUDPSocketType* sock) override;
+      QuicAsyncUDPSocketWrapper* sock) override;
   ssize_t write(
-      QuicAsyncUDPSocketType& sock,
+      QuicAsyncUDPSocketWrapper& sock,
       const folly::SocketAddress& address) override;
   bool empty() const override;
   size_t size() const override;
@@ -98,9 +98,9 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& address,
-      QuicAsyncUDPSocketType* sock) override;
+      QuicAsyncUDPSocketWrapper* sock) override;
   ssize_t write(
-      QuicAsyncUDPSocketType& sock,
+      QuicAsyncUDPSocketWrapper& sock,
       const folly::SocketAddress& address) override;
 
  private:

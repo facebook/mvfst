@@ -10,7 +10,6 @@
 
 #include <folly/Random.h>
 #include <folly/io/Cursor.h>
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
@@ -19,6 +18,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/Timers.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/dsr/Types.h>
 #include <quic/dsr/test/Mocks.h>

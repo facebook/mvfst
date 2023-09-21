@@ -52,7 +52,7 @@ class QuicStreamAsyncTransportTest : public Test {
     EXPECT_CALL(*serverTransportFactory, _make(_, _, _, _))
         .WillOnce(Invoke(
             [&](folly::EventBase* evb,
-                std::unique_ptr<QuicAsyncUDPSocketType>& socket,
+                std::unique_ptr<QuicAsyncUDPSocketWrapper>& socket,
                 const folly::SocketAddress& /*addr*/,
                 std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
               auto transport = quic::QuicServerTransport::make(
@@ -156,7 +156,7 @@ class QuicStreamAsyncTransportTest : public Test {
         .WillOnce(Invoke([&p = promise]() mutable { p.setValue(); }));
 
     clientEvb_.runInLoop([&]() {
-      auto sock = std::make_unique<QuicAsyncUDPSocketType>(&clientEvb_);
+      auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&clientEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())

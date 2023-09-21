@@ -89,7 +89,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     folly::SocketAddress secondPeerAddress;
 
     // The UDP socket that will be used for the second connection attempt
-    std::unique_ptr<QuicAsyncUDPSocketType> secondSocket;
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> secondSocket;
 
     // Whether should write to the first UDP socket
     bool shouldWriteToFirstSocket{true};

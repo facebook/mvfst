@@ -30,7 +30,7 @@ class QuicClientTransport
  public:
   QuicClientTransport(
       QuicBackingEventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = 0,
       bool useConnectionEndWithErrorCallback = false);
@@ -38,7 +38,7 @@ class QuicClientTransport
   // Testing only API:
   QuicClientTransport(
       QuicBackingEventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize,
       PacketNum startingPacketNum,
@@ -59,7 +59,7 @@ class QuicClientTransport
   template <class TransportType = QuicClientTransport>
   static std::shared_ptr<TransportType> newClient(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> sock,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = 0,
       bool useConnectionEndWithErrorCallback = false) {
@@ -89,7 +89,7 @@ class QuicClientTransport
    * optional. If not called, INADDR_ANY will be used.
    */
   void setLocalAddress(folly::SocketAddress localAddress);
-  void addNewSocket(std::unique_ptr<QuicAsyncUDPSocketType> socket);
+  void addNewSocket(std::unique_ptr<QuicAsyncUDPSocketWrapper> socket);
   void setHappyEyeballsEnabled(bool happyEyeballsEnabled);
   virtual void setHappyEyeballsCachedFamily(sa_family_t cachedFamily);
 
@@ -156,7 +156,7 @@ class QuicClientTransport
   void setSelfOwning();
 
   void onNetworkSwitch(
-      std::unique_ptr<QuicAsyncUDPSocketType> newSock) override;
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> newSock) override;
 
   /**
    * Set callback for various transport stats (such as packet received, dropped

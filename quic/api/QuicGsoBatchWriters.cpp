@@ -38,7 +38,7 @@ bool GSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& /*unused*/,
-    QuicAsyncUDPSocketType* /*unused*/) {
+    QuicAsyncUDPSocketWrapper* /*unused*/) {
   // first buffer
   if (!buf_) {
     DCHECK_EQ(currBufs_, 0);
@@ -70,7 +70,7 @@ bool GSOPacketBatchWriter::append(
 }
 
 ssize_t GSOPacketBatchWriter::write(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     const folly::SocketAddress& address) {
   // Even though it's called writeGSO, it can handle individual writes by
   // setting gsoVal = 0.
@@ -105,7 +105,7 @@ bool GSOInplacePacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& /*buf*/,
     size_t size,
     const folly::SocketAddress& /* addr */,
-    QuicAsyncUDPSocketType* /* sock */) {
+    QuicAsyncUDPSocketWrapper* /* sock */) {
   CHECK(!needsFlush(size));
   ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   auto& buf = scopedBufAccessor.buf();
@@ -133,7 +133,7 @@ bool GSOInplacePacketBatchWriter::append(
  * conn_.bufAccessor.
  */
 ssize_t GSOInplacePacketBatchWriter::write(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     const folly::SocketAddress& address) {
   ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   CHECK(lastPacketEnd_);
@@ -236,7 +236,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& addr,
-    QuicAsyncUDPSocketType* sock) {
+    QuicAsyncUDPSocketWrapper* sock) {
   setSock(sock);
   currSize_ += size;
 
@@ -280,7 +280,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
 }
 
 ssize_t SendmmsgGSOPacketBatchWriter::write(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     const folly::SocketAddress& /*unused*/) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {

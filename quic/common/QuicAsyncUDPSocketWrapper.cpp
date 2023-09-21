@@ -10,14 +10,14 @@
 namespace quic {
 
 #ifdef MVFST_USE_LIBEV
-int getSocketFd(const QuicAsyncUDPSocketType& /* s */) {
+int getSocketFd(const QuicAsyncUDPSocketWrapper& /* s */) {
   return -1;
 }
 NetworkFdType toNetworkFdType(int fd) {
   return fd;
 }
 #else
-int getSocketFd(const QuicAsyncUDPSocketType& s) {
+int getSocketFd(const QuicAsyncUDPSocketWrapper& s) {
   return s.getNetworkSocket().toFd();
 }
 NetworkFdType toNetworkFdType(int fd) {

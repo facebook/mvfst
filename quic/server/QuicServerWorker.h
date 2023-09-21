@@ -189,7 +189,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
   /**
    * Sets the listening socket
    */
-  void setSocket(std::unique_ptr<QuicAsyncUDPSocketType> socket);
+  void setSocket(std::unique_ptr<QuicAsyncUDPSocketWrapper> socket);
 
   /**
    * Sets the socket options
@@ -203,8 +203,8 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
    */
   void bind(
       const folly::SocketAddress& address,
-      QuicAsyncUDPSocketType::BindOptions bindOptions =
-          QuicAsyncUDPSocketType::BindOptions());
+      QuicAsyncUDPSocketWrapper::BindOptions bindOptions =
+          QuicAsyncUDPSocketWrapper::BindOptions());
 
   /**
    * start reading data from the socket
@@ -238,7 +238,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
    * by other server
    */
   void allowBeingTakenOver(
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       const folly::SocketAddress& address);
 
   /**
@@ -246,7 +246,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
    * Returns const ref to SocketAddress representing the address it is bound to.
    */
   const folly::SocketAddress& overrideTakeoverHandlerAddress(
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       const folly::SocketAddress& address);
 
   /**
@@ -523,7 +523,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
    * This socket is powered by the same underlying eventbase
    * for this QuicServerWorker
    */
-  std::unique_ptr<QuicAsyncUDPSocketType> makeSocket(
+  std::unique_ptr<QuicAsyncUDPSocketWrapper> makeSocket(
       folly::EventBase* evb) const;
 
   /**
@@ -531,7 +531,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
    * This socket is powered by the same underlying eventbase
    * for this QuicServerWorker
    */
-  std::unique_ptr<QuicAsyncUDPSocketType> makeSocket(
+  std::unique_ptr<QuicAsyncUDPSocketWrapper> makeSocket(
       folly::EventBase* evb,
       int fd) const;
 
@@ -610,7 +610,7 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
       const ConnectionId& dstConnId,
       const folly::SocketAddress& client);
 
-  std::unique_ptr<QuicAsyncUDPSocketType> socket_;
+  std::unique_ptr<QuicAsyncUDPSocketWrapper> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
   SetEventCallback setEventCallback_{SetEventCallback::NONE};

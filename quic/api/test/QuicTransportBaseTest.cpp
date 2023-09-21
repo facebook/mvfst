@@ -23,7 +23,7 @@
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
 
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 
 using namespace testing;
 using namespace folly;
@@ -227,7 +227,7 @@ class TestQuicTransport
  public:
   TestQuicTransport(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
       : QuicTransportBase(evb, std::move(socket)),
@@ -570,7 +570,7 @@ class QuicTransportImplTest : public Test {
   void SetUp() override {
     backingEvb = std::make_unique<folly::EventBase>();
     evb = std::make_unique<QuicEventBase>(backingEvb.get());
-    auto socket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+    auto socket = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(
         backingEvb.get());
     socketPtr = socket.get();
     transport = std::make_shared<TestQuicTransport>(
@@ -611,7 +611,7 @@ class QuicTransportImplTest : public Test {
   NiceMock<MockConnectionCallback> connCallback;
   TestByteEventCallback byteEventCallback;
   std::shared_ptr<TestQuicTransport> transport;
-  folly::test::MockAsyncUDPSocket* socketPtr;
+  quic::test::MockAsyncUDPSocket* socketPtr;
 };
 
 class QuicTransportImplTestClose : public QuicTransportImplTest,

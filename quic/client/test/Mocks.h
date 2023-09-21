@@ -92,7 +92,7 @@ class MockQuicClientTransport : public quic::QuicClientTransport {
   explicit MockQuicClientTransport(
       TestType testType,
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory)
       : QuicClientTransport(
             evb,

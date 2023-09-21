@@ -38,7 +38,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
   // wrapper for mocked make since gmock doesn't support methods with rvalue ref
   QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       const folly::SocketAddress& addr,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
@@ -50,7 +50,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       (QuicServerTransport::Ptr),
       _make,
       (folly::EventBase*,
-       std::unique_ptr<QuicAsyncUDPSocketType>&,
+       std::unique_ptr<QuicAsyncUDPSocketWrapper>&,
        const folly::SocketAddress&,
        std::shared_ptr<const fizz::server::FizzServerContext>),
       (noexcept));
@@ -100,11 +100,11 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
 class MockQuicUDPSocketFactory : public QuicUDPSocketFactory {
  public:
   ~MockQuicUDPSocketFactory() = default;
-  std::unique_ptr<QuicAsyncUDPSocketType> make(folly::EventBase* evb, int fd)
+  std::unique_ptr<QuicAsyncUDPSocketWrapper> make(folly::EventBase* evb, int fd)
       override {
-    return std::unique_ptr<QuicAsyncUDPSocketType>(_make(evb, fd));
+    return std::unique_ptr<QuicAsyncUDPSocketWrapper>(_make(evb, fd));
   }
-  MOCK_METHOD(QuicAsyncUDPSocketType*, _make, (folly::EventBase*, int));
+  MOCK_METHOD(QuicAsyncUDPSocketWrapper*, _make, (folly::EventBase*, int));
 };
 
 class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
@@ -148,7 +148,7 @@ class MockQuicServerTransport : public QuicServerTransport {
  public:
   MockQuicServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket)
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket)
       : QuicServerTransport(evb, std::move(socket), nullptr, nullptr, nullptr) {
   }
   MOCK_CONST_METHOD0(getOneRttCipherInfo, CipherInfo());

@@ -7,16 +7,12 @@
 
 #pragma once
 
+#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
-namespace quic {
+namespace quic::test {
 
-class QuicUDPSocketFactory {
- public:
-  virtual ~QuicUDPSocketFactory() {}
+using MockAsyncUDPSocket =
+    folly::test::MockAsyncUDPSocketT<quic::QuicAsyncUDPSocketWrapper>;
 
-  virtual std::unique_ptr<QuicAsyncUDPSocketWrapper> make(
-      folly::EventBase* evb,
-      int fd) = 0;
-};
-} // namespace quic
+} // namespace quic::test

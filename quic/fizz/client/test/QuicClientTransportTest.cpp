@@ -89,7 +89,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<TestingQuicClientTransport> createClient() {
     pskCache_ = std::make_shared<BasicQuicPskCache>();
 
-    auto sock = std::make_unique<QuicAsyncUDPSocketType>(&eventbase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&eventbase_);
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)
@@ -1092,7 +1092,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   folly::SocketAddress v4Address("0.0.0.0", 0);
   client->addNewPeerAddress(v4Address);
 
-  auto newSocket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+  auto newSocket = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(
       eventbase_.get());
   auto newSocketPtr = newSocket.get();
   EXPECT_CALL(*sock, pauseRead());
@@ -1108,7 +1108,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
-  auto newSocket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+  auto newSocket = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(
       eventbase_.get());
   auto newSocketPtr = newSocket.get();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
@@ -1343,7 +1343,7 @@ class QuicClientTransportHappyEyeballsTest
  public:
   void SetUpChild() override {
     auto secondSocket =
-        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+        std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(
             eventbase_.get());
     secondSock = secondSocket.get();
 
@@ -2025,7 +2025,7 @@ class QuicClientTransportHappyEyeballsTest
   }
 
  protected:
-  folly::test::MockAsyncUDPSocket* secondSock;
+  quic::test::MockAsyncUDPSocket* secondSock;
   SocketAddress serverAddrV4{"127.0.0.1", 443};
   SocketAddress serverAddrV6{"::1", 443};
 };
@@ -5280,7 +5280,7 @@ class QuicZeroRttHappyEyeballsClientTransportTest
     client->setHostname(hostname_);
 
     auto secondSocket =
-        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+        std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(
             eventbase_.get());
     secondSock = secondSocket.get();
 
@@ -5304,7 +5304,7 @@ class QuicZeroRttHappyEyeballsClientTransportTest
   }
 
  protected:
-  folly::test::MockAsyncUDPSocket* secondSock;
+  quic::test::MockAsyncUDPSocket* secondSock;
   SocketAddress firstAddress{"::1", 443};
   SocketAddress secondAddress{"127.0.0.1", 443};
 };
@@ -5795,7 +5795,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   };
 
   EventBase evb;
-  AsyncUDPSocket socket(&evb);
+  QuicAsyncUDPSocketWrapper socket(&evb);
   TransportSettings transportSettings;
   EmptyErrMessageCallback errMessageCallback;
   EmptyReadCallback readCallback;

@@ -31,7 +31,7 @@ void happyEyeballsAddPeerAddress(
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
-    std::unique_ptr<QuicAsyncUDPSocketType> socket);
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket);
 
 void startHappyEyeballs(
     QuicClientConnectionState& connection,
@@ -44,7 +44,7 @@ void startHappyEyeballs(
     const folly::SocketOptionMap& options);
 
 void happyEyeballsSetUpSocket(
-    QuicAsyncUDPSocketType& socket,
+    QuicAsyncUDPSocketWrapper& socket,
     folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
@@ -58,6 +58,6 @@ void happyEyeballsStartSecondSocket(
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     QuicTimerCallback& connAttemptDelayTimeout,
-    std::unique_ptr<QuicAsyncUDPSocketType>& socket,
+    std::unique_ptr<QuicAsyncUDPSocketWrapper>& socket,
     const folly::SocketAddress& peerAddress);
 } // namespace quic

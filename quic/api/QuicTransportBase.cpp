@@ -29,7 +29,7 @@ namespace quic {
 
 QuicTransportBase::QuicTransportBase(
     QuicBackingEventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketType> socket,
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
     bool useConnectionEndWithErrorCallback)
     : socket_(std::move(socket)),
       useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),

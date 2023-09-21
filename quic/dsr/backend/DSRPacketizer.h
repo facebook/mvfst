@@ -153,7 +153,7 @@ struct RequestGroup {
 };
 
 BufQuicBatchResult writePacketsGroup(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider);
 

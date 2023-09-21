@@ -57,7 +57,7 @@ void happyEyeballsAddPeerAddress(
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
-    std::unique_ptr<QuicAsyncUDPSocketType> socket) {
+    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket) {
   connection.happyEyeballsState.secondSocket = std::move(socket);
 }
 
@@ -122,7 +122,7 @@ void startHappyEyeballs(
 }
 
 void happyEyeballsSetUpSocket(
-    QuicAsyncUDPSocketType& socket,
+    QuicAsyncUDPSocketWrapper& socket,
     folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
@@ -188,7 +188,7 @@ void happyEyeballsStartSecondSocket(
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     QuicTimerCallback& connAttemptDelayTimeout,
-    std::unique_ptr<QuicAsyncUDPSocketType>& socket,
+    std::unique_ptr<QuicAsyncUDPSocketWrapper>& socket,
     const folly::SocketAddress& peerAddress) {
   if (connection.happyEyeballsState.finished) {
     return;

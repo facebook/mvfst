@@ -8,8 +8,8 @@
 #include <quic/api/QuicBatchWriter.h>
 #include <quic/api/QuicBatchWriterFactory.h>
 
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <gtest/gtest.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 
@@ -63,7 +63,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingNone) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketType sock(&evb);
+  QuicAsyncUDPSocketWrapper sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -93,7 +93,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketType sock(&evb);
+  QuicAsyncUDPSocketWrapper sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -135,7 +135,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketType sock(&evb);
+  QuicAsyncUDPSocketWrapper sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -172,7 +172,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketType sock(&evb);
+  QuicAsyncUDPSocketWrapper sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -255,7 +255,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsg) {
 TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketType sock(&evb);
+  QuicAsyncUDPSocketWrapper sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -301,7 +301,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
 TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketType sock(&evb);
+  QuicAsyncUDPSocketWrapper sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -443,7 +443,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
 TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::test::MockAsyncUDPSocket sock(&evb);
+  quic::test::MockAsyncUDPSocket sock(&evb);
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -492,7 +492,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
 TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::test::MockAsyncUDPSocket sock(&evb);
+  quic::test::MockAsyncUDPSocket sock(&evb);
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -533,7 +533,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
 TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::test::MockAsyncUDPSocket sock(&evb);
+  quic::test::MockAsyncUDPSocket sock(&evb);
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -579,7 +579,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
 TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::test::MockAsyncUDPSocket sock(&evb);
+  quic::test::MockAsyncUDPSocket sock(&evb);
   gsoSupported_ = true;
 
   uint32_t batchSize = 20;
@@ -764,7 +764,7 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestWrite) {
   EXPECT_FALSE(batchWriter->empty());
 
   folly::EventBase evb;
-  folly::test::MockAsyncUDPSocket sock(&evb);
+  quic::test::MockAsyncUDPSocket sock(&evb);
   EXPECT_CALL(sock, write(_, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,

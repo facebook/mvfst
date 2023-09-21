@@ -24,13 +24,15 @@ using QuicAsyncUDPSocketType = folly::AsyncUDPSocket;
 using NetworkFdType = folly::NetworkSocket;
 #endif
 
-int getSocketFd(const QuicAsyncUDPSocketType& s);
-NetworkFdType toNetworkFdType(int fd);
-
-class QuicAsyncUDPSocketWrapper {
+class QuicAsyncUDPSocketWrapper : public QuicAsyncUDPSocketType {
  public:
+  using QuicAsyncUDPSocketType::QuicAsyncUDPSocketType;
+  ~QuicAsyncUDPSocketWrapper() override = default;
   using ReadCallback = QuicAsyncUDPSocketType::ReadCallback;
   using ErrMessageCallback = QuicAsyncUDPSocketType::ErrMessageCallback;
 };
+
+int getSocketFd(const QuicAsyncUDPSocketWrapper& s);
+NetworkFdType toNetworkFdType(int fd);
 
 } // namespace quic

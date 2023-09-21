@@ -474,7 +474,8 @@ class QuicSocket {
    * @param socket The new socket that should be used by the transport.
    * If this is null then do not replace the underlying socket.
    */
-  virtual void onNetworkSwitch(std::unique_ptr<QuicAsyncUDPSocketType>) {}
+  virtual void onNetworkSwitch(
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> /*unused*/) {}
 
   /**
    * Get the flow control settings for the given stream (or connection flow

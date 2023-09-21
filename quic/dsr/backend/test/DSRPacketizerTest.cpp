@@ -5,9 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/dsr/backend/DSRPacketizer.h>
 #include <quic/dsr/backend/test/TestUtils.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
@@ -57,7 +57,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
   auto testBatchWriter = new test::TestPacketBatchWriter(16);
   auto batchWriter = BatchWriterPtr(testBatchWriter);
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       false /* threadLocal */,
@@ -102,7 +102,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
 TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
   auto batchWriter = BatchWriterPtr(new test::TestPacketBatchWriter(16));
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       false /* threadLocal */,
@@ -172,7 +172,7 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 
   std::vector<Buf> sentData;
-  auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   EXPECT_CALL(*sock, writeGSO(conn_.peerAddress, _, _))
       .WillRepeatedly(Invoke([&](const folly::SocketAddress&,
                                  const std::unique_ptr<folly::IOBuf>& buf,

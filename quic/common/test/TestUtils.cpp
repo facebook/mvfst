@@ -33,7 +33,7 @@ const RegularQuicWritePacket& writeQuicPacket(
     QuicServerConnectionState& conn,
     ConnectionId srcConnId,
     ConnectionId dstConnId,
-    folly::test::MockAsyncUDPSocket& sock,
+    quic::test::MockAsyncUDPSocket& sock,
     QuicStreamState& stream,
     const folly::IOBuf& data,
     bool eof) {
@@ -58,7 +58,7 @@ const RegularQuicWritePacket& writeQuicPacket(
 
 PacketNum rstStreamAndSendPacket(
     QuicServerConnectionState& conn,
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     QuicStreamState& stream,
     ApplicationErrorCode errorCode) {
   auto aead = createNoOpAead();
@@ -770,14 +770,14 @@ bool TestPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& /*unused*/,
     size_t size,
     const folly::SocketAddress& /*unused*/,
-    QuicAsyncUDPSocketType* /*unused*/) {
+    QuicAsyncUDPSocketWrapper* /*unused*/) {
   bufNum_++;
   bufSize_ += size;
   return ((maxBufs_ < 0) || (bufNum_ >= maxBufs_));
 }
 
 ssize_t TestPacketBatchWriter::write(
-    QuicAsyncUDPSocketType& /*unused*/,
+    QuicAsyncUDPSocketWrapper& /*unused*/,
     const folly::SocketAddress& /*unused*/) {
   return bufSize_;
 }

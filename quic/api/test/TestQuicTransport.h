@@ -22,7 +22,7 @@ class TestQuicTransport
  public:
   TestQuicTransport(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
       : QuicTransportBase(evb, std::move(socket)),

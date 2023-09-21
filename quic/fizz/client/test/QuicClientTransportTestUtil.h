@@ -11,7 +11,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/api/QuicTransportBase.h>
 
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
@@ -19,6 +18,7 @@
 #include <quic/common/QuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/state/test/MockQuicStats.h>
@@ -46,7 +46,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
 
   TestingQuicClientTransport(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketType> socket,
+      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connIdSize = kDefaultConnectionIdSize,
       bool useConnectionEndWithErrorCallback = false)
@@ -144,7 +144,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
     destructionCallback_ = std::move(destructionCallback);
   }
 
-  void invokeOnNotifyDataAvailable(QuicAsyncUDPSocketType& sock) {
+  void invokeOnNotifyDataAvailable(QuicAsyncUDPSocketWrapper& sock) {
     onNotifyDataAvailable(sock);
   }
 
@@ -398,7 +398,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   void SetUp() {
     auto socket =
-        std::make_unique<testing::NiceMock<folly::test::MockAsyncUDPSocket>>(
+        std::make_unique<testing::NiceMock<quic::test::MockAsyncUDPSocket>>(
             eventbase_.get());
     sock = socket.get();
 
@@ -899,7 +899,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   testing::NiceMock<MockReadCallback> readCb;
   testing::NiceMock<MockConnectionSetupCallback> clientConnSetupCallback;
   testing::NiceMock<MockConnectionCallback> clientConnCallback;
-  folly::test::MockAsyncUDPSocket* sock;
+  quic::test::MockAsyncUDPSocket* sock;
   std::shared_ptr<TestingQuicClientTransport::DestructionCallback>
       destructionCallback;
   std::unique_ptr<folly::EventBase> eventbase_;

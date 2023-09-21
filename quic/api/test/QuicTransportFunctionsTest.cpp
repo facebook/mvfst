@@ -7,9 +7,9 @@
 
 #include <quic/api/QuicTransportFunctions.h>
 
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -28,7 +28,7 @@ namespace test {
 using PacketStreamDetails = OutstandingPacketMetadata::StreamDetails;
 
 uint64_t writeProbingDataToSocketForTest(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     QuicConnectionStateBase& conn,
     uint8_t probesToSend,
     const Aead& aead,
@@ -59,7 +59,7 @@ uint64_t writeProbingDataToSocketForTest(
 }
 
 void writeCryptoDataProbesToSocketForTest(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     QuicConnectionStateBase& conn,
     uint8_t probesToSend,
     const Aead& aead,
@@ -2622,7 +2622,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -2662,7 +2662,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicdataToSocketWithPacer) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -2693,7 +2693,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   // ~50 bytes
@@ -2802,7 +2802,7 @@ TEST_F(
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -2847,7 +2847,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithNoBytesForHeader) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -2872,7 +2872,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithNoBytesForHeader) {
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketRetxBufferSorted) {
   EventBase evb;
-  NiceMock<folly::test::MockAsyncUDPSocket> socket(&evb);
+  NiceMock<quic::test::MockAsyncUDPSocket> socket(&evb);
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("Whatsapp");
@@ -2911,7 +2911,7 @@ TEST_F(QuicTransportFunctionsTest, NothingWritten) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   // 18 isn't enough to write 3 ack blocks, but is enough to write a pure
@@ -2955,7 +2955,7 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   auto conn = createConn();
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(200);
@@ -3024,7 +3024,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingNewData) {
   conn->congestionController = std::move(mockCongestionController);
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(conn->udpSendPacketLen * 2);
@@ -3056,7 +3056,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   conn->congestionController.reset();
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(100));
   auto capturingAead = std::make_unique<MockAead>();
@@ -3104,7 +3104,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
   conn->peerMinAckDelay = 1ms;
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(100));
   auto capturingAead = std::make_unique<MockAead>();
@@ -3171,7 +3171,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   conn.congestionController = std::move(mockCongestionController);
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto cryptoStream = &conn.cryptoState->initialStream;
   auto buf = buildRandomInputData(conn.udpSendPacketLen * 2);
@@ -3214,7 +3214,7 @@ TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
   conn.congestionController = std::move(mockCongestionController);
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto cryptoStream = &conn.cryptoState->initialStream;
   uint8_t probesToSend = 4;
@@ -3251,7 +3251,7 @@ TEST_F(QuicTransportFunctionsTest, ProbingNotFallbackToPingWhenNoQuota) {
   conn->congestionController = std::move(mockCongestionController);
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
   EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
@@ -3271,7 +3271,7 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
   auto conn = createConn();
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawSocket, write(_, _))
       .Times(1)
@@ -3298,7 +3298,7 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToImmediateAck) {
   conn->peerMinAckDelay = 1ms;
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawSocket, write(_, _))
       .Times(1)
@@ -3328,7 +3328,7 @@ TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {
   writeDataToQuicStream(*cryptoStream, buf->clone());
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto res = writeCryptoAndAckDataToSocket(
       *rawSocket,
@@ -3356,7 +3356,7 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
   writeDataToQuicStream(*cryptoStream, buf->clone());
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
   auto res = writeCryptoAndAckDataToSocket(
       *rawSocket,
@@ -3401,7 +3401,7 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
   auto conn = createConn();
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 2;
@@ -3458,7 +3458,7 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -3507,7 +3507,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   // Pure acks without an oneRttCipher
@@ -4043,7 +4043,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -4102,7 +4102,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
 
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -4172,7 +4172,7 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
   conn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   EventBase evb;
   auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto initialStream =
       getCryptoStream(*conn->cryptoState, EncryptionLevel::Initial);
   auto handshakeStream =
@@ -4237,7 +4237,7 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
   auto conn = createConn();
   conn->udpSendPacketLen = 1200;
   EventBase evb;
-  auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = sock.get();
 
   EXPECT_CALL(*rawSocket, write(_, _))
@@ -4286,7 +4286,7 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFramesAckFreq) {
   conn->udpSendPacketLen = 1200;
   conn->peerMinAckDelay = 1ms;
   EventBase evb;
-  auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = sock.get();
 
   EXPECT_CALL(*rawSocket, write(_, _))
@@ -4346,7 +4346,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
   conn->bufAccessor = simpleBufAccessor.get();
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
-  folly::test::MockAsyncUDPSocket mockSock(&evb);
+  quic::test::MockAsyncUDPSocket mockSock(&evb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Andante in C minor");
@@ -4387,7 +4387,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderRollbackBuf) {
   conn->bufAccessor = simpleBufAccessor.get();
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
-  folly::test::MockAsyncUDPSocket mockSock(&evb);
+  quic::test::MockAsyncUDPSocket mockSock(&evb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
   EXPECT_CALL(mockSock, write(_, _)).Times(0);
   writeQuicDataToSocket(
@@ -4414,7 +4414,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
   conn->bufAccessor = simpleBufAccessor.get();
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
-  folly::test::MockAsyncUDPSocket mockSock(&evb);
+  quic::test::MockAsyncUDPSocket mockSock(&evb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(conn->udpSendPacketLen * 10);
@@ -4449,7 +4449,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
-  folly::test::MockAsyncUDPSocket mockSock(&evb);
+  quic::test::MockAsyncUDPSocket mockSock(&evb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
 
   SimpleBufAccessor bufAccessor(

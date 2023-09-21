@@ -24,7 +24,7 @@
 
 #include <fizz/client/FizzClientContext.h>
 #include <fizz/server/FizzServerContext.h>
-#include <folly/io/async/test/MockAsyncUDPSocket.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 
 #include <folly/ssl/Init.h>
 #include <quic/codec/QuicConnectionId.h>
@@ -52,7 +52,7 @@ const RegularQuicWritePacket& writeQuicPacket(
     QuicServerConnectionState& conn,
     ConnectionId srcConnId,
     ConnectionId dstConnId,
-    folly::test::MockAsyncUDPSocket& sock,
+    quic::test::MockAsyncUDPSocket& sock,
     QuicStreamState& stream,
     const folly::IOBuf& data,
     bool eof = false);
@@ -67,7 +67,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
 
 PacketNum rstStreamAndSendPacket(
     QuicServerConnectionState& conn,
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocketWrapper& sock,
     QuicStreamState& stream,
     ApplicationErrorCode errorCode);
 
@@ -365,10 +365,10 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& /*unused*/,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      QuicAsyncUDPSocketType* /*unused*/) override;
+      QuicAsyncUDPSocketWrapper* /*unused*/) override;
 
   ssize_t write(
-      QuicAsyncUDPSocketType& /*unused*/,
+      QuicAsyncUDPSocketWrapper& /*unused*/,
       const folly::SocketAddress& /*unused*/) override;
 
   size_t getBufSize() const {
