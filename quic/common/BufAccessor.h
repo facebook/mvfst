@@ -7,9 +7,9 @@
 
 #pragma once
 #include <folly/io/IOBuf.h>
+#include <quic/QuicConstants.h>
 
 namespace quic {
-using Buf = std::unique_ptr<folly::IOBuf>;
 
 class BufAccessor {
  public:

@@ -8,10 +8,12 @@
 #pragma once
 
 #include <folly/chrono/Clock.h>
+#include <folly/io/IOBuf.h>
 #include <quic/common/third-party/enum.h>
 #include <sys/types.h>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <string_view>
@@ -33,6 +35,7 @@ using SystemClock = folly::chrono::SystemClock;
 
 namespace quic {
 
+using Buf = std::unique_ptr<folly::IOBuf>;
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 using DurationRep = std::chrono::microseconds::rep;
