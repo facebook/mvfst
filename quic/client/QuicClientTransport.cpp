@@ -1427,10 +1427,55 @@ void QuicClientTransport::onNotifyDataAvailable(
   size_t totalData = 0;
   folly::Optional<folly::SocketAddress> server;
 
-  if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
+  if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
+    const auto result = sock.recvMmsg(
+        readBufferSize, numPackets, networkData, server, totalData);
+
+    // track the received packets
+    for (const auto& packet : networkData.packets) {
+      if (!packet.buf) {
+        continue;
+      }
+      trackDatagramReceived(packet.buf->computeChainDataLength());
+    }
+
+    // Propagate errors
+    // TODO(bschlinker): Investigate generalization of loopDetectorCallback
+    // TODO(bschlinker): Consider merging this into ReadCallback
+    if (result.maybeNoReadReason) {
+      const auto& noReadReason = result.maybeNoReadReason.value();
+      switch (noReadReason) {
+        case NoReadReason::RETRIABLE_ERROR:
+          if (conn_->loopDetectorCallback) {
+            conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+          }
+          break;
+        case NoReadReason::NONRETRIABLE_ERROR:
+          // If we got a non-retriable error, we might have received
+          // a packet that we could process, however let's just quit early.
+          sock.pauseRead();
+          if (conn_->loopDetectorCallback) {
+            conn_->readDebugState.noReadReason =
+                NoReadReason::NONRETRIABLE_ERROR;
+          }
+          onReadError(folly::AsyncSocketException(
+              folly::AsyncSocketException::INTERNAL_ERROR,
+              "::recvmmsg() failed",
+              errno));
+          break;
+        case NoReadReason::READ_OK:
+        case NoReadReason::EMPTY_DATA:
+        case NoReadReason::TRUNCATED:
+        case NoReadReason::STALE_DATA:
+          break;
+      }
+    }
+  } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
+    // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
     recvmmsgStorage_.resize(numPackets);
     recvMmsg(sock, readBufferSize, numPackets, networkData, server, totalData);
   } else {
+    // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
     recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
   }
 

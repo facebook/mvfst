@@ -222,7 +222,9 @@ struct TransportSettings {
   uint16_t maxRecvBatchSize{5};
   // Whether or not we should recv data in a batch.
   bool shouldRecvBatch{false};
-  // Whether or not use recvmmsg when shouldRecvBatch is true.
+  // Whether to use new receive path for recvmmsg.
+  bool shouldUseWrapperRecvmmsgForBatchRecv{false};
+  // Whether or not use recvmmsg.
   bool shouldUseRecvmmsgForBatchRecv{false};
   // Config struct for congestion controllers
   CongestionControlConfig ccaConfig;

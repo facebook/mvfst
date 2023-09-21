@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/NetworkData.h>
 #include <quic/common/QuicEventBase.h>
 
 #ifdef MVFST_USE_LIBEV
@@ -44,13 +45,64 @@ class QuicAsyncUDPSocketWrapper : public QuicAsyncUDPSocketType {
 
   using ErrMessageCallback = QuicAsyncUDPSocketType::ErrMessageCallback;
 
- private:
+  /**
+   * recv() result structure.
+   */
+  struct RecvResult {
+    RecvResult() = default;
+    explicit RecvResult(NoReadReason noReadReason)
+        : maybeNoReadReason(noReadReason) {}
+
+    folly::Optional<NoReadReason> maybeNoReadReason;
+  };
+
+  /**
+   * Receive packets from the socket.
+   *
+   * Can be called after onNotifyDataAvailable().
+   *
+   * @param readBufferSize     Size of ReadBuffer to allocate in bytes.
+   * @param numPackets         Max number of packets to try to receive.
+   * @param networkData        Object to populate with received packets.
+   * @param peerAddress        Object to populate with peer IP address.
+   * @param totalData          Total bytes read from the socket.
+   */
+  virtual RecvResult recvMmsg(
+      uint64_t readBufferSize,
+      uint16_t numPackets,
+      NetworkData& networkData,
+      folly::Optional<folly::SocketAddress>& peerAddress,
+      size_t& totalData) = 0;
 };
 
 class QuicAsyncUDPSocketWrapperImpl : public QuicAsyncUDPSocketWrapper {
  public:
   using QuicAsyncUDPSocketWrapper::QuicAsyncUDPSocketWrapper;
   ~QuicAsyncUDPSocketWrapperImpl() override = default;
+
+  RecvResult recvMmsg(
+      uint64_t readBufferSize,
+      uint16_t numPackets,
+      NetworkData& networkData,
+      folly::Optional<folly::SocketAddress>& peerAddress,
+      size_t& totalData) override;
+
+ private:
+  struct RecvmmsgStorage {
+    struct impl_ {
+      struct sockaddr_storage addr;
+      struct iovec iovec;
+      // Buffers we pass to recvmmsg.
+      Buf readBuffer;
+    };
+
+    // Storage for the recvmmsg system call.
+    std::vector<struct mmsghdr> msgs;
+    std::vector<struct impl_> impl_;
+    void resize(size_t numPackets);
+  };
+
+  RecvmmsgStorage recvmmsgStorage_;
 };
 
 int getSocketFd(const QuicAsyncUDPSocketWrapper& s);

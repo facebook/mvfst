@@ -257,6 +257,7 @@ class QuicClientTransport
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
  private:
+  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   struct RecvmmsgStorage {
     struct impl_ {
       struct sockaddr_storage addr;
@@ -296,6 +297,7 @@ class QuicClientTransport
   // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
+  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   RecvmmsgStorage recvmmsgStorage_;
   // We will only send transport knobs once, this flag keeps track of it
   bool transportKnobsSent_{false};
