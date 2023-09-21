@@ -156,7 +156,7 @@ class QuicStreamAsyncTransportTest : public Test {
         .WillOnce(Invoke([&p = promise]() mutable { p.setValue(); }));
 
     clientEvb_.runInLoop([&]() {
-      auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&clientEvb_);
+      auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&clientEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())

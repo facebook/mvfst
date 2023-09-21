@@ -63,7 +63,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingNone) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -93,7 +93,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -135,7 +135,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -172,7 +172,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
 TEST_P(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -255,7 +255,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsg) {
 TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -301,7 +301,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
 TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;

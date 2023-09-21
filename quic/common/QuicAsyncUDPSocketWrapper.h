@@ -32,6 +32,12 @@ class QuicAsyncUDPSocketWrapper : public QuicAsyncUDPSocketType {
   using ErrMessageCallback = QuicAsyncUDPSocketType::ErrMessageCallback;
 };
 
+class QuicAsyncUDPSocketWrapperImpl : public QuicAsyncUDPSocketWrapper {
+ public:
+  using QuicAsyncUDPSocketWrapper::QuicAsyncUDPSocketWrapper;
+  ~QuicAsyncUDPSocketWrapperImpl() override = default;
+};
+
 int getSocketFd(const QuicAsyncUDPSocketWrapper& s);
 NetworkFdType toNetworkFdType(int fd);
 

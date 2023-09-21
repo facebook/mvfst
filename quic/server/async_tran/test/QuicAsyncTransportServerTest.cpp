@@ -84,7 +84,7 @@ class QuicAsyncTransportServerTest : public Test {
     EXPECT_CALL(clientWriteCB_, writeSuccess_()).WillOnce(Return());
 
     clientEvb_.runInEventBaseThreadAndWait([&]() {
-      auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&clientEvb_);
+      auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&clientEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())

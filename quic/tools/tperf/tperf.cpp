@@ -648,7 +648,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   void start() {
     folly::SocketAddress addr(host_.c_str(), port_);
 
-    auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&eventBase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&eventBase_);
     auto fizzClientContext =
         FizzClientQuicHandshakeContext::Builder()
             .setCertificateVerifier(test::createTestCertificateVerifier())

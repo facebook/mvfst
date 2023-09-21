@@ -13,6 +13,6 @@
 namespace quic::test {
 
 using MockAsyncUDPSocket =
-    folly::test::MockAsyncUDPSocketT<quic::QuicAsyncUDPSocketWrapper>;
+    folly::test::MockAsyncUDPSocketT<quic::QuicAsyncUDPSocketWrapperImpl>;
 
 } // namespace quic::test

@@ -172,7 +172,7 @@ void TakeoverPacketHandler::forwardPacket(Buf writeBuffer) {
 
 std::unique_ptr<QuicAsyncUDPSocketWrapper> TakeoverPacketHandler::makeSocket(
     folly::EventBase* evb) {
-  return std::make_unique<QuicAsyncUDPSocketWrapper>(evb);
+  return std::make_unique<QuicAsyncUDPSocketWrapperImpl>(evb);
 }
 
 void TakeoverPacketHandler::processForwardedPacket(

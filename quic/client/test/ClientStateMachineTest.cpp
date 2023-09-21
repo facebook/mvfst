@@ -107,7 +107,7 @@ TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   client_->clientConnectionId = ConnectionId::createRandom(8);
   client_->happyEyeballsState.finished = true;
   client_->happyEyeballsState.secondSocket =
-      std::make_unique<QuicAsyncUDPSocketWrapper>(&evb);
+      std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&evb);
   auto newConn = undoAllClientStateForRetry(std::move(client_));
   EXPECT_TRUE(newConn->happyEyeballsState.finished);
   EXPECT_NE(nullptr, newConn->happyEyeballsState.secondSocket);

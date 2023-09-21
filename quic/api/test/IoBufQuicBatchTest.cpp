@@ -21,7 +21,7 @@ namespace quic {
 namespace testing {
 void RunTest(int numBatch) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapper sock(&evb);
+  QuicAsyncUDPSocketWrapperImpl sock(&evb);
 
   auto batchWriter = BatchWriterPtr(new test::TestPacketBatchWriter(numBatch));
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};

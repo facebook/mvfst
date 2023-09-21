@@ -18,7 +18,7 @@ class QuicSharedUDPSocketFactory : public QuicUDPSocketFactory {
 
   std::unique_ptr<QuicAsyncUDPSocketWrapper> make(folly::EventBase* evb, int fd)
       override {
-    auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(evb);
+    auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(evb);
     if (fd != -1) {
       sock->setFD(
           folly::NetworkSocket::fromFd(fd),

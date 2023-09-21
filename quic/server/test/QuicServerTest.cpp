@@ -2192,7 +2192,7 @@ class QuicServerTest : public Test {
     folly::SocketAddress addr2("::1", 0);
     std::unique_ptr<QuicAsyncUDPSocketWrapper> client;
     evbThread_.getEventBase()->runInEventBaseThreadAndWait([&] {
-      client = std::make_unique<QuicAsyncUDPSocketWrapper>(
+      client = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(
           evbThread_.getEventBase());
       client->bind(addr2);
     });
@@ -2476,7 +2476,7 @@ class QuicServerTakeoverTest : public Test {
     folly::SocketAddress clientAddr("::1", 0);
     std::unique_ptr<QuicAsyncUDPSocketWrapper> client;
     evbThread_.getEventBase()->runInEventBaseThreadAndWait([&] {
-      client = std::make_unique<QuicAsyncUDPSocketWrapper>(
+      client = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(
           evbThread_.getEventBase());
       client->bind(clientAddr);
     });
@@ -2624,7 +2624,7 @@ struct UDPReader : public QuicAsyncUDPSocketWrapper::ReadCallback {
   void start(EventBase* evb, SocketAddress addr) {
     evb_ = evb;
     evb_->runInEventBaseThreadAndWait([&] {
-      client = std::make_unique<QuicAsyncUDPSocketWrapper>(evb_);
+      client = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(evb_);
       client->bind(addr);
       client->resumeRead(this);
     });
@@ -3231,7 +3231,7 @@ class ServerTransportParameters : public testing::Test {
             .build();
     auto client = std::make_shared<QuicClientTransport>(
         &evb_,
-        std::make_unique<QuicAsyncUDPSocketWrapper>(&evb_),
+        std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&evb_),
         std::move(fizzClientContext));
     client->addNewPeerAddress(server_->getAddress());
     client->setHostname("::1");

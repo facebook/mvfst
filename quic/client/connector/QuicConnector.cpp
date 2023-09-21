@@ -55,7 +55,7 @@ void QuicConnector::connect(
     return;
   }
 
-  auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(eventBase);
+  auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(eventBase);
   quicClient_ = quic::QuicClientTransport::newClient(
       eventBase,
       std::move(sock),

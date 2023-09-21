@@ -97,7 +97,7 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
       if (evb && evb->getBackingEventBase() && !socket_) {
         auto fd = writer->getAndResetFd();
         if (fd >= 0) {
-          socket_ = std::make_unique<quic::QuicAsyncUDPSocketWrapper>(
+          socket_ = std::make_unique<quic::QuicAsyncUDPSocketWrapperImpl>(
               evb->getBackingEventBase());
           socket_->setFD(
               quic::toNetworkFdType(fd),

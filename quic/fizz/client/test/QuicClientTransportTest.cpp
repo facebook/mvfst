@@ -89,7 +89,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<TestingQuicClientTransport> createClient() {
     pskCache_ = std::make_shared<BasicQuicPskCache>();
 
-    auto sock = std::make_unique<QuicAsyncUDPSocketWrapper>(&eventbase_);
+    auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&eventbase_);
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)
@@ -5795,7 +5795,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   };
 
   EventBase evb;
-  QuicAsyncUDPSocketWrapper socket(&evb);
+  QuicAsyncUDPSocketWrapperImpl socket(&evb);
   TransportSettings transportSettings;
   EmptyErrMessageCallback errMessageCallback;
   EmptyReadCallback readCallback;
