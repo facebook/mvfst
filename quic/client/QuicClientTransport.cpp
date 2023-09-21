@@ -1284,7 +1284,7 @@ void QuicClientTransport::recvMmsg(
       char,
       QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams::
           kCmsgSpace>>
-      controlVec(useGRO ? numPackets : 0);
+      controlVec((useGRO || useTS) ? numPackets : 0);
 
   // we need to consider MSG_TRUNC too
   if (useGRO) {
