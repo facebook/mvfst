@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/chrono/Clock.h>
 #include <quic/common/third-party/enum.h>
 #include <sys/types.h>
 #include <chrono>
@@ -15,6 +16,20 @@
 #include <ostream>
 #include <string_view>
 #include <vector>
+
+/**
+ * Namespace for mvfst chrono types.
+ *
+ * Using a separate namespace for clock types to minimize type conflicts in
+ * tests and other code which may be using `using namespace quic` while also
+ * having aliased chrono types.
+ */
+namespace quic::chrono {
+
+using SteadyClock = folly::chrono::SteadyClock;
+using SystemClock = folly::chrono::SystemClock;
+
+} // namespace quic::chrono
 
 namespace quic {
 
