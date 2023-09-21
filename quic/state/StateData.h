@@ -163,8 +163,6 @@ struct OutstandingsInfo {
 
 class AppLimitedTracker {
  public:
-  using Clock = std::chrono::steady_clock;
-
   /**
    * Mark the connection as application limited.
    */
