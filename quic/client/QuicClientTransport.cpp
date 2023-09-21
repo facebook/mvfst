@@ -122,7 +122,7 @@ void QuicClientTransport::processUDPData(
     const folly::SocketAddress& peer,
     NetworkDataSingle&& networkData) {
   BufQueue udpData;
-  udpData.append(std::move(networkData.data));
+  udpData.append(std::move(networkData.packet.buf));
 
   if (!conn_->version) {
     // We only check for version negotiation packets before the version
@@ -155,7 +155,7 @@ void QuicClientTransport::processUDPData(
       !clientConn_->pendingOneRttData.empty()) {
     BufQueue pendingPacket;
     for (auto& pendingData : clientConn_->pendingOneRttData) {
-      pendingPacket.append(std::move(pendingData.networkData.data));
+      pendingPacket.append(std::move(pendingData.networkData.packet.buf));
       processPacketData(
           pendingData.peer,
           pendingData.networkData.receiveTimePoint,
@@ -168,7 +168,7 @@ void QuicClientTransport::processUDPData(
       !clientConn_->pendingHandshakeData.empty()) {
     BufQueue pendingPacket;
     for (auto& pendingData : clientConn_->pendingHandshakeData) {
-      pendingPacket.append(std::move(pendingData.networkData.data));
+      pendingPacket.append(std::move(pendingData.networkData.packet.buf));
       processPacketData(
           pendingData.peer,
           pendingData.networkData.receiveTimePoint,
@@ -270,7 +270,8 @@ void QuicClientTransport::processPacketData(
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
         NetworkDataSingle(
-            std::move(cipherUnavailable->packet), receiveTimePoint),
+            ReceivedPacket(std::move(cipherUnavailable->packet)),
+            receiveTimePoint),
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(

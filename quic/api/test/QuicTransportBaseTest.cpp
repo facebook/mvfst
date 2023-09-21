@@ -265,10 +265,10 @@ class TestQuicTransport
 
   void onReadData(const folly::SocketAddress&, NetworkDataSingle&& data)
       override {
-    if (!data.data) {
+    if (!data.packet.buf) {
       return;
     }
-    folly::io::Cursor cursor(data.data.get());
+    folly::io::Cursor cursor(data.packet.buf.get());
     while (!cursor.isAtEnd()) {
       // create server chosen connId with processId = 0 and workerId = 0
       ServerConnectionIdParams params(0, 0, 0);

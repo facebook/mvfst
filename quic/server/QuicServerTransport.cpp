@@ -512,7 +512,7 @@ void QuicServerTransport::processPendingData(bool async) {
         serverPtr->onNetworkData(
             pendingPacket.peer,
             NetworkData(
-                std::move(pendingPacket.networkData.data),
+                std::move(pendingPacket.networkData.packet.buf),
                 pendingPacket.networkData.receiveTimePoint));
         if (serverPtr->closeState_ == CloseState::CLOSED) {
           // The pending data could potentially contain a connection close, or

@@ -45,6 +45,7 @@
 namespace quic {
 
 struct ReceivedPacket {
+  ReceivedPacket() = default;
   explicit ReceivedPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
 
   // data
@@ -65,8 +66,10 @@ struct NetworkData {
     }
   }
 
-  NetworkData(std::vector<Buf>&& packetBufs, const TimePoint& receiveTime)
-      : receiveTimePoint(receiveTime),
+  NetworkData(
+      std::vector<Buf>&& packetBufs,
+      const TimePoint& receiveTimePointIn)
+      : receiveTimePoint(receiveTimePointIn),
         packets([&packetBufs]() {
           std::vector<ReceivedPacket> result;
           result.reserve(packetBufs.size());
@@ -97,18 +100,18 @@ struct NetworkData {
 };
 
 struct NetworkDataSingle {
-  Buf data;
+  ReceivedPacket packet;
   TimePoint receiveTimePoint;
   size_t totalData{0};
 
   NetworkDataSingle() = default;
 
   NetworkDataSingle(
-      std::unique_ptr<folly::IOBuf> buf,
-      const TimePoint& receiveTime)
-      : data(std::move(buf)), receiveTimePoint(receiveTime) {
-    if (data) {
-      totalData += data->computeChainDataLength();
+      ReceivedPacket&& packetIn,
+      const TimePoint& receiveTimePointIn)
+      : packet(std::move(packetIn)), receiveTimePoint(receiveTimePointIn) {
+    if (packet.buf) {
+      totalData += packet.buf->computeChainDataLength();
     }
   }
 };

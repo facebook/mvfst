@@ -1905,7 +1905,8 @@ void QuicTransportBase::onNetworkData(
       onReadData(
           peer,
           NetworkDataSingle(
-              std::move(packet.buf), networkData.receiveTimePoint));
+              ReceivedPacket(std::move(packet.buf)),
+              networkData.receiveTimePoint));
       if (conn_->peerConnectionError) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));

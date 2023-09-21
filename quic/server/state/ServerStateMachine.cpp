@@ -707,7 +707,8 @@ static void handleCipherUnavailable(
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;
     pendingReadData.networkData = NetworkDataSingle(
-        std::move(originalData->packet), readData.networkData.receiveTimePoint);
+        ReceivedPacket(std::move(originalData->packet)),
+        readData.networkData.receiveTimePoint);
     pendingData->emplace_back(std::move(pendingReadData));
     VLOG(10) << "Adding pending data to "
              << toString(originalData->protectionType)
@@ -731,15 +732,15 @@ void onServerReadDataFromOpen(
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Open);
   // Don't bother parsing if the data is empty.
-  if (!readData.networkData.data ||
-      readData.networkData.data->computeChainDataLength() == 0) {
+  if (!readData.networkData.packet.buf ||
+      readData.networkData.packet.buf->computeChainDataLength() == 0) {
     return;
   }
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
     firstPacketFromPeer = true;
 
-    folly::io::Cursor cursor(readData.networkData.data.get());
+    folly::io::Cursor cursor(readData.networkData.packet.buf.get());
     auto initialByte = cursor.readBE<uint8_t>();
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
@@ -848,7 +849,7 @@ void onServerReadDataFromOpen(
     conn.peerAddress = conn.originalPeerAddress;
   }
   BufQueue udpData;
-  udpData.append(std::move(readData.networkData.data));
+  udpData.append(std::move(readData.networkData.packet.buf));
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
@@ -1374,7 +1375,7 @@ void onServerReadDataFromClosed(
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Closed);
   BufQueue udpData;
-  udpData.append(std::move(readData.networkData.data));
+  udpData.append(std::move(readData.networkData.packet.buf));
   auto packetSize = udpData.empty() ? 0 : udpData.chainLength();
   if (!conn.readCodec) {
     // drop data. We closed before we even got the first packet. This is
