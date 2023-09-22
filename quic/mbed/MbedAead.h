@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <fizz/crypto/aead/CryptoUtil.h>
 #include <quic/handshake/Aead.h>
 
 extern "C" {
@@ -47,6 +48,23 @@ class MbedAead : public Aead {
   size_t getCipherOverhead() const override;
 
  private:
+  void setCipherKey(const mbedtls_operation_t operation) const {
+    // set key for encryption and decryption (we create separate Aead for read
+    // and write, i.e. only one of enc or dec operation will ever be called on
+    // obj)
+    const uint8_t* key_data = key_.key->data();
+    const size_t key_bitlen = key_.key->length() << 3;
+    CHECK_EQ(
+        mbedtls_cipher_setkey(&cipher_ctx, key_data, key_bitlen, operation), 0);
+  }
+
+  std::array<uint8_t, MBEDTLS_MAX_IV_LENGTH> getIV(uint64_t seqNum) const {
+    return fizz::createIV<MBEDTLS_MAX_IV_LENGTH>(
+        /*seqNum=*/seqNum,
+        /*ivLength=*/key_.iv->length(),
+        /*trafficIvKey=*/folly::ByteRange(key_.iv->data(), key_.iv->length()));
+  }
+
   TrafficKey key_;
   mutable mbedtls_cipher_context_t cipher_ctx;
 };
