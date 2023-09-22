@@ -77,6 +77,40 @@ std::unique_ptr<folly::IOBuf> MbedAead::inplaceEncrypt(
   return ciphertext_buf;
 }
 
+folly::Optional<std::unique_ptr<folly::IOBuf>> MbedAead::tryDecrypt(
+    std::unique_ptr<folly::IOBuf>&& ciphertext,
+    const folly::IOBuf* assocData,
+    uint64_t seqNum) const {
+  // support only unchained iobufs for now
+  CHECK(!ciphertext->isChained());
+  CHECK(assocData == nullptr || !assocData->isChained());
+
+  setCipherKey(MBEDTLS_DECRYPT);
+
+  // create IOBuf of size len(plaintext) - getCipherOverhead()
+  const size_t tag_len = getCipherOverhead();
+  auto plaintext_buf = folly::IOBuf::create(ciphertext->length());
+  auto iv = getIV(seqNum);
+  size_t write_size{0};
+
+  if (mbedtls_cipher_auth_decrypt_ext(
+          /*ctx=*/&cipher_ctx,
+          /*iv=*/iv.data(),
+          /*iv_len=*/std::min<size_t>(iv.size(), key_.iv->length()),
+          /*ad=*/assocData ? assocData->data() : nullptr,
+          /*ad_len=*/assocData ? assocData->length() : 0,
+          /*input=*/ciphertext->data(),
+          /*ilen=*/ciphertext->length(),
+          /*output=*/plaintext_buf->writableData(),
+          /*output_len=*/plaintext_buf->capacity(),
+          /*olen=*/&write_size,
+          /*tag_len=*/tag_len) != 0) {
+    return folly::none;
+  }
+  plaintext_buf->append(write_size);
+  return plaintext_buf;
+}
+
 size_t MbedAead::getCipherOverhead() const {
   return TAG_LENGTH;
 }
