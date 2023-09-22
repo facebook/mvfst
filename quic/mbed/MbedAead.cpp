@@ -41,6 +41,42 @@ MbedAead::MbedAead(const CipherType cipherType, TrafficKey&& key)
   CHECK_EQ(mbedtls_cipher_setup(&cipher_ctx, cipher_info), 0);
 }
 
+// does not support inplace encryption just yet
+std::unique_ptr<folly::IOBuf> MbedAead::inplaceEncrypt(
+    std::unique_ptr<folly::IOBuf>&& plaintext,
+    const folly::IOBuf* assocData,
+    uint64_t seqNum) const {
+  // support only unchained iobufs for now
+  CHECK(!plaintext->isChained());
+  CHECK(assocData == nullptr || !assocData->isChained());
+
+  setCipherKey(MBEDTLS_ENCRYPT);
+
+  // create IOBuf of size len(plaintext) + getCipherOverhead()
+  const size_t tag_len = getCipherOverhead();
+  auto ciphertext_buf = folly::IOBuf::create(plaintext->length() + tag_len);
+  auto iv = getIV(seqNum);
+  size_t write_size{0};
+
+  if (mbedtls_cipher_auth_encrypt_ext(
+          /*ctx=*/&cipher_ctx,
+          /*iv=*/iv.data(),
+          /*iv_len=*/std::min<size_t>(iv.size(), key_.iv->length()),
+          /*ad=*/assocData ? assocData->data() : nullptr,
+          /*ad_len=*/assocData ? assocData->length() : 0,
+          /*input=*/plaintext->data(),
+          /*ilen=*/plaintext->length(),
+          /*output=*/ciphertext_buf->writableData(),
+          /*output_len=*/ciphertext_buf->capacity(),
+          /*olen=*/&write_size,
+          /*tag_len=*/tag_len) != 0) {
+    throw std::runtime_error("mbedtls: failed to encrypt!");
+  }
+
+  ciphertext_buf->append(write_size);
+  return ciphertext_buf;
+}
+
 size_t MbedAead::getCipherOverhead() const {
   return TAG_LENGTH;
 }
