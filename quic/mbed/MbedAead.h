@@ -15,12 +15,18 @@ extern "C" {
 
 namespace quic {
 
+enum CipherType { AESGCM128 };
+
 class MbedAead : public Aead {
  public:
-  MbedAead() = default;
+  MbedAead(const CipherType cipherType, TrafficKey&& key);
+
+  ~MbedAead() override {
+    mbedtls_cipher_free(&cipher_ctx);
+  }
 
   folly::Optional<TrafficKey> getKey() const override {
-    return folly::none;
+    return TrafficKey{.key = key_.key->clone(), .iv = key_.iv->clone()};
   }
 
   std::unique_ptr<folly::IOBuf> inplaceEncrypt(
@@ -37,9 +43,12 @@ class MbedAead : public Aead {
     return folly::none;
   }
 
-  size_t getCipherOverhead() const override {
-    return 0;
-  }
+  // returns tag length
+  size_t getCipherOverhead() const override;
+
+ private:
+  TrafficKey key_;
+  mutable mbedtls_cipher_context_t cipher_ctx;
 };
 
 } // namespace quic
