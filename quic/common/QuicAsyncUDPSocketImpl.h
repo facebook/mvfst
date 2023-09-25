@@ -81,7 +81,7 @@ class QuicAsyncUDPSocketImpl {
       struct msghdr& /* msg */);
 
   explicit QuicAsyncUDPSocketImpl(QuicBackingEventBase*);
-  ~QuicAsyncUDPSocketImpl();
+  virtual ~QuicAsyncUDPSocketImpl();
 
   // Initializes underlying socket fd. This is called in bind() and connect()
   // internally if fd is not yet set at the time of the call. But if there is a
