@@ -49,8 +49,10 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"ackElicitingThreshold\": 99, "
       "\"reorderingThreshold\": \"88\", "
       "\"minRttDivisor\": 77, "
-      "\"useSmallThresholdDuringStartup\": true "
-      "}"
+      "\"useSmallThresholdDuringStartup\": true"
+      "},"
+      "\"ignoreInflightHi\": true, "
+      "\"ignoreLoss\": true "
       "}";
   auto config = parseCongestionControlConfig(testString);
   EXPECT_EQ(config.conservativeRecovery, true);
@@ -61,6 +63,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.additiveIncreaseAfterHystart, true);
   EXPECT_EQ(config.onlyGrowCwndWhenLimited, true);
   EXPECT_EQ(config.leaveHeadroomForCwndLimited, true);
+  EXPECT_EQ(config.ignoreInflightHi, true);
+  EXPECT_EQ(config.ignoreLoss, true);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(config.ackFrequencyConfig->ackElicitingThreshold, 99);
@@ -83,6 +87,8 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.enableAckAggregationInStartup, false);
   EXPECT_EQ(config.probeRttDisabledIfAppLimited, false);
   EXPECT_EQ(config.drainToTarget, false);
+  EXPECT_EQ(config.ignoreInflightHi, false);
+  EXPECT_EQ(config.ignoreLoss, false);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(

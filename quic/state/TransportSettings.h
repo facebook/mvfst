@@ -67,6 +67,14 @@ struct CongestionControlConfig {
 
   // Used by: BBR1
   folly::Optional<AckFrequencyConfig> ackFrequencyConfig;
+
+  // Used by: BBR2
+  // Whether BBR2 should not use inflightHi when settings its cwnd.
+  bool ignoreInflightHi{false};
+
+  // Used by: BBR2
+  // Wether BBR2 should ignore packet loss (i.e. act more like BBR1)
+  bool ignoreLoss{false};
 };
 
 struct DatagramConfig {

@@ -115,7 +115,8 @@ void Bbr2CongestionController::onPacketAckOrLoss(
         cwndGain_);
   };
 
-  if (lossEvent && lossEvent->lostPackets > 0) {
+  if (lossEvent && lossEvent->lostPackets > 0 &&
+      !conn_.transportSettings.ccaConfig.ignoreLoss) {
     // The pseudo code in BBRHandleLostPacket is included in
     // updateProbeBwCyclePhase. No need to repeat it here.
 
@@ -296,14 +297,16 @@ void Bbr2CongestionController::setCwnd(
 
   // BBRBoundCwndForModel()
   auto cap = std::numeric_limits<uint64_t>::max();
-  if (inflightHi_.has_value()) {
+  if (inflightHi_.has_value() &&
+      !conn_.transportSettings.ccaConfig.ignoreInflightHi) {
     if (isProbeBwState(state_) && state_ != State::ProbeBw_Cruise) {
       cap = *inflightHi_;
     } else if (state_ == State::ProbeRTT || state_ == State::ProbeBw_Cruise) {
       cap = getTargetInflightWithHeadroom();
     }
   }
-  if (inflightLo_.has_value()) {
+  if (inflightLo_.has_value() &&
+      !conn_.transportSettings.ccaConfig.ignoreLoss) {
     cap = std::min(cap, *inflightLo_);
   }
   cap = std::max(cap, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
@@ -385,7 +388,7 @@ void Bbr2CongestionController::updateCongestionSignals(
   if (state_ == State::ProbeBw_Up) {
     return;
   }
-  if (lossBytesInRound_ > 0) {
+  if (lossBytesInRound_ > 0 && !conn_.transportSettings.ccaConfig.ignoreLoss) {
     // InitLowerBounds
     if (!bandwidthLo_) {
       bandwidthLo_ = maxBwFilter_.GetBest();
@@ -462,7 +465,8 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   which servers a similar purpose to discontiguous ranges but it's not exactly
   the same.
   */
-  if (filledPipe_ || !roundStart_ || isAppLimited()) {
+  if (filledPipe_ || !roundStart_ || isAppLimited() ||
+      conn_.transportSettings.ccaConfig.ignoreLoss) {
     // TODO: the appLimited condition means we could tolerate losses in startup
     // if we haven't found the full bandwidth. This may need to be revisited.
 
