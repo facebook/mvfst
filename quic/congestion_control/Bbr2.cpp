@@ -666,6 +666,10 @@ void Bbr2CongestionController::probeInflightHiUpward(uint64_t ackedBytes) {
 }
 
 void Bbr2CongestionController::updateMinRtt() {
+  if (idleRestart_) {
+    probeRttMinTimestamp_ = Clock::now();
+    probeRttMinValue_ = kDefaultMinRtt;
+  }
   probeRttExpired_ = probeRttMinTimestamp_
       ? Clock::now() > (probeRttMinTimestamp_.value() + kProbeRTTInterval)
       : true;
