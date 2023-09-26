@@ -429,6 +429,7 @@ void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();
 
   if (state_ == State::Startup && filledPipe_) {
+    bandwidthHi_ = maxBwFilter_.GetBest();
     enterDrain();
   }
 }
