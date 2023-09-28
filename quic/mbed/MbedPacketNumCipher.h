@@ -18,7 +18,8 @@ namespace quic {
 
 class MbedPacketNumCipher : public PacketNumberCipher {
  public:
-  MbedPacketNumCipher() {}
+  explicit MbedPacketNumCipher(const CipherType cipherType);
+  ~MbedPacketNumCipher() override;
 
   void setKey(folly::ByteRange /*key*/) override {}
 
@@ -35,6 +36,8 @@ class MbedPacketNumCipher : public PacketNumberCipher {
   }
 
  private:
+  const mbedtls_cipher_info_t* cipher_info{nullptr};
+  mbedtls_cipher_context_t enc_ctx;
   Buf key_{nullptr};
 };
 
