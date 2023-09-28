@@ -31,13 +31,36 @@ class MbedPacketNumCipher : public PacketNumberCipher {
     return cipher_info->key_bitlen >> 3;
   }
 
-  HeaderProtectionMask mask(folly::ByteRange /*sample*/) const override {
-    return HeaderProtectionMask();
+  HeaderProtectionMask mask(folly::ByteRange sample) const override {
+    /**
+     * RFC9001:
+     * The ciphertext of the packet is sampled and used as input to an
+     * encryption algorithm. The output of this algorithm is a 5-byte mask that
+     * is applied to the protected header fields using exclusive OR.
+     */
+    HeaderProtectionMask out_mask;
+    size_t out_len{0};
+    CHECK_EQ(out_mask.size(), sample.size());
+
+    // ecb mode does not use iv
+    if (mbedtls_cipher_crypt(
+            /*ctx=*/&enc_ctx,
+            /*iv=*/nullptr,
+            /*iv_len=*/0,
+            /*input=*/sample.data(),
+            /*ilen=*/sample.size(),
+            /*output=*/out_mask.data(),
+            /*olen=*/&out_len) != 0 ||
+        out_len != out_mask.size()) {
+      throw std::runtime_error("mbedtls: failed to generate mask");
+    }
+
+    return out_mask;
   }
 
  private:
   const mbedtls_cipher_info_t* cipher_info{nullptr};
-  mbedtls_cipher_context_t enc_ctx;
+  mutable mbedtls_cipher_context_t enc_ctx;
   Buf key_{nullptr};
 };
 
