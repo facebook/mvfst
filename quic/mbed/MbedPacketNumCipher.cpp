@@ -45,4 +45,20 @@ MbedPacketNumCipher::~MbedPacketNumCipher() {
   mbedtls_cipher_free(&enc_ctx);
 }
 
+void MbedPacketNumCipher::setKey(folly::ByteRange key) {
+  key_ = folly::IOBuf::copyBuffer(key);
+  size_t key_bitlen = key.size() << 3;
+
+  // reset context
+  if (mbedtls_cipher_reset(&enc_ctx) != 0) {
+    throw std::runtime_error("mbedtls: cipher_reset failed!");
+  }
+
+  // setkey & operation mode on context
+  if (mbedtls_cipher_setkey(
+          &enc_ctx, key_->writableData(), key_bitlen, MBEDTLS_ENCRYPT) != 0) {
+    throw std::runtime_error("mbedtls: cipher_setkey failed!");
+  }
+}
+
 } // namespace quic

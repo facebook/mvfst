@@ -21,14 +21,14 @@ class MbedPacketNumCipher : public PacketNumberCipher {
   explicit MbedPacketNumCipher(const CipherType cipherType);
   ~MbedPacketNumCipher() override;
 
-  void setKey(folly::ByteRange /*key*/) override {}
+  void setKey(folly::ByteRange key) override;
 
   const Buf& getKey() const override {
     return key_;
   }
 
   size_t keyLength() const override {
-    return 0;
+    return cipher_info->key_bitlen >> 3;
   }
 
   HeaderProtectionMask mask(folly::ByteRange /*sample*/) const override {
