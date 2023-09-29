@@ -35,7 +35,6 @@
 #include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/DelayedDestruction.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <chrono>
 #include <list>
