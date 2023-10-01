@@ -43,7 +43,7 @@ struct OutstandingPacketMetadata {
   // tracks the number of writes on this socket.
   uint64_t writeCount{0};
   // Cmsgs added by the QuicSocket when this packet was written
-  folly::Optional<folly::SocketOptionMap> cmsgs;
+  folly::Optional<folly::SocketCmsgMap> cmsgs;
 
   // Has value if the packet is lost by timeout. The value is the loss timeout
   // dividend that was used to declare this packet.

@@ -660,9 +660,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * specific transport and does not change the other sockets sharing the same
    * fd.
    */
-  void setCmsgs(const folly::SocketOptionMap& options);
+  void setCmsgs(const folly::SocketCmsgMap& options);
 
-  void appendCmsgs(const folly::SocketOptionMap& options);
+  void appendCmsgs(const folly::SocketCmsgMap& options);
 
   /**
    * Sets the policy per stream group id.
@@ -852,7 +852,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
    * required by this QuicSocket's packet processors.
    */
-  folly::Optional<folly::SocketOptionMap> getAdditionalCmsgsForAsyncUDPSocket();
+  folly::Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   std::atomic<QuicEventBase*> qEvbPtr_;
   std::unique_ptr<QuicAsyncUDPSocketWrapper> socket_;

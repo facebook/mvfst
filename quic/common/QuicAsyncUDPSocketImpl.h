@@ -185,10 +185,10 @@ class QuicAsyncUDPSocketImpl {
   /**
    * Set extra control messages to send
    */
-  void setCmsgs(const folly::SocketOptionMap& /* cmsgs */);
-  void appendCmsgs(const folly::SocketOptionMap& /* cmsgs */);
+  void setCmsgs(const folly::SocketCmsgMap& /* cmsgs */);
+  void appendCmsgs(const folly::SocketCmsgMap& /* cmsgs */);
   void setAdditionalCmsgsFunc(
-      folly::Function<folly::Optional<folly::SocketOptionMap>()>&&
+      folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&
       /* additionalCmsgsFunc */);
 
   /*

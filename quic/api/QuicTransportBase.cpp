@@ -3826,11 +3826,11 @@ void QuicTransportBase::notifyAppRateLimited() {
   }
 }
 
-void QuicTransportBase::setCmsgs(const folly::SocketOptionMap& options) {
+void QuicTransportBase::setCmsgs(const folly::SocketCmsgMap& options) {
   socket_->setCmsgs(options);
 }
 
-void QuicTransportBase::appendCmsgs(const folly::SocketOptionMap& options) {
+void QuicTransportBase::appendCmsgs(const folly::SocketCmsgMap& options) {
   socket_->appendCmsgs(options);
 }
 
@@ -3904,7 +3904,7 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 }
 
 void QuicTransportBase::updatePacketProcessorsPrewriteRequests() {
-  folly::SocketOptionMap cmsgs;
+  folly::SocketCmsgMap cmsgs;
   for (const auto& pp : conn_->packetProcessors) {
     // In case of overlapping cmsg keys, the priority is given to
     // that were added to the QuicSocket first.
@@ -3921,7 +3921,7 @@ void QuicTransportBase::updatePacketProcessorsPrewriteRequests() {
   conn_->socketCmsgsState.targetWriteCount = conn_->writeCount;
 }
 
-folly::Optional<folly::SocketOptionMap>
+folly::Optional<folly::SocketCmsgMap>
 QuicTransportBase::getAdditionalCmsgsForAsyncUDPSocket() {
   if (conn_->socketCmsgsState.additionalCmsgs) {
     // This callback should be happening for the target write

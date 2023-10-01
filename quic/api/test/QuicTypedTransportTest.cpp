@@ -975,7 +975,7 @@ TYPED_TEST(
   this->loopForWrites();
   ASSERT_FALSE(this->getConn().outstandings.packets.empty());
 
-  folly::SocketOptionMap expectedCmsgs;
+  folly::SocketCmsgMap expectedCmsgs;
   expectedCmsgs[{IPPROTO_IPV6, IPV6_HOPLIMIT}] = 255;
   expectedCmsgs[{IPPROTO_IPV6, IPV6_DONTFRAG}] = 1;
   auto pkt = this->getConn().outstandings.packets.rbegin();
@@ -1019,7 +1019,7 @@ TYPED_TEST(
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
 
     // Verify both packets are marked
-    folly::SocketOptionMap expectedCmsgs;
+    folly::SocketCmsgMap expectedCmsgs;
     expectedCmsgs[{IPPROTO_IPV6, IPV6_HOPLIMIT}] = 255;
     auto pkt = this->getConn().outstandings.packets.rbegin();
     ASSERT_TRUE(pkt->metadata.cmsgs);
@@ -1065,7 +1065,7 @@ TYPED_TEST(
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
 
     // Verify the last two packets are marked
-    folly::SocketOptionMap expectedCmsgs;
+    folly::SocketCmsgMap expectedCmsgs;
     expectedCmsgs[{IPPROTO_IPV6, IPV6_DONTFRAG}] = 1;
     auto pkt = this->getConn().outstandings.packets.rbegin();
     ASSERT_TRUE(pkt->metadata.cmsgs);

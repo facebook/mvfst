@@ -667,7 +667,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
       retransmissionPolicies;
 
   struct SocketCmsgsState {
-    folly::Optional<folly::SocketOptionMap> additionalCmsgs;
+    folly::Optional<folly::SocketCmsgMap> additionalCmsgs;
     // The write count which this SocketCmsgs state is intended for.
     // This is used to make sure this cmsgs list does not end up used
     // for multiple writes.

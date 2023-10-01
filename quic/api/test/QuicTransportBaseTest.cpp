@@ -4212,7 +4212,7 @@ TEST_P(QuicTransportImplTestBase, ZeroLengthDatagramBufs) {
 
 TEST_P(QuicTransportImplTestBase, Cmsgs) {
   transport->setServerConnectionId();
-  folly::SocketOptionMap cmsgs;
+  folly::SocketCmsgMap cmsgs;
   cmsgs[{IPPROTO_IP, IP_TOS}] = 123;
   EXPECT_CALL(*socketPtr, setCmsgs(_)).Times(1);
   transport->setCmsgs(cmsgs);

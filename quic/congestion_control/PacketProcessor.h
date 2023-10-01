@@ -17,7 +17,7 @@ namespace quic {
 class PacketProcessor {
  public:
   struct PrewriteRequest {
-    folly::Optional<folly::SocketOptionMap> cmsgs;
+    folly::Optional<folly::SocketCmsgMap> cmsgs;
   };
 
   virtual ~PacketProcessor() = default;

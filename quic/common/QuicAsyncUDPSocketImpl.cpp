@@ -112,7 +112,7 @@ int QuicAsyncUDPSocketImpl::writem(
 }
 
 void QuicAsyncUDPSocketImpl::setAdditionalCmsgsFunc(
-    folly::Function<folly::Optional<folly::SocketOptionMap>()>&&
+    folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&
     /* additionalCmsgsFunc */) {
   LOG(WARNING)
       << "Setting an additional cmsgs function is not implemented for QuicAsyncUDPSocketImpl";
@@ -157,12 +157,12 @@ void QuicAsyncUDPSocketImpl::detachEventBase() {
 }
 
 void QuicAsyncUDPSocketImpl::setCmsgs(
-    const folly::SocketOptionMap& /* cmsgs */) {
+    const folly::SocketCmsgMap& /* cmsgs */) {
   throw std::runtime_error("setCmsgs is not implemented.");
 }
 
 void QuicAsyncUDPSocketImpl::appendCmsgs(
-    const folly::SocketOptionMap& /* cmsgs */) {
+    const folly::SocketCmsgMap& /* cmsgs */) {
   throw std::runtime_error("appendCmsgs is not implemented.");
 }
 
