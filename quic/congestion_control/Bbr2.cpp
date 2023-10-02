@@ -221,7 +221,7 @@ void Bbr2CongestionController::resetCongestionSignals() {
 }
 
 void Bbr2CongestionController::resetLowerBounds() {
-  bandwidthLo_ = Bandwidth(std::numeric_limits<uint64_t>::max(), 1us);
+  bandwidthLo_.reset();
   inflightLo_.reset();
 }
 void Bbr2CongestionController::enterStartup() {
@@ -234,7 +234,7 @@ void Bbr2CongestionController::setPacing() {
   uint64_t pacingWindow =
       bandwidth_ * minRtt_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
   VLOG(6) << fmt::format(
-      "Setting pacing to {}. From bandwdith_={} pacingGain_={} kPacingMarginPercent={} units={} interval={}",
+      "Setting pacing to {}. From bandwidth_={} pacingGain_={} kPacingMarginPercent={} units={} interval={}",
       Bandwidth(pacingWindow, minRtt_).normalizedDescribe(),
       bandwidth_.normalizedDescribe(),
       pacingGain_,
@@ -390,7 +390,7 @@ void Bbr2CongestionController::updateCongestionSignals(
   }
   if (lossBytesInRound_ > 0 && !conn_.transportSettings.ccaConfig.ignoreLoss) {
     // InitLowerBounds
-    if (!bandwidthLo_) {
+    if (!bandwidthLo_.has_value()) {
       bandwidthLo_ = maxBwFilter_.GetBest();
     }
     if (!inflightLo_.has_value()) {
@@ -398,7 +398,7 @@ void Bbr2CongestionController::updateCongestionSignals(
     }
 
     // LossLowerBounds
-    bandwidthLo_ = std::max(bandwidthLatest_, bandwidthLo_ * kBeta);
+    bandwidthLo_ = std::max(bandwidthLatest_, *bandwidthLo_ * kBeta);
     inflightLo_ =
         std::max(inflightLatest_, static_cast<uint64_t>(*inflightLo_ * kBeta));
   }
@@ -429,7 +429,6 @@ void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();
 
   if (state_ == State::Startup && filledPipe_) {
-    bandwidthHi_ = maxBwFilter_.GetBest();
     enterDrain();
   }
 }
@@ -559,12 +558,17 @@ void Bbr2CongestionController::adaptUpperBounds(
   }
 
   if (!checkInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
-    /* Loss rate is safe. Adjust upper bounds upward. */
-    if (!inflightHi_.has_value() ||
-        inflightBytesAtLargestAckedPacket > *inflightHi_) {
+    if (!inflightHi_.has_value() || !bandwidthHi_.has_value()) {
+      // No loss has occurred yet so these values are not set and do not need to
+      // be raised.
+      return;
+    }
+    /* There is loss but it's at safe levels. The limits are populated so we
+     * update them */
+    if (inflightBytesAtLargestAckedPacket > *inflightHi_) {
       inflightHi_ = inflightBytesAtLargestAckedPacket;
     }
-    if (bandwidthLatest_ > bandwidthHi_) {
+    if (bandwidthLatest_ > *bandwidthHi_) {
       bandwidthHi_ = bandwidthLatest_;
     }
     if (state_ == State::ProbeBw_Up) {
@@ -628,6 +632,7 @@ void Bbr2CongestionController::handleInFlightTooHigh(
         inflightBytesAtLargestAckedPacket,
         static_cast<uint64_t>(
             static_cast<float>(getTargetInflightWithGain()) * kBeta));
+    bandwidthHi_ = maxBwFilter_.GetBest();
   }
   if (state_ == State::ProbeBw_Up) {
     startProbeBwDown();
@@ -651,9 +656,10 @@ uint64_t Bbr2CongestionController::getTargetInflightWithHeadroom() const {
 }
 
 void Bbr2CongestionController::probeInflightHiUpward(uint64_t ackedBytes) {
-  CHECK(inflightHi_.has_value()) << "probing inflight high before it's set";
-  if (!cwndLimitedInRound_ || cwndBytes_ < *inflightHi_) {
-    return; /* not fully using inflight_hi, so don't grow it */
+  if (!inflightHi_.has_value() || !cwndLimitedInRound_ ||
+      cwndBytes_ < *inflightHi_) {
+    return; /* no inflight_hi set or not fully using inflight_hi, so don't grow
+               it */
   }
   probeUpAcks_ += ackedBytes;
   if (probeUpAcks_ >= probeUpCount_) {
@@ -750,11 +756,14 @@ void Bbr2CongestionController::boundCwndForProbeRTT() {
 }
 
 void Bbr2CongestionController::boundBwForModel() {
-  if (state_ == State::Startup) {
-    bandwidth_ = maxBwFilter_.GetBest();
-  } else {
-    bandwidth_ =
-        std::min(std::min(maxBwFilter_.GetBest(), bandwidthLo_), bandwidthHi_);
+  bandwidth_ = maxBwFilter_.GetBest();
+  if (state_ != State::Startup) {
+    if (bandwidthLo_.has_value()) {
+      bandwidth_ = std::min(bandwidth_, *bandwidthLo_);
+    }
+    if (bandwidthHi_.has_value()) {
+      bandwidth_ = std::min(bandwidth_, *bandwidthHi_);
+    }
   }
   if (conn_.qLogger) {
     conn_.qLogger->addBandwidthEstUpdate(bandwidth_.units, bandwidth_.interval);

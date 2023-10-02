@@ -140,7 +140,8 @@ class Bbr2CongestionController : public CongestionController {
   // Data Rate Model Parameters
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>
       maxBwFilter_;
-  Bandwidth bandwidthHi_, bandwidthLo_, bandwidth_;
+  Bandwidth bandwidth_;
+  folly::Optional<Bandwidth> bandwidthHi_, bandwidthLo_;
   uint64_t cycleCount_{0}; // TODO: this can be one bit
 
   // Data Volume Model Parameters
