@@ -156,8 +156,7 @@ void QuicAsyncUDPSocketImpl::detachEventBase() {
   LOG(INFO) << __func__;
 }
 
-void QuicAsyncUDPSocketImpl::setCmsgs(
-    const folly::SocketCmsgMap& /* cmsgs */) {
+void QuicAsyncUDPSocketImpl::setCmsgs(const folly::SocketCmsgMap& /* cmsgs */) {
   throw std::runtime_error("setCmsgs is not implemented.");
 }
 
