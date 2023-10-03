@@ -95,7 +95,7 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
     }
     // If we got a non-retriable error, we might have received
     // a packet that we could process, however let's just quit early.
-    // pauseRead();
+    pauseRead();
     return RecvResult(NoReadReason::NONRETRIABLE_ERROR);
   }
 
