@@ -7,8 +7,6 @@
 
 #pragma once
 
-#ifdef MVFST_USE_LIBEV
-
 // The following macros are defined both in 'libev' and 'libevent'.
 // To avoid compilation errors, they should be undefined before including libev
 #undef EV_READ
@@ -17,7 +15,7 @@
 #undef EV_SIGNAL
 #undef EVLOOP_NONBLOCK
 
-#include <ev.h> // @manual
+#include <ev.h>
 
 #include <memory>
 #include <thread>
@@ -150,5 +148,3 @@ class QuicLibevEventBase {
 };
 
 } // namespace quic
-
-#endif // MVFST_USE_LIBEV

@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifdef MVFST_USE_LIBEV
-
 #include <quic/common/QuicAsyncUDPSocketImpl.h>
 
 #include <cstring>
@@ -398,5 +396,3 @@ void QuicAsyncUDPSocketImpl::readWatcherCallback(
 }
 
 } // namespace quic
-
-#endif // MVFST_USE_LIBEV

@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifndef MVFST_USE_LIBEV
-
 #include <quic/api/QuicGsoBatchWriters.h>
 
 namespace {
@@ -308,5 +306,3 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
 }
 
 } // namespace quic
-
-#endif

@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifdef MVFST_USE_LIBEV
-
 #include <glog/logging.h>
 #include <quic/common/QuicEventBase.h>
 
@@ -205,5 +203,3 @@ QuicLibevEventBase::~QuicLibevEventBase() {
   ev_check_stop(ev_loop_, &checkWatcher_);
 }
 } // namespace quic
-
-#endif // MVFST_USE_LIBEV

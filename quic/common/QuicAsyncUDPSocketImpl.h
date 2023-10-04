@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifdef MVFST_USE_LIBEV
-
 #pragma once
 
 #include <folly/Range.h>
@@ -266,5 +264,3 @@ class QuicAsyncUDPSocketImpl {
   ErrMessageCallback* errMessageCallback_ = nullptr;
 };
 } // namespace quic
-
-#endif

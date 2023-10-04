@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifdef MVFST_USE_LIBEV
-
 #include <quic/api/QuicBatchWriterFactory.h>
 
 namespace quic {
@@ -44,5 +42,3 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
 }
 
 } // namespace quic
-
-#endif
