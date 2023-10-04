@@ -2316,6 +2316,18 @@ TEST_F(QuicClientTransportAfterStartTest, StaleReadLoopCounting) {
   EXPECT_EQ(NoReadReason::STALE_DATA, conn.readDebugState.noReadReason);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, TruncatedReadLoopCounting) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(1, NoReadReason::TRUNCATED));
+  client->invokeOnDataAvailable(serverAddr, 1000, true);
+}
+
 TEST_F(QuicClientTransportAfterStartTest, RetriableErrorLoopCounting) {
   auto& conn = client->getNonConstConn();
   auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
