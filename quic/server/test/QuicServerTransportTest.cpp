@@ -3409,6 +3409,33 @@ TEST_F(
 
 TEST_F(
     QuicUnencryptedServerTransportTest,
+    TestReceiveClientFinishedFromChangedPeerAddressNoClose) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  server->getNonConstConn().qLogger = qLogger;
+  server->getNonConstConn().transportSettings.closeIfMigrationDuringHandshake =
+      false;
+  recvClientHello();
+
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
+  recvClientFinished(true, &newPeer);
+  EXPECT_FALSE(server->getConn().localConnectionError);
+  EXPECT_FALSE(server->isClosed());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(event->packetSize, 44);
+  EXPECT_EQ(
+      event->dropReason,
+      PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
     ReceiveHandshakePacketFromChangedPeerAddress) {
   server->getNonConstConn().transportSettings.disableMigration = false;
 

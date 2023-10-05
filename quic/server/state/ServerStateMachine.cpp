@@ -1002,6 +1002,9 @@ void onServerReadDataFromOpen(
             conn.statsCallback,
             onPacketDropped,
             PacketDropReason::PEER_ADDRESS_CHANGE);
+        if (!conn.transportSettings.closeIfMigrationDuringHandshake) {
+          return;
+        }
         const char* errMsg = encryptionLevel != EncryptionLevel::AppData
             ? "Migration not allowed during handshake"
             : "Migration disabled";

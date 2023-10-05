@@ -321,6 +321,8 @@ struct TransportSettings {
   // are enabled or not and should not a part of
   //  maybeAckReceiveTimestampsConfigSentToPeer optional.
   uint64_t maxReceiveTimestampsPerAckStored{kMaxReceivedPktsTimestampsStored};
+  // Close the connection completely if a migration occurs during the handshake.
+  bool closeIfMigrationDuringHandshake{true};
 };
 
 } // namespace quic
