@@ -228,7 +228,7 @@ void QuicAsyncUDPSocketImpl::bind(const folly::SocketAddress& address) {
         "error binding socket to " + address.describe(), errno);
   }
 
-  bzero(&saddr, sizeof(saddr));
+  memset(&saddr, 0, sizeof(saddr));
   socklen_t len = sizeof(saddr);
   if (::getsockname(fd_, &saddr, &len) != 0) {
     throw QuicAsyncUDPSocketException("error retrieving local address", errno);
@@ -255,7 +255,7 @@ void QuicAsyncUDPSocketImpl::connect(const folly::SocketAddress& address) {
   connectedAddress_ = address;
 
   if (!localAddress_.isInitialized()) {
-    bzero(&saddr, sizeof(saddr));
+    memset(&saddr, 0, sizeof(saddr));
     socklen_t len = sizeof(saddr);
     if (::getsockname(fd_, &saddr, &len) != 0) {
       throw QuicAsyncUDPSocketException(
@@ -310,7 +310,13 @@ int QuicAsyncUDPSocketImpl::recvmmsg(
     unsigned int vlen,
     unsigned int flags,
     struct timespec* timeout) {
+#ifdef FOLLY_HAVE_RECVMMSG
   return ::recvmmsg(fd_, msgvec, vlen, (int)flags, timeout);
+#else
+  // TODO: share cross-platform code with folly's AsyncUDPSocket.
+  LOG(FATAL) << "no recvmmsg";
+  return -1;
+#endif
 }
 
 bool QuicAsyncUDPSocketImpl::setGRO(bool /* bVal */) {
