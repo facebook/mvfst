@@ -7,7 +7,6 @@ add_library(
   mvfst_batch_writer
   QuicBatchWriter.cpp
   QuicBatchWriterFactory.cpp
-  QuicBatchWriterFactoryMobile.cpp
   QuicGsoBatchWriters.cpp
 )
 
