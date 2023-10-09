@@ -7,8 +7,6 @@ add_library(
   mvfst_dsr_sender INTERFACE
 )
 
-set_property(TARGET mvfst_dsr_sender PROPERTY VERSION ${PACKAGE_VERSION})
-
 target_include_directories(
   mvfst_dsr_sender INTERFACE
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
