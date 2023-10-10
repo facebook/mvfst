@@ -61,8 +61,10 @@ QuicTransportBase::QuicTransportBase(
     return 0us;
   });
   if (socket_) {
-    socket_->setAdditionalCmsgsFunc(
-        [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+    folly::Function<folly::Optional<folly::SocketCmsgMap>()> func = [&]() {
+      return getAdditionalCmsgsForAsyncUDPSocket();
+    };
+    socket_->setAdditionalCmsgsFunc(std::move(func));
   }
 }
 
