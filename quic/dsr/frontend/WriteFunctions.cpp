@@ -70,7 +70,7 @@ uint64_t writePacketizationRequest(
     auto packet = std::move(packetBuilder).buildPacket();
     // The contract is that if scheduler can schedule, builder has to be able to
     // build.
-    CHECK_GT(packet.encodedSize, 0);
+    CHECK_GT(packet.encodedSize, 0u);
     bool instructionAddError = false;
     for (const auto& instruction : packet.sendInstructions) {
       if (!schedulerResult.sender->addSendInstruction(instruction)) {
