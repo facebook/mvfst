@@ -107,12 +107,10 @@ void Bbr2CongestionController::onPacketAckOrLoss(
         conn_.lossState.inflightBytes, lossEvent->lostBytes);
   }
   SCOPE_EXIT {
-    VLOG(6) << fmt::format(
-        "State={} inflight={} cwnd={} (gain={})",
-        bbr2StateToString(state_),
-        conn_.lossState.inflightBytes,
-        getCongestionWindow(),
-        cwndGain_);
+    VLOG(6) << "State=" << bbr2StateToString(state_)
+            << " inflight=" << conn_.lossState.inflightBytes
+            << " cwnd=" << getCongestionWindow() << "(gain=" << cwndGain_
+            << ")";
   };
 
   if (lossEvent && lossEvent->lostPackets > 0 &&
@@ -233,14 +231,13 @@ void Bbr2CongestionController::enterStartup() {
 void Bbr2CongestionController::setPacing() {
   uint64_t pacingWindow =
       bandwidth_ * minRtt_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
-  VLOG(6) << fmt::format(
-      "Setting pacing to {}. From bandwidth_={} pacingGain_={} kPacingMarginPercent={} units={} interval={}",
-      Bandwidth(pacingWindow, minRtt_).normalizedDescribe(),
-      bandwidth_.normalizedDescribe(),
-      pacingGain_,
-      kPacingMarginPercent,
-      pacingWindow,
-      minRtt_.count());
+  VLOG(6) << "Setting pacing to "
+          << Bandwidth(pacingWindow, minRtt_).normalizedDescribe()
+          << " from bandwidth_=" << bandwidth_.normalizedDescribe()
+          << " pacingGain_=" << pacingGain_
+          << " kPacingMarginPercent=" << kPacingMarginPercent
+          << " units=" << pacingWindow << " interval=" << minRtt_.count();
+
   if (state_ == State::Startup && !filledPipe_) {
     pacingWindow = std::max(
         pacingWindow,
@@ -344,10 +341,8 @@ void Bbr2CongestionController::updateLatestDeliverySignals(
 
   bandwidthLatest_ =
       std::max(bandwidthLatest_, getBandwidthSampleFromAck(ackEvent));
-  VLOG(6) << fmt::format(
-      "Bandwidth latest= {}  AppLimited={}",
-      bandwidthLatest_.normalizedDescribe(),
-      bandwidthLatest_.isAppLimited);
+  VLOG(6) << "Bandwidth latest=" << bandwidthLatest_.normalizedDescribe()
+          << "  AppLimited=" << bandwidthLatest_.isAppLimited;
   inflightLatest_ = std::max(inflightLatest_, bandwidthLatest_.units);
 
   auto pkt = ackEvent.getLargestNewlyAckedPacket();
@@ -369,9 +364,8 @@ void Bbr2CongestionController::updateCongestionSignals(
   // Update max bandwidth
   if (bandwidthLatest_ > maxBwFilter_.GetBest() ||
       !bandwidthLatest_.isAppLimited) {
-    VLOG(6) << fmt::format(
-        "Updating bandwidth filter with sample: {}",
-        bandwidthLatest_.normalizedDescribe());
+    VLOG(6) << "Updating bandwidth filter with sample: "
+            << bandwidthLatest_.normalizedDescribe();
     maxBwFilter_.Update(bandwidthLatest_, cycleCount_);
   }
 
@@ -485,10 +479,8 @@ void Bbr2CongestionController::enterDrain() {
 
 void Bbr2CongestionController::checkDrain() {
   if (state_ == State::Drain) {
-    VLOG(6) << fmt::format(
-        "Current inflight {} target inflight {}",
-        conn_.lossState.inflightBytes,
-        getTargetInflightWithGain(1.0));
+    VLOG(6) << "Current inflight" << conn_.lossState.inflightBytes
+            << " target inflight " << getTargetInflightWithGain(1.0);
   }
   if (state_ == State::Drain &&
       conn_.lossState.inflightBytes <= getTargetInflightWithGain(1.0)) {
