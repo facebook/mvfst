@@ -46,7 +46,9 @@ constexpr uint8_t kPacingMarginPercent = 1;
 Bbr2CongestionController::Bbr2CongestionController(
     QuicConnectionStateBase& conn)
     : conn_(conn),
-      maxBwFilter_(kMaxBwFilterLen, Bandwidth(), 0),
+      // WindowedFilter window_length is expiry time which inflates the window
+      // length by 1
+      maxBwFilter_(kMaxBwFilterLen - 1, Bandwidth(), 0),
       probeRttMinTimestamp_(Clock::now()),
       maxExtraAckedFilter_(kMaxExtraAckedFilterLen, 0, 0),
       cwndBytes_(
