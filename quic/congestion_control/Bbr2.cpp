@@ -425,6 +425,9 @@ void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();
 
   if (state_ == State::Startup && filledPipe_) {
+    if (conn_.transportSettings.ccaConfig.advanceCycleAfterStartup) {
+      cycleCount_++;
+    }
     enterDrain();
   }
 }

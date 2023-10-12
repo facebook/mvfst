@@ -73,8 +73,12 @@ struct CongestionControlConfig {
   bool ignoreInflightHi{false};
 
   // Used by: BBR2
-  // Wether BBR2 should ignore packet loss (i.e. act more like BBR1)
+  // Whether BBR2 should ignore packet loss (i.e. act more like BBR1)
   bool ignoreLoss{false};
+
+  // Used by: BBR2
+  // Whether BBR2 should advance the cycle count on exiting startup
+  bool advanceCycleAfterStartup{true};
 };
 
 struct DatagramConfig {
