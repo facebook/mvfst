@@ -20,11 +20,9 @@ class MbedCryptoFactory : public CryptoFactory {
       QuicVersion version) const override;
 
   std::unique_ptr<Aead> makeInitialAead(
-      folly::StringPiece /*label*/,
-      const ConnectionId& /*clientDestinationConnId*/,
-      QuicVersion /*version*/) const override {
-    return nullptr;
-  }
+      folly::StringPiece label,
+      const ConnectionId& clientDstConnId,
+      QuicVersion version) const override;
 
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       folly::ByteRange /*baseSecret*/) const override {

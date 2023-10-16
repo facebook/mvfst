@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/mbed/MbedAead.h>
 #include <quic/mbed/MbedCryptoFactory.h>
 
 #include <glog/logging.h>
@@ -143,4 +144,70 @@ Buf MbedCryptoFactory::makeInitialTrafficSecret(
   return output_key;
 }
 
+std::unique_ptr<Aead> MbedCryptoFactory::makeInitialAead(
+    folly::StringPiece label,
+    const ConnectionId& clientDstConnId,
+    QuicVersion version) const {
+  /**
+   * RFC9001:
+   * The current encryption level secret and the label "quic key" are input to
+   * the KDF to produce the AEAD key; the label "quic iv" is used to derive the
+   * Initialization Vector (IV)
+   */
+  auto initial_secret =
+      makeInitialTrafficSecret(label, clientDstConnId, version);
+  CHECK(!initial_secret->isChained());
+
+  // message digest info struct
+  const mbedtls_md_info_t* md_info =
+      CHECK_NOTNULL(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256));
+
+  // cipher info struct
+  const mbedtls_cipher_info_t* cipher_info =
+      CHECK_NOTNULL(mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_GCM));
+
+  // hkdf expand to produce key & iv for constructing Aead
+  size_t key_size = cipher_info->key_bitlen >> 3;
+  auto key = folly::IOBuf::create(key_size);
+  auto key_label =
+      HkdfLabel(/*length=*/key_size, /*label=*/kQuicKeyLabel).encodeHkdfLabel();
+  if (mbedtls_hkdf_expand(
+          /*md=*/md_info,
+          /*prk=*/initial_secret->data(),
+          /*prk_len=*/initial_secret->length(),
+          /*info=*/key_label.data(),
+          /*info_len=*/key_label.size(),
+          /*okm=*/key->writableData(),
+          /*okm_len=*/key_size) != 0) {
+    throw std::runtime_error("mbedtls: hkdf expand failed!");
+  }
+
+  auto iv = folly::IOBuf::create(cipher_info->iv_size);
+  auto iv_label =
+      HkdfLabel(/*length=*/cipher_info->iv_size, /*label=*/kQuicIVLabel)
+          .encodeHkdfLabel();
+  if (mbedtls_hkdf_expand(
+          /*md=*/md_info,
+          /*prk=*/initial_secret->data(),
+          /*prk_len=*/initial_secret->length(),
+          /*info=*/iv_label.data(),
+          /*info_len=*/iv_label.size(),
+          /*okm=*/iv->writableData(),
+          /*okm_len=*/cipher_info->iv_size) != 0) {
+    throw std::runtime_error("mbedtls: hkdf expand failed!");
+  }
+
+  // adjust iobuf tail accordingly
+  key->append(key_size);
+  iv->append(cipher_info->iv_size);
+
+  /**
+   * RFC9001:
+   * Initial packets use AEAD_AES_128_GCM with keys derived from the Destination
+   * Connection ID field of the first Initial packet sent by the client
+   */
+  return std::make_unique<MbedAead>(
+      CipherType::AESGCM128,
+      TrafficKey{.key = std::move(key), .iv = std::move(iv)});
+}
 } // namespace quic
