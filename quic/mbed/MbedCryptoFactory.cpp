@@ -7,6 +7,7 @@
 
 #include <quic/mbed/MbedAead.h>
 #include <quic/mbed/MbedCryptoFactory.h>
+#include <quic/mbed/MbedPacketNumCipher.h>
 
 #include <glog/logging.h>
 
@@ -150,6 +151,7 @@ std::unique_ptr<Aead> MbedCryptoFactory::makeInitialAead(
     QuicVersion version) const {
   /**
    * RFC9001:
+   *
    * The current encryption level secret and the label "quic key" are input to
    * the KDF to produce the AEAD key; the label "quic iv" is used to derive the
    * Initialization Vector (IV)
@@ -203,6 +205,7 @@ std::unique_ptr<Aead> MbedCryptoFactory::makeInitialAead(
 
   /**
    * RFC9001:
+   *
    * Initial packets use AEAD_AES_128_GCM with keys derived from the Destination
    * Connection ID field of the first Initial packet sent by the client
    */
@@ -210,4 +213,50 @@ std::unique_ptr<Aead> MbedCryptoFactory::makeInitialAead(
       CipherType::AESGCM128,
       TrafficKey{.key = std::move(key), .iv = std::move(iv)});
 }
+
+// TODO(damlaj): only supports one algorithm right now
+std::unique_ptr<PacketNumberCipher> MbedCryptoFactory::makePacketNumberCipher(
+    folly::ByteRange secret) const {
+  /**
+   * RFC9001:
+   *
+   * Parts of QUIC packet headers, in particular the Packet Number field, are
+   * protected using a key ... derived using the "quic hp" label to provide
+   * confidentiality protection to those fields.
+   */
+
+  // message digest info struct
+  const mbedtls_md_info_t* md_info =
+      CHECK_NOTNULL(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256));
+
+  // cipher info struct
+  const mbedtls_cipher_info_t* cipher_info =
+      CHECK_NOTNULL(mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_GCM));
+
+  // hkdf expand to produce key & iv for constructing Aead
+  size_t key_size = cipher_info->key_bitlen >> 3;
+  auto key = folly::IOBuf::create(key_size);
+  auto key_label =
+      HkdfLabel(/*length=*/key_size, /*label=*/kQuicPNLabel).encodeHkdfLabel();
+
+  if (mbedtls_hkdf_expand(
+          /*md=*/md_info,
+          /*prk=*/uchr_ptr(secret.data()),
+          /*prk_len=*/secret.size(),
+          /*info=*/key_label.data(),
+          /*info_len=*/key_label.size(),
+          /*okm=*/key->writableData(),
+          /*okm_len=*/key_size) != 0) {
+    throw std::runtime_error("mbedtls: hkdf expand failed!");
+  }
+
+  // adjust iobuf tail accordingly
+  key->append(key_size);
+
+  auto packetNumCipher = std::make_unique<MbedPacketNumCipher>(AESGCM128);
+  packetNumCipher->setKey(folly::ByteRange(key->data(), key->length()));
+
+  return packetNumCipher;
+}
+
 } // namespace quic

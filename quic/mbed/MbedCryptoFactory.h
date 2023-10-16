@@ -25,9 +25,7 @@ class MbedCryptoFactory : public CryptoFactory {
       QuicVersion version) const override;
 
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      folly::ByteRange /*baseSecret*/) const override {
-    return nullptr;
-  }
+      folly::ByteRange secret) const override;
 };
 
 } // namespace quic
