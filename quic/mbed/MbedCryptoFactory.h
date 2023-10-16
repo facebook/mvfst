@@ -8,17 +8,16 @@
 #pragma once
 
 #include <quic/handshake/CryptoFactory.h>
+#include <quic/handshake/HandshakeLayer.h>
 
 namespace quic {
 
 class MbedCryptoFactory : public CryptoFactory {
  public:
   Buf makeInitialTrafficSecret(
-      folly::StringPiece /*label*/,
-      const ConnectionId& /*clientDestinationConnId*/,
-      QuicVersion /*version*/) const override {
-    return nullptr;
-  }
+      folly::StringPiece label,
+      const ConnectionId& clientDstConnId,
+      QuicVersion version) const override;
 
   std::unique_ptr<Aead> makeInitialAead(
       folly::StringPiece /*label*/,
