@@ -45,19 +45,19 @@ struct ClientTransportParametersExtension {
     return serverTransportParameters_;
   }
 
-  QuicVersion encodingVersion_;
-  uint64_t initialMaxData_;
-  uint64_t initialMaxStreamDataBidiLocal_;
-  uint64_t initialMaxStreamDataBidiRemote_;
-  uint64_t initialMaxStreamDataUni_;
-  uint64_t initialMaxStreamsBidi_;
-  uint64_t initialMaxStreamsUni_;
-  std::chrono::milliseconds idleTimeout_;
-  uint64_t ackDelayExponent_;
-  uint64_t maxRecvPacketSize_;
-  uint64_t activeConnectionLimit_;
-  ConnectionId initialSourceCid_;
+  const QuicVersion encodingVersion_;
+  const uint64_t initialMaxData_;
+  const uint64_t initialMaxStreamDataBidiLocal_;
+  const uint64_t initialMaxStreamDataBidiRemote_;
+  const uint64_t initialMaxStreamDataUni_;
+  const uint64_t initialMaxStreamsBidi_;
+  const uint64_t initialMaxStreamsUni_;
+  const std::chrono::milliseconds idleTimeout_;
+  const uint64_t ackDelayExponent_;
+  const uint64_t maxRecvPacketSize_;
+  const uint64_t activeConnectionLimit_;
+  const ConnectionId initialSourceCid_;
+  const std::vector<TransportParameter> customTransportParameters_;
   folly::Optional<ServerTransportParameters> serverTransportParameters_;
-  std::vector<TransportParameter> customTransportParameters_;
 };
 } // namespace quic
