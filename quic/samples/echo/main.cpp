@@ -13,10 +13,14 @@
 
 #include <quic/samples/echo/EchoClient.h>
 #include <quic/samples/echo/EchoServer.h>
+#include <quic/samples/echo/EchoTransportServer.h>
 
 DEFINE_string(host, "::1", "Echo server hostname/IP");
 DEFINE_int32(port, 6666, "Echo server port");
-DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
+DEFINE_string(
+    mode,
+    "server",
+    "Mode to run in: 'client', 'server', transport-server");
 DEFINE_string(
     token,
     "",
@@ -54,6 +58,9 @@ int main(int argc, char* argv[]) {
         FLAGS_enable_migration,
         FLAGS_use_stream_groups,
         FLAGS_disable_rtx);
+    server.start();
+  } else if (FLAGS_mode == "transport-server") {
+    EchoTransportServer server(FLAGS_host, FLAGS_port);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {
