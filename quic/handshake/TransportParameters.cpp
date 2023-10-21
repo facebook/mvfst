@@ -84,16 +84,6 @@ TransportParameterId CustomTransportParameter::getParameterId() const {
   return static_cast<TransportParameterId>(id_);
 }
 
-CustomStringTransportParameter::CustomStringTransportParameter(
-    uint64_t id,
-    std::string value)
-    : CustomTransportParameter(id), value_(value) {}
-
-TransportParameter CustomStringTransportParameter::encode() const {
-  return {
-      static_cast<TransportParameterId>(id_), folly::IOBuf::copyBuffer(value_)};
-}
-
 CustomIntegralTransportParameter::CustomIntegralTransportParameter(
     uint64_t id,
     uint64_t value)

@@ -74,16 +74,6 @@ class CustomTransportParameter {
   uint64_t id_;
 };
 
-class CustomStringTransportParameter : public CustomTransportParameter {
- public:
-  CustomStringTransportParameter(uint64_t id, std::string value);
-
-  TransportParameter encode() const override;
-
- private:
-  std::string value_;
-};
-
 class CustomIntegralTransportParameter : public CustomTransportParameter {
  public:
   CustomIntegralTransportParameter(uint64_t id, uint64_t value);
