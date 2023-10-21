@@ -204,38 +204,4 @@ inline void validateTransportExtensions(
     }
   }
 }
-
-namespace detail {
-
-template <>
-struct Reader<quic::TransportParameter> {
-  template <class T>
-  size_t read(quic::TransportParameter& param, folly::io::Cursor& cursor) {
-    size_t len = 0;
-    uint16_t tmpId;
-    len += detail::read(tmpId, cursor);
-    param.parameter = static_cast<quic::TransportParameterId>(tmpId);
-    len += readBuf<uint16_t>(param.value, cursor);
-    return len;
-  }
-};
-
-template <>
-struct Writer<quic::TransportParameter> {
-  template <class T>
-  void write(const quic::TransportParameter& param, folly::io::Appender& out) {
-    uint16_t tmpId = static_cast<uint16_t>(param.parameter);
-    detail::write(tmpId, out);
-    detail::writeBuf<uint16_t>(param.value, out);
-  }
-};
-
-template <>
-struct Sizer<quic::TransportParameter> {
-  template <class T>
-  size_t getSize(const quic::TransportParameter& param) {
-    return sizeof(uint16_t) + getBufSize<uint16_t>(param.value);
-  }
-};
-} // namespace detail
 } // namespace fizz
