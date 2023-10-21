@@ -94,15 +94,6 @@ TransportParameter CustomStringTransportParameter::encode() const {
       static_cast<TransportParameterId>(id_), folly::IOBuf::copyBuffer(value_)};
 }
 
-CustomBlobTransportParameter::CustomBlobTransportParameter(
-    uint64_t id,
-    std::unique_ptr<folly::IOBuf> value)
-    : CustomTransportParameter(id), value_(std::move(value)) {}
-
-TransportParameter CustomBlobTransportParameter::encode() const {
-  return {static_cast<TransportParameterId>(id_), value_->clone()};
-}
-
 CustomIntegralTransportParameter::CustomIntegralTransportParameter(
     uint64_t id,
     uint64_t value)

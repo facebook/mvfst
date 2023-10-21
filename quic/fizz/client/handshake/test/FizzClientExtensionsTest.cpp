@@ -195,13 +195,8 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   std::unique_ptr<CustomTransportParameter> element2 =
       std::make_unique<CustomStringTransportParameter>(0x4001, "abc");
 
-  std::unique_ptr<CustomTransportParameter> element3 =
-      std::make_unique<CustomBlobTransportParameter>(
-          0x4002, folly::IOBuf::copyBuffer(randomBytes));
-
   customTransportParameters.push_back(element1->encode());
   customTransportParameters.push_back(element2->encode());
-  customTransportParameters.push_back(element3->encode());
 
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1,
@@ -242,15 +237,6 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
 
   EXPECT_NE(it2, serverParams->parameters.end());
 
-  auto it3 = std::find_if(
-      serverParams->parameters.begin(),
-      serverParams->parameters.end(),
-      [](const TransportParameter& param) {
-        return static_cast<uint16_t>(param.parameter) == 0x4002;
-      });
-
-  EXPECT_NE(it3, serverParams->parameters.end());
-
   // check that the values equal what we expect
   folly::IOBufEqualTo eq;
 
@@ -259,8 +245,6 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   EXPECT_EQ(val->first, 12);
 
   EXPECT_TRUE(eq(folly::IOBuf::copyBuffer("abc"), it2->value));
-
-  EXPECT_TRUE(eq(folly::IOBuf::copyBuffer(randomBytes), it3->value));
 }
 } // namespace test
 } // namespace quic

@@ -84,18 +84,6 @@ class CustomStringTransportParameter : public CustomTransportParameter {
   std::string value_;
 };
 
-class CustomBlobTransportParameter : public CustomTransportParameter {
- public:
-  CustomBlobTransportParameter(
-      uint64_t id,
-      std::unique_ptr<folly::IOBuf> value);
-
-  TransportParameter encode() const override;
-
- private:
-  std::unique_ptr<folly::IOBuf> value_;
-};
-
 class CustomIntegralTransportParameter : public CustomTransportParameter {
  public:
   CustomIntegralTransportParameter(uint64_t id, uint64_t value);
