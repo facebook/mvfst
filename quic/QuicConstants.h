@@ -614,6 +614,10 @@ constexpr uint16_t kMaxDatagramPacketOverhead = 25 + 16;
 // The Maximum number of datagrams (in/out) to buffer
 constexpr uint32_t kDefaultMaxDatagramsBuffered = 75;
 
+// Minimum interval between new session tickets sent by the server in
+// milliseconds
+constexpr std::chrono::milliseconds kMinIntervalBetweenSessionTickets = 100ms;
+
 enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
   REJECT_IF_NO_EXACT_MATCH = 0,
   LIMIT_IF_NO_EXACT_MATCH = 1,

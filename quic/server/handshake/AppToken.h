@@ -35,6 +35,7 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamDataBidiRemote,
     uint64_t initialMaxStreamDataUni,
     uint64_t initialMaxStreamsBidi,
-    uint64_t initialMaxStreamsUni);
+    uint64_t initialMaxStreamsUni,
+    folly::Optional<uint64_t> cwndHintBytes = folly::none);
 
 } // namespace quic

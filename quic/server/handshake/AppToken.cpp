@@ -17,7 +17,8 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamDataBidiRemote,
     uint64_t initialMaxStreamDataUni,
     uint64_t initialMaxStreamsBidi,
-    uint64_t initialMaxStreamsUni) {
+    uint64_t initialMaxStreamsUni,
+    folly::Optional<uint64_t> cwndHintBytes) {
   TicketTransportParameters params;
   params.parameters.push_back(
       encodeIntegerParameter(TransportParameterId::idle_timeout, idleTimeout));
@@ -38,6 +39,10 @@ TicketTransportParameters createTicketTransportParameters(
       TransportParameterId::initial_max_streams_bidi, initialMaxStreamsBidi));
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::initial_max_streams_uni, initialMaxStreamsUni));
+  if (cwndHintBytes) {
+    params.parameters.push_back((encodeIntegerParameter(
+        TransportParameterId::cwnd_hint_bytes, *cwndHintBytes)));
+  }
   return params;
 }
 

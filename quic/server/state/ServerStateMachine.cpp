@@ -545,7 +545,8 @@ void updateTransportParamsFromTicket(
     uint64_t initialMaxStreamDataBidiRemote,
     uint64_t initialMaxStreamDataUni,
     uint64_t initialMaxStreamsBidi,
-    uint64_t initialMaxStreamsUni) {
+    uint64_t initialMaxStreamsUni,
+    folly::Optional<uint64_t> maybeCwndHintBytes) {
   conn.transportSettings.idleTimeout = std::chrono::milliseconds(idleTimeout);
   conn.transportSettings.maxRecvPacketSize = maxRecvPacketSize;
 
@@ -563,6 +564,13 @@ void updateTransportParamsFromTicket(
   conn.transportSettings.advertisedInitialMaxStreamsBidi =
       initialMaxStreamsBidi;
   conn.transportSettings.advertisedInitialMaxStreamsUni = initialMaxStreamsUni;
+
+  conn.maybeCwndHintBytes = maybeCwndHintBytes;
+
+  if (maybeCwndHintBytes) {
+    VLOG(7) << fmt::format(
+        "Got a cwnd hint in a 0-rtt ticket.  = {}", *maybeCwndHintBytes);
+  }
 }
 
 void onConnectionMigration(

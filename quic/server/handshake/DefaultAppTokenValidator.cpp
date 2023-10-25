@@ -130,6 +130,10 @@ bool DefaultAppTokenValidator::validate(
     return validated = false;
   }
 
+  // This is an optional parameter in the ticket
+  auto cwndHintBytes =
+      getIntegerParameter(TransportParameterId::cwnd_hint_bytes, params);
+
   // TODO max ack delay, is this really necessary?
   // spec says disable_migration should also be in the ticket. It shouldn't.
 
@@ -159,7 +163,8 @@ bool DefaultAppTokenValidator::validate(
       *ticketMaxStreamDataBidiRemote,
       *ticketMaxStreamDataUni,
       *ticketMaxStreamsBidi,
-      *ticketMaxStreamsUni);
+      *ticketMaxStreamsUni,
+      cwndHintBytes);
 
   return validated;
 }

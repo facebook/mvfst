@@ -190,6 +190,7 @@ class QuicServerTransport
   void maybeNotifyHandshakeFinished();
   bool hasReadCipher() const;
   void registerAllTransportKnobParamHandlers();
+  bool shouldWriteNewSessionTicket();
 
  private:
   RoutingCallback* routingCb_{nullptr};
@@ -197,7 +198,8 @@ class QuicServerTransport
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   bool notifiedRouting_{false};
   bool notifiedConnIdBound_{false};
-  bool newSessionTicketWritten_{false};
+  folly::Optional<TimePoint> newSessionTicketWrittenTimestamp_;
+  folly::Optional<uint64_t> newSessionTicketWrittenCwndHint_;
   QuicServerConnectionState* serverConn_;
   std::unordered_map<
       uint64_t,

@@ -72,6 +72,14 @@ void expectAppTokenEqual(
       appToken.transportParams.parameters);
   EXPECT_EQ(ackDelayExponent, expectedAckDelayExponent);
 
+  auto cwndHintBytes = getIntegerParameter(
+      TransportParameterId::cwnd_hint_bytes,
+      decodedAppToken->transportParams.parameters);
+  auto expectedCwndHintBytes = getIntegerParameter(
+      TransportParameterId::cwnd_hint_bytes,
+      appToken.transportParams.parameters);
+  EXPECT_EQ(cwndHintBytes, expectedCwndHintBytes);
+
   EXPECT_EQ(
       decodedAppToken->sourceAddresses.size(), appToken.sourceAddresses.size());
   for (size_t ii = 0; ii < appToken.sourceAddresses.size(); ++ii) {
@@ -239,6 +247,26 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
+  appToken.version = QuicVersion::MVFST;
+  Buf buf = encodeAppToken(appToken);
+
+  expectAppTokenEqual(decodeAppToken(*buf), appToken);
+}
+
+TEST(AppTokenTest, TestEncodeAndDecodeCwndHint) {
+  AppToken appToken;
+  appToken.transportParams = createTicketTransportParameters(
+      kDefaultIdleTimeout.count(),
+      kDefaultUDPReadBufferSize,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      std::numeric_limits<uint32_t>::max() - 8,
+      std::numeric_limits<uint32_t>::max() - 9,
+      std::numeric_limits<uint32_t>::max() - 10);
+  appToken.sourceAddresses = {
+      folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 

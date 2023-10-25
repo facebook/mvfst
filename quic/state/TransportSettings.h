@@ -296,6 +296,8 @@ struct TransportSettings {
   bool dropIngressOnStopSending{false};
   bool advertisedKnobFrameSupport{true};
   bool removeStreamAfterEomCallbackUnset{false};
+  // Whether to include cwnd hint in new session tickets for 0-rtt
+  bool includeCwndHintsInSessionTicket{false};
 
   // The default priority to instantiate streams with.
   Priority defaultPriority{kDefaultPriority};
