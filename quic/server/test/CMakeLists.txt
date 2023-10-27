@@ -20,6 +20,18 @@ quic_add_test(TARGET QuicServerTest
   mvfst_transport
 )
 
+quic_add_test(TARGET QuicClientServerIntegrationTest
+  SOURCES
+  QuicClientServerIntegrationTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_codec
+  mvfst_codec_types
+  mvfst_server
+  mvfst_test_utils
+  mvfst_transport
+)
+
 quic_add_test(TARGET QuicServerTransportTest
   SOURCES
   QuicServerTransportTest.cpp
