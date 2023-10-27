@@ -210,4 +210,26 @@ TEST_F(ServerTransportParameters, disableMigrationParam) {
   EXPECT_NE(it, serverTransportParams->parameters.end());
 }
 
+TEST_F(ServerTransportParameters, MaxStreamGroupsParam) {
+  // advertise support for stream groups
+  serverTs_.advertisedMaxStreamGroups = 1;
+  startServer();
+
+  // create & connect client
+  client_ = createQuicClient();
+  clientConnect();
+  auto clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+
+  const auto& serverTransportParams =
+      clientConn->clientHandshakeLayer->getServerTransportParams();
+  CHECK(serverTransportParams.has_value());
+
+  // validate stream_groups_enabled parameter was rx'd
+  auto it = findParameter(
+      serverTransportParams->parameters,
+      TransportParameterId::stream_groups_enabled);
+  EXPECT_NE(it, serverTransportParams->parameters.end());
+}
+
 } // namespace quic::test
