@@ -105,6 +105,11 @@ class ServerTransportParameters : public testing::Test {
   folly::EventBase evb_;
 };
 
+/**
+ * Tests the parameters that are sent with the default TransportSettings. Test
+ * will need to be modified when we begin sending a new transport parameter on
+ * the wire by default.
+ */
 TEST_F(ServerTransportParameters, InvariantlyAdvertisedParameters) {
   startServer();
 
@@ -120,20 +125,26 @@ TEST_F(ServerTransportParameters, InvariantlyAdvertisedParameters) {
   CHECK(serverTransportParams.has_value());
 
   using _id = TransportParameterId;
-  for (auto paramId :
-       {_id::initial_max_stream_data_bidi_local,
-        _id::initial_max_stream_data_bidi_remote,
-        _id::initial_max_stream_data_uni,
-        _id::initial_max_data,
-        _id::initial_max_streams_bidi,
-        _id::initial_max_streams_uni,
-        _id::idle_timeout,
-        _id::ack_delay_exponent,
-        _id::max_packet_size,
-        _id::stateless_reset_token}) {
-    auto param =
-        getIntegerParameter(paramId, serverTransportParams->parameters);
-    EXPECT_TRUE(param.has_value());
+  auto expectedParams = {
+      _id::initial_max_stream_data_bidi_local,
+      _id::initial_max_stream_data_bidi_remote,
+      _id::initial_max_stream_data_uni,
+      _id::initial_max_data,
+      _id::initial_max_streams_bidi,
+      _id::initial_max_streams_uni,
+      _id::idle_timeout,
+      _id::ack_delay_exponent,
+      _id::max_packet_size,
+      _id::stateless_reset_token,
+      _id::disable_migration,
+      _id::knob_frames_supported,
+      _id::ack_receive_timestamps_enabled};
+
+  // validate equality of expected params and params sent by server
+  EXPECT_EQ(serverTransportParams->parameters.size(), expectedParams.size());
+  for (auto paramId : expectedParams) {
+    auto param = findParameter(serverTransportParams->parameters, paramId);
+    EXPECT_NE(param, serverTransportParams->parameters.end());
   }
 
   client_.reset();
