@@ -139,16 +139,16 @@ inline std::uint64_t siphash24(const void *src, std::size_t len, const Key *key)
 	const std::uint8_t *m = reinterpret_cast<const std::uint8_t *>(in);
 
 	switch (len) {
-		case 7: pt[6] = m[6];
-		case 6: pt[5] = m[5];
-		case 5: pt[4] = m[4];
+		case 7: pt[6] = m[6]; [[fallthrough]];
+		case 6: pt[5] = m[5]; [[fallthrough]];
+		case 5: pt[4] = m[4]; [[fallthrough]];
 		case 4:
 				*(reinterpret_cast<std::uint32_t*>(pt)) =
 					*(reinterpret_cast<const std::uint32_t*>(m));
 				break;
-		case 3: pt[2] = m[2];
-		case 2: pt[1] = m[1];
-		case 1: pt[0] = m[0];
+		case 3: pt[2] = m[2]; [[fallthrough]];
+		case 2: pt[1] = m[1]; [[fallthrough]];
+		case 1: pt[0] = m[0]; 
 	}
 	b |= _le64toh(t);
 
