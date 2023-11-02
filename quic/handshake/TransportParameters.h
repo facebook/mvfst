@@ -61,30 +61,6 @@ struct TransportParameter {
   }
 };
 
-class CustomTransportParameter {
- public:
-  TransportParameterId getParameterId() const;
-
-  virtual TransportParameter encode() const = 0;
-
-  virtual ~CustomTransportParameter() = default;
-
- protected:
-  explicit CustomTransportParameter(uint64_t id) : id_(id) {}
-
-  uint64_t id_;
-};
-
-class CustomIntegralTransportParameter : public CustomTransportParameter {
- public:
-  CustomIntegralTransportParameter(uint64_t id, uint64_t value);
-
-  TransportParameter encode() const override;
-
- private:
-  uint64_t value_;
-};
-
 struct ClientTransportParameters {
   std::vector<TransportParameter> parameters;
 };

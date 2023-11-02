@@ -189,10 +189,8 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
 
   std::string randomBytes = "\x01\x00\x55\x12\xff";
 
-  std::unique_ptr<CustomTransportParameter> element1 =
-      std::make_unique<CustomIntegralTransportParameter>(0x4000, 12);
-
-  customTransportParameters.push_back(element1->encode());
+  customTransportParameters.push_back(
+      encodeIntegerParameter(static_cast<TransportParameterId>(0x4000), 12));
 
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1,

@@ -196,11 +196,8 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  auto knobFrameSupportParam =
-      std::make_unique<CustomIntegralTransportParameter>(
-          static_cast<uint64_t>(TransportParameterId::knob_frames_supported),
-          1);
-  transportParams.push_back(knobFrameSupportParam->encode());
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 1));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   processServerInitialParams(clientConn, serverTransportParams, 0);
@@ -211,11 +208,8 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  auto knobFrameSupportParam =
-      std::make_unique<CustomIntegralTransportParameter>(
-          static_cast<uint64_t>(TransportParameterId::knob_frames_supported),
-          0);
-  transportParams.push_back(knobFrameSupportParam->encode());
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 0));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   processServerInitialParams(clientConn, serverTransportParams, 0);
@@ -239,10 +233,9 @@ TEST_P(
   std::vector<TransportParameter> transportParams;
 
   if (GetParam().peerMaxGroupsIn > 0) {
-    CustomIntegralTransportParameter streamGroupsEnabledParam(
-        static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-        GetParam().peerMaxGroupsIn);
-    transportParams.push_back(streamGroupsEnabledParam.encode());
+    transportParams.push_back(encodeIntegerParameter(
+        TransportParameterId::stream_groups_enabled,
+        GetParam().peerMaxGroupsIn));
   }
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};

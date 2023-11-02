@@ -10,6 +10,7 @@
 #include <quic/common/BufUtil.h>
 
 namespace quic {
+
 folly::Optional<uint64_t> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
@@ -78,19 +79,6 @@ TransportParameter encodeIntegerParameter(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
   return {id, std::move(data)};
-}
-
-TransportParameterId CustomTransportParameter::getParameterId() const {
-  return static_cast<TransportParameterId>(id_);
-}
-
-CustomIntegralTransportParameter::CustomIntegralTransportParameter(
-    uint64_t id,
-    uint64_t value)
-    : CustomTransportParameter(id), value_(value) {}
-
-TransportParameter CustomIntegralTransportParameter::encode() const {
-  return encodeIntegerParameter(static_cast<TransportParameterId>(id_), value_);
 }
 
 } // namespace quic

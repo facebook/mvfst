@@ -26,8 +26,8 @@ static ClientHello getClientHello(QuicVersion version) {
   auto chlo = TestMessages::clientHello();
 
   ClientTransportParameters clientParams;
-  clientParams.parameters.emplace_back(
-      CustomIntegralTransportParameter(0xffff, 0xffff).encode());
+  clientParams.parameters.emplace_back(encodeIntegerParameter(
+      static_cast<TransportParameterId>(0xffff), 0xffff));
 
   chlo.extensions.push_back(encodeExtension(clientParams, version));
 
@@ -116,8 +116,8 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
 
   auto chlo = getClientHello(QuicVersion::QUIC_V1);
   ClientTransportParameters duplicateClientParams;
-  duplicateClientParams.parameters.emplace_back(
-      CustomIntegralTransportParameter(0xffff, 0xffff).encode());
+  duplicateClientParams.parameters.emplace_back(encodeIntegerParameter(
+      static_cast<TransportParameterId>(0xffff), 0xffff));
   chlo.extensions.push_back(
       encodeExtension(duplicateClientParams, QuicVersion::QUIC_V1));
 

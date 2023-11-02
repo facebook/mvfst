@@ -1624,54 +1624,43 @@ void QuicClientTransport::setSelfOwning() {
 
 void QuicClientTransport::setSupportedExtensionTransportParameters() {
   const auto& ts = conn_->transportSettings;
+  using TpId = TransportParameterId;
   customTransportParameters_.clear();
+
   if (ts.minAckDelay.hasValue()) {
-    CustomIntegralTransportParameter minAckDelayParam(
-        static_cast<uint64_t>(TransportParameterId::min_ack_delay),
-        ts.minAckDelay.value().count());
-    customTransportParameters_.push_back(minAckDelayParam.encode());
+    customTransportParameters_.push_back(encodeIntegerParameter(
+        TpId::min_ack_delay, ts.minAckDelay.value().count()));
   }
 
   if (ts.datagramConfig.enabled) {
-    CustomIntegralTransportParameter maxDatagramFrameSize(
-        static_cast<uint64_t>(TransportParameterId::max_datagram_frame_size),
-        conn_->datagramState.maxReadFrameSize);
-    customTransportParameters_.push_back(maxDatagramFrameSize.encode());
+    customTransportParameters_.push_back(encodeIntegerParameter(
+        TpId::max_datagram_frame_size, conn_->datagramState.maxReadFrameSize));
   }
 
-  CustomIntegralTransportParameter ackReceiveTimestampsEnabled(
-      static_cast<uint64_t>(
-          TransportParameterId::ack_receive_timestamps_enabled),
-      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);
-  customTransportParameters_.push_back(ackReceiveTimestampsEnabled.encode());
+  customTransportParameters_.push_back(encodeIntegerParameter(
+      TpId::ack_receive_timestamps_enabled,
+      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0));
 
   if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
-    CustomIntegralTransportParameter maxReceiveTimestampsPerAck(
-        static_cast<uint64_t>(
-            TransportParameterId::max_receive_timestamps_per_ack),
+    customTransportParameters_.push_back(encodeIntegerParameter(
+        TpId::max_receive_timestamps_per_ack,
         ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .maxReceiveTimestampsPerAck);
-    customTransportParameters_.push_back(maxReceiveTimestampsPerAck.encode());
+            .maxReceiveTimestampsPerAck));
 
-    CustomIntegralTransportParameter receiveTimestampsExponent(
-        static_cast<uint64_t>(
-            TransportParameterId::receive_timestamps_exponent),
+    customTransportParameters_.push_back(encodeIntegerParameter(
+        TpId::receive_timestamps_exponent,
         ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .receiveTimestampsExponent);
-    customTransportParameters_.push_back(receiveTimestampsExponent.encode());
+            .receiveTimestampsExponent));
   }
 
   if (ts.advertisedKnobFrameSupport) {
-    CustomIntegralTransportParameter knobFrameSupport(
-        static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
-    customTransportParameters_.push_back(knobFrameSupport.encode());
+    customTransportParameters_.push_back(
+        encodeIntegerParameter(TpId::knob_frames_supported, 1));
   }
 
   if (ts.advertisedMaxStreamGroups > 0) {
-    CustomIntegralTransportParameter streamGroupsEnabledParam(
-        static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-        conn_->transportSettings.advertisedMaxStreamGroups);
-    customTransportParameters_.push_back(streamGroupsEnabledParam.encode());
+    customTransportParameters_.push_back(encodeIntegerParameter(
+        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups));
   }
 }
 
