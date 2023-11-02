@@ -23,8 +23,7 @@ folly::Optional<uint64_t> getIntegerParameter(
   if (!parameter) {
     throw QuicTransportException(
         folly::to<std::string>(
-            "Failed to decode integer from TransportParameterId: ",
-            static_cast<uint64_t>(id)),
+            "Failed to decode integer from TransportParameterId: ", u64_tp(id)),
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
   return parameter->first;

@@ -13,6 +13,9 @@
 
 namespace quic {
 
+// macro for repetitive static_cast<uint64_t>(TransportParameterId)
+#define u64_tp(tp_id) static_cast<uint64_t>(tp_id)
+
 enum class TransportParameterId : uint64_t {
   original_destination_connection_id = 0x0000,
   idle_timeout = 0x0001,
@@ -58,6 +61,47 @@ struct TransportParameter {
     parameter = other.parameter;
     value = std::move(other.value);
     return *this;
+  }
+
+  /**
+   * RFC9000:
+   * Each transport parameter is encoded as an (identifier, length, value)
+   * tuple:
+   *
+   *  Transport Parameter {
+   *    Transport Parameter ID (i),
+   *    Transport Parameter Length (i),
+   *    Transport Parameter Value (..),
+   *  }
+   */
+
+  // calc size needed to encode TransportParameter on the wire as shown above
+  uint64_t getEncodedSize() const {
+    // varint size of param + varint size of value's length + size of value
+    uint64_t valueLen = value->computeChainDataLength();
+    return getQuicIntegerSize(u64_tp(parameter)).value() +
+        getQuicIntegerSize(valueLen).value() + valueLen;
+  }
+
+  // Encodes TransportParameter as shown above (avoids reallocations)
+  Buf encode() const {
+    // reserve the exact size needed
+    auto res = folly::IOBuf::createCombined(getEncodedSize());
+
+    // write parameter; need to improve QuicInteger encoding methods
+    BufWriter writer(*res, res->capacity());
+    auto appenderOp = [&](auto val) { writer.writeBE(val); };
+    CHECK(encodeQuicInteger(u64_tp(parameter), appenderOp));
+
+    // write size of value
+    CHECK(encodeQuicInteger(value->computeChainDataLength(), appenderOp));
+
+    // write value if present
+    if (value) {
+      writer.insert(value.get());
+    }
+
+    return res;
   }
 };
 

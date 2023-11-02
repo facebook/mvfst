@@ -12,29 +12,39 @@
 #include <quic/common/BufUtil.h>
 #include <quic/handshake/TransportParameters.h>
 
-namespace quic {
+namespace {
+
+inline quic::Buf encodeVarintParams(
+    const std::vector<quic::TransportParameter>& parameters) {
+  // chain all encodings
+  quic::BufQueue queue;
+  for (const auto& param : parameters) {
+    queue.append(param.encode());
+  }
+
+  if (auto encodedParams = queue.move()) {
+    // coalesce and return
+    encodedParams->coalesce();
+    return encodedParams;
+  }
+
+  // callers expect empty buf if no parameters supplied
+  return folly::IOBuf::create(0);
+}
 
 inline fizz::ExtensionType getQuicTransportParametersExtention(
-    QuicVersion version) {
-  if (version == QuicVersion::QUIC_V1 ||
-      version == QuicVersion::QUIC_V1_ALIAS) {
+    quic::QuicVersion version) {
+  if (version == quic::QuicVersion::QUIC_V1 ||
+      version == quic::QuicVersion::QUIC_V1_ALIAS) {
     return fizz::ExtensionType::quic_transport_parameters;
   } else {
     return fizz::ExtensionType::quic_transport_parameters_draft;
   }
 }
 
-inline void encodeVarintParams(
-    const std::vector<TransportParameter>& parameters,
-    BufAppender& appender) {
-  auto appenderOp = [&](auto val) { appender.writeBE(val); };
-  for (auto& param : parameters) {
-    encodeQuicInteger(static_cast<uint64_t>(param.parameter), appenderOp);
-    size_t len = param.value->computeChainDataLength();
-    encodeQuicInteger(len, appenderOp);
-    appender.insert(param.value->clone());
-  }
-}
+} // namespace
+
+namespace quic {
 
 inline void removeDuplicateParams(std::vector<TransportParameter>& params) {
   std::sort(
@@ -80,9 +90,7 @@ inline fizz::Extension encodeExtension(
     QuicVersion encodingVersion) {
   fizz::Extension ext;
   ext.extension_type = getQuicTransportParametersExtention(encodingVersion);
-  ext.extension_data = folly::IOBuf::create(0);
-  BufAppender appender(ext.extension_data.get(), 40);
-  encodeVarintParams(params.parameters, appender);
+  ext.extension_data = encodeVarintParams(params.parameters);
   return ext;
 }
 
@@ -91,9 +99,7 @@ inline fizz::Extension encodeExtension(
     QuicVersion encodingVersion) {
   fizz::Extension ext;
   ext.extension_type = getQuicTransportParametersExtention(encodingVersion);
-  ext.extension_data = folly::IOBuf::create(0);
-  BufAppender appender(ext.extension_data.get(), 40);
-  encodeVarintParams(params.parameters, appender);
+  ext.extension_data = encodeVarintParams(params.parameters);
   return ext;
 }
 
@@ -102,9 +108,7 @@ inline fizz::Extension encodeExtension(
     QuicVersion encodingVersion) {
   fizz::Extension ext;
   ext.extension_type = getQuicTransportParametersExtention(encodingVersion);
-  ext.extension_data = folly::IOBuf::create(0);
-  BufAppender appender(ext.extension_data.get(), 40);
-  encodeVarintParams(params.parameters, appender);
+  ext.extension_data = encodeVarintParams(params.parameters);
   return ext;
 }
 
