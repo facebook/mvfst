@@ -242,8 +242,7 @@ TEST_P(
     CustomIntegralTransportParameter streamGroupsEnabledParam(
         static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
         GetParam().peerMaxGroupsIn);
-    CHECK(
-        setCustomTransportParameter(streamGroupsEnabledParam, transportParams));
+    transportParams.push_back(streamGroupsEnabledParam.encode());
   }
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};

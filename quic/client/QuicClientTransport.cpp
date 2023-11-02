@@ -1017,7 +1017,7 @@ void QuicClientTransport::startCryptoHandshake() {
       *clientConn_->initialDestinationConnectionId, version);
 
   setSupportedExtensionTransportParameters();
-  maybeEnableStreamGroups();
+
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
       conn_->transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -1666,6 +1666,13 @@ void QuicClientTransport::setSupportedExtensionTransportParameters() {
         static_cast<uint64_t>(TransportParameterId::knob_frames_supported), 1);
     customTransportParameters_.push_back(knobFrameSupport.encode());
   }
+
+  if (ts.advertisedMaxStreamGroups > 0) {
+    CustomIntegralTransportParameter streamGroupsEnabledParam(
+        static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
+        conn_->transportSettings.advertisedMaxStreamGroups);
+    customTransportParameters_.push_back(streamGroupsEnabledParam.encode());
+  }
 }
 
 void QuicClientTransport::adjustGROBuffers() {
@@ -1766,21 +1773,6 @@ void QuicClientTransport::maybeSendTransportKnobs() {
       }
     }
     transportKnobsSent_ = true;
-  }
-}
-
-void QuicClientTransport::maybeEnableStreamGroups() {
-  if (conn_->transportSettings.advertisedMaxStreamGroups == 0) {
-    return;
-  }
-
-  CustomIntegralTransportParameter streamGroupsEnabledParam(
-      static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
-      conn_->transportSettings.advertisedMaxStreamGroups);
-
-  if (!setCustomTransportParameter(
-          streamGroupsEnabledParam, customTransportParameters_)) {
-    LOG(ERROR) << "failed to set stream groups enabled transport parameter";
   }
 }
 

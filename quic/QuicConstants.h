@@ -77,9 +77,6 @@ constexpr uint16_t kMaxNumGROBuffers = 64;
 constexpr uint16_t kDefaultNumGROBuffers = kMinNumGROBuffers;
 
 constexpr uint16_t kMaxNumCoalescedPackets = 5;
-// As per version 20 of the spec, transport parameters for private use must
-// have ids with first byte being 0xff.
-constexpr uint16_t kCustomTransportParameterThreshold = 0xff00;
 
 // The length of the integrity tag present in a retry packet.
 constexpr uint32_t kRetryIntegrityTagLen = 16;

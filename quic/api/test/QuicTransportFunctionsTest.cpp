@@ -4731,36 +4731,6 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
   }
 }
 
-TEST_F(QuicTransportFunctionsTest, CustomTransportParamTest) {
-  std::vector<TransportParameter> customTransportParameters;
-
-  // Add new param.
-  EXPECT_TRUE(setCustomTransportParameter(
-      CustomIntegralTransportParameter(kCustomTransportParameterThreshold, 0),
-      customTransportParameters));
-  EXPECT_EQ(customTransportParameters.size(), 1);
-
-  // Existing param not added.
-  EXPECT_FALSE(setCustomTransportParameter(
-      CustomIntegralTransportParameter(kCustomTransportParameterThreshold, 1),
-      customTransportParameters));
-  EXPECT_EQ(customTransportParameters.size(), 1);
-
-  // Bad param id is not added.
-  EXPECT_FALSE(setCustomTransportParameter(
-      CustomIntegralTransportParameter(
-          kCustomTransportParameterThreshold - 1, 2),
-      customTransportParameters));
-  EXPECT_EQ(customTransportParameters.size(), 1);
-
-  // Another valid param added.
-  EXPECT_TRUE(setCustomTransportParameter(
-      CustomIntegralTransportParameter(
-          kCustomTransportParameterThreshold + 1, 0),
-      customTransportParameters));
-  EXPECT_EQ(customTransportParameters.size(), 2);
-}
-
 TEST_F(
     QuicTransportFunctionsTest,
     StaticCapOnWritableBytesFromThrottlingSignalProvider) {

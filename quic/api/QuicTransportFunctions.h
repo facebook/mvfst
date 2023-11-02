@@ -325,16 +325,6 @@ bool writeLoopTimeLimit(
     TimePoint loopBeginTime,
     const QuicConnectionStateBase& connection);
 
-/**
- * Sets private transport parameters that are not in the TransportParameterId
- * enum. See kCustomTransportParameterThreshold in QuicConstants.h
- * - checks that the custom param id complies to the spec
- * - checks that the param is not in the provided vector already
- */
-bool setCustomTransportParameter(
-    const CustomTransportParameter& customParam,
-    std::vector<TransportParameter>& customTransportParameters);
-
 bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn);
 bool toWriteHandshakeAcks(const quic::QuicConnectionStateBase& conn);
 bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn);

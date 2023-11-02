@@ -1591,11 +1591,7 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
     CustomIntegralTransportParameter streamGroupsEnabledParam(
         static_cast<uint64_t>(TransportParameterId::stream_groups_enabled),
         ts.advertisedMaxStreamGroups);
-
-    if (!setCustomTransportParameter(
-            streamGroupsEnabledParam, customTransportParams)) {
-      LOG(ERROR) << "failed to set stream groups enabled transport parameter";
-    }
+    customTransportParams.push_back(streamGroupsEnabledParam.encode());
   }
 
   CustomIntegralTransportParameter ackReceiveTimestampsEnabled(
