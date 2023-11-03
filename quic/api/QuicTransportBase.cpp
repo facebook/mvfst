@@ -1606,7 +1606,7 @@ void QuicTransportBase::logStreamOpenEvent(StreamId streamId) {
 void QuicTransportBase::handleNewStreams(std::vector<StreamId>& streamStorage) {
   const auto& newPeerStreamIds = streamStorage;
   for (const auto& streamId : newPeerStreamIds) {
-    CHECK_NOTNULL(connCallback_);
+    CHECK_NOTNULL(connCallback_.get());
     if (isBidirectionalStream(streamId)) {
       connCallback_->onNewBidirectionalStream(streamId);
     } else {
@@ -1625,7 +1625,7 @@ void QuicTransportBase::handleNewGroupedStreams(
     std::vector<StreamId>& streamStorage) {
   const auto& newPeerStreamIds = streamStorage;
   for (const auto& streamId : newPeerStreamIds) {
-    CHECK_NOTNULL(connCallback_);
+    CHECK_NOTNULL(connCallback_.get());
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
     CHECK(stream->groupId);
     if (isBidirectionalStream(streamId)) {
@@ -2845,11 +2845,12 @@ void QuicTransportBase::setAckRxTimestampsDisabled(
 }
 
 void QuicTransportBase::setConnectionSetupCallback(
-    ConnectionSetupCallback* callback) {
+    folly::MaybeManagedPtr<ConnectionSetupCallback> callback) {
   connSetupCallback_ = callback;
 }
 
-void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
+void QuicTransportBase::setConnectionCallback(
+    folly::MaybeManagedPtr<ConnectionCallback> callback) {
   connCallback_ = callback;
 }
 

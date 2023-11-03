@@ -25,8 +25,8 @@ namespace quic {
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
     std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
-    ConnectionSetupCallback* connSetupCb,
-    ConnectionCallback* connStreamsCb,
+    folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
+    folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory,
     PacketNum startingPacketNum)
@@ -43,8 +43,8 @@ QuicServerTransport::QuicServerTransport(
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
     std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
-    ConnectionSetupCallback* connSetupCb,
-    ConnectionCallback* connStreamsCb,
+    folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
+    folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory,
     bool useConnectionEndWithErrorCallback)
@@ -85,8 +85,8 @@ QuicServerTransport::~QuicServerTransport() {
 QuicServerTransport::Ptr QuicServerTransport::make(
     folly::EventBase* evb,
     std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
-    ConnectionSetupCallback* connSetupCb,
-    ConnectionCallback* connStreamsCb,
+    const folly::MaybeManagedPtr<ConnectionSetupCallback>& connSetupCb,
+    const folly::MaybeManagedPtr<ConnectionCallback>& connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     bool useConnectionEndWithErrorCallback) {
   return std::make_shared<QuicServerTransport>(

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/Expected.h>
+#include <folly/MaybeManagedPtr.h>
 #include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncTransportCertificate.h>
@@ -273,13 +274,14 @@ class QuicSocket {
    * socket.
    */
   virtual void setConnectionSetupCallback(
-      ConnectionSetupCallback* callback) = 0;
+      folly::MaybeManagedPtr<ConnectionSetupCallback> callback) = 0;
 
   /**
    * Sets connection streams callback. This callback must be set after
    * connection set up is finished and is ready for streams processing.
    */
-  virtual void setConnectionCallback(ConnectionCallback* callback) = 0;
+  virtual void setConnectionCallback(
+      folly::MaybeManagedPtr<ConnectionCallback> callback) = 0;
 
   /**
    * Sets the functions that mvfst will invoke to validate early data params

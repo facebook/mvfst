@@ -135,8 +135,14 @@ class MockQuicSocket : public QuicSocket {
       (folly::Expected<folly::Unit, LocalErrorCode>),
       setReadCallback,
       (StreamId, ReadCallback*, folly::Optional<ApplicationErrorCode> err));
-  MOCK_METHOD(void, setConnectionSetupCallback, (ConnectionSetupCallback*));
-  MOCK_METHOD(void, setConnectionCallback, (ConnectionCallback*));
+  MOCK_METHOD(
+      void,
+      setConnectionSetupCallback,
+      (folly::MaybeManagedPtr<ConnectionSetupCallback>));
+  MOCK_METHOD(
+      void,
+      setConnectionCallback,
+      (folly::MaybeManagedPtr<ConnectionCallback>));
   void setEarlyDataAppParamsFunctions(
       folly::Function<bool(const folly::Optional<std::string>&, const Buf&)
                           const> validator,

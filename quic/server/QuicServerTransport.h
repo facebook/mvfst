@@ -74,16 +74,16 @@ class QuicServerTransport
   static QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
-      ConnectionSetupCallback* connSetupCb,
-      ConnectionCallback* connStreamsCb,
+      const folly::MaybeManagedPtr<ConnectionSetupCallback>& connSetupCb,
+      const folly::MaybeManagedPtr<ConnectionCallback>& connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       bool useConnectionEndWithErrorCallback = false);
 
   QuicServerTransport(
       folly::EventBase* evb,
       std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
-      ConnectionSetupCallback* connSetupCb,
-      ConnectionCallback* connStreamsCb,
+      folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
+      folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       std::unique_ptr<CryptoFactory> cryptoFactory = nullptr,
       bool useConnectionEndWithErrorCallback = false);
@@ -92,8 +92,8 @@ class QuicServerTransport
   QuicServerTransport(
       folly::EventBase* evb,
       std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
-      ConnectionSetupCallback* connSetupCb,
-      ConnectionCallback* connStreamsCb,
+      folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
+      folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       std::unique_ptr<CryptoFactory> cryptoFactory,
       PacketNum startingPacketNum);
