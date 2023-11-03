@@ -662,6 +662,10 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
         << (transportSettings.dataPathType == DataPathType::ContinuousMemory
                 ? "ContinuousMemory"
                 : "ChainedMemory");
+    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL2) {
+      transportSettings.includeCwndHintsInSessionTicket = true;
+      transportSettings.useCwndHintsInSessionTicket = true;
+    }
     trans->setTransportSettings(transportSettings);
     trans->setConnectionIdAlgo(connIdAlgo_.get());
     trans->setServerConnectionIdRejector(this);

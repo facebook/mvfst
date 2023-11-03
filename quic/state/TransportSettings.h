@@ -298,6 +298,8 @@ struct TransportSettings {
   bool removeStreamAfterEomCallbackUnset{false};
   // Whether to include cwnd hint in new session tickets for 0-rtt
   bool includeCwndHintsInSessionTicket{false};
+  // Whether to use cwnd hints received in resumption tickets for 0-rtt
+  bool useCwndHintsInSessionTicket{false};
 
   // The default priority to instantiate streams with.
   Priority defaultPriority{kDefaultPriority};
