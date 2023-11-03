@@ -49,6 +49,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onInflightBytesSample, (uint64_t));
   MOCK_METHOD(void, onRttSample, (uint64_t));
   MOCK_METHOD(void, onBandwidthSample, (uint64_t));
+  MOCK_METHOD(void, onCwndHintBytesSample, (uint64_t));
   MOCK_METHOD(void, onNewCongestionController, (CongestionControlType));
   MOCK_METHOD(void, onPTO, ());
   MOCK_METHOD(void, onRead, (size_t));

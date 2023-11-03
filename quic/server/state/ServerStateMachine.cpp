@@ -568,8 +568,7 @@ void updateTransportParamsFromTicket(
   conn.maybeCwndHintBytes = maybeCwndHintBytes;
 
   if (maybeCwndHintBytes) {
-    VLOG(7) << fmt::format(
-        "Got a cwnd hint in a 0-rtt ticket.  = {}", *maybeCwndHintBytes);
+    QUIC_STATS(conn.statsCallback, onCwndHintBytesSample, *maybeCwndHintBytes);
   }
 }
 

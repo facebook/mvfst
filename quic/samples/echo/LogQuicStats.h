@@ -170,6 +170,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << __func__ << " bandwidth=" << bandwidth;
   }
 
+  void onCwndHintBytesSample(uint64_t cwndHintBytes) override {
+    VLOG(2) << __func__ << " cwndHintBytes=" << cwndHintBytes;
+  }
+
   void onNewCongestionController(CongestionControlType type) override {
     VLOG(2) << prefix_ << __func__
             << " type=" << congestionControlTypeToString(type);
