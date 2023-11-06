@@ -713,9 +713,8 @@ static void handleCipherUnavailable(
         PacketDropReason::PARSE_ERROR_PACKET_BUFFERED);
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;
-    pendingReadData.networkData = NetworkDataSingle(
-        ReceivedPacket(std::move(originalData->packet)),
-        readData.networkData.packet.timings.receiveTimePoint);
+    pendingReadData.udpPacket = ReceivedPacket(
+        std::move(originalData->packet), readData.udpPacket.timings);
     pendingData->emplace_back(std::move(pendingReadData));
     VLOG(10) << "Adding pending data to "
              << toString(originalData->protectionType)
@@ -739,15 +738,15 @@ void onServerReadDataFromOpen(
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Open);
   // Don't bother parsing if the data is empty.
-  if (!readData.networkData.packet.buf ||
-      readData.networkData.packet.buf->computeChainDataLength() == 0) {
+  if (!readData.udpPacket.buf ||
+      readData.udpPacket.buf->computeChainDataLength() == 0) {
     return;
   }
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
     firstPacketFromPeer = true;
 
-    folly::io::Cursor cursor(readData.networkData.packet.buf.get());
+    folly::io::Cursor cursor(readData.udpPacket.buf.get());
     auto initialByte = cursor.readBE<uint8_t>();
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
@@ -856,7 +855,7 @@ void onServerReadDataFromOpen(
     conn.peerAddress = conn.originalPeerAddress;
   }
   BufQueue udpData;
-  udpData.append(std::move(readData.networkData.packet.buf));
+  udpData.append(std::move(readData.udpPacket.buf));
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
@@ -1022,10 +1021,7 @@ void onServerReadDataFromOpen(
 
     auto& ackState = getAckState(conn, packetNumberSpace);
     uint64_t distanceFromExpectedPacketNum = updateLargestReceivedPacketNum(
-        conn,
-        ackState,
-        packetNum,
-        readData.networkData.packet.timings.receiveTimePoint);
+        conn, ackState, packetNum, readData.udpPacket.timings.receiveTimePoint);
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }
@@ -1113,7 +1109,7 @@ void onServerReadDataFromOpen(
                 }
               },
               markPacketLoss,
-              readData.networkData.packet.timings.receiveTimePoint));
+              readData.udpPacket.timings.receiveTimePoint));
           break;
         }
         case QuicFrame::Type::RstStreamFrame: {
@@ -1272,9 +1268,7 @@ void onServerReadDataFromOpen(
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;
           handleDatagram(
-              conn,
-              frame,
-              readData.networkData.packet.timings.receiveTimePoint);
+              conn, frame, readData.udpPacket.timings.receiveTimePoint);
           break;
         }
         case QuicFrame::Type::ImmediateAckFrame: {
@@ -1391,7 +1385,7 @@ void onServerReadDataFromClosed(
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Closed);
   BufQueue udpData;
-  udpData.append(std::move(readData.networkData.packet.buf));
+  udpData.append(std::move(readData.udpPacket.buf));
   auto packetSize = udpData.empty() ? 0 : udpData.chainLength();
   if (!conn.readCodec) {
     // drop data. We closed before we even got the first packet. This is

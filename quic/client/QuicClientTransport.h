@@ -122,9 +122,8 @@ class QuicClientTransport
   }
 
   // From QuicTransportBase
-  void onReadData(
-      const folly::SocketAddress& peer,
-      NetworkDataSingle&& networkData) override;
+  void onReadData(const folly::SocketAddress& peer, ReceivedPacket&& udpPacket)
+      override;
   void writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
@@ -247,7 +246,7 @@ class QuicClientTransport
    */
   void processUdpPacket(
       const folly::SocketAddress& peer,
-      NetworkDataSingle&& networkData);
+      ReceivedPacket&& udpPacket);
 
   /**
    * Process data within a single UDP packet.

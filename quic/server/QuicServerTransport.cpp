@@ -144,10 +144,10 @@ void QuicServerTransport::setServerConnectionIdRejector(
 
 void QuicServerTransport::onReadData(
     const folly::SocketAddress& peer,
-    NetworkDataSingle&& networkData) {
+    ReceivedPacket&& udpPacket) {
   ServerEvents::ReadData readData;
   readData.peer = peer;
-  readData.networkData = std::move(networkData);
+  readData.udpPacket = std::move(udpPacket);
   bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
   uint64_t prevWritableBytes = serverConn_->writableBytesLimit
       ? *serverConn_->writableBytesLimit
@@ -512,8 +512,8 @@ void QuicServerTransport::processPendingData(bool async) {
         serverPtr->onNetworkData(
             pendingPacket.peer,
             NetworkData(
-                std::move(pendingPacket.networkData.packet.buf),
-                pendingPacket.networkData.packet.timings.receiveTimePoint));
+                std::move(pendingPacket.udpPacket.buf),
+                pendingPacket.udpPacket.timings.receiveTimePoint));
         if (serverPtr->closeState_ == CloseState::CLOSED) {
           // The pending data could potentially contain a connection close, or
           // the app could have triggered a connection close with an error. It

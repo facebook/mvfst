@@ -263,12 +263,12 @@ class TestQuicTransport
     return lossTimeout_.getTimeRemaining();
   }
 
-  void onReadData(const folly::SocketAddress&, NetworkDataSingle&& data)
+  void onReadData(const folly::SocketAddress&, ReceivedPacket&& udpPacket)
       override {
-    if (!data.packet.buf) {
+    if (!udpPacket.buf) {
       return;
     }
-    folly::io::Cursor cursor(data.packet.buf.get());
+    folly::io::Cursor cursor(udpPacket.buf.get());
     while (!cursor.isAtEnd()) {
       // create server chosen connId with processId = 0 and workerId = 0
       ServerConnectionIdParams params(0, 0, 0);
@@ -290,7 +290,7 @@ class TestQuicTransport
       } else if (type == TestFrameType::DATAGRAM) {
         auto buffer = decodeDatagramFrame(cursor);
         auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
-        handleDatagram(*conn_, frame, data.packet.timings.receiveTimePoint);
+        handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
       } else if (type == TestFrameType::STREAM_GROUP) {
         auto res = decodeStreamGroupBuffer(cursor);
         QuicStreamState* stream =

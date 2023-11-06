@@ -125,29 +125,4 @@ struct NetworkData {
   size_t totalData_{0};
 };
 
-struct NetworkDataSingle {
-  ReceivedPacket packet;
-  size_t totalData{0};
-
-  NetworkDataSingle() = default;
-
-  explicit NetworkDataSingle(ReceivedPacket&& packetIn)
-      : packet(std::move(packetIn)) {
-    if (packet.buf) {
-      totalData += packet.buf->computeChainDataLength();
-    }
-  }
-
-  // TODO(bschlinker): Deprecate
-  NetworkDataSingle(
-      ReceivedPacket&& packetIn,
-      const TimePoint& receiveTimePointIn)
-      : packet(std::move(packetIn)) {
-    packet.timings.receiveTimePoint = receiveTimePointIn;
-    if (packet.buf) {
-      totalData += packet.buf->computeChainDataLength();
-    }
-  }
-};
-
 } // namespace quic

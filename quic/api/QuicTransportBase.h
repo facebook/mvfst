@@ -309,7 +309,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    */
   virtual void onReadData(
       const folly::SocketAddress& peer,
-      NetworkDataSingle&& networkData) = 0;
+      ReceivedPacket&& udpPacket) = 0;
 
   /**
    * Invoked when we have to write some data to the wire.

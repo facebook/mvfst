@@ -22,13 +22,11 @@ namespace quic {
 struct CachedServerTransportParameters;
 
 struct PendingClientData {
-  NetworkDataSingle networkData;
+  ReceivedPacket udpPacket;
   folly::SocketAddress peer;
 
-  PendingClientData(
-      NetworkDataSingle networkDataIn,
-      folly::SocketAddress peerIn)
-      : networkData(std::move(networkDataIn)), peer(std::move(peerIn)) {}
+  PendingClientData(ReceivedPacket udpPacketIn, folly::SocketAddress peerIn)
+      : udpPacket(std::move(udpPacketIn)), peer(std::move(peerIn)) {}
 };
 
 struct QuicClientConnectionState : public QuicConnectionStateBase {

@@ -120,9 +120,9 @@ QuicClientTransport::~QuicClientTransport() {
 
 void QuicClientTransport::processUdpPacket(
     const folly::SocketAddress& peer,
-    NetworkDataSingle&& networkData) {
+    ReceivedPacket&& udpPacket) {
   BufQueue udpData;
-  udpData.append(std::move(networkData.packet.buf));
+  udpData.append(std::move(udpPacket.buf));
 
   if (!conn_->version) {
     // We only check for version negotiation packets before the version
@@ -143,7 +143,7 @@ void QuicClientTransport::processUdpPacket(
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
-    processUdpPacketData(peer, networkData.packet.timings, udpData);
+    processUdpPacketData(peer, udpPacket.timings, udpData);
   }
   VLOG_IF(4, !udpData.empty())
       << "Leaving " << udpData.chainLength()
@@ -155,11 +155,9 @@ void QuicClientTransport::processUdpPacket(
       !clientConn_->pendingOneRttData.empty()) {
     BufQueue pendingPacket;
     for (auto& pendingData : clientConn_->pendingOneRttData) {
-      pendingPacket.append(std::move(pendingData.networkData.packet.buf));
+      pendingPacket.append(std::move(pendingData.udpPacket.buf));
       processUdpPacketData(
-          pendingData.peer,
-          pendingData.networkData.packet.timings,
-          pendingPacket);
+          pendingData.peer, pendingData.udpPacket.timings, pendingPacket);
       pendingPacket.move();
     }
     clientConn_->pendingOneRttData.clear();
@@ -168,11 +166,9 @@ void QuicClientTransport::processUdpPacket(
       !clientConn_->pendingHandshakeData.empty()) {
     BufQueue pendingPacket;
     for (auto& pendingData : clientConn_->pendingHandshakeData) {
-      pendingPacket.append(std::move(pendingData.networkData.packet.buf));
+      pendingPacket.append(std::move(pendingData.udpPacket.buf));
       processUdpPacketData(
-          pendingData.peer,
-          pendingData.networkData.packet.timings,
-          pendingPacket);
+          pendingData.peer, pendingData.udpPacket.timings, pendingPacket);
       pendingPacket.move();
     }
     clientConn_->pendingHandshakeData.clear();
@@ -269,10 +265,7 @@ void QuicClientTransport::processUdpPacketData(
         ? clientConn_->pendingOneRttData
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
-        NetworkDataSingle(
-            ReceivedPacket(
-                std::move(cipherUnavailable->packet), udpPacketTimings),
-            udpPacketTimings.receiveTimePoint),
+        ReceivedPacket(std::move(cipherUnavailable->packet), udpPacketTimings),
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
@@ -806,7 +799,7 @@ void QuicClientTransport::processUdpPacketData(
 
 void QuicClientTransport::onReadData(
     const folly::SocketAddress& peer,
-    NetworkDataSingle&& networkData) {
+    ReceivedPacket&& udpPacket) {
   if (closeState_ == CloseState::CLOSED) {
     // If we are closed, then we shouldn't process new network data.
     QUIC_STATS(
@@ -817,7 +810,7 @@ void QuicClientTransport::onReadData(
     return;
   }
   bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
-  processUdpPacket(peer, std::move(networkData));
+  processUdpPacket(peer, std::move(udpPacket));
   if (connSetupCallback_ && waitingForFirstPacket &&
       hasReceivedPackets(*conn_)) {
     connSetupCallback_->onFirstPeerPacketProcessed();
