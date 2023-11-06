@@ -100,9 +100,7 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
   }
 
   CHECK_LE(numMsgsRecvd, numPackets);
-  // Need to save our position so we can recycle the unused buffers.
-  uint16_t i;
-  for (i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
+  for (uint16_t i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
     auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
     auto& msg = msgs[i];
