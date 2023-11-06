@@ -33,6 +33,8 @@ struct ReceivedPacket {
 
   ReceivedPacket() = default;
   explicit ReceivedPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
+  ReceivedPacket(Buf&& bufIn, const Timings& timingsIn)
+      : buf(std::move(bufIn)), timings(timingsIn) {}
 
   Buf buf;
   Timings timings;

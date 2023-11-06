@@ -241,7 +241,7 @@ class QuicClientTransport
 
   void processPacketData(
       const folly::SocketAddress& peer,
-      TimePoint receiveTimePoint,
+      const ReceivedPacket::Timings& packetTimings,
       BufQueue& packetQueue);
 
   void startCryptoHandshake();
