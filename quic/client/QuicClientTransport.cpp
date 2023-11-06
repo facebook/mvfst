@@ -1499,7 +1499,6 @@ void QuicClientTransport::onNotifyDataAvailable(
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
   networkData.setReceiveTimePoint(packetReceiveTime);
-  networkData.setTotalData(totalData);
   onNetworkData(*server, std::move(networkData));
 }
 

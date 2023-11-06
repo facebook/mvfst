@@ -79,6 +79,7 @@ struct NetworkData {
   void addPacket(ReceivedPacket&& packetIn) {
     packets_.emplace_back(std::move(packetIn));
     packets_.back().timings.receiveTimePoint = receiveTimePoint_;
+    totalData_ += packets_.back().buf->computeChainDataLength();
   }
 
   [[nodiscard]] const std::vector<ReceivedPacket>& getPackets() const {
@@ -98,10 +99,6 @@ struct NetworkData {
 
   [[nodiscard]] TimePoint getReceiveTimePoint() const {
     return receiveTimePoint_;
-  }
-
-  void setTotalData(const size_t totalDataIn) {
-    totalData_ = totalDataIn;
   }
 
   [[nodiscard]] size_t getTotalData() const {
