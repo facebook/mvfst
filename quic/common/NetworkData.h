@@ -16,20 +16,36 @@
 namespace quic {
 
 struct ReceivedPacket {
+  struct Timings {
+    // Legacy Receive TimePoint.
+    //
+    // This TimePoint is being deprecated in favor of having TimePoints that are
+    // named specifically for the timing event being tracked.
+    //
+    // The meaning of this TimePoint varies by transport implementation and
+    // settings: it can be the time when recv() started or completed, the socket
+    // RX timestamp for this packet or another packet received during the same
+    // call to recv*(), or something else entirely.
+    //
+    // TODO(bschlinker): Complete deprecation
+    TimePoint receiveTimePoint;
+  };
+
   ReceivedPacket() = default;
   explicit ReceivedPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
 
-  // data
   Buf buf;
+  Timings timings;
 };
 
 struct NetworkData {
   NetworkData() = default;
-  NetworkData(Buf&& buf, const TimePoint& receiveTime)
-      : receiveTimePoint_(receiveTime) {
+  NetworkData(Buf&& buf, const TimePoint& receiveTimePointIn)
+      : receiveTimePoint_(receiveTimePointIn) {
     if (buf) {
       totalData_ = buf->computeChainDataLength();
       packets_.emplace_back(std::move(buf));
+      packets_.back().timings.receiveTimePoint = receiveTimePointIn;
     }
   }
 
@@ -37,11 +53,14 @@ struct NetworkData {
       std::vector<Buf>&& packetBufs,
       const TimePoint& receiveTimePointIn)
       : receiveTimePoint_(receiveTimePointIn),
-        packets_([&packetBufs]() {
+        packets_([&packetBufs, &receiveTimePointIn]() {
           std::vector<ReceivedPacket> result;
           result.reserve(packetBufs.size());
           for (auto& packetBuf : packetBufs) {
             result.emplace_back(std::move(packetBuf));
+          }
+          for (auto& packet : result) {
+            packet.timings.receiveTimePoint = receiveTimePointIn;
           }
           return result;
         }()),
@@ -59,6 +78,7 @@ struct NetworkData {
 
   void addPacket(ReceivedPacket&& packetIn) {
     packets_.emplace_back(std::move(packetIn));
+    packets_.back().timings.receiveTimePoint = receiveTimePoint_;
   }
 
   [[nodiscard]] const std::vector<ReceivedPacket>& getPackets() const {
@@ -71,6 +91,9 @@ struct NetworkData {
 
   void setReceiveTimePoint(const TimePoint& receiveTimePointIn) {
     receiveTimePoint_ = receiveTimePointIn;
+    for (auto& packet : packets_) {
+      packet.timings.receiveTimePoint = receiveTimePointIn;
+    }
   }
 
   [[nodiscard]] TimePoint getReceiveTimePoint() const {
@@ -105,15 +128,23 @@ struct NetworkData {
 
 struct NetworkDataSingle {
   ReceivedPacket packet;
-  TimePoint receiveTimePoint;
   size_t totalData{0};
 
   NetworkDataSingle() = default;
 
+  explicit NetworkDataSingle(ReceivedPacket&& packetIn)
+      : packet(std::move(packetIn)) {
+    if (packet.buf) {
+      totalData += packet.buf->computeChainDataLength();
+    }
+  }
+
+  // TODO(bschlinker): Deprecate
   NetworkDataSingle(
       ReceivedPacket&& packetIn,
       const TimePoint& receiveTimePointIn)
-      : packet(std::move(packetIn)), receiveTimePoint(receiveTimePointIn) {
+      : packet(std::move(packetIn)) {
+    packet.timings.receiveTimePoint = receiveTimePointIn;
     if (packet.buf) {
       totalData += packet.buf->computeChainDataLength();
     }

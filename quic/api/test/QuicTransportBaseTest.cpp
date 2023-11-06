@@ -290,7 +290,7 @@ class TestQuicTransport
       } else if (type == TestFrameType::DATAGRAM) {
         auto buffer = decodeDatagramFrame(cursor);
         auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
-        handleDatagram(*conn_, frame, data.receiveTimePoint);
+        handleDatagram(*conn_, frame, data.packet.timings.receiveTimePoint);
       } else if (type == TestFrameType::STREAM_GROUP) {
         auto res = decodeStreamGroupBuffer(cursor);
         QuicStreamState* stream =

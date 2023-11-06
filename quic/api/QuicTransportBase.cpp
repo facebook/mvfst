@@ -1889,7 +1889,7 @@ void QuicTransportBase::onNetworkData(
         builder.addReceivedPacket(
             SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
                 Builder()
-                    .setPacketReceiveTime(networkData.getReceiveTimePoint())
+                    .setPacketReceiveTime(packet.timings.receiveTimePoint)
                     .setPacketNumBytes(packet.buf->computeChainDataLength())
                     .build());
       }
@@ -1903,13 +1903,9 @@ void QuicTransportBase::onNetworkData(
               });
     }
 
-    const auto receiveTimePoint = networkData.getReceiveTimePoint();
     auto packets = std::move(networkData).movePackets();
     for (auto& packet : packets) {
-      onReadData(
-          peer,
-          NetworkDataSingle(
-              ReceivedPacket(std::move(packet.buf)), receiveTimePoint));
+      onReadData(peer, NetworkDataSingle(std::move(packet)));
       if (conn_->peerConnectionError) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));

@@ -590,9 +590,8 @@ void QuicServerWorker::forwardNetworkData(
           "Forwarding packet with unknown connId version from client={} to another process, routingInfo={}",
           client.describe(),
           logRoutingInfo(routingData.destinationConnId));
-      auto recvTime = networkData.getReceiveTimePoint();
       takeoverPktHandler_.forwardPacketToAnotherServer(
-          client, std::move(networkData).moveAllData(), recvTime);
+          client, std::move(networkData));
       QUIC_STATS(statsCallback_, onPacketForwarded);
       return;
     } else {
@@ -795,9 +794,8 @@ void QuicServerWorker::dispatchPacketData(
         "Forwarding packet from client={} to another process, routingInfo={}",
         client.describe(),
         logRoutingInfo(dstConnId));
-    auto recvTime = networkData.getReceiveTimePoint();
     takeoverPktHandler_.forwardPacketToAnotherServer(
-        client, std::move(networkData).moveAllData(), recvTime);
+        client, std::move(networkData));
     QUIC_STATS(statsCallback_, onPacketForwarded);
   });
 

@@ -715,7 +715,7 @@ static void handleCipherUnavailable(
     pendingReadData.peer = readData.peer;
     pendingReadData.networkData = NetworkDataSingle(
         ReceivedPacket(std::move(originalData->packet)),
-        readData.networkData.receiveTimePoint);
+        readData.networkData.packet.timings.receiveTimePoint);
     pendingData->emplace_back(std::move(pendingReadData));
     VLOG(10) << "Adding pending data to "
              << toString(originalData->protectionType)
@@ -1022,7 +1022,10 @@ void onServerReadDataFromOpen(
 
     auto& ackState = getAckState(conn, packetNumberSpace);
     uint64_t distanceFromExpectedPacketNum = updateLargestReceivedPacketNum(
-        conn, ackState, packetNum, readData.networkData.receiveTimePoint);
+        conn,
+        ackState,
+        packetNum,
+        readData.networkData.packet.timings.receiveTimePoint);
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }
@@ -1110,7 +1113,7 @@ void onServerReadDataFromOpen(
                 }
               },
               markPacketLoss,
-              readData.networkData.receiveTimePoint));
+              readData.networkData.packet.timings.receiveTimePoint));
           break;
         }
         case QuicFrame::Type::RstStreamFrame: {
@@ -1268,7 +1271,10 @@ void onServerReadDataFromOpen(
           // Datagram isn't retransmittable. But we would like to ack them
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;
-          handleDatagram(conn, frame, readData.networkData.receiveTimePoint);
+          handleDatagram(
+              conn,
+              frame,
+              readData.networkData.packet.timings.receiveTimePoint);
           break;
         }
         case QuicFrame::Type::ImmediateAckFrame: {

@@ -143,7 +143,8 @@ void QuicClientTransport::processUDPData(
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
-    processPacketData(peer, networkData.receiveTimePoint, udpData);
+    processPacketData(
+        peer, networkData.packet.timings.receiveTimePoint, udpData);
   }
   VLOG_IF(4, !udpData.empty())
       << "Leaving " << udpData.chainLength()
@@ -158,7 +159,7 @@ void QuicClientTransport::processUDPData(
       pendingPacket.append(std::move(pendingData.networkData.packet.buf));
       processPacketData(
           pendingData.peer,
-          pendingData.networkData.receiveTimePoint,
+          pendingData.networkData.packet.timings.receiveTimePoint,
           pendingPacket);
       pendingPacket.move();
     }
@@ -171,7 +172,7 @@ void QuicClientTransport::processUDPData(
       pendingPacket.append(std::move(pendingData.networkData.packet.buf));
       processPacketData(
           pendingData.peer,
-          pendingData.networkData.receiveTimePoint,
+          pendingData.networkData.packet.timings.receiveTimePoint,
           pendingPacket);
       pendingPacket.move();
     }

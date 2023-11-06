@@ -80,8 +80,7 @@ class TakeoverPacketHandler {
 
   void forwardPacketToAnotherServer(
       const folly::SocketAddress& peerAddress,
-      Buf data,
-      const TimePoint& packetReceiveTime);
+      NetworkData&& networkData);
 
   void processForwardedPacket(const folly::SocketAddress& client, Buf data);
 

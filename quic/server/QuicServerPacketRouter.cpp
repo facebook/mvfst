@@ -129,9 +129,11 @@ void TakeoverPacketHandler::setDestination(
 
 void TakeoverPacketHandler::forwardPacketToAnotherServer(
     const folly::SocketAddress& peerAddress,
-    Buf data,
-    const TimePoint& packetReceiveTime) {
-  // create buffer for the peerAddress address and clientPacketReceiveTime
+    NetworkData&& networkData) {
+  const TimePoint receiveTimePoint = networkData.getReceiveTimePoint();
+  Buf buf = std::move(networkData).moveAllData();
+
+  // create buffer for the peerAddress address and receiveTimePoint
   // Serialize: version (4B), socket(2 + 16)B and time of ack (8B)
   auto bufSize = sizeof(TakeoverProtocolVersion) + sizeof(uint16_t) +
       peerAddress.getActualSize() + sizeof(uint64_t);
@@ -142,9 +144,9 @@ void TakeoverPacketHandler::forwardPacketToAnotherServer(
   uint16_t socklen = peerAddress.getAddress(&addrStorage);
   appender.writeBE<uint16_t>(socklen);
   appender.push((uint8_t*)&addrStorage, socklen);
-  uint64_t tick = packetReceiveTime.time_since_epoch().count();
+  uint64_t tick = receiveTimePoint.time_since_epoch().count();
   appender.writeBE<uint64_t>(tick);
-  writeBuffer->prependChain(std::move(data));
+  writeBuffer->prependChain(std::move(buf));
   forwardPacket(std::move(writeBuffer));
 }
 
