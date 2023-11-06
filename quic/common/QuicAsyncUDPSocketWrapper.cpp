@@ -142,9 +142,9 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
       size_t len = bytesRead;
       size_t remaining = len;
       size_t offset = 0;
-      size_t totalNumPackets =
-          networkData.packets.size() + ((len + params.gro - 1) / params.gro);
-      networkData.packets.reserve(totalNumPackets);
+      size_t totalNumPackets = networkData.getPackets().size() +
+          ((len + params.gro - 1) / params.gro);
+      networkData.reserve(totalNumPackets);
       while (remaining) {
         if (static_cast<int>(remaining) > params.gro) {
           auto tmp = readBuffer->cloneOne();
@@ -157,18 +157,18 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.packets.emplace_back(std::move(tmp));
+          networkData.addPacket(ReceivedPacket(std::move(tmp)));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.packets.emplace_back(std::move(readBuffer));
+          networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
         }
       }
     } else {
-      networkData.packets.emplace_back(std::move(readBuffer));
+      networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
     }
   }
 

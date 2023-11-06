@@ -1873,7 +1873,7 @@ void QuicTransportBase::onNetworkData(
     updateWriteLooper(true);
   };
   try {
-    conn_->lossState.totalBytesRecvd += networkData.totalData;
+    conn_->lossState.totalBytesRecvd += networkData.getTotalData();
     auto originalAckVersion = currentAckStateVersion(*conn_);
 
     // handle PacketsReceivedEvent if requested by observers
@@ -1883,13 +1883,13 @@ void QuicTransportBase::onNetworkData(
                 SocketObserverInterface::Events::packetsReceivedEvents>()) {
       auto builder = SocketObserverInterface::PacketsReceivedEvent::Builder()
                          .setReceiveLoopTime(TimePoint::clock::now())
-                         .setNumPacketsReceived(networkData.packets.size())
-                         .setNumBytesReceived(networkData.totalData);
-      for (auto& packet : networkData.packets) {
+                         .setNumPacketsReceived(networkData.getPackets().size())
+                         .setNumBytesReceived(networkData.getTotalData());
+      for (auto& packet : networkData.getPackets()) {
         builder.addReceivedPacket(
             SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
                 Builder()
-                    .setPacketReceiveTime(networkData.receiveTimePoint)
+                    .setPacketReceiveTime(networkData.getReceiveTimePoint())
                     .setPacketNumBytes(packet.buf->computeChainDataLength())
                     .build());
       }
@@ -1903,12 +1903,13 @@ void QuicTransportBase::onNetworkData(
               });
     }
 
-    for (auto& packet : networkData.packets) {
+    const auto receiveTimePoint = networkData.getReceiveTimePoint();
+    auto packets = std::move(networkData).movePackets();
+    for (auto& packet : packets) {
       onReadData(
           peer,
           NetworkDataSingle(
-              ReceivedPacket(std::move(packet.buf)),
-              networkData.receiveTimePoint));
+              ReceivedPacket(std::move(packet.buf)), receiveTimePoint));
       if (conn_->peerConnectionError) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));

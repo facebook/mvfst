@@ -44,9 +44,9 @@ namespace quic {
 namespace test {
 
 MATCHER_P(NetworkDataMatches, networkData, "") {
-  for (size_t i = 0; i < arg.packets.size(); ++i) {
+  for (size_t i = 0; i < arg.getPackets().size(); ++i) {
     folly::IOBufEqualTo eq;
-    bool equals = eq(*arg.packets[i].buf, networkData);
+    bool equals = eq(*arg.getPackets()[i].buf, networkData);
     if (equals) {
       return true;
     }
@@ -1971,8 +1971,8 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
           EXPECT_EQ(addr.getPort(), clientAddr.getPort());
           // the original data should be extracted after processing takeover
           // protocol related information
-          EXPECT_EQ(networkData->packets.size(), 1);
-          EXPECT_TRUE(eq(*data, *(networkData->packets[0].buf)));
+          EXPECT_EQ(networkData->getPackets().size(), 1);
+          EXPECT_TRUE(eq(*data, *(networkData->getPackets()[0].buf)));
           EXPECT_TRUE(isForwardedData);
         };
         EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
@@ -2163,9 +2163,9 @@ class QuicServerTest : public Test {
               .WillByDefault(Invoke(
                   [&, expected = std::shared_ptr<folly::IOBuf>(data->clone())](
                       auto, const auto& networkData) mutable {
-                    EXPECT_GT(networkData.packets.size(), 0);
+                    EXPECT_GT(networkData.getPackets().size(), 0);
                     EXPECT_TRUE(folly::IOBufEqualTo()(
-                        *networkData.packets[0].buf, *expected));
+                        *networkData.getPackets()[0].buf, *expected));
                     std::unique_lock<std::mutex> lg(m);
                     calledOnNetworkData = true;
                     cv.notify_one();
@@ -2324,9 +2324,9 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
 
   EXPECT_CALL(*transport, onNetworkData(_, _))
       .WillOnce(Invoke([&](auto, const auto& networkData) {
-        EXPECT_GT(networkData.packets.size(), 0);
-        EXPECT_TRUE(
-            folly::IOBufEqualTo()(*networkData.packets[0].buf, *initialData));
+        EXPECT_GT(networkData.getPackets().size(), 0);
+        EXPECT_TRUE(folly::IOBufEqualTo()(
+            *networkData.getPackets()[0].buf, *initialData));
       }));
 
   server_->routeDataToWorker(
@@ -2424,9 +2424,9 @@ class QuicServerTakeoverTest : public Test {
           EXPECT_CALL(*transport, onNetworkData(_, _))
               .WillOnce(Invoke(
                   [&, expected = data.get()](auto, const auto& networkData) {
-                    EXPECT_GT(networkData.packets.size(), 0);
+                    EXPECT_GT(networkData.getPackets().size(), 0);
                     EXPECT_TRUE(folly::IOBufEqualTo()(
-                        *networkData.packets[0].buf, *expected));
+                        *networkData.getPackets()[0].buf, *expected));
                     baton.post();
                   }));
           return transport;
@@ -2532,9 +2532,9 @@ class QuicServerTakeoverTest : public Test {
     EXPECT_CALL(*transportCbForOldServer, onNetworkData(_, _))
         .WillOnce(
             Invoke([&, expected = data.get()](auto, const auto& networkData) {
-              EXPECT_GT(networkData.packets.size(), 0);
+              EXPECT_GT(networkData.getPackets().size(), 0);
               EXPECT_TRUE(folly::IOBufEqualTo()(
-                  *networkData.packets[0].buf, *expected));
+                  *networkData.getPackets()[0].buf, *expected));
               b1.post();
             }));
     // new quic server receives the packet and forwards it
@@ -2995,9 +2995,9 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
         EXPECT_CALL(*transport, onNetworkData(_, _))
             .WillOnce(Invoke(
                 [&, expected = data.get()](auto, const auto& networkData) {
-                  EXPECT_GT(networkData.packets.size(), 0);
+                  EXPECT_GT(networkData.getPackets().size(), 0);
                   EXPECT_TRUE(folly::IOBufEqualTo()(
-                      *networkData.packets[0].buf, *expected));
+                      *networkData.getPackets()[0].buf, *expected));
                   b.post();
                 }));
         return transport;
@@ -3038,9 +3038,9 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
   folly::Baton<> b1;
   auto verifyZeroRtt = [&](const folly::SocketAddress& peer,
                            const NetworkData& networkData) noexcept {
-    EXPECT_GT(networkData.packets.size(), 0);
+    EXPECT_GT(networkData.getPackets().size(), 0);
     EXPECT_EQ(peer, reader->getSocket().address());
-    EXPECT_TRUE(folly::IOBufEqualTo()(*data, *networkData.packets[0].buf));
+    EXPECT_TRUE(folly::IOBufEqualTo()(*data, *networkData.getPackets()[0].buf));
     b1.post();
   };
   EXPECT_CALL(*transport, onNetworkData(_, _)).WillOnce(Invoke(verifyZeroRtt));
@@ -3091,7 +3091,7 @@ TEST_F(QuicServerTest, ZeroRttBeforeInitial) {
         EXPECT_CALL(*transport, onNetworkData(_, _))
             .Times(2)
             .WillRepeatedly(Invoke([&](auto, auto& networkData) {
-              for (auto& packet : networkData.packets) {
+              for (const auto& packet : networkData.getPackets()) {
                 receivedData.emplace_back(packet.buf->clone());
               }
               if (receivedData.size() == 2) {

@@ -24,24 +24,20 @@ struct ReceivedPacket {
 };
 
 struct NetworkData {
-  TimePoint receiveTimePoint;
-  std::vector<ReceivedPacket> packets;
-  size_t totalData{0};
-
   NetworkData() = default;
   NetworkData(Buf&& buf, const TimePoint& receiveTime)
-      : receiveTimePoint(receiveTime) {
+      : receiveTimePoint_(receiveTime) {
     if (buf) {
-      totalData = buf->computeChainDataLength();
-      packets.emplace_back(std::move(buf));
+      totalData_ = buf->computeChainDataLength();
+      packets_.emplace_back(std::move(buf));
     }
   }
 
   NetworkData(
       std::vector<Buf>&& packetBufs,
       const TimePoint& receiveTimePointIn)
-      : receiveTimePoint(receiveTimePointIn),
-        packets([&packetBufs]() {
+      : receiveTimePoint_(receiveTimePointIn),
+        packets_([&packetBufs]() {
           std::vector<ReceivedPacket> result;
           result.reserve(packetBufs.size());
           for (auto& packetBuf : packetBufs) {
@@ -49,17 +45,49 @@ struct NetworkData {
           }
           return result;
         }()),
-        totalData([this]() {
+        totalData_([this]() {
           size_t result = 0;
-          for (const auto& packet : packets) {
+          for (const auto& packet : packets_) {
             result += packet.buf->computeChainDataLength();
           }
           return result;
         }()) {}
 
+  void reserve(size_t size) {
+    packets_.reserve(size);
+  }
+
+  void addPacket(ReceivedPacket&& packetIn) {
+    packets_.emplace_back(std::move(packetIn));
+  }
+
+  [[nodiscard]] const std::vector<ReceivedPacket>& getPackets() const {
+    return packets_;
+  }
+
+  std::vector<ReceivedPacket> movePackets() && {
+    return std::move(packets_);
+  }
+
+  void setReceiveTimePoint(const TimePoint& receiveTimePointIn) {
+    receiveTimePoint_ = receiveTimePointIn;
+  }
+
+  [[nodiscard]] TimePoint getReceiveTimePoint() const {
+    return receiveTimePoint_;
+  }
+
+  void setTotalData(const size_t totalDataIn) {
+    totalData_ = totalDataIn;
+  }
+
+  [[nodiscard]] size_t getTotalData() const {
+    return totalData_;
+  }
+
   std::unique_ptr<folly::IOBuf> moveAllData() && {
     std::unique_ptr<folly::IOBuf> buf;
-    for (auto& packet : packets) {
+    for (auto& packet : packets_) {
       if (buf) {
         buf->prependChain(std::move(packet.buf));
       } else {
@@ -68,6 +96,11 @@ struct NetworkData {
     }
     return buf;
   }
+
+ private:
+  TimePoint receiveTimePoint_;
+  std::vector<ReceivedPacket> packets_;
+  size_t totalData_{0};
 };
 
 struct NetworkDataSingle {

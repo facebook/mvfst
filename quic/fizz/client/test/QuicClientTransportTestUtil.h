@@ -720,7 +720,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       NetworkData&& data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
-    for (const auto& packet : data.packets) {
+    for (const auto& packet : data.getPackets()) {
       deliverDataWithoutErrorCheck(
           peer == nullptr ? serverAddr : *peer, packet.buf->coalesce(), writes);
     }
@@ -756,7 +756,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       NetworkData&& data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
-    for (const auto& packet : data.packets) {
+    for (const auto& packet : data.getPackets()) {
       deliverData(
           peer == nullptr ? serverAddr : *peer, packet.buf->coalesce(), writes);
     }

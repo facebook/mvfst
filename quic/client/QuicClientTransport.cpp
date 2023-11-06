@@ -1236,9 +1236,9 @@ void QuicClientTransport::recvMsg(
       size_t len = bytesRead;
       size_t remaining = len;
       size_t offset = 0;
-      size_t totalNumPackets =
-          networkData.packets.size() + ((len + params.gro - 1) / params.gro);
-      networkData.packets.reserve(totalNumPackets);
+      size_t totalNumPackets = networkData.getPackets().size() +
+          ((len + params.gro - 1) / params.gro);
+      networkData.reserve(totalNumPackets);
       while (remaining) {
         if (static_cast<int>(remaining) > params.gro) {
           auto tmp = readBuffer->cloneOne();
@@ -1251,18 +1251,18 @@ void QuicClientTransport::recvMsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.packets.emplace_back(std::move(tmp));
+          networkData.addPacket(ReceivedPacket(std::move(tmp)));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.packets.emplace_back(std::move(readBuffer));
+          networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
         }
       }
     } else {
-      networkData.packets.emplace_back(std::move(readBuffer));
+      networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
     }
     trackDatagramReceived(bytesRead);
   }
@@ -1382,9 +1382,9 @@ void QuicClientTransport::recvMmsg(
       size_t len = bytesRead;
       size_t remaining = len;
       size_t offset = 0;
-      size_t totalNumPackets =
-          networkData.packets.size() + ((len + params.gro - 1) / params.gro);
-      networkData.packets.reserve(totalNumPackets);
+      size_t totalNumPackets = networkData.getPackets().size() +
+          ((len + params.gro - 1) / params.gro);
+      networkData.reserve(totalNumPackets);
       while (remaining) {
         if (static_cast<int>(remaining) > params.gro) {
           auto tmp = readBuffer->cloneOne();
@@ -1397,18 +1397,18 @@ void QuicClientTransport::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.packets.emplace_back(std::move(tmp));
+          networkData.addPacket(ReceivedPacket(std::move(tmp)));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.packets.emplace_back(std::move(readBuffer));
+          networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
         }
       }
     } else {
-      networkData.packets.emplace_back(std::move(readBuffer));
+      networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
     }
 
     trackDatagramReceived(bytesRead);
@@ -1423,7 +1423,7 @@ void QuicClientTransport::onNotifyDataAvailable(
   const uint16_t numPackets = conn_->transportSettings.maxRecvBatchSize;
 
   NetworkData networkData;
-  networkData.packets.reserve(numPackets);
+  networkData.reserve(numPackets);
   size_t totalData = 0;
   folly::Optional<folly::SocketAddress> server;
 
@@ -1432,7 +1432,7 @@ void QuicClientTransport::onNotifyDataAvailable(
         readBufferSize, numPackets, networkData, server, totalData);
 
     // track the received packets
-    for (const auto& packet : networkData.packets) {
+    for (const auto& packet : networkData.getPackets()) {
       if (!packet.buf) {
         continue;
       }
@@ -1479,7 +1479,7 @@ void QuicClientTransport::onNotifyDataAvailable(
     recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
   }
 
-  if (networkData.packets.empty()) {
+  if (networkData.getPackets().empty()) {
     // recvMmsg and recvMsg might have already set the reason and counter
     if (conn_->loopDetectorCallback) {
       if (conn_->readDebugState.noReadReason == NoReadReason::READ_OK) {
@@ -1497,8 +1497,8 @@ void QuicClientTransport::onNotifyDataAvailable(
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
-  networkData.receiveTimePoint = packetReceiveTime;
-  networkData.totalData = totalData;
+  networkData.setReceiveTimePoint(packetReceiveTime);
+  networkData.setTotalData(totalData);
   onNetworkData(*server, std::move(networkData));
 }
 
