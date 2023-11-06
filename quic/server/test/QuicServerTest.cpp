@@ -2228,7 +2228,7 @@ class QuicServerTest : public Test {
   TransportSettings transportSettings_;
   MockQuicStatsFactory* transportStatsFactory_;
   uint32_t clientHostId_{0}, serverHostId_{0xAABBCC};
-} // namespace test
+}; // namespace test
 
 TEST_F(QuicServerTest, NetworkTest) {
   runTest(std::vector<folly::EventBase*>());
