@@ -276,6 +276,6 @@ class ServerHandshake : public Handshake {
    */
   virtual bool processPendingCryptoEvent() = 0;
   virtual void writeNewSessionTicketToCrypto(const AppToken& appToken) = 0;
-}; // namespace quic
+} // namespace quic
 
 } // namespace quic
