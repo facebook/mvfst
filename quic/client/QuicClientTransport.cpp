@@ -121,36 +121,39 @@ QuicClientTransport::~QuicClientTransport() {
 void QuicClientTransport::processUdpPacket(
     const folly::SocketAddress& peer,
     ReceivedPacket&& udpPacket) {
-  BufQueue udpData;
-  udpData.append(std::move(udpPacket.buf));
+  // Process the arriving UDP packet, which may have coalesced QUIC packets.
+  {
+    BufQueue udpData;
+    udpData.append(std::move(udpPacket.buf));
 
-  if (!conn_->version) {
-    // We only check for version negotiation packets before the version
-    // is negotiated.
-    auto versionNegotiation =
-        conn_->readCodec->tryParsingVersionNegotiation(udpData);
-    if (versionNegotiation) {
-      VLOG(4) << "Got version negotiation packet from peer=" << peer
-              << " versions=" << std::hex << versionNegotiation->versions << " "
-              << *this;
+    if (!conn_->version) {
+      // We only check for version negotiation packets before the version
+      // is negotiated.
+      auto versionNegotiation =
+          conn_->readCodec->tryParsingVersionNegotiation(udpData);
+      if (versionNegotiation) {
+        VLOG(4) << "Got version negotiation packet from peer=" << peer
+                << " versions=" << std::hex << versionNegotiation->versions
+                << " " << *this;
 
-      throw QuicInternalException(
-          "Received version negotiation packet",
-          LocalErrorCode::CONNECTION_ABANDONED);
+        throw QuicInternalException(
+            "Received version negotiation packet",
+            LocalErrorCode::CONNECTION_ABANDONED);
+      }
     }
+
+    for (uint16_t processedPackets = 0;
+         !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
+         processedPackets++) {
+      processUdpPacketData(peer, udpPacket.timings, udpData);
+    }
+    VLOG_IF(4, !udpData.empty())
+        << "Leaving " << udpData.chainLength()
+        << " bytes unprocessed after attempting to process "
+        << kMaxNumCoalescedPackets << " packets.";
   }
 
-  for (uint16_t processedPackets = 0;
-       !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
-       processedPackets++) {
-    processUdpPacketData(peer, udpPacket.timings, udpData);
-  }
-  VLOG_IF(4, !udpData.empty())
-      << "Leaving " << udpData.chainLength()
-      << " bytes unprocessed after attempting to process "
-      << kMaxNumCoalescedPackets << " packets.";
-
-  // Process any pending 1RTT and handshake packets if we have keys.
+  // Process any deferred pending 1RTT and handshake packets if we have keys.
   if (conn_->readCodec->getOneRttReadCipher() &&
       !clientConn_->pendingOneRttData.empty()) {
     BufQueue pendingPacket;
