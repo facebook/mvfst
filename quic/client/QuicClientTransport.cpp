@@ -118,7 +118,7 @@ QuicClientTransport::~QuicClientTransport() {
   }
 }
 
-void QuicClientTransport::processUDPData(
+void QuicClientTransport::processUdpPacket(
     const folly::SocketAddress& peer,
     NetworkDataSingle&& networkData) {
   BufQueue udpData;
@@ -143,7 +143,7 @@ void QuicClientTransport::processUDPData(
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
-    processPacketData(peer, networkData.packet.timings, udpData);
+    processUdpPacketData(peer, networkData.packet.timings, udpData);
   }
   VLOG_IF(4, !udpData.empty())
       << "Leaving " << udpData.chainLength()
@@ -156,7 +156,7 @@ void QuicClientTransport::processUDPData(
     BufQueue pendingPacket;
     for (auto& pendingData : clientConn_->pendingOneRttData) {
       pendingPacket.append(std::move(pendingData.networkData.packet.buf));
-      processPacketData(
+      processUdpPacketData(
           pendingData.peer,
           pendingData.networkData.packet.timings,
           pendingPacket);
@@ -169,7 +169,7 @@ void QuicClientTransport::processUDPData(
     BufQueue pendingPacket;
     for (auto& pendingData : clientConn_->pendingHandshakeData) {
       pendingPacket.append(std::move(pendingData.networkData.packet.buf));
-      processPacketData(
+      processUdpPacketData(
           pendingData.peer,
           pendingData.networkData.packet.timings,
           pendingPacket);
@@ -179,16 +179,16 @@ void QuicClientTransport::processUDPData(
   }
 }
 
-void QuicClientTransport::processPacketData(
+void QuicClientTransport::processUdpPacketData(
     const folly::SocketAddress& peer,
-    const ReceivedPacket::Timings& packetTimings,
-    BufQueue& packetQueue) {
-  auto packetSize = packetQueue.chainLength();
+    const ReceivedPacket::Timings& udpPacketTimings,
+    BufQueue& udpPacketData) {
+  auto packetSize = udpPacketData.chainLength();
   if (packetSize == 0) {
     return;
   }
   auto parsedPacket = conn_->readCodec->parsePacket(
-      packetQueue, conn_->ackStates, conn_->clientConnectionId->size());
+      udpPacketData, conn_->ackStates, conn_->clientConnectionId->size());
   StatelessReset* statelessReset = parsedPacket.statelessReset();
   if (statelessReset) {
     const auto& token = clientConn_->statelessResetToken;
@@ -270,8 +270,9 @@ void QuicClientTransport::processPacketData(
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
         NetworkDataSingle(
-            ReceivedPacket(std::move(cipherUnavailable->packet), packetTimings),
-            packetTimings.receiveTimePoint),
+            ReceivedPacket(
+                std::move(cipherUnavailable->packet), udpPacketTimings),
+            udpPacketTimings.receiveTimePoint),
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
@@ -372,7 +373,7 @@ void QuicClientTransport::processPacketData(
   }
   auto& ackState = getAckState(*conn_, pnSpace);
   uint64_t distanceFromExpectedPacketNum = updateLargestReceivedPacketNum(
-      *conn_, ackState, packetNum, packetTimings.receiveTimePoint);
+      *conn_, ackState, packetNum, udpPacketTimings.receiveTimePoint);
   if (distanceFromExpectedPacketNum > 0) {
     QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
   }
@@ -461,7 +462,7 @@ void QuicClientTransport::processPacketData(
               }
             },
             markPacketLoss,
-            packetTimings.receiveTimePoint));
+            udpPacketTimings.receiveTimePoint));
         break;
       }
       case QuicFrame::Type::RstStreamFrame: {
@@ -616,7 +617,7 @@ void QuicClientTransport::processPacketData(
         // Datagram isn't retransmittable. But we would like to ack them early.
         // So, make Datagram frames count towards ack policy
         pktHasRetransmittableData = true;
-        handleDatagram(*conn_, frame, packetTimings.receiveTimePoint);
+        handleDatagram(*conn_, frame, udpPacketTimings.receiveTimePoint);
         break;
       }
       case QuicFrame::Type::ImmediateAckFrame: {
@@ -816,7 +817,7 @@ void QuicClientTransport::onReadData(
     return;
   }
   bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
-  processUDPData(peer, std::move(networkData));
+  processUdpPacket(peer, std::move(networkData));
   if (connSetupCallback_ && waitingForFirstPacket &&
       hasReceivedPackets(*conn_)) {
     connSetupCallback_->onFirstPeerPacketProcessed();
