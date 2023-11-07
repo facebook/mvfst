@@ -25,8 +25,6 @@ class BatchWriterFactory {
   static BatchWriterPtr makeBatchWriter(
       const quic::QuicBatchingMode& batchingMode,
       uint32_t batchSize,
-      bool useThreadLocal,
-      const std::chrono::microseconds& threadLocalDelay,
       DataPathType dataPathType,
       QuicConnectionStateBase& conn,
       bool gsoSupported);
@@ -53,6 +51,7 @@ class BatchWriterFactory {
         }
         // Fall through to Sendmmsg batching if gso is not supported.
       }
+        [[fallthrough]];
       case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
         return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
       case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {

@@ -32,8 +32,6 @@ BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t) {
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
-    bool /* useThreadLocal */,
-    const std::chrono::microseconds& /* threadLocalDelay */,
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
     bool gsoSupported) {

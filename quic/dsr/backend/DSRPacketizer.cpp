@@ -144,7 +144,6 @@ BufQuicBatchResult writePacketsGroup(
       fakeConn, fakeConn.transportSettings.maxBatchSize));
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
-      false /* thread local batching */,
       sock,
       reqGroup.clientAddress,
       nullptr /* statsCallback */,

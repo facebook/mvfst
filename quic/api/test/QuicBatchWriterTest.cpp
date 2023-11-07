@@ -24,8 +24,7 @@ constexpr const auto kStrLenLT = 5;
 constexpr const auto kBatchNum = 3;
 constexpr const auto kNumLoops = 10;
 
-struct QuicBatchWriterTest : public ::testing::Test,
-                             public ::testing::WithParamInterface<bool> {
+struct QuicBatchWriterTest : public ::testing::Test {
   QuicBatchWriterTest()
       : conn_(FizzServerQuicHandshakeContext::Builder().build()) {}
 
@@ -34,13 +33,10 @@ struct QuicBatchWriterTest : public ::testing::Test,
   bool gsoSupported_{false};
 };
 
-TEST_P(QuicBatchWriterTest, TestBatchingNone) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingNone) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_NONE,
       kBatchNum,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -60,8 +56,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingNone) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingGSOBase) {
   folly::EventBase evb;
   QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
@@ -71,8 +66,6 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -90,8 +83,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBase) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   folly::EventBase evb;
   QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
@@ -101,8 +93,6 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -132,8 +122,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   folly::EventBase evb;
   QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
@@ -143,8 +132,6 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -169,8 +156,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   folly::EventBase evb;
   QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
@@ -180,8 +166,6 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       kBatchNum,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -215,13 +199,10 @@ TEST_P(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingSendmmsg) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsg) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG,
       kBatchNum,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -252,8 +233,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsg) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   folly::EventBase evb;
   QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
@@ -263,8 +243,6 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
       kBatchNum,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -298,8 +276,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   folly::EventBase evb;
   QuicAsyncUDPSocketWrapperImpl sock(&evb);
   sock.setReuseAddr(false);
@@ -309,8 +286,6 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
       3 * kBatchNum,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -349,8 +324,7 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   }
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
@@ -359,8 +333,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -374,8 +346,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   EXPECT_TRUE(batchWriter->needsFlush(conn_.udpSendPacketLen));
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterAppendLimit) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterAppendLimit) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
@@ -384,8 +355,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendLimit) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -407,8 +376,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendLimit) {
       batchWriter->append(nullptr, 1000, folly::SocketAddress(), nullptr));
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
@@ -417,8 +385,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -440,8 +406,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
       batchWriter->append(nullptr, 700, folly::SocketAddress(), nullptr));
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
   folly::EventBase evb;
   quic::test::MockAsyncUDPSocket sock(&evb);
   uint32_t batchSize = 20;
@@ -452,8 +417,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -489,8 +452,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteAll) {
   EXPECT_EQ(0, buf->length());
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterWriteOne) {
   folly::EventBase evb;
   quic::test::MockAsyncUDPSocket sock(&evb);
   uint32_t batchSize = 20;
@@ -501,8 +463,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -530,8 +490,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterWriteOne) {
   EXPECT_EQ(0, buf->length());
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   folly::EventBase evb;
   quic::test::MockAsyncUDPSocket sock(&evb);
   uint32_t batchSize = 20;
@@ -542,8 +501,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -576,8 +533,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   EXPECT_EQ(0, buf->headroom());
 }
 
-TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
-  bool useThreadLocal = GetParam();
+TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   folly::EventBase evb;
   quic::test::MockAsyncUDPSocket sock(&evb);
   gsoSupported_ = true;
@@ -590,8 +546,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
-      useThreadLocal,
-      quic::kDefaultThreadLocalDelay,
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -621,11 +575,6 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   EXPECT_EQ(0, rawBuf->headroom());
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    QuicBatchWriterTest,
-    QuicBatchWriterTest,
-    ::testing::Values(false, true));
-
 class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
  public:
   SinglePacketInplaceBatchWriterTest()
@@ -643,8 +592,6 @@ class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
     return quic::BatchWriterFactory::makeBatchWriter(
         batchingMode,
         conn_.transportSettings.maxBatchSize,
-        false /* useThreadLocal */,
-        quic::kDefaultThreadLocalDelay,
         conn_.transportSettings.dataPathType,
         conn_,
         false /* gsoSupported_ */);

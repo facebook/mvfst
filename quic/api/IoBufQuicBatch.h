@@ -20,14 +20,8 @@ struct BufQuicBatchResult {
 
 class IOBufQuicBatch {
  public:
-  enum class FlushType {
-    FLUSH_TYPE_ALWAYS,
-    FLUSH_TYPE_ALLOW_THREAD_LOCAL_DELAY,
-  };
-
   IOBufQuicBatch(
       BatchWriterPtr&& batchWriter,
-      bool threadLocal,
       QuicAsyncUDPSocketWrapper& sock,
       const folly::SocketAddress& peerAddress,
       QuicTransportStatsCallback* statsCallback,
@@ -38,8 +32,7 @@ class IOBufQuicBatch {
   // returns true if it succeeds and false if the loop should end
   bool write(std::unique_ptr<folly::IOBuf>&& buf, size_t encodedSize);
 
-  bool flush(
-      FlushType flushType = FlushType::FLUSH_TYPE_ALLOW_THREAD_LOCAL_DELAY);
+  bool flush();
 
   FOLLY_ALWAYS_INLINE uint64_t getPktSent() const {
     return result_.packetsSent;
@@ -61,7 +54,6 @@ class IOBufQuicBatch {
   bool isRetriableError(int err);
 
   BatchWriterPtr batchWriter_;
-  bool threadLocal_;
   QuicAsyncUDPSocketWrapper& sock_;
   const folly::SocketAddress& peerAddress_;
   QuicTransportStatsCallback* statsCallback_{nullptr};

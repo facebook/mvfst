@@ -1487,8 +1487,6 @@ WriteQuicDataResult writeConnectionDataToSocket(
   auto batchWriter = BatchWriterFactory::makeBatchWriter(
       connection.transportSettings.batchingMode,
       connection.transportSettings.maxBatchSize,
-      connection.transportSettings.useThreadLocalBatching,
-      connection.transportSettings.threadLocalDelay,
       connection.transportSettings.dataPathType,
       connection,
       *connection.gsoSupported);
@@ -1498,7 +1496,6 @@ WriteQuicDataResult writeConnectionDataToSocket(
       : &static_cast<QuicClientConnectionState&>(connection).happyEyeballsState;
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
-      connection.transportSettings.useThreadLocalBatching,
       sock,
       connection.peerAddress,
       connection.statsCallback,

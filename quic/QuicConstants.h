@@ -364,9 +364,6 @@ QuicBatchingMode getQuicBatchingMode(uint32_t val);
 // by BATCHING_MODE_GSO
 constexpr uint32_t kDefaultQuicMaxBatchSize = 16;
 
-// thread local delay
-constexpr std::chrono::microseconds kDefaultThreadLocalDelay = 1ms;
-
 // rfc6298:
 constexpr int kRttAlpha = 8;
 constexpr int kRttBeta = 4;

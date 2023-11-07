@@ -31,7 +31,6 @@ void RunTest(int numBatch) {
 
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
-      false,
       sock,
       peerAddress,
       conn.statsCallback,

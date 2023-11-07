@@ -60,7 +60,6 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
-      false /* threadLocal */,
       *socket,
       peerAddress,
       nullptr /* statsCallback */,
@@ -105,7 +104,6 @@ TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
-      false /* threadLocal */,
       *socket,
       peerAddress,
       nullptr /* statsCallback */,

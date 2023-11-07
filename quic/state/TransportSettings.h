@@ -182,11 +182,6 @@ struct TransportSettings {
   uint16_t flowControlWindowFrequency{2};
   // batching mode
   QuicBatchingMode batchingMode{QuicBatchingMode::BATCHING_MODE_NONE};
-  // use thread local batcher - currently it works only with
-  // BATCHING_MODE_SENDMMSG_GSO it will not be enabled if the mode is different
-  bool useThreadLocalBatching{false};
-  // thread local delay interval
-  std::chrono::microseconds threadLocalDelay{kDefaultThreadLocalDelay};
   // maximum number of packets we can batch. This does not apply to
   // BATCHING_MODE_NONE
   uint32_t maxBatchSize{kDefaultQuicMaxBatchSize};
