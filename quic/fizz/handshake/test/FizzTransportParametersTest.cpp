@@ -56,6 +56,8 @@ StringPiece serverParamsD29{"ffa500100008121254761256146904049d7f3e7d"};
 StringPiece ticketParamsV1{"0039000604049d7f3e7d"};
 StringPiece ticketParamsD29{"ffa5000604049d7f3e7d"};
 
+constexpr QuicVersion kQuicDraft = static_cast<QuicVersion>(0xff00001d);
+
 TEST_F(QuicExtensionsTest, TestClientParamsV1) {
   auto exts = getExtensions(clientParamsV1);
   auto ext = getClientExtension(exts, QuicVersion::QUIC_V1);
@@ -70,13 +72,13 @@ TEST_F(QuicExtensionsTest, TestClientParamsV1) {
 
   // Confirm D29 parameters are not parsed for V1.
   auto d29Exts = getExtensions(clientParamsD29);
-  auto d2Ext = getClientExtension(exts, QuicVersion::QUIC_DRAFT);
+  auto d2Ext = getClientExtension(exts, kQuicDraft);
   EXPECT_EQ(d2Ext, folly::none);
 }
 
 TEST_F(QuicExtensionsTest, TestClientParamsD29) {
   auto exts = getExtensions(clientParamsD29);
-  auto ext = getClientExtension(exts, QuicVersion::QUIC_DRAFT);
+  auto ext = getClientExtension(exts, kQuicDraft);
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
@@ -84,7 +86,7 @@ TEST_F(QuicExtensionsTest, TestClientParamsD29) {
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
-  checkEncode(std::move(*ext), clientParamsD29, QuicVersion::QUIC_DRAFT);
+  checkEncode(std::move(*ext), clientParamsD29, kQuicDraft);
 }
 
 TEST_F(QuicExtensionsTest, TestServerParamsV1) {
@@ -111,13 +113,13 @@ TEST_F(QuicExtensionsTest, TestServerParamsV1) {
 
   // Confirm D29 parameters are not parsed for V1.
   auto d29Exts = getExtensions(serverParamsD29);
-  auto d2Ext = getServerExtension(exts, QuicVersion::QUIC_DRAFT);
+  auto d2Ext = getServerExtension(exts, kQuicDraft);
   EXPECT_EQ(d2Ext, folly::none);
 }
 
 TEST_F(QuicExtensionsTest, TestServerParamsD29) {
   auto exts = getExtensions(serverParamsD29);
-  auto ext = getServerExtension(exts, QuicVersion::QUIC_DRAFT);
+  auto ext = getServerExtension(exts, kQuicDraft);
 
   EXPECT_EQ(
       ext->parameters[0].parameter,
@@ -135,7 +137,7 @@ TEST_F(QuicExtensionsTest, TestServerParamsD29) {
           TransportParameterId::original_destination_connection_id,
           ext->parameters),
       connId);
-  checkEncode(std::move(*ext), serverParamsD29, QuicVersion::QUIC_DRAFT);
+  checkEncode(std::move(*ext), serverParamsD29, kQuicDraft);
 }
 
 TEST_F(QuicExtensionsTest, TestTicketParamsV1) {
@@ -153,13 +155,13 @@ TEST_F(QuicExtensionsTest, TestTicketParamsV1) {
 
   // Confirm D29 parameters are not parsed for V1.
   auto d29Exts = getExtensions(ticketParamsD29);
-  auto d2Ext = getTicketExtension(exts, QuicVersion::QUIC_DRAFT);
+  auto d2Ext = getTicketExtension(exts, kQuicDraft);
   EXPECT_EQ(d2Ext, folly::none);
 }
 
 TEST_F(QuicExtensionsTest, TestTicketParamsD29) {
   auto exts = getExtensions(ticketParamsD29);
-  auto ext = getTicketExtension(exts, QuicVersion::QUIC_DRAFT);
+  auto ext = getTicketExtension(exts, kQuicDraft);
 
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
@@ -168,7 +170,7 @@ TEST_F(QuicExtensionsTest, TestTicketParamsD29) {
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
-  checkEncode(std::move(*ext), ticketParamsD29, QuicVersion::QUIC_DRAFT);
+  checkEncode(std::move(*ext), ticketParamsD29, kQuicDraft);
 }
 
 } // namespace test

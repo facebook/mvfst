@@ -50,7 +50,7 @@ RegularQuicWritePacket makeTestLongPacket(LongHeader::Types type) {
       getTestConnectionId(0),
       getTestConnectionId(1),
       2 /* packetNum */,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(header));
   return packet;
 }

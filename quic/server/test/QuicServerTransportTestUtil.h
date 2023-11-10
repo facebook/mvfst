@@ -146,7 +146,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
             }));
     EXPECT_CALL(*sock, address())
         .WillRepeatedly(testing::ReturnRef(serverAddr));
-    supportedVersions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
+    supportedVersions = {QuicVersion::MVFST};
     serverCtx = createServerCtx();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();

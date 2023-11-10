@@ -151,8 +151,7 @@ void processServerInitialParams(
       static_cast<TransportParameterId>(
           TransportParameterId::knob_frames_supported),
       serverParams.parameters);
-  if (conn.version == QuicVersion::QUIC_DRAFT ||
-      conn.version == QuicVersion::QUIC_V1 ||
+  if (conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,

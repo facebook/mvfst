@@ -4061,8 +4061,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   getFakeHandshakeLayer()->allowZeroRttKeys();
   setupClientReadCodec();
-  recvClientHello(true, QuicVersion::QUIC_DRAFT);
-  recvClientFinished(true, nullptr, QuicVersion::QUIC_DRAFT);
+  recvClientHello(true, QuicVersion::MVFST);
+  recvClientFinished(true, nullptr, QuicVersion::MVFST);
   auto& packets = server->getConn().outstandings.packets;
   ASSERT_FALSE(packets.empty());
   int numHandshakeDone = 0;
@@ -4108,7 +4108,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
 
   getFakeHandshakeLayer()->allowZeroRttKeys();
   setupClientReadCodec();
-  recvClientHello(true, QuicVersion::QUIC_DRAFT);
+  recvClientHello(true, QuicVersion::MVFST);
 
   /**
    * Receiving just the chlo should not issue a NewTokenFrame.
@@ -4116,7 +4116,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
   EXPECT_EQ(getNewTokenFrame(server->getConn().outstandings.packets).first, 0);
 
   EXPECT_CALL(*quicStats_, onNewTokenIssued());
-  recvClientFinished(true, nullptr, QuicVersion::QUIC_DRAFT);
+  recvClientFinished(true, nullptr, QuicVersion::MVFST);
 
   /**
    * After the handshake is complete, we expect only one NewTokenFrame to be

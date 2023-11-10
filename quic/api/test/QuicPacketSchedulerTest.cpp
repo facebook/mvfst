@@ -38,7 +38,7 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       srcConnId,
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
       packet,
@@ -68,7 +68,7 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       srcConnId,
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
       packet,
@@ -697,7 +697,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
       srcConnId,
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),

@@ -49,14 +49,14 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
       getTestConnectionId(),
       getTestConnectionId(),
       321,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
 
   LongHeader headerRetry(
       packetType,
       getTestConnectionId(),
       getTestConnectionId(),
       321,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::MVFST,
       std::string("this is a retry token :)"));
 
   RegularQuicPacketBuilder builder(
@@ -213,7 +213,7 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       getTestConnectionId(0),
       getTestConnectionId(1),
       200,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   EXPECT_EQ(
       PacketNumberSpace::Initial, initialLongHeader.getPacketNumberSpace());
   EXPECT_EQ(
@@ -225,7 +225,7 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       getTestConnectionId(2),
       getTestConnectionId(3),
       201,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   EXPECT_EQ(PacketNumberSpace::Initial, retryLongHeader.getPacketNumberSpace());
   EXPECT_EQ(
       PacketNumberSpace::Initial,
@@ -236,7 +236,7 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       getTestConnectionId(4),
       getTestConnectionId(5),
       202,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   EXPECT_EQ(
       PacketNumberSpace::Handshake, handshakeLongHeader.getPacketNumberSpace());
   EXPECT_EQ(
@@ -249,7 +249,7 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       getTestConnectionId(6),
       getTestConnectionId(7),
       203,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   EXPECT_EQ(
       PacketNumberSpace::AppData, zeroRttLongHeader.getPacketNumberSpace());
   EXPECT_EQ(
@@ -266,7 +266,7 @@ TEST_F(PacketHeaderTest, LongHeader) {
       getTestConnectionId(4),
       getTestConnectionId(5),
       packetNumber,
-      QuicVersion::QUIC_DRAFT);
+      QuicVersion::MVFST);
   PacketHeader readHeader(std::move(handshakeLongHeader));
   EXPECT_NE(readHeader.asLong(), nullptr);
   EXPECT_EQ(readHeader.asShort(), nullptr);

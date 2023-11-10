@@ -92,8 +92,7 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
       ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId(std::vector<uint8_t>()));
   EXPECT_THROW(
-      ext.getExtensions(getClientHello(QuicVersion::QUIC_DRAFT)),
-      FizzException);
+      ext.getExtensions(getClientHello(QuicVersion::MVFST)), FizzException);
   EXPECT_NO_THROW(ext.getExtensions(getClientHello(QuicVersion::QUIC_V1)));
 }
 

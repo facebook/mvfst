@@ -48,28 +48,6 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
   EXPECT_EQ(clientParams->parameters.size(), 10);
 }
 
-TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::QUIC_DRAFT,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
-  auto extensions = ext.getClientHelloExtensions();
-
-  EXPECT_EQ(extensions.size(), 1);
-  auto clientParams = getClientExtension(extensions, QuicVersion::QUIC_DRAFT);
-  ASSERT_TRUE(clientParams.has_value());
-  EXPECT_EQ(clientParams->parameters.size(), 11);
-}
-
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::QUIC_V1,
@@ -151,8 +129,7 @@ TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
 
   auto ee = TestMessages::encryptedExt();
   ServerTransportParameters serverParams;
-  ee.extensions.push_back(
-      encodeExtension(serverParams, QuicVersion::QUIC_DRAFT));
+  ee.extensions.push_back(encodeExtension(serverParams, QuicVersion::MVFST));
 
   EXPECT_THROW(ext.onEncryptedExtensions(ee.extensions), FizzException);
 

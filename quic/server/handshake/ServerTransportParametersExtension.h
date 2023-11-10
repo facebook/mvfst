@@ -67,8 +67,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
 
     ServerTransportParameters params;
     params.parameters.reserve(10);
-    if (encodingVersion_ == QuicVersion::QUIC_DRAFT ||
-        encodingVersion_ == QuicVersion::QUIC_V1 ||
+    if (encodingVersion_ == QuicVersion::QUIC_V1 ||
         encodingVersion_ == QuicVersion::QUIC_V1_ALIAS) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::original_destination_connection_id,
@@ -107,8 +106,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           encodeEmptyParameter(TransportParameterId::disable_migration));
     }
 
-    if (encodingVersion_ == QuicVersion::QUIC_DRAFT ||
-        encodingVersion_ == QuicVersion::QUIC_V1 ||
+    if (encodingVersion_ == QuicVersion::QUIC_V1 ||
         encodingVersion_ == QuicVersion::QUIC_V1_ALIAS) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::initial_source_connection_id,

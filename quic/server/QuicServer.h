@@ -393,15 +393,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       const folly::SocketAddress& address,
       const std::vector<folly::EventBase*>& evbs);
 
-  std::vector<QuicVersion> supportedVersions_{
-      {QuicVersion::MVFST,
-       QuicVersion::MVFST_EXPERIMENTAL,
-       QuicVersion::MVFST_EXPERIMENTAL2,
-       QuicVersion::MVFST_EXPERIMENTAL3,
-       QuicVersion::MVFST_ALIAS,
-       QuicVersion::QUIC_V1,
-       QuicVersion::QUIC_V1_ALIAS,
-       QuicVersion::QUIC_DRAFT}};
+  std::vector<QuicVersion> supportedVersions_{{
+      QuicVersion::MVFST,
+      QuicVersion::MVFST_EXPERIMENTAL,
+      QuicVersion::MVFST_EXPERIMENTAL2,
+      QuicVersion::MVFST_EXPERIMENTAL3,
+      QuicVersion::MVFST_ALIAS,
+      QuicVersion::QUIC_V1,
+      QuicVersion::QUIC_V1_ALIAS,
+  }};
 
   std::atomic<bool> shutdown_{true};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;

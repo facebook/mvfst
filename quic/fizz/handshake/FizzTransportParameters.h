@@ -192,17 +192,6 @@ inline void validateTransportExtensions(
                 "unexpected extension type ({:#x}) for quic v1",
                 extension.extension_type),
             fizz::AlertDescription::illegal_parameter);
-      } else if (
-          encodingVersion == quic::QuicVersion::QUIC_DRAFT &&
-          extension.extension_type !=
-              fizz::ExtensionType::quic_transport_parameters_draft) {
-        // This is a QUIC draft version using an incorrect transport parameters
-        // extension type
-        throw fizz::FizzException(
-            fmt::format(
-                "unexpected extension type ({:#x}) for quic draft version",
-                extension.extension_type),
-            fizz::AlertDescription::illegal_parameter);
       }
       found = true;
     }

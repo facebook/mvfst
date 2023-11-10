@@ -55,8 +55,7 @@ class FizzClientExtensions : public fizz::ClientExtensions {
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::active_connection_id_limit,
         clientParameters_->activeConnectionLimit_));
-    if (clientParameters_->encodingVersion_ == QuicVersion::QUIC_DRAFT ||
-        clientParameters_->encodingVersion_ == QuicVersion::QUIC_V1 ||
+    if (clientParameters_->encodingVersion_ == QuicVersion::QUIC_V1 ||
         clientParameters_->encodingVersion_ == QuicVersion::QUIC_V1_ALIAS) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::initial_source_connection_id,

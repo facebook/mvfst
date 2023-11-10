@@ -605,14 +605,14 @@ RegularQuicWritePacket createNewPacket(
           getTestConnectionId(1),
           getTestConnectionId(2),
           packetNum,
-          QuicVersion::QUIC_DRAFT));
+          QuicVersion::MVFST));
     case PacketNumberSpace::Handshake:
       return RegularQuicWritePacket(LongHeader(
           LongHeader::Types::Handshake,
           getTestConnectionId(0),
           getTestConnectionId(4),
           packetNum,
-          QuicVersion::QUIC_DRAFT));
+          QuicVersion::MVFST));
     case PacketNumberSpace::AppData:
       return RegularQuicWritePacket(ShortHeader(
           ProtectionType::KeyPhaseOne, getTestConnectionId(), packetNum));

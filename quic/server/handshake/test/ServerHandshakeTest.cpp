@@ -66,7 +66,7 @@ class ServerHandshakeTest : public Test {
   virtual void setupClientAndServerContext() {}
 
   QuicVersion getVersion() {
-    return QuicVersion::QUIC_DRAFT;
+    return QuicVersion::MVFST;
   }
 
   virtual void initialize() {

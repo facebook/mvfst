@@ -411,8 +411,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
         {QuicVersion::MVFST,
          MVFST1,
          QuicVersion::QUIC_V1,
-         QuicVersion::QUIC_V1_ALIAS,
-         QuicVersion::QUIC_DRAFT});
+         QuicVersion::QUIC_V1_ALIAS});
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ON_CALL(*sock, resumeRead(testing::_))
         .WillByDefault(testing::SaveArg<0>(&networkReadCallback));
