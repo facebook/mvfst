@@ -213,6 +213,11 @@ class ServerHandshake : public Handshake {
    */
   void processPendingEvents();
 
+  /**
+   * Returns the AppToken seen in session ticket if the session was resumed.
+   */
+  const folly::Optional<Buf>& getAppToken() const;
+
  protected:
   Phase phase_{Phase::Handshake};
 

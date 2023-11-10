@@ -124,11 +124,12 @@ TEST(
   EXPECT_CALL(*quicStats, onZeroRttAccepted());
   EXPECT_TRUE(validator.validate(resState));
 
+  // Transport settings will not be updated by the ticket.
   EXPECT_EQ(
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
-      initialMaxData - 1);
-  EXPECT_EQ(conn.flowControlState.windowSize, initialMaxData - 1);
-  EXPECT_EQ(conn.flowControlState.advertisedMaxOffset, initialMaxData - 1);
+      initialMaxData);
+  EXPECT_EQ(conn.flowControlState.windowSize, initialMaxData);
+  EXPECT_EQ(conn.flowControlState.advertisedMaxOffset, initialMaxData);
 }
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {

@@ -253,6 +253,10 @@ void ServerHandshake::processPendingEvents() {
   }
 }
 
+const folly::Optional<Buf>& ServerHandshake::getAppToken() const {
+  return state_.appToken();
+}
+
 class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
  public:
   explicit ActionMoveVisitor(ServerHandshake& server) : server_(server) {}

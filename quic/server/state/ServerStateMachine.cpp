@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/state/ServerStateMachine.h>
 
@@ -454,6 +455,8 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     if (!conn.sentHandshakeDone) {
       sendSimpleFrame(conn, HandshakeDoneFrame());
       conn.sentHandshakeDone = true;
+      maybeUpdateTransportFromAppToken(
+          conn, conn.serverHandshakeLayer->getAppToken());
     }
 
     if (!conn.sentNewTokenFrame &&
@@ -535,39 +538,33 @@ void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn) {
   }
 }
 
-void updateTransportParamsFromTicket(
+void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
-    uint64_t idleTimeout,
-    uint64_t maxRecvPacketSize,
-    uint64_t initialMaxData,
-    uint64_t initialMaxStreamDataBidiLocal,
-    uint64_t initialMaxStreamDataBidiRemote,
-    uint64_t initialMaxStreamDataUni,
-    uint64_t initialMaxStreamsBidi,
-    uint64_t initialMaxStreamsUni,
-    folly::Optional<uint64_t> maybeCwndHintBytes) {
-  conn.transportSettings.idleTimeout = std::chrono::milliseconds(idleTimeout);
-  conn.transportSettings.maxRecvPacketSize = maxRecvPacketSize;
-
-  conn.transportSettings.advertisedInitialConnectionFlowControlWindow =
-      initialMaxData;
-  conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow =
-      initialMaxStreamDataBidiLocal;
-  conn.transportSettings.advertisedInitialBidiRemoteStreamFlowControlWindow =
-      initialMaxStreamDataBidiRemote;
-  conn.transportSettings.advertisedInitialUniStreamFlowControlWindow =
-      initialMaxStreamDataUni;
-  updateFlowControlStateWithSettings(
-      conn.flowControlState, conn.transportSettings);
-
-  conn.transportSettings.advertisedInitialMaxStreamsBidi =
-      initialMaxStreamsBidi;
-  conn.transportSettings.advertisedInitialMaxStreamsUni = initialMaxStreamsUni;
-
-  conn.maybeCwndHintBytes = maybeCwndHintBytes;
-
+    const folly::Optional<Buf>& tokenBuf) {
+  if (!tokenBuf) {
+    return;
+  }
+  auto appToken = decodeAppToken(*tokenBuf.value());
+  if (!appToken) {
+    VLOG(10) << "Failed to decode app token";
+    return;
+  }
+  auto& params = appToken->transportParams.parameters;
+  auto maybeCwndHintBytes =
+      getIntegerParameter(TransportParameterId::cwnd_hint_bytes, params);
   if (maybeCwndHintBytes) {
     QUIC_STATS(conn.statsCallback, onCwndHintBytesSample, *maybeCwndHintBytes);
+
+    // Only use the cwndHint if the source address is included in the token
+    DCHECK(conn.peerAddress.isInitialized());
+    auto addressMatches =
+        std::find(
+            appToken->sourceAddresses.begin(),
+            appToken->sourceAddresses.end(),
+            conn.peerAddress.getIPAddress()) != appToken->sourceAddresses.end();
+    if (addressMatches) {
+      conn.maybeCwndHintBytes = maybeCwndHintBytes;
+    }
   }
 }
 

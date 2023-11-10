@@ -566,8 +566,6 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
 void QuicServerTransport::maybeWriteNewSessionTicket() {
   if (shouldWriteNewSessionTicket() && !ctx_->getSendNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
-    VLOG(7) << "Writing a new session ticket with cwnd="
-            << conn_->congestionController->getCongestionWindow();
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kWriteNst);
     }
@@ -575,6 +573,8 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     folly::Optional<uint64_t> cwndHint = folly::none;
     if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
         conn_->congestionController) {
+      VLOG(7) << "Writing a new session ticket with cwnd="
+              << conn_->congestionController->getCongestionWindow();
       cwndHint = conn_->congestionController->getCongestionWindow();
       newSessionTicketWrittenCwndHint_ = cwndHint;
     }
