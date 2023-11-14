@@ -41,6 +41,9 @@ class QuicServerWorker : public QuicAsyncUDPSocketWrapper::ReadCallback,
                          public folly::EventRecvmsgCallback,
                          public folly::EventRecvmsgMultishotCallback,
                          public QuicTimerCallback {
+ public:
+  static int getUnfinishedHandshakeCount();
+
  private:
   struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
     static auto constexpr kBuffSize = 1024;

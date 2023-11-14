@@ -49,6 +49,9 @@ bool isValidConnIdLength(const quic::ConnectionId& connId) {
 namespace quic {
 
 std::atomic_int globalUnfinishedHandshakes{0};
+int QuicServerWorker::getUnfinishedHandshakeCount() {
+  return globalUnfinishedHandshakes.load(std::memory_order_relaxed);
+}
 
 QuicServerWorker::QuicServerWorker(
     std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
