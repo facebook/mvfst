@@ -99,7 +99,45 @@ TEST_P(MbedCipherTest, TestEncryptWithTagRoom) {
   auto cipher = getTestCipher(GetParam());
   auto input = toIOBuf(GetParam().plaintext, 0, cipher->getCipherOverhead());
   auto out = callEncrypt(cipher, GetParam(), std::move(input));
-  EXPECT_FALSE(out->isChained());
+}
+
+TEST_P(MbedCipherTest, TestChainedPlaintext) {
+  auto cipher = getTestCipher(GetParam());
+
+  // split plaintext into two iobuf chunks;
+  // midpoint index rounded up to nearest multiple of two
+  size_t plaintext_idx = GetParam().plaintext.size() / 2;
+  plaintext_idx += (plaintext_idx % 2);
+
+  auto plaintext_a = GetParam().plaintext.substr(0, plaintext_idx);
+  auto plaintext_b = GetParam().plaintext.substr(plaintext_idx);
+
+  // chain plaintexts together
+  auto plaintext = toIOBuf(std::move(plaintext_a));
+  plaintext->appendToChain(toIOBuf(std::move(plaintext_b)));
+
+  auto out = callEncrypt(cipher, GetParam(), std::move(plaintext));
+}
+
+TEST_P(MbedCipherTest, TestChainedPlaintextWithTagRoom) {
+  auto cipher = getTestCipher(GetParam());
+
+  // split plaintext into two iobuf chunks;
+  // midpoint index rounded up to nearest multiple of two
+  size_t plaintext_idx = GetParam().plaintext.size() / 2;
+  plaintext_idx += (plaintext_idx % 2);
+
+  auto plaintext_a = GetParam().plaintext.substr(0, plaintext_idx);
+  auto plaintext_b = GetParam().plaintext.substr(plaintext_idx);
+
+  // chain plaintexts together
+  auto plaintext = toIOBuf(std::move(plaintext_a));
+  plaintext->appendToChain(toIOBuf(
+      std::move(plaintext_b),
+      /*headroom=*/0,
+      /*tailroom=*/cipher->getCipherOverhead()));
+
+  auto out = callEncrypt(cipher, GetParam(), std::move(plaintext));
 }
 
 TEST_P(MbedCipherTest, TestEncryptReusedCipher) {

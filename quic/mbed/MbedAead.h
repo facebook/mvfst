@@ -40,7 +40,6 @@ class MbedAead : public Aead {
     return TrafficKey{.key = key_.key->clone(), .iv = key_.iv->clone()};
   }
 
-  // does not support inplace encryption just yet
   std::unique_ptr<folly::IOBuf> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* assocData,
