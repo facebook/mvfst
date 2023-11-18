@@ -9,23 +9,47 @@
 
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
+#include <quic/mbed/MbedAead.h>
 
 namespace quic {
 
 class MbedCryptoFactory : public CryptoFactory {
  public:
-  Buf makeInitialTrafficSecret(
+  /**
+   * Given a label (i.e. "client in" or "server in") generates an Aead object,
+   * with key & iv derived by ::makeInitialTrafficSecret() below, to
+   * encrypt/decrypt quic initial packets
+   */
+  [[nodiscard]] std::unique_ptr<Aead> makeInitialAead(
       folly::StringPiece label,
       const ConnectionId& clientDstConnId,
       QuicVersion version) const override;
 
-  std::unique_ptr<Aead> makeInitialAead(
-      folly::StringPiece label,
-      const ConnectionId& clientDstConnId,
-      QuicVersion version) const override;
-
-  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+  /**
+   * Given a secret, constructs a bit mask to obfuscate header fields in the
+   * quic packet (e.g. Packet Number field)
+   */
+  [[nodiscard]] std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       folly::ByteRange secret) const override;
+
+  /**
+   * Given a secret, initializes/constructs Aead by expanding the secret to
+   * derive key & iv pairs using "quic key" & "quic iv" labels respectively
+   */
+  [[nodiscard]] std::unique_ptr<Aead> makeQuicAead(
+      const CipherType cipher,
+      folly::ByteRange secret) const;
+
+ private:
+  /**
+   * Given a label (i.e. "client in" or "server in") generates a secret that is
+   * subsequently passed into hkdf-expand-label to derive key and iv
+   * used to initialize/construct Aead object
+   */
+  [[nodiscard]] Buf makeInitialTrafficSecret(
+      folly::StringPiece label,
+      const ConnectionId& clientDstConnId,
+      QuicVersion version) const override;
 };
 
 } // namespace quic

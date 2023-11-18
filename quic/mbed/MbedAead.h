@@ -18,6 +18,16 @@ namespace quic {
 
 enum CipherType { AESGCM128 };
 
+constexpr mbedtls_cipher_type_t toMbedCipherType(
+    const quic::CipherType cipherType) {
+  switch (cipherType) {
+    case quic::CipherType::AESGCM128:
+      return MBEDTLS_CIPHER_AES_128_GCM;
+    default:
+      folly::assume_unreachable();
+  }
+}
+
 class MbedAead : public Aead {
  public:
   MbedAead(const CipherType cipherType, TrafficKey&& key);

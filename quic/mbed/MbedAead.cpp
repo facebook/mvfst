@@ -12,14 +12,6 @@
 namespace {
 
 constexpr uint8_t TAG_LENGTH = 16;
-constexpr mbedtls_cipher_type_t toMbedCipherType(quic::CipherType cipherType) {
-  switch (cipherType) {
-    case quic::CipherType::AESGCM128:
-      return MBEDTLS_CIPHER_AES_128_GCM;
-    default:
-      folly::assume_unreachable();
-  }
-}
 
 } // namespace
 
