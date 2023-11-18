@@ -45,7 +45,6 @@ class MbedAead : public Aead {
       const folly::IOBuf* assocData,
       uint64_t seqNum) const override;
 
-  // does not support inplace decryption just yet
   folly::Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* assocData,

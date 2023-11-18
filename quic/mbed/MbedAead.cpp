@@ -82,7 +82,6 @@ folly::Optional<std::unique_ptr<folly::IOBuf>> MbedAead::tryDecrypt(
 
   // create IOBuf of size len(plaintext) - getCipherOverhead()
   const size_t tag_len = getCipherOverhead();
-  auto plaintext_buf = folly::IOBuf::create(ciphertext->length());
   auto iv = getIV(seqNum);
   size_t write_size{0};
 
@@ -94,14 +93,15 @@ folly::Optional<std::unique_ptr<folly::IOBuf>> MbedAead::tryDecrypt(
           /*ad_len=*/assocData ? assocData->length() : 0,
           /*input=*/ciphertext->data(),
           /*ilen=*/ciphertext->length(),
-          /*output=*/plaintext_buf->writableData(),
-          /*output_len=*/plaintext_buf->capacity(),
+          /*output=*/ciphertext->writableData(),
+          /*output_len=*/ciphertext->capacity(),
           /*olen=*/&write_size,
           /*tag_len=*/tag_len) != 0) {
     return folly::none;
   }
-  plaintext_buf->append(write_size);
-  return plaintext_buf;
+  // remove tag from iobuf
+  ciphertext->trimEnd(tag_len);
+  return ciphertext;
 }
 
 size_t MbedAead::getCipherOverhead() const {
