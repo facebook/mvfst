@@ -72,4 +72,15 @@ MbedClientHandshake::~MbedClientHandshake() {
   mbedtls_ssl_config_free(&ssl_conf);
 }
 
+std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+MbedClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
+  // TODO(@damlaj) support 0-rtt
+  CHECK(kind != CipherKind::ZeroRttWrite);
+
+  // TODO(@damlaj) support other cipher suites
+  auto aead = crypto_factory.makeQuicAead(CipherType::AESGCM128, secret);
+  auto packetnum_cipher = crypto_factory.makePacketNumberCipher(secret);
+  return {std::move(aead), std::move(packetnum_cipher)};
+}
+
 } // namespace quic

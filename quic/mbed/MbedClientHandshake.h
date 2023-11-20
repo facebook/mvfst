@@ -54,9 +54,7 @@ class MbedClientHandshake : public ClientHandshake {
   }
 
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
-  buildCiphers(CipherKind /*kind*/, folly::ByteRange /*secret*/) override {
-    return {nullptr, nullptr};
-  }
+  buildCiphers(CipherKind kind, folly::ByteRange secret) override;
 
  private:
   mbedtls_ssl_config ssl_conf;
