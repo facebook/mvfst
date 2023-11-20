@@ -17,7 +17,8 @@ namespace quic {
 
 class MbedClientHandshake : public ClientHandshake {
  public:
-  MbedClientHandshake() = default;
+  explicit MbedClientHandshake(QuicClientConnectionState* conn);
+  ~MbedClientHandshake() override;
 
   const CryptoFactory& getCryptoFactory() const override {
     return crypto_factory;
@@ -58,6 +59,8 @@ class MbedClientHandshake : public ClientHandshake {
   }
 
  private:
+  mbedtls_ssl_config ssl_conf;
+  mbedtls_ssl_context ssl_ctx;
   MbedCryptoFactory crypto_factory;
   folly::Optional<std::string> alpn{folly::none};
 };
