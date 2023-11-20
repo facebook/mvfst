@@ -24,14 +24,14 @@ constexpr uint64_t kEightByteLimit = 0x3FFFFFFFFFFFFFFF;
 
 namespace {
 template <typename BufOp>
-inline uint8_t encodeOneByte(BufOp bufop, uint64_t value) {
+inline size_t encodeOneByte(BufOp bufop, uint64_t value) {
   auto modified = static_cast<uint8_t>(value);
   bufop(modified);
   return sizeof(modified);
 }
 
 template <typename BufOp>
-inline uint16_t encodeTwoBytes(BufOp bufop, uint64_t value) {
+inline size_t encodeTwoBytes(BufOp bufop, uint64_t value) {
   auto reduced = static_cast<uint16_t>(value);
   uint16_t modified = reduced | 0x4000;
   bufop(modified);
@@ -39,7 +39,7 @@ inline uint16_t encodeTwoBytes(BufOp bufop, uint64_t value) {
 }
 
 template <typename BufOp>
-inline uint32_t encodeFourBytes(BufOp bufop, uint64_t value) {
+inline size_t encodeFourBytes(BufOp bufop, uint64_t value) {
   auto reduced = static_cast<uint32_t>(value);
   uint32_t modified = reduced | 0x80000000;
   bufop(modified);
@@ -47,7 +47,7 @@ inline uint32_t encodeFourBytes(BufOp bufop, uint64_t value) {
 }
 
 template <typename BufOp>
-inline uint64_t encodeEightBytes(BufOp bufop, uint64_t value) {
+inline size_t encodeEightBytes(BufOp bufop, uint64_t value) {
   uint64_t modified = value | 0xC000000000000000;
   bufop(modified);
   return sizeof(modified);
