@@ -56,7 +56,41 @@ class MbedClientHandshake : public ClientHandshake {
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(CipherKind kind, folly::ByteRange secret) override;
 
+  /**
+   * Struct used to define static c-style callbacks and proxy them to the
+   * corresponding methods on this object. This allows us to mark the MbedTLS
+   * callback functions as private.
+   */
+  friend struct MbedTlsQuicMethodCb;
+
  private:
+  // MbedTLS quic callbacks
+
+  // cb invoked when secrets are derived by the tls layer for a given enc level
+  int setEncryptionSecrets(
+      EncryptionLevel /*level*/,
+      const uint8_t* /*readKey*/,
+      const uint8_t* /*writeKey*/,
+      size_t /*length*/) {
+    return 0;
+  }
+
+  // cb invoked when new handshake data is available to send to peer
+  int addHandshakeData(
+      EncryptionLevel /*level*/,
+      const uint8_t* /*data*/,
+      size_t /*length*/) {
+    return 0;
+  }
+
+  // cb invoked to inform quic to deliver alert to peer
+  int sendAlert(EncryptionLevel /*level*/, uint8_t /*alert*/) {
+    return 0;
+  }
+
+  // cb invoked on new TLS session ticket post-handshake
+  void processNewSession(mbedtls_ssl_session* /*sessionTicket*/) {}
+
   mbedtls_ssl_config ssl_conf;
   mbedtls_ssl_context ssl_ctx;
   MbedCryptoFactory crypto_factory;

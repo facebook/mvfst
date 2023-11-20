@@ -54,9 +54,78 @@ void initSslConfigDefaults(mbedtls_ssl_config* conf) {
   // TODO(@damlaj) early data support likely goes here
 }
 
+// convert mbedtls_ssl_crypto_level to quic::EncryptionLevel
+quic::EncryptionLevel toQuicEncLevel(mbedtls_ssl_crypto_level level) {
+  switch (level) {
+    case MBEDTLS_SSL_CRYPTO_LEVEL_INITIAL:
+      return quic::EncryptionLevel::Initial;
+    case MBEDTLS_SSL_CRYPTO_LEVEL_HANDSHAKE:
+      return quic::EncryptionLevel::Handshake;
+    case MBEDTLS_SSL_CRYPTO_LEVEL_APPLICATION:
+      return quic::EncryptionLevel::AppData;
+    case MBEDTLS_SSL_CRYPTO_LEVEL_EARLY_DATA:
+      return quic::EncryptionLevel::EarlyData;
+    default:
+      folly::assume_unreachable();
+  };
+}
+
 } // namespace
 
 namespace quic {
+
+/**
+ * MbedTlsQuicMethodCb is a friend struct of MbedClientHandshake that proxies
+ * c-style callbacks to the corresponding private MbedClientHandshake member
+ * methods. We likely don't want mbed callbacks to be exposed publicly.
+ */
+struct MbedTlsQuicMethodCb {
+  // cb invoked when secrets are derived by the tls layer for a given enc level
+  static int mbedtls_quic_set_encryption_secrets(
+      void* param,
+      mbedtls_ssl_crypto_level level,
+      const uint8_t* read_secret,
+      const uint8_t* write_secret,
+      size_t len) {
+    return reinterpret_cast<MbedClientHandshake*>(param)->setEncryptionSecrets(
+        toQuicEncLevel(level), read_secret, write_secret, len);
+  }
+
+  // cb invoked when new handshake data is available to send to peer
+  static int mbedtls_quic_add_handshake_data(
+      void* param,
+      mbedtls_ssl_crypto_level level,
+      const uint8_t* data,
+      size_t len) {
+    return reinterpret_cast<MbedClientHandshake*>(param)->addHandshakeData(
+        toQuicEncLevel(level), data, len);
+  }
+
+  // cb invoked to inform quic to deliver alert to peer
+  static int mbedtls_quic_send_alert(
+      void* param,
+      mbedtls_ssl_crypto_level level,
+      uint8_t alert) {
+    return reinterpret_cast<MbedClientHandshake*>(param)->sendAlert(
+        toQuicEncLevel(level), alert);
+  }
+
+  // cb invoked on new TLS session
+  static void mbedtls_quic_process_new_session(
+      void* param,
+      mbedtls_ssl_session* session_ticket) {
+    return reinterpret_cast<MbedClientHandshake*>(param)->processNewSession(
+        session_ticket);
+  }
+};
+
+struct mbedtls_quic_method mbedtls_quic_method_cb {
+  .set_encryption_secrets =
+      MbedTlsQuicMethodCb::mbedtls_quic_set_encryption_secrets,
+  .add_handshake_data = MbedTlsQuicMethodCb::mbedtls_quic_add_handshake_data,
+  .send_alert = MbedTlsQuicMethodCb::mbedtls_quic_send_alert,
+  .process_new_session = MbedTlsQuicMethodCb::mbedtls_quic_process_new_session,
+};
 
 MbedClientHandshake::MbedClientHandshake(QuicClientConnectionState* conn)
     : ClientHandshake(conn) {
@@ -65,6 +134,9 @@ MbedClientHandshake::MbedClientHandshake(QuicClientConnectionState* conn)
   // init & apply ssl config defaults
   initSslConfigDefaults(&ssl_conf);
   CHECK_EQ(mbedtls_ssl_setup(&ssl_ctx, &ssl_conf), 0);
+
+  // install quic callbacks
+  mbedtls_ssl_set_hs_quic_method(&ssl_ctx, this, &mbedtls_quic_method_cb);
 }
 
 MbedClientHandshake::~MbedClientHandshake() {
