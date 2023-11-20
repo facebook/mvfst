@@ -68,18 +68,17 @@ class MbedClientHandshake : public ClientHandshake {
 
   // cb invoked when secrets are derived by the tls layer for a given enc level
   int setEncryptionSecrets(
-      EncryptionLevel /*level*/,
-      const uint8_t* /*readKey*/,
-      const uint8_t* /*writeKey*/,
-      size_t /*length*/) {
-    return 0;
-  }
+      EncryptionLevel level,
+      const uint8_t* readKey,
+      const uint8_t* writeKey,
+      size_t length);
 
   // cb invoked when new handshake data is available to send to peer
   int addHandshakeData(
-      EncryptionLevel /*level*/,
-      const uint8_t* /*data*/,
-      size_t /*length*/) {
+      EncryptionLevel level,
+      const uint8_t* data,
+      size_t length) {
+    writeDataToStream(level, folly::IOBuf::copyBuffer(data, length));
     return 0;
   }
 

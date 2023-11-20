@@ -155,4 +155,56 @@ MbedClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
   return {std::move(aead), std::move(packetnum_cipher)};
 }
 
+// cb invoked when secrets are derived by the tls layer for a given enc level
+int MbedClientHandshake::setEncryptionSecrets(
+    EncryptionLevel level,
+    const uint8_t* readKey,
+    const uint8_t* writeKey,
+    size_t length) {
+  // at least one of the keys should be available
+  CHECK(readKey != nullptr || writeKey != nullptr);
+
+  if (readKey != nullptr) {
+    folly::ByteRange key_bytes(readKey, length);
+    switch (level) {
+      case EncryptionLevel::Handshake:
+        computeCiphers(CipherKind::HandshakeRead, key_bytes);
+        break;
+      case EncryptionLevel::AppData:
+        computeCiphers(CipherKind::OneRttRead, key_bytes);
+        break;
+      default:
+        /**
+         * - Initial read/write keys are obtained via
+         *   MbedCryptoFactory::makeInitialAead()
+         *
+         * - 0-rtt not yet supported
+         */
+        break;
+    }
+  }
+
+  if (writeKey != nullptr) {
+    folly::ByteRange key_bytes(writeKey, length);
+    switch (level) {
+      case EncryptionLevel::Handshake:
+        computeCiphers(CipherKind::HandshakeWrite, key_bytes);
+        break;
+      case EncryptionLevel::AppData:
+        computeCiphers(CipherKind::OneRttWrite, key_bytes);
+        break;
+      default:
+        /**
+         * - Initial read/write keys are obtained via
+         *   MbedCryptoFactory::makeInitialAead()
+         *
+         * - 0-rtt not yet supported
+         */
+        break;
+    }
+  }
+
+  return 0;
+}
+
 } // namespace quic
