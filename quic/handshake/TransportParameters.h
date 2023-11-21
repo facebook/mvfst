@@ -86,7 +86,8 @@ struct TransportParameter {
   // Encodes TransportParameter as shown above (avoids reallocations)
   Buf encode() const {
     // reserve the exact size needed
-    auto res = folly::IOBuf::createCombined(getEncodedSize());
+    auto res =
+        folly::IOBuf::createCombined(static_cast<size_t>(getEncodedSize()));
 
     // write parameter; need to improve QuicInteger encoding methods
     BufWriter writer(*res, res->capacity());
