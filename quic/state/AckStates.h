@@ -43,10 +43,6 @@ struct AckState : WriteAckFrameState {
   bool needsToSendAckImmediately{false};
   // Count of outstanding packets received with retransmittable data.
   uint8_t numRxPacketsRecvd{0};
-  // Receive time of the latest packet
-  folly::Optional<TimePoint> latestRecvdPacketTime;
-  // Packet number of the latest packet
-  folly::Optional<PacketNum> latestReceivedPacketNum;
 };
 
 struct AckStates {
