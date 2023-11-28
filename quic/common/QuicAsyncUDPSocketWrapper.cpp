@@ -136,7 +136,7 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
     }
 
     // timings
-    ReceivedPacket::Timings timings;
+    ReceivedUdpPacket::Timings timings;
 
     // socket timestamps
     //
@@ -145,14 +145,14 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
     // ts[2] -> hardware timestamp
     if (params.ts.has_value()) {
       const auto timespecToTimestamp = [](const timespec& ts)
-          -> folly::Optional<ReceivedPacket::Timings::SocketTimestampExt> {
+          -> folly::Optional<ReceivedUdpPacket::Timings::SocketTimestampExt> {
         std::chrono::nanoseconds duration = std::chrono::seconds(ts.tv_sec) +
             std::chrono::nanoseconds(ts.tv_nsec);
         if (duration == duration.zero()) {
           return folly::none;
         }
 
-        ReceivedPacket::Timings::SocketTimestampExt sockTsExt;
+        ReceivedUdpPacket::Timings::SocketTimestampExt sockTsExt;
         sockTsExt.rawDuration = duration;
         sockTsExt.systemClock.raw = std::chrono::system_clock::time_point(
             std::chrono::duration_cast<std::chrono::system_clock::duration>(
@@ -186,18 +186,19 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedPacket(std::move(tmp), timings));
+          networkData.addPacket(ReceivedUdpPacket(std::move(tmp), timings));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedPacket(std::move(readBuffer), timings));
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(readBuffer), timings));
         }
       }
     } else {
-      networkData.addPacket(ReceivedPacket(std::move(readBuffer), timings));
+      networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer), timings));
     }
   }
 

@@ -301,29 +301,29 @@ SocketObserverInterface::PacketsWrittenEvent::PacketsWrittenEvent(
       numBytesWritten(
           *CHECK_NOTNULL(builderFields.maybeNumBytesWritten.get_pointer())) {}
 
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder&&
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder::
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
     setPacketReceiveTime(const TimePoint packetReceiveTimeIn) {
   maybePacketReceiveTime = packetReceiveTimeIn;
   return std::move(*this);
 }
 
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder&&
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder::
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
     setPacketNumBytes(const uint64_t packetNumBytesIn) {
   maybePacketNumBytes = packetNumBytesIn;
   return std::move(*this);
 }
 
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder::
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
     build() && {
-  return ReceivedPacket(std::move(*this));
+  return ReceivedUdpPacket(std::move(*this));
 }
 
-SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::ReceivedPacket(
-    SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
-        BuilderFields&& builderFields)
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
+    ReceivedUdpPacket(SocketObserverInterface::PacketsReceivedEvent::
+                          ReceivedUdpPacket::BuilderFields&& builderFields)
     : packetReceiveTime(
           *CHECK_NOTNULL(builderFields.maybePacketReceiveTime.get_pointer())),
       packetNumBytes(
@@ -351,8 +351,8 @@ SocketObserverInterface::PacketsReceivedEvent::Builder::setNumBytesReceived(
 }
 
 SocketObserverInterface::PacketsReceivedEvent::Builder&&
-SocketObserverInterface::PacketsReceivedEvent::Builder::addReceivedPacket(
-    ReceivedPacket&& packetIn) {
+SocketObserverInterface::PacketsReceivedEvent::Builder::addReceivedUdpPacket(
+    ReceivedUdpPacket&& packetIn) {
   receivedPackets.emplace_back(packetIn);
   return std::move(*this);
 }

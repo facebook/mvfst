@@ -133,8 +133,9 @@ class QuicServerTransport
   void verifiedClientAddress();
 
   // From QuicTransportBase
-  void onReadData(const folly::SocketAddress& peer, ReceivedPacket&& udpPacket)
-      override;
+  void onReadData(
+      const folly::SocketAddress& peer,
+      ReceivedUdpPacket&& udpPacket) override;
   void writeData() override;
   void closeTransport() override;
   void unbindConnection() override;

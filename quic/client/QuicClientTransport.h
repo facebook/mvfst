@@ -122,8 +122,9 @@ class QuicClientTransport
   }
 
   // From QuicTransportBase
-  void onReadData(const folly::SocketAddress& peer, ReceivedPacket&& udpPacket)
-      override;
+  void onReadData(
+      const folly::SocketAddress& peer,
+      ReceivedUdpPacket&& udpPacket) override;
   void writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
@@ -246,7 +247,7 @@ class QuicClientTransport
    */
   void processUdpPacket(
       const folly::SocketAddress& peer,
-      ReceivedPacket&& udpPacket);
+      ReceivedUdpPacket&& udpPacket);
 
   /**
    * Process data within a single UDP packet.
@@ -268,7 +269,7 @@ class QuicClientTransport
    */
   void processUdpPacketData(
       const folly::SocketAddress& peer,
-      const ReceivedPacket::Timings& udpPacketTimings,
+      const ReceivedUdpPacket::Timings& udpPacketTimings,
       BufQueue& udpPacketData);
 
   void startCryptoHandshake();

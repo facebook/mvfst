@@ -709,7 +709,7 @@ static void handleCipherUnavailable(
         PacketDropReason::PARSE_ERROR_PACKET_BUFFERED);
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;
-    pendingReadData.udpPacket = ReceivedPacket(
+    pendingReadData.udpPacket = ReceivedUdpPacket(
         std::move(originalData->packet), readData.udpPacket.timings);
     pendingData->emplace_back(std::move(pendingReadData));
     VLOG(10) << "Adding pending data to "
@@ -1021,7 +1021,7 @@ void onServerReadDataFromOpen(
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }
-    DCHECK(hasReceivedPackets(conn));
+    DCHECK(hasReceivedUdpPackets(conn));
 
     bool pktHasRetransmittableData = false;
     bool pktHasCryptoData = false;

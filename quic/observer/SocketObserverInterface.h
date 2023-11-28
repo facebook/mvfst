@@ -222,7 +222,7 @@ class SocketObserverInterface {
     /**
      * Packet received.
      */
-    struct ReceivedPacket {
+    struct ReceivedUdpPacket {
       // Packet receive timestamp.
       //
       // If socket receive (RX) timestamps are used this will be the timestamp
@@ -242,12 +242,12 @@ class SocketObserverInterface {
       struct Builder : public BuilderFields {
         Builder&& setPacketReceiveTime(const TimePoint packetReceiveTimeIn);
         Builder&& setPacketNumBytes(const uint64_t packetNumBytesIn);
-        ReceivedPacket build() &&;
+        ReceivedUdpPacket build() &&;
         explicit Builder() = default;
       };
 
       // Use builder to construct.
-      explicit ReceivedPacket(BuilderFields&& builderFields);
+      explicit ReceivedUdpPacket(BuilderFields&& builderFields);
     };
 
     // Receive loop timestamp.
@@ -260,13 +260,13 @@ class SocketObserverInterface {
     const uint64_t numBytesReceived;
 
     // Details for each received packet.
-    std::vector<ReceivedPacket> receivedPackets;
+    std::vector<ReceivedUdpPacket> receivedPackets;
 
     struct BuilderFields {
       folly::Optional<TimePoint> maybeReceiveLoopTime;
       folly::Optional<uint64_t> maybeNumPacketsReceived;
       folly::Optional<uint64_t> maybeNumBytesReceived;
-      std::vector<ReceivedPacket> receivedPackets;
+      std::vector<ReceivedUdpPacket> receivedPackets;
       explicit BuilderFields() = default;
     };
 
@@ -274,7 +274,7 @@ class SocketObserverInterface {
       Builder&& setReceiveLoopTime(const TimePoint receiveLoopTimeIn);
       Builder&& setNumPacketsReceived(const uint64_t numPacketsReceivedIn);
       Builder&& setNumBytesReceived(const uint64_t numBytesReceivedIn);
-      Builder&& addReceivedPacket(ReceivedPacket&& packetIn);
+      Builder&& addReceivedUdpPacket(ReceivedUdpPacket&& packetIn);
       PacketsReceivedEvent build() &&;
       explicit Builder() = default;
     };

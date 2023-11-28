@@ -263,7 +263,7 @@ class TestQuicTransport
     return lossTimeout_.getTimeRemaining();
   }
 
-  void onReadData(const folly::SocketAddress&, ReceivedPacket&& udpPacket)
+  void onReadData(const folly::SocketAddress&, ReceivedUdpPacket&& udpPacket)
       override {
     if (!udpPacket.buf) {
       return;

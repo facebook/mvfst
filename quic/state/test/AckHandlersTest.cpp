@@ -141,7 +141,7 @@ auto getNumAckReceiveTimestamps(const AckEvent& ackEvent) {
 uint64_t buildExpectedReceiveTimestamps(
     const RecvdPacketsTimestampsRange& timestampsRange,
     folly::F14FastMap<PacketNum, uint64_t>& expectedReceiveTimestamps,
-    quic::PacketNum latestReceivedPacketWithAddedGap,
+    quic::PacketNum latestReceivedUdpPacketWithAddedGap,
     uint64_t lastReceiveTimestamp,
     uint64_t maxTimestamps) {
   if (timestampsRange.timestamp_delta_count == 0 ||
@@ -150,7 +150,7 @@ uint64_t buildExpectedReceiveTimestamps(
   }
   auto receiveTimestamp = lastReceiveTimestamp;
   auto receivedPacketNum =
-      latestReceivedPacketWithAddedGap - timestampsRange.gap;
+      latestReceivedUdpPacketWithAddedGap - timestampsRange.gap;
   uint64_t timestampsProcessed = 0;
   for (const auto& delta : timestampsRange.deltas) {
     receiveTimestamp -= delta;

@@ -120,7 +120,7 @@ QuicClientTransport::~QuicClientTransport() {
 
 void QuicClientTransport::processUdpPacket(
     const folly::SocketAddress& peer,
-    ReceivedPacket&& udpPacket) {
+    ReceivedUdpPacket&& udpPacket) {
   // Process the arriving UDP packet, which may have coalesced QUIC packets.
   {
     BufQueue udpData;
@@ -180,7 +180,7 @@ void QuicClientTransport::processUdpPacket(
 
 void QuicClientTransport::processUdpPacketData(
     const folly::SocketAddress& peer,
-    const ReceivedPacket::Timings& udpPacketTimings,
+    const ReceivedUdpPacket::Timings& udpPacketTimings,
     BufQueue& udpPacketData) {
   auto packetSize = udpPacketData.chainLength();
   if (packetSize == 0) {
@@ -268,7 +268,8 @@ void QuicClientTransport::processUdpPacketData(
         ? clientConn_->pendingOneRttData
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
-        ReceivedPacket(std::move(cipherUnavailable->packet), udpPacketTimings),
+        ReceivedUdpPacket(
+            std::move(cipherUnavailable->packet), udpPacketTimings),
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
@@ -804,7 +805,7 @@ void QuicClientTransport::processUdpPacketData(
 
 void QuicClientTransport::onReadData(
     const folly::SocketAddress& peer,
-    ReceivedPacket&& udpPacket) {
+    ReceivedUdpPacket&& udpPacket) {
   if (closeState_ == CloseState::CLOSED) {
     // If we are closed, then we shouldn't process new network data.
     QUIC_STATS(
@@ -814,10 +815,10 @@ void QuicClientTransport::onReadData(
     }
     return;
   }
-  bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
+  bool waitingForFirstPacket = !hasReceivedUdpPackets(*conn_);
   processUdpPacket(peer, std::move(udpPacket));
   if (connSetupCallback_ && waitingForFirstPacket &&
-      hasReceivedPackets(*conn_)) {
+      hasReceivedUdpPackets(*conn_)) {
     connSetupCallback_->onFirstPeerPacketProcessed();
   }
   if (!transportReadyNotified_ && hasWriteCipher()) {
@@ -1250,18 +1251,18 @@ void QuicClientTransport::recvMsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedPacket(std::move(tmp)));
+          networkData.addPacket(ReceivedUdpPacket(std::move(tmp)));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
+          networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
         }
       }
     } else {
-      networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
+      networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
     }
     trackDatagramReceived(bytesRead);
   }
@@ -1394,18 +1395,18 @@ void QuicClientTransport::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedPacket(std::move(tmp)));
+          networkData.addPacket(ReceivedUdpPacket(std::move(tmp)));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
+          networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
         }
       }
     } else {
-      networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
+      networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
     }
 
     trackDatagramReceived(bytesRead);

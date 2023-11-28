@@ -17,7 +17,14 @@
 
 namespace quic {
 
-struct ReceivedPacket {
+/**
+ * Received UDP packet with timings.
+ *
+ * A single UDP packet can contain multiple QUIC packets due to UDP packet
+ * coalescing (see RFC 9000, section 12.2). When invoked, this function attempts
+ * to transform the UDP packet data into one or more QUIC packets.
+ */
+struct ReceivedUdpPacket {
   struct Timings {
     /**
      * Socket timestamp with additional information.
@@ -47,10 +54,10 @@ struct ReceivedPacket {
     folly::Optional<SocketTimestampExt> maybeSoftwareTs;
   };
 
-  ReceivedPacket() = default;
-  explicit ReceivedPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
-  ReceivedPacket(Buf&& bufIn, const Timings& timingsIn)
-      : buf(std::move(bufIn)), timings(timingsIn) {}
+  ReceivedUdpPacket() = default;
+  explicit ReceivedUdpPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
+  ReceivedUdpPacket(Buf&& bufIn, Timings timingsIn)
+      : buf(std::move(bufIn)), timings(std::move(timingsIn)) {}
 
   Buf buf;
   Timings timings;
@@ -72,7 +79,7 @@ struct NetworkData {
       const TimePoint& receiveTimePointIn)
       : receiveTimePoint_(receiveTimePointIn),
         packets_([&packetBufs, &receiveTimePointIn]() {
-          std::vector<ReceivedPacket> result;
+          std::vector<ReceivedUdpPacket> result;
           result.reserve(packetBufs.size());
           for (auto& packetBuf : packetBufs) {
             result.emplace_back(std::move(packetBuf));
@@ -94,17 +101,17 @@ struct NetworkData {
     packets_.reserve(size);
   }
 
-  void addPacket(ReceivedPacket&& packetIn) {
+  void addPacket(ReceivedUdpPacket&& packetIn) {
     packets_.emplace_back(std::move(packetIn));
     packets_.back().timings.receiveTimePoint = receiveTimePoint_;
     totalData_ += packets_.back().buf->computeChainDataLength();
   }
 
-  [[nodiscard]] const std::vector<ReceivedPacket>& getPackets() const {
+  [[nodiscard]] const std::vector<ReceivedUdpPacket>& getPackets() const {
     return packets_;
   }
 
-  std::vector<ReceivedPacket> movePackets() && {
+  std::vector<ReceivedUdpPacket> movePackets() && {
     return std::move(packets_);
   }
 
@@ -137,7 +144,7 @@ struct NetworkData {
 
  private:
   TimePoint receiveTimePoint_;
-  std::vector<ReceivedPacket> packets_;
+  std::vector<ReceivedUdpPacket> packets_;
   size_t totalData_{0};
 };
 

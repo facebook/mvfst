@@ -70,7 +70,7 @@ class TestQuicTransport
 
   void onReadData(
       const folly::SocketAddress& /* peer */,
-      ReceivedPacket&& /* udpPacket */) noexcept override {}
+      ReceivedUdpPacket&& /* udpPacket */) noexcept override {}
 
   void writeData() override {
     if (closed) {

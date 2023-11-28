@@ -1031,7 +1031,7 @@ struct ShortHeader {
   bool readInitialByte(uint8_t initalByte);
   bool readConnectionId(folly::io::Cursor& cursor);
   bool readPacketNum(
-      PacketNum largestReceivedPacketNum,
+      PacketNum largestReceivedUdpPacketNum,
       folly::io::Cursor& cursor);
 
  private:

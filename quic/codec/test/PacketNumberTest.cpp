@@ -16,19 +16,19 @@ namespace quic {
 namespace test {
 
 struct Packet8DecodeData {
-  PacketNum largestReceivedPacketNum;
+  PacketNum largestReceivedUdpPacketNum;
   uint8_t encoded;
   PacketNum expected;
 };
 
 struct Packet16DecodeData {
-  PacketNum largestReceivedPacketNum;
+  PacketNum largestReceivedUdpPacketNum;
   uint16_t encoded;
   PacketNum expected;
 };
 
 struct Packet32DecodeData {
-  PacketNum largestReceivedPacketNum;
+  PacketNum largestReceivedUdpPacketNum;
   uint32_t encoded;
   PacketNum expected;
 };
@@ -43,7 +43,7 @@ TEST_P(Packet8DecodeTest, Decode) {
       decodePacketNumber(
           GetParam().encoded,
           sizeof(GetParam().encoded),
-          GetParam().largestReceivedPacketNum + 1));
+          GetParam().largestReceivedUdpPacketNum + 1));
 }
 
 TEST_P(Packet16DecodeTest, Decode) {
@@ -52,14 +52,14 @@ TEST_P(Packet16DecodeTest, Decode) {
       decodePacketNumber(
           GetParam().encoded,
           sizeof(GetParam().encoded),
-          GetParam().largestReceivedPacketNum + 1));
+          GetParam().largestReceivedUdpPacketNum + 1));
 }
 
 TEST_P(Packet32DecodeTest, Decode) {
   auto decoded = decodePacketNumber(
       GetParam().encoded,
       sizeof(GetParam().encoded),
-      GetParam().largestReceivedPacketNum + 1);
+      GetParam().largestReceivedUdpPacketNum + 1);
   EXPECT_EQ(GetParam().expected, decoded) << std::hex << decoded;
 }
 

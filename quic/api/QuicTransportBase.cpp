@@ -1886,8 +1886,8 @@ void QuicTransportBase::onNetworkData(
                          .setNumPacketsReceived(networkData.getPackets().size())
                          .setNumBytesReceived(networkData.getTotalData());
       for (auto& packet : networkData.getPackets()) {
-        builder.addReceivedPacket(
-            SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
+        builder.addReceivedUdpPacket(
+            SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
                 Builder()
                     .setPacketReceiveTime(packet.timings.receiveTimePoint)
                     .setPacketNumBytes(packet.buf->computeChainDataLength())

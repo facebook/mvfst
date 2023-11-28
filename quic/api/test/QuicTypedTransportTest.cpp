@@ -1372,10 +1372,10 @@ struct AckEventMatcherBuilder {
 };
 
 template <typename T>
-struct ReceivedPacketMatcherBuilder {
-  using Builder = ReceivedPacketMatcherBuilder;
+struct ReceivedUdpPacketMatcherBuilder {
+  using Builder = ReceivedUdpPacketMatcherBuilder;
   using Obj =
-      quic::SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket;
+      quic::SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket;
   Builder&& setExpectedPacketReceiveTime(
       const TimePoint expectedPacketReceiveTime) {
     maybeExpectedPacketReceiveTime = expectedPacketReceiveTime;
@@ -1411,7 +1411,7 @@ struct ReceivedPacketMatcherBuilder {
       FAIL(); // unhandled typed test
     }
   }
-  explicit ReceivedPacketMatcherBuilder() = default;
+  explicit ReceivedUdpPacketMatcherBuilder() = default;
 
   folly::Optional<TimePoint> maybeExpectedPacketReceiveTime;
   folly::Optional<uint64_t> maybeExpectedPacketNumBytes;
@@ -4619,7 +4619,7 @@ TYPED_TEST(
         testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
         testing::Field(
             &Event::receivedPackets,
-            testing::ElementsAre(ReceivedPacketMatcherBuilder<TypeParam>()
+            testing::ElementsAre(ReceivedUdpPacketMatcherBuilder<TypeParam>()
                                      .setExpectedPacketReceiveTime(pkt1RecvTime)
                                      .setExpectedPacketNumBytes(pkt1NumBytes)
                                      .build())));
@@ -4645,7 +4645,7 @@ TYPED_TEST(
         testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
         testing::Field(
             &Event::receivedPackets,
-            testing::ElementsAre(ReceivedPacketMatcherBuilder<TypeParam>()
+            testing::ElementsAre(ReceivedUdpPacketMatcherBuilder<TypeParam>()
                                      .setExpectedPacketReceiveTime(pkt2RecvTime)
                                      .setExpectedPacketNumBytes(pkt2NumBytes)
                                      .build())));
@@ -4716,12 +4716,12 @@ TYPED_TEST(
             &Event::receivedPackets,
             testing::ElementsAre(
                 // pkt1
-                ReceivedPacketMatcherBuilder<TypeParam>()
+                ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch1RecvTime)
                     .setExpectedPacketNumBytes(pkt1NumBytes)
                     .build(),
                 // pkt2
-                ReceivedPacketMatcherBuilder<TypeParam>()
+                ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch1RecvTime)
                     .setExpectedPacketNumBytes(pkt2NumBytes)
                     .build())));
@@ -4759,12 +4759,12 @@ TYPED_TEST(
             &Event::receivedPackets,
             testing::ElementsAre(
                 // pkt1
-                ReceivedPacketMatcherBuilder<TypeParam>()
+                ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch2RecvTime)
                     .setExpectedPacketNumBytes(pkt3NumBytes)
                     .build(),
                 // pkt2
-                ReceivedPacketMatcherBuilder<TypeParam>()
+                ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch2RecvTime)
                     .setExpectedPacketNumBytes(pkt4NumBytes)
                     .build())));

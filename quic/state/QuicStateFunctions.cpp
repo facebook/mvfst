@@ -305,7 +305,7 @@ std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(
       });
 }
 
-bool hasReceivedPacketsAtLastCloseSent(
+bool hasReceivedUdpPacketsAtLastCloseSent(
     const QuicConnectionStateBase& conn) noexcept {
   const auto* initialAckState = conn.ackStates.initialAckState.get();
   const auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
@@ -332,7 +332,7 @@ bool hasNotReceivedNewPacketsSinceLastCloseSent(
       appDataAckState.largestRecvdPacketNum;
 }
 
-void updateLargestReceivedPacketsAtLastCloseSent(
+void updateLargestReceivedUdpPacketsAtLastCloseSent(
     QuicConnectionStateBase& conn) noexcept {
   auto* initialAckState = conn.ackStates.initialAckState.get();
   auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
@@ -350,7 +350,7 @@ void updateLargestReceivedPacketsAtLastCloseSent(
       conn.ackStates.appDataAckState.largestRecvdPacketNum;
 }
 
-bool hasReceivedPackets(const QuicConnectionStateBase& conn) noexcept {
+bool hasReceivedUdpPackets(const QuicConnectionStateBase& conn) noexcept {
   const auto* initialAckState = conn.ackStates.initialAckState.get();
   const auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
   const auto& appDataAckState = conn.ackStates.appDataAckState;
@@ -407,7 +407,7 @@ uint64_t addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
     const PacketNum packetNum,
-    const ReceivedPacket::Timings& timings) {
+    const ReceivedUdpPacket::Timings& timings) {
   PacketNum expectedNextPacket = 0;
   if (ackState.largestRecvdPacketNum) {
     expectedNextPacket = *ackState.largestRecvdPacketNum + 1;

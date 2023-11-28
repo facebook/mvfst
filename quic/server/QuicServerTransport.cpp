@@ -144,11 +144,11 @@ void QuicServerTransport::setServerConnectionIdRejector(
 
 void QuicServerTransport::onReadData(
     const folly::SocketAddress& peer,
-    ReceivedPacket&& udpPacket) {
+    ReceivedUdpPacket&& udpPacket) {
   ServerEvents::ReadData readData;
   readData.peer = peer;
   readData.udpPacket = std::move(udpPacket);
-  bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
+  bool waitingForFirstPacket = !hasReceivedUdpPackets(*conn_);
   uint64_t prevWritableBytes = serverConn_->writableBytesLimit
       ? *serverConn_->writableBytesLimit
       : std::numeric_limits<uint64_t>::max();
@@ -164,7 +164,7 @@ void QuicServerTransport::onReadData(
         shared_from_this(), *conn_->serverConnectionId);
   }
   if (connSetupCallback_ && waitingForFirstPacket &&
-      hasReceivedPackets(*conn_)) {
+      hasReceivedUdpPackets(*conn_)) {
     connSetupCallback_->onFirstPeerPacketProcessed();
   }
 
@@ -208,16 +208,16 @@ void QuicServerTransport::writeData() {
   const ConnectionId& destConnId = *conn_->clientConnectionId;
   if (closeState_ == CloseState::CLOSED) {
     if (conn_->peerConnectionError &&
-        hasReceivedPacketsAtLastCloseSent(*conn_)) {
+        hasReceivedUdpPacketsAtLastCloseSent(*conn_)) {
       // The peer sent us an error, we are in draining state now.
       return;
     }
-    if (hasReceivedPacketsAtLastCloseSent(*conn_) &&
+    if (hasReceivedUdpPacketsAtLastCloseSent(*conn_) &&
         hasNotReceivedNewPacketsSinceLastCloseSent(*conn_)) {
       // We did not receive any new packets, do not sent a new close frame.
       return;
     }
-    updateLargestReceivedPacketsAtLastCloseSent(*conn_);
+    updateLargestReceivedUdpPacketsAtLastCloseSent(*conn_);
     if (conn_->oneRttWriteCipher) {
       CHECK(conn_->oneRttWriteHeaderCipher);
       writeShortClose(

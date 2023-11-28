@@ -479,7 +479,7 @@ void updateAckState(
     bool pkHasRetransmittableData,
     bool pkHasCryptoData,
     TimePoint receiveTimePoint) {
-  ReceivedPacket::Timings packetTimings;
+  ReceivedUdpPacket::Timings packetTimings;
   packetTimings.receiveTimePoint = receiveTimePoint;
   uint64_t distance = addPacketToAckState(
       conn, getAckState(conn, pnSpace), packetNum, packetTimings);

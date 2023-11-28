@@ -44,7 +44,7 @@ enum ServerState {
 struct ServerEvents {
   struct ReadData {
     folly::SocketAddress peer;
-    ReceivedPacket udpPacket;
+    ReceivedUdpPacket udpPacket;
   };
 
   struct Close {};

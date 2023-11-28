@@ -492,7 +492,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       QuicFrame::Type::ConnectionCloseFrame));
   serverWrites.clear();
 
-  auto currLargestReceivedPacketNum =
+  auto currLargestReceivedUdpPacketNum =
       server->getConn().ackStates.appDataAckState.largestRecvdPacketNum;
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
 
@@ -518,7 +518,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_GT(
       server->getConn().ackStates.appDataAckState.largestRecvdPacketNum,
-      currLargestReceivedPacketNum);
+      currLargestReceivedUdpPacketNum);
 
   // Deliver the same bad data again
   EXPECT_CALL(*quicStats_, onPacketDropped(_));
