@@ -690,12 +690,12 @@ void commonAckVisitorForAckFrame(
     }
   };
 
-  // Remove ack interval from ackState if an outstandingPacket with a
-  // AckFrame is acked. We may remove the current largest acked packet
-  // here, but keep its receive time behind. But then right after this
-  // updateLargestReceivedPacketNum will update that time stamp. Please
-  // note that this assume the peer isn't buggy in the sense that packet
-  // numbers it issues are only increasing.
+  // Remove intervals when OutstandingPacket with a AckFrame is acked.
+  //
+  // We may remove the current largest acked packet here, but keep its receive
+  // time behind. But then right after this addPacketToAckState will update that
+  // time stamp. Please note that this assume the peer isn't buggy
+  // in the sense that packet numbers it issues are only increasing.
   auto iter = frame.ackBlocks.crbegin();
   while (iter != frame.ackBlocks.crend()) {
     ackState.acks.withdraw(*iter);

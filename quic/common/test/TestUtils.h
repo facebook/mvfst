@@ -207,7 +207,7 @@ void updateAckState(
     PacketNum packetNum,
     bool pkHasRetransmittableData,
     bool pkHasCryptoData,
-    TimePoint receivedTime);
+    TimePoint receiveTimePoint);
 
 template <typename Match>
 OutstandingPacketWrapper* findOutstandingPacket(

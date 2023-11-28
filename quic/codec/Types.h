@@ -230,6 +230,7 @@ struct WriteAckFrameState {
   // than all previously received packets in the packet number space
   // tracked by this AckState.
   folly::Optional<RecvdPacketInfo> largestRecvdPacketInfo;
+
   // Receive timestamp and packet number for the last received packet.
   //
   // Will be different from the value stored in largestRecvdPacketInfo

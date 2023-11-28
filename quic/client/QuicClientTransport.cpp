@@ -367,9 +367,11 @@ void QuicClientTransport::processUdpPacketData(
     throw QuicTransportException(
         "Invalid connection id", TransportErrorCode::PROTOCOL_VIOLATION);
   }
+
+  // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
-  uint64_t distanceFromExpectedPacketNum = updateLargestReceivedPacketNum(
-      *conn_, ackState, packetNum, udpPacketTimings.receiveTimePoint);
+  uint64_t distanceFromExpectedPacketNum =
+      addPacketToAckState(*conn_, ackState, packetNum, udpPacketTimings);
   if (distanceFromExpectedPacketNum > 0) {
     QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
   }

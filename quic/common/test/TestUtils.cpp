@@ -478,9 +478,11 @@ void updateAckState(
     PacketNum packetNum,
     bool pkHasRetransmittableData,
     bool pkHasCryptoData,
-    TimePoint receivedTime) {
-  uint64_t distance = updateLargestReceivedPacketNum(
-      conn, getAckState(conn, pnSpace), packetNum, receivedTime);
+    TimePoint receiveTimePoint) {
+  ReceivedPacket::Timings packetTimings;
+  packetTimings.receiveTimePoint = receiveTimePoint;
+  uint64_t distance = addPacketToAckState(
+      conn, getAckState(conn, pnSpace), packetNum, packetTimings);
   updateAckSendStateOnRecvPacket(
       conn,
       getAckState(conn, pnSpace),

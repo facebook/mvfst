@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
+#include <quic/common/NetworkData.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -64,11 +65,11 @@ void increaseNextPacketNum(
  * Update largestReceivedPacketNum in ackState with packetNum. Return the
  * distance from the next packet number we expect to receive.
  */
-uint64_t updateLargestReceivedPacketNum(
+uint64_t addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
-    PacketNum packetNum,
-    TimePoint receivedTime);
+    const PacketNum packetNum,
+    const ReceivedPacket::Timings& timings);
 
 std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(
     QuicConnectionStateBase& conn,
