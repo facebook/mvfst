@@ -52,6 +52,12 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
   context->setCompatibilityMode(false);
   // Since Draft-17, EOED should not be sent
   context->setOmitEarlyRecordLayer(true);
+
+  folly::Optional<std::vector<fizz::ech::ECHConfig>> echConfigs;
+  if (hostname.hasValue()) {
+    echConfigs = fizzContext_->getECHConfigs(*hostname);
+  }
+
   processActions(machine_.processConnect(
       state_,
       std::move(context),
@@ -59,7 +65,7 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
       std::move(hostname),
       std::move(cachedPsk),
       std::make_shared<FizzClientExtensions>(getClientTransportParameters()),
-      folly::none));
+      std::move(echConfigs)));
 
   return transportParams;
 }

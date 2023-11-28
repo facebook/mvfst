@@ -43,6 +43,9 @@ class FizzClientQuicHandshakeContext
       QuicCachedPsk quicCachedPsk);
   void removePsk(const folly::Optional<std::string>& hostname);
 
+  folly::Optional<std::vector<fizz::ech::ECHConfig>> getECHConfigs(
+      const std::string& sni) const;
+
  private:
   /**
    * We make the constructor private so that users have to use the Builder
@@ -55,17 +58,20 @@ class FizzClientQuicHandshakeContext
   FizzClientQuicHandshakeContext(
       std::shared_ptr<const fizz::client::FizzClientContext> context,
       std::shared_ptr<const fizz::CertificateVerifier> verifier,
-      std::shared_ptr<QuicPskCache> pskCache);
+      std::shared_ptr<QuicPskCache> pskCache,
+      std::shared_ptr<fizz::client::ECHPolicy> echPolicy);
 
   FizzClientQuicHandshakeContext(
       std::shared_ptr<const fizz::client::FizzClientContext> context,
       std::shared_ptr<const fizz::CertificateVerifier> verifier,
       std::shared_ptr<QuicPskCache> pskCache,
-      std::unique_ptr<FizzCryptoFactory> cryptoFactory);
+      std::unique_ptr<FizzCryptoFactory> cryptoFactory,
+      std::shared_ptr<fizz::client::ECHPolicy> echPolicy);
 
   std::shared_ptr<const fizz::client::FizzClientContext> context_;
   std::shared_ptr<const fizz::CertificateVerifier> verifier_;
   std::shared_ptr<QuicPskCache> pskCache_;
+  std::shared_ptr<fizz::client::ECHPolicy> echPolicy_;
   std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
 
  public:
@@ -88,6 +94,12 @@ class FizzClientQuicHandshakeContext
       return std::move(*this);
     }
 
+    Builder&& setECHPolicy(
+        std::shared_ptr<fizz::client::ECHPolicy> echPolicy) && {
+      echPolicy_ = std::move(echPolicy);
+      return std::move(*this);
+    }
+
     Builder&& setCryptoFactory(std::unique_ptr<FizzCryptoFactory> factory) && {
       cryptoFactory_ = std::move(factory);
       return std::move(*this);
@@ -99,6 +111,7 @@ class FizzClientQuicHandshakeContext
     std::shared_ptr<const fizz::client::FizzClientContext> context_;
     std::shared_ptr<const fizz::CertificateVerifier> verifier_;
     std::shared_ptr<QuicPskCache> pskCache_;
+    std::shared_ptr<fizz::client::ECHPolicy> echPolicy_;
     std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
   };
 };

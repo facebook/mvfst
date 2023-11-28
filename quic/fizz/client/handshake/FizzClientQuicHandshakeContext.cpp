@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <fizz/client/ECHPolicy.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
@@ -14,19 +15,23 @@ namespace quic {
 FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
     std::shared_ptr<const fizz::CertificateVerifier> verifier,
-    std::shared_ptr<QuicPskCache> pskCache)
+    std::shared_ptr<QuicPskCache> pskCache,
+    std::shared_ptr<fizz::client::ECHPolicy> echPolicy)
     : context_(std::move(context)),
       verifier_(std::move(verifier)),
-      pskCache_(std::move(pskCache)) {}
+      pskCache_(std::move(pskCache)),
+      echPolicy_(std::move(echPolicy)) {}
 
 FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
     std::shared_ptr<const fizz::CertificateVerifier> verifier,
     std::shared_ptr<QuicPskCache> pskCache,
-    std::unique_ptr<FizzCryptoFactory> cryptoFactory)
+    std::unique_ptr<FizzCryptoFactory> cryptoFactory,
+    std::shared_ptr<fizz::client::ECHPolicy> echPolicy)
     : context_(std::move(context)),
       verifier_(std::move(verifier)),
       pskCache_(std::move(pskCache)),
+      echPolicy_(std::move(echPolicy)),
       cryptoFactory_(std::move(cryptoFactory)) {}
 
 std::unique_ptr<ClientHandshake>
@@ -63,6 +68,14 @@ void FizzClientQuicHandshakeContext::removePsk(
   }
 }
 
+folly::Optional<std::vector<fizz::ech::ECHConfig>>
+FizzClientQuicHandshakeContext::getECHConfigs(const std::string& sni) const {
+  if (!echPolicy_) {
+    return folly::none;
+  }
+  return echPolicy_->getConfig(sni);
+}
+
 std::shared_ptr<FizzClientQuicHandshakeContext>
 FizzClientQuicHandshakeContext::Builder::build() && {
   if (!context_) {
@@ -78,7 +91,8 @@ FizzClientQuicHandshakeContext::Builder::build() && {
           std::move(context_),
           std::move(verifier_),
           std::move(pskCache_),
-          std::move(cryptoFactory_)));
+          std::move(cryptoFactory_),
+          std::move(echPolicy_)));
 }
 
 } // namespace quic

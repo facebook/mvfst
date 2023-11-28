@@ -5,12 +5,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <fizz/protocol/ech/Decrypter.h>
+#include <folly/FBString.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <condition_variable>
 #include <mutex>
 
+#include <fizz/client/test/Mocks.h>
 #include <fizz/crypto/test/TestUtil.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <fizz/protocol/test/Mocks.h>
@@ -75,6 +78,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     folly::ssl::init();
     dg.reset(new DelayedHolder());
     serverCtx = ::quic::test::createServerCtx();
+    serverCtx->setECHDecrypter(getECHDecrypter());
     serverCtx->setOmitEarlyRecordLayer(true);
     serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
     // Fizz is the name of the identity for our server certificate.
@@ -86,6 +90,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
                                 .setFizzClientContext(clientCtx)
                                 .setCertificateVerifier(verifier)
                                 .setPskCache(getPskCache())
+                                .setECHPolicy(getECHPolicy())
                                 .build();
     conn.reset(new QuicClientConnectionState(handshakeFactory));
     conn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
@@ -120,6 +125,14 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   }
 
   virtual std::shared_ptr<QuicPskCache> getPskCache() {
+    return nullptr;
+  }
+
+  virtual std::shared_ptr<fizz::ech::Decrypter> getECHDecrypter() {
+    return nullptr;
+  }
+
+  virtual std::shared_ptr<fizz::client::test::MockECHPolicy> getECHPolicy() {
     return nullptr;
   }
 
@@ -583,5 +596,68 @@ TEST_F(ClientHandshakeZeroRttRejectFail, TestZeroRttRejectionParamsDontMatch) {
   expectZeroRttCipher(true, false);
   EXPECT_THROW(serverClientRound(), QuicInternalException);
 }
+
+class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
+ public:
+  void SetUp() override {
+    ClientHandshakeCallbackTest::SetUp();
+    auto handshakeBytes =
+        getHandshakeWriteBytes()->cloneCoalesced()->moveToFbString();
+    // Sanity Check: The original sni should not be encrypted when ECHPolicy is
+    // omitted from the FizzServerContext.
+    EXPECT_NE(handshakeBytes.find("Fizz"), handshakeBytes.size());
+  }
+
+  std::shared_ptr<fizz::ech::Decrypter> getECHDecrypter() override {
+    return echDecrypter;
+  }
+
+  std::shared_ptr<fizz::client::test::MockECHPolicy> getECHPolicy() override {
+    return echPolicy;
+  }
+
+  fizz::ech::ECHConfigContentDraft getECHConfigContent() {
+    fizz::ech::HpkeSymmetricCipherSuite suite{
+        fizz::hpke::KDFId::Sha256, fizz::hpke::AeadId::TLS_AES_128_GCM_SHA256};
+    fizz::ech::ECHConfigContentDraft echConfigContent;
+    echConfigContent.key_config.config_id = 0xFB;
+    echConfigContent.key_config.kem_id = fizz::hpke::KEMId::secp256r1;
+    echConfigContent.key_config.public_key = fizz::detail::encodeECPublicKey(
+        ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey));
+    echConfigContent.key_config.cipher_suites = {suite};
+    echConfigContent.maximum_name_length = 100;
+    echConfigContent.public_name = folly::IOBuf::copyBuffer("public.dummy.com");
+    return echConfigContent;
+  }
+
+  fizz::ech::ECHConfig getECHConfig() {
+    fizz::ech::ECHConfig config;
+    config.version = fizz::ech::ECHVersion::Draft15;
+    config.ech_config_content = fizz::encode(getECHConfigContent());
+    return config;
+  }
+
+  std::shared_ptr<fizz::client::test::MockECHPolicy> echPolicy;
+  std::shared_ptr<fizz::ech::ECHConfigManager> echDecrypter;
+};
+
+TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
+  echPolicy = std::make_shared<fizz::client::test::MockECHPolicy>();
+  EXPECT_CALL(*echPolicy, getConfig(_))
+      .WillOnce(Return(std::vector<fizz::ech::ECHConfig>{getECHConfig()}));
+
+  auto kex = std::make_unique<fizz::OpenSSLECKeyExchange<fizz::P256>>();
+  kex->setPrivateKey(fizz::test::getPrivateKey(fizz::test::kP256Key));
+  echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>();
+  echDecrypter->addDecryptionConfig(
+      fizz::ech::DecrypterParams{getECHConfig(), kex->clone()});
+
+  // Try handshake flow with ECHPolicy set on FizzClientContext.
+  quic::test::ClientHandshakeECHPolicyTest::SetUp();
+  auto handshakeBytes =
+      getHandshakeWriteBytes()->cloneCoalesced()->moveToFbString();
+  EXPECT_NE(handshakeBytes.find("public.dummy.com"), handshakeBytes.size());
+}
+
 } // namespace test
 } // namespace quic
