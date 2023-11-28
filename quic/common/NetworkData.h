@@ -7,8 +7,10 @@
 
 #pragma once
 
+#include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/TimePoints.h>
 
 #include <memory>
 #include <vector>
@@ -17,6 +19,17 @@ namespace quic {
 
 struct ReceivedPacket {
   struct Timings {
+    /**
+     * Socket timestamp with additional information.
+     */
+    struct SocketTimestampExt {
+      // raw duration read from the socket
+      std::chrono::nanoseconds rawDuration{};
+
+      // duration transformed into SystemClock TimePoint
+      chrono::SystemClockTimePointExt systemClock;
+    };
+
     // Legacy Receive TimePoint.
     //
     // This TimePoint is being deprecated in favor of having TimePoints that are
@@ -29,6 +42,9 @@ struct ReceivedPacket {
     //
     // TODO(bschlinker): Complete deprecation
     TimePoint receiveTimePoint;
+
+    // Socket timestamps, when available.
+    folly::Optional<SocketTimestampExt> maybeSoftwareTs;
   };
 
   ReceivedPacket() = default;

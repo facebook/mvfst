@@ -87,6 +87,7 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
 #endif
   }
 
+  // recvmmsg
   int numMsgsRecvd = recvmmsg(msgs.data(), numPackets, flags, nullptr);
   if (numMsgsRecvd < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -99,6 +100,7 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
     return RecvResult(NoReadReason::NONRETRIABLE_ERROR);
   }
 
+  // process msgs (packets) returned by recvmmsg
   CHECK_LE(numMsgsRecvd, numPackets);
   for (uint16_t i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
@@ -133,6 +135,35 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
       peerAddress->setFromSockaddr(rawAddr, kAddrLen);
     }
 
+    // timings
+    ReceivedPacket::Timings timings;
+
+    // socket timestamps
+    //
+    // ts[0] -> software timestamp
+    // ts[1] -> hardware timestamp transformed to userspace time (deprecated)
+    // ts[2] -> hardware timestamp
+    if (params.ts.has_value()) {
+      const auto timespecToTimestamp = [](const timespec& ts)
+          -> folly::Optional<ReceivedPacket::Timings::SocketTimestampExt> {
+        std::chrono::nanoseconds duration = std::chrono::seconds(ts.tv_sec) +
+            std::chrono::nanoseconds(ts.tv_nsec);
+        if (duration == duration.zero()) {
+          return folly::none;
+        }
+
+        ReceivedPacket::Timings::SocketTimestampExt sockTsExt;
+        sockTsExt.rawDuration = duration;
+        sockTsExt.systemClock.raw = std::chrono::system_clock::time_point(
+            std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                duration));
+        return sockTsExt;
+      };
+
+      const auto& ts = params.ts.value();
+      timings.maybeSoftwareTs = timespecToTimestamp(ts[0]);
+    }
+
     VLOG(10) << "Got data from socket peer=" << *peerAddress
              << " len=" << bytesRead;
     readBuffer->append(bytesRead);
@@ -155,18 +186,18 @@ QuicAsyncUDPSocketWrapperImpl::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedPacket(std::move(tmp)));
+          networkData.addPacket(ReceivedPacket(std::move(tmp), timings));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
+          networkData.addPacket(ReceivedPacket(std::move(readBuffer), timings));
         }
       }
     } else {
-      networkData.addPacket(ReceivedPacket(std::move(readBuffer)));
+      networkData.addPacket(ReceivedPacket(std::move(readBuffer), timings));
     }
   }
 
