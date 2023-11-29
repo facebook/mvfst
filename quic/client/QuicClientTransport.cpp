@@ -215,7 +215,8 @@ void QuicClientTransport::processUdpPacketData(
         !clientConn_->retryToken.empty();
 
     if (shouldRejectRetryPacket) {
-      VLOG(4) << "Server incorrectly issued a retry packet; dropping retry";
+      VLOG(4) << "Server incorrectly issued a retry packet; dropping retry "
+              << *this;
       return;
     }
 
@@ -225,7 +226,7 @@ void QuicClientTransport::processUdpPacketData(
     if (!clientConn_->clientHandshakeLayer->verifyRetryIntegrityTag(
             *originalDstConnId, *retryPacket)) {
       VLOG(4) << "The integrity tag in the retry packet was invalid. "
-              << "Dropping bad retry packet.";
+              << "Dropping bad retry packet. " << *this;
       return;
     }
 
@@ -280,6 +281,7 @@ void QuicClientTransport::processUdpPacketData(
 
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
+    LOG(ERROR) << "Packet parse error for " << *this << ", peer is " << peer;
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_CLIENT);
     if (conn_->qLogger) {
@@ -292,6 +294,7 @@ void QuicClientTransport::processUdpPacketData(
     // This is either a packet that has no data (long-header parsed but no data
     // found) or a regular packet with a short header and no frames. Both are
     // protocol violations.
+    LOG(ERROR) << "Packet has no frames " << *this;
     QUIC_STATS(
         conn_->statsCallback,
         onPacketDropped,
