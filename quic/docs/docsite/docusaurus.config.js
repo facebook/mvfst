@@ -41,7 +41,7 @@ module.exports = {
 //          customCss: require.resolve('./static/css/custom.css'),
 //        },
         staticDocsProject: 'mvfst',
-        trackingFile: 'xplat/staticdocs/WATCHED_FILES',
+        trackingFile: 'fbcode/staticdocs/WATCHED_FILES',
         'remark-code-snippets': {
           baseDir: '..',
         },
