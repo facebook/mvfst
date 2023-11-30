@@ -564,7 +564,7 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
 }
 
 void QuicServerTransport::maybeWriteNewSessionTicket() {
-  if (shouldWriteNewSessionTicket() && !ctx_->getSendNewSessionTicket() &&
+  if (shouldWriteNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kWriteNst);

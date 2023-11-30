@@ -4043,13 +4043,14 @@ TEST_F(
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 4);
-  std::array<::std::string, 4> updateArray = {
+  EXPECT_EQ(indices.size(), 5);
+  std::array<::std::string, 5> updateArray = {
       kDerivedZeroRttReadCipher,
       kDerivedOneRttWriteCipher,
       kTransportReady,
-      kDerivedOneRttReadCipher};
-  for (int i = 0; i < 4; ++i) {
+      kDerivedOneRttReadCipher,
+      kWriteNst};
+  for (int i = 0; i < 5; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
     EXPECT_EQ(event->update, updateArray[i]);

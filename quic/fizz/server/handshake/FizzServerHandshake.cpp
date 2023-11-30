@@ -59,8 +59,8 @@ void FizzServerHandshake::initializeImpl(
   context->setFactory(cryptoFactory_->getFizzFactory());
   context->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
   context->setVersionFallbackEnabled(false);
-  // Since Draft-17, client won't sent EOED
   context->setOmitEarlyRecordLayer(true);
+  context->setSendNewSessionTicket(false);
   state_.context() = std::move(context);
   callback_ = callback;
 

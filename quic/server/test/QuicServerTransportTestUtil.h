@@ -350,13 +350,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   virtual void expectWriteNewSessionTicket() {
     server->setEarlyDataAppParamsFunctions(
         [](const folly::Optional<std::string>&, const Buf&) { return false; },
-        []() -> Buf {
-          // This function shouldn't be called
-          EXPECT_TRUE(false);
-          return nullptr;
-        });
+        []() -> Buf { return nullptr; });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(testing::_))
-        .Times(0);
+        .Times(1);
   }
 
   virtual void setupConnection() {
