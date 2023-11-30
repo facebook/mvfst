@@ -276,13 +276,17 @@ void QuicAsyncUDPSocketImpl::setDFAndTurnOffPMTU() {
   switch (localAddress_.getFamily()) {
     case AF_INET:
       level = IPPROTO_IP;
+#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_PROBE)
       optname = IP_MTU_DISCOVER;
       optval = IP_PMTUDISC_PROBE;
+#endif
       break;
     case AF_INET6:
       level = IPPROTO_IPV6;
+#if defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_PROBE)
       optname = IPV6_MTU_DISCOVER;
       optval = IPV6_PMTUDISC_PROBE;
+#endif
       break;
   }
   if (optname && optval &&
