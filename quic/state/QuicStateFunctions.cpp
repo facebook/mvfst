@@ -424,15 +424,15 @@ uint64_t addPacketToAckState(
   }
   static_assert(Clock::is_steady, "Needs steady clock");
 
-  ackState.lastRecvdPacketInfo.assign({packetNum, timings.receiveTimePoint});
+  ackState.lastRecvdPacketInfo.assign({packetNum, timings});
 
   if (packetNum >= expectedNextPacket) {
     if (ackState.recvdPacketInfos.size() ==
         conn.transportSettings.maxReceiveTimestampsPerAckStored) {
       ackState.recvdPacketInfos.pop_front();
     }
-    ackState.recvdPacketInfos.emplace_back(WriteAckFrameState::ReceivedPacket{
-        packetNum, timings.receiveTimePoint});
+    ackState.recvdPacketInfos.emplace_back(
+        WriteAckFrameState::ReceivedPacket{packetNum, timings});
   }
 
   if (expectedNextPacket) {

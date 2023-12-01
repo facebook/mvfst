@@ -147,7 +147,6 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
 }
 using PacketsReceivedTimestampsDeque =
     CircularDeque<WriteAckFrameState::ReceivedPacket>;
-
 const auto kDefaultTimestampsDelta = 10us;
 const AckReceiveTimestampsConfig defaultAckReceiveTimestmpsConfig = {
     .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
@@ -171,9 +170,9 @@ PacketsReceivedTimestampsDeque populateReceiveTimestamps(
         auto diff = std::chrono::microseconds(
             lastPacketDelta -= kDefaultTimestampsDelta);
         if ((connTime + diff) > connTime) {
-          rpi.timeStamp = connTime + diff;
+          rpi.timings.receiveTimePoint = connTime + diff;
         } else {
-          rpi.timeStamp = connTime;
+          rpi.timings.receiveTimePoint = connTime;
         }
         pktsReceivedTimestamps.emplace_front(rpi);
       } else {
@@ -198,7 +197,8 @@ size_t computeBytesForAckReceivedTimestamps(
       ackFrameMetadata.ackState.lastRecvdPacketInfo.value().pktNum;
   std::chrono::duration lastTimeStampDelta =
       std::chrono::duration_cast<std::chrono::microseconds>(
-          ackFrameMetadata.ackState.lastRecvdPacketInfo.value().timeStamp -
+          ackFrameMetadata.ackState.lastRecvdPacketInfo.value()
+              .timings.receiveTimePoint -
           connTime);
 
   // When FrameType == ACK_RECEIVE_TIMESTAMPS, the minimum additional
@@ -232,10 +232,11 @@ WriteAckFrameState createTestWriteAckState(
   if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     ackState.recvdPacketInfos =
         populateReceiveTimestamps(ackBlocks, connTime, countTimestampsToStore);
-    ackState.lastRecvdPacketInfo.assign({
-        ackState.recvdPacketInfos.back().pktNum,
-        ackState.recvdPacketInfos.back().timeStamp,
-    });
+    ackState.lastRecvdPacketInfo.assign(
+        {ackState.recvdPacketInfos.back().pktNum,
+         ReceivedUdpPacket::Timings{
+             .receiveTimePoint =
+                 ackState.recvdPacketInfos.back().timings.receiveTimePoint}});
   }
   return ackState;
 }
@@ -255,7 +256,8 @@ void assertsOnDecodedReceiveTimestamps(
   EXPECT_EQ(
       readAckFrame.maybeLatestRecvdPacketTime.value(),
       std::chrono::duration_cast<std::chrono::microseconds>(
-          ackFrameMetaData.ackState.lastRecvdPacketInfo.value().timeStamp -
+          ackFrameMetaData.ackState.lastRecvdPacketInfo.value()
+              .timings.receiveTimePoint -
           ackFrameMetaData.connTime));
   EXPECT_EQ(
       readAckFrame.recvdPacketsTimestampRanges.size(),
@@ -947,7 +949,7 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
           rpi.pktNum = i;
           auto diff = std::chrono::microseconds(
               lastPacketDelta -= kDefaultTimestampsDelta);
-          rpi.timeStamp = connTime + diff;
+          rpi.timings.receiveTimePoint = connTime + diff;
           pktsReceivedTimestamps.emplace_front(rpi);
         } else {
           break;
@@ -957,7 +959,9 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
     ackState.recvdPacketInfos = pktsReceivedTimestamps;
     ackState.lastRecvdPacketInfo.assign({
         ackState.recvdPacketInfos.back().pktNum,
-        ackState.recvdPacketInfos.back().timeStamp,
+        ReceivedUdpPacket::Timings{
+            .receiveTimePoint =
+                ackState.recvdPacketInfos.back().timings.receiveTimePoint},
     });
   }
 

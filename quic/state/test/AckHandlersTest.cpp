@@ -1635,7 +1635,9 @@ TEST_P(AckHandlersTest, purgeAckReceiveTimestamps) {
     // Fill up the last 25 timestamps ending at PN 40.
     for (PacketNum pktNum = 15; pktNum <= 40; ++pktNum) {
       conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
-          WriteAckFrameState::ReceivedPacket{pktNum, expectedTime});
+          WriteAckFrameState::ReceivedPacket{
+              pktNum,
+              ReceivedUdpPacket::Timings{.receiveTimePoint = expectedTime}});
     }
 
     commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
@@ -1656,7 +1658,9 @@ TEST_P(AckHandlersTest, purgeAckReceiveTimestamps) {
     // Local ACK state has timestamps for {15, 40}
     for (PacketNum pktNum = 15; pktNum <= 40; ++pktNum) {
       conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
-          WriteAckFrameState::ReceivedPacket{pktNum, expectedTime});
+          WriteAckFrameState::ReceivedPacket{
+              pktNum,
+              ReceivedUdpPacket::Timings{.receiveTimePoint = expectedTime}});
     }
     // ACK frame in the ACKed packet has ACKs for {10, 20}, {25, 35}
     ackFrame.ackBlocks.emplace_back(10, 20);
@@ -1691,7 +1695,9 @@ TEST_P(AckHandlersTest, purgeAckReceiveTimestamps) {
     // Local ACK state has timestamps for {15, 40}
     for (PacketNum pktNum = 15; pktNum <= 40; ++pktNum) {
       conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
-          WriteAckFrameState::ReceivedPacket{pktNum, expectedTime});
+          WriteAckFrameState::ReceivedPacket{
+              pktNum,
+              ReceivedUdpPacket::Timings{.receiveTimePoint = expectedTime}});
     }
     // Selectively ACK some packets in the middle - {18, 20}, {25, 35}
     ackFrame.ackBlocks.emplace_back(25, 35);

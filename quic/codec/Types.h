@@ -19,6 +19,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/IntervalSet.h>
+#include <quic/common/NetworkData.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/common/Variant.h>
 
@@ -219,7 +220,7 @@ struct WriteAckFrameState {
    */
   struct ReceivedPacket {
     PacketNum pktNum;
-    TimePoint timeStamp;
+    ReceivedUdpPacket::Timings timings;
   };
 
   AckBlocks acks;

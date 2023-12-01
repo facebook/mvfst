@@ -332,13 +332,16 @@ static size_t fillPacketReceiveTimestamps(
            timestampIt->pktNum <= timestampIntervalsIt->end) {
       std::chrono::microseconds deltaDuration;
       if (timestampIt == recvdPacketInfos.crbegin()) {
-        deltaDuration = (timestampIt->timeStamp > ackFrameMetaData.connTime)
+        deltaDuration =
+            (timestampIt->timings.receiveTimePoint > ackFrameMetaData.connTime)
             ? std::chrono::duration_cast<std::chrono::microseconds>(
-                  timestampIt->timeStamp - ackFrameMetaData.connTime)
+                  timestampIt->timings.receiveTimePoint -
+                  ackFrameMetaData.connTime)
             : 0us;
       } else {
         deltaDuration = std::chrono::duration_cast<std::chrono::microseconds>(
-            (timestampIt - 1)->timeStamp - timestampIt->timeStamp);
+            (timestampIt - 1)->timings.receiveTimePoint -
+            timestampIt->timings.receiveTimePoint);
       }
       auto delta = deltaDuration.count() >> receiveTimestampsExponent;
       // Check if adding a new time-stamp delta from the current time-stamp
@@ -424,10 +427,11 @@ folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
       maybeLastPktNum = ackState.lastRecvdPacketInfo.value().pktNum;
 
     maybeLastPktTsDelta =
-        (ackState.lastRecvdPacketInfo.value().timeStamp >
+        (ackState.lastRecvdPacketInfo.value().timings.receiveTimePoint >
                  ackFrameMetaData.connTime
              ? std::chrono::duration_cast<std::chrono::microseconds>(
-                   ackState.lastRecvdPacketInfo.value().timeStamp -
+                   ackState.lastRecvdPacketInfo.value()
+                       .timings.receiveTimePoint -
                    ackFrameMetaData.connTime)
              : 0us);
 
@@ -507,10 +511,11 @@ folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
   if (ackState.lastRecvdPacketInfo) {
     lastPktNum = ackState.lastRecvdPacketInfo.value().pktNum;
     lastPktTsDelta =
-        (ackState.lastRecvdPacketInfo.value().timeStamp >
+        (ackState.lastRecvdPacketInfo.value().timings.receiveTimePoint >
                  ackFrameMetaData.connTime
              ? std::chrono::duration_cast<std::chrono::microseconds>(
-                   ackState.lastRecvdPacketInfo.value().timeStamp -
+                   ackState.lastRecvdPacketInfo.value()
+                       .timings.receiveTimePoint -
                    ackFrameMetaData.connTime)
              : 0us);
   }

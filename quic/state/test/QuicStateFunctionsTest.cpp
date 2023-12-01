@@ -224,15 +224,21 @@ TEST_P(
   // Packets 1 and 5 are out of order and will not be stored.
   auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
   std::deque<WriteAckFrameState::ReceivedPacket> expectedPktsInfo = {
-      {0, recvdTs}, {2, recvdTs}, {3, recvdTs}, {4, recvdTs}, {6, recvdTs}};
+      {0, ReceivedUdpPacket::Timings{.receiveTimePoint = recvdTs}},
+      {2, ReceivedUdpPacket::Timings{.receiveTimePoint = recvdTs}},
+      {3, ReceivedUdpPacket::Timings{.receiveTimePoint = recvdTs}},
+      {4, ReceivedUdpPacket::Timings{.receiveTimePoint = recvdTs}},
+      {6, ReceivedUdpPacket::Timings{.receiveTimePoint = recvdTs}}};
   EXPECT_EQ(expectedPktsInfo.size(), ackState.recvdPacketInfos.size());
   for (unsigned long i = 0; i < expectedPktsInfo.size(); i++) {
     EXPECT_EQ(expectedPktsInfo[i].pktNum, ackState.recvdPacketInfos[i].pktNum);
     EXPECT_EQ(
-        expectedPktsInfo[i].timeStamp, ackState.recvdPacketInfos[i].timeStamp);
+        expectedPktsInfo[i].timings.receiveTimePoint,
+        ackState.recvdPacketInfos[i].timings.receiveTimePoint);
   }
   EXPECT_EQ(ackState.lastRecvdPacketInfo.value().pktNum, 5);
-  EXPECT_EQ(ackState.lastRecvdPacketInfo.value().timeStamp, recvdTs);
+  EXPECT_EQ(
+      ackState.lastRecvdPacketInfo.value().timings.receiveTimePoint, recvdTs);
 }
 
 INSTANTIATE_TEST_SUITE_P(
