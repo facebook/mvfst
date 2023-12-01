@@ -431,8 +431,8 @@ uint64_t addPacketToAckState(
         conn.transportSettings.maxReceiveTimestampsPerAckStored) {
       ackState.recvdPacketInfos.pop_front();
     }
-    ackState.recvdPacketInfos.emplace_back(
-        RecvdPacketInfo{packetNum, timings.receiveTimePoint});
+    ackState.recvdPacketInfos.emplace_back(WriteAckFrameState::ReceivedPacket{
+        packetNum, timings.receiveTimePoint});
   }
 
   if (expectedNextPacket) {

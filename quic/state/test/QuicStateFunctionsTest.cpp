@@ -223,7 +223,7 @@ TEST_P(
   }
   // Packets 1 and 5 are out of order and will not be stored.
   auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
-  std::deque<RecvdPacketInfo> expectedPktsInfo = {
+  std::deque<WriteAckFrameState::ReceivedPacket> expectedPktsInfo = {
       {0, recvdTs}, {2, recvdTs}, {3, recvdTs}, {4, recvdTs}, {6, recvdTs}};
   EXPECT_EQ(expectedPktsInfo.size(), ackState.recvdPacketInfos.size());
   for (unsigned long i = 0; i < expectedPktsInfo.size(); i++) {

@@ -50,14 +50,6 @@ template <class T>
 using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame>;
 using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
 
-/**
- * Info stored on receipt of a packet for use in subsequent ACK.
- */
-struct RecvdPacketInfo {
-  PacketNum pktNum;
-  TimePoint timeStamp;
-};
-
 struct PaddingFrame {
   // How many contiguous padding frames this represents.
   uint16_t numFrames{1};
@@ -222,6 +214,14 @@ struct WriteAckFrame {
 };
 
 struct WriteAckFrameState {
+  /**
+   * Info stored on receipt of a packet for use in subsequent ACK.
+   */
+  struct ReceivedPacket {
+    PacketNum pktNum;
+    TimePoint timeStamp;
+  };
+
   AckBlocks acks;
 
   // Receive timestamp and packet number for the largest received packet.
@@ -229,7 +229,7 @@ struct WriteAckFrameState {
   // Updated whenever we receive a packet with a larger packet number
   // than all previously received packets in the packet number space
   // tracked by this AckState.
-  folly::Optional<RecvdPacketInfo> largestRecvdPacketInfo;
+  folly::Optional<ReceivedPacket> largestRecvdPacketInfo;
 
   // Receive timestamp and packet number for the last received packet.
   //
@@ -237,7 +237,7 @@ struct WriteAckFrameState {
   // if the last packet was received out of order and thus had a packet
   // number less than that of a previously received packet in the packet
   // number space tracked by this AckState.
-  folly::Optional<RecvdPacketInfo> lastRecvdPacketInfo;
+  folly::Optional<ReceivedPacket> lastRecvdPacketInfo;
 
   // Packet number and timestamp of recently received packets.
   //
@@ -249,7 +249,7 @@ struct WriteAckFrameState {
   // if the packet number is greater than the packet number of the last
   // element in the deque (e.g., entries are not added for packets that
   // arrive out of order relative to previously received packets).
-  CircularDeque<RecvdPacketInfo> recvdPacketInfos;
+  CircularDeque<ReceivedPacket> recvdPacketInfos;
 };
 
 struct WriteAckFrameMetaData {
