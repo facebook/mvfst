@@ -281,7 +281,7 @@ void QuicClientTransport::processUdpPacketData(
 
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
-    LOG(ERROR) << "Packet parse error for " << *this << ", peer is " << peer;
+    VLOG(4) << "Packet parse error for " << *this;
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_CLIENT);
     if (conn_->qLogger) {
