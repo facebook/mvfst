@@ -25,47 +25,7 @@ class FizzClientExtensions : public fizz::ClientExtensions {
     std::vector<fizz::Extension> exts;
 
     ClientTransportParameters params;
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_stream_data_bidi_local,
-        clientParameters_->initialMaxStreamDataBidiLocal_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_stream_data_bidi_remote,
-        clientParameters_->initialMaxStreamDataBidiRemote_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_stream_data_uni,
-        clientParameters_->initialMaxStreamDataUni_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_data,
-        clientParameters_->initialMaxData_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_bidi,
-        clientParameters_->initialMaxStreamsBidi_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_uni,
-        clientParameters_->initialMaxStreamsUni_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::idle_timeout,
-        clientParameters_->idleTimeout_.count()));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::ack_delay_exponent,
-        clientParameters_->ackDelayExponent_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::max_packet_size,
-        clientParameters_->maxRecvPacketSize_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::active_connection_id_limit,
-        clientParameters_->activeConnectionLimit_));
-    if (clientParameters_->encodingVersion_ == QuicVersion::QUIC_V1 ||
-        clientParameters_->encodingVersion_ == QuicVersion::QUIC_V1_ALIAS) {
-      params.parameters.push_back(encodeConnIdParameter(
-          TransportParameterId::initial_source_connection_id,
-          clientParameters_->initialSourceCid_));
-    }
-
-    for (const auto& customParameter :
-         clientParameters_->customTransportParameters_) {
-      params.parameters.push_back(customParameter);
-    }
+    params.parameters = clientParameters_->getChloTransportParameters();
 
     exts.push_back(
         encodeExtension(params, clientParameters_->encodingVersion_));
