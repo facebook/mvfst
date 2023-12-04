@@ -161,4 +161,10 @@ inline TransportParameter encodeStatelessResetToken(
   statelessReset.value = folly::IOBuf::copyBuffer(token.data(), token.size());
   return statelessReset;
 }
+
+struct QuicConnectionStateBase;
+
+std::vector<TransportParameter> getSupportedExtTransportParams(
+    const QuicConnectionStateBase& conn);
+
 } // namespace quic

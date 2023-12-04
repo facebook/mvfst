@@ -6,6 +6,7 @@
  */
 
 #include <quic/handshake/TransportParameters.h>
+#include <quic/state/StateData.h>
 
 #include <quic/common/BufUtil.h>
 
@@ -78,6 +79,53 @@ TransportParameter encodeIntegerParameter(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
   return {id, std::move(data)};
+}
+
+std::vector<TransportParameter> getSupportedExtTransportParams(
+    const QuicConnectionStateBase& conn) {
+  using TpId = TransportParameterId;
+  const auto& ts = conn.transportSettings;
+
+  std::vector<TransportParameter> customTps;
+  customTps.reserve(7);
+
+  if (ts.datagramConfig.enabled) {
+    customTps.push_back(encodeIntegerParameter(
+        TransportParameterId::max_datagram_frame_size,
+        conn.datagramState.maxReadFrameSize));
+  }
+
+  if (ts.advertisedMaxStreamGroups > 0) {
+    customTps.push_back(encodeIntegerParameter(
+        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups));
+  }
+
+  customTps.push_back(encodeIntegerParameter(
+      TpId::ack_receive_timestamps_enabled,
+      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0));
+
+  if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
+    customTps.push_back(encodeIntegerParameter(
+        TpId::max_receive_timestamps_per_ack,
+        ts.maybeAckReceiveTimestampsConfigSentToPeer
+            ->maxReceiveTimestampsPerAck));
+
+    customTps.push_back(encodeIntegerParameter(
+        TpId::receive_timestamps_exponent,
+        ts.maybeAckReceiveTimestampsConfigSentToPeer
+            ->receiveTimestampsExponent));
+  }
+
+  if (ts.minAckDelay) {
+    customTps.push_back(encodeIntegerParameter(
+        TpId::min_ack_delay, ts.minAckDelay.value().count()));
+  }
+
+  if (ts.advertisedKnobFrameSupport) {
+    customTps.push_back(encodeIntegerParameter(TpId::knob_frames_supported, 1));
+  }
+
+  return customTps;
 }
 
 } // namespace quic

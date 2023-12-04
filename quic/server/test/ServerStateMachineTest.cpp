@@ -270,8 +270,7 @@ TEST(ServerStateMachineTest, TestEncodeMinAckDelayParamSet) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
   serverConn.transportSettings.minAckDelay = std::chrono::microseconds(1000);
-  auto customTransportParams =
-      quic::setSupportedExtensionTransportParameters(serverConn);
+  auto customTransportParams = getSupportedExtTransportParams(serverConn);
   auto minAckDelayParam = getIntegerParameter(
       TransportParameterId::min_ack_delay, customTransportParams);
   ASSERT_TRUE(minAckDelayParam.has_value());
@@ -282,8 +281,7 @@ TEST(ServerStateMachineTest, TestEncodeMinAckDelayParamNotSet) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
   serverConn.transportSettings.advertisedKnobFrameSupport = false;
-  auto customTransportParams =
-      quic::setSupportedExtensionTransportParameters(serverConn);
+  auto customTransportParams = getSupportedExtTransportParams(serverConn);
   EXPECT_THAT(
       customTransportParams,
       Not(Contains(testing::Field(
@@ -319,8 +317,7 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamEnabled) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
   serverConn.transportSettings.advertisedKnobFrameSupport = true;
-  auto customTransportParams =
-      quic::setSupportedExtensionTransportParameters(serverConn);
+  auto customTransportParams = getSupportedExtTransportParams(serverConn);
   auto knobFrameSupportedParam = getIntegerParameter(
       TransportParameterId::knob_frames_supported, customTransportParams);
   ASSERT_TRUE(knobFrameSupportedParam.has_value());
@@ -331,8 +328,7 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
   serverConn.transportSettings.advertisedKnobFrameSupport = false;
-  auto customTransportParams =
-      quic::setSupportedExtensionTransportParameters(serverConn);
+  auto customTransportParams = getSupportedExtTransportParams(serverConn);
   EXPECT_THAT(
       customTransportParams,
       Not(Contains(testing::Field(

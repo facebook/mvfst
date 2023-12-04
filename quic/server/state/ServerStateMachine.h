@@ -228,7 +228,4 @@ void onConnectionMigration(
     const folly::SocketAddress& newPeerAddress,
     bool isIntentional = false);
 
-std::vector<TransportParameter> setSupportedExtensionTransportParameters(
-    QuicServerConnectionState& conn);
-
 } // namespace quic

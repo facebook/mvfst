@@ -802,7 +802,7 @@ void onServerReadDataFromOpen(
     CHECK(newServerConnIdData.has_value());
     conn.serverConnectionId = newServerConnIdData->connId;
 
-    auto customTransportParams = setSupportedExtensionTransportParameters(conn);
+    auto customTransportParams = getSupportedExtTransportParams(conn);
 
     QUIC_STATS(conn.statsCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
@@ -1569,50 +1569,5 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   newConnIdData.token = generator.generateToken(newConnIdData.connId);
   selfConnectionIds.push_back(newConnIdData);
   return newConnIdData;
-}
-
-std::vector<TransportParameter> setSupportedExtensionTransportParameters(
-    QuicServerConnectionState& conn) {
-  using TpId = TransportParameterId;
-  std::vector<TransportParameter> customTps;
-  const auto& ts = conn.transportSettings;
-
-  if (ts.datagramConfig.enabled) {
-    customTps.push_back(encodeIntegerParameter(
-        TransportParameterId::max_datagram_frame_size,
-        conn.datagramState.maxReadFrameSize));
-  }
-
-  if (ts.advertisedMaxStreamGroups > 0) {
-    customTps.push_back(encodeIntegerParameter(
-        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups));
-  }
-
-  customTps.push_back(encodeIntegerParameter(
-      TpId::ack_receive_timestamps_enabled,
-      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0));
-
-  if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
-    customTps.push_back(encodeIntegerParameter(
-        TpId::max_receive_timestamps_per_ack,
-        ts.maybeAckReceiveTimestampsConfigSentToPeer
-            ->maxReceiveTimestampsPerAck));
-
-    customTps.push_back(encodeIntegerParameter(
-        TpId::receive_timestamps_exponent,
-        ts.maybeAckReceiveTimestampsConfigSentToPeer
-            ->receiveTimestampsExponent));
-  }
-
-  if (ts.minAckDelay) {
-    customTps.push_back(encodeIntegerParameter(
-        TpId::min_ack_delay, ts.minAckDelay.value().count()));
-  }
-
-  if (ts.advertisedKnobFrameSupport) {
-    customTps.push_back(encodeIntegerParameter(TpId::knob_frames_supported, 1));
-  }
-
-  return customTps;
 }
 } // namespace quic

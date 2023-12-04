@@ -1019,7 +1019,7 @@ void QuicClientTransport::startCryptoHandshake() {
   conn_->initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
       *clientConn_->initialDestinationConnectionId, version);
 
-  setSupportedExtensionTransportParameters();
+  customTransportParameters_ = getSupportedExtTransportParams(*conn_);
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
@@ -1620,48 +1620,6 @@ void QuicClientTransport::setHostname(const std::string& hostname) {
 
 void QuicClientTransport::setSelfOwning() {
   selfOwning_ = shared_from_this();
-}
-
-void QuicClientTransport::setSupportedExtensionTransportParameters() {
-  const auto& ts = conn_->transportSettings;
-  using TpId = TransportParameterId;
-  customTransportParameters_.clear();
-
-  if (ts.minAckDelay.hasValue()) {
-    customTransportParameters_.push_back(encodeIntegerParameter(
-        TpId::min_ack_delay, ts.minAckDelay.value().count()));
-  }
-
-  if (ts.datagramConfig.enabled) {
-    customTransportParameters_.push_back(encodeIntegerParameter(
-        TpId::max_datagram_frame_size, conn_->datagramState.maxReadFrameSize));
-  }
-
-  customTransportParameters_.push_back(encodeIntegerParameter(
-      TpId::ack_receive_timestamps_enabled,
-      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0));
-
-  if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
-    customTransportParameters_.push_back(encodeIntegerParameter(
-        TpId::max_receive_timestamps_per_ack,
-        ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .maxReceiveTimestampsPerAck));
-
-    customTransportParameters_.push_back(encodeIntegerParameter(
-        TpId::receive_timestamps_exponent,
-        ts.maybeAckReceiveTimestampsConfigSentToPeer.value()
-            .receiveTimestampsExponent));
-  }
-
-  if (ts.advertisedKnobFrameSupport) {
-    customTransportParameters_.push_back(
-        encodeIntegerParameter(TpId::knob_frames_supported, 1));
-  }
-
-  if (ts.advertisedMaxStreamGroups > 0) {
-    customTransportParameters_.push_back(encodeIntegerParameter(
-        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups));
-  }
 }
 
 void QuicClientTransport::adjustGROBuffers() {
