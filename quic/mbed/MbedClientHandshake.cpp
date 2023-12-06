@@ -6,6 +6,7 @@
  */
 
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
+#include <quic/handshake/TransportParameters.h>
 #include <quic/mbed/MbedClientHandshake.h>
 
 namespace {
@@ -94,6 +95,43 @@ quic::EncryptionLevel toQuicEncLevel(mbedtls_ssl_crypto_level level) {
     default:
       folly::assume_unreachable();
   };
+}
+
+/**
+ * note: adapted from quic/fizz/handshake/FizzTransportParameters.h
+ *
+ * decodes (id, len, value) transport parameter tuples
+ */
+folly::Expected<std::vector<quic::TransportParameter>, quic::TransportErrorCode>
+parseServerTransportParams(const uint8_t* params, const size_t params_len) {
+  using namespace quic;
+
+  std::vector<TransportParameter> server_params;
+  server_params.reserve(16);
+
+  // wrap in iobuf for cursor usage
+  auto encoded_params =
+      folly::IOBuf::wrapBufferAsValue(folly::ByteRange(params, params_len));
+  folly::io::Cursor cursor{&encoded_params};
+
+  // taken from quic/fizz/handshake/FizzTransportParameters.h
+  while (!cursor.isAtEnd()) {
+    auto id = decodeQuicInteger(cursor);
+    auto len = decodeQuicInteger(cursor);
+    if (!id.has_value() || !len.has_value() || !cursor.canAdvance(len->first)) {
+      // failed to parse id/len, otherwise successfully parsed id & len but
+      // cursor does not have at least len remaining bytes
+      return folly::makeUnexpected(
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    }
+
+    Buf value;
+    cursor.clone(value, len->first);
+    server_params.emplace_back(
+        static_cast<TransportParameterId>(id->first), std::move(value));
+  }
+
+  return server_params;
 }
 
 } // namespace
@@ -239,6 +277,25 @@ int MbedClientHandshake::setEncryptionSecrets(
          * - 0-rtt not yet supported
          */
         break;
+    }
+  }
+
+  // if 1-rtt read or write keys have been derived, peer's transport params
+  // should be available
+  if (level == EncryptionLevel::AppData) {
+    const uint8_t* params{nullptr};
+    size_t params_len{0};
+
+    mbedtls_ssl_get_peer_quic_transport_params(&ssl_ctx, &params, &params_len);
+    auto maybe_server_params = parseServerTransportParams(params, params_len);
+    if (maybe_server_params.hasError()) {
+      raiseError(folly::make_exception_wrapper<QuicTransportException>(
+          "mbedtls: failed to parse server transport params",
+          maybe_server_params.error()));
+    } else {
+      CHECK_NOTNULL(getClientTransportParameters().get())
+          ->serverTransportParameters_.emplace(ServerTransportParameters{
+              .parameters = std::move(maybe_server_params.value())});
     }
   }
 
