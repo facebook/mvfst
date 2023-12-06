@@ -10,7 +10,9 @@
 #include <quic/mbed/MbedCryptoFactory.h>
 
 extern "C" {
-#include "mbedtls/ssl.h" //@manual
+#include "mbedtls/ctr_drbg.h" // @manual
+#include "mbedtls/entropy.h" // @manual
+#include "mbedtls/ssl.h" // @manual
 }
 
 namespace quic {
@@ -39,9 +41,7 @@ class MbedClientHandshake : public ClientHandshake {
   }
 
   folly::Optional<CachedServerTransportParameters> connectImpl(
-      folly::Optional<std::string> /*hostname*/) override {
-    return folly::none;
-  }
+      folly::Optional<std::string> /*hostname*/) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override {
     return EncryptionLevel::Initial;
@@ -90,8 +90,14 @@ class MbedClientHandshake : public ClientHandshake {
   // cb invoked on new TLS session ticket post-handshake
   void processNewSession(mbedtls_ssl_session* /*sessionTicket*/) {}
 
+  // repeatedly invokes mbedtls_ssl_handshake_step until success, error, or
+  // mbedtls is blocked on more data
+  void doHandshakeSteps();
+
   mbedtls_ssl_config ssl_conf;
   mbedtls_ssl_context ssl_ctx;
+  mbedtls_ctr_drbg_context drbg_ctx;
+  mbedtls_entropy_context entropy_ctx;
   MbedCryptoFactory crypto_factory;
   folly::Optional<std::string> alpn{folly::none};
 };

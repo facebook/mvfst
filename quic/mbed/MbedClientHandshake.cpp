@@ -5,9 +5,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/mbed/MbedClientHandshake.h>
 
 namespace {
+
+#define uchr_ptr(x) reinterpret_cast<const unsigned char*>(x)
+
+constexpr std::string_view kPseudoRandomTag = "facebook/mvfst";
 
 static int kSSLPresetQuicCiphersuites[] = {
     MBEDTLS_TLS1_3_AES_128_GCM_SHA256,
@@ -17,6 +22,27 @@ static mbedtls_ecp_group_id kSSLPresentQuicCurves[] = {
     MBEDTLS_ECP_DP_CURVE25519,
     MBEDTLS_ECP_DP_SECP256R1,
     MBEDTLS_ECP_DP_NONE};
+
+// returns contiguous buf of serialized chlo transport parameters
+quic::Buf getChloTransportParams(
+    const std::shared_ptr<quic::ClientTransportParametersExtension>&
+        client_params) {
+  using namespace quic;
+
+  std::vector<TransportParameter> transport_params =
+      CHECK_NOTNULL(client_params.get())->getChloTransportParameters();
+
+  // chain all transport parameters
+  BufQueue encoded_params;
+  for (const auto& tp : transport_params) {
+    encoded_params.append(tp.encode());
+  }
+
+  // coalesce into contiguous buffer
+  auto res = encoded_params.move();
+  res->coalesce();
+  return res;
+}
 
 /**
  * Initializes and applies preset default values on config.
@@ -137,6 +163,18 @@ MbedClientHandshake::MbedClientHandshake(QuicClientConnectionState* conn)
 
   // install quic callbacks
   mbedtls_ssl_set_hs_quic_method(&ssl_ctx, this, &mbedtls_quic_method_cb);
+
+  // init randomness contexts
+  mbedtls_ctr_drbg_init(&drbg_ctx);
+  mbedtls_entropy_init(&entropy_ctx);
+  mbedtls_ssl_conf_rng(&ssl_conf, mbedtls_ctr_drbg_random, &drbg_ctx);
+  CHECK(
+      mbedtls_ctr_drbg_seed(
+          &drbg_ctx,
+          mbedtls_entropy_func,
+          &entropy_ctx,
+          uchr_ptr(kPseudoRandomTag.data()),
+          kPseudoRandomTag.size()) == 0);
 }
 
 MbedClientHandshake::~MbedClientHandshake() {
@@ -205,6 +243,42 @@ int MbedClientHandshake::setEncryptionSecrets(
   }
 
   return 0;
+}
+
+folly::Optional<CachedServerTransportParameters>
+MbedClientHandshake::connectImpl(folly::Optional<std::string> /*hostname*/) {
+  // set transport parameters
+  auto transport_params =
+      getChloTransportParams(getClientTransportParameters());
+
+  if (mbedtls_ssl_set_quic_transport_params(
+          &ssl_ctx, transport_params->data(), transport_params->length()) !=
+      0) {
+    // failed to set transport parameters
+    raiseError(folly::make_exception_wrapper<QuicTransportException>(
+        "set_transport_params failed", TransportErrorCode::INTERNAL_ERROR));
+    return folly::none;
+  }
+
+  // do handshake
+  doHandshakeSteps();
+
+  return folly::none;
+}
+
+void MbedClientHandshake::doHandshakeSteps() {
+  while (ssl_ctx.state != MBEDTLS_SSL_HANDSHAKE_OVER) {
+    int res = mbedtls_ssl_handshake_step(&ssl_ctx);
+    if (res == MBEDTLS_ERR_SSL_WANT_READ) {
+      // blocked on more data
+      break;
+    } else if (res != 0) {
+      // error while performing handshake step
+      raiseError(folly::make_exception_wrapper<QuicTransportException>(
+          "handshake_step failed", TransportErrorCode::INTERNAL_ERROR));
+      break;
+    }
+  }
 }
 
 } // namespace quic
