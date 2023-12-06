@@ -44,10 +44,26 @@ class MbedClientHandshake : public ClientHandshake {
       folly::Optional<std::string> /*hostname*/) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override {
-    return EncryptionLevel::Initial;
+    switch (ssl_ctx.quic_hs_crypto_level) {
+      case MBEDTLS_SSL_CRYPTO_LEVEL_INITIAL:
+        return EncryptionLevel::Initial;
+      case MBEDTLS_SSL_CRYPTO_LEVEL_HANDSHAKE:
+        return EncryptionLevel::Handshake;
+      case MBEDTLS_SSL_CRYPTO_LEVEL_APPLICATION:
+        return EncryptionLevel::AppData;
+      case MBEDTLS_SSL_CRYPTO_LEVEL_EARLY_DATA:
+      case MBEDTLS_SSL_CRYPTO_LEVEL_MAX:
+      default:
+        folly::assume_unreachable();
+    }
   }
 
-  void processSocketData(folly::IOBufQueue& /*queue*/) override {}
+  /**
+   * This is invoked by ClientHandshake::doHandshake() whenever we receive
+   * CRYPTO frame data. The encryption level associated with the IOBufQueue
+   * is the result of ::getReadRecordLayerEncryptionLevel
+   */
+  void processSocketData(folly::IOBufQueue& queue) override;
 
   bool matchEarlyParameters() override {
     return false;
@@ -91,7 +107,7 @@ class MbedClientHandshake : public ClientHandshake {
   void processNewSession(mbedtls_ssl_session* /*sessionTicket*/) {}
 
   // repeatedly invokes mbedtls_ssl_handshake_step until success, error, or
-  // mbedtls is blocked on more data
+  // mbedtls_want_read (blocked on more data)
   void doHandshakeSteps();
 
   mbedtls_ssl_config ssl_conf;

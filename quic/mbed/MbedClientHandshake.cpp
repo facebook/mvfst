@@ -245,6 +245,43 @@ int MbedClientHandshake::setEncryptionSecrets(
   return 0;
 }
 
+void MbedClientHandshake::processSocketData(folly::IOBufQueue& queue) {
+  /**
+   * This guard invokes ::waitForData(), which signals to ::doHandshake() to
+   * stop its loop invoking ::processSocketData(). The only time we dismiss
+   * the guard is if the encryption level (i.e.
+   * ::getReadRecordLayerEncryptionLevel) has changed as a result of mbedtls
+   * processing handshake data – since we may have pending data for the new
+   * encryption level that needs processing.
+   */
+  auto guard = folly::makeGuard([this]() { this->waitForData(); });
+
+  if (queue.empty()) {
+    return;
+  }
+  // consume all the data in the buffer so that the next time we receive
+  // CRYPTO data, no duplicate data will be sent to mbedtls
+  auto buf = queue.move();
+  buf->coalesce();
+  if (mbedtls_quic_input_provide_data(
+          &ssl_ctx, ssl_ctx.quic_hs_crypto_level, buf->data(), buf->length()) !=
+      0) {
+    raiseError(folly::make_exception_wrapper<QuicTransportException>(
+        "mbedtls_quic_input_provide_data failed",
+        TransportErrorCode::INTERNAL_ERROR));
+    return;
+  }
+
+  auto preEncryptionLevel = getReadRecordLayerEncryptionLevel();
+
+  // mbedtls processes handshake data in ::doHandshakeSteps()
+  doHandshakeSteps();
+
+  if (preEncryptionLevel != getReadRecordLayerEncryptionLevel()) {
+    guard.dismiss();
+  }
+}
+
 folly::Optional<CachedServerTransportParameters>
 MbedClientHandshake::connectImpl(folly::Optional<std::string> /*hostname*/) {
   // set transport parameters
