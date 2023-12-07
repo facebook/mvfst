@@ -28,7 +28,7 @@ void TokenlessPacer::refreshPacingRate(
   }
   uint64_t targetRateBytesPerSec = (rtt == 0us)
       ? std::numeric_limits<uint64_t>::max()
-      : cwndBytes * 1s / rtt;
+      : (cwndBytes * 1s * rttFactorDenominator_) / (rtt * rttFactorNumerator_);
   if (targetRateBytesPerSec > maxPacingRateBytesPerSec_) {
     return setPacingRate(maxPacingRateBytesPerSec_);
   } else if (rtt < conn_.transportSettings.pacingTickInterval) {
