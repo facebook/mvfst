@@ -452,7 +452,6 @@ class QuicStreamManager {
       writableStreams_.insert(stream.id);
     }
     if (stream.hasWritableBufMeta()) {
-      LOG(ERROR) << "writable DSR: " << stream.id;
       writableDSRStreams_.insert(stream.id);
     }
     if (!stream.lossBuffer.empty()) {
