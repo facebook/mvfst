@@ -1743,7 +1743,7 @@ TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadError) {
   transport->closeStream(stream1);
 
   EXPECT_CALL(readCb1, readError(stream1, IsError(LocalErrorCode::NO_ERROR)));
-  EXPECT_CALL(connCallback, onStreamStateReaped(stream1));
+  EXPECT_CALL(connCallback, onStreamPreReaped(stream1));
   transport->driveReadCallbacks();
 
   EXPECT_FALSE(transport->transportConn->streamManager->streamExists(stream1));

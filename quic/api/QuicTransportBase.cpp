@@ -2610,10 +2610,10 @@ void QuicTransportBase::checkForClosedStream() {
       conn_->qLogger->addTransportStateUpdate(
           getClosingStream(folly::to<std::string>(*itr)));
     }
-    conn_->streamManager->removeClosedStream(*itr);
     if (connCallback_) {
-      connCallback_->onStreamStateReaped(*itr);
+      connCallback_->onStreamPreReaped(*itr);
     }
+    conn_->streamManager->removeClosedStream(*itr);
     maybeSendStreamLimitUpdates(*conn_);
     if (readCbIt != readCallbacks_.end()) {
       readCallbacks_.erase(readCbIt);

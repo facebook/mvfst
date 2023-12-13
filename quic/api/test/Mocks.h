@@ -123,7 +123,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       onNewUnidirectionalStreamInGroup,
       (StreamId, StreamGroupId),
       (noexcept));
-  MOCK_METHOD((void), onStreamStateReaped, (StreamId), (noexcept));
+  MOCK_METHOD((void), onStreamPreReaped, (StreamId), (noexcept));
   MOCK_METHOD(
       (void),
       onStopSending,

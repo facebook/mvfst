@@ -132,10 +132,11 @@ class QuicSocket {
         StreamGroupId) noexcept {}
 
     /**
-     * Invoked when a given stream has been closed and its state reaped by
-     * the transport. After this point no operations can be done on the stream.
+     * Invoked when a given stream has been closed and its state is about to
+     * be reaped by the transport. This is the last chance to do any final
+     * state querying operations on the stream.
      */
-    virtual void onStreamStateReaped(StreamId) noexcept {}
+    virtual void onStreamPreReaped(StreamId) noexcept {}
 
     /**
      * Invoked when a stream receives a StopSending frame from a peer.
