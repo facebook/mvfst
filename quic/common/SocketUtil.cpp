@@ -26,6 +26,10 @@ void applySocketOptions(
     }
     if ((family == AF_INET && option.first.level == IPPROTO_IP) ||
         (family == AF_INET6 && option.first.level == IPPROTO_IPV6) ||
+#ifdef IP_BIND_ADDRESS_NO_PORT
+        (option.first.level == IPPROTO_IP &&
+         option.first.optname == IP_BIND_ADDRESS_NO_PORT) ||
+#endif
         option.first.level == IPPROTO_UDP || option.first.level == SOL_SOCKET ||
         option.first.level == SOL_UDP) {
       validOptions.insert(option);
