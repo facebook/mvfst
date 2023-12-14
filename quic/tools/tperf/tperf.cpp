@@ -15,8 +15,10 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/AcceptObserver.h>
@@ -26,6 +28,7 @@
 #include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfDSRSender.h>
 #include <quic/tools/tperf/TperfQLogger.h>
+#include <memory>
 
 DEFINE_string(host, "::1", "TPerf server hostname/IP");
 DEFINE_int32(port, 6666, "TPerf server port");
@@ -184,13 +187,13 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       uint64_t blockSize,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
-      QuicAsyncUDPSocketWrapper& sock,
+      folly::AsyncUDPSocket& sock,
       bool dsrEnabled)
-      : evb_(evbIn),
+      : evb_(std::make_shared<FollyQuicEventBase>(evbIn)),
+        udpSock_(FollyQuicAsyncUDPSocket(evb_, sock)),
         blockSize_(blockSize),
         numStreams_(numStreams),
         maxBytesPerStream_(maxBytesPerStream),
-        udpSock_(sock),
         dsrEnabled_(dsrEnabled) {
     buf_ = folly::IOBuf::createCombined(blockSize_);
   }
@@ -308,7 +311,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   folly::EventBase* getEventBase() {
-    return evb_;
+    return evb_->getBackingEventBase();
   }
 
  private:
@@ -350,14 +353,14 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
  private:
   std::shared_ptr<quic::QuicSocket> sock_;
-  folly::EventBase* evb_;
+  std::shared_ptr<FollyQuicEventBase> evb_;
+  FollyQuicAsyncUDPSocket udpSock_;
   uint64_t blockSize_;
   std::unique_ptr<folly::IOBuf> buf_;
   uint32_t numStreams_;
   uint64_t maxBytesPerStream_;
   std::unordered_map<quic::StreamId, uint64_t> bytesPerStream_;
   std::set<quic::StreamId> streamsHavingDSRSender_;
-  QuicAsyncUDPSocketWrapper& udpSock_;
   bool dsrEnabled_;
 };
 
@@ -377,7 +380,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::unique_ptr<folly::AsyncUDPSocket> sock,
       const folly::SocketAddress&,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
@@ -522,7 +525,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       bool useInplaceWrite)
       : host_(host),
         port_(port),
-        eventBase_(transportTimerResolution),
+        fEvb_(transportTimerResolution),
+        qEvb_(std::make_shared<FollyQuicEventBase>(&fEvb_)),
         duration_(duration),
         window_(window),
         autotuneWindow_(autotuneWindow),
@@ -530,7 +534,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
         congestionControlType_(congestionControlType),
         maxReceivePacketSize_(maxReceivePacketSize),
         useInplaceWrite_(useInplaceWrite) {
-    eventBase_.setName("tperf_client");
+    fEvb_.setName("tperf_client");
   }
 
   void timeoutExpired() noexcept override {
@@ -602,7 +606,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     VLOG(5) << "TPerfClient: new unidirectional stream=" << id;
     if (!timerScheduled_) {
       timerScheduled_ = true;
-      eventBase_.timer().scheduleTimeout(this, duration_);
+      fEvb_.timer().scheduleTimeout(this, duration_);
     }
     quicClient_->setReadCallback(id, this);
     receivedStreams_++;
@@ -621,7 +625,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   void onConnectionEnd() noexcept override {
     LOG(INFO) << "TPerfClient connection end";
 
-    eventBase_.terminateLoopSoon();
+    fEvb_.terminateLoopSoon();
   }
 
   void onConnectionSetupError(QuicError error) noexcept override {
@@ -630,7 +634,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
 
   void onConnectionError(QuicError error) noexcept override {
     LOG(ERROR) << "TPerfClient error: " << toString(error.code);
-    eventBase_.terminateLoopSoon();
+    fEvb_.terminateLoopSoon();
   }
 
   void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
@@ -647,14 +651,16 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
 
   void start() {
     folly::SocketAddress addr(host_.c_str(), port_);
+    auto sock = std::make_unique<folly::AsyncUDPSocket>(&fEvb_);
+    auto sockWrapper =
+        std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_, std::move(sock));
 
-    auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&eventBase_);
     auto fizzClientContext =
         FizzClientQuicHandshakeContext::Builder()
             .setCertificateVerifier(test::createTestCertificateVerifier())
             .build();
     quicClient_ = std::make_shared<quic::QuicClientTransport>(
-        &eventBase_, std::move(sock), std::move(fizzClientContext));
+        qEvb_, std::move(sockWrapper), std::move(fizzClientContext));
     quicClient_->setHostname("tperf");
     quicClient_->addNewPeerAddress(addr);
     quicClient_->setCongestionControllerFactory(
@@ -703,7 +709,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
     quicClient_->start(this, this);
-    eventBase_.loopForever();
+    fEvb_.loopForever();
   }
 
   ~TPerfClient() override = default;
@@ -713,7 +719,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   std::string host_;
   uint16_t port_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
-  folly::EventBase eventBase_;
+  folly::EventBase fEvb_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
   uint64_t receivedBytes_{0};
   uint64_t receivedStreams_{0};
   std::map<quic::StreamId, uint64_t> bytesPerStream_;

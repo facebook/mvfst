@@ -8,11 +8,11 @@
 #pragma once
 
 #include <quic/client/state/ClientStateMachine.h>
-#include <quic/common/QuicEventBase.h>
+#include <quic/common/events/QuicEventBase.h>
 
 #include <folly/io/SocketOptionMap.h>
 #include <folly/net/NetOps.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 
 #include <chrono>
 #include <memory>
@@ -31,7 +31,7 @@ void happyEyeballsAddPeerAddress(
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket);
+    std::unique_ptr<QuicAsyncUDPSocket> socket);
 
 void startHappyEyeballs(
     QuicClientConnectionState& connection,
@@ -39,17 +39,17 @@ void startHappyEyeballs(
     sa_family_t cachedFamily,
     QuicTimerCallback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttemptDelay,
-    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
-    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
+    QuicAsyncUDPSocket::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
 void happyEyeballsSetUpSocket(
-    QuicAsyncUDPSocketWrapper& socket,
+    QuicAsyncUDPSocket& socket,
     folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
-    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
-    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
+    QuicAsyncUDPSocket::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
 void happyEyeballsStartSecondSocket(
@@ -58,6 +58,6 @@ void happyEyeballsStartSecondSocket(
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     QuicTimerCallback& connAttemptDelayTimeout,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper>& socket,
+    std::unique_ptr<QuicAsyncUDPSocket>& socket,
     const folly::SocketAddress& peerAddress);
 } // namespace quic

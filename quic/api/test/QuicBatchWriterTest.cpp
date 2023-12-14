@@ -7,6 +7,8 @@
 
 #include <quic/api/QuicBatchWriter.h>
 #include <quic/api/QuicBatchWriterFactory.h>
+#include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 
 #include <gtest/gtest.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
@@ -58,7 +60,9 @@ TEST_F(QuicBatchWriterTest, TestBatchingNone) {
 
 TEST_F(QuicBatchWriterTest, TestBatchingGSOBase) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapperImpl sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -85,7 +89,9 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBase) {
 
 TEST_F(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapperImpl sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -124,7 +130,9 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
 
 TEST_F(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapperImpl sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -158,7 +166,9 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
 
 TEST_F(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapperImpl sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -235,7 +245,9 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsg) {
 
 TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapperImpl sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -278,7 +290,9 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
 
 TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   folly::EventBase evb;
-  QuicAsyncUDPSocketWrapperImpl sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
   sock.bind(folly::SocketAddress("127.0.0.1", 0));
   gsoSupported_ = sock.getGSO() >= 0;
@@ -408,7 +422,9 @@ TEST_F(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
 
 TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
   folly::EventBase evb;
-  quic::test::MockAsyncUDPSocket sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -440,7 +456,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
                            const std::unique_ptr<folly::IOBuf>& buf,
-                           folly::AsyncUDPSocket::WriteOptions options) {
+                           QuicAsyncUDPSocket::WriteOptions options) {
         EXPECT_EQ(1000 * 5 + 700, buf->length());
         EXPECT_EQ(1000, options.gso);
         return 1000 * 5 + 700;
@@ -454,7 +470,9 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
 
 TEST_F(QuicBatchWriterTest, InplaceWriterWriteOne) {
   folly::EventBase evb;
-  quic::test::MockAsyncUDPSocket sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -492,7 +510,9 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteOne) {
 
 TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   folly::EventBase evb;
-  quic::test::MockAsyncUDPSocket sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -520,7 +540,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
                            const std::unique_ptr<folly::IOBuf>& buf,
-                           folly::AsyncUDPSocket::WriteOptions options) {
+                           QuicAsyncUDPSocket::WriteOptions options) {
         EXPECT_EQ(5 * 700, buf->length());
         EXPECT_EQ(700, options.gso);
         return 700 * 5;
@@ -535,7 +555,9 @@ TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
 
 TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   folly::EventBase evb;
-  quic::test::MockAsyncUDPSocket sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
   gsoSupported_ = true;
 
   uint32_t batchSize = 20;
@@ -711,7 +733,9 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestWrite) {
   EXPECT_FALSE(batchWriter->empty());
 
   folly::EventBase evb;
-  quic::test::MockAsyncUDPSocket sock(&evb);
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
   EXPECT_CALL(sock, write(_, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,

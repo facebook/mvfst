@@ -15,8 +15,10 @@
 #include <quic/api/QuicStreamAsyncTransport.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
@@ -38,6 +40,9 @@ class QuicStreamAsyncTransportTest : public Test {
   };
 
  public:
+  QuicStreamAsyncTransportTest() {
+    clientQuicEvb_ = std::make_shared<FollyQuicEventBase>(&clientEvb_);
+  }
   void SetUp() override {
     folly::ssl::init();
     createServer();
@@ -52,7 +57,7 @@ class QuicStreamAsyncTransportTest : public Test {
     EXPECT_CALL(*serverTransportFactory, _make(_, _, _, _))
         .WillOnce(Invoke(
             [&](folly::EventBase* evb,
-                std::unique_ptr<QuicAsyncUDPSocketWrapper>& socket,
+                std::unique_ptr<FollyAsyncUDPSocketAlias>& socket,
                 const folly::SocketAddress& /*addr*/,
                 std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
               auto transport = quic::QuicServerTransport::make(
@@ -156,13 +161,13 @@ class QuicStreamAsyncTransportTest : public Test {
         .WillOnce(Invoke([&p = promise]() mutable { p.setValue(); }));
 
     clientEvb_.runInLoop([&]() {
-      auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&clientEvb_);
+      auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(clientQuicEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())
               .build();
       client_ = std::make_shared<QuicClientTransport>(
-          &clientEvb_, std::move(sock), std::move(fizzClientContext));
+          clientQuicEvb_, std::move(sock), std::move(fizzClientContext));
       client_->setHostname("echo.com");
       client_->addNewPeerAddress(serverAddr_);
       client_->start(&clientConnectionSetupCB_, &clientConnectionCB_);
@@ -191,6 +196,7 @@ class QuicStreamAsyncTransportTest : public Test {
 
   std::shared_ptr<QuicClientTransport> client_;
   folly::EventBase clientEvb_;
+  std::shared_ptr<FollyQuicEventBase> clientQuicEvb_;
   NiceMock<MockConnectionSetupCallback> clientConnectionSetupCB_;
   NiceMock<MockConnectionCallback> clientConnectionCB_;
 };

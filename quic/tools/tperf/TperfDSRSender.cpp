@@ -10,7 +10,7 @@
 
 namespace quic {
 
-TperfDSRSender::TperfDSRSender(Buf sendBuf, QuicAsyncUDPSocketWrapper& sock)
+TperfDSRSender::TperfDSRSender(Buf sendBuf, QuicAsyncUDPSocket& sock)
     : sock_(sock), buf_(std::move(sendBuf)) {}
 
 bool TperfDSRSender::addSendInstruction(const SendInstruction& instruction) {

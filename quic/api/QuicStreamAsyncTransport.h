@@ -9,7 +9,7 @@
 
 #include <folly/io/async/AsyncTransport.h>
 #include <quic/api/QuicSocket.h>
-#include <quic/common/QuicEventBase.h>
+#include <quic/common/events/QuicEventBase.h>
 
 namespace quic {
 
@@ -20,7 +20,7 @@ namespace quic {
 class QuicStreamAsyncTransport : public folly::AsyncTransport,
                                  public QuicSocket::ReadCallback,
                                  public QuicSocket::WriteCallback,
-                                 public QuicEventBase::LoopCallback {
+                                 public QuicEventBaseLoopCallback {
  public:
   using UniquePtr = std::unique_ptr<
       QuicStreamAsyncTransport,

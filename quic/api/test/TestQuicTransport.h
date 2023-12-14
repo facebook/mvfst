@@ -9,7 +9,6 @@
 
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/common/QuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -21,11 +20,11 @@ class TestQuicTransport
       public std::enable_shared_from_this<TestQuicTransport> {
  public:
   TestQuicTransport(
-      folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
-      : QuicTransportBase(evb, std::move(socket)),
+      : QuicTransportBase(std::move(evb), std::move(socket)),
         observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
     setConnectionSetupCallback(connSetupCb);
     setConnectionCallback(connCb);
@@ -65,7 +64,7 @@ class TestQuicTransport
   }
 
   bool isPacingScheduled() {
-    return writeLooper_->isScheduled();
+    return writeLooper_->isPacingScheduled();
   }
 
   void onReadData(
@@ -137,10 +136,6 @@ class TestQuicTransport
 
   CloseState closeState() {
     return closeState_;
-  }
-
-  folly::HHWheelTimer* getTimer() {
-    return &getEventBase()->timer();
   }
 
   void drainImmediately() {

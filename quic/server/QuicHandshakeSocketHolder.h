@@ -27,7 +27,7 @@ class QuicHandshakeSocketHolder
 
   static QuicServerTransport::Ptr makeServerTransport(
       folly::EventBase* evb,
-      std::unique_ptr<quic::QuicAsyncUDPSocketWrapper> socket,
+      std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       Callback* callback) {
     auto acceptCb = std::make_unique<QuicHandshakeSocketHolder>(callback);

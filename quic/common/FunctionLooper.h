@@ -12,8 +12,8 @@
 #include <folly/Optional.h>
 #include <folly/io/async/DelayedDestruction.h>
 #include <quic/QuicConstants.h>
-#include <quic/common/QuicEventBase.h>
-#include <quic/common/Timers.h>
+#include <quic/common/events/QuicEventBase.h>
+#include <quic/common/events/QuicTimer.h>
 
 namespace quic {
 enum class LooperType : uint8_t {
@@ -29,19 +29,19 @@ std::ostream& operator<<(std::ostream& /* out */, const LooperType& /*rhs*/);
  * in multiple evb loops. Calling run() will cause the loop to start and stop()
  * will call the loop to stop.
  */
-class FunctionLooper : public QuicEventBase::LoopCallback,
-                       public folly::DelayedDestruction,
-                       public TimerHighRes::Callback {
+class FunctionLooper : public QuicEventBaseLoopCallback,
+                       public QuicTimerCallback,
+                       public folly::DelayedDestruction {
  public:
   using Ptr =
       std::unique_ptr<FunctionLooper, folly::DelayedDestruction::Destructor>;
 
   explicit FunctionLooper(
-      QuicEventBase* evb,
+      std::shared_ptr<QuicEventBase> evb,
       folly::Function<void()>&& func,
       LooperType type);
 
-  void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
+  void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
   bool hasPacingTimer() const noexcept;
 
@@ -68,10 +68,22 @@ class FunctionLooper : public QuicEventBase::LoopCallback,
   bool isRunning() const;
 
   /**
+   * Whether the pacing timer is scheduled or not. This is not thread-safe and
+   * should only be called on the looper's evb.
+   */
+  bool isPacingScheduled();
+
+  /**
+   * Whether the loop callback is scheduled or not. This is not thread-safe and
+   * should only be called on the looper's evb.
+   */
+  bool isLoopCallbackScheduled();
+
+  /**
    * Attaches a new event base to the function looper. Must be invoked on the
    * evb that the looper is to be attached to.
    */
-  void attachEventBase(QuicEventBase* evb);
+  void attachEventBase(std::shared_ptr<QuicEventBase> evb);
 
   /**
    * Detaches the current event base from the function looper. Must be called on
@@ -98,10 +110,10 @@ class FunctionLooper : public QuicEventBase::LoopCallback,
   void commonLoopBody() noexcept;
   bool schedulePacingTimeout() noexcept;
 
-  QuicEventBase* evb_;
+  std::shared_ptr<QuicEventBase> evb_;
   folly::Function<void()> func_;
   folly::Optional<folly::Function<std::chrono::microseconds()>> pacingFunc_;
-  TimerHighRes::SharedPtr pacingTimer_;
+  QuicTimer::SharedPtr pacingTimer_;
   bool running_{false};
   bool inLoopBody_{false};
   const LooperType type_;

@@ -23,7 +23,7 @@ TakeoverHandlerCallback::TakeoverHandlerCallback(
     QuicServerWorker* worker,
     TakeoverPacketHandler& takeoverPktHandler,
     const TransportSettings& transportSettings,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket)
+    std::unique_ptr<FollyAsyncUDPSocketAlias> socket)
     : worker_(worker),
       takeoverPktHandler_(takeoverPktHandler),
       transportSettings_(transportSettings),
@@ -44,7 +44,7 @@ void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
 }
 
 void TakeoverHandlerCallback::rebind(
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+    std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
     const folly::SocketAddress& addr) {
   if (socket_) {
     // first reset existing socket if any
@@ -69,7 +69,7 @@ const folly::SocketAddress& TakeoverHandlerCallback::getAddress() const {
 
 int TakeoverHandlerCallback::getSocketFD() {
   CHECK(socket_);
-  return getSocketFd(*socket_);
+  return socket_->getNetworkSocket().toFd();
 }
 
 void TakeoverHandlerCallback::getReadBuffer(void** buf, size_t* len) noexcept {
@@ -172,9 +172,9 @@ void TakeoverPacketHandler::forwardPacket(Buf writeBuffer) {
   pktForwardingSocket_->write(pktForwardDestAddr_, std::move(writeBuffer));
 }
 
-std::unique_ptr<QuicAsyncUDPSocketWrapper> TakeoverPacketHandler::makeSocket(
+std::unique_ptr<FollyAsyncUDPSocketAlias> TakeoverPacketHandler::makeSocket(
     folly::EventBase* evb) {
-  return std::make_unique<QuicAsyncUDPSocketWrapperImpl>(evb);
+  return std::make_unique<FollyAsyncUDPSocketAlias>(evb);
 }
 
 void TakeoverPacketHandler::processForwardedPacket(

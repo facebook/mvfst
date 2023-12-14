@@ -12,6 +12,8 @@
 
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
+#include <quic/server/QuicServerTransport.h>
 
 #include <quic/samples/echo/EchoHandler.h>
 
@@ -24,7 +26,9 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
   explicit UDPAcceptor(
       folly::EventBase* evb,
       std::shared_ptr<folly::AsyncUDPSocket> socket)
-      : evb_(evb), socket_(std::move(socket)) {}
+      : evb_(evb),
+        qEvb_(std::make_shared<FollyQuicEventBase>(evb_)),
+        socket_(std::move(socket)) {}
 
   void getReadBuffer(void** buf, size_t* len) noexcept override {
     readBuffer_ = folly::IOBuf::create(quic::kDefaultUDPReadBufferSize);
@@ -47,20 +51,18 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
       auto fizzServerCtx = quic::test::createServerCtx();
       fizzServerCtx->setClock(std::make_shared<fizz::SystemClock>());
 
-      auto quicSocket =
-          std::make_unique<quic::QuicAsyncUDPSocketWrapperImpl>(evb_);
+      auto follySharedSocket = std::make_unique<FollyAsyncUDPSocketAlias>(evb_);
 
-      int fd = socket_->getNetworkSocket().toFd();
-      if (fd != -1) {
-        quicSocket->setFD(
-            folly::NetworkSocket::fromFd(fd),
-            QuicAsyncUDPSocketWrapper::FDOwnership::SHARED);
-        quicSocket->setDFAndTurnOffPMTU();
+      auto sockFD = socket_->getNetworkSocket();
+      if (sockFD.toFd() != -1) {
+        follySharedSocket->setFD(
+            sockFD, FollyAsyncUDPSocketAlias::FDOwnership::SHARED);
+        follySharedSocket->setDFAndTurnOffPMTU();
       }
 
       transport_ = quic::QuicServerTransport::make(
-          evb_,
-          std::move(quicSocket),
+          qEvb_->getBackingEventBase(),
+          std::move(follySharedSocket),
           quicHandler_.get(),
           quicHandler_.get(),
           fizzServerCtx);
@@ -102,6 +104,7 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
 
  private:
   folly::EventBase* evb_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
   std::shared_ptr<folly::AsyncUDPSocket> socket_;
   std::shared_ptr<EchoHandler> quicHandler_;
   std::shared_ptr<quic::QuicServerTransport> transport_;

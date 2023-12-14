@@ -13,15 +13,15 @@ bool BatchWriter::needsFlush(size_t /*unused*/) {
   return false;
 }
 
-void BatchWriter::setSock(QuicAsyncUDPSocketWrapper* sock) {
-  if (sock && !evb_.getBackingEventBase()) {
-    fd_ = ::dup(getSocketFd(*sock));
-    evb_.setBackingEventBase(sock->getEventBase());
+void BatchWriter::setSock(QuicAsyncUDPSocket* sock) {
+  if (sock && !evb_) {
+    fd_ = ::dup(sock->getFD());
+    evb_ = sock->getEventBase().get();
   }
 }
 
 QuicEventBase* BatchWriter::evb() {
-  return &evb_;
+  return evb_;
 }
 
 int BatchWriter::getAndResetFd() {
@@ -40,7 +40,7 @@ bool SinglePacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t /*unused*/,
     const folly::SocketAddress& /*unused*/,
-    QuicAsyncUDPSocketWrapper* /*unused*/) {
+    QuicAsyncUDPSocket* /*unused*/) {
   buf_ = std::move(buf);
 
   // needs to be flushed
@@ -48,7 +48,7 @@ bool SinglePacketBatchWriter::append(
 }
 
 ssize_t SinglePacketBatchWriter::write(
-    QuicAsyncUDPSocketWrapper& sock,
+    QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
   return sock.write(address, buf_);
 }
@@ -64,13 +64,13 @@ bool SinglePacketInplaceBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& /* buf */,
     size_t /*unused*/,
     const folly::SocketAddress& /*unused*/,
-    QuicAsyncUDPSocketWrapper* /*unused*/) {
+    QuicAsyncUDPSocket* /*unused*/) {
   // Always flush. This should trigger a write afterwards.
   return true;
 }
 
 ssize_t SinglePacketInplaceBatchWriter::write(
-    QuicAsyncUDPSocketWrapper& sock,
+    QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
   ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   auto& buf = scopedBufAccessor.buf();
@@ -109,7 +109,7 @@ bool SendmmsgPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& /*unused*/,
-    QuicAsyncUDPSocketWrapper* /*unused*/) {
+    QuicAsyncUDPSocket* /*unused*/) {
   CHECK_LT(bufs_.size(), maxBufs_);
   bufs_.emplace_back(std::move(buf));
   currSize_ += size;
@@ -124,7 +124,7 @@ bool SendmmsgPacketBatchWriter::append(
 }
 
 ssize_t SendmmsgPacketBatchWriter::write(
-    QuicAsyncUDPSocketWrapper& sock,
+    QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {

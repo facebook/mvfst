@@ -14,10 +14,11 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/Types.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/TransportKnobs.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/QuicServerTransport.h>
@@ -30,13 +31,13 @@ namespace quic::test {
 class TestingQuicServerTransport : public QuicServerTransport {
  public:
   TestingQuicServerTransport(
-      folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::shared_ptr<FollyQuicEventBase> evb,
+      std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
       : QuicServerTransport(
-            evb,
+            std::move(evb),
             std::move(sock),
             connSetupCb,
             connCb,
@@ -54,8 +55,8 @@ class TestingQuicServerTransport : public QuicServerTransport {
     return *dynamic_cast<QuicServerConnectionState*>(conn_.get());
   }
 
-  QuicAsyncUDPSocketWrapper& getSocket() {
-    return *socket_;
+  QuicAsyncUDPSocket& getSocket() {
+    return *socket_.get();
   }
 
   auto& idleTimeout() {
@@ -87,7 +88,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
   }
 
   bool isDraining() {
-    return drainTimeout_.isScheduled();
+    return evb_->isTimeoutScheduled(&drainTimeout_);
   }
 
   void triggerCryptoEvent() {
@@ -120,7 +121,9 @@ class TestingQuicServerTransport : public QuicServerTransport {
 
 class QuicServerTransportTestBase : public virtual testing::Test {
  public:
-  QuicServerTransportTestBase() = default;
+  QuicServerTransportTestBase() {
+    qEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
+  }
   virtual ~QuicServerTransportTestBase() = default;
 
   void SetUp() {
@@ -135,7 +138,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     ServerConnectionIdParams params(0, 0, 1);
     auto sock =
         std::make_unique<testing::NiceMock<quic::test::MockAsyncUDPSocket>>(
-            &evb);
+            qEvb_);
     socket = sock.get();
     EXPECT_CALL(*sock, write(testing::_, testing::_))
         .WillRepeatedly(
@@ -151,7 +154,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
     server = std::make_shared<TestingQuicServerTransport>(
-        &evb, std::move(sock), &connSetupCallback, &connCallback, serverCtx);
+        qEvb_, std::move(sock), &connSetupCallback, &connCallback, serverCtx);
     server->setCongestionControllerFactory(ccFactory_);
     server->setCongestionControl(CongestionControlType::Cubic);
     server->setRoutingCallback(&routingCallback);
@@ -188,7 +191,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   void startTransport() {
     server->accept();
     setupConnection();
-    EXPECT_TRUE(server->idleTimeout().isScheduled());
+    EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
     EXPECT_EQ(server->getConn().peerConnectionIds.size(), 1);
     EXPECT_EQ(
         *server->getConn().clientConnectionId,
@@ -576,6 +579,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   }
 
   folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
   folly::SocketAddress serverAddr;
   folly::SocketAddress clientAddr;
   testing::NiceMock<MockConnectionSetupCallback> connSetupCallback;

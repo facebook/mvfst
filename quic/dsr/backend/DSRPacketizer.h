@@ -15,6 +15,7 @@
 #include <folly/Hash.h>
 #include <folly/SocketAddress.h>
 #include <folly/container/EvictingCacheMap.h>
+#include <folly/io/async/AsyncUDPSocket.h>
 #include <quic/api/IoBufQuicBatch.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/QuicConnectionId.h>
@@ -153,7 +154,7 @@ struct RequestGroup {
 };
 
 BufQuicBatchResult writePacketsGroup(
-    QuicAsyncUDPSocketWrapper& sock,
+    QuicAsyncUDPSocket& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider);
 

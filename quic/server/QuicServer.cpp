@@ -262,7 +262,7 @@ void QuicServer::bindWorkersToSocket(
                 folly::NetworkSocket::fromFd(::dup(takeoverOverFd)),
                 // set ownership to OWNS to allow ::close()'ing of of the fd
                 // when this server goes away
-                QuicAsyncUDPSocketWrapper::FDOwnership::OWNS);
+                FollyAsyncUDPSocketAlias::FDOwnership::OWNS);
             worker->setSocket(std::move(workerSocket));
             if (idx == 0) {
               self->boundAddress_ = worker->getAddress();

@@ -5,13 +5,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <quic/client/connector/QuicConnector.h>
-
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncSSLSocket.h>
+#include <folly/io/async/AsyncUDPSocket.h>
+
 #include <quic/api/QuicSocket.h>
+#include <quic/client/connector/QuicConnector.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+
+#include <memory>
 
 using namespace std;
 
@@ -30,7 +34,7 @@ void QuicConnector::onReplaySafe() noexcept {
   if (cb_) {
     cb_->onConnectSuccess();
   }
-  cancelTimeout();
+  qEvb_->cancelTimeout(this);
   cleanUpAndCloseSocket();
 }
 
@@ -54,10 +58,10 @@ void QuicConnector::connect(
     LOG(ERROR) << "Already connecting...";
     return;
   }
-
-  auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(eventBase);
+  qEvb_ = std::make_shared<FollyQuicEventBase>(eventBase);
+  auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_);
   quicClient_ = quic::QuicClientTransport::newClient(
-      eventBase,
+      qEvb_,
       std::move(sock),
       quic::FizzClientQuicHandshakeContext::Builder()
           .setFizzClientContext(std::move(fizzContext))
@@ -88,8 +92,10 @@ void QuicConnector::connect(
 }
 
 void QuicConnector::connect(
+    std::shared_ptr<quic::FollyQuicEventBase> qEvb,
     std::shared_ptr<quic::QuicClientTransport> quicClient,
     std::chrono::milliseconds connectTimeout) {
+  qEvb_ = qEvb;
   quicClient_ = std::move(quicClient);
   doConnect(connectTimeout);
 }

@@ -12,9 +12,9 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/common/FunctionLooper.h>
 #include <quic/common/NetworkData.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
-#include <quic/common/QuicEventBase.h>
-#include <quic/common/Timers.h>
+#include <quic/common/events/QuicEventBase.h>
+#include <quic/common/events/QuicTimer.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/congestion_control/NewReno.h>
@@ -38,8 +38,8 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
 class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
-      QuicBackingEventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> socket,
       bool useConnectionEndWithErrorCallback = false);
 
   ~QuicTransportBase() override;
@@ -48,9 +48,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       QuicTimerCallback* callback,
       std::chrono::milliseconds timeout);
 
-  void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
+  void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
-  [[nodiscard]] QuicBackingEventBase* getEventBase() const override;
+  [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
 
   folly::Optional<ConnectionId> getClientConnectionId() const override;
 
@@ -256,7 +256,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void detachEventBase() override;
 
-  void attachEventBase(QuicBackingEventBase* evb) override;
+  void attachEventBase(std::shared_ptr<QuicEventBase> evb) override;
 
   folly::Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
@@ -602,7 +602,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
   void cancelLossTimeout();
-  bool isLossTimeoutScheduled() const;
+  bool isLossTimeoutScheduled(); // TODO: make this const again
 
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
@@ -856,8 +856,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    */
   folly::Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
-  std::atomic<QuicEventBase*> qEvbPtr_;
-  std::unique_ptr<QuicAsyncUDPSocketWrapper> socket_;
+  std::shared_ptr<QuicEventBase> evb_;
+  std::unique_ptr<QuicAsyncUDPSocket> socket_;
   folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
   folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.
@@ -979,6 +979,11 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     std::shared_ptr<SocketObserverContainer> observerContainer_;
   };
 
+ protected:
+  void cancelTimeout(QuicTimerCallback* callback);
+
+  bool isTimeoutScheduled(QuicTimerCallback* callback) const;
+
  private:
   /**
    * Helper functions to handle new streams.
@@ -1005,10 +1010,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * additionalCmsgs callback
    */
   void updatePacketProcessorsPrewriteRequests();
-
- private:
-  QuicEventBase qEvb_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
+
 } // namespace quic

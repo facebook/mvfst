@@ -13,7 +13,7 @@
 namespace quic {
 IOBufQuicBatch::IOBufQuicBatch(
     BatchWriterPtr&& batchWriter,
-    QuicAsyncUDPSocketWrapper& sock,
+    QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& peerAddress,
     QuicTransportStatsCallback* statsCallback,
     QuicClientConnectionState::HappyEyeballsState* happyEyeballsState)
@@ -86,9 +86,11 @@ bool IOBufQuicBatch::flushInternal() {
   // If error occurred on first socket, kick off second socket immediately
   if (!written && happyEyeballsState_ &&
       happyEyeballsState_->connAttemptDelayTimeout &&
-      happyEyeballsState_->connAttemptDelayTimeout->isScheduled()) {
+      sock_.getEventBase()->isTimeoutScheduled(
+          happyEyeballsState_->connAttemptDelayTimeout)) {
     happyEyeballsState_->connAttemptDelayTimeout->timeoutExpired();
-    happyEyeballsState_->connAttemptDelayTimeout->cancelTimeout();
+    sock_.getEventBase()->cancelTimeout(
+        happyEyeballsState_->connAttemptDelayTimeout);
   }
 
   folly::Optional<int> secondSocketErrno;

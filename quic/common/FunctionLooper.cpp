@@ -13,13 +13,12 @@ namespace quic {
 using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
-    QuicEventBase* evb,
+    std::shared_ptr<QuicEventBase> evb,
     folly::Function<void()>&& func,
     LooperType type)
-    : evb_(evb), func_(std::move(func)), type_(type) {}
+    : evb_(std::move(evb)), func_(std::move(func)), type_(type) {}
 
-void FunctionLooper::setPacingTimer(
-    TimerHighRes::SharedPtr pacingTimer) noexcept {
+void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
   pacingTimer_ = std::move(pacingTimer);
 }
 
@@ -52,7 +51,8 @@ void FunctionLooper::commonLoopBody() noexcept {
 }
 
 bool FunctionLooper::schedulePacingTimeout() noexcept {
-  if (pacingFunc_ && pacingTimer_ && !isScheduled()) {
+  if (pacingFunc_ && pacingTimer_ &&
+      !pacingTimer_->isTimerCallbackScheduled(this)) {
     auto timeUntilWrite = (*pacingFunc_)();
     if (timeUntilWrite != 0us) {
       nextPacingTime_ = Clock::now() + timeUntilWrite;
@@ -78,20 +78,22 @@ void FunctionLooper::run(bool thisIteration) noexcept {
             << " in loop body and using pacing - not rescheduling";
     return;
   }
-  if (isLoopCallbackScheduled() || (!fireLoopEarly_ && isScheduled())) {
+  if (evb_->isLoopCallbackScheduled(this) ||
+      (!fireLoopEarly_ && pacingTimer_ &&
+       pacingTimer_->isTimerCallbackScheduled(this))) {
     VLOG(10) << __func__ << ": " << type_ << " already scheduled";
     return;
   }
   // If we are pacing, we're about to write again, if it's close, just write
   // now.
-  if (isScheduled()) {
+  if (pacingTimer_ && pacingTimer_->isTimerCallbackScheduled(this)) {
     auto n = Clock::now();
     auto timeUntilWrite = nextPacingTime_ < n
         ? 0us
         : std::chrono::duration_cast<std::chrono::milliseconds>(
               nextPacingTime_ - n);
     if (timeUntilWrite <= 1ms) {
-      cancelTimeout();
+      pacingTimer_->cancelTimeout(this);
       // The next loop is good enough
       thisIteration = false;
     } else {
@@ -104,26 +106,40 @@ void FunctionLooper::run(bool thisIteration) noexcept {
 void FunctionLooper::stop() noexcept {
   VLOG(10) << __func__ << ": " << type_;
   running_ = false;
-  cancelLoopCallback();
-  cancelTimeout();
+  if (evb_) {
+    evb_->cancelLoopCallback(this);
+  }
+  if (pacingTimer_) {
+    pacingTimer_->cancelTimeout(this);
+  }
 }
 
 bool FunctionLooper::isRunning() const {
   return running_;
 }
 
-void FunctionLooper::attachEventBase(QuicEventBase* evb) {
+bool FunctionLooper::isPacingScheduled() {
+  return pacingTimer_ && pacingTimer_->isTimerCallbackScheduled(this);
+}
+
+bool FunctionLooper::isLoopCallbackScheduled() {
+  return evb_->isLoopCallbackScheduled(this);
+}
+
+void FunctionLooper::attachEventBase(std::shared_ptr<QuicEventBase> evb) {
   VLOG(10) << __func__ << ": " << type_;
   DCHECK(!evb_);
   DCHECK(evb && evb->isInEventBaseThread());
-  evb_ = evb;
+  evb_ = std::move(evb);
 }
 
 void FunctionLooper::detachEventBase() {
   VLOG(10) << __func__ << ": " << type_;
   DCHECK(evb_ && evb_->isInEventBaseThread());
   stop();
-  cancelTimeout();
+  if (pacingTimer_) {
+    pacingTimer_->cancelTimeout(this);
+  }
   evb_ = nullptr;
 }
 

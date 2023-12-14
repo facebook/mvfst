@@ -15,8 +15,8 @@
 
 #include <utility>
 
-namespace folly {
-class EventBase;
+namespace quic {
+class QuicEventBase;
 }
 
 namespace quic {
@@ -457,7 +457,7 @@ class SocketObserverInterface {
    */
   virtual void evbAttach(
       QuicSocket* /* socket */,
-      folly::EventBase* /* evb */) noexcept {}
+      QuicEventBase* /* evb */) noexcept {}
 
   /**
    * evbDetach() will be invoked when an existing event base is detached
@@ -468,7 +468,7 @@ class SocketObserverInterface {
    */
   virtual void evbDetach(
       QuicSocket* /* socket */,
-      folly::EventBase* /* evb */) noexcept {}
+      QuicEventBase* /* evb */) noexcept {}
 
   /**
    * startWritingFromAppLimited() is invoked when the socket is currently

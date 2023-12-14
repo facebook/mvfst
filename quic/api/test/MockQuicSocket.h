@@ -51,7 +51,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(const folly::SocketAddress&, getPeerAddress, (), (const));
   MOCK_METHOD(const folly::SocketAddress&, getOriginalPeerAddress, (), (const));
   MOCK_METHOD(const folly::SocketAddress&, getLocalAddress, (), (const));
-  MOCK_METHOD(folly::EventBase*, getEventBase, (), (const));
+  MOCK_METHOD(std::shared_ptr<QuicEventBase>, getEventBase, (), (const));
   MOCK_METHOD(
       (folly::Expected<size_t, LocalErrorCode>),
       getStreamReadOffset,
@@ -277,7 +277,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(void, sendPing, (std::chrono::milliseconds));
   MOCK_METHOD(const QuicConnectionStateBase*, getState, (), (const));
   MOCK_METHOD(bool, isDetachable, ());
-  MOCK_METHOD(void, attachEventBase, (folly::EventBase*));
+  MOCK_METHOD(void, attachEventBase, (std::shared_ptr<QuicEventBase>));
   MOCK_METHOD(void, detachEventBase, ());
   MOCK_METHOD(folly::Optional<LocalErrorCode>, setControlStream, (StreamId));
 

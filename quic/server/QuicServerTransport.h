@@ -7,10 +7,14 @@
 
 #pragma once
 
+#include <folly/io/async/AsyncUDPSocket.h>
+#include <folly/io/async/EventBase.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/common/TransportKnobs.h>
+#include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/handshake/ServerTransportParametersExtension.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
@@ -73,15 +77,15 @@ class QuicServerTransport
 
   static QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
       const folly::MaybeManagedPtr<ConnectionSetupCallback>& connSetupCb,
       const folly::MaybeManagedPtr<ConnectionCallback>& connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       bool useConnectionEndWithErrorCallback = false);
 
   QuicServerTransport(
-      folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::shared_ptr<FollyQuicEventBase> evb,
+      std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
       folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
       folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -90,8 +94,8 @@ class QuicServerTransport
 
   // Testing only API:
   QuicServerTransport(
-      folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::shared_ptr<FollyQuicEventBase> evb,
+      std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
       folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
       folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -191,6 +195,13 @@ class QuicServerTransport
   bool hasReadCipher() const;
   void registerAllTransportKnobParamHandlers();
   bool shouldWriteNewSessionTicket();
+
+  folly::EventBase* getFollyEventbase() const {
+    // TODO (jbeshay): handle nullptr
+    return getEventBase()
+        ->getTypedEventBase<FollyQuicEventBase>()
+        ->getBackingEventBase();
+  }
 
  private:
   RoutingCallback* routingCb_{nullptr};

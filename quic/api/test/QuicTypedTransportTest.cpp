@@ -1560,7 +1560,10 @@ TYPED_TEST(
 
   // wait for the drain
   EXPECT_CALL(*observer, closing(transport, _));
-  transport->getEventBase()->timer().scheduleTimeoutFn(
+  auto follyEvb = transport->getEventBase()
+                      ->template getTypedEventBase<FollyQuicEventBase>()
+                      ->getBackingEventBase();
+  follyEvb->timer().scheduleTimeoutFn(
       [&] { transport->getEventBase()->terminateLoopSoon(); },
       folly::chrono::ceil<std::chrono::milliseconds>(
           1ms + kDrainFactor * calculatePTO(this->getConn())));

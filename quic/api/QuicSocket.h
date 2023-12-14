@@ -14,9 +14,9 @@
 #include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
-#include <quic/common/QuicEventBase.h>
 #include <quic/common/SmallCollections.h>
+#include <quic/common/events/QuicEventBase.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverTypes.h>
@@ -28,10 +28,6 @@
 
 #include <folly/Portability.h>
 #include <chrono>
-
-namespace folly {
-class EventBase;
-}
 
 namespace quic {
 
@@ -420,7 +416,7 @@ class QuicSocket {
   /**
    * Returns the event base associated with this socket
    */
-  [[nodiscard]] virtual QuicBackingEventBase* getEventBase() const = 0;
+  [[nodiscard]] virtual std::shared_ptr<QuicEventBase> getEventBase() const = 0;
 
   /**
    * Returns the current offset already read or written by the application on
@@ -483,8 +479,8 @@ class QuicSocket {
    * @param socket The new socket that should be used by the transport.
    * If this is null then do not replace the underlying socket.
    */
-  virtual void onNetworkSwitch(
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> /*unused*/) {}
+  virtual void onNetworkSwitch(std::unique_ptr<QuicAsyncUDPSocket> /*unused*/) {
+  }
 
   /**
    * Get the flow control settings for the given stream (or connection flow
@@ -1270,7 +1266,7 @@ class QuicSocket {
    * eventbase that needs to be attached and the caller must make sure that
    * there is no eventbase already attached to the socket.
    */
-  virtual void attachEventBase(QuicBackingEventBase* evb) = 0;
+  virtual void attachEventBase(std::shared_ptr<QuicEventBase> evb) = 0;
 
   /**
    * Returns whether or not the eventbase can currently be detached from the

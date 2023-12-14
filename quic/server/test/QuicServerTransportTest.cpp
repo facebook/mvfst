@@ -182,11 +182,11 @@ TEST_F(QuicServerTransportTest, IdleTimerResetOnRecvNewData) {
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  server->idleTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
   recvEncryptedStream(streamId, *expected);
-  ASSERT_TRUE(server->idleTimeout().isScheduled());
-  ASSERT_TRUE(server->keepaliveTimeout().isScheduled());
+  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
   EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
@@ -196,17 +196,17 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
 
   auto expected = IOBuf::copyBuffer("hello");
   auto packet = recvEncryptedStream(streamId, *expected);
-  ASSERT_TRUE(server->idleTimeout().isScheduled());
-  ASSERT_TRUE(server->keepaliveTimeout().isScheduled());
+  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
 
-  server->idleTimeout().cancelTimeout();
-  server->keepaliveTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
-  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  qEvb_->cancelTimeout(&server->keepaliveTimeout());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
   // Try delivering the same packet again
   deliverData(packet->clone(), false);
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
-  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
   EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
@@ -217,29 +217,29 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   server->getNonConstConn().receivedNewPacketBeforeWrite = false;
   StreamId streamId = server->createBidirectionalStream().value();
 
-  server->idleTimeout().cancelTimeout();
-  server->keepaliveTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  qEvb_->cancelTimeout(&server->keepaliveTimeout());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
   server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the darkness is to keep us apart"),
       false);
   loopForWrites();
   // It was the first packet
-  EXPECT_TRUE(server->idleTimeout().isScheduled());
-  EXPECT_TRUE(server->keepaliveTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
 
   // cancel it and write something else. This time idle timer shouldn't set.
-  server->idleTimeout().cancelTimeout();
-  server->keepaliveTimeout().cancelTimeout();
-  EXPECT_FALSE(server->idleTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  qEvb_->cancelTimeout(&server->keepaliveTimeout());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
   server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the daylight feels like it's a long way off"),
       false);
   loopForWrites();
-  EXPECT_FALSE(server->idleTimeout().isScheduled());
-  EXPECT_FALSE(server->keepaliveTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
 }
 
 TEST_F(QuicServerTransportTest, TimeoutsNotSetAfterClose) {
@@ -257,16 +257,16 @@ TEST_F(QuicServerTransportTest, TimeoutsNotSetAfterClose) {
   server->close(QuicError(
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
       std::string("how about no")));
-  server->idleTimeout().cancelTimeout();
-  server->keepaliveTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  qEvb_->cancelTimeout(&server->keepaliveTimeout());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
 
   deliverDataWithoutErrorCheck(packet->clone());
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
-  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
-  ASSERT_FALSE(server->lossTimeout().isScheduled());
-  ASSERT_FALSE(server->ackTimeout().isScheduled());
-  ASSERT_TRUE(server->drainTimeout().isScheduled());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->lossTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->ackTimeout()));
+  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&server->drainTimeout()));
 }
 
 TEST_F(QuicServerTransportTest, InvalidMigrationNoDrain) {
@@ -284,22 +284,22 @@ TEST_F(QuicServerTransportTest, InvalidMigrationNoDrain) {
   server->close(QuicError(
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
       std::string("migration disabled")));
-  server->idleTimeout().cancelTimeout();
-  server->keepaliveTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  qEvb_->cancelTimeout(&server->keepaliveTimeout());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
 
   deliverDataWithoutErrorCheck(packet->clone());
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
-  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
-  ASSERT_FALSE(server->lossTimeout().isScheduled());
-  ASSERT_FALSE(server->ackTimeout().isScheduled());
-  ASSERT_FALSE(server->drainTimeout().isScheduled());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->lossTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->ackTimeout()));
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->drainTimeout()));
 }
 
 TEST_F(QuicServerTransportTest, IdleTimeoutExpired) {
   server->idleTimeout().timeoutExpired();
 
-  EXPECT_FALSE(server->idleTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
   EXPECT_TRUE(server->isDraining());
   EXPECT_TRUE(server->isClosed());
   auto serverReadCodec = makeClientEncryptedCodec();
@@ -314,14 +314,14 @@ TEST_F(QuicServerTransportTest, KeepaliveTimeoutExpired) {
 
   EXPECT_FALSE(server->isDraining());
   EXPECT_FALSE(server->isClosed());
-  server->idleTimeout().cancelTimeout();
-  server->keepaliveTimeout().cancelTimeout();
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  qEvb_->cancelTimeout(&server->keepaliveTimeout());
   server->getNonConstConn().receivedNewPacketBeforeWrite = true;
   // After we write, the idletimout and keepalive timeout should be
   // scheduled and there should be a ping written.
   loopForWrites();
-  EXPECT_TRUE(server->idleTimeout().isScheduled());
-  EXPECT_TRUE(server->keepaliveTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
   auto serverReadCodec = makeClientEncryptedCodec();
   EXPECT_TRUE(verifyFramePresent(
       serverWrites, *serverReadCodec, QuicFrame::Type::PingFrame));
@@ -330,8 +330,8 @@ TEST_F(QuicServerTransportTest, KeepaliveTimeoutExpired) {
 TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
   server->idleTimeout().timeoutExpired();
 
-  EXPECT_FALSE(server->idleTimeout().isScheduled());
-  EXPECT_FALSE(server->keepaliveTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->keepaliveTimeout()));
   EXPECT_TRUE(server->isDraining());
   EXPECT_TRUE(server->isClosed());
 
@@ -1278,6 +1278,7 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
 TEST_F(QuicServerTransportTest, TestAckRstStream) {
   auto streamId = server->createUnidirectionalStream().value();
   auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+
   auto packetNum = rstStreamAndSendPacket(
       server->getNonConstConn(),
       server->getSocket(),
@@ -1744,8 +1745,8 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
   server->close(QuicError(
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
       std::string("test close")));
-  server->idleTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  qEvb_->cancelTimeout(&server->idleTimeout());
+  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -1939,7 +1940,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_TRUE(server->getConn().pathValidationLimiter != nullptr);
 
@@ -1961,7 +1962,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   deliverData(packetToBuf(packet), false, &newPeer);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
@@ -2007,7 +2008,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2027,7 +2028,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   deliverData(packetToBuf(packet), false, &newPeer);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
   EXPECT_FALSE(server->getConn().writableBytesLimit);
 
   // After Pathresponse frame is received, srtt,lrtt = sampleRtt;
@@ -2075,7 +2076,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2096,7 +2097,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   deliverData(packetToBuf(packet), false, &newPeer);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 }
 
 TEST_P(
@@ -2131,7 +2132,7 @@ TEST_P(
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_TRUE(server->getConn().pathValidationLimiter != nullptr);
 
@@ -2160,7 +2161,7 @@ TEST_P(
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
@@ -2598,7 +2599,7 @@ TEST_F(
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2636,7 +2637,7 @@ TEST_F(
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 0);
   EXPECT_EQ(server->getConn().lossState.srtt, srtt);
@@ -2673,7 +2674,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2710,7 +2711,7 @@ TEST_F(
   deliverData(std::move(packetData2), false, &newPeer2);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2762,7 +2763,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
+  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2798,7 +2799,7 @@ TEST_F(
   deliverData(std::move(packetData2));
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
-  EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
+  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&server->pathValidationTimeout()));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 0);
   EXPECT_EQ(server->getConn().lossState.srtt, srtt);

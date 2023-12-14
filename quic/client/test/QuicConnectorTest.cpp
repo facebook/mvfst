@@ -8,8 +8,9 @@
 #include <gtest/gtest.h>
 #include <quic/client/connector/QuicConnector.h>
 #include <quic/client/test/Mocks.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
 using namespace ::testing;
@@ -20,6 +21,7 @@ class QuicConnectorTest : public Test {
  public:
   void SetUp() override {
     connector_ = std::make_unique<QuicConnector>(&cb_);
+    qEvb_ = std::make_shared<FollyQuicEventBase>(&eventBase_);
   }
 
   std::shared_ptr<fizz::CertificateVerifier> createTestCertificateVerifier() {
@@ -32,7 +34,7 @@ class QuicConnectorTest : public Test {
     auto verifier = createTestCertificateVerifier();
     auto clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     auto pskCache = std::make_shared<BasicQuicPskCache>();
-    auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&eventBase_);
+    auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_);
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)
@@ -40,12 +42,13 @@ class QuicConnectorTest : public Test {
                                  .build();
 
     quicClient_ = std::make_shared<MockQuicClientTransport>(
-        testType, &eventBase_, std::move(sock), std::move(fizzClientContext));
+        testType, qEvb_, std::move(sock), std::move(fizzClientContext));
 
-    connector_->connect(quicClient_, connectTimeout);
+    connector_->connect(qEvb_, quicClient_, connectTimeout);
   }
 
   folly::EventBase eventBase_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
   std::unique_ptr<QuicConnector> connector_;
   MockQuicConnectorCallback cb_;
   std::shared_ptr<MockQuicClientTransport> quicClient_;

@@ -15,7 +15,6 @@
 #include <folly/io/SocketOptionMap.h>
 #include <folly/net/NetOps.h>
 #include <folly/portability/Sockets.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 
 #include <chrono>
 #include <memory>
@@ -57,7 +56,7 @@ void happyEyeballsAddPeerAddress(
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket) {
+    std::unique_ptr<QuicAsyncUDPSocket> socket) {
   connection.happyEyeballsState.secondSocket = std::move(socket);
 }
 
@@ -67,8 +66,8 @@ void startHappyEyeballs(
     sa_family_t cachedFamily,
     QuicTimerCallback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttempDelay,
-    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
-    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
+    QuicAsyncUDPSocket::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
   if (connection.happyEyeballsState.v6PeerAddress.isInitialized() &&
       connection.happyEyeballsState.v4PeerAddress.isInitialized()) {
@@ -105,7 +104,7 @@ void startHappyEyeballs(
           options);
     } catch (const std::exception&) {
       // If second socket bind throws exception, give it up
-      connAttemptDelayTimeout.cancelTimeout();
+      evb->cancelTimeout(&connAttemptDelayTimeout);
       connection.happyEyeballsState.finished = true;
     }
   } else if (connection.happyEyeballsState.v6PeerAddress.isInitialized()) {
@@ -122,12 +121,12 @@ void startHappyEyeballs(
 }
 
 void happyEyeballsSetUpSocket(
-    QuicAsyncUDPSocketWrapper& socket,
+    QuicAsyncUDPSocket& socket,
     folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
-    QuicAsyncUDPSocketWrapper::ErrMessageCallback* errMsgCallback,
-    QuicAsyncUDPSocketWrapper::ReadCallback* readCallback,
+    QuicAsyncUDPSocket::ErrMessageCallback* errMsgCallback,
+    QuicAsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
   auto sockFamily = localAddress.value_or(peerAddress).getFamily();
   socket.setReuseAddr(false);
@@ -166,7 +165,7 @@ void happyEyeballsSetUpSocket(
 #endif
 
   if (mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(getSocketFd(socket));
+    mvfst_hook_on_socket_create(socket.getFD());
   }
 
   // never fragment, always turn off PMTU
@@ -188,12 +187,12 @@ void happyEyeballsStartSecondSocket(
 void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     QuicTimerCallback& connAttemptDelayTimeout,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper>& socket,
+    std::unique_ptr<QuicAsyncUDPSocket>& socket,
     const folly::SocketAddress& peerAddress) {
   if (connection.happyEyeballsState.finished) {
     return;
   }
-  connAttemptDelayTimeout.cancelTimeout();
+  socket->getEventBase()->cancelTimeout(&connAttemptDelayTimeout);
   connection.happyEyeballsState.finished = true;
   connection.happyEyeballsState.shouldWriteToFirstSocket = true;
   connection.happyEyeballsState.shouldWriteToSecondSocket = false;

@@ -16,6 +16,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/dsr/Types.h>
@@ -471,7 +472,8 @@ TEST_F(QuicLossFunctionsTest, TestOnPTOSkipProcessed) {
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
   auto stream1Id =
@@ -520,7 +522,8 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
   auto stream1Id =
@@ -576,7 +579,8 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
   auto stream1Id =
@@ -647,7 +651,8 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
 
 TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("Worse case scenario");
@@ -684,7 +689,8 @@ TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossAfterStreamReset) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
@@ -869,7 +875,8 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
 TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
   auto conn = createConn();
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto currentOffset = stream->currentWriteOffset;
@@ -961,7 +968,8 @@ TEST_F(QuicLossFunctionsTest, ReorderingThresholdChecksSamePacketNumberSpace) {
 TEST_F(QuicLossFunctionsTest, TestMarkWindowUpdateLoss) {
   auto conn = createConn();
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   conn->streamManager->queueWindowUpdate(stream->id);
@@ -1445,7 +1453,8 @@ TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
 }
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   ASSERT_TRUE(conn->outstandings.packets.empty());
   ASSERT_TRUE(conn->outstandings.packetEvents.empty());
@@ -3142,7 +3151,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionDisabled) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
 
   conn->transportSettings.advertisedMaxStreamGroups = 16;
@@ -3194,7 +3204,8 @@ TEST_F(
     QuicLossFunctionsTest,
     TestMarkPacketLossRetransmissionPolicyPresentButNotDisabled) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
 
   conn->transportSettings.advertisedMaxStreamGroups = 16;
@@ -3244,7 +3255,8 @@ TEST_F(
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionPolicyTwoGroups) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
 
   conn->transportSettings.advertisedMaxStreamGroups = 16;
@@ -3303,7 +3315,8 @@ TEST_F(
     QuicLossFunctionsTest,
     TestMarkPacketLossRetransmissionPolicyTwoGroupsTwoPackets) {
   folly::EventBase evb;
-  MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
 
   conn->transportSettings.advertisedMaxStreamGroups = 16;

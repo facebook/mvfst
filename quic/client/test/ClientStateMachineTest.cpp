@@ -11,7 +11,8 @@
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/client/test/Mocks.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
@@ -104,10 +105,11 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
 
 TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   folly::EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   client_->clientConnectionId = ConnectionId::createRandom(8);
   client_->happyEyeballsState.finished = true;
   client_->happyEyeballsState.secondSocket =
-      std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&evb);
+      std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);
   auto newConn = undoAllClientStateForRetry(std::move(client_));
   EXPECT_TRUE(newConn->happyEyeballsState.finished);
   EXPECT_NE(nullptr, newConn->happyEyeballsState.secondSocket);

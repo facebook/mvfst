@@ -14,8 +14,8 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/NetworkData.h>
-#include <quic/common/QuicEventBase.h>
-#include <quic/common/Timers.h>
+#include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/events/QuicTimer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/state/StateData.h>
 
@@ -207,12 +207,17 @@ class MockQuicTransport : public QuicServerTransport {
   };
 
   MockQuicTransport(
-      folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::shared_ptr<FollyQuicEventBase> evb,
+      std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
-      : QuicServerTransport(evb, std::move(sock), connSetupCb, connCb, ctx) {}
+      : QuicServerTransport(
+            std::move(evb),
+            std::move(sock),
+            connSetupCb,
+            connCb,
+            ctx) {}
 
   virtual ~MockQuicTransport() {
     customDestructor();
@@ -222,11 +227,11 @@ class MockQuicTransport : public QuicServerTransport {
   MOCK_METHOD(const folly::SocketAddress&, getPeerAddress, (), (const));
   MOCK_METHOD(const folly::SocketAddress&, getOriginalPeerAddress, (), (const));
 
-  MOCK_METHOD((folly::EventBase*), getEventBase, (), (const));
+  MOCK_METHOD((std::shared_ptr<QuicEventBase>), getEventBase, (), (const));
   MOCK_METHOD((void), accept, (), ());
   MOCK_METHOD((void), setTransportSettings, (TransportSettings), ());
   MOCK_METHOD((void), setOriginalPeerAddress, (const folly::SocketAddress&));
-  MOCK_METHOD((void), setPacingTimer, (TimerHighRes::SharedPtr), (noexcept));
+  MOCK_METHOD((void), setPacingTimer, (QuicTimer::SharedPtr), (noexcept));
   MOCK_METHOD(
       (void),
       onNetworkData,
@@ -326,8 +331,16 @@ class MockLegacyObserver : public LegacyObserver {
       (QuicSocket*, const CloseStartedEvent&),
       (noexcept));
   MOCK_METHOD((void), closing, (QuicSocket*, const ClosingEvent&), (noexcept));
-  MOCK_METHOD((void), evbAttach, (QuicSocket*, folly::EventBase*), (noexcept));
-  MOCK_METHOD((void), evbDetach, (QuicSocket*, folly::EventBase*), (noexcept));
+  MOCK_METHOD(
+      (void),
+      evbAttach,
+      (QuicSocket*, quic::QuicEventBase*),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
+      evbDetach,
+      (QuicSocket*, quic::QuicEventBase*),
+      (noexcept));
   MOCK_METHOD(
       (void),
       startWritingFromAppLimited,

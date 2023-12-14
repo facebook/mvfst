@@ -18,20 +18,21 @@
 #include <quic/common/TransportKnobs.h>
 #include <algorithm>
 #include <chrono>
+#include <memory>
 #include <stdexcept>
 
 namespace quic {
 
 QuicServerTransport::QuicServerTransport(
-    folly::EventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+    std::shared_ptr<FollyQuicEventBase> evb,
+    std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
     folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
     folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory,
     PacketNum startingPacketNum)
     : QuicServerTransport(
-          evb,
+          std::move(evb),
           std::move(sock),
           connSetupCb,
           connStreamsCb,
@@ -41,15 +42,15 @@ QuicServerTransport::QuicServerTransport(
 }
 
 QuicServerTransport::QuicServerTransport(
-    folly::EventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+    std::shared_ptr<FollyQuicEventBase> evb,
+    std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
     folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
     folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory,
     bool useConnectionEndWithErrorCallback)
     : QuicTransportBase(
-          evb,
+          std::move(evb),
           std::move(sock),
           useConnectionEndWithErrorCallback),
       ctx_(std::move(ctx)),
@@ -84,14 +85,16 @@ QuicServerTransport::~QuicServerTransport() {
 
 QuicServerTransport::Ptr QuicServerTransport::make(
     folly::EventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+    std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
     const folly::MaybeManagedPtr<ConnectionSetupCallback>& connSetupCb,
     const folly::MaybeManagedPtr<ConnectionCallback>& connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     bool useConnectionEndWithErrorCallback) {
+  auto qEvb = std::make_shared<FollyQuicEventBase>(evb);
+  auto qSock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb, std::move(sock));
   return std::make_shared<QuicServerTransport>(
-      evb,
-      std::move(sock),
+      std::move(qEvb),
+      std::move(qSock),
       connSetupCb,
       connStreamsCb,
       ctx,
@@ -194,7 +197,7 @@ void QuicServerTransport::accept() {
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
   serverConn_->serverHandshakeLayer->initialize(
-      qEvbPtr_.load()->getBackingEventBase(),
+      getFollyEventbase(),
       this,
       std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }

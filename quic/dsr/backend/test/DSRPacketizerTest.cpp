@@ -6,8 +6,10 @@
  */
 
 #include <folly/portability/GTest.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/dsr/backend/DSRPacketizer.h>
 #include <quic/dsr/backend/test/TestUtils.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
@@ -45,9 +47,11 @@ class DSRPacketizerSingleWriteTest : public Test {
   void SetUp() override {
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher();
+    qEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
   }
 
   folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
@@ -57,7 +61,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
   auto testBatchWriter = new test::TestPacketBatchWriter(16);
   auto batchWriter = BatchWriterPtr(testBatchWriter);
   auto socket =
-      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       *socket,
@@ -101,7 +105,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
 TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
   auto batchWriter = BatchWriterPtr(new test::TestPacketBatchWriter(16));
   auto socket =
-      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       *socket,
@@ -134,9 +138,14 @@ TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
 }
 
 class DSRMultiWriteTest : public DSRCommonTestFixture {
+  void SetUp() override {
+    qEvb_ = std::make_shared<FollyQuicEventBase>(&evb_);
+  }
+
  protected:
   FizzCryptoFactory factory_;
-  folly::EventBase evb;
+  folly::EventBase evb_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
 };
 
 TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
@@ -170,11 +179,11 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 
   std::vector<Buf> sentData;
-  auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(&evb);
+  auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
   EXPECT_CALL(*sock, writeGSO(conn_.peerAddress, _, _))
       .WillRepeatedly(Invoke([&](const folly::SocketAddress&,
                                  const std::unique_ptr<folly::IOBuf>& buf,
-                                 folly::AsyncUDPSocket::WriteOptions) {
+                                 QuicAsyncUDPSocket::WriteOptions) {
         sentData.push_back(buf->clone());
         return buf->computeChainDataLength();
       }));

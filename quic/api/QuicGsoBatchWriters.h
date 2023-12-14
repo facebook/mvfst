@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/api/QuicBatchWriter.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 
 namespace quic {
 
@@ -22,10 +23,9 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      QuicAsyncUDPSocketWrapper* /*unused*/) override;
-  ssize_t write(
-      QuicAsyncUDPSocketWrapper& sock,
-      const folly::SocketAddress& address) override;
+      QuicAsyncUDPSocket* /*unused*/) override;
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override;
   void setTxTime(std::chrono::microseconds txTime) override {
     txTime_ = txTime;
   }
@@ -54,10 +54,9 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& addr,
-      QuicAsyncUDPSocketWrapper* sock) override;
-  ssize_t write(
-      QuicAsyncUDPSocketWrapper& sock,
-      const folly::SocketAddress& address) override;
+      QuicAsyncUDPSocket* sock) override;
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override;
   bool empty() const override;
   size_t size() const override;
 
@@ -97,10 +96,9 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
       std::unique_ptr<folly::IOBuf>&& buf,
       size_t size,
       const folly::SocketAddress& address,
-      QuicAsyncUDPSocketWrapper* sock) override;
-  ssize_t write(
-      QuicAsyncUDPSocketWrapper& sock,
-      const folly::SocketAddress& address) override;
+      QuicAsyncUDPSocket* sock) override;
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override;
 
  private:
   // max number of buffer chains we can accumulate before we need to flush
@@ -111,7 +109,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   size_t currSize_{0};
   // array of IOBufs
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
-  std::vector<folly::AsyncUDPSocket::WriteOptions> options_;
+  std::vector<QuicAsyncUDPSocket::WriteOptions> options_;
   std::vector<size_t> prevSize_;
   std::vector<folly::SocketAddress> addrs_;
 

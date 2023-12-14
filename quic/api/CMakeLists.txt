@@ -26,7 +26,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_batch_writer
-  mvfst_async_udp_socket_wrapper
+  mvfst_async_udp_socket
   mvfst_events
   mvfst_constants
   mvfst_state_machine
@@ -35,7 +35,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_batch_writer PUBLIC
   Folly::folly
-  mvfst_async_udp_socket_wrapper
+  mvfst_async_udp_socket
   mvfst_events
   mvfst_constants
   mvfst_state_machine
@@ -66,7 +66,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_transport
-  mvfst_async_udp_socket_wrapper
+  mvfst_async_udp_socket
   mvfst_batch_writer
   mvfst_buf_accessor
   mvfst_bufutil

@@ -15,7 +15,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
@@ -24,21 +24,21 @@ class ClientHandshakeFactory;
 
 class QuicClientTransport
     : public QuicTransportBase,
-      public QuicAsyncUDPSocketWrapper::ReadCallback,
-      public QuicAsyncUDPSocketWrapper::ErrMessageCallback,
+      public QuicAsyncUDPSocket::ReadCallback,
+      public QuicAsyncUDPSocket::ErrMessageCallback,
       public std::enable_shared_from_this<QuicClientTransport> {
  public:
   QuicClientTransport(
-      QuicBackingEventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = 0,
       bool useConnectionEndWithErrorCallback = false);
 
   // Testing only API:
   QuicClientTransport(
-      QuicBackingEventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize,
       PacketNum startingPacketNum,
@@ -58,8 +58,8 @@ class QuicClientTransport
    */
   template <class TransportType = QuicClientTransport>
   static std::shared_ptr<TransportType> newClient(
-      folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> sock,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> sock,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = 0,
       bool useConnectionEndWithErrorCallback = false) {
@@ -89,7 +89,7 @@ class QuicClientTransport
    * optional. If not called, INADDR_ANY will be used.
    */
   void setLocalAddress(folly::SocketAddress localAddress);
-  void addNewSocket(std::unique_ptr<QuicAsyncUDPSocketWrapper> socket);
+  void addNewSocket(std::unique_ptr<QuicAsyncUDPSocket> socket);
   void setHappyEyeballsEnabled(bool happyEyeballsEnabled);
   virtual void setHappyEyeballsCachedFamily(sa_family_t cachedFamily);
 
@@ -131,11 +131,11 @@ class QuicClientTransport
   bool hasWriteCipher() const override;
   std::shared_ptr<QuicTransportBase> sharedGuard() override;
 
-  // QuicAsyncUDPSocketWrapper::ReadCallback
+  // QuicAsyncUDPSocket::ReadCallback
   void onReadClosed() noexcept override {}
   void onReadError(const folly::AsyncSocketException&) noexcept override;
 
-  // QuicAsyncUDPSocketWrapper::ErrMessageCallback
+  // QuicAsyncUDPSocket::ErrMessageCallback
   void errMessage(const cmsghdr& cmsg) noexcept override;
   void errMessageError(const folly::AsyncSocketException&) noexcept override {}
 
@@ -155,8 +155,7 @@ class QuicClientTransport
    */
   void setSelfOwning();
 
-  void onNetworkSwitch(
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> newSock) override;
+  void onNetworkSwitch(std::unique_ptr<QuicAsyncUDPSocket> newSock) override;
 
   /**
    * Set callback for various transport stats (such as packet received, dropped
@@ -210,7 +209,7 @@ class QuicClientTransport
     return wrappedObserverContainer_.getPtr();
   }
 
-  // From QuicAsyncUDPSocketWrapper::ReadCallback
+  // From QuicAsyncUDPSocket::ReadCallback
   void getReadBuffer(void** buf, size_t* len) noexcept override;
   void onDataAvailable(
       const folly::SocketAddress& server,
@@ -218,17 +217,17 @@ class QuicClientTransport
       bool truncated,
       OnDataAvailableParams params) noexcept override;
   bool shouldOnlyNotify() override;
-  void onNotifyDataAvailable(QuicAsyncUDPSocketWrapper& sock) noexcept override;
+  void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
 
   void recvMsg(
-      QuicAsyncUDPSocketType& sock,
+      QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       int numPackets,
       NetworkData& networkData,
       folly::Optional<folly::SocketAddress>& server,
       size_t& totalData);
   void recvMmsg(
-      QuicAsyncUDPSocketType& sock,
+      QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,

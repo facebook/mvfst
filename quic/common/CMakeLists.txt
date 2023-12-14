@@ -30,7 +30,8 @@ target_link_libraries(
 add_library(
   mvfst_looper
   FunctionLooper.cpp
-  Timers.cpp
+  events/HighResQuicTimer.cpp
+  events/TimerFDQuicTimer.cpp
 )
 
 set_property(TARGET mvfst_looper PROPERTY VERSION ${PACKAGE_VERSION})
@@ -73,30 +74,6 @@ target_compile_options(
 
 target_link_libraries(
   mvfst_bufutil PUBLIC
-  Folly::folly
-)
-
-add_library(
-  mvfst_events
-  QuicEventBase.cpp
-)
-
-set_property(TARGET mvfst_events PROPERTY VERSION ${PACKAGE_VERSION})
-
-target_include_directories(
-  mvfst_events PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_events
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-target_link_libraries(
-  mvfst_events PUBLIC
   Folly::folly
 )
 
@@ -149,31 +126,6 @@ target_link_libraries(
   Folly::folly
 )
 
-add_library(
-  mvfst_async_udp_socket_wrapper
-  QuicAsyncUDPSocketWrapper.cpp
-)
-
-set_property(TARGET mvfst_async_udp_socket_wrapper PROPERTY VERSION ${PACKAGE_VERSION})
-
-target_include_directories(
-  mvfst_async_udp_socket_wrapper PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_async_udp_socket_wrapper
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-target_link_libraries(
-  mvfst_async_udp_socket_wrapper PUBLIC
-  Folly::folly
-  mvfst_events
-)
-
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -204,12 +156,6 @@ install(
 )
 
 install(
-  TARGETS mvfst_events
-  EXPORT mvfst-exports
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
-install(
   TARGETS mvfst_socketutil
   EXPORT mvfst-exports
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -221,10 +167,6 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-install(
-  TARGETS mvfst_async_udp_socket_wrapper
-  EXPORT mvfst-exports
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
+add_subdirectory(events)
+add_subdirectory(udpsocket)
 add_subdirectory(test)

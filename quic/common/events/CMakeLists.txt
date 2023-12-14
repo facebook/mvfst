@@ -4,35 +4,27 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_happyeyeballs
-  QuicHappyEyeballsFunctions.cpp
+  mvfst_events
+  FollyQuicEventBase.cpp
 )
 
-set_property(TARGET mvfst_happyeyeballs PROPERTY VERSION ${PACKAGE_VERSION})
+set_property(TARGET mvfst_events PROPERTY VERSION ${PACKAGE_VERSION})
 
 target_include_directories(
-  mvfst_happyeyeballs PUBLIC
+  mvfst_events PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
   $<INSTALL_INTERFACE:include/>
 )
 
 target_compile_options(
-  mvfst_happyeyeballs
+  mvfst_events
   PRIVATE
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
-add_dependencies(
-  mvfst_happyeyeballs
-  mvfst_async_udp_socket
-  mvfst_state_machine
-)
-
 target_link_libraries(
-  mvfst_happyeyeballs PUBLIC
+  mvfst_events PUBLIC
   Folly::folly
-  mvfst_async_udp_socket
-  mvfst_state_machine
 )
 
 file(
@@ -43,11 +35,11 @@ file(
 list(FILTER QUIC_API_HEADERS_TOINSTALL EXCLUDE REGEX test/)
 foreach(header ${QUIC_API_HEADERS_TOINSTALL})
   get_filename_component(header_dir ${header} DIRECTORY)
-  install(FILES ${header} DESTINATION include/quic/happyeyeballs/${header_dir})
+  install(FILES ${header} DESTINATION include/quic/api/${header_dir})
 endforeach()
 
 install(
-  TARGETS mvfst_happyeyeballs
+  TARGETS mvfst_events
   EXPORT mvfst-exports
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

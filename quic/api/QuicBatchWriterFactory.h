@@ -8,9 +8,7 @@
 #pragma once
 
 #include <quic/api/QuicBatchWriter.h>
-#ifndef MVFST_USE_LIBEV
 #include <quic/api/QuicGsoBatchWriters.h>
-#endif
 
 namespace quic {
 

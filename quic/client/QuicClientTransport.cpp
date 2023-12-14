@@ -36,14 +36,14 @@ constexpr socklen_t kAddrLen = sizeof(sockaddr_storage);
 namespace quic {
 
 QuicClientTransport::QuicClientTransport(
-    QuicBackingEventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+    std::shared_ptr<QuicEventBase> evb,
+    std::unique_ptr<QuicAsyncUDPSocket> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     PacketNum startingPacketNum,
     bool useConnectionEndWithErrorCallback)
     : QuicClientTransport(
-          evb,
+          std::move(evb),
           std::move(socket),
           std::move(handshakeFactory),
           connectionIdSize,
@@ -52,13 +52,13 @@ QuicClientTransport::QuicClientTransport(
 }
 
 QuicClientTransport::QuicClientTransport(
-    QuicBackingEventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+    std::shared_ptr<QuicEventBase> evb,
+    std::unique_ptr<QuicAsyncUDPSocket> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     bool useConnectionEndWithErrorCallback)
     : QuicTransportBase(
-          evb,
+          std::move(evb),
           std::move(socket),
           useConnectionEndWithErrorCallback),
       happyEyeballsConnAttemptDelayTimeout_(this),
@@ -1086,9 +1086,9 @@ void QuicClientTransport::errMessage(
         happyEyeballsState.shouldWriteToFirstSocket = false;
         socket_->pauseRead();
         if (happyEyeballsState.connAttemptDelayTimeout &&
-            happyEyeballsState.connAttemptDelayTimeout->isScheduled()) {
+            isTimeoutScheduled(happyEyeballsState.connAttemptDelayTimeout)) {
           happyEyeballsState.connAttemptDelayTimeout->timeoutExpired();
-          happyEyeballsState.connAttemptDelayTimeout->cancelTimeout();
+          cancelTimeout(happyEyeballsState.connAttemptDelayTimeout);
         }
       } else if (
           cmsg.cmsg_level == SOL_IP &&
@@ -1148,7 +1148,7 @@ bool QuicClientTransport::shouldOnlyNotify() {
 }
 
 void QuicClientTransport::recvMsg(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     int numPackets,
     NetworkData& networkData,
@@ -1171,7 +1171,7 @@ void QuicClientTransport::recvMsg(
     }
 
     int flags = 0;
-    QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams params;
+    QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
     struct msghdr msg {};
     msg.msg_name = rawAddr;
     msg.msg_namelen = rawAddr ? kAddrLen : 0;
@@ -1180,8 +1180,9 @@ void QuicClientTransport::recvMsg(
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     bool useGRO = sock.getGRO() > 0;
     bool useTS = sock.getTimestamping() > 0;
-    char control[QuicAsyncUDPSocketWrapper::ReadCallback::
-                     OnDataAvailableParams::kCmsgSpace] = {};
+    char control
+        [QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace] =
+            {};
 
     if (useGRO || useTS) {
       msg.msg_control = control;
@@ -1216,7 +1217,7 @@ void QuicClientTransport::recvMsg(
     }
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO) {
-      QuicAsyncUDPSocketWrapper::fromMsg(params, msg);
+      QuicAsyncUDPSocket::fromMsg(params, msg);
 
       // truncated
       if ((size_t)ret > readBufferSize) {
@@ -1272,7 +1273,7 @@ void QuicClientTransport::recvMsg(
 }
 
 void QuicClientTransport::recvMmsg(
-    QuicAsyncUDPSocketType& sock,
+    QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets,
     NetworkData& networkData,
@@ -1285,8 +1286,7 @@ void QuicClientTransport::recvMmsg(
   bool useTS = sock.getTimestamping() > 0;
   std::vector<std::array<
       char,
-      QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams::
-          kCmsgSpace>>
+      QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace>>
       controlVec((useGRO || useTS) ? numPackets : 0);
 
   // we need to consider MSG_TRUNC too
@@ -1355,10 +1355,10 @@ void QuicClientTransport::recvMmsg(
       // should ignore such datagrams.
       continue;
     }
-    QuicAsyncUDPSocketWrapper::ReadCallback::OnDataAvailableParams params;
+    QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (useGRO || useTS) {
-      QuicAsyncUDPSocketWrapper::fromMsg(params, msg.msg_hdr);
+      QuicAsyncUDPSocket::fromMsg(params, msg.msg_hdr);
 
       // truncated
       if (bytesRead > readBufferSize) {
@@ -1417,7 +1417,7 @@ void QuicClientTransport::recvMmsg(
 }
 
 void QuicClientTransport::onNotifyDataAvailable(
-    QuicAsyncUDPSocketWrapper& sock) noexcept {
+    QuicAsyncUDPSocket& sock) noexcept {
   CHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize =
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
@@ -1429,7 +1429,7 @@ void QuicClientTransport::onNotifyDataAvailable(
   folly::Optional<folly::SocketAddress> server;
 
   if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
-    const auto result = sock.recvMmsg(
+    const auto result = sock.recvmmsgNetworkData(
         readBufferSize, numPackets, networkData, server, totalData);
 
     // track the received packets
@@ -1519,7 +1519,7 @@ void QuicClientTransport::start(
     // TODO Supply v4 delay amount from somewhere when we want to tune this
     startHappyEyeballs(
         *clientConn_,
-        qEvbPtr_,
+        evb_.get(),
         happyEyeballsCachedFamily_,
         happyEyeballsConnAttemptDelayTimeout_,
         happyEyeballsCachedFamily_ == AF_UNSPEC
@@ -1610,7 +1610,7 @@ void QuicClientTransport::setHappyEyeballsCachedFamily(
 }
 
 void QuicClientTransport::addNewSocket(
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket) {
+    std::unique_ptr<QuicAsyncUDPSocket> socket) {
   happyEyeballsAddSocket(*clientConn_, std::move(socket));
 }
 
@@ -1639,7 +1639,7 @@ void QuicClientTransport::adjustGROBuffers() {
 }
 
 void QuicClientTransport::closeTransport() {
-  happyEyeballsConnAttemptDelayTimeout_.cancelTimeout();
+  cancelTimeout(&happyEyeballsConnAttemptDelayTimeout_);
 }
 
 void QuicClientTransport::unbindConnection() {
@@ -1656,7 +1656,7 @@ void QuicClientTransport::setSupportedVersions(
 }
 
 void QuicClientTransport::onNetworkSwitch(
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> newSock) {
+    std::unique_ptr<QuicAsyncUDPSocket> newSock) {
   if (!conn_->oneRttWriteCipher) {
     return;
   }

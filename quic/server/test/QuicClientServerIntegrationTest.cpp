@@ -7,6 +7,7 @@
 
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
@@ -14,6 +15,7 @@
 
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
+#include <memory>
 
 using namespace testing;
 
@@ -27,7 +29,7 @@ class QuicTransportFactory : public quic::QuicServerTransportFactory {
   // no-op quic server transport factory
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
-      std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+      std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
       const folly::SocketAddress& /* peerAddr */,
       quic::QuicVersion /*quicVersion*/,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
@@ -47,6 +49,9 @@ class QuicTransportFactory : public quic::QuicServerTransportFactory {
 
 class ServerTransportParameters : public testing::Test {
  public:
+  void SetUp() override {
+    qEvb_ = std::make_shared<FollyQuicEventBase>(&evb_);
+  }
   void TearDown() override {
     if (client_) {
       client_->close(folly::none);
@@ -90,8 +95,8 @@ class ServerTransportParameters : public testing::Test {
             .setCertificateVerifier(createTestCertificateVerifier())
             .build();
     auto client = std::make_shared<QuicClientTransport>(
-        &evb_,
-        std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&evb_),
+        qEvb_,
+        std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_),
         std::move(fizzClientContext));
     client->addNewPeerAddress(server_->getAddress());
     client->setHostname("::1");
@@ -103,6 +108,7 @@ class ServerTransportParameters : public testing::Test {
   std::shared_ptr<QuicServer> server_;
   TransportSettings serverTs_{};
   folly::EventBase evb_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
 };
 
 /**

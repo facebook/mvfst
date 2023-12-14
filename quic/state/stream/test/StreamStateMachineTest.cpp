@@ -10,6 +10,7 @@
 
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -148,7 +149,8 @@ TEST_F(QuicOpenStateTest, AckStream) {
   folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
   EventBase evb;
-  auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
 
   auto buf = IOBuf::copyBuffer("hello");
   writeQuicPacket(
@@ -182,7 +184,8 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
   EventBase evb;
-  auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
 
   auto buf = IOBuf::copyBuffer("hello");
   writeQuicPacket(
@@ -242,7 +245,8 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   EventBase evb;
-  quic::test::MockAsyncUDPSocket socket(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket socket(qEvb);
   folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
 
@@ -382,7 +386,8 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   stream->recvState = StreamRecvState::Closed;
 
   EventBase evb;
-  auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(&evb);
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
 
   auto buf = IOBuf::copyBuffer("hello");
   writeQuicPacket(

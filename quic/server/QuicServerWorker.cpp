@@ -9,11 +9,11 @@
 #include <folly/chrono/Conv.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/SocketOptionMap.h>
+#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
-#include <quic/common/SocketUtil.h>
-#include <quic/common/Timers.h>
 #include <atomic>
+#include <memory>
 
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
 #include <linux/net_tstamp.h>
@@ -69,14 +69,14 @@ folly::EventBase* QuicServerWorker::getEventBase() const {
 }
 
 void QuicServerWorker::setSocket(
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket) {
+    std::unique_ptr<FollyAsyncUDPSocketAlias> socket) {
   socket_ = std::move(socket);
   evb_ = folly::Executor::KeepAlive(socket_->getEventBase());
 }
 
 void QuicServerWorker::bind(
     const folly::SocketAddress& address,
-    QuicAsyncUDPSocketWrapper::BindOptions bindOptions) {
+    FollyAsyncUDPSocketAlias::BindOptions bindOptions) {
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
   switch (setEventCallback_) {
@@ -93,7 +93,7 @@ void QuicServerWorker::bind(
   // bind, since bind creates the fd.
   if (socketOptions_) {
     applySocketOptions(
-        *socket_,
+        *socket_.get(),
         *socketOptions_,
         address.getFamily(),
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
@@ -101,7 +101,7 @@ void QuicServerWorker::bind(
   socket_->bind(address, bindOptions);
   if (socketOptions_) {
     applySocketOptions(
-        *socket_,
+        *socket_.get(),
         *socketOptions_,
         address.getFamily(),
         folly::SocketOptionKey::ApplyPos::POST_BIND);
@@ -118,7 +118,7 @@ void QuicServerWorker::bind(
   socket_->setTXTime({CLOCK_MONOTONIC, /*deadline=*/false});
 
   if (mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(getSocketFd(*socket_));
+    mvfst_hook_on_socket_create(socket_->getNetworkSocket().toFd());
   }
 }
 
@@ -179,7 +179,7 @@ void QuicServerWorker::setUnfinishedHandshakeLimit(
 void QuicServerWorker::start() {
   CHECK(socket_);
   if (!pacingTimer_) {
-    pacingTimer_ = TimerHighRes::newTimer(
+    pacingTimer_ = std::make_unique<TimerFDQuicTimer>(
         evb_.get(), transportSettings_.pacingTimerResolution);
   }
   socket_->resumeRead(this);
@@ -210,7 +210,7 @@ void QuicServerWorker::pauseRead() {
 
 int QuicServerWorker::getFD() {
   CHECK(socket_);
-  return getSocketFd(*socket_);
+  return socket_->getNetworkSocket().toFd();
 }
 
 const folly::SocketAddress& QuicServerWorker::getAddress() const {
@@ -508,7 +508,7 @@ void QuicServerWorker::recvmsgMultishotCallback(
       struct msghdr msg;
       msg.msg_controllen = p.control.size();
       msg.msg_control = (void*)p.control.data();
-      QuicAsyncUDPSocketWrapper::fromMsg(params, msg);
+      FollyAsyncUDPSocketAlias::fromMsg(params, msg);
     }
 #endif
     bool truncated = false;
@@ -534,7 +534,7 @@ void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int bytesRead) {
     OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (msg.msg_control) {
-      QuicAsyncUDPSocketWrapper::fromMsg(params, msg);
+      FollyAsyncUDPSocketAlias::fromMsg(params, msg);
     }
 #endif
     bool truncated = false;
@@ -617,7 +617,7 @@ void QuicServerWorker::forwardNetworkData(
 }
 
 void QuicServerWorker::setPacingTimer(
-    TimerHighRes::SharedPtr pacingTimer) noexcept {
+    TimerFDQuicTimer::SharedPtr pacingTimer) noexcept {
   pacingTimer_ = std::move(pacingTimer);
 }
 
@@ -1105,7 +1105,7 @@ void QuicServerWorker::sendRetryPacket(
 }
 
 void QuicServerWorker::allowBeingTakenOver(
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+    std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
     const folly::SocketAddress& address) {
   DCHECK(!takeoverCB_);
   // We instantiate and bind the TakeoverHandlerCallback to the given address.
@@ -1116,7 +1116,7 @@ void QuicServerWorker::allowBeingTakenOver(
 }
 
 const folly::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+    std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
     const folly::SocketAddress& address) {
   CHECK(takeoverCB_);
   takeoverCB_->rebind(std::move(socket), address);
@@ -1238,22 +1238,22 @@ void QuicServerWorker::setHealthCheckToken(
   healthCheckToken_ = folly::IOBuf::copyBuffer(healthCheckToken);
 }
 
-std::unique_ptr<QuicAsyncUDPSocketWrapper> QuicServerWorker::makeSocket(
+std::unique_ptr<FollyAsyncUDPSocketAlias> QuicServerWorker::makeSocket(
     folly::EventBase* evb) const {
   CHECK(socket_);
-  auto sock = socketFactory_->make(evb, getSocketFd(*socket_));
+  auto sock = socketFactory_->make(evb, socket_->getNetworkSocket().toFd());
   if (sock && mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(getSocketFd(*sock));
+    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
   }
   return sock;
 }
 
-std::unique_ptr<QuicAsyncUDPSocketWrapper> QuicServerWorker::makeSocket(
+std::unique_ptr<FollyAsyncUDPSocketAlias> QuicServerWorker::makeSocket(
     folly::EventBase* evb,
     int fd) const {
   auto sock = socketFactory_->make(evb, fd);
   if (sock && mvfst_hook_on_socket_create) {
-    mvfst_hook_on_socket_create(getSocketFd(*sock));
+    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
   }
   return sock;
 }
@@ -1547,6 +1547,27 @@ size_t QuicServerWorker::SourceIdentityHash::operator()(
   *port = sid.first.getPort();
 
   return siphash::siphash24(key.data(), key.size(), &hashKey);
+}
+
+void applySocketOptions(
+    FollyAsyncUDPSocketAlias& sock,
+    const folly::SocketOptionMap& options,
+    sa_family_t family,
+    folly::SocketOptionKey::ApplyPos pos) noexcept {
+  folly::SocketOptionMap validOptions;
+
+  for (const auto& option : options) {
+    if (pos != option.first.applyPos_) {
+      continue;
+    }
+    if ((family == AF_INET && option.first.level == IPPROTO_IP) ||
+        (family == AF_INET6 && option.first.level == IPPROTO_IPV6) ||
+        option.first.level == IPPROTO_UDP || option.first.level == SOL_SOCKET ||
+        option.first.level == SOL_UDP) {
+      validOptions.insert(option);
+    }
+  }
+  sock.applyOptions(validOptions, pos);
 }
 
 } // namespace quic

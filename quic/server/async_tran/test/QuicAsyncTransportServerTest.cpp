@@ -14,7 +14,6 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientAsyncTransport.h>
 #include <quic/client/QuicClientTransport.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
@@ -32,6 +31,7 @@ namespace quic::test {
 class QuicAsyncTransportServerTest : public Test {
  public:
   void SetUp() override {
+    clientEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
     folly::ssl::init();
     createServer();
     createClient();
@@ -66,7 +66,7 @@ class QuicAsyncTransportServerTest : public Test {
   }
 
   void createClient() {
-    clientEvbThread_ = std::thread([&]() { clientEvb_.loopForever(); });
+    clientEvbThread_ = std::thread([&]() { clientEvb_->loopForever(); });
 
     EXPECT_CALL(clientReadCB_, isBufferMovable_())
         .WillRepeatedly(Return(false));
@@ -83,14 +83,14 @@ class QuicAsyncTransportServerTest : public Test {
     EXPECT_CALL(clientReadCB_, readEOF_()).WillOnce(Return());
     EXPECT_CALL(clientWriteCB_, writeSuccess_()).WillOnce(Return());
 
-    clientEvb_.runInEventBaseThreadAndWait([&]() {
-      auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(&clientEvb_);
+    clientEvb_->runInEventBaseThreadAndWait([&]() {
+      auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(clientEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())
               .build();
       client_ = std::make_shared<QuicClientTransport>(
-          &clientEvb_, std::move(sock), std::move(fizzClientContext));
+          clientEvb_, std::move(sock), std::move(fizzClientContext));
       client_->setHostname("echo.com");
       client_->addNewPeerAddress(serverAddr_);
       clientAsyncWrapper_.reset(new QuicClientAsyncTransport(client_));
@@ -101,11 +101,11 @@ class QuicAsyncTransportServerTest : public Test {
   void TearDown() override {
     server_->shutdown();
     server_ = nullptr;
-    clientEvb_.runInEventBaseThreadAndWait([&] {
+    clientEvb_->runInEventBaseThreadAndWait([&] {
       clientAsyncWrapper_ = nullptr;
       client_ = nullptr;
     });
-    clientEvb_.terminateLoopSoon();
+    clientEvb_->terminateLoopSoon();
     clientEvbThread_.join();
   }
 
@@ -118,7 +118,8 @@ class QuicAsyncTransportServerTest : public Test {
   std::array<uint8_t, 1024> serverBuf_;
 
   std::shared_ptr<QuicClientTransport> client_;
-  folly::EventBase clientEvb_;
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> clientEvb_;
   std::thread clientEvbThread_;
   QuicClientAsyncTransport::UniquePtr clientAsyncWrapper_;
   folly::test::MockWriteCallback clientWriteCB_;
@@ -132,7 +133,7 @@ TEST_F(QuicAsyncTransportServerTest, ReadWrite) {
   clientReadPromise_ = std::move(promise);
 
   std::string msg = "jaja";
-  clientEvb_.runInEventBaseThreadAndWait([&] {
+  clientEvb_->runInEventBaseThreadAndWait([&] {
     clientAsyncWrapper_->write(&clientWriteCB_, msg.data(), msg.size());
     clientAsyncWrapper_->shutdownWrite();
   });

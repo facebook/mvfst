@@ -131,7 +131,7 @@ static auto& getThreadLocalConn(size_t maxPackets = 44) {
 }
 
 BufQuicBatchResult writePacketsGroup(
-    QuicAsyncUDPSocketWrapper& sock,
+    QuicAsyncUDPSocket& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
   if (reqGroup.requests.empty()) {

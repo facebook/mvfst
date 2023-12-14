@@ -459,7 +459,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1048576; }};
 
   // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
-  QuicAsyncUDPSocketWrapper::BindOptions bindOptions_;
+  FollyAsyncUDPSocketAlias::BindOptions bindOptions_;
 
   // set by getEventBaseBackend if multishot callback is
   // supported

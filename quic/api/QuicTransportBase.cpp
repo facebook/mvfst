@@ -23,15 +23,17 @@
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <memory>
 #include <sstream>
 
 namespace quic {
 
 QuicTransportBase::QuicTransportBase(
-    QuicBackingEventBase* evb,
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> socket,
+    std::shared_ptr<QuicEventBase> evb,
+    std::unique_ptr<QuicAsyncUDPSocket> socket,
     bool useConnectionEndWithErrorCallback)
-    : socket_(std::move(socket)),
+    : evb_(std::move(evb)),
+      socket_(std::move(socket)),
       useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),
       lossTimeout_(this),
       ackTimeout_(this),
@@ -41,19 +43,17 @@ QuicTransportBase::QuicTransportBase(
       drainTimeout_(this),
       pingTimeout_(this),
       readLooper_(new FunctionLooper(
-          evb ? &qEvb_ : nullptr,
+          evb_,
           [this]() { invokeReadDataAndCallbacks(); },
           LooperType::ReadLooper)),
       peekLooper_(new FunctionLooper(
-          evb ? &qEvb_ : nullptr,
+          evb_,
           [this]() { invokePeekDataAndCallbacks(); },
           LooperType::PeekLooper)),
       writeLooper_(new FunctionLooper(
-          evb ? &qEvb_ : nullptr,
+          evb_,
           [this]() { pacedWriteDataToSocket(); },
           LooperType::WriteLooper)) {
-  qEvbPtr_ = evb ? &qEvb_ : nullptr;
-  qEvb_.setBackingEventBase(evb);
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
       return conn_->pacer->getTimeUntilNextWrite();
@@ -71,11 +71,23 @@ QuicTransportBase::QuicTransportBase(
 void QuicTransportBase::scheduleTimeout(
     QuicTimerCallback* callback,
     std::chrono::milliseconds timeout) {
-  qEvb_.scheduleTimeout(callback, timeout);
+  if (evb_) {
+    evb_->scheduleTimeout(callback, timeout);
+  }
+}
+
+void QuicTransportBase::cancelTimeout(QuicTimerCallback* callback) {
+  if (evb_) {
+    evb_->cancelTimeout(callback);
+  }
+}
+
+bool QuicTransportBase::isTimeoutScheduled(QuicTimerCallback* callback) const {
+  return evb_ ? evb_->isTimeoutScheduled(callback) : false;
 }
 
 void QuicTransportBase::setPacingTimer(
-    TimerHighRes::SharedPtr pacingTimer) noexcept {
+    QuicTimer::SharedPtr pacingTimer) noexcept {
   if (pacingTimer) {
     writeLooper_->setPacingTimer(std::move(pacingTimer));
   }
@@ -89,8 +101,8 @@ void QuicTransportBase::setCongestionControllerFactory(
   conn_->congestionController.reset();
 }
 
-QuicBackingEventBase* QuicTransportBase::getEventBase() const {
-  return qEvb_.getBackingEventBase();
+std::shared_ptr<QuicEventBase> QuicTransportBase::getEventBase() const {
+  return evb_;
 }
 
 const std::shared_ptr<QLogger> QuicTransportBase::getQLogger() const {
@@ -203,8 +215,8 @@ void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
   // the drain timeout may have been scheduled by a previous close, in which
   // case, our close would not take effect. This cancels the drain timeout in
   // this case and expires the timeout.
-  if (drainTimeout_.isScheduled()) {
-    drainTimeout_.cancelTimeout();
+  if (isTimeoutScheduled(&drainTimeout_)) {
+    cancelTimeout(&drainTimeout_);
     drainTimeoutExpired();
   }
 }
@@ -350,11 +362,11 @@ void QuicTransportBase::closeImpl(
     }
   }
   cancelLossTimeout();
-  ackTimeout_.cancelTimeout();
-  pathValidationTimeout_.cancelTimeout();
-  idleTimeout_.cancelTimeout();
-  keepaliveTimeout_.cancelTimeout();
-  pingTimeout_.cancelTimeout();
+  cancelTimeout(&ackTimeout_);
+  cancelTimeout(&pathValidationTimeout_);
+  cancelTimeout(&idleTimeout_);
+  cancelTimeout(&keepaliveTimeout_);
+  cancelTimeout(&pingTimeout_);
 
   VLOG(10) << "Stopping read looper due to immediate close " << *this;
   readLooper_->stop();
@@ -421,7 +433,7 @@ void QuicTransportBase::closeImpl(
       drainConnection && !isReset && !isAbandon && !isInvalidMigration;
   if (drainConnection) {
     // We ever drain once, and the object ever gets created once.
-    DCHECK(!drainTimeout_.isScheduled());
+    DCHECK(!isTimeoutScheduled(&drainTimeout_));
     scheduleTimeout(
         &drainTimeout_,
         folly::chrono::ceil<std::chrono::milliseconds>(
@@ -1451,12 +1463,12 @@ void QuicTransportBase::handlePingCallbacks() {
   if (!conn_->pendingEvents.cancelPingTimeout) {
     return; // nothing to cancel
   }
-  if (!pingTimeout_.isScheduled()) {
+  if (!isTimeoutScheduled(&pingTimeout_)) {
     // set cancelpingTimeOut to false, delayed acks
     conn_->pendingEvents.cancelPingTimeout = false;
     return; // nothing to do, as timeout has already fired
   }
-  pingTimeout_.cancelTimeout();
+  cancelTimeout(&pingTimeout_);
   if (pingCallback_ != nullptr) {
     pingCallback_->pingAcknowledged();
   }
@@ -1970,8 +1982,8 @@ void QuicTransportBase::setIdleTimer() {
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
-  idleTimeout_.cancelTimeout();
-  keepaliveTimeout_.cancelTimeout();
+  cancelTimeout(&idleTimeout_);
+  cancelTimeout(&keepaliveTimeout_);
   auto localIdleTimeout = conn_->transportSettings.idleTimeout;
   // The local idle timeout being zero means it is disabled.
   if (localIdleTimeout == 0ms) {
@@ -2751,7 +2763,7 @@ void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
-  timeout = timeMax(timeout, qEvb_.getTimerTickInterval());
+  timeout = timeMax(timeout, evb_->getTimerTickInterval());
   scheduleTimeout(&lossTimeout_, timeout);
 }
 
@@ -2760,7 +2772,7 @@ void QuicTransportBase::scheduleAckTimeout() {
     return;
   }
   if (conn_->pendingEvents.scheduleAckTimeout) {
-    if (!ackTimeout_.isScheduled()) {
+    if (!isTimeoutScheduled(&ackTimeout_)) {
       auto factoredRtt = std::chrono::duration_cast<std::chrono::microseconds>(
           kAckTimerFactor * conn_->lossState.srtt);
       // If we are using ACK_FREQUENCY, disable the factored RTT heuristic
@@ -2770,7 +2782,7 @@ void QuicTransportBase::scheduleAckTimeout() {
       }
       auto timeout = timeMax(
           std::chrono::duration_cast<std::chrono::microseconds>(
-              qEvb_.getTimerTickInterval()),
+              evb_->getTimerTickInterval()),
           timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
       auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
@@ -2779,9 +2791,9 @@ void QuicTransportBase::scheduleAckTimeout() {
       scheduleTimeout(&ackTimeout_, timeoutMs);
     }
   } else {
-    if (ackTimeout_.isScheduled()) {
+    if (isTimeoutScheduled(&ackTimeout_)) {
       VLOG(10) << __func__ << " cancel timeout " << *this;
-      ackTimeout_.cancelTimeout();
+      cancelTimeout(&ackTimeout_);
     }
   }
 }
@@ -2790,7 +2802,7 @@ void QuicTransportBase::schedulePingTimeout(
     PingCallback* pingCb,
     std::chrono::milliseconds timeout) {
   // if a ping timeout is already scheduled, nothing to do, return
-  if (pingTimeout_.isScheduled()) {
+  if (isTimeoutScheduled(&pingTimeout_)) {
     return;
   }
 
@@ -2803,13 +2815,13 @@ void QuicTransportBase::schedulePathValidationTimeout() {
     return;
   }
   if (!conn_->pendingEvents.schedulePathValidationTimeout) {
-    if (pathValidationTimeout_.isScheduled()) {
+    if (isTimeoutScheduled(&pathValidationTimeout_)) {
       VLOG(10) << __func__ << " cancel timeout " << *this;
       // This means path validation succeeded, and we should have updated to
       // correct state
-      pathValidationTimeout_.cancelTimeout();
+      cancelTimeout(&pathValidationTimeout_);
     }
-  } else if (!pathValidationTimeout_.isScheduled()) {
+  } else if (!isTimeoutScheduled(&pathValidationTimeout_)) {
     auto pto = conn_->lossState.srtt +
         std::max(4 * conn_->lossState.rttvar, kGranularity) +
         conn_->lossState.maxAckDelay;
@@ -2824,11 +2836,11 @@ void QuicTransportBase::schedulePathValidationTimeout() {
 }
 
 void QuicTransportBase::cancelLossTimeout() {
-  lossTimeout_.cancelTimeout();
+  cancelTimeout(&lossTimeout_);
 }
 
-bool QuicTransportBase::isLossTimeoutScheduled() const {
-  return lossTimeout_.isScheduled();
+bool QuicTransportBase::isLossTimeoutScheduled() {
+  return isTimeoutScheduled(&lossTimeout_);
 }
 
 void QuicTransportBase::setSupportedVersions(
@@ -3450,23 +3462,22 @@ bool QuicTransportBase::isDetachable() {
   return conn_->nodeType == QuicNodeType::Client;
 }
 
-void QuicTransportBase::attachEventBase(QuicBackingEventBase* evb) {
+void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
   VLOG(10) << __func__ << " " << *this;
   DCHECK(!getEventBase());
-  DCHECK(evb && evb->isInEventBaseThread());
-  qEvb_.setBackingEventBase(evb);
-  qEvbPtr_ = &qEvb_;
+  DCHECK(evbIn && evbIn->isInEventBaseThread());
+  evb_ = std::move(evbIn);
   if (socket_) {
-    socket_->attachEventBase(evb);
+    socket_->attachEventBase(evb_);
   }
 
   scheduleAckTimeout();
   schedulePathValidationTimeout();
   setIdleTimer();
 
-  readLooper_->attachEventBase(&qEvb_);
-  peekLooper_->attachEventBase(&qEvb_);
-  writeLooper_->attachEventBase(&qEvb_);
+  readLooper_->attachEventBase(evb_);
+  peekLooper_->attachEventBase(evb_);
+  writeLooper_->attachEventBase(evb_);
   updateReadLooper();
   updatePeekLooper();
   updateWriteLooper(false);
@@ -3479,7 +3490,7 @@ void QuicTransportBase::attachEventBase(QuicBackingEventBase* evb) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::evbEvents>(
             [this](auto observer, auto observed) {
-              observer->evbAttach(observed, qEvb_.getBackingEventBase());
+              observer->evbAttach(observed, evb_.get());
             });
   }
 #endif
@@ -3493,12 +3504,12 @@ void QuicTransportBase::detachEventBase() {
   }
   connWriteCallback_ = nullptr;
   pendingWriteCallbacks_.clear();
-  lossTimeout_.cancelTimeout();
-  ackTimeout_.cancelTimeout();
-  pathValidationTimeout_.cancelTimeout();
-  idleTimeout_.cancelTimeout();
-  keepaliveTimeout_.cancelTimeout();
-  drainTimeout_.cancelTimeout();
+  cancelTimeout(&lossTimeout_);
+  cancelTimeout(&ackTimeout_);
+  cancelTimeout(&pathValidationTimeout_);
+  cancelTimeout(&idleTimeout_);
+  cancelTimeout(&keepaliveTimeout_);
+  cancelTimeout(&drainTimeout_);
   readLooper_->detachEventBase();
   peekLooper_->detachEventBase();
   writeLooper_->detachEventBase();
@@ -3511,13 +3522,12 @@ void QuicTransportBase::detachEventBase() {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::evbEvents>(
             [this](auto observer, auto observed) {
-              observer->evbDetach(observed, qEvb_.getBackingEventBase());
+              observer->evbDetach(observed, evb_.get());
             });
   }
 #endif
 
-  qEvb_.setBackingEventBase(nullptr);
-  qEvbPtr_ = nullptr;
+  evb_ = nullptr;
 }
 
 folly::Optional<LocalErrorCode> QuicTransportBase::setControlStream(
@@ -3558,7 +3568,7 @@ void QuicTransportBase::pacedWriteDataToSocket() {
   }
 
   // We are in the middle of a pacing interval. Leave it be.
-  if (writeLooper_->isScheduled()) {
+  if (writeLooper_->isPacingScheduled()) {
     // The next burst is already scheduled. Since the burst size doesn't depend
     // on much data we currently have in buffer at all, no need to change
     // anything.

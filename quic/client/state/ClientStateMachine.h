@@ -10,7 +10,7 @@
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/common/NetworkData.h>
-#include <quic/common/QuicAsyncUDPSocketWrapper.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -88,7 +88,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     folly::SocketAddress secondPeerAddress;
 
     // The UDP socket that will be used for the second connection attempt
-    std::unique_ptr<QuicAsyncUDPSocketWrapper> secondSocket;
+    std::unique_ptr<QuicAsyncUDPSocket> secondSocket;
 
     // Whether should write to the first UDP socket
     bool shouldWriteToFirstSocket{true};

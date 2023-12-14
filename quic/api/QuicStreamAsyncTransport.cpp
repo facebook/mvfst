@@ -7,6 +7,7 @@
 
 #include <folly/io/Cursor.h>
 #include <quic/api/QuicStreamAsyncTransport.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 
 namespace quic {
 
@@ -277,7 +278,9 @@ bool QuicStreamAsyncTransport::error() const {
 }
 
 folly::EventBase* QuicStreamAsyncTransport::getEventBase() const {
-  return sock_->getEventBase();
+  return sock_->getEventBase()
+      ->getTypedEventBase<FollyQuicEventBase>()
+      ->getBackingEventBase();
 }
 
 void QuicStreamAsyncTransport::attachEventBase(

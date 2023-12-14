@@ -19,8 +19,10 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/samples/echo/LogQuicStats.h>
 
@@ -193,16 +195,17 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   void start(std::string token) {
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
+    auto qEvb = std::make_shared<FollyQuicEventBase>(evb);
     folly::SocketAddress addr(host_.c_str(), port_);
 
     evb->runInEventBaseThreadAndWait([&] {
-      auto sock = std::make_unique<QuicAsyncUDPSocketWrapperImpl>(evb);
+      auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())
               .build();
       quicClient_ = std::make_shared<quic::QuicClientTransport>(
-          evb, std::move(sock), std::move(fizzClientContext));
+          qEvb, std::move(sock), std::move(fizzClientContext));
       quicClient_->setHostname("echo.com");
       quicClient_->addNewPeerAddress(addr);
       if (!token.empty()) {
