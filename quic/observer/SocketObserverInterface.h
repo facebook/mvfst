@@ -58,9 +58,8 @@ class SocketObserverInterface {
     // mvfst currently supports C++17 onwards. However, we can enable this for
     // unit tests and other code that we expect to run in C++20.
 #if FOLLY_CPLUSPLUS >= 202002L
-    friend auto operator<=>(
-        const CloseStartedEvent&,
-        const CloseStartedEvent&) = default;
+    friend bool operator==(const CloseStartedEvent&, const CloseStartedEvent&) =
+        default;
 #elif _WIN32
     friend auto operator!=(
         const CloseStartedEvent& right,
