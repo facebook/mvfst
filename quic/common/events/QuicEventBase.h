@@ -1,0 +1,146 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#pragma once
+
+#include <folly/Function.h>
+#include <folly/GLog.h>
+#include <chrono>
+#include <cstdint>
+
+namespace quic {
+
+class QuicEventBase;
+
+class QuicEventBaseLoopCallback {
+ public:
+  friend class QuicEventBase;
+
+  virtual ~QuicEventBaseLoopCallback() = default;
+  virtual void runLoopCallback() noexcept = 0;
+  class LoopCallbackImpl {};
+
+ private:
+  LoopCallbackImpl* implHandle{nullptr};
+};
+
+class QuicTimerCallback {
+ public:
+  friend class QuicEventBase;
+  virtual ~QuicTimerCallback() = default;
+  virtual void timeoutExpired() noexcept = 0;
+  /// This callback was canceled. The default implementation is to just
+  /// proxy to `timeoutExpired` but if you care about the difference between
+  /// the timeout finishing or being canceled you can override this.
+  virtual void callbackCanceled() noexcept {
+    timeoutExpired();
+  }
+  class TimerCallbackImpl {};
+
+ private:
+  TimerCallbackImpl* implHandle{nullptr};
+};
+
+/**
+ * An interface mvfst expects from event base implementation.
+ */
+class QuicEventBase {
+ public:
+  virtual ~QuicEventBase() = default;
+
+  virtual void runInLoop(
+      QuicEventBaseLoopCallback* callback,
+      bool thisIteration = false) = 0;
+
+  virtual void runInLoop(
+      folly::Function<void()> cb,
+      bool thisIteration = false) = 0;
+
+  virtual void runAfterDelay(
+      folly::Function<void()> cb,
+      uint32_t milliseconds) = 0;
+
+  virtual void runInEventBaseThreadAndWait(
+      folly::Function<void()> fn) noexcept = 0;
+
+  virtual void runImmediatelyOrRunInEventBaseThreadAndWait(
+      folly::Function<void()> fn) noexcept = 0;
+
+  virtual void runInEventBaseThread(folly::Function<void()> fn) noexcept = 0;
+
+  [[nodiscard]] virtual bool isInEventBaseThread() const = 0;
+
+  virtual void scheduleTimeout(
+      QuicTimerCallback* callback,
+      std::chrono::milliseconds timeout) = 0;
+
+  virtual bool scheduleTimeoutHighRes(
+      QuicTimerCallback* callback,
+      std::chrono::microseconds timeout) = 0;
+
+  virtual void cancelLoopCallback(QuicEventBaseLoopCallback* callback) = 0;
+
+  virtual bool isTimeoutScheduled(QuicTimerCallback* callback) const = 0;
+
+  virtual std::chrono::milliseconds getTimeoutTimeRemaining(
+      QuicTimerCallback* callback) const = 0;
+
+  virtual void cancelTimeout(QuicTimerCallback* callback) = 0;
+
+  virtual bool isLoopCallbackScheduled(
+      QuicEventBaseLoopCallback* callback) const = 0;
+
+  virtual bool loopOnce(int flags = 0) = 0;
+
+  virtual bool loop() = 0;
+
+  virtual void loopForever() = 0;
+
+  virtual bool loopIgnoreKeepAlive() = 0;
+
+  virtual void terminateLoopSoon() = 0;
+
+  [[nodiscard]] virtual std::chrono::milliseconds getTimerTickInterval()
+      const = 0;
+
+  template <
+      typename T,
+      typename = std::enable_if_t<std::is_base_of_v<QuicEventBase, T>>>
+  T* getTypedEventBase() {
+    auto evb = dynamic_cast<T*>(this);
+    if (evb) {
+      return evb;
+    } else {
+      LOG(WARNING) << "Failed to cast QuicEventBase to " << typeid(T).name();
+      return nullptr;
+    }
+  }
+
+  static void setImplHandle(
+      QuicEventBaseLoopCallback* callback,
+      QuicEventBaseLoopCallback::LoopCallbackImpl* handle) {
+    callback->implHandle = handle;
+  }
+
+  static QuicEventBaseLoopCallback::LoopCallbackImpl* getImplHandle(
+      QuicEventBaseLoopCallback* callback) {
+    return callback->implHandle;
+  }
+
+  static void setImplHandle(
+      QuicTimerCallback* callback,
+      QuicTimerCallback::TimerCallbackImpl* handle) {
+    callback->implHandle = handle;
+  }
+
+  static QuicTimerCallback::TimerCallbackImpl* getImplHandle(
+      QuicTimerCallback* callback) {
+    return callback->implHandle;
+  }
+};
+
+} // namespace quic
