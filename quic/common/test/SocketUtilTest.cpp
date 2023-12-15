@@ -8,26 +8,20 @@
 #include <folly/portability/GTest.h>
 #include <gmock/gmock.h>
 #include <quic/common/SocketUtil.h>
+#include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 
-class MockQuicAsyncUDPSocketWrapper : public quic::QuicAsyncUDPSocketWrapper {
+class MockQuicAsyncUDPSocket : public quic::FollyQuicAsyncUDPSocket {
  public:
-  using QuicAsyncUDPSocketWrapper::QuicAsyncUDPSocketWrapper;
+  explicit MockQuicAsyncUDPSocket(std::shared_ptr<quic::FollyQuicEventBase> evb)
+      : quic::FollyQuicAsyncUDPSocket(evb) {}
   MOCK_METHOD2(
       applyOptions,
       void(const folly::SocketOptionMap&, folly::SocketOptionKey::ApplyPos));
-  RecvResult recvMmsg(
-      uint64_t /*readBufferSize*/,
-      uint16_t /*numPackets*/,
-      quic::NetworkData& /*networkData*/,
-      folly::Optional<folly::SocketAddress>& /*peerAddress*/,
-      size_t& /*totalData*/) {
-    return {};
-  }
 };
 
 TEST(SocketUtilTest, applySocketOptions) {
-  folly::EventBase evb;
-  MockQuicAsyncUDPSocketWrapper sock(&evb);
+  MockQuicAsyncUDPSocket sock(nullptr);
   const folly::SocketOptionMap opts = {
       {{SOL_SOCKET, SO_KEEPALIVE, folly::SocketOptionKey::ApplyPos::POST_BIND},
        false},
