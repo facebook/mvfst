@@ -3929,6 +3929,27 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnImmediate) {
   evb_.loop();
 }
 
+TEST_F(QuicTransportTest, NotifyPendingWriteConnWritableBytesBacpressure) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.backpressureHeadroomFactor = 1;
+  EXPECT_CALL(
+      writeCallback_, onConnectionWriteReady(10 * kDefaultUDPSendPacketLen));
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(10 * kDefaultUDPSendPacketLen));
+  transport_->notifyPendingWriteOnConnection(&writeCallback_);
+  evb_.loop();
+  Mock::VerifyAndClearExpectations(&writeCallback_);
+  EXPECT_CALL(
+      writeCallback_, onConnectionWriteReady(20 * kDefaultUDPSendPacketLen));
+  conn.transportSettings.backpressureHeadroomFactor = 2;
+  transport_->notifyPendingWriteOnConnection(&writeCallback_);
+  evb_.loop();
+}
+
 TEST_F(QuicTransportTest, NotifyPendingWriteStreamImmediate) {
   auto stream = transport_->createBidirectionalStream().value();
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream, _));
@@ -4131,6 +4152,51 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
   handleConnWindowUpdate(
       conn,
       MaxDataFrame(conn.flowControlState.peerAdvertisedMaxOffset + 1000),
+      num);
+  transport_->onNetworkData(
+      SocketAddress("::1", 10000),
+      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+}
+
+TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.backpressureHeadroomFactor = 1;
+
+  auto stream = conn.streamManager->getStream(streamId);
+  // Artificially restrict the conn flow control to have no bytes remaining.
+  updateFlowControlOnWriteToStream(
+      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  updateFlowControlOnWriteToSocket(
+      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+
+  EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _)).Times(0);
+  transport_->notifyPendingWriteOnStream(stream->id, &writeCallback_);
+  evb_.loop();
+  Mock::VerifyAndClearExpectations(&writeCallback_);
+
+  transport_->onNetworkData(
+      SocketAddress("::1", 10000),
+      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(10 * kDefaultUDPSendPacketLen));
+
+  EXPECT_CALL(
+      writeCallback_,
+      onStreamWriteReady(stream->id, 10 * kDefaultUDPSendPacketLen));
+
+  PacketNum num = 10;
+  // Give the conn some headroom.
+  handleConnWindowUpdate(
+      conn,
+      MaxDataFrame(
+          conn.flowControlState.peerAdvertisedMaxOffset +
+          1000 * kDefaultUDPSendPacketLen),
       num);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),

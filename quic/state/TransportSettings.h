@@ -326,6 +326,12 @@ struct TransportSettings {
   uint64_t maxReceiveTimestampsPerAckStored{kMaxReceivedPktsTimestampsStored};
   // Close the connection completely if a migration occurs during the handshake.
   bool closeIfMigrationDuringHandshake{true};
+  // Whether to use writable bytes to apply app backpressure via the callbacks
+  // for the max writable on stream or connection. The value is a multiplier
+  // for the writable bytes given in the callback, which may be useful for
+  // allowing cwnd growth. 0 disables. The amount given to callbacks has the
+  // current amount of stream bytes buffered subtracted from it.
+  uint8_t backpressureHeadroomFactor{0};
 };
 
 } // namespace quic

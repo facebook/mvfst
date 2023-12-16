@@ -2212,15 +2212,21 @@ uint64_t QuicTransportBase::maxWritableOnStream(
     const QuicStreamState& stream) const {
   auto connWritableBytes = maxWritableOnConn();
   auto streamFlowControlBytes = getSendStreamFlowControlBytesAPI(stream);
-  auto flowControlAllowedBytes =
-      std::min(streamFlowControlBytes, connWritableBytes);
-  return flowControlAllowedBytes;
+  return std::min(streamFlowControlBytes, connWritableBytes);
 }
 
 uint64_t QuicTransportBase::maxWritableOnConn() const {
   auto connWritableBytes = getSendConnFlowControlBytesAPI(*conn_);
   auto availableBufferSpace = bufferSpaceAvailable();
-  return std::min(connWritableBytes, availableBufferSpace);
+  uint64_t ret = std::min(connWritableBytes, availableBufferSpace);
+  uint8_t multiplier = conn_->transportSettings.backpressureHeadroomFactor;
+  if (multiplier > 0) {
+    auto headRoom = multiplier * congestionControlWritableBytes(*conn_);
+    auto bufferLen = conn_->flowControlState.sumCurStreamBufferLen;
+    headRoom -= bufferLen > headRoom ? headRoom : bufferLen;
+    ret = std::min(ret, headRoom);
+  }
+  return ret;
 }
 
 QuicSocket::WriteResult QuicTransportBase::writeChain(
