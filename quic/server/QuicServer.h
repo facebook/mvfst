@@ -138,18 +138,14 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * Options are being set before and after bind, and not at the time of
    * invoking this function.
    */
-  void setSocketOptions(const folly::SocketOptionMap& options) noexcept {
-    socketOptions_ = options;
-  }
+  void setSocketOptions(const folly::SocketOptionMap& options) noexcept;
 
   /**
    * Sets whether the underlying socket should set the IPV6_ONLY socket option
    * or not. If set to false, IPv4-mapped IPv6 addresses will be enabled on the
    * socket.
    */
-  void setBindV6Only(bool bindV6Only) {
-    bindOptions_.bindV6Only = bindV6Only;
-  }
+  void setBindV6Only(bool bindV6Only);
 
   /**
    * Set the server id of the quic server.
@@ -464,6 +460,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // set by getEventBaseBackend if multishot callback is
   // supported
   bool backendSupportsMultishotCallback_{false};
+
+  /**
+   * QuicServer does not support multi-threaded/concurrent access. mainThreadId_
+   * is initialized to the id of the thread that constructed the QuicServer and
+   * all member methods check the invariant that they are invoked in
+   * mainThreadId_. This is temporary until we move all member methods that
+   * shouldn't be invoked after initialization into the constructor.
+   */
+  const std::thread::id mainThreadId_{};
 };
 
 } // namespace quic

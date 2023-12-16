@@ -27,8 +27,8 @@ FOLLY_GFLAGS_DEFINE_int32(
     0,
     "connection id format version quic server used for encoding. only non-zero version is honored");
 
-namespace quic {
 namespace {
+using namespace quic;
 // Determine which worker to route to
 // This **MUST** be kept in sync with the BPF program (if supplied)
 size_t getWorkerToRouteTo(
@@ -43,9 +43,16 @@ size_t getWorkerToRouteTo(
 constexpr std::string_view kQuicServerNotInitialized =
     "Quic server is not initialized. "
     "Consider calling waitUntilInitialized() prior to: ";
-} // namespace
 
-QuicServer::QuicServer() {
+void checkRunningInThread(const std::thread::id expectedThreadId) {
+  CHECK(std::this_thread::get_id() == expectedThreadId);
+}
+
+} // namespace
+//
+namespace quic {
+
+QuicServer::QuicServer() : mainThreadId_(std::this_thread::get_id()) {
 #ifdef _WIN32
   listenerSocketFactory_ = std::make_unique<QuicReusePortUDPSocketFactory>(
       true /* reusePort*/, true /* reuseAddr */);
@@ -62,21 +69,25 @@ QuicServer::QuicServer() {
 
 void QuicServer::setQuicServerTransportFactory(
     std::unique_ptr<QuicServerTransportFactory> factory) {
+  checkRunningInThread(mainThreadId_);
   transportFactory_ = std::move(factory);
 }
 
 void QuicServer::setQuicUDPSocketFactory(
     std::unique_ptr<QuicUDPSocketFactory> factory) {
+  checkRunningInThread(mainThreadId_);
   socketFactory_ = std::move(factory);
 }
 
 void QuicServer::setListenerSocketFactory(
     std::unique_ptr<QuicUDPSocketFactory> factory) {
+  checkRunningInThread(mainThreadId_);
   listenerSocketFactory_ = std::move(factory);
 }
 
 void QuicServer::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
+  checkRunningInThread(mainThreadId_);
   CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   CHECK(ccFactory);
   ccFactory_ = std::move(ccFactory);
@@ -85,18 +96,22 @@ void QuicServer::setCongestionControllerFactory(
 void QuicServer::setRateLimit(
     std::function<uint64_t()> count,
     std::chrono::seconds window) {
+  checkRunningInThread(mainThreadId_);
   rateLimit_ = folly::make_optional<RateLimit>(std::move(count), window);
 }
 
 void QuicServer::setUnfinishedHandshakeLimit(std::function<int()> limitFn) {
+  checkRunningInThread(mainThreadId_);
   unfinishedHandshakeLimitFn_ = std::move(limitFn);
 }
 
 void QuicServer::setSupportedVersion(const std::vector<QuicVersion>& versions) {
+  checkRunningInThread(mainThreadId_);
   supportedVersions_ = versions;
 }
 
 void QuicServer::setProcessId(ProcessId id) noexcept {
+  checkRunningInThread(mainThreadId_);
   processId_ = id;
 }
 
@@ -109,6 +124,7 @@ bool QuicServer::isInitialized() const noexcept {
 }
 
 void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
+  checkRunningInThread(mainThreadId_);
   CHECK(ctx_) << "Must set a TLS context for the Quic server";
   CHECK_LE(maxWorkers, std::numeric_limits<uint8_t>::max());
   size_t numCpu = std::thread::hardware_concurrency();
@@ -136,6 +152,7 @@ void QuicServer::initialize(
     const folly::SocketAddress& address,
     const std::vector<folly::EventBase*>& evbs,
     bool useDefaultTransport) {
+  checkRunningInThread(mainThreadId_);
   CHECK(!evbs.empty());
   CHECK_LE(evbs.size(), std::numeric_limits<uint8_t>::max())
       << "Quic Server does not support more than "
@@ -291,6 +308,7 @@ void QuicServer::bindWorkersToSocket(
 }
 
 void QuicServer::start() {
+  checkRunningInThread(mainThreadId_);
   CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   // initialize the thread local ptr to workers
   runOnAllWorkers([&](auto worker) mutable {
@@ -308,6 +326,7 @@ void QuicServer::start() {
 void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker
+  checkRunningInThread(mainThreadId_);
   CHECK(!workers_.empty());
   CHECK(!shutdown_);
 
@@ -338,6 +357,7 @@ void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
 
 folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
     const folly::SocketAddress& addr) {
+  checkRunningInThread(mainThreadId_);
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker
   CHECK(!workers_.empty());
@@ -366,6 +386,7 @@ folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
 }
 
 void QuicServer::pauseRead() {
+  checkRunningInThread(mainThreadId_);
   runOnAllWorkersSync([&](auto worker) mutable { worker->pauseRead(); });
 }
 
@@ -524,12 +545,14 @@ void QuicServer::runOnAllWorkersSync(
 }
 
 void QuicServer::setHostId(uint32_t hostId) noexcept {
+  checkRunningInThread(mainThreadId_);
   CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   hostId_ = hostId;
 }
 
 void QuicServer::setConnectionIdVersion(
     ConnectionIdVersion cidVersion) noexcept {
+  checkRunningInThread(mainThreadId_);
   CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   if (FLAGS_qs_conn_id_version) {
     LOG(ERROR) << "Connection Id Version has been set to " << (int)cidVersion_
@@ -541,11 +564,13 @@ void QuicServer::setConnectionIdVersion(
 
 void QuicServer::setTransportSettingsOverrideFn(
     TransportSettingsOverrideFn fn) {
+  checkRunningInThread(mainThreadId_);
   CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   transportSettingsOverrideFn_ = std::move(fn);
 }
 
 void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
+  checkRunningInThread(mainThreadId_);
   // Make sure the token satisfies the required properties, i.e. it is not a
   // valid quic header.
   auto parsed = parseHeader(*folly::IOBuf::copyBuffer(healthCheckToken));
@@ -559,6 +584,7 @@ void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
 
 void QuicServer::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
+  checkRunningInThread(mainThreadId_);
   ctx_ = ctx;
   runOnAllWorkers([ctx](auto worker) mutable { worker->setFizzContext(ctx); });
 }
@@ -584,6 +610,7 @@ const TransportSettings& QuicServer::getTransportSettings() const noexcept {
 }
 
 void QuicServer::setTransportSettings(TransportSettings transportSettings) {
+  checkRunningInThread(mainThreadId_);
   transportSettings_ = transportSettings;
   runOnAllWorkers([transportSettings](auto worker) mutable {
     worker->setTransportSettings(transportSettings);
@@ -599,6 +626,7 @@ void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {
 
 void QuicServer::blockListedSrcPort(
     std::function<bool(uint16_t)> isBlockListedSrcPort) {
+  checkRunningInThread(mainThreadId_);
   isBlockListedSrcPort_ = isBlockListedSrcPort;
   runOnAllWorkers([isBlockListedSrcPort](auto worker) mutable {
     worker->setIsBlockListedSrcPort(isBlockListedSrcPort);
@@ -606,6 +634,7 @@ void QuicServer::blockListedSrcPort(
 }
 
 void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
+  checkRunningInThread(mainThreadId_);
   if (initialized_) {
     runOnAllWorkersSync([destAddr](auto worker) mutable {
       worker->startPacketForwarding(destAddr);
@@ -614,6 +643,7 @@ void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
 }
 
 void QuicServer::stopPacketForwarding(std::chrono::milliseconds delay) {
+  checkRunningInThread(mainThreadId_);
   std::lock_guard<std::mutex> guard(startMutex_);
   if (!initialized_ || shutdown_) {
     return;
@@ -637,12 +667,14 @@ void QuicServer::stopPacketForwarding(std::chrono::milliseconds delay) {
 
 void QuicServer::setTransportStatsCallbackFactory(
     std::unique_ptr<QuicTransportStatsCallbackFactory> statsFactory) {
+  checkRunningInThread(mainThreadId_);
   CHECK(statsFactory);
   transportStatsFactory_ = std::move(statsFactory);
 }
 
 void QuicServer::setConnectionIdAlgoFactory(
     std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory) {
+  checkRunningInThread(mainThreadId_);
   CHECK(!initialized_);
   CHECK(connIdAlgoFactory);
   connIdAlgoFactory_ = std::move(connIdAlgoFactory);
@@ -673,6 +705,7 @@ const folly::SocketAddress& QuicServer::getAddress() const {
 }
 
 void QuicServer::setListeningFDs(const std::vector<int>& fds) {
+  checkRunningInThread(mainThreadId_);
   std::lock_guard<std::mutex> guard(startMutex_);
   listeningFDs_ = fds;
 }
@@ -683,6 +716,7 @@ int QuicServer::getListeningSocketFD() const {
 }
 
 std::vector<int> QuicServer::getAllListeningSocketFDs() const noexcept {
+  checkRunningInThread(mainThreadId_);
   CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   std::vector<int> sockets(workers_.size());
   for (const auto& worker : workers_) {
@@ -706,11 +740,13 @@ TakeoverProtocolVersion QuicServer::getTakeoverProtocolVersion()
 }
 
 int QuicServer::getTakeoverHandlerSocketFD() const {
+  checkRunningInThread(mainThreadId_);
   CHECK(takeoverHandlerInitialized_) << "TakeoverHanders are not initialized. ";
   return workers_[0]->getTakeoverHandlerSocketFD();
 }
 
 std::vector<folly::EventBase*> QuicServer::getWorkerEvbs() const noexcept {
+  checkRunningInThread(mainThreadId_);
   CHECK(initialized_) << kQuicServerNotInitialized << __func__;
   std::vector<folly::EventBase*> ebvs;
   for (const auto& worker : workers_) {
@@ -764,6 +800,22 @@ bool QuicServer::removeAcceptObserver(
     }
   });
   return success;
+}
+
+void QuicServer::setSocketOptions(
+    const folly::SocketOptionMap& options) noexcept {
+  checkRunningInThread(mainThreadId_);
+  socketOptions_ = options;
+}
+
+/**
+ * Sets whether the underlying socket should set the IPV6_ONLY socket option
+ * or not. If set to false, IPv4-mapped IPv6 addresses will be enabled on the
+ * socket.
+ */
+void QuicServer::setBindV6Only(bool bindV6Only) {
+  checkRunningInThread(mainThreadId_);
+  bindOptions_.bindV6Only = bindV6Only;
 }
 
 } // namespace quic
