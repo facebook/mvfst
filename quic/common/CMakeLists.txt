@@ -78,30 +78,6 @@ target_link_libraries(
 )
 
 add_library(
-  mvfst_socketutil
-  SocketUtil.cpp
-)
-
-set_property(TARGET mvfst_socketutil PROPERTY VERSION ${PACKAGE_VERSION})
-
-target_include_directories(
-  mvfst_socketutil PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_socketutil
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-target_link_libraries(
-  mvfst_socketutil PUBLIC
-  Folly::folly
-)
-
-add_library(
   mvfst_transport_knobs
   TransportKnobs.cpp
 )
@@ -151,12 +127,6 @@ install(
 
 install(
   TARGETS mvfst_bufutil
-  EXPORT mvfst-exports
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
-install(
-  TARGETS mvfst_socketutil
   EXPORT mvfst-exports
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

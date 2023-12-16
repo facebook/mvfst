@@ -84,7 +84,6 @@ add_dependencies(
   mvfst_loss
   mvfst_observer
   mvfst_qlogger
-  mvfst_socketutil
   mvfst_state_ack_handler
   mvfst_state_datagram_handler
   mvfst_state_functions
@@ -115,7 +114,6 @@ target_link_libraries(
   mvfst_loss
   mvfst_observer
   mvfst_qlogger
-  mvfst_socketutil
   mvfst_state_ack_handler
   mvfst_state_datagram_handler
   mvfst_state_functions

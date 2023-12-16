@@ -22,6 +22,7 @@
 #endif
 
 #include <folly/Conv.h>
+#include <quic/common/SocketUtil.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
@@ -1547,27 +1548,6 @@ size_t QuicServerWorker::SourceIdentityHash::operator()(
   *port = sid.first.getPort();
 
   return siphash::siphash24(key.data(), key.size(), &hashKey);
-}
-
-void applySocketOptions(
-    FollyAsyncUDPSocketAlias& sock,
-    const folly::SocketOptionMap& options,
-    sa_family_t family,
-    folly::SocketOptionKey::ApplyPos pos) noexcept {
-  folly::SocketOptionMap validOptions;
-
-  for (const auto& option : options) {
-    if (pos != option.first.applyPos_) {
-      continue;
-    }
-    if ((family == AF_INET && option.first.level == IPPROTO_IP) ||
-        (family == AF_INET6 && option.first.level == IPPROTO_IPV6) ||
-        option.first.level == IPPROTO_UDP || option.first.level == SOL_SOCKET ||
-        option.first.level == SOL_UDP) {
-      validOptions.insert(option);
-    }
-  }
-  sock.applyOptions(validOptions, pos);
 }
 
 } // namespace quic

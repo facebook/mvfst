@@ -41,7 +41,6 @@ set(mvfst_LIBRARIES
   mvfst::mvfst_looper
   mvfst::mvfst_buf_accessor
   mvfst::mvfst_bufutil
-  mvfst::mvfst_socketutil
   mvfst::mvfst_transport_knobs
   mvfst::mvfst_cc_algo
   mvfst::mvfst_dsr_types

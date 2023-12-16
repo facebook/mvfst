@@ -720,10 +720,4 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   TimePoint largestPacketReceiveTime_{TimePoint::min()};
 };
 
-void applySocketOptions(
-    FollyAsyncUDPSocketAlias& sock,
-    const folly::SocketOptionMap& options,
-    sa_family_t family,
-    folly::SocketOptionKey::ApplyPos pos) noexcept;
-
 } // namespace quic
