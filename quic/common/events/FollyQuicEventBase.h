@@ -84,10 +84,19 @@ class FollyQuicEventBase : public QuicEventBase {
 
  private:
   void unregisterLoopCallbackInternal(QuicEventBaseLoopCallback* callback) {
+    auto implHandle =
+        static_cast<LoopCallbackWrapper*>(getImplHandle(callback));
+    CHECK_NOTNULL(implHandle);
+    loopCallbackWrappers_.erase(loopCallbackWrappers_.iterator_to(*implHandle));
     setImplHandle(callback, nullptr);
   }
 
   void unregisterTimerCallbackInternal(QuicTimerCallback* callback) {
+    auto implHandle =
+        static_cast<TimerCallbackWrapper*>(getImplHandle(callback));
+    CHECK_NOTNULL(implHandle);
+    timerCallbackWrappers_.erase(
+        timerCallbackWrappers_.iterator_to(*implHandle));
     setImplHandle(callback, nullptr);
   }
 

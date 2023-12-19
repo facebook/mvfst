@@ -19,11 +19,8 @@ FollyQuicEventBase::~FollyQuicEventBase() {
     delete wrapper;
   });
   timerCallbackWrappers_.clear_and_dispose([](TimerCallbackWrapper* wrapper) {
-    // We only need to cancel and delete the wrapper if it's scheduled.
-    if (wrapper->isScheduled()) {
-      wrapper->cancelTimeout();
-      delete wrapper;
-    }
+    wrapper->cancelTimeout();
+    delete wrapper;
   });
 }
 
