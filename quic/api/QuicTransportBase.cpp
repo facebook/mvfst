@@ -167,6 +167,8 @@ const folly::SocketAddress& QuicTransportBase::getLocalAddress() const {
 
 QuicTransportBase::~QuicTransportBase() {
   resetConnectionCallbacks();
+  // Just in case this ended up hanging around.
+  cancelTimeout(&drainTimeout_);
 
   // closeImpl and closeUdpSocket should have been triggered by destructor of
   // derived class to ensure that observers are properly notified
