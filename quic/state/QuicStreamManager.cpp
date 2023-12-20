@@ -64,7 +64,7 @@ static bool isStreamUnopened(
 // Returns false if the stream is closed or already opened.
 static LocalErrorCode openPeerStreamIfNotClosed(
     StreamId streamId,
-    folly::F14FastSet<StreamId>& openStreams,
+    StreamIdSet& openStreams,
     StreamId& nextAcceptableStreamId,
     StreamId maxStreamId,
     std::vector<StreamId>* newStreams) {
@@ -77,12 +77,11 @@ static LocalErrorCode openPeerStreamIfNotClosed(
 
   StreamId start = nextAcceptableStreamId;
   auto numNewStreams = (streamId - start) / detail::kStreamIncrement;
-  openStreams.reserve(openStreams.size() + numNewStreams);
   if (newStreams) {
     newStreams->reserve(newStreams->size() + numNewStreams);
   }
+  openStreams.add(start, streamId);
   while (start <= streamId) {
-    openStreams.emplace(start);
     if (newStreams) {
       newStreams->push_back(start);
     }
@@ -97,7 +96,7 @@ static LocalErrorCode openPeerStreamIfNotClosed(
 
 static LocalErrorCode openLocalStreamIfNotClosed(
     StreamId streamId,
-    folly::F14FastSet<StreamId>& openStreams,
+    StreamIdSet& openStreams,
     StreamId& nextAcceptableStreamId,
     StreamId maxStreamId) {
   if (streamId < nextAcceptableStreamId) {
@@ -107,14 +106,7 @@ static LocalErrorCode openLocalStreamIfNotClosed(
     return LocalErrorCode::STREAM_LIMIT_EXCEEDED;
   }
 
-  StreamId start = nextAcceptableStreamId;
-  auto numNewStreams = (streamId - start) / detail::kStreamIncrement;
-  openStreams.reserve(openStreams.size() + numNewStreams);
-  while (start <= streamId) {
-    openStreams.emplace(start);
-    start += detail::kStreamIncrement;
-  }
-
+  openStreams.add(nextAcceptableStreamId, streamId);
   if (streamId >= nextAcceptableStreamId) {
     nextAcceptableStreamId = streamId + detail::kStreamIncrement;
   }
@@ -124,15 +116,15 @@ static LocalErrorCode openLocalStreamIfNotClosed(
 bool QuicStreamManager::streamExists(StreamId streamId) {
   if (isLocalStream(nodeType_, streamId)) {
     if (isUnidirectionalStream(streamId)) {
-      return openUnidirectionalLocalStreams_.count(streamId) > 0;
+      return openUnidirectionalLocalStreams_.contains(streamId);
     } else {
-      return openBidirectionalLocalStreams_.count(streamId) > 0;
+      return openBidirectionalLocalStreams_.contains(streamId);
     }
   } else {
     if (isUnidirectionalStream(streamId)) {
-      return openUnidirectionalPeerStreams_.count(streamId) > 0;
+      return openUnidirectionalPeerStreams_.contains(streamId);
     } else {
-      return openBidirectionalPeerStreams_.count(streamId) > 0;
+      return openBidirectionalPeerStreams_.contains(streamId);
     }
   }
 }
@@ -269,7 +261,7 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
   auto& openLocalStreams = isUnidirectionalStream(streamId)
       ? openUnidirectionalLocalStreams_
       : openBidirectionalLocalStreams_;
-  if (openLocalStreams.count(streamId)) {
+  if (openLocalStreams.contains(streamId)) {
     // Open a lazily created stream.
     auto it = streams_.emplace(
         std::piecewise_construct,
@@ -373,7 +365,7 @@ QuicStreamManager::createNextUnidirectionalStreamGroup() {
 folly::Expected<StreamGroupId, LocalErrorCode>
 QuicStreamManager::createNextStreamGroup(
     StreamGroupId& groupId,
-    folly::F14FastSet<StreamGroupId>& streamGroups) {
+    StreamIdSet& streamGroups) {
   auto maxLocalStreamGroupId = std::min(
       transportSettings_->advertisedMaxStreamGroups *
           detail::kStreamGroupIncrement,
@@ -384,7 +376,7 @@ QuicStreamManager::createNextStreamGroup(
 
   auto id = groupId;
   groupId += detail::kStreamIncrement;
-  streamGroups.insert(id);
+  streamGroups.add(id);
 
   return id;
 }
@@ -445,7 +437,7 @@ QuicStreamState* FOLLY_NULLABLE QuicStreamManager::getOrCreatePeerStream(
   auto& openPeerStreams = isUnidirectionalStream(streamId)
       ? openUnidirectionalPeerStreams_
       : openBidirectionalPeerStreams_;
-  if (openPeerStreams.count(streamId)) {
+  if (openPeerStreams.contains(streamId)) {
     // Stream was already open, create the state for it lazily.
     return instantiatePeerStream(streamId, streamGroupId);
   }
@@ -503,7 +495,7 @@ QuicStreamManager::createStream(
   if (streamGroupId) {
     const auto& openGroups = isUni ? openUnidirectionalLocalStreamGroups_
                                    : openBidirectionalLocalStreamGroups_;
-    if (openGroups.find(*streamGroupId) == openGroups.cend()) {
+    if (!openGroups.contains(*streamGroupId)) {
       throw QuicTransportException(
           "Attempted creating a stream in non-existent group",
           TransportErrorCode::STREAM_STATE_ERROR);
@@ -586,7 +578,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     auto& openPeerStreams = isUnidirectionalStream(streamId)
         ? openUnidirectionalPeerStreams_
         : openBidirectionalPeerStreams_;
-    openPeerStreams.erase(streamId);
+    openPeerStreams.remove(streamId);
     // Check if we should send a stream limit update. We need to send an
     // update every time we've closed a number of streams >= the set windowing
     // fraction.
@@ -620,7 +612,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     auto& openLocalStreams = isUnidirectionalStream(streamId)
         ? openUnidirectionalLocalStreams_
         : openBidirectionalLocalStreams_;
-    openLocalStreams.erase(streamId);
+    openLocalStreams.remove(streamId);
   }
 
   updateAppIdleState();

@@ -25,9 +25,64 @@ constexpr uint64_t kMaxStreamGroupId = 128 * kStreamGroupIncrement;
 
 } // namespace detail
 
+/*
+ * Class for containing a set of stream IDs, which wraps a IntervalSet.
+ * This saves space when the set contains "contiguous" stream IDs for a given
+ * type. For example, 0, 4, 8, ... 400 is internally represented by a single
+ * entry, [0, 400].
+ */
+class StreamIdSet {
+ public:
+  explicit StreamIdSet(StreamId base) : base_(static_cast<uint8_t>(base)) {}
+  StreamIdSet() : base_(0) {}
+
+  void add(StreamId id) {
+    add(id, id);
+  }
+
+  void remove(StreamId id) {
+    id -= base_;
+    CHECK_EQ(id % detail::kStreamIncrement, 0);
+    id /= detail::kStreamIncrement;
+    streams_.withdraw(Interval<StreamId>(id, id));
+  }
+
+  void add(StreamId first, StreamId last) {
+    first -= base_;
+    last -= base_;
+    CHECK_EQ(first % detail::kStreamIncrement, 0);
+    CHECK_EQ(last % detail::kStreamIncrement, 0);
+    first /= detail::kStreamIncrement;
+    last /= detail::kStreamIncrement;
+    streams_.insert(first, last);
+  }
+
+  [[nodiscard]] bool contains(StreamId id) const {
+    id -= base_;
+    id /= detail::kStreamIncrement;
+    return streams_.contains(id, id);
+  }
+
+  [[nodiscard]] size_t size() const {
+    size_t ret = 0;
+    for (const auto& [start, end] : streams_) {
+      ret += end - start + 1;
+    }
+    return ret;
+  }
+
+  void clear() {
+    streams_.clear();
+  }
+
+ private:
+  IntervalSet<StreamId, 1, std::vector> streams_;
+  uint8_t base_;
+};
+
 class QuicStreamManager {
  public:
-  explicit QuicStreamManager(
+  QuicStreamManager(
       QuicConnectionStateBase& conn,
       QuicNodeType nodeType,
       const TransportSettings& transportSettings)
@@ -59,6 +114,18 @@ class QuicStreamManager {
     }
     nextBidirectionalStreamGroupId_ = nextBidirectionalStreamId_;
     nextUnidirectionalStreamGroupId_ = nextUnidirectionalStreamId_;
+    openBidirectionalLocalStreams_ =
+        StreamIdSet(initialLocalBidirectionalStreamId_);
+    openUnidirectionalLocalStreams_ =
+        StreamIdSet(initialLocalUnidirectionalStreamId_);
+    openBidirectionalPeerStreams_ =
+        StreamIdSet(initialRemoteBidirectionalStreamId_);
+    openUnidirectionalPeerStreams_ =
+        StreamIdSet(initialRemoteUnidirectionalStreamId_);
+    openBidirectionalLocalStreamGroups_ =
+        StreamIdSet(nextBidirectionalStreamGroupId_);
+    openUnidirectionalLocalStreamGroups_ =
+        StreamIdSet(nextUnidirectionalStreamGroupId_);
     refreshTransportSettings(transportSettings);
     writeQueue_.setMaxNextsPerStream(
         transportSettings.priorityQueueWritesPerStream);
@@ -68,7 +135,7 @@ class QuicStreamManager {
    * Constructor to facilitate migration of a QuicStreamManager to another
    * QuicConnectionStateBase
    */
-  explicit QuicStreamManager(
+  QuicStreamManager(
       QuicConnectionStateBase& conn,
       QuicNodeType nodeType,
       const TransportSettings& transportSettings,
@@ -1029,7 +1096,7 @@ class QuicStreamManager {
 
   folly::Expected<StreamGroupId, LocalErrorCode> createNextStreamGroup(
       StreamGroupId& groupId,
-      folly::F14FastSet<StreamGroupId>& streamGroups);
+      StreamIdSet& streamGroups);
 
   /*
    * Helper to consume new stream ids.
@@ -1107,22 +1174,22 @@ class QuicStreamManager {
   uint64_t numControlStreams_{0};
 
   // Bidirectional streams that are opened by the peer on the connection.
-  folly::F14FastSet<StreamId> openBidirectionalPeerStreams_;
+  StreamIdSet openBidirectionalPeerStreams_;
 
   // Unidirectional streams that are opened by the peer on the connection.
-  folly::F14FastSet<StreamId> openUnidirectionalPeerStreams_;
+  StreamIdSet openUnidirectionalPeerStreams_;
 
   // Bidirectional streams that are opened locally on the connection.
-  folly::F14FastSet<StreamId> openBidirectionalLocalStreams_;
+  StreamIdSet openBidirectionalLocalStreams_;
 
   // Unidirectional streams that are opened locally on the connection.
-  folly::F14FastSet<StreamId> openUnidirectionalLocalStreams_;
+  StreamIdSet openUnidirectionalLocalStreams_;
 
   // Bidirectional stream groupss that are opened locally on the connection.
-  folly::F14FastSet<StreamGroupId> openBidirectionalLocalStreamGroups_;
+  StreamIdSet openBidirectionalLocalStreamGroups_;
 
   // Unidirectional stream groups that are opened locally on the connection.
-  folly::F14FastSet<StreamGroupId> openUnidirectionalLocalStreamGroups_;
+  StreamIdSet openUnidirectionalLocalStreamGroups_;
 
   // A map of streams that are active.
   folly::F14FastMap<StreamId, QuicStreamState> streams_;

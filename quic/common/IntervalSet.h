@@ -95,7 +95,7 @@ class IntervalSet : private Container<Interval<T, Unit>> {
 
   void withdraw(const Interval<T, Unit>& interval);
 
-  bool contains(const T& start, const T& end);
+  [[nodiscard]] bool contains(const T& start, const T& end) const;
 
   /**
    * The version changes whenever we insert into the ack list.
