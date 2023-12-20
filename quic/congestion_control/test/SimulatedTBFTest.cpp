@@ -68,6 +68,7 @@ TEST_F(SimulatedTBFTest, EmptyIntervalsTrackingDisabled_WithConsume) {
   SimulatedTBF stbf(config);
   const TimePoint t = Clock::now();
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), stbf.getBurstSizeBytes());
+  EXPECT_EQ(stbf.getTokenBalance(t), stbf.getBurstSizeBytes());
 
   EXPECT_THROW((void)stbf.bucketEmptyAt(t), QuicInternalException);
   EXPECT_THROW(
@@ -78,12 +79,15 @@ TEST_F(SimulatedTBFTest, EmptyIntervalsTrackingDisabled_WithConsume) {
   // Consume 100 bytes
   EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(100, t), 100);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), config.burstSizeBytes - 100);
+  EXPECT_EQ(stbf.getTokenBalance(t), config.burstSizeBytes - 100);
+
   // Consume the rest of the bytes in bucket
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(
           config.burstSizeBytes - 100, t),
       config.burstSizeBytes - 100);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), 0);
   EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(1, t), 0);
 
   EXPECT_THROW((void)stbf.bucketEmptyAt(t), QuicInternalException);
@@ -107,6 +111,7 @@ TEST_F(SimulatedTBFTest, NoConsumeCheckNoEmptyIntervals) {
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t, t));
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t, t + 20s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), stbf.getBurstSizeBytes());
+  EXPECT_EQ(stbf.getTokenBalance(t), stbf.getBurstSizeBytes());
 }
 
 /*
@@ -121,6 +126,7 @@ TEST_F(SimulatedTBFTest, ConsumeMoreThanBurstSize) {
   const TimePoint t = Clock::now();
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), stbf.getBurstSizeBytes());
+  EXPECT_EQ(stbf.getTokenBalance(t), stbf.getBurstSizeBytes());
   EXPECT_THROW(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(
           config.burstSizeBytes + 1, t),
@@ -149,6 +155,7 @@ TEST_F(SimulatedTBFTest, MultiConsumeWithEmptyInterval) {
           config.burstSizeBytes - 10, t - 1s),
       config.burstSizeBytes - 10);
   EXPECT_NEAR(stbf.getNumAvailableTokensInBytes(t - 1s), 10, 0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t - 1s), 10, 0.01);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t - 1s));
 
@@ -158,10 +165,13 @@ TEST_F(SimulatedTBFTest, MultiConsumeWithEmptyInterval) {
       stbf.getNumAvailableTokensInBytes(t),
       10 + config.rateBytesPerSecond,
       0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t), 10 + config.rateBytesPerSecond, 0.01);
+
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_NEAR(stbf.getTokenBalance(t), -90, 0.01);
   // No interval added because bucket had 10 tokens before consuming
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t - 1s, t));
@@ -171,6 +181,7 @@ TEST_F(SimulatedTBFTest, MultiConsumeWithEmptyInterval) {
   // Bucket is in debt now, so any consume after t will put the bucket in debt
   EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(1, t + 1ms), 1);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 1ms), 0);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 1ms), -90 + 100 * (0.001) - 1, 0.01);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
 
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
@@ -183,9 +194,11 @@ TEST_F(SimulatedTBFTest, MultiConsumeWithEmptyInterval) {
   // 909ms to pay this debt. Note that the time range below is adjusted to avoid
   // inconsistencies across different runs due to floating point calculations
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1ms, t + 909ms));
-  EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 909ms), 0);
+  EXPECT_NEAR(stbf.getNumAvailableTokensInBytes(t + 910ms), 0, 0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 910ms), 0, 0.01);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 911ms));
   EXPECT_GT(stbf.getNumAvailableTokensInBytes(t + 911ms), 0);
+  EXPECT_GT(stbf.getTokenBalance(t + 911ms), 0);
 }
 
 /*
@@ -209,6 +222,7 @@ TEST_F(SimulatedTBFTest, MultiConsumeNoEmptyInterval) {
         stbf.getNumAvailableTokensInBytes(t + std::chrono::seconds{i}),
         100,
         0.01);
+    EXPECT_NEAR(stbf.getTokenBalance(t + std::chrono::seconds{i}), 100, 0.01);
   }
 
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
@@ -244,10 +258,12 @@ TEST_F(SimulatedTBFTest, NoEmptyIntervalAfterDrainIfTsHadTokens) {
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t, t));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), -1800);
 
   // Consume one byte in t + 1s: tokens: -1800 + (1 * 100) - 1 = -1701
   EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(1, t + 1s), 1);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 1s), 0);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 1s), -1701, 0.01);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_TRUE(stbf.bucketEmptyAt(t + 1s));
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t, t + 1s));
@@ -256,6 +272,7 @@ TEST_F(SimulatedTBFTest, NoEmptyIntervalAfterDrainIfTsHadTokens) {
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 18s));
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 19s));
   EXPECT_GT(stbf.getNumAvailableTokensInBytes(t + 19s), 0);
+  EXPECT_GT(stbf.getTokenBalance(t + 19s), 0);
 }
 
 /*
@@ -279,6 +296,8 @@ TEST_F(SimulatedTBFTest, AddAndForgetOneEmptyInterval) {
     EXPECT_EQ(
         stbf.getNumAvailableTokensInBytes(t + std::chrono::seconds{i}), 0);
   }
+  EXPECT_EQ(stbf.getTokenBalance(t + 10s), -800);
+
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   // First consume doesn't put the bucket in debt
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
@@ -341,6 +360,7 @@ TEST_F(SimulatedTBFTest, AddTwoEmptyIntervalsAndForgetOne) {
         stbf.getNumAvailableTokensInBytes(t + std::chrono::seconds{i}), 0);
   }
 
+  EXPECT_EQ(stbf.getTokenBalance(t + 5s), -300);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 1s));
@@ -349,6 +369,7 @@ TEST_F(SimulatedTBFTest, AddTwoEmptyIntervalsAndForgetOne) {
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 2s, t + 8s));
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 9s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 8s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 8s), 0);
   EXPECT_NEAR(
       stbf.getNumAvailableTokensInBytes(t + 9s),
       config.rateBytesPerSecond,
@@ -361,6 +382,8 @@ TEST_F(SimulatedTBFTest, AddTwoEmptyIntervalsAndForgetOne) {
       stbf.getNumAvailableTokensInBytes(t + 10s),
       config.rateBytesPerSecond * 2,
       0.01);
+  EXPECT_NEAR(
+      stbf.getTokenBalance(t + 10s), config.rateBytesPerSecond * 2, 0.01);
   for (int i = 0; i < 5; i++) {
     EXPECT_EQ(
         stbf.consumeWithBorrowNonBlockingAndUpdateState(
@@ -370,8 +393,10 @@ TEST_F(SimulatedTBFTest, AddTwoEmptyIntervalsAndForgetOne) {
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 2);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 11s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 12s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 12s), -600);
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 12s, t + 18s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 18s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 18s), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 19s));
 
   stbf.forgetEmptyIntervalsPriorTo(t + 13s);
@@ -394,11 +419,13 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleInterval) {
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), 0);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), -config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 1s));
@@ -410,6 +437,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleInterval) {
           config.burstSizeBytes, t + 1s),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 1s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 1s), -300);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
   EXPECT_TRUE(stbf.bucketEmptyAt(t + 1s));
@@ -417,6 +445,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleInterval) {
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t, t + 4s));
   // It takes 3 seconds for the bucket to pay its debt
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 4s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 4s), 0);
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 4s));
   EXPECT_NEAR(
       stbf.getNumAvailableTokensInBytes(t + 5s),
@@ -430,14 +459,17 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleInterval) {
           config.burstSizeBytes, t + 4s),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 4s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 4s), -config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 6s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 6s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 6s), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 7s));
   EXPECT_NEAR(
       stbf.getNumAvailableTokensInBytes(t + 7s),
       config.rateBytesPerSecond,
       0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 7s), config.rateBytesPerSecond, 0.01);
 }
 
 /*
@@ -451,15 +483,18 @@ TEST_F(SimulatedTBFTest, MultipleConsumeMultipleIntervals) {
   SimulatedTBF stbf(config);
   const TimePoint t = Clock::now();
 
-  // Consume and drain completely: tokens = -200 at t = 0
+  // Consume and drain completely: tokens = 0 at t
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), 0);
+
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), -200);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
 
   // Consume more tokens to put the bucket more in debt:
@@ -469,6 +504,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeMultipleIntervals) {
           config.burstSizeBytes, t + 1s),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 1s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 1s), -300);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_TRUE(stbf.bucketEmptyAt(t + 1s));
   // It takes 3 seconds for the bucket to pay its debt
@@ -477,12 +513,14 @@ TEST_F(SimulatedTBFTest, MultipleConsumeMultipleIntervals) {
       stbf.getNumAvailableTokensInBytes(t + 5s),
       config.rateBytesPerSecond,
       0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 5s), config.rateBytesPerSecond, 0.01);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 5s));
 
   // Let the bucket to gain 400 tokens after 4s.
   // At t = 5s, tokens = -300 + (4s * 100) - 50 = 50
   EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(50, t + 5s), 50);
   EXPECT_NEAR(stbf.getNumAvailableTokensInBytes(t + 5s), 50, 0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 5s), 50, 0.01);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 4s));
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 5s));
@@ -491,27 +529,32 @@ TEST_F(SimulatedTBFTest, MultipleConsumeMultipleIntervals) {
   // tokens = 50 - 150 = -100
   EXPECT_EQ(stbf.consumeWithBorrowNonBlockingAndUpdateState(150, t + 5s), 150);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 5s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 5s), -100);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 5s));
 
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 6s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 6s), 0);
   // At t=6s, consume 200 tokens to create a new interval
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(
           config.burstSizeBytes, t + 6s),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 6s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 6s), -200);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 2);
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 4s));
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 5s));
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t + 5s, t + 6s));
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 6s, t + 8s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 8s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 8s), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 9s));
   EXPECT_NEAR(
       stbf.getNumAvailableTokensInBytes(t + 9s),
       config.rateBytesPerSecond,
       0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 9s), config.rateBytesPerSecond, 0.01);
 }
 
 /*
@@ -526,15 +569,17 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleIntervalWithDebtBuffCapped) {
   SimulatedTBF stbf(config);
   const TimePoint t = Clock::now();
 
-  // Consume and drain completely: tokens = -200 at t = 0
+  // Consume and drain completely: tokens = 0 at t
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), 0);
   EXPECT_EQ(
       stbf.consumeWithBorrowNonBlockingAndUpdateState(config.burstSizeBytes, t),
       config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t), -config.burstSizeBytes);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
 
   // Try to consume 200 more bytes 1s later to put the bucket more in debt and
@@ -546,6 +591,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleIntervalWithDebtBuffCapped) {
           config.burstSizeBytes, t + 1s),
       0);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 1s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 1s), -100);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 1s));
 
@@ -555,6 +601,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleIntervalWithDebtBuffCapped) {
           config.burstSizeBytes - 100, t + 1s),
       config.burstSizeBytes - 100);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 1s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 1s), -200);
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_TRUE(stbf.bucketEmptyAt(t + 1s));
 
@@ -563,6 +610,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleIntervalWithDebtBuffCapped) {
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 3s));
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 4s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 3s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 3s), 0);
 
   // Consume 200 more bytes 2s later to extend the existing interval
   EXPECT_EQ(
@@ -572,11 +620,13 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleIntervalWithDebtBuffCapped) {
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 1);
   EXPECT_TRUE(stbf.bucketEmptyThroughoutWindow(t + 1s, t + 5s));
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t + 5s), 0);
+  EXPECT_EQ(stbf.getTokenBalance(t + 5s), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t + 6s));
   EXPECT_NEAR(
       stbf.getNumAvailableTokensInBytes(t + 6s),
       config.rateBytesPerSecond,
       0.01);
+  EXPECT_NEAR(stbf.getTokenBalance(t + 6s), config.rateBytesPerSecond, 0.01);
   // Since the queue is full, any subsequent consume at t + 3s should return
   // zero (i.e., no more bytes can be consumed)
   EXPECT_EQ(

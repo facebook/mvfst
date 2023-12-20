@@ -172,12 +172,15 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
 
 [[nodiscard]] double SimulatedTBF::getNumAvailableTokensInBytes(
     const TimePoint& time) const {
-  double timeDouble =
-      std::chrono::duration<double>(
-          time.time_since_epoch() // convert to double and seconds
-          )
-          .count();
+  double timeDouble = timePointToDouble(time);
   return available(
+      config_.rateBytesPerSecond, config_.burstSizeBytes, timeDouble);
+}
+
+[[nodiscard]] double SimulatedTBF::getTokenBalance(
+    const TimePoint& time) const {
+  double timeDouble = timePointToDouble(time);
+  return balance(
       config_.rateBytesPerSecond, config_.burstSizeBytes, timeDouble);
 }
 

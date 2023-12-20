@@ -116,6 +116,19 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
       const TimePoint& time) const;
 
   /**
+   * Returns token balance at the specified time (negative if in debt).
+   *
+   * If the token bucket is in debt at the specified time (meaning that a queue
+   * of packets would be waiting to consume tokens), the value returned will be
+   * negative.
+   *
+   * @param time  TimePoint greater than or equal to TimePoint last passed to
+   *              consumeWithBorrowNonBlockingAndUpdateState().
+   * @return      The number of tokens (bytes); negative if debt (queuing).
+   */
+  [[nodiscard]] double getTokenBalance(const TimePoint& time) const;
+
+  /**
    * Returns the number of intervals in which the bucket were empty or in
    * debt.
    */
@@ -128,6 +141,9 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   [[nodiscard]] folly::Optional<double> getMaxDebtQueueSizeBytes() const;
 
  private:
+  static double timePointToDouble(TimePoint timePoint) {
+    return std::chrono::duration<double>(timePoint.time_since_epoch()).count();
+  }
   struct EmptyIntervalState {
     std::shared_ptr<std::deque<TimeInterval>> emptyBucketTimeIntervals_;
     folly::Optional<TimePoint> maybeLastSendTimeBucketNotEmpty_;
