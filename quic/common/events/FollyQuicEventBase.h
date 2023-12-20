@@ -15,6 +15,8 @@
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/HHWheelTimer-fwd.h>
 
+FOLLY_GNU_DISABLE_WARNING("-Wdeprecated-declarations")
+
 namespace quic {
 
 /**
