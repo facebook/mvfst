@@ -334,10 +334,14 @@ QuicStreamManager::createNextUnidirectionalStream(
 QuicStreamState* FOLLY_NULLABLE QuicStreamManager::instantiatePeerStream(
     StreamId streamId,
     folly::Optional<StreamGroupId> groupId) {
-  if (groupId &&
-      (peerStreamGroupsSeen_.find(*groupId) == peerStreamGroupsSeen_.cend())) {
-    newPeerStreamGroups_.insert(*groupId);
-    peerStreamGroupsSeen_.insert(*groupId);
+  if (groupId) {
+    auto& seenSet = isUnidirectionalStream(streamId)
+        ? peerUnidirectionalStreamGroupsSeen_
+        : peerBidirectionalStreamGroupsSeen_;
+    if (!seenSet.contains(*groupId)) {
+      newPeerStreamGroups_.insert(*groupId);
+      seenSet.add(*groupId);
+    }
   }
 
   if (transportSettings_->notifyOnNewStreamsExplicitly) {

@@ -31,7 +31,7 @@
 namespace quic {
 
 using StreamId = uint64_t;
-using StreamGroupId = uint64_t;
+using StreamGroupId = StreamId;
 
 enum class PacketNumberSpace : uint8_t {
   Initial,

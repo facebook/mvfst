@@ -853,7 +853,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroup) {
   manager.refreshTransportSettings(conn.transportSettings);
 
   const StreamId peerStreamId = 2;
-  const StreamGroupId peeGroupId = 0;
+  const StreamGroupId peeGroupId = 2;
   auto stream = manager.getStream(peerStreamId, peeGroupId);
   EXPECT_NE(stream, nullptr);
   EXPECT_EQ(stream->groupId, peeGroupId);
@@ -877,7 +877,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   manager.refreshTransportSettings(conn.transportSettings);
 
   StreamId peerStreamId = 2;
-  StreamGroupId peeGroupId = 0;
+  StreamGroupId peeGroupId = 2;
   auto stream = manager.getStream(peerStreamId, peeGroupId);
   EXPECT_NE(stream, nullptr);
   EXPECT_EQ(stream->groupId, peeGroupId);
@@ -886,7 +886,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
 
   // Another stream, same group.
   peerStreamId = 6;
-  peeGroupId = 0;
+  peeGroupId = 2;
   stream = manager.getStream(peerStreamId, peeGroupId);
   EXPECT_NE(stream, nullptr);
   EXPECT_EQ(stream->groupId, peeGroupId);
@@ -895,7 +895,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
 
   // New stream, new group.
   peerStreamId = 10;
-  peeGroupId = 4;
+  peeGroupId = 6;
   stream = manager.getStream(peerStreamId, peeGroupId);
   EXPECT_NE(stream, nullptr);
   EXPECT_EQ(stream->groupId, peeGroupId);
@@ -904,7 +904,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
 
   // New stream, previous group.
   peerStreamId = 14;
-  peeGroupId = 0;
+  peeGroupId = 2;
   stream = manager.getStream(peerStreamId, peeGroupId);
   EXPECT_NE(stream, nullptr);
   EXPECT_EQ(stream->groupId, peeGroupId);
@@ -913,7 +913,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
 
   // New stream, current group.
   peerStreamId = 18;
-  peeGroupId = 4;
+  peeGroupId = 6;
   stream = manager.getStream(peerStreamId, peeGroupId);
   EXPECT_NE(stream, nullptr);
   EXPECT_EQ(stream->groupId, peeGroupId);

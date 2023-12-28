@@ -100,6 +100,8 @@ class QuicStreamManager {
       initialLocalUnidirectionalStreamId_ = 0x03;
       initialRemoteBidirectionalStreamId_ = 0x00;
       initialRemoteUnidirectionalStreamId_ = 0x02;
+      peerUnidirectionalStreamGroupsSeen_ = StreamIdSet(0x02);
+      peerBidirectionalStreamGroupsSeen_ = StreamIdSet(0x00);
     } else {
       nextAcceptablePeerBidirectionalStreamId_ = 0x01;
       nextAcceptablePeerUnidirectionalStreamId_ = 0x03;
@@ -111,6 +113,8 @@ class QuicStreamManager {
       initialLocalUnidirectionalStreamId_ = 0x02;
       initialRemoteBidirectionalStreamId_ = 0x01;
       initialRemoteUnidirectionalStreamId_ = 0x03;
+      peerUnidirectionalStreamGroupsSeen_ = StreamIdSet(0x03);
+      peerBidirectionalStreamGroupsSeen_ = StreamIdSet(0x01);
     }
     nextBidirectionalStreamGroupId_ = nextBidirectionalStreamId_;
     nextUnidirectionalStreamGroupId_ = nextUnidirectionalStreamId_;
@@ -188,7 +192,8 @@ class QuicStreamManager {
         std::move(other.openUnidirectionalLocalStreamGroups_);
     newPeerStreams_ = std::move(other.newPeerStreams_);
     newPeerStreamGroups_ = std::move(other.newPeerStreamGroups_);
-    peerStreamGroupsSeen_ = std::move(other.peerStreamGroupsSeen_);
+    peerUnidirectionalStreamGroupsSeen_ =
+        std::move(other.peerUnidirectionalStreamGroupsSeen_);
     newGroupedPeerStreams_ = std::move(other.newGroupedPeerStreams_);
     blockedStreams_ = std::move(other.blockedStreams_);
     stopSendingStreams_ = std::move(other.stopSendingStreams_);
@@ -408,7 +413,8 @@ class QuicStreamManager {
     openUnidirectionalPeerStreams_.clear();
     openBidirectionalLocalStreamGroups_.clear();
     openUnidirectionalLocalStreamGroups_.clear();
-    peerStreamGroupsSeen_.clear();
+    peerUnidirectionalStreamGroupsSeen_.clear();
+    peerBidirectionalStreamGroupsSeen_.clear();
     streams_.clear();
   }
 
@@ -1060,7 +1066,8 @@ class QuicStreamManager {
   }
 
   [[nodiscard]] size_t getNumPeerStreamGroupsSeen() const {
-    return peerStreamGroupsSeen_.size();
+    return peerUnidirectionalStreamGroupsSeen_.size() +
+        peerBidirectionalStreamGroupsSeen_.size();
   }
 
  private:
@@ -1204,7 +1211,8 @@ class QuicStreamManager {
   folly::F14FastSet<StreamGroupId> newPeerStreamGroups_;
 
   // Peer group ids seen.
-  folly::F14FastSet<StreamGroupId> peerStreamGroupsSeen_;
+  StreamIdSet peerUnidirectionalStreamGroupsSeen_;
+  StreamIdSet peerBidirectionalStreamGroupsSeen_;
 
   // Map of streams that were blocked
   folly::F14FastMap<StreamId, StreamDataBlockedFrame> blockedStreams_;
