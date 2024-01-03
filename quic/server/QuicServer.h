@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <memory>
 #include <vector>
 
@@ -404,7 +403,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   TransportSettings transportSettings_;
   std::mutex startMutex_;
   std::atomic<bool> initialized_{false};
-  std::condition_variable startCv_;
   std::atomic<bool> takeoverHandlerInitialized_{false};
   std::vector<std::unique_ptr<folly::ScopedEventBaseThread>> workerEvbs_;
 
@@ -460,6 +458,12 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // set by getEventBaseBackend if multishot callback is
   // supported
   bool backendSupportsMultishotCallback_{false};
+
+  // flag to ensure baton is only posted once
+  folly::once_flag startDone_;
+  // baton used to block in ::waitUntilInitialized – posted via shutdown path or
+  // last worker to have been initialized
+  folly::Baton<> startDoneBaton_;
 
   /**
    * QuicServer does not support multi-threaded/concurrent access. mainThreadId_

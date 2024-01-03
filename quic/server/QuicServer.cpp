@@ -293,7 +293,8 @@ void QuicServer::bindWorkersToSocket(
           if (idx == (numWorkers - 1)) {
             VLOG(4) << "Initialized all workers in the eventbase";
             self->initialized_ = true;
-            self->startCv_.notify_all();
+            folly::call_once(
+                self->startDone_, [self]() { self->startDoneBaton_.post(); });
           }
         });
   }
@@ -466,14 +467,15 @@ void QuicServer::handleWorkerError(LocalErrorCode error) {
 }
 
 void QuicServer::waitUntilInitialized() {
-  std::unique_lock<std::mutex> guard(startMutex_);
   if (shutdown_ || initialized_) {
     return;
   }
   for (auto& worker : workers_) {
-    DCHECK(!worker->getEventBase()->isInEventBaseThread());
+    CHECK(!worker->getEventBase()->isInEventBaseThread());
   }
-  startCv_.wait(guard, [&] { return initialized_ || shutdown_; });
+  // block until all workers have been initialized or shutdown completed
+  startDoneBaton_.wait();
+  CHECK(initialized_ || shutdown_);
 }
 
 QuicServer::~QuicServer() {
@@ -495,7 +497,7 @@ void QuicServer::shutdown(LocalErrorCode error) {
     std::lock_guard<std::mutex> guard(startMutex_);
     evbToWorkers_.erase(worker->getEventBase());
   }
-  startCv_.notify_all();
+  folly::call_once(startDone_, [this]() { this->startDoneBaton_.post(); });
 }
 
 bool QuicServer::hasShutdown() const noexcept {
