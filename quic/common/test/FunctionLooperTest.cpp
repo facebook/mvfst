@@ -217,20 +217,20 @@ TEST(FunctionLooperTest, KeepPacing) {
   EXPECT_EQ(1, count);
   EXPECT_TRUE(looper->isPacingScheduled());
 
-  pacingTimer->cancelTimeout(looper.get());
+  looper->cancelTimerCallback();
   EXPECT_FALSE(looper->isPacingScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(2, count);
   EXPECT_TRUE(looper->isPacingScheduled());
 
-  pacingTimer->cancelTimeout(looper.get());
+  looper->cancelTimerCallback();
   EXPECT_FALSE(looper->isPacingScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(3, count);
   EXPECT_TRUE(looper->isPacingScheduled());
 
   stopPacing = true;
-  pacingTimer->cancelTimeout(looper.get());
+  looper->cancelTimerCallback();
   EXPECT_FALSE(looper->isPacingScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(4, count);

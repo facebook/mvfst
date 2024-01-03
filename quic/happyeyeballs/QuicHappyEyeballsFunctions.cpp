@@ -104,7 +104,7 @@ void startHappyEyeballs(
           options);
     } catch (const std::exception&) {
       // If second socket bind throws exception, give it up
-      evb->cancelTimeout(&connAttemptDelayTimeout);
+      connAttemptDelayTimeout.cancelTimerCallback();
       connection.happyEyeballsState.finished = true;
     }
   } else if (connection.happyEyeballsState.v6PeerAddress.isInitialized()) {
@@ -192,7 +192,7 @@ void happyEyeballsOnDataReceived(
   if (connection.happyEyeballsState.finished) {
     return;
   }
-  socket->getEventBase()->cancelTimeout(&connAttemptDelayTimeout);
+  connAttemptDelayTimeout.cancelTimerCallback();
   connection.happyEyeballsState.finished = true;
   connection.happyEyeballsState.shouldWriteToFirstSocket = true;
   connection.happyEyeballsState.shouldWriteToSecondSocket = false;

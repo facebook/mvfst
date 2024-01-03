@@ -11,7 +11,6 @@
 
 #include <quic/common/events/QuicEventBase.h>
 
-#include <folly/IntrusiveList.h>
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/HHWheelTimer-fwd.h>
 
@@ -66,42 +65,13 @@ class FollyQuicEventBase : public QuicEventBase {
       QuicTimerCallback* callback,
       std::chrono::milliseconds timeout) override;
 
-  bool isTimeoutScheduled(QuicTimerCallback* callback) const override;
-
-  std::chrono::milliseconds getTimeoutTimeRemaining(
-      QuicTimerCallback* callback) const override;
-
-  void cancelTimeout(QuicTimerCallback* callback) override;
-
   [[nodiscard]] std::chrono::milliseconds getTimerTickInterval() const override;
-
-  void cancelLoopCallback(QuicEventBaseLoopCallback* callback) override;
-
-  bool isLoopCallbackScheduled(
-      QuicEventBaseLoopCallback* callback) const override;
 
   folly::EventBase* getBackingEventBase() {
     return backingEvb_;
   }
 
  private:
-  void unregisterLoopCallbackInternal(QuicEventBaseLoopCallback* callback) {
-    auto implHandle =
-        static_cast<LoopCallbackWrapper*>(getImplHandle(callback));
-    CHECK_NOTNULL(implHandle);
-    loopCallbackWrappers_.erase(loopCallbackWrappers_.iterator_to(*implHandle));
-    setImplHandle(callback, nullptr);
-  }
-
-  void unregisterTimerCallbackInternal(QuicTimerCallback* callback) {
-    auto implHandle =
-        static_cast<TimerCallbackWrapper*>(getImplHandle(callback));
-    CHECK_NOTNULL(implHandle);
-    timerCallbackWrappers_.erase(
-        timerCallbackWrappers_.iterator_to(*implHandle));
-    setImplHandle(callback, nullptr);
-  }
-
   class TimerCallbackWrapper : public folly::HHWheelTimer::Callback,
                                public folly::AsyncTimeout,
                                public QuicTimerCallback::TimerCallbackImpl {
@@ -110,71 +80,77 @@ class FollyQuicEventBase : public QuicEventBase {
         QuicTimerCallback* callback,
         FollyQuicEventBase* evb)
         : folly::AsyncTimeout(evb->getBackingEventBase()) {
-      parentEvb_ = evb;
       callback_ = callback;
     }
 
     friend class FollyQuicEventBase;
 
+    // folly::AsyncTimeout and folly::HHWheelTimer::Callback
     void timeoutExpired() noexcept override {
-      parentEvb_->unregisterTimerCallbackInternal(callback_);
       callback_->timeoutExpired();
-      delete this;
     }
 
+    // folly::HHWheelTimer::Callback
     void callbackCanceled() noexcept override {
-      parentEvb_->unregisterTimerCallbackInternal(callback_);
       callback_->callbackCanceled();
-      delete this;
     }
 
-    bool isScheduled() noexcept {
-      return folly::AsyncTimeout::isScheduled() ||
-          folly::HHWheelTimer::Callback::isScheduled();
-    }
-
-    void cancelTimeout() noexcept {
+    // QuicTimerCallback::TimerCallbackImpl
+    void cancelImpl() noexcept override {
       folly::AsyncTimeout::cancelTimeout();
       folly::HHWheelTimer::Callback::cancelTimeout();
     }
 
+    // QuicTimerCallback::TimerCallbackImpl
+    [[nodiscard]] bool isScheduledImpl() const noexcept override {
+      return folly::AsyncTimeout::isScheduled() ||
+          folly::HHWheelTimer::Callback::isScheduled();
+    }
+
+    // QuicTimerCallback::TimerCallbackImpl
+    [[nodiscard]] std::chrono::milliseconds getTimeRemainingImpl()
+        const noexcept override {
+      return folly::HHWheelTimer::Callback::getTimeRemaining();
+    }
+
    private:
-    FollyQuicEventBase* parentEvb_;
+    // Hide these functions
+    [[nodiscard]] bool isScheduled() const {
+      return isScheduledImpl();
+    }
+    void cancelTimeout() noexcept {
+      return cancelImpl();
+    }
     QuicTimerCallback* callback_;
-    folly::IntrusiveListHook listHook_;
   };
 
   class LoopCallbackWrapper
       : public folly::EventBase::LoopCallback,
         public QuicEventBaseLoopCallback::LoopCallbackImpl {
    public:
-    explicit LoopCallbackWrapper(
-        QuicEventBaseLoopCallback* callback,
-        FollyQuicEventBase* evb) {
-      parentEvb_ = evb;
+    explicit LoopCallbackWrapper(QuicEventBaseLoopCallback* callback) {
       callback_ = callback;
     }
 
-    friend class FollyQuicEventBase;
-
+    // folly::EventBase::LoopCallback
     void runLoopCallback() noexcept override {
-      // We need to remove the callback wrapper from the parent evb's map, call
-      // the callback, then delete this wrapper.
-      parentEvb_->unregisterLoopCallbackInternal(callback_);
       callback_->runLoopCallback();
-      delete this;
+    }
+
+    // QuicEventBaseLoopCallback::LoopCallbackImpl
+    void cancelImpl() noexcept override {
+      folly::EventBase::LoopCallback::cancelLoopCallback();
+    }
+
+    // QuicEventBaseLoopCallback::LoopCallbackImpl
+    [[nodiscard]] bool isScheduledImpl() const noexcept override {
+      return folly::EventBase::LoopCallback::isLoopCallbackScheduled();
     }
 
    private:
-    FollyQuicEventBase* parentEvb_;
     QuicEventBaseLoopCallback* callback_;
-    folly::IntrusiveListHook listHook_;
   };
 
-  folly::IntrusiveList<LoopCallbackWrapper, &LoopCallbackWrapper::listHook_>
-      loopCallbackWrappers_;
-  folly::IntrusiveList<TimerCallbackWrapper, &TimerCallbackWrapper::listHook_>
-      timerCallbackWrappers_;
   folly::EventBase* backingEvb_{nullptr};
 };
 

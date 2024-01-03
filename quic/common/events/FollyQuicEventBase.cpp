@@ -13,30 +13,17 @@ FollyQuicEventBase::FollyQuicEventBase(folly::EventBase* evb) {
   backingEvb_ = evb;
 }
 
-FollyQuicEventBase::~FollyQuicEventBase() {
-  loopCallbackWrappers_.clear_and_dispose([](LoopCallbackWrapper* wrapper) {
-    wrapper->cancelLoopCallback();
-    delete wrapper;
-  });
-  timerCallbackWrappers_.clear_and_dispose([](TimerCallbackWrapper* wrapper) {
-    wrapper->cancelTimeout();
-    delete wrapper;
-  });
-}
+FollyQuicEventBase::~FollyQuicEventBase() = default;
 
 void FollyQuicEventBase::runInLoop(
     QuicEventBaseLoopCallback* callback,
     bool thisIteration) {
   auto wrapper = static_cast<LoopCallbackWrapper*>(getImplHandle(callback));
   if (!wrapper) {
-    wrapper = new LoopCallbackWrapper(callback, this);
-    loopCallbackWrappers_.push_back(*wrapper);
+    wrapper = new LoopCallbackWrapper(callback);
     setImplHandle(callback, wrapper);
-    return backingEvb_->runInLoop(wrapper, thisIteration);
-  } else {
-    // This callback is already scheduled.
-    return;
   }
+  return backingEvb_->runInLoop(wrapper, thisIteration);
 }
 
 void FollyQuicEventBase::runInLoop(
@@ -100,13 +87,12 @@ bool FollyQuicEventBase::scheduleTimeoutHighRes(
   }
   auto wrapper =
       static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
-  if (wrapper != nullptr) {
-    // This callback is already scheduled.
-    return false;
+  if (wrapper == nullptr) {
+    // This is the first time this timer callback is getting scheduled. Create a
+    // wrapper for it.
+    wrapper = new TimerCallbackWrapper(timerCallback, this);
+    setImplHandle(timerCallback, wrapper);
   }
-  wrapper = new TimerCallbackWrapper(timerCallback, this);
-  timerCallbackWrappers_.push_back(*wrapper);
-  setImplHandle(timerCallback, wrapper);
   return backingEvb_->scheduleTimeoutHighRes(wrapper, timeout);
 }
 
@@ -119,73 +105,17 @@ void FollyQuicEventBase::scheduleTimeout(
   }
   auto wrapper =
       static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
-  if (wrapper != nullptr) {
-    // This callback is already scheduled.
-    return;
+  if (wrapper == nullptr) {
+    // This is the first time this timer callback is getting scheduled. Create a
+    // wrapper for it.
+    wrapper = new TimerCallbackWrapper(timerCallback, this);
+    setImplHandle(timerCallback, wrapper);
   }
-  wrapper = new TimerCallbackWrapper(timerCallback, this);
-  timerCallbackWrappers_.push_back(*wrapper);
-  setImplHandle(timerCallback, wrapper);
   backingEvb_->timer().scheduleTimeout(wrapper, timeout);
-}
-
-bool FollyQuicEventBase::isTimeoutScheduled(
-    QuicTimerCallback* timerCallback) const {
-  if (!timerCallback || !getImplHandle(timerCallback)) {
-    // There is no wrapper. Nothing is scheduled.
-    return false;
-  }
-  auto wrapper =
-      static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
-  return wrapper->isScheduled();
-}
-
-std::chrono::milliseconds FollyQuicEventBase::getTimeoutTimeRemaining(
-    QuicTimerCallback* timerCallback) const {
-  if (!timerCallback || !getImplHandle(timerCallback)) {
-    // There is no wrapper. Nothing to check.
-    return std::chrono::milliseconds(0);
-  }
-  auto wrapper =
-      static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
-  return wrapper->getTimeRemaining();
-}
-
-void FollyQuicEventBase::cancelTimeout(QuicTimerCallback* timerCallback) {
-  if (!timerCallback || !getImplHandle(timerCallback)) {
-    // There is no wrapper. Nothing to cancel.
-    return;
-  }
-  auto wrapper =
-      static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
-  unregisterTimerCallbackInternal(timerCallback);
-  wrapper->cancelTimeout();
-  delete wrapper;
 }
 
 std::chrono::milliseconds FollyQuicEventBase::getTimerTickInterval() const {
   return backingEvb_->timer().getTickInterval();
-}
-
-void FollyQuicEventBase::cancelLoopCallback(
-    QuicEventBaseLoopCallback* callback) {
-  auto wrapper = static_cast<LoopCallbackWrapper*>(getImplHandle(callback));
-  if (!wrapper) {
-    return;
-  }
-  unregisterLoopCallbackInternal(callback);
-  wrapper->cancelLoopCallback();
-  delete wrapper;
-}
-
-bool FollyQuicEventBase::isLoopCallbackScheduled(
-    QuicEventBaseLoopCallback* callback) const {
-  auto wrapper =
-      static_cast<const LoopCallbackWrapper*>(getImplHandle(callback));
-  if (!wrapper) {
-    return false;
-  }
-  return wrapper->isLoopCallbackScheduled();
 }
 
 } // namespace quic

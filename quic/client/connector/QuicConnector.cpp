@@ -34,7 +34,7 @@ void QuicConnector::onReplaySafe() noexcept {
   if (cb_) {
     cb_->onConnectSuccess();
   }
-  qEvb_->cancelTimeout(this);
+  cancelTimerCallback();
   cleanUpAndCloseSocket();
 }
 

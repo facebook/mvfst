@@ -86,11 +86,10 @@ bool IOBufQuicBatch::flushInternal() {
   // If error occurred on first socket, kick off second socket immediately
   if (!written && happyEyeballsState_ &&
       happyEyeballsState_->connAttemptDelayTimeout &&
-      sock_.getEventBase()->isTimeoutScheduled(
-          happyEyeballsState_->connAttemptDelayTimeout)) {
+      happyEyeballsState_->connAttemptDelayTimeout
+          ->isTimerCallbackScheduled()) {
+    happyEyeballsState_->connAttemptDelayTimeout->cancelTimerCallback();
     happyEyeballsState_->connAttemptDelayTimeout->timeoutExpired();
-    sock_.getEventBase()->cancelTimeout(
-        happyEyeballsState_->connAttemptDelayTimeout);
   }
 
   folly::Optional<int> secondSocketErrno;

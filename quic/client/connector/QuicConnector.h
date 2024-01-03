@@ -41,9 +41,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
   ~QuicConnector() override {
     // TODO we shouldn't need to do this but just as a safety measure
     // to ensure we don't get a callback after detruction.
-    if (qEvb_) {
-      qEvb_->cancelTimeout(this);
-    }
+    cancelTimerCallback();
   }
 
   void connect(

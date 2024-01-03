@@ -20,9 +20,27 @@ class QuicEventBaseLoopCallback {
  public:
   friend class QuicEventBase;
 
-  virtual ~QuicEventBaseLoopCallback() = default;
+  virtual ~QuicEventBaseLoopCallback() {
+    if (implHandle) {
+      implHandle->cancelImpl();
+      delete implHandle;
+    }
+  }
   virtual void runLoopCallback() noexcept = 0;
-  class LoopCallbackImpl {};
+  void cancelLoopCallback() noexcept {
+    if (implHandle) {
+      implHandle->cancelImpl();
+    }
+  }
+  [[nodiscard]] bool isLoopCallbackScheduled() const noexcept {
+    return implHandle ? implHandle->isScheduledImpl() : false;
+  }
+  class LoopCallbackImpl {
+   public:
+    virtual ~LoopCallbackImpl() = default;
+    virtual void cancelImpl() noexcept = 0;
+    [[nodiscard]] virtual bool isScheduledImpl() const noexcept = 0;
+  };
 
  private:
   LoopCallbackImpl* implHandle{nullptr};
@@ -31,7 +49,12 @@ class QuicEventBaseLoopCallback {
 class QuicTimerCallback {
  public:
   friend class QuicEventBase;
-  virtual ~QuicTimerCallback() = default;
+  virtual ~QuicTimerCallback() {
+    if (implHandle) {
+      implHandle->cancelImpl();
+      delete implHandle;
+    }
+  }
   virtual void timeoutExpired() noexcept = 0;
   /// This callback was canceled. The default implementation is to just
   /// proxy to `timeoutExpired` but if you care about the difference between
@@ -39,7 +62,33 @@ class QuicTimerCallback {
   virtual void callbackCanceled() noexcept {
     timeoutExpired();
   }
-  class TimerCallbackImpl {};
+
+  void cancelTimerCallback() noexcept {
+    if (implHandle) {
+      implHandle->cancelImpl();
+    }
+  }
+
+  [[nodiscard]] bool isTimerCallbackScheduled() const noexcept {
+    return implHandle ? implHandle->isScheduledImpl() : false;
+  }
+
+  [[nodiscard]] std::chrono::milliseconds getTimerCallbackTimeRemaining()
+      const noexcept {
+    if (!implHandle) {
+      return std::chrono::milliseconds(0);
+    }
+    return implHandle->getTimeRemainingImpl();
+  }
+
+  class TimerCallbackImpl {
+   public:
+    virtual ~TimerCallbackImpl() = default;
+    virtual void cancelImpl() noexcept = 0;
+    [[nodiscard]] virtual bool isScheduledImpl() const noexcept = 0;
+    [[nodiscard]] virtual std::chrono::milliseconds getTimeRemainingImpl()
+        const noexcept = 0;
+  };
 
  private:
   TimerCallbackImpl* implHandle{nullptr};
@@ -81,18 +130,6 @@ class QuicEventBase {
   virtual bool scheduleTimeoutHighRes(
       QuicTimerCallback* callback,
       std::chrono::microseconds timeout) = 0;
-
-  virtual void cancelLoopCallback(QuicEventBaseLoopCallback* callback) = 0;
-
-  virtual bool isTimeoutScheduled(QuicTimerCallback* callback) const = 0;
-
-  virtual std::chrono::milliseconds getTimeoutTimeRemaining(
-      QuicTimerCallback* callback) const = 0;
-
-  virtual void cancelTimeout(QuicTimerCallback* callback) = 0;
-
-  virtual bool isLoopCallbackScheduled(
-      QuicEventBaseLoopCallback* callback) const = 0;
 
   virtual bool loopOnce(int flags = 0) = 0;
 

@@ -9,7 +9,6 @@
 
 #include <quic/common/events/QuicTimer.h>
 
-#include <folly/IntrusiveList.h>
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/HHWheelTimer.h>
 
@@ -28,47 +27,43 @@ class HighResQuicTimer : public QuicTimer {
       QuicTimerCallback* callback,
       std::chrono::microseconds timeout) override;
 
-  bool isTimerCallbackScheduled(QuicTimerCallback* callback) const override;
-
-  void cancelTimeout(QuicTimerCallback* callback) override;
-
  private:
-  void unregisterCallbackInternal(QuicTimerCallback* callback) {
-    QuicEventBase::setImplHandle(callback, nullptr);
-  }
-
   class TimerCallbackWrapper : public folly::HHWheelTimerHighRes::Callback,
-                               QuicTimerCallback::TimerCallbackImpl {
+                               public QuicTimerCallback::TimerCallbackImpl {
    public:
-    explicit TimerCallbackWrapper(
-        QuicTimerCallback* callback,
-        HighResQuicTimer* parentTimer) {
-      parentTimer_ = parentTimer;
+    explicit TimerCallbackWrapper(QuicTimerCallback* callback) {
       callback_ = callback;
     }
 
-    friend class HighResQuicTimer;
-
     void timeoutExpired() noexcept override {
-      parentTimer_->unregisterCallbackInternal(callback_);
       callback_->timeoutExpired();
-      delete this;
     }
 
     void callbackCanceled() noexcept override {
-      parentTimer_->unregisterCallbackInternal(callback_);
       callback_->callbackCanceled();
-      delete this;
+    }
+
+    // QuicTimerCallback::TimerCallbackImpl
+    void cancelImpl() noexcept override {
+      folly::HHWheelTimerHighRes::Callback::cancelTimeout();
+    }
+
+    // QuicTimerCallback::TimerCallbackImpl
+    [[nodiscard]] bool isScheduledImpl() const noexcept override {
+      return folly::HHWheelTimerHighRes::Callback::isScheduled();
+    }
+
+    // QuicTimerCallback::TimerCallbackImpl
+    [[nodiscard]] std::chrono::milliseconds getTimeRemainingImpl()
+        const noexcept override {
+      // TODO parametrize this type if it's used anywhere outside of tests
+      return std::chrono::duration_cast<std::chrono::milliseconds>(
+          folly::HHWheelTimerHighRes::Callback::getTimeRemaining());
     }
 
    private:
-    HighResQuicTimer* parentTimer_;
     QuicTimerCallback* callback_;
-    folly::IntrusiveListHook listHook_;
   };
-
-  folly::IntrusiveList<TimerCallbackWrapper, &TimerCallbackWrapper::listHook_>
-      timerCallbackWrappers_;
 
   folly::HHWheelTimerHighRes::UniquePtr wheelTimer_;
 };

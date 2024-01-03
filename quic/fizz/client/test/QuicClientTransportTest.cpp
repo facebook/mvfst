@@ -1199,8 +1199,8 @@ TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV4Address) {
   EXPECT_FALSE(conn.happyEyeballsState.finished);
   EXPECT_FALSE(conn.peerAddress.isInitialized());
   client->start(&clientConnSetupCallback, &clientConnCallback);
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                   .isTimerCallbackScheduled());
   EXPECT_TRUE(conn.happyEyeballsState.finished);
   EXPECT_EQ(conn.peerAddress, serverAddr);
 }
@@ -1219,8 +1219,8 @@ TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV6Address) {
   EXPECT_FALSE(conn.happyEyeballsState.finished);
   EXPECT_FALSE(conn.peerAddress.isInitialized());
   client->start(&clientConnSetupCallback, &clientConnCallback);
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                   .isTimerCallbackScheduled());
   EXPECT_TRUE(conn.happyEyeballsState.finished);
   EXPECT_EQ(conn.peerAddress, serverAddrV6);
 }
@@ -1231,7 +1231,7 @@ TEST_F(QuicClientTransportTest, IdleTimerResetOnWritingFirstData) {
   client->start(&clientConnSetupCallback, &clientConnCallback);
   loopForWrites();
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 }
 
 TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
@@ -1393,8 +1393,8 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
     EXPECT_EQ(socketWrites.size(), 1);
     EXPECT_TRUE(
         verifyLongHeader(*socketWrites.at(0), LongHeader::Types::Initial));
@@ -1414,8 +1414,8 @@ class QuicClientTransportHappyEyeballsTest
     } else {
       performFakeHandshake(firstAddress);
     }
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
     EXPECT_TRUE(client->getConn().happyEyeballsState.finished);
     EXPECT_EQ(client->getConn().originalPeerAddress, firstAddress);
     EXPECT_EQ(client->getConn().peerAddress, firstAddress);
@@ -1440,8 +1440,8 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
     EXPECT_EQ(socketWrites.size(), 1);
     EXPECT_TRUE(
         verifyLongHeader(*socketWrites.at(0), LongHeader::Types::Initial));
@@ -1450,11 +1450,11 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -1465,7 +1465,7 @@ class QuicClientTransportHappyEyeballsTest
           return buf->computeChainDataLength();
         }));
     EXPECT_CALL(*secondSock, write(secondAddress, _));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
     EXPECT_EQ(socketWrites.size(), 1);
     EXPECT_TRUE(
@@ -1517,8 +1517,8 @@ class QuicClientTransportHappyEyeballsTest
     setConnectionIds();
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
     EXPECT_EQ(socketWrites.size(), 1);
 
     EXPECT_TRUE(
@@ -1528,11 +1528,11 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -1543,7 +1543,7 @@ class QuicClientTransportHappyEyeballsTest
           socketWrites.push_back(buf->clone());
           return buf->computeChainDataLength();
         }));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
     EXPECT_EQ(socketWrites.size(), 1);
     EXPECT_TRUE(
@@ -1591,8 +1591,8 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
     EXPECT_TRUE(conn.happyEyeballsState.finished);
   }
@@ -1612,12 +1612,12 @@ class QuicClientTransportHappyEyeballsTest
     // Continue trying first socket
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(secondAddress, _));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1638,12 +1638,12 @@ class QuicClientTransportHappyEyeballsTest
     // Give up first socket
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     EXPECT_CALL(*sock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, write(secondAddress, _));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1674,12 +1674,12 @@ class QuicClientTransportHappyEyeballsTest
     client->errMessage(cmsgbuf.hdr);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     EXPECT_CALL(*sock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, write(secondAddress, _));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 #endif
   }
@@ -1694,23 +1694,23 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
     EXPECT_CALL(*secondSock, write(secondAddress, _));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -1718,7 +1718,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
     EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1732,16 +1732,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -1752,7 +1752,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*sock, pauseRead()).Times(2);
     EXPECT_CALL(*sock, close()).Times(1);
     EXPECT_CALL(*secondSock, write(secondAddress, _));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -1760,7 +1760,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1775,16 +1775,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     EXPECT_CALL(*sock, pauseRead()).Times(2);
     EXPECT_CALL(*sock, close()).Times(1);
@@ -1806,7 +1806,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 #endif
   }
@@ -1821,23 +1821,23 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -1845,7 +1845,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
     EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1859,16 +1859,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -1879,7 +1879,7 @@ class QuicClientTransportHappyEyeballsTest
     // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*secondSock, pauseRead()).Times(2);
     EXPECT_CALL(*secondSock, close()).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -1887,7 +1887,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1902,16 +1902,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -1930,7 +1930,7 @@ class QuicClientTransportHappyEyeballsTest
     // Socket is paused read once during happy eyeballs
     EXPECT_CALL(*secondSock, pauseRead()).Times(1);
     EXPECT_CALL(*secondSock, close()).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -1938,7 +1938,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 #endif
   }
@@ -1953,16 +1953,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -1970,7 +1970,7 @@ class QuicClientTransportHappyEyeballsTest
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -1978,7 +1978,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
     EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
 
@@ -1992,16 +1992,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
@@ -2010,7 +2010,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
     EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
-    qEvb_->cancelTimeout(&client->lossTimeout());
+    client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
@@ -2028,16 +2028,16 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
 
     // Manually expire conn attempt timeout
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
     client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-        &client->happyEyeballsConnAttemptDelayTimeout()));
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
 
     union {
       struct cmsghdr hdr;
@@ -3350,11 +3350,11 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  qEvb_->cancelTimeout(&client->idleTimeout());
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  client->idleTimeout().cancelTimerCallback();
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   deliverData(packet->coalesce());
   ASSERT_TRUE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 
   auto packet2 = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -3364,11 +3364,11 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
-  qEvb_->cancelTimeout(&client->idleTimeout());
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  client->idleTimeout().cancelTimerCallback();
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   deliverData(packet2->coalesce());
   ASSERT_TRUE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
@@ -3388,11 +3388,11 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
   deliverData(packet->coalesce(), false);
 
   ASSERT_TRUE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 
-  qEvb_->cancelTimeout(&client->idleTimeout());
+  client->idleTimeout().cancelTimerCallback();
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   quicStats_ = std::make_shared<testing::NiceMock<MockQuicStats>>();
   client->setTransportStatsCallback(quicStats_);
   EXPECT_CALL(*quicStats_, onDuplicatedPacketReceived());
@@ -3400,7 +3400,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
   deliverData(packet->coalesce(), false);
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   client->closeNow(folly::none);
 }
 
@@ -3427,14 +3427,14 @@ TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
   } else {
     client->close(folly::none);
   }
-  qEvb_->cancelTimeout(&client->idleTimeout());
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  client->idleTimeout().cancelTimerCallback();
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
 
   deliverDataWithoutErrorCheck(packet->coalesce());
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->lossTimeout()));
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->ackTimeout()));
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&client->drainTimeout()));
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
+  ASSERT_FALSE(client->lossTimeout().isTimerCallbackScheduled());
+  ASSERT_FALSE(client->ackTimeout().isTimerCallbackScheduled());
+  ASSERT_TRUE(client->drainTimeout().isTimerCallbackScheduled());
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
@@ -3450,13 +3450,13 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
 
   // There should still be outstanding packets
   auto expected = IOBuf::copyBuffer("hello");
-  qEvb_->cancelTimeout(&client->idleTimeout());
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  client->idleTimeout().cancelTimerCallback();
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   client->writeChain(streamId, expected->clone(), false);
   loopForWrites();
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   client->closeNow(folly::none);
 }
 
@@ -3477,12 +3477,12 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   // Clear out all the outstanding packets to simulate quiescent state.
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
   client->getNonConstConn().outstandings.reset();
-  qEvb_->cancelTimeout(&client->idleTimeout());
+  client->idleTimeout().cancelTimerCallback();
   auto streamId = client->createBidirectionalStream().value();
   auto expected = folly::IOBuf::copyBuffer("hello");
   client->writeChain(streamId, expected->clone(), false);
   loopForWrites();
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  ASSERT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
@@ -3490,7 +3490,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
   socketWrites.clear();
   client->idleTimeout().timeoutExpired();
 
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  EXPECT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
   EXPECT_TRUE(client->isDraining());
   EXPECT_TRUE(client->isClosed());
 
@@ -4633,7 +4633,7 @@ TEST_F(QuicClientTransportAfterStartTest, WriteThrowsExceptionWhileDraining) {
       toString(LocalErrorCode::INTERNAL_ERROR).str());
   EXPECT_CALL(*sock, write(_, _)).WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
   client->close(err);
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+  EXPECT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, DestroyEvbWhileLossTimeoutActive) {
@@ -4644,7 +4644,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyEvbWhileLossTimeoutActive) {
   auto write = IOBuf::copyBuffer("no");
   client->writeChain(streamId, write->clone(), true);
   loopForWrites();
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(&client->lossTimeout()));
+  EXPECT_TRUE(client->lossTimeout().isTimerCallbackScheduled());
   eventbase_.reset();
 }
 
@@ -5383,10 +5383,10 @@ TEST_F(
   auto& conn = client->getConn();
   EXPECT_EQ(conn.peerAddress, firstAddress);
   EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                  .isTimerCallbackScheduled());
   // Cancel the delay timer because we want to manually fire it
-  qEvb_->cancelTimeout(&client->happyEyeballsConnAttemptDelayTimeout());
+  client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
 
   auto streamId = client->createBidirectionalStream().value();
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
@@ -5399,8 +5399,8 @@ TEST_F(
   EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
   client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
   EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                   .isTimerCallbackScheduled());
   loopForWrites();
   // Declared lost
   EXPECT_FALSE(zeroRttPacketsOutstanding());
@@ -5422,7 +5422,7 @@ TEST_F(
             socketWrites.push_back(buf->clone());
             return buf->computeChainDataLength();
           }));
-  qEvb_->cancelTimeout(&client->lossTimeout());
+  client->lossTimeout().cancelTimerCallback();
   client->lossTimeout().timeoutExpired();
   ASSERT_EQ(socketWrites.size(), 4);
   EXPECT_TRUE(
@@ -5473,8 +5473,8 @@ TEST_F(
   auto& conn = client->getConn();
   EXPECT_EQ(conn.peerAddress, firstAddress);
   EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  ASSERT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                  .isTimerCallbackScheduled());
 
   EXPECT_CALL(*sock, write(firstAddress, _))
       .WillOnce(Invoke(
@@ -5486,12 +5486,12 @@ TEST_F(
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_FALSE(zeroRttPacketsOutstanding());
-  ASSERT_FALSE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  ASSERT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                   .isTimerCallbackScheduled());
 
   ASSERT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(
-      &client->happyEyeballsConnAttemptDelayTimeout()));
+  EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                   .isTimerCallbackScheduled());
 
   EXPECT_CALL(*secondSock, write(secondAddress, _))
       .Times(2)
@@ -5500,7 +5500,7 @@ TEST_F(
             socketWrites.push_back(buf->clone());
             return buf->computeChainDataLength();
           }));
-  qEvb_->cancelTimeout(&client->lossTimeout());
+  client->lossTimeout().cancelTimerCallback();
   client->lossTimeout().timeoutExpired();
   ASSERT_EQ(socketWrites.size(), 2);
   EXPECT_TRUE(

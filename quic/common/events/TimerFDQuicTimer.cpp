@@ -27,43 +27,19 @@ void TimerFDQuicTimer::scheduleTimeout(
     // There is no callback. Nothing to schedule.
     return;
   }
-  if (QuicEventBase::getImplHandle(callback)) {
-    // This callback is already scheduled.
-    return;
+  auto wrapper = static_cast<TimerCallbackWrapper*>(
+      QuicEventBase::getImplHandle(callback));
+  if (wrapper == nullptr) {
+    // This is the first time this timer callback is getting scheduled. Create a
+    // wrapper for it.
+    wrapper = new TimerCallbackWrapper(callback);
+    QuicEventBase::setImplHandle(callback, wrapper);
   }
-  auto* wrapper = new TimerCallbackWrapper(callback, this);
-  timerCallbackWrappers_.push_back(*wrapper);
-  QuicEventBase::setImplHandle(callback, wrapper);
   return wheelTimer_->scheduleTimeout(wrapper, timeout);
 }
 
-bool TimerFDQuicTimer::isTimerCallbackScheduled(
-    QuicTimerCallback* callback) const {
-  if (!callback || !QuicEventBase::getImplHandle(callback)) {
-    // There is no wrapper. Nothing is scheduled.
-    return false;
-  }
-  auto wrapper = static_cast<TimerCallbackWrapper*>(
-      QuicEventBase::getImplHandle(callback));
-  return wrapper->isScheduled();
-}
-
-void TimerFDQuicTimer::cancelTimeout(QuicTimerCallback* callback) {
-  if (!callback || !QuicEventBase::getImplHandle(callback)) {
-    // There is no wrapper. Nothing to cancel.
-    return;
-  }
-  auto wrapper = static_cast<TimerCallbackWrapper*>(
-      QuicEventBase::getImplHandle(callback));
-  wrapper->cancelTimeout();
-  unregisterCallbackInternal(callback);
-  delete wrapper;
-}
-
 TimerFDQuicTimer::~TimerFDQuicTimer() {
-  // Resetting the wheel timer cancels all pending timeouts which clears the
-  // wrappers.
+  // Resetting the wheel timer cancels all pending timeouts.
   wheelTimer_.reset();
-  CHECK(timerCallbackWrappers_.empty());
 }
 } // namespace quic

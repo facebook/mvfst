@@ -11,6 +11,16 @@
 
 namespace {
 
+void libEvTimeoutCallback(
+    struct ev_loop* /* loop */,
+    ev_timer* w,
+    int /* revents */) {
+  auto wrapper =
+      static_cast<quic::LibevQuicEventBase::TimerCallbackWrapper*>(w->data);
+  CHECK(wrapper != nullptr);
+  wrapper->timeoutExpired();
+}
+
 void libEvCheckCallback(
     struct ev_loop* /* loop */,
     ev_check* w,
@@ -44,7 +54,14 @@ void LibevQuicEventBase::runInLoop(
     QuicEventBaseLoopCallback* callback,
     bool /* thisIteration */) {
   CHECK(isInEventBaseThread());
-  loopCallbacks_.push_back(callback);
+  auto wrapper = static_cast<LoopCallbackWrapper*>(getImplHandle(callback));
+  if (!wrapper) {
+    wrapper = new LoopCallbackWrapper(callback);
+    QuicEventBase::setImplHandle(callback, wrapper);
+  }
+  if (!wrapper->listHook_.is_linked()) {
+    loopCallbackWrappers_.push_back(*wrapper);
+  }
 }
 
 void LibevQuicEventBase::runInEventBaseThreadAndWait(
@@ -52,49 +69,53 @@ void LibevQuicEventBase::runInEventBaseThreadAndWait(
   fn();
 }
 
-void LibevQuicEventBase::cancelLoopCallback(
-    QuicEventBaseLoopCallback* callback) {
-  auto itr = std::find(loopCallbacks_.begin(), loopCallbacks_.end(), callback);
-  if (itr != loopCallbacks_.end()) {
-    loopCallbacks_.erase(itr);
-  }
+void LibevQuicEventBase::scheduleTimeout(
+    QuicTimerCallback* timerCallback,
+    std::chrono::milliseconds timeout) {
+  scheduleTimeout(
+      timerCallback,
+      std::chrono::duration_cast<std::chrono::microseconds>(timeout));
 }
 
-bool LibevQuicEventBase::isLoopCallbackScheduled(
-    QuicEventBaseLoopCallback* callback) const {
-  auto itr = std::find(loopCallbacks_.begin(), loopCallbacks_.end(), callback);
-  return itr != loopCallbacks_.end();
+bool LibevQuicEventBase::scheduleTimeoutHighRes(
+    QuicTimerCallback* timerCallback,
+    std::chrono::microseconds timeout) {
+  scheduleTimeout(timerCallback, timeout);
+  return true;
 }
 
 void LibevQuicEventBase::scheduleTimeout(
-    QuicTimerCallback* callback,
-    std::chrono::milliseconds timeout) {
-  CHECK(!isTimeoutScheduled(callback));
-
-  auto evTimer = new LibevQuicTimer(ev_loop_, true /*selfOwned*/);
-
-  evTimer->scheduleTimeout(
-      callback, std::chrono::duration_cast<std::chrono::microseconds>(timeout));
-  setImplHandle(callback, evTimer);
-}
-
-bool LibevQuicEventBase::isTimeoutScheduled(QuicTimerCallback* callback) const {
-  auto evTimer = static_cast<LibevQuicTimer*>(getImplHandle(callback));
-  return evTimer && evTimer->isTimerCallbackScheduled(callback);
-}
-
-void LibevQuicEventBase::cancelTimeout(QuicTimerCallback* callback) {
-  auto evTimer = static_cast<LibevQuicTimer*>(getImplHandle(callback));
-  if (evTimer) {
-    evTimer->cancelTimeout(callback);
+    QuicTimerCallback* timerCallback,
+    std::chrono::microseconds timeout) {
+  if (!timerCallback) {
+    // There is no callback. Nothing to schedule.
+    return;
   }
+  double seconds = timeout.count() / 1000.;
+  auto wrapper =
+      static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
+  if (wrapper == nullptr) {
+    // This is the first time this timer callback is getting scheduled. Create a
+    // wrapper for it.
+    wrapper = new TimerCallbackWrapper(timerCallback, ev_loop_);
+    wrapper->ev_timer_.data = wrapper;
+    ev_timer_init(
+        &wrapper->ev_timer_,
+        libEvTimeoutCallback,
+        seconds /* after */,
+        0. /* repeat */);
+    setImplHandle(timerCallback, wrapper);
+  } else {
+    // We already have a wrapper. Just re-arm it.
+    ev_timer_set(&wrapper->ev_timer_, seconds /* after */, 0. /* repeat */);
+  }
+
+  ev_timer_start(ev_loop_, &wrapper->ev_timer_);
 }
 
 void LibevQuicEventBase::checkCallbacks() {
-  std::vector<QuicEventBaseLoopCallback*> callbacks;
-  std::swap(callbacks, loopCallbacks_);
-  for (auto cb : callbacks) {
-    cb->runLoopCallback();
+  while (!loopCallbackWrappers_.empty()) {
+    loopCallbackWrappers_.front().runLoopCallback();
   }
 }
 

@@ -88,7 +88,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
   }
 
   bool isDraining() {
-    return evb_->isTimeoutScheduled(&drainTimeout_);
+    return drainTimeout_.isTimerCallbackScheduled();
   }
 
   void triggerCryptoEvent() {
@@ -191,7 +191,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   void startTransport() {
     server->accept();
     setupConnection();
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(&server->idleTimeout()));
+    EXPECT_TRUE(server->idleTimeout().isTimerCallbackScheduled());
     EXPECT_EQ(server->getConn().peerConnectionIds.size(), 1);
     EXPECT_EQ(
         *server->getConn().clientConnectionId,

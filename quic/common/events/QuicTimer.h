@@ -26,10 +26,6 @@ class QuicTimer : public folly::DelayedDestruction {
   virtual void scheduleTimeout(
       QuicTimerCallback* callback,
       std::chrono::microseconds timeout) = 0;
-
-  virtual bool isTimerCallbackScheduled(QuicTimerCallback* callback) const = 0;
-
-  virtual void cancelTimeout(QuicTimerCallback* callback) = 0;
 };
 
 } // namespace quic

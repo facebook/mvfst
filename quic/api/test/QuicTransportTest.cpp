@@ -2224,14 +2224,15 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(conn.outstandingPathValidation);
   EXPECT_FALSE(
-      qEvb_->isTimeoutScheduled(&transport_->getPathValidationTimeout()));
+      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
+
   loopForWrites();
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
   EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(conn.outstandingPathValidation);
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge);
   EXPECT_TRUE(
-      qEvb_->isTimeoutScheduled(&transport_->getPathValidationTimeout()));
+      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
 
   EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
@@ -2267,18 +2268,18 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(conn.outstandingPathValidation);
   EXPECT_FALSE(
-      qEvb_->isTimeoutScheduled(&transport_->getPathValidationTimeout()));
+      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
   loopForWrites();
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
   EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(conn.outstandingPathValidation);
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge);
   EXPECT_TRUE(
-      qEvb_->isTimeoutScheduled(&transport_->getPathValidationTimeout()));
+      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
 
   EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
 
-  qEvb_->cancelTimeout(&transport_->getPathValidationTimeout());
+  transport_->getPathValidationTimeout().cancelTimerCallback();
   transport_->getPathValidationTimeout().timeoutExpired();
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(conn.outstandingPathValidation);
@@ -2303,12 +2304,12 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
   EXPECT_TRUE(conn.outstandingPathValidation);
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge);
   EXPECT_TRUE(
-      qEvb_->isTimeoutScheduled(&transport_->getPathValidationTimeout()));
+      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
 
   EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
 
   PathChallengeFrame pathChallenge2(456);
-  qEvb_->cancelTimeout(&transport_->getPathValidationTimeout());
+  transport_->getPathValidationTimeout().cancelTimerCallback();
   conn.pendingEvents.schedulePathValidationTimeout = false;
   conn.outstandingPathValidation = folly::none;
   conn.pendingEvents.pathChallenge = pathChallenge2;
@@ -2321,7 +2322,7 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
   EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge2);
   EXPECT_TRUE(
-      qEvb_->isTimeoutScheduled(&transport_->getPathValidationTimeout()));
+      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
 
   EXPECT_EQ(2, transport_->getConnectionState().outstandings.packets.size());
 }
@@ -2432,7 +2433,7 @@ TEST_F(QuicTransportTest, DoNotResendLostPathChallengeIfNotOutstanding) {
           ->packet;
 
   // Fire path validation timer
-  qEvb_->cancelTimeout(&transport_->getPathValidationTimeout());
+  transport_->getPathValidationTimeout().cancelTimerCallback();
   transport_->getPathValidationTimeout().timeoutExpired();
 
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
@@ -4446,41 +4447,41 @@ TEST_F(QuicTransportTest, NoStream) {
 
 TEST_F(QuicTransportTest, CancelAckTimeout) {
   qEvb_->scheduleTimeout(transport_->getAckTimeout(), 1000000ms);
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = false;
   transport_->onNetworkData(
       SocketAddress("::1", 10128),
       NetworkData(IOBuf::copyBuffer("MTA New York Service"), Clock::now()));
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
 }
 
 TEST_F(QuicTransportTest, ScheduleAckTimeout) {
   // Make srtt large so we will use kMinAckTimeout
   transport_->getConnectionState().lossState.srtt = 25000000us;
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
       NetworkData(
           IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
-      qEvb_->getTimeoutTimeRemaining(transport_->getAckTimeout()).count(),
+      transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
       25,
       5);
 }
 
 TEST_F(QuicTransportTest, ScheduleAckTimeoutSRTTFactor) {
   transport_->getConnectionState().lossState.srtt = 50ms;
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
       NetworkData(
           IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
-      qEvb_->getTimeoutTimeRemaining(transport_->getAckTimeout()).count(),
+      transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
       50 / 4,
       2);
 }
@@ -4491,15 +4492,15 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutAckFreq) {
   transport_->getConnectionState()
       .ackStates.appDataAckState.ackFrequencySequenceNumber = 1;
   transport_->getConnectionState().ackStates.maxAckDelay = 50ms / 3;
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
       NetworkData(
           IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
-      qEvb_->getTimeoutTimeRemaining(transport_->getAckTimeout()).count(),
+      transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
       50 / 3,
       2);
 }
@@ -4508,28 +4509,28 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutFromMaxAckDelay) {
   // Make srtt large so we will use maxAckDelay
   transport_->getConnectionState().lossState.srtt = 25000000us;
   transport_->getConnectionState().ackStates.maxAckDelay = 10ms;
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
       NetworkData(
           IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
-      qEvb_->getTimeoutTimeRemaining(transport_->getAckTimeout()).count(),
+      transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
       10,
       5);
 }
 
 TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   transport_->getConnectionState().lossState.srtt = 25000000us;
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
       NetworkData(
           IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
-  EXPECT_TRUE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   // We need to send some packets, otherwise loss timer won't be scheduled
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(kDefaultUDPSendPacketLen + 20);
@@ -4541,7 +4542,7 @@ TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   EXPECT_TRUE(transport_->isLossTimeoutScheduled());
 
   transport_->closeNow(folly::none);
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(transport_->getAckTimeout()));
+  EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_FALSE(transport_->isLossTimeoutScheduled());
 }
 
@@ -4568,7 +4569,7 @@ TEST_F(QuicTransportTest, IdleTimeoutMin) {
   transport_->getConnectionState().peerIdleTimeout = 15s;
   transport_->setIdleTimerNow();
   EXPECT_NEAR(
-      qEvb_->getTimeoutTimeRemaining(&transport_->idleTimeout()).count(),
+      transport_->idleTimeout().getTimerCallbackTimeRemaining().count(),
       15000,
       1000);
 }
@@ -4577,16 +4578,16 @@ TEST_F(QuicTransportTest, IdleTimeoutLocalDisabled) {
   transport_->getConnectionState().transportSettings.idleTimeout = 0s;
   transport_->getConnectionState().peerIdleTimeout = 15s;
   transport_->setIdleTimerNow();
-  EXPECT_FALSE(qEvb_->isTimeoutScheduled(&transport_->idleTimeout()));
+  EXPECT_FALSE(transport_->idleTimeout().isTimerCallbackScheduled());
 }
 
 TEST_F(QuicTransportTest, IdleTimeoutPeerDisabled) {
   transport_->getConnectionState().transportSettings.idleTimeout = 60s;
   transport_->getConnectionState().peerIdleTimeout = 0s;
   transport_->setIdleTimerNow();
-  ASSERT_TRUE(qEvb_->isTimeoutScheduled(&transport_->idleTimeout()));
+  ASSERT_TRUE(transport_->idleTimeout().isTimerCallbackScheduled());
   EXPECT_NEAR(
-      qEvb_->getTimeoutTimeRemaining(&transport_->idleTimeout()).count(),
+      transport_->idleTimeout().getTimerCallbackTimeRemaining().count(),
       60000,
       1000);
 }

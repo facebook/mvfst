@@ -262,7 +262,7 @@ class TestQuicTransport
   }
 
   std::chrono::milliseconds getLossTimeoutRemainingTime() {
-    return evb_->getTimeoutTimeRemaining(&lossTimeout_);
+    return lossTimeout_.getTimerCallbackTimeRemaining();
   }
 
   void onReadData(const folly::SocketAddress&, ReceivedUdpPacket&& udpPacket)
@@ -365,7 +365,7 @@ class TestQuicTransport
   }
 
   void invokeCancelPingTimeout() {
-    evb_->cancelTimeout(&pingTimeout_);
+    pingTimeout_.cancelTimerCallback();
   }
 
   void invokeHandlePingCallbacks() {
@@ -377,10 +377,7 @@ class TestQuicTransport
   }
 
   bool isPingTimeoutScheduled() {
-    if (evb_->isTimeoutScheduled(&pingTimeout_)) {
-      return true;
-    }
-    return false;
+    return pingTimeout_.isTimerCallbackScheduled();
   }
 
   auto& writeLooper() {

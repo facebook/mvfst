@@ -77,13 +77,11 @@ void QuicTransportBase::scheduleTimeout(
 }
 
 void QuicTransportBase::cancelTimeout(QuicTimerCallback* callback) {
-  if (evb_) {
-    evb_->cancelTimeout(callback);
-  }
+  callback->cancelTimerCallback();
 }
 
 bool QuicTransportBase::isTimeoutScheduled(QuicTimerCallback* callback) const {
-  return evb_ ? evb_->isTimeoutScheduled(callback) : false;
+  return callback->isTimerCallbackScheduled();
 }
 
 void QuicTransportBase::setPacingTimer(

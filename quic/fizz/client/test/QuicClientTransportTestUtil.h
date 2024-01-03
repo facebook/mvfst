@@ -115,7 +115,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
   }
 
   bool isDraining() {
-    return evb_->isTimeoutScheduled(&drainTimeout_);
+    return drainTimeout_.isTimerCallbackScheduled();
   }
 
   auto& serverInitialParamsSet() {
@@ -549,7 +549,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     setUpSocketExpectations();
     client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
-    EXPECT_TRUE(qEvb_->isTimeoutScheduled(&client->idleTimeout()));
+    EXPECT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 
     EXPECT_EQ(socketWrites.size(), 1);
     EXPECT_TRUE(
