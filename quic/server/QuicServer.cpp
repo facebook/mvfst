@@ -195,31 +195,7 @@ void QuicServer::initializeWorkers(
       worker->setTransportFactory(transportFactory_.get());
       worker->setFizzContext(ctx_);
     }
-    if (healthCheckToken_) {
-      worker->setHealthCheckToken(*healthCheckToken_);
-    }
-    if (transportStatsFactory_) {
-      workerEvb->runInEventBaseThread(
-          [self = this->shared_from_this(),
-           workerPtr = worker.get(),
-           transportStatsFactory = transportStatsFactory_.get()] {
-            if (self->shutdown_) {
-              return;
-            }
-            auto statsCallback = transportStatsFactory->make();
-            CHECK(statsCallback);
-            workerPtr->setTransportStatsCallback(std::move(statsCallback));
-          });
-    }
-    worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
-    worker->setCongestionControllerFactory(ccFactory_);
-    if (rateLimit_) {
-      worker->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(
-          rateLimit_->count, rateLimit_->window));
-    }
-    worker->setUnfinishedHandshakeLimit(unfinishedHandshakeLimitFn_);
     worker->setWorkerId(i);
-    worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
     workers_.push_back(std::move(worker));
     evbToWorkers_.emplace(workerEvb, workers_.back().get());
   }
@@ -243,6 +219,22 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->setProcessId(processId_);
   worker->setHostId(hostId_);
   worker->setConnectionIdVersion(cidVersion_);
+  if (healthCheckToken_) {
+    worker->setHealthCheckToken(*healthCheckToken_);
+  }
+  if (transportStatsFactory_) {
+    auto statsCallback = transportStatsFactory_->make();
+    CHECK(statsCallback);
+    worker->setTransportStatsCallback(std::move(statsCallback));
+  }
+  worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
+  worker->setCongestionControllerFactory(ccFactory_);
+  if (rateLimit_) {
+    worker->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(
+        rateLimit_->count, rateLimit_->window));
+  }
+  worker->setUnfinishedHandshakeLimit(unfinishedHandshakeLimitFn_);
+  worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
   return worker;
 }
 
