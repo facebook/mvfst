@@ -114,8 +114,16 @@ void LibevQuicEventBase::scheduleTimeout(
 }
 
 void LibevQuicEventBase::checkCallbacks() {
-  while (!loopCallbackWrappers_.empty()) {
-    loopCallbackWrappers_.front().runLoopCallback();
+  // Running the callbacks in the loop callback list may change the contents of
+  // the list or completely delete the list (with the event base). We swap the
+  // list here to ensure the list survives until the end of the function.
+  folly::IntrusiveList<LoopCallbackWrapper, &LoopCallbackWrapper::listHook_>
+      currentLoopWrappers;
+  loopCallbackWrappers_.swap(currentLoopWrappers);
+  while (!currentLoopWrappers.empty()) {
+    // runLoopCallback first unlinks the callback wrapper from the list.
+    // This allows the callback to schedule itself again on the swapped list.
+    currentLoopWrappers.front().runLoopCallback();
   }
 }
 
