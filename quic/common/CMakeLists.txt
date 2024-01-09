@@ -31,7 +31,6 @@ add_library(
   mvfst_looper
   FunctionLooper.cpp
   events/HighResQuicTimer.cpp
-  events/TimerFDQuicTimer.cpp
 )
 
 set_property(TARGET mvfst_looper PROPERTY VERSION ${PACKAGE_VERSION})

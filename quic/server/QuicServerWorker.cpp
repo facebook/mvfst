@@ -180,7 +180,7 @@ void QuicServerWorker::setUnfinishedHandshakeLimit(
 void QuicServerWorker::start() {
   CHECK(socket_);
   if (!pacingTimer_) {
-    pacingTimer_ = std::make_unique<TimerFDQuicTimer>(
+    pacingTimer_ = std::make_unique<HighResQuicTimer>(
         evb_.get(), transportSettings_.pacingTimerResolution);
   }
   socket_->resumeRead(this);
@@ -618,7 +618,7 @@ void QuicServerWorker::forwardNetworkData(
 }
 
 void QuicServerWorker::setPacingTimer(
-    TimerFDQuicTimer::SharedPtr pacingTimer) noexcept {
+    QuicTimer::SharedPtr pacingTimer) noexcept {
   pacingTimer_ = std::move(pacingTimer);
 }
 

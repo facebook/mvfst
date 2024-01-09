@@ -12,6 +12,11 @@
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/HHWheelTimer.h>
 
+#if !FOLLY_MOBILE
+#define QUIC_USE_TIMERFD_TIMEOUT_MGR
+#include <folly/experimental/STTimerFDTimeoutManager.h>
+#endif
+
 namespace quic {
 
 class HighResQuicTimer : public QuicTimer {
@@ -66,6 +71,9 @@ class HighResQuicTimer : public QuicTimer {
   };
 
   folly::HHWheelTimerHighRes::UniquePtr wheelTimer_;
+#ifdef QUIC_USE_TIMERFD_TIMEOUT_MGR
+  folly::STTimerFDTimeoutManager timeoutMgr_;
+#endif
 };
 
 } // namespace quic

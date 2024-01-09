@@ -8,12 +8,23 @@
 #include <quic/common/events/HighResQuicTimer.h>
 
 namespace quic {
+
+#ifdef QUIC_USE_TIMERFD_TIMEOUT_MGR
+HighResQuicTimer::HighResQuicTimer(
+    folly::EventBase* eventBase,
+    std::chrono::microseconds intervalDuration)
+    : timeoutMgr_(eventBase) {
+  wheelTimer_ =
+      folly::HHWheelTimerHighRes::newTimer(&timeoutMgr_, intervalDuration);
+}
+#else
 HighResQuicTimer::HighResQuicTimer(
     folly::EventBase* eventBase,
     std::chrono::microseconds intervalDuration) {
   wheelTimer_ =
       folly::HHWheelTimerHighRes::newTimer(eventBase, intervalDuration);
 }
+#endif
 
 std::chrono::microseconds HighResQuicTimer::getTickInterval() const {
   return wheelTimer_->getTickInterval();

@@ -20,7 +20,7 @@
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/BufAccessor.h>
-#include <quic/common/events/TimerFDQuicTimer.h>
+#include <quic/common/events/HighResQuicTimer.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerTransportFactory.h>
@@ -180,7 +180,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   folly::EventBase* getEventBase() const;
 
-  void setPacingTimer(TimerFDQuicTimer::SharedPtr pacingTimer) noexcept;
+  void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
   /*
    * Take in a function to supply overrides for transport parameters, given
@@ -666,7 +666,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   enum ProcessId processId_ { ProcessId::ZERO };
   TakeoverPacketHandler takeoverPktHandler_;
   bool packetForwardingEnabled_{false};
-  TimerFDQuicTimer::SharedPtr pacingTimer_;
+  QuicTimer::SharedPtr pacingTimer_;
 
   // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
