@@ -67,8 +67,6 @@ class QuicTransportTest : public Test {
  public:
   QuicTransportTest() {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&evb_);
-    qTimer_ = std::make_unique<HighResQuicTimer>(
-        &evb_, evb_.timer().getTickInterval());
   }
   ~QuicTransportTest() override = default;
 
@@ -124,7 +122,6 @@ class QuicTransportTest : public Test {
  protected:
   folly::EventBase evb_;
   std::shared_ptr<FollyQuicEventBase> qEvb_;
-  std::unique_ptr<HighResQuicTimer> qTimer_;
   MockAsyncUDPSocket* socket_;
   NiceMock<MockConnectionSetupCallback> connSetupCallback_;
   NiceMock<MockConnectionCallback> connCallback_;
