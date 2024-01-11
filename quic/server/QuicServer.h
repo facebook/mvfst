@@ -365,6 +365,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
  private:
   QuicServer();
 
+  using MaybeOwnedEvbPtr =
+      std::unique_ptr<folly::IOExecutor, void (*)(folly::IOExecutor*)>;
+
+  // initializes a QuicServerWorker per evb.
+  void initializeImpl(
+      const folly::SocketAddress& address,
+      std::vector<MaybeOwnedEvbPtr> evbs,
+      bool useDefaultTransport = false);
+
   struct EventBaseBackendDetails {
     std::unique_ptr<folly::EventBaseBackendBase> (*factory)();
     bool supportsRecvmsgMultishot = false;
@@ -372,9 +381,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   static EventBaseBackendDetails getEventBaseBackendDetails();
 
   // helper function to initialize workers
-  void initializeWorkers(
-      const std::vector<folly::EventBase*>& evbs,
-      bool useDefaultTransport);
+  void initializeWorkers(bool useDefaultTransport);
 
   std::unique_ptr<QuicServerWorker> newWorkerWithoutSocket();
 
@@ -384,9 +391,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // helper method to run the given function in all worker synchronously
   void runOnAllWorkersSync(const std::function<void(QuicServerWorker*)>& func);
 
-  void bindWorkersToSocket(
-      const folly::SocketAddress& address,
-      const std::vector<folly::EventBase*>& evbs);
+  void bindWorkersToSocket(const folly::SocketAddress& address);
 
   std::vector<QuicVersion> supportedVersions_{{
       QuicVersion::MVFST,
@@ -404,7 +409,10 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::mutex startMutex_;
   std::atomic<bool> initialized_{false};
   std::atomic<bool> takeoverHandlerInitialized_{false};
-  std::vector<std::unique_ptr<folly::ScopedEventBaseThread>> workerEvbs_;
+
+  // stores all the worker evbs which may be owned (i.e. ScopedEventBaseThread)
+  // or unowned (i.e. folly::EventBase*)
+  folly::Synchronized<std::vector<MaybeOwnedEvbPtr>> workerEvbs_;
 
   std::vector<std::unique_ptr<QuicServerWorker>> workers_;
   // Thread local pointer to QuicServerWorker. This is useful to avoid

@@ -48,6 +48,14 @@ void checkRunningInThread(const std::thread::id expectedThreadId) {
   CHECK(std::this_thread::get_id() == expectedThreadId);
 }
 
+// these two functions either delete the IOExecutor if we own it, or otherwise
+// no-op
+void ownedEvbDeleter(folly::IOExecutor* evb) {
+  std::default_delete<folly::IOExecutor>()(evb);
+}
+
+void unownedEvbDeleter(folly::IOExecutor*) {}
+
 } // namespace
 //
 namespace quic {
@@ -134,23 +142,44 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   auto const backendDetails = getEventBaseBackendDetails();
   backendSupportsMultishotCallback_ = backendDetails.supportsRecvmsgMultishot;
   auto numWorkers = std::min(numCpu, maxWorkers);
-  std::vector<folly::EventBase*> evbs;
+
+  // ::start() is the api for QuicServer to construct and own the EventBases the
+  // QuicServerWorkers are running on
+  std::vector<MaybeOwnedEvbPtr> ownedEvbs;
+  ownedEvbs.reserve(numWorkers);
   for (size_t i = 0; i < numWorkers; ++i) {
     auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>(
         folly::EventBase::Options().setBackendFactory(backendDetails.factory),
         nullptr,
         "");
-    workerEvbs_.push_back(std::move(scopedEvb));
-    auto workerEvb = workerEvbs_.back()->getEventBase();
-    evbs.push_back(workerEvb);
+
+    ownedEvbs.push_back({scopedEvb.release(), ownedEvbDeleter});
   }
-  initialize(address, evbs, true /* useDefaultTransport */);
+  initializeImpl(address, std::move(ownedEvbs), true /* useDefaultTransport */);
   start();
 }
 
 void QuicServer::initialize(
     const folly::SocketAddress& address,
     const std::vector<folly::EventBase*>& evbs,
+    bool useDefaultTransport) {
+  checkRunningInThread(mainThreadId_);
+
+  // transform evbs to std::vector<MaybeOwnedEvbPtr> with no ownership
+  std::vector<MaybeOwnedEvbPtr> unownedEvbs;
+  unownedEvbs.reserve(evbs.size());
+
+  for (auto* evb : evbs) {
+    unownedEvbs.push_back(
+        {static_cast<folly::IOExecutor*>(evb), unownedEvbDeleter});
+  }
+
+  initializeImpl(address, std::move(unownedEvbs), useDefaultTransport);
+}
+
+void QuicServer::initializeImpl(
+    const folly::SocketAddress& address,
+    std::vector<MaybeOwnedEvbPtr> evbs,
     bool useDefaultTransport) {
   checkRunningInThread(mainThreadId_);
   CHECK(!evbs.empty());
@@ -170,25 +199,24 @@ void QuicServer::initialize(
   // it the connid algo factory is not set, use default impl
   if (!connIdAlgoFactory_) {
     connIdAlgoFactory_ = std::make_unique<DefaultConnectionIdAlgoFactory>();
-    connIdAlgo_ = connIdAlgoFactory_->make();
-  } else {
-    connIdAlgo_ = connIdAlgoFactory_->make();
   }
+  connIdAlgo_ = connIdAlgoFactory_->make();
+
   if (!ccFactory_) {
     ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
   }
 
-  initializeWorkers(evbs, useDefaultTransport);
-  bindWorkersToSocket(address, evbs);
+  workerEvbs_.swap(evbs);
+
+  initializeWorkers(useDefaultTransport);
+  bindWorkersToSocket(address);
 }
 
-void QuicServer::initializeWorkers(
-    const std::vector<folly::EventBase*>& evbs,
-    bool useDefaultTransport) {
+void QuicServer::initializeWorkers(bool useDefaultTransport) {
   CHECK(workers_.empty());
   // iterate in the order of insertion in vector
-  for (size_t i = 0; i < evbs.size(); ++i) {
-    auto workerEvb = evbs[i];
+  auto workerEvbs = workerEvbs_.rlock();
+  for (size_t i = 0; i < workerEvbs->size(); ++i) {
     auto worker = newWorkerWithoutSocket();
     if (useDefaultTransport) {
       CHECK(transportFactory_) << "Transport factory is not set";
@@ -197,7 +225,8 @@ void QuicServer::initializeWorkers(
     }
     worker->setWorkerId(i);
     workers_.push_back(std::move(worker));
-    evbToWorkers_.emplace(workerEvb, workers_.back().get());
+    evbToWorkers_.emplace(
+        (*workerEvbs)[i]->getEventBase(), workers_.back().get());
   }
 }
 
@@ -238,14 +267,13 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   return worker;
 }
 
-void QuicServer::bindWorkersToSocket(
-    const folly::SocketAddress& address,
-    const std::vector<folly::EventBase*>& evbs) {
-  auto numWorkers = evbs.size();
+void QuicServer::bindWorkersToSocket(const folly::SocketAddress& address) {
+  auto workerEvbs = workerEvbs_.rlock();
+  auto numWorkers = workerEvbs->size();
   CHECK(!initialized_);
   boundAddress_ = address;
   for (size_t i = 0; i < numWorkers; ++i) {
-    auto workerEvb = evbs[i];
+    auto* workerEvb = (*workerEvbs)[i]->getEventBase();
     workerEvb->runImmediatelyOrRunInEventBaseThreadAndWait(
         [self = this->shared_from_this(),
          workerEvb,
