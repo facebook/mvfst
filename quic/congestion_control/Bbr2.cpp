@@ -115,8 +115,7 @@ void Bbr2CongestionController::onPacketAckOrLoss(
             << ")";
   };
 
-  if (lossEvent && lossEvent->lostPackets > 0 &&
-      !conn_.transportSettings.ccaConfig.ignoreLoss) {
+  if (lossEvent && lossEvent->lostPackets > 0) {
     // The pseudo code in BBRHandleLostPacket is included in
     // updateProbeBwCyclePhase. No need to repeat it here.
 
