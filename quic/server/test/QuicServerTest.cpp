@@ -2269,8 +2269,14 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
         false,
         header.getDestinationConnId(),
         header.getSourceConnId());
-    server_->routeDataToWorker(
-        kClientAddr, std::move(routingData), std::move(networkData), version);
+    static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
+        ->routeDataToWorker(
+            kClientAddr,
+            std::move(routingData),
+            std::move(networkData),
+            version,
+            evbThread.getEventBase(),
+            /*isForwardedData=*/false);
   }));
   std::thread t([&] { server_->shutdown(); });
   t.join();
@@ -2324,11 +2330,14 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
             *networkData.getPackets()[0].buf, *initialData));
       }));
 
-  server_->routeDataToWorker(
-      client->address(),
-      std::move(routingData),
-      std::move(networkData),
-      version);
+  static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
+      ->routeDataToWorker(
+          client->address(),
+          std::move(routingData),
+          std::move(networkData),
+          version,
+          evbThread.getEventBase(),
+          /*isForwardedData=*/false);
 
   // cleanup transport
   transport->getEventBase()->runInEventBaseThreadAndWait(

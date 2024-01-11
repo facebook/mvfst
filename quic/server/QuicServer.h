@@ -216,19 +216,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   void waitUntilInitialized();
 
-  void handleWorkerError(LocalErrorCode error) override;
-
-  /**
-   * Routes the given data for the given client to the correct worker that may
-   * have the state for the connection associated with the given data and client
-   */
-  void routeDataToWorker(
-      const folly::SocketAddress& client,
-      RoutingData&& routingData,
-      NetworkData&& networkData,
-      folly::Optional<QuicVersion> quicVersion,
-      bool isForwardedData = false) override;
-
   /**
    * Set the transport factory for the worker associated with the given
    * eventbase.
@@ -364,6 +351,20 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
  private:
   QuicServer();
+
+  /**
+   * Routes the given data for the given client to the correct worker that may
+   * have the state for the connection associated with the given data and client
+   */
+  void routeDataToWorker(
+      const folly::SocketAddress& client,
+      RoutingData&& routingData,
+      NetworkData&& networkData,
+      folly::Optional<QuicVersion> quicVersion,
+      folly::EventBase* workerEvb,
+      bool isForwardedData = false) override;
+
+  void handleWorkerError(LocalErrorCode error) override;
 
   using MaybeOwnedEvbPtr =
       std::unique_ptr<folly::IOExecutor, void (*)(folly::IOExecutor*)>;

@@ -416,6 +416,7 @@ void QuicServer::routeDataToWorker(
     RoutingData&& routingData,
     NetworkData&& networkData,
     folly::Optional<QuicVersion> quicVersion,
+    folly::EventBase*,
     bool isForwardedData) {
   // figure out worker idx
   if (!initialized_) {

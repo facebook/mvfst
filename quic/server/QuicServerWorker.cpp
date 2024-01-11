@@ -614,6 +614,7 @@ void QuicServerWorker::forwardNetworkData(
       std::move(routingData),
       std::move(networkData),
       std::move(quicVersion),
+      getEventBase(),
       isForwardedData);
 }
 

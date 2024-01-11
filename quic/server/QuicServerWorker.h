@@ -167,6 +167,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
         RoutingData&& routingData,
         NetworkData&& networkData,
         folly::Optional<QuicVersion> quicVersion,
+        folly::EventBase* workerEvb,
         bool isForwardedData) = 0;
   };
 

@@ -84,6 +84,7 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
       RoutingData&& routingDataIn,
       NetworkData&& networkDataIn,
       folly::Optional<QuicVersion> quicVersion,
+      folly::EventBase*,
       bool isForwardedData = false) {
     auto routingData = std::make_unique<RoutingData>(std::move(routingDataIn));
     auto networkData = std::make_unique<NetworkData>(std::move(networkDataIn));
