@@ -208,6 +208,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
           qEvb, std::move(sock), std::move(fizzClientContext));
       quicClient_->setHostname("echo.com");
       quicClient_->addNewPeerAddress(addr);
+      quicClient_->setSupportedVersions({QuicVersion::QUIC_V1});
       if (!token.empty()) {
         quicClient_->setNewToken(token);
       }
