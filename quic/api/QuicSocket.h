@@ -270,6 +270,11 @@ class QuicSocket {
 
     // Total number of stream bytes received on this stream.
     folly::Optional<uint64_t> streamBytesReceived{0};
+
+    // Stream read error (if one occured)
+    folly::Optional<QuicErrorCode> streamReadError;
+    // Stream write error (if one occured)
+    folly::Optional<QuicErrorCode> streamWriteError;
   };
 
   /**

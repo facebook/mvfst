@@ -3600,7 +3600,9 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
       packets,
       stream->streamLossCount,
       stream->finalWriteOffset,
-      stream->finalReadOffset};
+      stream->finalReadOffset,
+      stream->streamReadError,
+      stream->streamWriteError};
 }
 
 void QuicTransportBase::describe(std::ostream& os) const {
