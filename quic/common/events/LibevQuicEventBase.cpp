@@ -91,7 +91,7 @@ void LibevQuicEventBase::scheduleTimeout(
     // There is no callback. Nothing to schedule.
     return;
   }
-  double seconds = timeout.count() / 1000.;
+  double seconds = std::chrono::duration<double>(timeout).count();
   auto wrapper =
       static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
   if (wrapper == nullptr) {
