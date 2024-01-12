@@ -404,6 +404,9 @@ void QuicTransportBase::closeImpl(
   conn_->ackStates.appDataAckState.acks.clear();
 
   if (transportReadyNotified_) {
+    // This connection was open, update the stats for close.
+    QUIC_STATS(conn_->statsCallback, onConnectionClose, cancelCode.code);
+
     processConnectionCallbacks(cancelCode);
   } else {
     processConnectionSetupCallbacks(cancelCode);
@@ -502,7 +505,6 @@ void QuicTransportBase::processConnectionCallbacks(
     return;
   }
 
-  QUIC_STATS(conn_->statsCallback, onConnectionClose, cancelCode.code);
   if (useConnectionEndWithErrorCallback_) {
     connCallback_->onConnectionEnd(cancelCode);
     return;

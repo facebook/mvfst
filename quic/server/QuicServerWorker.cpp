@@ -1292,7 +1292,6 @@ void QuicServerWorker::onConnectionIdAvailable(
       // If we aren't currently running, start the timer.
       evb_->timer().scheduleTimeout(this, timeLoggingSamplingInterval_);
     }
-    QUIC_STATS(statsCallback_, onNewConnection);
   }
 }
 

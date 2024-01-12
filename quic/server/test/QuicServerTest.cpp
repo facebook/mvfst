@@ -657,7 +657,6 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   PacketNum num = 2;
   ShortHeader shortHeaderConnId(ProtectionType::KeyPhaseZero, connId, num);
 
-  EXPECT_CALL(*quicStats_, onNewConnection());
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
   worker_.get()->onConnectionIdAvailable(transport_, connId);
   const auto& connIdMap = worker_->getConnectionIdMap();
@@ -726,7 +725,6 @@ TEST_F(QuicServerWorkerTest, RetireConnIds) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   const auto& addrMap = worker_->getSrcToTransportMap();
 
-  EXPECT_CALL(*quicStats_, onNewConnection());
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
   worker_->onConnectionIdAvailable(transport_, connId);
   EXPECT_EQ(connIdMap.count(connId), 1);
@@ -804,7 +802,6 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 
-  EXPECT_CALL(*quicStats_, onNewConnection());
   ConnectionId newConnId = getTestConnectionId(hostId_);
 
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
@@ -1149,7 +1146,6 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
   auto connId = getTestConnectionId(hostId_);
   createQuicConnection(kClientAddr, connId);
 
-  EXPECT_CALL(*quicStats_, onNewConnection());
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
@@ -1188,7 +1184,6 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
   auto connId = getTestConnectionId(hostId_);
   createQuicConnection(kClientAddr, connId);
 
-  EXPECT_CALL(*quicStats_, onNewConnection());
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);

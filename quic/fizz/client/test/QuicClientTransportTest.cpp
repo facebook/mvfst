@@ -175,6 +175,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
 
   void expectStatsCallbacks() {
     quicStats_ = std::make_shared<MockQuicStats>();
+    EXPECT_CALL(*quicStats_, onNewConnection()).Times(1);
     EXPECT_CALL(*quicStats_, onPacketReceived()).Times(AtLeast(1));
     EXPECT_CALL(*quicStats_, onPacketSent()).Times(AtLeast(1));
     EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);

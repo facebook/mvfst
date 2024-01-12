@@ -4596,6 +4596,7 @@ class QuicServerTransportHandshakeTest
     // If 0-rtt is accepted, one rtt write cipher will be available after CHLO
     // is processed
     if (GetParam().acceptZeroRtt) {
+      EXPECT_CALL(*quicStats_, onNewConnection());
       EXPECT_CALL(connSetupCallback, onTransportReady());
       EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(0);
     }
@@ -4606,6 +4607,7 @@ class QuicServerTransportHandshakeTest
     // If 0-rtt is disabled, one rtt write cipher will be available after CFIN
     // is processed
     if (!GetParam().acceptZeroRtt) {
+      EXPECT_CALL(*quicStats_, onNewConnection());
       EXPECT_CALL(connSetupCallback, onTransportReady());
     }
     // onConnectionIdBound is always invoked after CFIN is processed

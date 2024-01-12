@@ -684,6 +684,9 @@ void QuicServerTransport::maybeNotifyTransportReady() {
     }
     transportReadyNotified_ = true;
     connSetupCallback_->onTransportReady();
+
+    // This is a new connection. Update QUIC Stats
+    QUIC_STATS(conn_->statsCallback, onNewConnection);
   }
 }
 

@@ -827,6 +827,9 @@ void QuicClientTransport::onReadData(
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
     connSetupCallback_->onTransportReady();
+
+    // This is a new connection. Update QUIC Stats
+    QUIC_STATS(statsCallback_, onNewConnection);
   }
 
   // Checking connSetupCallback_ because application will start to write data
