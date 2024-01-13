@@ -150,8 +150,12 @@ uint64_t convertEncodedDurationToMicroseconds(
     uint64_t delay) {
   // ackDelayExponentToUse is guaranteed to be less than the size of uint64_t
   uint64_t delayOverflowMask = 0xFFFFFFFFFFFFFFFF;
-  uint8_t leftShift = (sizeof(delay) * 8 - exponentToUse);
-  DCHECK_LT(leftShift, sizeof(delayOverflowMask) * 8);
+
+  constexpr uint8_t delayValWidth = sizeof(delay) * 8;
+  if (exponentToUse == 0 || exponentToUse >= delayValWidth) {
+    return delay;
+  }
+  uint8_t leftShift = (delayValWidth - exponentToUse);
   delayOverflowMask = delayOverflowMask << leftShift;
   if ((delay & delayOverflowMask) != 0) {
     throw QuicTransportException(
