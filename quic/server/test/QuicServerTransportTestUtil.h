@@ -403,9 +403,10 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     // Once oneRtt keys are available, ServerTransport must call the
     // onConnectionIdBound on its 'routingCallback'
     EXPECT_CALL(routingCallback, onConnectionIdBound(testing::_))
-        .WillOnce(testing::Invoke([&, clientAddr = clientAddr](auto transport) {
-          EXPECT_EQ(clientAddr, transport->getOriginalPeerAddress());
-        }));
+        .WillOnce(
+            testing::Invoke([&, clientAddr_2 = clientAddr](auto transport) {
+              EXPECT_EQ(clientAddr_2, transport->getOriginalPeerAddress());
+            }));
 
     EXPECT_TRUE(server->getConn().pendingEvents.frames.empty());
     EXPECT_EQ(server->getConn().nextSelfConnectionIdSequence, 1);
