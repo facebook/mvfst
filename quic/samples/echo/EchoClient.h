@@ -279,7 +279,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       if (message.empty()) {
         continue;
       }
-      evb->runInEventBaseThreadAndWait([=] {
+      evb->runInEventBaseThreadAndWait([=, this] {
         if (enableStreamGroups_) {
           sendMessageInStreamGroup();
         } else {
