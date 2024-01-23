@@ -34,6 +34,8 @@ class BufAccessor {
 
 class SimpleBufAccessor : public BufAccessor {
  public:
+  explicit SimpleBufAccessor(Buf buf);
+
   // The result capacity could be higher than the desired capacity.
   explicit SimpleBufAccessor(size_t capacity);
 
