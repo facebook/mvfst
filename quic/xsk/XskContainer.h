@@ -77,6 +77,6 @@ class XskContainer {
   int numQueues_;
 };
 
-#endif
-
 } // namespace facebook::xdpsocket
+
+#endif
