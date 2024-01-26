@@ -27,11 +27,11 @@ EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type) {
 folly::StringPiece getQuicVersionSalt(QuicVersion version) {
   switch (version) {
     case QuicVersion::QUIC_V1:
-      FOLLY_FALLTHROUGH;
+      [[fallthrough]];
     case QuicVersion::QUIC_V1_ALIAS:
       return kQuicV1Salt;
     case QuicVersion::MVFST:
-      FOLLY_FALLTHROUGH;
+      [[fallthrough]];
     default:
       // Default to one arbitrarily.
       return kQuicDraft23Salt;
