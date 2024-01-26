@@ -130,9 +130,9 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     : remainingBytes_(remainingBytes),
       largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
-      header_(folly::IOBuf::create(kLongHeaderHeaderSize)),
+      header_(folly::IOBuf::CreateOp::CREATE, kLongHeaderHeaderSize),
       body_(folly::IOBuf::create(kAppenderGrowthSize)),
-      headerAppender_(header_.get(), kLongHeaderHeaderSize),
+      headerAppender_(&header_, kLongHeaderHeaderSize),
       bodyAppender_(body_.get(), kAppenderGrowthSize) {
   if (frameHint) {
     packet_.frames.reserve(frameHint);
@@ -143,7 +143,7 @@ uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
   bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
   CHECK(packetNumberEncoding_)
       << "packetNumberEncoding_ should be valid after ctor";
-  return folly::to<uint32_t>(header_->computeChainDataLength()) +
+  return folly::to<uint32_t>(header_.computeChainDataLength()) +
       (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
 }
 
@@ -399,7 +399,7 @@ bool RegularSizeEnforcedPacketBuilder::canBuildPacket() const noexcept {
   const ShortHeader* shortHeader = packet_.header.asShort();
   // We also don't want to send packets longer than kDefaultMaxUDPPayload
   return shortHeader && enforcedSize_ <= kDefaultMaxUDPPayload &&
-      (body_->computeChainDataLength() + header_->computeChainDataLength() +
+      (body_->computeChainDataLength() + header_.computeChainDataLength() +
            cipherOverhead_ <
        enforcedSize_);
 }
@@ -409,7 +409,7 @@ RegularSizeEnforcedPacketBuilder::buildPacket() && {
   // Store counters on the stack to overhead from function calls
   size_t extraDataWritten = 0;
   size_t bodyLength = body_->computeChainDataLength();
-  size_t headerLength = header_->computeChainDataLength();
+  size_t headerLength = header_.computeChainDataLength();
   while (extraDataWritten + bodyLength + headerLength + cipherOverhead_ <
          enforcedSize_) {
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
@@ -435,7 +435,7 @@ InplaceSizeEnforcedPacketBuilder::InplaceSizeEnforcedPacketBuilder(
 bool InplaceSizeEnforcedPacketBuilder::canBuildPacket() const noexcept {
   const ShortHeader* shortHeader = packet_.header.asShort();
   size_t encryptedPacketSize =
-      header_->length() + body_->length() + cipherOverhead_;
+      header_.length() + body_->length() + cipherOverhead_;
   size_t delta = enforcedSize_ - encryptedPacketSize;
   return shortHeader && enforcedSize_ <= kDefaultMaxUDPPayload &&
       encryptedPacketSize < enforcedSize_ && iobuf_->tailroom() >= delta;
@@ -445,14 +445,14 @@ PacketBuilderInterface::Packet
 InplaceSizeEnforcedPacketBuilder::buildPacket() && {
   // Create bodyWriter
   size_t encryptedPacketSize =
-      header_->length() + body_->length() + cipherOverhead_;
+      header_.length() + body_->length() + cipherOverhead_;
   size_t paddingSize = enforcedSize_ - encryptedPacketSize;
   BufWriter bodyWriter(*iobuf_, paddingSize);
 
   // Store counters on the stack to overhead from function calls
   size_t extraDataWritten = 0;
   size_t bodyLength = body_->computeChainDataLength();
-  size_t headerLength = header_->computeChainDataLength();
+  size_t headerLength = header_.computeChainDataLength();
   while (extraDataWritten + bodyLength + headerLength + cipherOverhead_ <
          enforcedSize_) {
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
@@ -728,9 +728,9 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   // for encryption.
   PacketBuilderInterface::Packet builtPacket(
       std::move(packet_),
-      (bodyStart_
-           ? folly::IOBuf::wrapBuffer(headerStart_, (bodyStart_ - headerStart_))
-           : nullptr),
+      (bodyStart_ ? folly::IOBuf::wrapBufferAsValue(
+                        headerStart_, (bodyStart_ - headerStart_))
+                  : folly::IOBuf()),
       (bodyStart_
            ? folly::IOBuf::wrapBuffer(bodyStart_, iobuf_->tail() - bodyStart_)
            : nullptr));

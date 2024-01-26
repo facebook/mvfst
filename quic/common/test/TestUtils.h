@@ -119,7 +119,13 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
 Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet);
 
 Buf packetToBufCleartext(
-    const RegularQuicPacketBuilder::Packet& packet,
+    RegularQuicPacketBuilder::Packet& packet,
+    const Aead& cleartextCipher,
+    const PacketNumberCipher& headerCipher,
+    PacketNum packetNum);
+
+Buf packetToBufCleartext(
+    RegularQuicPacketBuilder::Packet&& packet,
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum);

@@ -52,7 +52,7 @@ TEST_F(QuicHeaderCodecTest, ShortHeaderTest) {
       0 /* largestAcked */);
   builder.encodePacketHeader();
   auto packet = std::move(builder).buildPacket();
-  auto result = parseHeader(*packet.header);
+  auto result = parseHeader(packet.header);
   auto& header = result->parsedHeader;
   LongHeader* longHeader = header->asLong();
   if (longHeader) {

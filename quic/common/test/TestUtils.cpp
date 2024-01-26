@@ -391,7 +391,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
 }
 
 Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
-  auto packetBuf = packet.header->clone();
+  auto packetBuf = packet.header.clone();
   if (packet.body) {
     packetBuf->prependChain(packet.body->clone());
   }
@@ -399,13 +399,13 @@ Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
 }
 
 Buf packetToBufCleartext(
-    const RegularQuicPacketBuilder::Packet& packet,
+    RegularQuicPacketBuilder::Packet& packet,
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum) {
   VLOG(10) << __func__ << " packet header: "
-           << folly::hexlify(packet.header->clone()->moveToFbString());
-  auto packetBuf = packet.header->clone();
+           << folly::hexlify(packet.header.clone()->moveToFbString());
+  auto packetBuf = packet.header.clone();
   Buf body;
   if (packet.body) {
     packet.body->coalesce();
@@ -414,24 +414,32 @@ Buf packetToBufCleartext(
     body = folly::IOBuf::create(0);
   }
   auto headerForm = packet.packet.header.getHeaderForm();
-  packet.header->coalesce();
+  packet.header.coalesce();
   auto tagLen = cleartextCipher.getCipherOverhead();
   if (body->tailroom() < tagLen) {
     body->prependChain(folly::IOBuf::create(tagLen));
   }
   body->coalesce();
   auto encryptedBody = cleartextCipher.inplaceEncrypt(
-      std::move(body), packet.header.get(), packetNum);
+      std::move(body), &packet.header, packetNum);
   encryptedBody->coalesce();
   encryptPacketHeader(
       headerForm,
-      packet.header->writableData(),
-      packet.header->length(),
+      packet.header.writableData(),
+      packet.header.length(),
       encryptedBody->data(),
       encryptedBody->length(),
       headerCipher);
   packetBuf->prependChain(std::move(encryptedBody));
   return packetBuf;
+}
+
+Buf packetToBufCleartext(
+    RegularQuicPacketBuilder::Packet&& packet,
+    const Aead& cleartextCipher,
+    const PacketNumberCipher& headerCipher,
+    PacketNum packetNum) {
+  return packetToBufCleartext(packet, cleartextCipher, headerCipher, packetNum);
 }
 
 uint64_t computeExpectedDelay(

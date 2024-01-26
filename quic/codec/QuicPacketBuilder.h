@@ -47,10 +47,10 @@ class PacketBuilderInterface {
   // and body into a continuous memory.
   struct Packet {
     RegularQuicWritePacket packet;
-    Buf header;
+    folly::IOBuf header;
     Buf body;
 
-    Packet(RegularQuicWritePacket packetIn, Buf headerIn, Buf bodyIn)
+    Packet(RegularQuicWritePacket packetIn, folly::IOBuf headerIn, Buf bodyIn)
         : packet(std::move(packetIn)),
           header(std::move(headerIn)),
           body(std::move(bodyIn)) {}
@@ -254,7 +254,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   uint32_t remainingBytes_;
   PacketNum largestAckedPacketNum_;
   RegularQuicWritePacket packet_;
-  std::unique_ptr<folly::IOBuf> header_;
+  folly::IOBuf header_;
   std::unique_ptr<folly::IOBuf> body_;
   BufAppender headerAppender_;
   BufAppender bodyAppender_;
@@ -303,7 +303,7 @@ class RegularSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
 
  private:
   RegularQuicWritePacket packet_;
-  Buf header_;
+  folly::IOBuf header_;
   Buf body_;
   BufAppender bodyAppender_;
   uint64_t enforcedSize_;
@@ -339,7 +339,7 @@ class InplaceSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
   BufAccessor& bufAccessor_;
   Buf iobuf_;
   RegularQuicWritePacket packet_;
-  Buf header_;
+  folly::IOBuf header_;
   Buf body_;
   uint64_t enforcedSize_;
   uint32_t cipherOverhead_;

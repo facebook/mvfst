@@ -56,7 +56,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildEmpty) {
   PacketRebuilder rebuilder(regularBuilder, conn);
   auto packet = std::move(regularBuilder).buildPacket();
   EXPECT_TRUE(packet.packet.frames.empty());
-  EXPECT_FALSE(packet.header->empty());
+  EXPECT_FALSE(packet.header.empty());
   EXPECT_TRUE(packet.body->empty());
 }
 
@@ -84,13 +84,13 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto packet = std::move(regularBuilder1).buildPacket();
   auto outstanding = makeDummyOutstandingPacket(packet.packet, 1000);
-  EXPECT_FALSE(packet.header->empty());
+  EXPECT_FALSE(packet.header.empty());
   ASSERT_EQ(packet.packet.frames.size(), 2);
   EXPECT_FALSE(packet.body->empty());
   regularBuilder2.encodePacketHeader();
   ASSERT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
   auto rebuilt = std::move(regularBuilder2).buildPacket();
-  EXPECT_FALSE(rebuilt.header->empty());
+  EXPECT_FALSE(rebuilt.header.empty());
   ASSERT_EQ(rebuilt.packet.frames.size(), 3);
   auto padding = rebuilt.packet.frames.back().asPaddingFrame();
   ASSERT_TRUE(padding != nullptr);
@@ -253,7 +253,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
         EXPECT_TRUE(false); /* should never happen*/
     }
   }
-  EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.header, *packet2.header));
+  EXPECT_TRUE(folly::IOBufEqualTo()(packet1.header, packet2.header));
   // TODO: I don't have a good way to verify body without decode them
 }
 
@@ -332,7 +332,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
           packet1.packet.frames.data(),
           packet2.packet.frames.data(),
           packet1.packet.frames.size()));
-  EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.header, *packet2.header));
+  EXPECT_TRUE(folly::IOBufEqualTo()(packet1.header, packet2.header));
   // Once we start to use the correct ack delay value in AckFrames, this needs
   // to be changed:
   EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.body, *packet2.body));
@@ -399,7 +399,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
     EXPECT_EQ(buf->computeChainDataLength(), streamFrame->len);
     EXPECT_EQ(true, streamFrame->fin);
   }
-  EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.header, *packet2.header));
+  EXPECT_TRUE(folly::IOBufEqualTo()(packet1.header, packet2.header));
 }
 
 TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
@@ -487,7 +487,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   ShortHeader shortHeader2(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
-      (packet1.header->computeChainDataLength() +
+      (packet1.header.computeChainDataLength() +
        packet1.body->computeChainDataLength()) /
           2,
       std::move(shortHeader2),

@@ -251,8 +251,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   }
   uint32_t encodedSize = 0;
   uint32_t encodedBodySize = 0;
-  if (packet.header) {
-    encodedSize += packet.header->computeChainDataLength();
+  if (!packet.header.empty()) {
+    encodedSize += packet.header.computeChainDataLength();
   }
   if (packet.body) {
     encodedSize += packet.body->computeChainDataLength();

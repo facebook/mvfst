@@ -270,21 +270,21 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
     }
     return DataPathResult::makeBuildFailure();
   }
-  CHECK(!packet->header->isChained());
-  auto headerLen = packet->header->length();
+  CHECK(!packet->header.isChained());
+  auto headerLen = packet->header.length();
   buf = connection.bufAccessor->obtain();
   CHECK(
       packet->body->data() > buf->data() &&
       packet->body->tail() <= buf->tail());
   CHECK(
-      packet->header->data() >= buf->data() &&
-      packet->header->tail() < buf->tail());
+      packet->header.data() >= buf->data() &&
+      packet->header.tail() < buf->tail());
   // Trim off everything before the current packet, and the header length, so
   // buf's data starts from the body part of buf.
   buf->trimStart(prevSize + headerLen);
   // buf and packetBuf is actually the same.
   auto packetBuf =
-      aead.inplaceEncrypt(std::move(buf), packet->header.get(), packetNum);
+      aead.inplaceEncrypt(std::move(buf), &packet->header, packetNum);
   CHECK(packetBuf->headroom() == headerLen + prevSize);
   // Include header back.
   packetBuf->prepend(headerLen);
@@ -353,8 +353,8 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
     }
     return DataPathResult::makeBuildFailure();
   }
-  packet->header->coalesce();
-  auto headerLen = packet->header->length();
+  packet->header.coalesce();
+  auto headerLen = packet->header.length();
   auto bodyLen = packet->body->computeChainDataLength();
   auto unencrypted = folly::IOBuf::createCombined(
       headerLen + bodyLen + aead.getCipherOverhead());
@@ -362,11 +362,11 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
   unencrypted->advance(headerLen);
   unencrypted->append(bodyLen);
-  auto packetBuf = aead.inplaceEncrypt(
-      std::move(unencrypted), packet->header.get(), packetNum);
+  auto packetBuf =
+      aead.inplaceEncrypt(std::move(unencrypted), &packet->header, packetNum);
   DCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
-  auto headerCursor = folly::io::Cursor(packet->header.get());
+  auto headerCursor = folly::io::Cursor(&packet->header);
   headerCursor.pull(packetBuf->writableData(), headerLen);
   packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
 
@@ -1262,22 +1262,22 @@ void writeCloseCommon(
     return;
   }
   auto packet = std::move(packetBuilder).buildPacket();
-  packet.header->coalesce();
+  packet.header.coalesce();
   packet.body->reserve(0, aead.getCipherOverhead());
   CHECK_GE(packet.body->tailroom(), aead.getCipherOverhead());
-  auto body = aead.inplaceEncrypt(
-      std::move(packet.body), packet.header.get(), packetNum);
+  auto body =
+      aead.inplaceEncrypt(std::move(packet.body), &packet.header, packetNum);
   body->coalesce();
   encryptPacketHeader(
       headerForm,
-      packet.header->writableData(),
-      packet.header->length(),
+      packet.header.writableData(),
+      packet.header.length(),
       body->data(),
       body->length(),
       headerCipher);
-  auto packetBuf = std::move(packet.header);
-  packetBuf->prependChain(std::move(body));
-  auto packetSize = packetBuf->computeChainDataLength();
+  folly::IOBuf packetBuf(std::move(packet.header));
+  packetBuf.prependChain(std::move(body));
+  auto packetSize = packetBuf.computeChainDataLength();
   if (connection.qLogger) {
     connection.qLogger->addPacket(packet.packet, packetSize);
   }
@@ -1287,7 +1287,9 @@ void writeCloseCommon(
   // Increment the sequence number.
   increaseNextPacketNum(connection, pnSpace);
   // best effort writing to the socket, ignore any errors.
-  auto ret = sock.write(connection.peerAddress, packetBuf);
+
+  Buf packetBufPtr = packetBuf.clone();
+  auto ret = sock.write(connection.peerAddress, packetBufPtr);
   connection.lossState.totalBytesSent += packetSize;
   if (ret < 0) {
     VLOG(4) << "Error writing connection close " << folly::errnoStr(errno)

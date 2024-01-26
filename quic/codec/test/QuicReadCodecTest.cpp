@@ -390,7 +390,7 @@ TEST_F(QuicReadCodecTest, BadResetFirstTwoBits) {
       true,
       ProtectionType::KeyPhaseZero);
   overridePacketWithToken(streamPacket, tok);
-  uint8_t* packetHeaderBuffer = streamPacket.header.get()->writableData();
+  uint8_t* packetHeaderBuffer = streamPacket.header.writableData();
   while (*packetHeaderBuffer & 0x40) {
     uint8_t randomByte;
     folly::Random::secureRandom(&randomByte, 1);
@@ -437,7 +437,7 @@ TEST_F(QuicReadCodecTest, RandomizedShortHeaderLeadsToReset) {
       true,
       ProtectionType::KeyPhaseZero);
   overridePacketWithToken(streamPacket, tok);
-  uint8_t* packetHeaderBuffer = streamPacket.header.get()->writableData();
+  uint8_t* packetHeaderBuffer = streamPacket.header.writableData();
   uint8_t randomByte;
   folly::Random::secureRandom(&randomByte, 1);
   *packetHeaderBuffer = 0x40 | (randomByte & 0b00111111);

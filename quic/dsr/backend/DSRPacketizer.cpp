@@ -75,22 +75,22 @@ bool writeSingleQuicPacket(
     ioBufBatch.flush();
     return false;
   }
-  CHECK(!packet.header->isChained());
+  CHECK(!packet.header.isChained());
 
-  auto headerLen = packet.header->length();
+  auto headerLen = packet.header.length();
   buildBuf = accessor.obtain();
   CHECK(
       packet.body->data() > buildBuf->data() &&
       packet.body->tail() <= buildBuf->tail());
   CHECK(
-      packet.header->data() >= buildBuf->data() &&
-      packet.header->tail() < buildBuf->tail());
+      packet.header.data() >= buildBuf->data() &&
+      packet.header.tail() < buildBuf->tail());
   // Trim off everything before the current packet, and the header length, so
   // buildBuf's data starts from the body part of buildBuf.
   buildBuf->trimStart(prevSize + headerLen);
   // buildBuf and packetbuildBuf is actually the same.
   auto packetbuildBuf =
-      aead.inplaceEncrypt(std::move(buildBuf), packet.header.get(), packetNum);
+      aead.inplaceEncrypt(std::move(buildBuf), &packet.header, packetNum);
   CHECK_EQ(packetbuildBuf->headroom(), headerLen + prevSize);
   // Include header back.
   packetbuildBuf->prepend(headerLen);

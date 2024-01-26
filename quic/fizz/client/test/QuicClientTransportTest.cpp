@@ -5802,7 +5802,7 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
       aead,
       0 /* largestAcked */);
 
-  deliverData(serverAddr, packet.header->coalesce());
+  deliverData(serverAddr, packet.header.coalesce());
   EXPECT_EQ(
       getAckState(client->getConn(), PacketNumberSpace::Handshake)
           .largestRecvdPacketNum,

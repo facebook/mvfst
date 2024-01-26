@@ -146,8 +146,8 @@ auto buildEmptyPacket(
 uint64_t getEncodedSize(const RegularQuicPacketBuilder::Packet& packet) {
   // calculate size as the plaintext size
   uint32_t encodedSize = 0;
-  if (packet.header) {
-    encodedSize += packet.header->computeChainDataLength();
+  if (!packet.header.empty()) {
+    encodedSize += packet.header.computeChainDataLength();
   }
   if (packet.body) {
     encodedSize += packet.body->computeChainDataLength();
@@ -1176,7 +1176,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
 
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto packetEncodedSize =
-      packet.header ? packet.header->computeChainDataLength() : 0;
+      !packet.header.empty() ? packet.header.computeChainDataLength() : 0;
   packetEncodedSize += packet.body ? packet.body->computeChainDataLength() : 0;
 
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
@@ -1191,8 +1191,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  packetEncodedSize =
-      nonHandshake.header ? nonHandshake.header->computeChainDataLength() : 0;
+  packetEncodedSize = !nonHandshake.header.empty()
+      ? nonHandshake.header.computeChainDataLength()
+      : 0;
   packetEncodedSize +=
       nonHandshake.body ? nonHandshake.body->computeChainDataLength() : 0;
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();

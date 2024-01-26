@@ -31,16 +31,16 @@ Buf packetToBuf(
   auto buf = folly::IOBuf::create(0);
   // This does not matter.
   PacketNum num = 10;
-  if (packet.header) {
-    buf->prependChain(packet.header->clone());
+  if (!packet.header.empty()) {
+    buf->prependChain(packet.header.clone());
   }
   std::unique_ptr<folly::IOBuf> body = folly::IOBuf::create(0);
   if (packet.body) {
     body = packet.body->clone();
   }
-  if (aead && packet.header) {
+  if (aead && !packet.header.empty()) {
     auto bodySize = body->computeChainDataLength();
-    body = aead->inplaceEncrypt(std::move(body), packet.header.get(), num);
+    body = aead->inplaceEncrypt(std::move(body), &packet.header, num);
     EXPECT_GT(body->computeChainDataLength(), bodySize);
   }
   if (body) {
@@ -320,7 +320,7 @@ TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
     EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
     auto out = std::move(sizeEnforcedBuilder).buildPacket();
     EXPECT_EQ(
-        out.header->computeChainDataLength() +
+        out.header.computeChainDataLength() +
             out.body->computeChainDataLength(),
         enforcedSize - cipherOverhead);
     auto buf = packetToBuf(out, aead_);
@@ -333,7 +333,7 @@ TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
     EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
     auto out = std::move(sizeEnforcedBuilder).buildPacket();
     EXPECT_EQ(
-        out.header->computeChainDataLength() +
+        out.header.computeChainDataLength() +
             out.body->computeChainDataLength(),
         enforcedSize - cipherOverhead);
     auto buf = packetToBuf(out, aead_);
@@ -462,7 +462,7 @@ TEST_P(QuicPacketBuilderTest, LongHeaderBytesCounting) {
       estimatedHeaderBytes, expectedWrittenHeaderFieldLen + kMaxPacketLenSize);
   writeFrame(PaddingFrame(), *builder);
   EXPECT_LE(
-      std::move(*builder).buildPacket().header->computeChainDataLength(),
+      std::move(*builder).buildPacket().header.computeChainDataLength(),
       estimatedHeaderBytes);
 }
 
@@ -480,7 +480,7 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
   auto headerBytes = builder->getHeaderBytes();
   writeFrame(PaddingFrame(), *builder);
   EXPECT_EQ(
-      std::move(*builder).buildPacket().header->computeChainDataLength(),
+      std::move(*builder).buildPacket().header.computeChainDataLength(),
       headerBytes);
 }
 
@@ -546,7 +546,7 @@ TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
   ASSERT_TRUE(builtOut2.packet.frames[0].asPaddingFrame());
   EXPECT_EQ(builtOut2.packet.frames[0].asPaddingFrame()->numFrames, 40);
 
-  EXPECT_EQ(builtOut2.header->length(), builtOut1.header->length());
+  EXPECT_EQ(builtOut2.header.length(), builtOut1.header.length());
   EXPECT_EQ(20, builtOut2.body->length() - builtOut1.body->length());
 }
 
