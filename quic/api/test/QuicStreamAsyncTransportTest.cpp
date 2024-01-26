@@ -164,6 +164,7 @@ class QuicStreamAsyncTransportTest : public Test {
       auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(clientQuicEvb_);
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
+              .setFizzClientContext(test::createClientCtx())
               .setCertificateVerifier(test::createTestCertificateVerifier())
               .build();
       client_ = std::make_shared<QuicClientTransport>(

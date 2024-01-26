@@ -75,10 +75,11 @@ class ServerHandshakeTest : public Test {
 
   void SetUp() override {
     folly::ssl::init();
-    clientCtx = std::make_shared<fizz::client::FizzClientContext>();
+    // This client context is used outside the context of QUIC in this test, so
+    // we have to manually configure the QUIC record customizations.
+    clientCtx = quic::test::createClientCtx();
     clientCtx->setOmitEarlyRecordLayer(true);
     clientCtx->setFactory(std::make_shared<QuicFizzFactory>());
-    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx = quic::test::createServerCtx();
     setupClientAndServerContext();
     auto fizzServerContext = FizzServerQuicHandshakeContext::Builder()
@@ -380,7 +381,7 @@ TEST_F(ServerHandshakeTest, TestHandshakeSuccess) {
     std::rethrow_exception(ex);
   }
   expectOneRttCipher(true);
-  EXPECT_EQ(handshake->getApplicationProtocol(), folly::none);
+  EXPECT_EQ(handshake->getApplicationProtocol(), "quic_test");
   EXPECT_TRUE(handshakeSuccess);
 }
 
@@ -401,7 +402,7 @@ TEST_F(ServerHandshakeTest, TestHandshakeSuccessIgnoreNonHandshake) {
     std::rethrow_exception(ex);
   }
   expectOneRttCipher(true);
-  EXPECT_EQ(handshake->getApplicationProtocol(), folly::none);
+  EXPECT_EQ(handshake->getApplicationProtocol(), "quic_test");
   EXPECT_TRUE(handshakeSuccess);
 }
 

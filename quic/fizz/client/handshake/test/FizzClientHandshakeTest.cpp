@@ -48,8 +48,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   ClientHandshakeTest() {}
 
   virtual void setupClientAndServerContext() {
-    clientCtx = std::make_shared<fizz::client::FizzClientContext>();
-    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
+    clientCtx = createClientCtx();
   }
 
   QuicVersion getVersion() {
@@ -392,10 +391,9 @@ TEST_F(ClientHandshakeTest, TestAppBytesInterpretedAsHandshake) {
 class ClientHandshakeCallbackTest : public ClientHandshakeTest {
  public:
   void setupClientAndServerContext() override {
-    clientCtx = std::make_shared<fizz::client::FizzClientContext>();
+    clientCtx = createClientCtx();
     clientCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
     serverCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
-    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupZeroRttOnServerCtx(*serverCtx, psk_);
   }
 
@@ -441,15 +439,13 @@ class ClientHandshakeHRRTest : public ClientHandshakeTest {
   ~ClientHandshakeHRRTest() override = default;
 
   void setupClientAndServerContext() override {
-    clientCtx = std::make_shared<fizz::client::FizzClientContext>();
+    clientCtx = createClientCtx();
     clientCtx->setSupportedGroups(
         {fizz::NamedGroup::secp256r1, fizz::NamedGroup::x25519});
     clientCtx->setDefaultShares({fizz::NamedGroup::secp256r1});
-    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
-    serverCtx = std::make_shared<fizz::server::FizzServerContext>();
+    serverCtx = createServerCtx();
     serverCtx->setFactory(std::make_shared<QuicFizzFactory>());
     serverCtx->setSupportedGroups({fizz::NamedGroup::x25519});
-    serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupCtxWithTestCert(*serverCtx);
   }
 };
@@ -493,13 +489,11 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   ~ClientHandshakeZeroRttTest() override = default;
 
   void setupClientAndServerContext() override {
-    clientCtx = std::make_shared<fizz::client::FizzClientContext>();
+    clientCtx = createClientCtx();
     clientCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
     clientCtx->setSupportedAlpns({"h3", "hq"});
-    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
     serverCtx->setSupportedAlpns({"h3"});
-    serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupCtxWithTestCert(*serverCtx);
     psk = setupZeroRttOnClientCtx(*clientCtx, hostname);
     setupZeroRttServer();

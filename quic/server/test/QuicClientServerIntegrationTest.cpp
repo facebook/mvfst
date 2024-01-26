@@ -92,6 +92,7 @@ class ServerTransportParameters : public testing::Test {
         << "::startServer() must be invoked prior to ::createQuicClient()";
     auto fizzClientContext =
         FizzClientQuicHandshakeContext::Builder()
+            .setFizzClientContext(quic::test::createClientCtx())
             .setCertificateVerifier(createTestCertificateVerifier())
             .build();
     auto client = std::make_shared<QuicClientTransport>(

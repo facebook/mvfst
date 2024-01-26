@@ -132,6 +132,8 @@ bool isState(const S& s) {
       [](const auto&) { return false; });
 }
 
+std::shared_ptr<fizz::client::FizzClientContext> createClientCtx();
+
 std::shared_ptr<fizz::server::FizzServerContext> createServerCtx();
 
 void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx);

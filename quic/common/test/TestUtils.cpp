@@ -120,6 +120,13 @@ static std::shared_ptr<fizz::SelfCert> readCert() {
       std::move(privKey), std::move(certs));
 }
 
+std::shared_ptr<fizz::client::FizzClientContext> createClientCtx() {
+  auto clientCtx = std::make_shared<fizz::client::FizzClientContext>();
+  clientCtx->setClock(std::make_shared<NiceMock<fizz::test::MockClock>>());
+  clientCtx->setSupportedAlpns({"quic_test"});
+  return clientCtx;
+}
+
 std::shared_ptr<fizz::server::FizzServerContext> createServerCtx() {
   auto cert = readCert();
   auto certManager = std::make_unique<fizz::server::CertManager>();
@@ -129,6 +136,7 @@ std::shared_ptr<fizz::server::FizzServerContext> createServerCtx() {
   serverCtx->setCertManager(std::move(certManager));
   serverCtx->setOmitEarlyRecordLayer(true);
   serverCtx->setClock(std::make_shared<NiceMock<fizz::test::MockClock>>());
+  serverCtx->setSupportedAlpns({"quic_test"});
   return serverCtx;
 }
 
