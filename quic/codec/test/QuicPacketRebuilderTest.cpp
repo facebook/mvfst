@@ -57,7 +57,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildEmpty) {
   auto packet = std::move(regularBuilder).buildPacket();
   EXPECT_TRUE(packet.packet.frames.empty());
   EXPECT_FALSE(packet.header.empty());
-  EXPECT_TRUE(packet.body->empty());
+  EXPECT_TRUE(packet.body.empty());
 }
 
 TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
@@ -86,7 +86,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
   auto outstanding = makeDummyOutstandingPacket(packet.packet, 1000);
   EXPECT_FALSE(packet.header.empty());
   ASSERT_EQ(packet.packet.frames.size(), 2);
-  EXPECT_FALSE(packet.body->empty());
+  EXPECT_FALSE(packet.body.empty());
   regularBuilder2.encodePacketHeader();
   ASSERT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
   auto rebuilt = std::move(regularBuilder2).buildPacket();
@@ -95,8 +95,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
   auto padding = rebuilt.packet.frames.back().asPaddingFrame();
   ASSERT_TRUE(padding != nullptr);
   EXPECT_GT(padding->numFrames, 1000);
-  EXPECT_FALSE(rebuilt.body->empty());
-  EXPECT_GT(rebuilt.body->computeChainDataLength(), 1200);
+  EXPECT_FALSE(rebuilt.body.empty());
+  EXPECT_GT(rebuilt.body.computeChainDataLength(), 1200);
 }
 
 TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
@@ -335,7 +335,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   EXPECT_TRUE(folly::IOBufEqualTo()(packet1.header, packet2.header));
   // Once we start to use the correct ack delay value in AckFrames, this needs
   // to be changed:
-  EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.body, *packet2.body));
+  EXPECT_TRUE(folly::IOBufEqualTo()(packet1.body, packet2.body));
 }
 
 TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
@@ -488,7 +488,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       (packet1.header.computeChainDataLength() +
-       packet1.body->computeChainDataLength()) /
+       packet1.body.computeChainDataLength()) /
           2,
       std::move(shortHeader2),
       0 /* largestAcked */);

@@ -2644,8 +2644,7 @@ TEST_F(QuicClientTransportAfterStartTest, ShortHeaderPacketWithNoFrames) {
       0 /* largestAcked */);
   builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
-  auto packet = std::move(builder).buildPacket();
-  auto buf = packetToBuf(packet);
+  Buf buf = packetToBuf(std::move(builder).buildPacket());
   buf->coalesce();
   buf->reserve(0, 200);
   buf->append(20);

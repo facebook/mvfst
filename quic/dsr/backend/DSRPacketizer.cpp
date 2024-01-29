@@ -69,7 +69,7 @@ bool writeSingleQuicPacket(
     ioBufBatch.flush();
     return false;
   }
-  if (!packet.body) {
+  if (packet.body.empty()) {
     LOG(ERROR) << "DSR Send failed: Build empty body buffer";
     rollbackBuf();
     ioBufBatch.flush();
@@ -80,8 +80,8 @@ bool writeSingleQuicPacket(
   auto headerLen = packet.header.length();
   buildBuf = accessor.obtain();
   CHECK(
-      packet.body->data() > buildBuf->data() &&
-      packet.body->tail() <= buildBuf->tail());
+      packet.body.data() > buildBuf->data() &&
+      packet.body.tail() <= buildBuf->tail());
   CHECK(
       packet.header.data() >= buildBuf->data() &&
       packet.header.tail() < buildBuf->tail());

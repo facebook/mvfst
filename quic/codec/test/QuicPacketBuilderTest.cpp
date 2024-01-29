@@ -35,8 +35,8 @@ Buf packetToBuf(
     buf->prependChain(packet.header.clone());
   }
   std::unique_ptr<folly::IOBuf> body = folly::IOBuf::create(0);
-  if (packet.body) {
-    body = packet.body->clone();
+  if (!packet.body.empty()) {
+    body = packet.body.clone();
   }
   if (aead && !packet.header.empty()) {
     auto bodySize = body->computeChainDataLength();
@@ -257,7 +257,7 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
   size_t expectedOutputSize =
       sizeof(Sample) + kMaxPacketNumEncodingSize - encodedPacketNum.length;
   // We wrote less than sample bytes into the packet, so we'll pad it to sample
-  EXPECT_EQ(builtOut.body->computeChainDataLength(), expectedOutputSize);
+  EXPECT_EQ(builtOut.body.computeChainDataLength(), expectedOutputSize);
   auto resultBuf = packetToBuf(builtOut);
 
   auto& resultShortHeader = *resultRegularPacket.header.asShort();
@@ -314,27 +314,25 @@ TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
 
   auto param = GetParam();
   if (param == TestFlavor::Regular) {
-    EXPECT_EQ(builtOut.body->isManagedOne(), true);
+    EXPECT_EQ(builtOut.body.isManagedOne(), true);
     RegularSizeEnforcedPacketBuilder sizeEnforcedBuilder(
         std::move(builtOut), enforcedSize, cipherOverhead);
     EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
     auto out = std::move(sizeEnforcedBuilder).buildPacket();
     EXPECT_EQ(
-        out.header.computeChainDataLength() +
-            out.body->computeChainDataLength(),
+        out.header.computeChainDataLength() + out.body.computeChainDataLength(),
         enforcedSize - cipherOverhead);
     auto buf = packetToBuf(out, aead_);
     EXPECT_EQ(buf->computeChainDataLength(), enforcedSize);
 
   } else {
-    EXPECT_EQ(builtOut.body->isManagedOne(), false);
+    EXPECT_EQ(builtOut.body.isManagedOne(), false);
     InplaceSizeEnforcedPacketBuilder sizeEnforcedBuilder(
         *simpleBufAccessor_, std::move(builtOut), enforcedSize, cipherOverhead);
     EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
     auto out = std::move(sizeEnforcedBuilder).buildPacket();
     EXPECT_EQ(
-        out.header.computeChainDataLength() +
-            out.body->computeChainDataLength(),
+        out.header.computeChainDataLength() + out.body.computeChainDataLength(),
         enforcedSize - cipherOverhead);
     auto buf = packetToBuf(out, aead_);
     EXPECT_EQ(buf->computeChainDataLength(), enforcedSize);
@@ -396,7 +394,7 @@ TEST_P(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
       sizeof(Sample) + kMaxPacketNumEncodingSize - encodedPacketNum.length;
   EXPECT_EQ(resultRegularPacket.frames.size(), 1);
   EXPECT_EQ(
-      builtOut.body->computeChainDataLength(),
+      builtOut.body.computeChainDataLength(),
       expectedOutputSize - cipherOverhead);
 }
 
@@ -422,7 +420,7 @@ TEST_P(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
   // We should have padded the remaining bytes with Padding frames.
   EXPECT_EQ(resultRegularPacket.frames.size(), 1);
   EXPECT_EQ(
-      builtOut.body->computeChainDataLength(), totalPacketSize - headerSize);
+      builtOut.body.computeChainDataLength(), totalPacketSize - headerSize);
 }
 
 TEST_F(QuicPacketBuilderTest, PacketBuilderWrapper) {
@@ -547,7 +545,7 @@ TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
   EXPECT_EQ(builtOut2.packet.frames[0].asPaddingFrame()->numFrames, 40);
 
   EXPECT_EQ(builtOut2.header.length(), builtOut1.header.length());
-  EXPECT_EQ(20, builtOut2.body->length() - builtOut1.body->length());
+  EXPECT_EQ(20, builtOut2.body.length() - builtOut1.body.length());
 }
 
 TEST_F(QuicPacketBuilderTest, InplaceBuilderShorterHeaderBytes) {

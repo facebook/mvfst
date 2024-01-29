@@ -131,9 +131,9 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
       largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
       header_(folly::IOBuf::CreateOp::CREATE, kLongHeaderHeaderSize),
-      body_(folly::IOBuf::create(kAppenderGrowthSize)),
+      body_(folly::IOBuf::CreateOp::CREATE, kAppenderGrowthSize),
       headerAppender_(&header_, kLongHeaderHeaderSize),
-      bodyAppender_(body_.get(), kAppenderGrowthSize) {
+      bodyAppender_(&body_, kAppenderGrowthSize) {
   if (frameHint) {
     packet_.frames.reserve(frameHint);
   }
@@ -236,7 +236,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
   size_t extraDataWritten = 0;
-  size_t bodyLength = body_->computeChainDataLength();
+  size_t bodyLength = body_.computeChainDataLength();
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !packet_.empty && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
@@ -246,7 +246,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   }
   if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
     QuicInteger pktLen(
-        packetNumberEncoding_->length + body_->computeChainDataLength() +
+        packetNumberEncoding_->length + body_.computeChainDataLength() +
         cipherOverhead_);
     pktLen.encode([&](auto val) { headerAppender_.writeBE(val); });
     appendBytes(
@@ -389,7 +389,7 @@ RegularSizeEnforcedPacketBuilder::RegularSizeEnforcedPacketBuilder(
     : packet_(std::move(packet.packet)),
       header_(std::move(packet.header)),
       body_(std::move(packet.body)),
-      bodyAppender_(body_.get(), kAppenderGrowthSize),
+      bodyAppender_(&body_, kAppenderGrowthSize),
       enforcedSize_(enforcedSize),
       cipherOverhead_(cipherOverhead) {}
 
@@ -399,7 +399,7 @@ bool RegularSizeEnforcedPacketBuilder::canBuildPacket() const noexcept {
   const ShortHeader* shortHeader = packet_.header.asShort();
   // We also don't want to send packets longer than kDefaultMaxUDPPayload
   return shortHeader && enforcedSize_ <= kDefaultMaxUDPPayload &&
-      (body_->computeChainDataLength() + header_.computeChainDataLength() +
+      (body_.computeChainDataLength() + header_.computeChainDataLength() +
            cipherOverhead_ <
        enforcedSize_);
 }
@@ -408,7 +408,7 @@ PacketBuilderInterface::Packet
 RegularSizeEnforcedPacketBuilder::buildPacket() && {
   // Store counters on the stack to overhead from function calls
   size_t extraDataWritten = 0;
-  size_t bodyLength = body_->computeChainDataLength();
+  size_t bodyLength = body_.computeChainDataLength();
   size_t headerLength = header_.computeChainDataLength();
   while (extraDataWritten + bodyLength + headerLength + cipherOverhead_ <
          enforcedSize_) {
@@ -435,7 +435,7 @@ InplaceSizeEnforcedPacketBuilder::InplaceSizeEnforcedPacketBuilder(
 bool InplaceSizeEnforcedPacketBuilder::canBuildPacket() const noexcept {
   const ShortHeader* shortHeader = packet_.header.asShort();
   size_t encryptedPacketSize =
-      header_.length() + body_->length() + cipherOverhead_;
+      header_.length() + body_.length() + cipherOverhead_;
   size_t delta = enforcedSize_ - encryptedPacketSize;
   return shortHeader && enforcedSize_ <= kDefaultMaxUDPPayload &&
       encryptedPacketSize < enforcedSize_ && iobuf_->tailroom() >= delta;
@@ -445,13 +445,13 @@ PacketBuilderInterface::Packet
 InplaceSizeEnforcedPacketBuilder::buildPacket() && {
   // Create bodyWriter
   size_t encryptedPacketSize =
-      header_.length() + body_->length() + cipherOverhead_;
+      header_.length() + body_.length() + cipherOverhead_;
   size_t paddingSize = enforcedSize_ - encryptedPacketSize;
   BufWriter bodyWriter(*iobuf_, paddingSize);
 
   // Store counters on the stack to overhead from function calls
   size_t extraDataWritten = 0;
-  size_t bodyLength = body_->computeChainDataLength();
+  size_t bodyLength = body_.computeChainDataLength();
   size_t headerLength = header_.computeChainDataLength();
   while (extraDataWritten + bodyLength + headerLength + cipherOverhead_ <
          enforcedSize_) {
@@ -463,7 +463,8 @@ InplaceSizeEnforcedPacketBuilder::buildPacket() && {
   PacketBuilderInterface::Packet builtPacket(
       std::move(packet_),
       std::move(header_),
-      folly::IOBuf::wrapBuffer(body_->data(), iobuf_->tail() - body_->data()));
+      folly::IOBuf::wrapBufferAsValue(
+          body_.data(), iobuf_->tail() - body_.data()));
 
   // Release internal iobuf
   bufAccessor_.release(std::move(iobuf_));
@@ -731,9 +732,9 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
       (bodyStart_ ? folly::IOBuf::wrapBufferAsValue(
                         headerStart_, (bodyStart_ - headerStart_))
                   : folly::IOBuf()),
-      (bodyStart_
-           ? folly::IOBuf::wrapBuffer(bodyStart_, iobuf_->tail() - bodyStart_)
-           : nullptr));
+      (bodyStart_ ? folly::IOBuf::wrapBufferAsValue(
+                        bodyStart_, iobuf_->tail() - bodyStart_)
+                  : folly::IOBuf()));
   releaseOutputBufferInternal();
   return builtPacket;
 }

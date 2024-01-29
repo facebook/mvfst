@@ -392,8 +392,8 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
 
 Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
   auto packetBuf = packet.header.clone();
-  if (packet.body) {
-    packetBuf->prependChain(packet.body->clone());
+  if (!packet.body.empty()) {
+    packetBuf->prependChain(packet.body.clone());
   }
   return packetBuf;
 }
@@ -407,9 +407,9 @@ Buf packetToBufCleartext(
            << folly::hexlify(packet.header.clone()->moveToFbString());
   auto packetBuf = packet.header.clone();
   Buf body;
-  if (packet.body) {
-    packet.body->coalesce();
-    body = packet.body->clone();
+  if (!packet.body.empty()) {
+    packet.body.coalesce();
+    body = packet.body.clone();
   } else {
     body = folly::IOBuf::create(0);
   }
@@ -739,7 +739,7 @@ writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
 void overridePacketWithToken(
     PacketBuilderInterface::Packet& packet,
     const StatelessResetToken& token) {
-  overridePacketWithToken(*packet.body, token);
+  overridePacketWithToken(packet.body, token);
 }
 
 void overridePacketWithToken(

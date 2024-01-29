@@ -4415,8 +4415,8 @@ class AckEventForAppDataTest : public Test {
     if (!packet.header.empty()) {
       encodedSize += packet.header.computeChainDataLength();
     }
-    if (packet.body) {
-      encodedSize += packet.body->computeChainDataLength();
+    if (!packet.body.empty()) {
+      encodedSize += packet.body.computeChainDataLength();
     }
     return encodedSize;
   }
@@ -4424,8 +4424,8 @@ class AckEventForAppDataTest : public Test {
   uint64_t getEncodedBodySize(const RegularQuicPacketBuilder::Packet& packet) {
     // calculate size as the plaintext size
     uint32_t encodedBodySize = 0;
-    if (packet.body) {
-      encodedBodySize += packet.body->computeChainDataLength();
+    if (!packet.body.empty()) {
+      encodedBodySize += packet.body.computeChainDataLength();
     }
     return encodedBodySize;
   }

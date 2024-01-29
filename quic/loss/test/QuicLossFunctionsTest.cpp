@@ -254,9 +254,9 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   if (!packet.header.empty()) {
     encodedSize += packet.header.computeChainDataLength();
   }
-  if (packet.body) {
-    encodedSize += packet.body->computeChainDataLength();
-    encodedBodySize += packet.body->computeChainDataLength();
+  if (!packet.body.empty()) {
+    encodedSize += packet.body.computeChainDataLength();
+    encodedBodySize += packet.body.computeChainDataLength();
   }
   auto outstandingPacket = OutstandingPacketWrapper(
       packet.packet,
