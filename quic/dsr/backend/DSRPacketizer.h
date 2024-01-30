@@ -95,26 +95,6 @@ class QuicPacketizer {
       bool eof) = 0;
 };
 
-/**
- * Write a single encrypted packet buffer into ioBufBatch. The source data is
- * passed via buf. The first byte in buf is supposed to be matching the offset.
- * Alternatively some sort of cache data provider can be passed to this function
- * to let it fetch the correct bytes internally.
- */
-bool writeSingleQuicPacket(
-    IOBufQuicBatch& ioBufBatch,
-    BufAccessor& accessor,
-    ConnectionId dcid,
-    PacketNum packetNum,
-    PacketNum largestAckedByPeer,
-    const Aead& aead,
-    const PacketNumberCipher& headerCipher,
-    StreamId streamId,
-    size_t offset,
-    size_t length,
-    bool eof,
-    Buf buf);
-
 struct PacketizationRequest {
   PacketizationRequest(
       PacketNum packetNumIn,
@@ -153,9 +133,75 @@ struct RequestGroup {
   std::chrono::microseconds writeOffset{0us};
 };
 
-BufQuicBatchResult writePacketsGroup(
-    QuicAsyncUDPSocket& sock,
-    RequestGroup& reqGroup,
-    const std::function<Buf(const PacketizationRequest& req)>& bufProvider);
+class PacketGroupWriter {
+ public:
+  virtual ~PacketGroupWriter() = default;
+
+  BufQuicBatchResult writePacketsGroup(
+      RequestGroup& reqGroup,
+      const std::function<Buf(const PacketizationRequest& req)>& bufProvider);
+
+  bool writeSingleQuicPacket(
+      BufAccessor& accessor,
+      ConnectionId dcid,
+      PacketNum packetNum,
+      PacketNum largestAckedByPeer,
+      const Aead& aead,
+      const PacketNumberCipher& headerCipher,
+      StreamId streamId,
+      size_t offset,
+      size_t length,
+      bool eof,
+      Buf buf);
+
+ protected:
+  uint32_t prevSize_{0};
+
+ private:
+  virtual void flush() = 0;
+
+  virtual BufAccessor* getBufAccessor() = 0;
+
+  virtual void rollback() = 0;
+
+  virtual bool send(uint32_t size) = 0;
+
+  virtual BufQuicBatchResult getResult() = 0;
+};
+
+class UdpSocketPacketGroupWriter : public PacketGroupWriter {
+ public:
+  // This constructor is for testing only.
+  UdpSocketPacketGroupWriter(
+      QuicAsyncUDPSocket& sock,
+      const folly::SocketAddress& clientAddress,
+      BatchWriterPtr&& batchWriter);
+
+  UdpSocketPacketGroupWriter(
+      QuicAsyncUDPSocket& sock,
+      const folly::SocketAddress& clientAddress);
+
+  ~UdpSocketPacketGroupWriter() override = default;
+
+  IOBufQuicBatch& getIOBufQuicBatch() {
+    return ioBufBatch_;
+  }
+
+ private:
+  void flush() override;
+
+  BufAccessor* getBufAccessor() override;
+
+  void rollback() override;
+
+  bool send(uint32_t size) override;
+
+  BufQuicBatchResult getResult() override;
+
+  QuicAsyncUDPSocket& sock_;
+  quic::QuicConnectionStateBase& fakeConn_;
+  IOBufQuicBatch ioBufBatch_;
+  BufQuicBatchResult result_;
+};
 
 } // namespace quic

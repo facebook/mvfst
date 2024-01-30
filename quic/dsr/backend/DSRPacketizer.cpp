@@ -11,8 +11,7 @@
 #include <quic/dsr/backend/DSRPacketizer.h>
 
 namespace quic {
-bool writeSingleQuicPacket(
-    IOBufQuicBatch& ioBufBatch,
+bool PacketGroupWriter::writeSingleQuicPacket(
     BufAccessor& accessor,
     ConnectionId dcid,
     PacketNum packetNum,
@@ -29,14 +28,8 @@ bool writeSingleQuicPacket(
     return false;
   }
   auto buildBuf = accessor.obtain();
-  auto prevSize = buildBuf->length();
+  prevSize_ = buildBuf->length();
   accessor.release(std::move(buildBuf));
-
-  auto rollbackBuf = [&accessor, prevSize]() {
-    auto buildBuf = accessor.obtain();
-    buildBuf->trimEnd(buildBuf->length() - prevSize);
-    accessor.release(std::move(buildBuf));
-  };
 
   ShortHeader shortHeader(ProtectionType::KeyPhaseZero, dcid, packetNum);
   InplaceQuicPacketBuilder builder(
@@ -66,13 +59,14 @@ bool writeSingleQuicPacket(
 
   if (packet.packet.empty) {
     LOG(ERROR) << "DSR Send failed: Build empty packet.";
-    ioBufBatch.flush();
+    rollback();
+    flush();
     return false;
   }
   if (packet.body.empty()) {
     LOG(ERROR) << "DSR Send failed: Build empty body buffer";
-    rollbackBuf();
-    ioBufBatch.flush();
+    rollback();
+    flush();
     return false;
   }
   CHECK(!packet.header.isChained());
@@ -87,11 +81,11 @@ bool writeSingleQuicPacket(
       packet.header.tail() < buildBuf->tail());
   // Trim off everything before the current packet, and the header length, so
   // buildBuf's data starts from the body part of buildBuf.
-  buildBuf->trimStart(prevSize + headerLen);
+  buildBuf->trimStart(prevSize_ + headerLen);
   // buildBuf and packetbuildBuf is actually the same.
   auto packetbuildBuf =
       aead.inplaceEncrypt(std::move(buildBuf), &packet.header, packetNum);
-  CHECK_EQ(packetbuildBuf->headroom(), headerLen + prevSize);
+  CHECK_EQ(packetbuildBuf->headroom(), headerLen + prevSize_);
   // Include header back.
   packetbuildBuf->prepend(headerLen);
 
@@ -106,18 +100,48 @@ bool writeSingleQuicPacket(
   CHECK(!packetbuildBuf->isChained());
   auto encodedSize = packetbuildBuf->length();
   // Include previous packets back.
-  packetbuildBuf->prepend(prevSize);
+  packetbuildBuf->prepend(prevSize_);
   accessor.release(std::move(packetbuildBuf));
-  bool ret =
-      ioBufBatch.write(nullptr /* no need to pass buildBuf */, encodedSize);
+  bool ret = send(encodedSize);
   return ret;
 }
 
-// TODO using a connection state for this is kind of janky and we should
-// refactor the batch writer interface to not need this.
-// This isn't a real connection, it's just used for the batch writer state.
-// 44 is near the number of the maximum GSO the kernel can accept for a full
-// Ethernet MTU (44 * 1452 = 63888)
+BufQuicBatchResult PacketGroupWriter::writePacketsGroup(
+    RequestGroup& reqGroup,
+    const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
+  if (reqGroup.requests.empty()) {
+    LOG(ERROR) << "Empty packetization request";
+    return {};
+  }
+  if (!reqGroup.cipherPair->aead || !reqGroup.cipherPair->headerCipher) {
+    LOG(ERROR) << "Missing ciphers";
+    return {};
+  }
+  // It's ok if reqGourp's size is larger than ioBufBatch's batch size. The
+  // ioBufBatch will flush when it hits the limit then start a new batch
+  // transparently.
+  for (const auto& request : reqGroup.requests) {
+    auto bufAccessor = getBufAccessor();
+    auto ret = writeSingleQuicPacket(
+        *bufAccessor,
+        reqGroup.dcid,
+        request.packetNum,
+        request.largestAckedPacketNum,
+        *reqGroup.cipherPair->aead,
+        *reqGroup.cipherPair->headerCipher,
+        request.streamId,
+        request.offset,
+        request.len,
+        request.fin,
+        bufProvider(request));
+    if (!ret) {
+      return getResult();
+    }
+  }
+  flush();
+  return getResult();
+}
+
 static auto& getThreadLocalConn(size_t maxPackets = 44) {
   static thread_local QuicConnectionStateBase fakeConn{QuicNodeType::Server};
   static thread_local bool initAccessor FOLLY_MAYBE_UNUSED = [&]() {
@@ -130,51 +154,53 @@ static auto& getThreadLocalConn(size_t maxPackets = 44) {
   return fakeConn;
 }
 
-BufQuicBatchResult writePacketsGroup(
+UdpSocketPacketGroupWriter::UdpSocketPacketGroupWriter(
     QuicAsyncUDPSocket& sock,
-    RequestGroup& reqGroup,
-    const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
-  if (reqGroup.requests.empty()) {
-    LOG(ERROR) << "Empty packetization request";
-    return {};
-  }
-  auto& fakeConn = getThreadLocalConn();
-  auto& bufAccessor = *fakeConn.bufAccessor;
-  auto batchWriter = BatchWriterPtr(new GSOInplacePacketBatchWriter(
-      fakeConn, fakeConn.transportSettings.maxBatchSize));
-  IOBufQuicBatch ioBufBatch(
-      std::move(batchWriter),
-      sock,
-      reqGroup.clientAddress,
-      nullptr /* statsCallback */,
-      nullptr /* happyEyeballsState */);
-  if (!reqGroup.cipherPair->aead || !reqGroup.cipherPair->headerCipher) {
-    LOG(ERROR) << "Missing ciphers";
-    return {};
-  }
-  // It's ok if reqGourp's size is larger than ioBufBatch's batch size. The
-  // ioBufBatch will flush when it hits the limit then start a new batch
-  // transparently.
-  for (const auto& request : reqGroup.requests) {
-    auto ret = writeSingleQuicPacket(
-        ioBufBatch,
-        bufAccessor,
-        reqGroup.dcid,
-        request.packetNum,
-        request.largestAckedPacketNum,
-        *reqGroup.cipherPair->aead,
-        *reqGroup.cipherPair->headerCipher,
-        request.streamId,
-        request.offset,
-        request.len,
-        request.fin,
-        bufProvider(request));
-    if (!ret) {
-      return ioBufBatch.getResult();
-    }
-  }
-  ioBufBatch.flush();
-  return ioBufBatch.getResult();
+    const folly::SocketAddress& clientAddress,
+    BatchWriterPtr&& batchWriter)
+    : sock_(sock),
+      fakeConn_(getThreadLocalConn()),
+      ioBufBatch_(
+          std::move(batchWriter),
+          sock_,
+          clientAddress,
+          nullptr /* statsCallback */,
+          nullptr /* happyEyeballsState */) {}
+
+UdpSocketPacketGroupWriter::UdpSocketPacketGroupWriter(
+    QuicAsyncUDPSocket& sock,
+    const folly::SocketAddress& clientAddress)
+    : sock_(sock),
+      fakeConn_(getThreadLocalConn()),
+      ioBufBatch_(
+          BatchWriterPtr(new GSOInplacePacketBatchWriter(
+              fakeConn_,
+              fakeConn_.transportSettings.maxBatchSize)),
+          sock_,
+          clientAddress,
+          nullptr /* statsCallback */,
+          nullptr /* happyEyeballsState */) {}
+
+BufAccessor* UdpSocketPacketGroupWriter::getBufAccessor() {
+  return fakeConn_.bufAccessor;
+}
+
+void UdpSocketPacketGroupWriter::rollback() {
+  auto buildBuf = getBufAccessor()->obtain();
+  buildBuf->trimEnd(buildBuf->length() - prevSize_);
+  getBufAccessor()->release(std::move(buildBuf));
+}
+
+bool UdpSocketPacketGroupWriter::send(uint32_t size) {
+  return ioBufBatch_.write(nullptr /* no need to pass buildBuf */, size);
+}
+
+void UdpSocketPacketGroupWriter::flush() {
+  ioBufBatch_.flush();
+}
+
+BufQuicBatchResult UdpSocketPacketGroupWriter::getResult() {
+  return ioBufBatch_.getResult();
 }
 
 } // namespace quic
