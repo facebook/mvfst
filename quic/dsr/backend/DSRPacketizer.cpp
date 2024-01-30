@@ -203,4 +203,41 @@ BufQuicBatchResult UdpSocketPacketGroupWriter::getResult() {
   return ioBufBatch_.getResult();
 }
 
+#if defined(__linux__)
+
+void XskPacketGroupWriter::flush() {
+  // Leaving this blank because the XskContainer does some flushing internally
+}
+
+BufAccessor* XskPacketGroupWriter::getBufAccessor() {
+  currentXskBuffer_ = xskContainer_->getXskBuffer(vipAddress_, clientAddress_);
+  auto ioBuf = folly::IOBuf::takeOwnership(
+      currentXskBuffer_.buffer,
+      kDefaultMaxUDPPayload,
+      0,
+      [](void* /* buf */, void* /* userData */) {
+        // Empty destructor because we don't own the buffer
+      });
+  bufAccessor_ = std::make_unique<SimpleBufAccessor>(std::move(ioBuf));
+  return bufAccessor_.get();
+}
+
+void XskPacketGroupWriter::rollback() {
+  xskContainer_->returnBuffer(currentXskBuffer_, vipAddress_, clientAddress_);
+}
+
+bool XskPacketGroupWriter::send(uint32_t size) {
+  currentXskBuffer_.payloadLength = size;
+  xskContainer_->writeXskBuffer(currentXskBuffer_, vipAddress_, clientAddress_);
+  result_.bytesSent += size;
+  result_.packetsSent++;
+  return true;
+}
+
+BufQuicBatchResult XskPacketGroupWriter::getResult() {
+  return result_;
+}
+
+#endif
+
 } // namespace quic

@@ -92,6 +92,7 @@ add_dependencies(
   mvfst_dsr_backend
   mvfst_dsr_types
   mvfst_transport
+  mvfst_xsk
 )
 
 target_link_libraries(
@@ -100,6 +101,7 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_dsr_types
   mvfst_transport
+  mvfst_xsk
 )
 
 target_compile_options(

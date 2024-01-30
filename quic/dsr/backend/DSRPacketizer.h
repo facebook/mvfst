@@ -25,6 +25,7 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/Aead.h>
+#include <quic/xsk/XskContainer.h>
 
 namespace quic {
 
@@ -203,5 +204,40 @@ class UdpSocketPacketGroupWriter : public PacketGroupWriter {
   IOBufQuicBatch ioBufBatch_;
   BufQuicBatchResult result_;
 };
+
+#if defined(__linux__)
+
+class XskPacketGroupWriter : public PacketGroupWriter {
+ public:
+  XskPacketGroupWriter(
+      facebook::xdpsocket::XskContainer* xskContainer,
+      folly::SocketAddress clientAddress,
+      folly::SocketAddress vipAddress)
+      : xskContainer_(xskContainer),
+        clientAddress_(std::move(clientAddress)),
+        vipAddress_(std::move(vipAddress)) {}
+
+  ~XskPacketGroupWriter() override = default;
+
+ private:
+  void flush() override;
+
+  BufAccessor* getBufAccessor() override;
+
+  void rollback() override;
+
+  bool send(uint32_t size) override;
+
+  BufQuicBatchResult getResult() override;
+
+  facebook::xdpsocket::XskContainer* xskContainer_;
+  folly::SocketAddress clientAddress_;
+  folly::SocketAddress vipAddress_;
+  facebook::xdpsocket::XskBuffer currentXskBuffer_;
+  BufQuicBatchResult result_;
+  std::unique_ptr<SimpleBufAccessor> bufAccessor_;
+};
+
+#endif
 
 } // namespace quic
