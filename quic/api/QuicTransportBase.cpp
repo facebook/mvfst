@@ -1637,8 +1637,7 @@ void QuicTransportBase::handleNewGroupedStreams(
 
 void QuicTransportBase::handleNewStreamCallbacks(
     std::vector<StreamId>& streamStorage) {
-  streamStorage =
-      conn_->streamManager->consumeNewPeerStreams(std::move(streamStorage));
+  streamStorage = conn_->streamManager->consumeNewPeerStreams();
   handleNewStreams(streamStorage);
 }
 
@@ -1653,8 +1652,7 @@ void QuicTransportBase::handleNewGroupedStreamCallbacks(
     }
   }
 
-  streamStorage = conn_->streamManager->consumeNewGroupedPeerStreams(
-      std::move(streamStorage));
+  streamStorage = conn_->streamManager->consumeNewGroupedPeerStreams();
   handleNewGroupedStreams(streamStorage);
 }
 
@@ -1706,8 +1704,7 @@ void QuicTransportBase::handleStreamFlowControlUpdatedCallbacks(
   // Iterate over streams that changed their flow control window and give
   // their registered listeners their updates.
   // We don't really need flow control notifications when we are closed.
-  streamStorage =
-      conn_->streamManager->consumeFlowControlUpdated(std::move(streamStorage));
+  streamStorage = conn_->streamManager->consumeFlowControlUpdated();
   const auto& flowControlUpdated = streamStorage;
   for (auto streamId : flowControlUpdated) {
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
