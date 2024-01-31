@@ -94,9 +94,10 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   folly::Optional<std::string> getAppProtocol() const override;
 
-  void setReceiveWindow(StreamId id, size_t recvWindowSize) override;
+  void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 
-  void setSendBuffer(StreamId id, size_t maxUnacked, size_t maxUnsent) override;
+  void setSendBuffer(StreamId, size_t /*maxUnacked*/, size_t /*maxUnsent*/)
+      override {}
 
   uint64_t getConnectionBufferAvailable() const override;
 
