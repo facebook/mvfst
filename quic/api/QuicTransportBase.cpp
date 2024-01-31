@@ -26,6 +26,19 @@
 #include <memory>
 #include <sstream>
 
+namespace {
+/**
+ * Helper function - if given error is not set, returns a generic app error.
+ * Used by close() and closeNow().
+ */
+constexpr auto APP_NO_ERROR = quic::GenericApplicationErrorCode::NO_ERROR;
+quic::QuicError maybeSetGenericAppError(
+    folly::Optional<quic::QuicError>&& error) {
+  return std::move(error).value_or(
+      quic::QuicError{APP_NO_ERROR, quic::toString(APP_NO_ERROR)});
+}
+} // namespace
+
 namespace quic {
 
 QuicTransportBase::QuicTransportBase(
@@ -186,14 +199,6 @@ bool QuicTransportBase::error() const {
   return conn_->localConnectionError.has_value();
 }
 
-QuicError QuicTransportBase::maybeSetGenericAppError(
-    folly::Optional<QuicError> error) {
-  return error ? error.value()
-               : QuicError(
-                     GenericApplicationErrorCode::NO_ERROR,
-                     toString(GenericApplicationErrorCode::NO_ERROR));
-}
-
 void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   // The caller probably doesn't need a conn callback any more because they
@@ -202,7 +207,7 @@ void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
 
   // If we were called with no error code, ensure that we are going to write
   // an application close, so the peer knows it didn't come from the transport.
-  errorCode = maybeSetGenericAppError(errorCode);
+  errorCode = maybeSetGenericAppError(std::move(errorCode));
   closeImpl(std::move(errorCode), true);
 }
 
@@ -210,7 +215,7 @@ void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
   DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   VLOG(4) << __func__ << " " << *this;
-  errorCode = maybeSetGenericAppError(errorCode);
+  errorCode = maybeSetGenericAppError(std::move(errorCode));
   closeImpl(std::move(errorCode), false);
   // the drain timeout may have been scheduled by a previous close, in which
   // case, our close would not take effect. This cancels the drain timeout in

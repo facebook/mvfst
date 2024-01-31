@@ -742,12 +742,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       const folly::Optional<StreamGroupId>& streamGroupId = folly::none);
 
   /**
-   * Helper function - if given error is not set, returns a generic app error.
-   * Used by close() and closeNow().
-   */
-  QuicError maybeSetGenericAppError(folly::Optional<QuicError> error);
-
-  /**
    * write data to socket
    *
    * At transport layer, this is the simplest form of write. It writes data
