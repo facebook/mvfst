@@ -16,7 +16,14 @@ FunctionLooper::FunctionLooper(
     std::shared_ptr<QuicEventBase> evb,
     folly::Function<void()>&& func,
     LooperType type)
-    : evb_(std::move(evb)), func_(std::move(func)), type_(type) {}
+    : evb_(std::move(evb)),
+      func_(std::move(func)),
+      type_(type),
+      running_(false),
+      inLoopBody_(false),
+      fireLoopEarly_(false) {
+  CHECK(func_);
+}
 
 void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
   pacingTimer_ = std::move(pacingTimer);
@@ -28,6 +35,7 @@ bool FunctionLooper::hasPacingTimer() const noexcept {
 
 void FunctionLooper::setPacingFunction(
     folly::Function<std::chrono::microseconds()>&& pacingFunc) {
+  CHECK(pacingFunc);
   pacingFunc_ = std::move(pacingFunc);
 }
 
@@ -52,7 +60,7 @@ void FunctionLooper::commonLoopBody() noexcept {
 
 bool FunctionLooper::schedulePacingTimeout() noexcept {
   if (pacingFunc_ && pacingTimer_ && !isTimerCallbackScheduled()) {
-    auto timeUntilWrite = (*pacingFunc_)();
+    auto timeUntilWrite = pacingFunc_();
     if (timeUntilWrite != 0us) {
       nextPacingTime_ = Clock::now() + timeUntilWrite;
       pacingTimer_->scheduleTimeout(this, timeUntilWrite);
