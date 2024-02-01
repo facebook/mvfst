@@ -94,13 +94,11 @@ class LibevQuicEventBase : public QuicEventBase, public QuicTimer {
 
   [[nodiscard]] std::chrono::milliseconds getTimerTickInterval()
       const override {
-    LOG(WARNING) << __func__ << " is not implemented in LibevQuicEventBase";
-    return std::chrono::milliseconds(0);
+    return std::chrono::milliseconds(1);
   }
 
   [[nodiscard]] std::chrono::microseconds getTickInterval() const override {
-    LOG(WARNING) << __func__ << " is not implemented in LibevQuicEventBase";
-    return std::chrono::microseconds(0);
+    return std::chrono::milliseconds(1);
   }
 
   struct ev_loop* getLibevLoop() {
