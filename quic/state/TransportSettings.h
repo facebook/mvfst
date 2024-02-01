@@ -337,6 +337,10 @@ struct TransportSettings {
   bool initiateKeyUpdate{false};
   // How many sent packets to send before initiating a key update
   uint64_t keyUpdatePacketCountInterval{kDefaultKeyUpdatePacketCountInterval};
+  // Whether to terminate the connection when a peer initiates a key update.
+  // TODO: Remove this. This is a temporary measure to gradually roll out key
+  // update support.
+  bool rejectIncomingKeyUpdates{false};
 };
 
 } // namespace quic
