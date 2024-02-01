@@ -109,8 +109,6 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    * Packet timestamping is currently not supported.
    */
   int getTimestamping() override {
-    LOG(WARNING) << __func__
-                 << " is not implemented in LibevQuicAsyncUDPSocket";
     return -1;
   }
 

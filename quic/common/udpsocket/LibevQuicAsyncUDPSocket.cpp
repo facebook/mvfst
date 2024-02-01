@@ -337,7 +337,6 @@ void LibevQuicAsyncUDPSocket::setErrMessageCallback(
 }
 
 int LibevQuicAsyncUDPSocket::getGRO() {
-  LOG(INFO) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
   return -1;
 }
 
@@ -360,7 +359,6 @@ int LibevQuicAsyncUDPSocket::recvmmsg(
 }
 
 bool LibevQuicAsyncUDPSocket::setGRO(bool /* bVal */) {
-  LOG(INFO) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
   return false;
 }
 
