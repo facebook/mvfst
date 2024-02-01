@@ -119,9 +119,9 @@ folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
 }
 
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
-  std::unique_ptr<Aead> aead;
-  std::unique_ptr<PacketNumberCipher> packetNumberCipher;
-  std::tie(aead, packetNumberCipher) = buildCiphers(kind, secret);
+  std::unique_ptr<Aead> aead = buildAead(kind, secret);
+  std::unique_ptr<PacketNumberCipher> packetNumberCipher =
+      buildHeaderCipher(secret);
   switch (kind) {
     case CipherKind::HandshakeWrite:
       conn_->handshakeWriteCipher = std::move(aead);
@@ -132,12 +132,15 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->readCodec->setHandshakeHeaderCipher(std::move(packetNumberCipher));
       break;
     case CipherKind::OneRttWrite:
+      writeTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
       conn_->oneRttWriteCipher = std::move(aead);
       conn_->oneRttWriteHeaderCipher = std::move(packetNumberCipher);
       break;
     case CipherKind::OneRttRead:
+      readTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
       conn_->readCodec->setOneRttReadCipher(std::move(aead));
       conn_->readCodec->setOneRttHeaderCipher(std::move(packetNumberCipher));
+      conn_->readCodec->setNextOneRttReadCipher(getNextOneRttReadCipher());
       break;
     case CipherKind::ZeroRttWrite:
       getClientConn()->zeroRttWriteCipher = std::move(aead);
@@ -147,6 +150,32 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       // Report error?
       break;
   }
+}
+
+std::unique_ptr<Aead> ClientHandshake::getNextOneRttWriteCipher() {
+  throwOnError();
+
+  CHECK(writeTrafficSecret_);
+  LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
+      << "Client read and write secrets are out of sync";
+  writeTrafficSecret_ = getNextTrafficSecret(writeTrafficSecret_->coalesce());
+  trafficSecretSync_--;
+  auto cipher =
+      buildAead(CipherKind::OneRttWrite, writeTrafficSecret_->coalesce());
+  return cipher;
+}
+
+std::unique_ptr<Aead> ClientHandshake::getNextOneRttReadCipher() {
+  throwOnError();
+
+  CHECK(readTrafficSecret_);
+  LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
+      << "Client read and write secrets are out of sync";
+  readTrafficSecret_ = getNextTrafficSecret(readTrafficSecret_->coalesce());
+  trafficSecretSync_++;
+  auto cipher =
+      buildAead(CipherKind::OneRttRead, readTrafficSecret_->coalesce());
+  return cipher;
 }
 
 void ClientHandshake::raiseError(folly::exception_wrapper error) {

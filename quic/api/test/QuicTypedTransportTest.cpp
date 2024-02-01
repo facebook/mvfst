@@ -1195,6 +1195,106 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
+/**
+ * Handle a successful incoming key update. This verifies that the write phase
+ * is advanced whenever a key update is detected.
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTest, HandleIncomingKeyUpdate) {
+  ASSERT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  auto numberOfWrittenPacketsInPhase =
+      this->getConn().oneRttWritePacketsSentInCurrentPhase;
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+
+  {
+    // Send a packet in the current phase
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    this->loopForWrites();
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+  }
+
+  {
+    // Receive a packet in the current phase. Both read and writer ciphers
+    // should remain in phase zero
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello2"), ProtectionType::KeyPhaseZero));
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseZero);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // Receive a packet in the next phase. This is a key update that should
+    // update both the read and write ciphers to phase one.
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello3"), ProtectionType::KeyPhaseOne));
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
+
+    // No packets have been written in phase one yet.
+    numberOfWrittenPacketsInPhase = 0;
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        numberOfWrittenPacketsInPhase);
+  }
+
+  {
+    // Send a packet. The connection should stay in phase one and increment the
+    // number of packets written in this phase.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello4"), false);
+    this->loopForWrites();
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+  }
+
+  {
+    // Receive an out-of-order packet in the previous phase. It should increment
+    // total number of bytes received but the current phase shouldn't change.
+    auto tmpData = IOBuf::copyBuffer("hello out of order");
+    auto pktBuf = quic::test::packetToBuf(createStreamPacket(
+        this->getSrcConnectionId(),
+        this->getDstConnectionId(),
+        this->peerPacketNumStore.nextAppDataPacketNum - 2, // older packet
+        streamId,
+        *tmpData /* stream data */,
+        0 /* cipherOverhead */,
+        0 /* largest acked */,
+        // // the following technically ignores lost ACK packets from peer, but
+        // // should meet the needs of the majority of tests...
+        // getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(0),
+        folly::none /* longHeaderOverride */,
+        false /* eof */,
+        ProtectionType::KeyPhaseZero));
+    pktBuf->coalesce();
+
+    auto receivedBytesBeforePacket = this->getConn().lossState.totalBytesRecvd;
+
+    this->deliverPacket(std::move(pktBuf));
+    // Read and Write phases don't advance.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
+
+    // The bytes from the old packet were received successfully.
+    EXPECT_GT(
+        this->getConn().lossState.totalBytesRecvd, receivedBytesBeforePacket);
+  }
+
+  this->getNonConstConn().outstandings.reset();
+
+  this->destroyTransport();
+}
+
 template <typename T>
 struct AckEventMatcherBuilder {
   using Builder = AckEventMatcherBuilder;

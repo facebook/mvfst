@@ -372,6 +372,18 @@ void QuicClientTransport::processUdpPacketData(
         "Invalid connection id", TransportErrorCode::PROTOCOL_VIOLATION);
   }
 
+  if (conn_->readCodec->getCurrentOneRttReadPhase() !=
+      conn_->oneRttWritePhase) {
+    // Peer has initiated a key update.
+    updateOneRttWriteCipher(
+        *conn_,
+        clientConn_->clientHandshakeLayer->getNextOneRttWriteCipher(),
+        conn_->readCodec->getCurrentOneRttReadPhase());
+
+    conn_->readCodec->setNextOneRttReadCipher(
+        clientConn_->clientHandshakeLayer->getNextOneRttReadCipher());
+  }
+
   // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
   uint64_t distanceFromExpectedPacketNum =

@@ -55,8 +55,11 @@ class FizzClientHandshake : public ClientHandshake {
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;
   bool matchEarlyParameters() override;
-  std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
-  buildCiphers(CipherKind kind, folly::ByteRange secret) override;
+  std::unique_ptr<Aead> buildAead(CipherKind kind, folly::ByteRange secret)
+      override;
+  std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
+      folly::ByteRange secret) override;
+  Buf getNextTrafficSecret(folly::ByteRange secret) const override;
 
   class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);

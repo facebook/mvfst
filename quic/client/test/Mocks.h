@@ -70,9 +70,14 @@ class MockClientHandshake : public ClientHandshake {
   MOCK_METHOD(void, processSocketData, (folly::IOBufQueue & queue));
   MOCK_METHOD(bool, matchEarlyParameters, ());
   MOCK_METHOD(
-      (std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>),
-      buildCiphers,
+      std::unique_ptr<Aead>,
+      buildAead,
       (ClientHandshake::CipherKind kind, folly::ByteRange secret));
+  MOCK_METHOD(
+      std::unique_ptr<PacketNumberCipher>,
+      buildHeaderCipher,
+      (folly::ByteRange secret));
+  MOCK_METHOD(Buf, getNextTrafficSecret, (folly::ByteRange secret), (const));
   MOCK_METHOD(
       const folly::Optional<std::string>&,
       getApplicationProtocol,

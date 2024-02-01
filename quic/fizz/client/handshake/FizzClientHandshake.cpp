@@ -152,8 +152,9 @@ bool FizzClientHandshake::matchEarlyParameters() {
   return fizz::client::earlyParametersMatch(state_);
 }
 
-std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
-FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
+std::unique_ptr<Aead> FizzClientHandshake::buildAead(
+    CipherKind kind,
+    folly::ByteRange secret) {
   bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
   fizz::CipherSuite cipher =
       isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
@@ -171,9 +172,19 @@ FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
       kQuicKeyLabel,
       kQuicIVLabel));
 
-  auto packetNumberCipher = cryptoFactory_->makePacketNumberCipher(secret);
+  return aead;
+}
+std::unique_ptr<PacketNumberCipher> FizzClientHandshake::buildHeaderCipher(
+    folly::ByteRange secret) {
+  return cryptoFactory_->makePacketNumberCipher(secret);
+}
 
-  return {std::move(aead), std::move(packetNumberCipher)};
+Buf FizzClientHandshake::getNextTrafficSecret(folly::ByteRange secret) const {
+  auto deriver =
+      state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
+  auto nextSecret = deriver->expandLabel(
+      secret, kQuicKULabel, folly::IOBuf::create(0), secret.size());
+  return nextSecret;
 }
 
 void FizzClientHandshake::onNewCachedPsk(
