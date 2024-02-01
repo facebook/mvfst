@@ -153,6 +153,23 @@ class QuicReadCodec {
   const ConnectionId& getServerConnectionId() const;
 
   /**
+   * Returns true if the (local) transport can initiate a key update. This is
+   * true if:
+   *    - the nextOneRttReadCipher is available, and
+   *    - we have received enough packets in the current one rtt phase.
+   */
+  [[nodiscard]] bool canInitiateKeyUpdate() const;
+
+  /*
+   * Advance the current one rtt read cipher to the next one.
+   * This discards the previous one rtt read cipher and leaves the next one rtt
+   * read cipher unset.
+   *
+   * Returns true if the cipher was successfully advanced.
+   */
+  bool advanceOneRttReadPhase();
+
+  /**
    * Should be invoked when the state machine believes that the handshake is
    * complete.
    */
@@ -191,7 +208,7 @@ class QuicReadCodec {
   // The packet number of the first packet in the current 1-RTT phase
   // It's not set when a key update is ongoing (i.e. the write key has been
   // updated but no packets have been received with the corresponding read key)
-  folly::Optional<PacketNum> currentOneRttReadPhaseStartPacketNum_;
+  folly::Optional<PacketNum> currentOneRttReadPhaseStartPacketNum_{0};
 
   std::unique_ptr<PacketNumberCipher> initialHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttHeaderCipher_;

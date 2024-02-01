@@ -362,8 +362,8 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
     // from the next phase. We should advance our oneRttCipher state.
     currentOneRttReadPhase_ = shortHeader->getProtectionType();
     currentOneRttReadPhaseStartPacketNum_.reset();
-    previousOneRttReadCipher_ = std::move(currentOneRttReadCipher_);
-    currentOneRttReadCipher_ = std::move(nextOneRttReadCipher_);
+    previousOneRttReadCipher_.reset(currentOneRttReadCipher_.release());
+    currentOneRttReadCipher_.reset(nextOneRttReadCipher_.release());
     // nextOneRttReadCipher_ will be populated by the transport
   }
 
@@ -435,6 +435,29 @@ CodecResult QuicReadCodec::parsePacket(
     return StatelessReset(*token);
   }
   return maybeShortHeaderPacket;
+}
+
+bool QuicReadCodec::canInitiateKeyUpdate() const {
+  if (!nextOneRttReadCipher_ || !currentOneRttReadPhaseStartPacketNum_) {
+    // We haven't received any packets in the current oneRtt phase yet.
+    return false;
+  }
+  return true;
+}
+
+bool QuicReadCodec::advanceOneRttReadPhase() {
+  if (!canInitiateKeyUpdate()) {
+    LOG(WARNING) << "Key update requested before the read codec can allow it";
+    return false;
+  }
+  previousOneRttReadCipher_.reset(currentOneRttReadCipher_.release());
+  currentOneRttReadCipher_.reset(nextOneRttReadCipher_.release());
+  currentOneRttReadPhase_ =
+      (currentOneRttReadPhase_ == ProtectionType::KeyPhaseZero)
+      ? ProtectionType::KeyPhaseOne
+      : ProtectionType::KeyPhaseZero;
+  currentOneRttReadPhaseStartPacketNum_.reset();
+  return true;
 }
 
 const Aead* QuicReadCodec::getOneRttReadCipher() const {
