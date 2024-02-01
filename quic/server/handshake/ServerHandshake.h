@@ -113,16 +113,31 @@ class ServerHandshake : public Handshake {
   std::unique_ptr<Aead> getHandshakeReadCipher();
 
   /**
-   * An edge triggered API to get the oneRttWriteCipher. Once you receive the
-   * write cipher subsequent calls will return null.
+   * An edge triggered API to get the first oneRttWriteCipher. Once you receive
+   * the write cipher subsequent calls will return null.
    */
-  std::unique_ptr<Aead> getOneRttWriteCipher();
+  std::unique_ptr<Aead> getFirstOneRttWriteCipher();
 
   /**
-   * An edge triggered API to get the oneRttReadCipher. Once you receive the
-   * read cipher subsequent calls will return null.
+   * An API to get oneRttWriteCiphers on key rotation. Each call will return a
+   * one rtt write cipher using the current traffic secret and advance the
+   * traffic secret.
    */
-  std::unique_ptr<Aead> getOneRttReadCipher();
+  std::unique_ptr<Aead> getNextOneRttWriteCipher();
+
+  /**
+   * An API to get oneRttReadCiphers. Each call will generate a one rtt
+   * read cipher using the current traffic secret and advance the traffic
+   * secret.
+   */
+  std::unique_ptr<Aead> getFirstOneRttReadCipher();
+
+  /**
+   * An API to get oneRttReadCiphers on key rotation. Each call will return a
+   * one rtt read cipher using the current traffic secret and advance the
+   * traffic secret.
+   */
+  std::unique_ptr<Aead> getNextOneRttReadCipher();
 
   /**
    * An edge triggered API to get the zeroRttReadCipher. Once you receive the
@@ -181,6 +196,12 @@ class ServerHandshake : public Handshake {
    * Returns the negotiated ALPN from the handshake.
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
+
+  /**
+   * Given secret_n, returns secret_n+1 to be used for generating the next Aead
+   * on key updates.
+   */
+  virtual Buf getNextTrafficSecret(folly::ByteRange secret) const = 0;
 
   ~ServerHandshake() override = default;
 
@@ -253,6 +274,15 @@ class ServerHandshake : public Handshake {
   std::unique_ptr<Aead> oneRttWriteCipher_;
   std::unique_ptr<Aead> zeroRttReadCipher_;
 
+  Buf readTrafficSecret_;
+  Buf writeTrafficSecret_;
+
+  // This variable is incremented every time a read traffic secret is rotated,
+  // and decremented for the write secret. Its value should be
+  // between -1 and 1. A value outside of this range indicates that the
+  // transport's read and write ciphers are likely out of sync.
+  int trafficSecretSync_{0};
+
   std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeReadHeaderCipher_;
@@ -271,8 +301,9 @@ class ServerHandshake : public Handshake {
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
-  virtual std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
-  buildCiphers(folly::ByteRange secret) = 0;
+  virtual std::unique_ptr<Aead> buildAead(folly::ByteRange secret) = 0;
+  virtual std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
+      folly::ByteRange secret) = 0;
 
   virtual void processAccept() = 0;
   /*

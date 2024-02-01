@@ -386,9 +386,9 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   // However, the cipher is only exported to QUIC if early data attempt is
   // accepted. Otherwise, the cipher will be available after cfin is
   // processed.
-  auto oneRttWriteCipher = handshakeLayer->getOneRttWriteCipher();
+  auto oneRttWriteCipher = handshakeLayer->getFirstOneRttWriteCipher();
   // One RTT read cipher is available after cfin is processed.
-  auto oneRttReadCipher = handshakeLayer->getOneRttReadCipher();
+  auto oneRttReadCipher = handshakeLayer->getFirstOneRttReadCipher();
 
   auto oneRttWriteHeaderCipher = handshakeLayer->getOneRttWriteHeaderCipher();
   auto oneRttReadHeaderCipher = handshakeLayer->getOneRttReadHeaderCipher();
@@ -419,6 +419,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
           "Duplicate 1-rtt write cipher", TransportErrorCode::CRYPTO_ERROR);
     }
     conn.oneRttWriteCipher = std::move(oneRttWriteCipher);
+    conn.oneRttWritePhase = ProtectionType::KeyPhaseZero;
 
     updatePacingOnKeyEstablished(conn);
 
@@ -440,6 +441,8 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     conn.isClientAddrVerified = true;
     conn.writableBytesLimit.reset();
     conn.readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
+    conn.readCodec->setNextOneRttReadCipher(
+        handshakeLayer->getNextOneRttReadCipher());
   }
   auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
   auto handshakeReadHeaderCipher =
@@ -1015,6 +1018,17 @@ void onServerReadDataFromOpen(
       }
     }
 
+    if (conn.readCodec->getCurrentOneRttReadPhase() != conn.oneRttWritePhase) {
+      // Peer has initiated a key update.
+      updateOneRttWriteCipher(
+          conn,
+          conn.serverHandshakeLayer->getNextOneRttWriteCipher(),
+          conn.readCodec->getCurrentOneRttReadPhase());
+
+      conn.readCodec->setNextOneRttReadCipher(
+          conn.serverHandshakeLayer->getNextOneRttReadCipher());
+    }
+
     auto& ackState = getAckState(conn, packetNumberSpace);
     uint64_t distanceFromExpectedPacketNum = addPacketToAckState(
         conn, ackState, packetNum, readData.udpPacket.timings);
@@ -1492,6 +1506,8 @@ void onServerReadDataFromClosed(
   if (conn.qLogger) {
     conn.qLogger->addPacket(regularPacket, packetSize);
   }
+
+  // TODO: Should we honor a key update from the peer on a closed connection?
 
   // Only process the close frames in the packet
   for (auto& quicFrame : regularPacket.frames) {

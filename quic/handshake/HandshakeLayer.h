@@ -16,6 +16,7 @@ namespace quic {
 constexpr folly::StringPiece kQuicKeyLabel = "quic key";
 constexpr folly::StringPiece kQuicIVLabel = "quic iv";
 constexpr folly::StringPiece kQuicPNLabel = "quic hp";
+constexpr folly::StringPiece kQuicKULabel = "quic ku";
 
 class Handshake {
  public:

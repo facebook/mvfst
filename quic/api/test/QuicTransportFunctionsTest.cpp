@@ -48,7 +48,7 @@ uint64_t writeProbingDataToSocketForTest(
              conn,
              *conn.clientConnectionId,
              *conn.serverConnectionId,
-             ShortHeaderBuilder(),
+             ShortHeaderBuilder(conn.oneRttWritePhase),
              EncryptionLevel::AppData,
              PacketNumberSpace::AppData,
              scheduler,

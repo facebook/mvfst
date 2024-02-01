@@ -219,8 +219,8 @@ class ServerHandshakeTest : public Test {
   }
 
   void setHandshakeState() {
-    auto oneRttWriteCipherTmp = handshake->getOneRttWriteCipher();
-    auto oneRttReadCipherTmp = handshake->getOneRttReadCipher();
+    auto oneRttWriteCipherTmp = handshake->getFirstOneRttWriteCipher();
+    auto oneRttReadCipherTmp = handshake->getFirstOneRttReadCipher();
     auto zeroRttReadCipherTmp = handshake->getZeroRttReadCipher();
     auto handshakeWriteCipherTmp = std::move(conn->handshakeWriteCipher);
     auto handshakeReadCipherTmp = handshake->getHandshakeReadCipher();
@@ -692,7 +692,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestAsyncError) {
   EXPECT_CALL(serverCallback, onCryptoEventAvailable())
       .WillRepeatedly(Invoke([&] {
         try {
-          handshake->getOneRttReadCipher();
+          handshake->getFirstOneRttReadCipher();
         } catch (std::exception&) {
           error = true;
         }
@@ -713,7 +713,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestCancelOnAsyncError) {
       }));
   promise.setValue();
   evb.loop();
-  EXPECT_THROW(handshake->getOneRttReadCipher(), std::runtime_error);
+  EXPECT_THROW(handshake->getFirstOneRttReadCipher(), std::runtime_error);
 }
 
 TEST_F(ServerHandshakeAsyncErrorTest, TestCancelWhileWaitingAsyncError) {
@@ -724,7 +724,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestCancelWhileWaitingAsyncError) {
 
   promise.setValue();
   evb.loop();
-  EXPECT_THROW(handshake->getOneRttReadCipher(), std::runtime_error);
+  EXPECT_THROW(handshake->getFirstOneRttReadCipher(), std::runtime_error);
 }
 
 class ServerHandshakeSyncErrorTest : public ServerHandshakePskTest {
@@ -743,7 +743,7 @@ TEST_F(ServerHandshakeSyncErrorTest, TestError) {
   // Make an async ticket decryption operation.
   clientServerRound();
   evb.loop();
-  EXPECT_THROW(handshake->getOneRttReadCipher(), std::runtime_error);
+  EXPECT_THROW(handshake->getFirstOneRttReadCipher(), std::runtime_error);
 }
 
 class ServerHandshakeZeroRttDefaultAppTokenValidatorTest

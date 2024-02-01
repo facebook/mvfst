@@ -126,10 +126,13 @@ class QuicReadCodec {
 
   const folly::Optional<StatelessResetToken>& getStatelessResetToken() const;
 
+  [[nodiscard]] ProtectionType getCurrentOneRttReadPhase() const;
+
   CodecParameters getCodecParameters() const;
 
   void setInitialReadCipher(std::unique_ptr<Aead> initialReadCipher);
   void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher);
+  void setNextOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher);
   void setZeroRttReadCipher(std::unique_ptr<Aead> zeroRttReadCipher);
   void setHandshakeReadCipher(std::unique_ptr<Aead> handshakeReadCipher);
 
@@ -178,9 +181,17 @@ class QuicReadCodec {
   // Cipher used to decrypt handshake packets.
   std::unique_ptr<Aead> initialReadCipher_;
 
-  std::unique_ptr<Aead> oneRttReadCipher_;
   std::unique_ptr<Aead> zeroRttReadCipher_;
   std::unique_ptr<Aead> handshakeReadCipher_;
+
+  std::unique_ptr<Aead> previousOneRttReadCipher_;
+  std::unique_ptr<Aead> currentOneRttReadCipher_;
+  std::unique_ptr<Aead> nextOneRttReadCipher_;
+  ProtectionType currentOneRttReadPhase_{ProtectionType::KeyPhaseZero};
+  // The packet number of the first packet in the current 1-RTT phase
+  // It's not set when a key update is ongoing (i.e. the write key has been
+  // updated but no packets have been received with the corresponding read key)
+  folly::Optional<PacketNum> currentOneRttReadPhaseStartPacketNum_;
 
   std::unique_ptr<PacketNumberCipher> initialHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttHeaderCipher_;

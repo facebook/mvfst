@@ -80,18 +80,44 @@ std::unique_ptr<Aead> ServerHandshake::getHandshakeReadCipher() {
   return std::move(handshakeReadCipher_);
 }
 
-std::unique_ptr<Aead> ServerHandshake::getOneRttWriteCipher() {
+std::unique_ptr<Aead> ServerHandshake::getFirstOneRttWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(oneRttWriteCipher_);
 }
 
-std::unique_ptr<Aead> ServerHandshake::getOneRttReadCipher() {
+std::unique_ptr<Aead> ServerHandshake::getNextOneRttWriteCipher() {
+  if (error_) {
+    throw QuicTransportException(error_->first, error_->second);
+  }
+  CHECK(writeTrafficSecret_);
+  LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
+      << "Server read and write secrets are out of sync";
+  writeTrafficSecret_ = getNextTrafficSecret(writeTrafficSecret_->coalesce());
+  trafficSecretSync_--;
+  auto cipher = buildAead(writeTrafficSecret_->coalesce());
+  return cipher;
+}
+
+std::unique_ptr<Aead> ServerHandshake::getFirstOneRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(oneRttReadCipher_);
+}
+
+std::unique_ptr<Aead> ServerHandshake::getNextOneRttReadCipher() {
+  if (error_) {
+    throw QuicTransportException(error_->first, error_->second);
+  }
+  CHECK(readTrafficSecret_);
+  LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
+      << "Server read and write secrets are out of sync";
+  readTrafficSecret_ = getNextTrafficSecret(readTrafficSecret_->coalesce());
+  trafficSecretSync_++;
+  auto cipher = buildAead(readTrafficSecret_->coalesce());
+  return cipher;
 }
 
 std::unique_ptr<Aead> ServerHandshake::getZeroRttReadCipher() {
@@ -435,9 +461,8 @@ void ServerHandshake::processActions(
 }
 
 void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
-  std::unique_ptr<Aead> aead;
-  std::unique_ptr<PacketNumberCipher> headerCipher;
-  std::tie(aead, headerCipher) = buildCiphers(secret);
+  std::unique_ptr<Aead> aead = buildAead(secret);
+  std::unique_ptr<PacketNumberCipher> headerCipher = buildHeaderCipher(secret);
   switch (kind) {
     case CipherKind::HandshakeRead:
       handshakeReadCipher_ = std::move(aead);
@@ -448,10 +473,12 @@ void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->handshakeWriteHeaderCipher = std::move(headerCipher);
       break;
     case CipherKind::OneRttRead:
+      readTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
       oneRttReadCipher_ = std::move(aead);
       oneRttReadHeaderCipher_ = std::move(headerCipher);
       break;
     case CipherKind::OneRttWrite:
+      writeTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
       oneRttWriteCipher_ = std::move(aead);
       oneRttWriteHeaderCipher_ = std::move(headerCipher);
       break;

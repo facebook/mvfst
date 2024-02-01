@@ -348,6 +348,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Write cipher for 1-RTT data
   std::unique_ptr<Aead> oneRttWriteCipher;
+  ProtectionType oneRttWritePhase{ProtectionType::KeyPhaseZero};
+  uint64_t oneRttWritePacketsSentInCurrentPhase = 0;
 
   // Write cipher for packets with initial keys.
   std::unique_ptr<Aead> initialWriteCipher;

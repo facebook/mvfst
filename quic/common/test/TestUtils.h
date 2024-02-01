@@ -535,6 +535,15 @@ class FakeServerHandshake : public FizzServerHandshake {
     }
     oneRttReadCipher_ = createNoOpAead();
     oneRttReadHeaderCipher_ = createNoOpHeaderCipher();
+    readTrafficSecret_ = folly::IOBuf::copyBuffer(getRandSecret());
+  }
+
+  std::unique_ptr<Aead> buildAead(folly::ByteRange /*secret*/) override {
+    return createNoOpAead();
+  }
+
+  Buf getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
+    return folly::IOBuf::copyBuffer(getRandSecret());
   }
 
   void setHandshakeKeys() {

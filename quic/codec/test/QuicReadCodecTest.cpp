@@ -440,7 +440,8 @@ TEST_F(QuicReadCodecTest, RandomizedShortHeaderLeadsToReset) {
   uint8_t* packetHeaderBuffer = streamPacket.header.writableData();
   uint8_t randomByte;
   folly::Random::secureRandom(&randomByte, 1);
-  *packetHeaderBuffer = 0x40 | (randomByte & 0b00111111);
+  // Do not randomize the HeaderForm bit, Fixed bit and Key Phase bit.
+  *packetHeaderBuffer = 0x40 | (randomByte & 0b00111011);
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
@@ -842,4 +843,476 @@ TEST_F(QuicReadCodecTest, parseEmptyDatagramFrame) {
               ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
           CodecParameters()),
       QuicTransportException);
+}
+
+TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {
+  /*
+   * - Receive a packet in phase zero
+   * - Receive a packet in phase one --> triggers key update
+   * - Receive an out-of-order packet in phase zero --> uses previous cipher
+   * - Receive a packet in phase one --> uses current cipher
+   * - Receive an in-order packet in phase zero --> triggers another key update
+   * All packets are decrypted successfully.
+   */
+  auto connId = getTestConnectionId();
+  auto aead1 = std::make_unique<MockAead>();
+  auto rawAead1 = aead1.get();
+
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead1),
+      nullptr /* 0-rtt zead */,
+      nullptr /* stateless reset token*/,
+      QuicNodeType::Client);
+
+  auto aead2 = std::make_unique<MockAead>();
+  auto rawAead2 = aead2.get();
+  codec->setNextOneRttReadCipher(std::move(aead2));
+
+  EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _))
+      .Times(1)
+      .WillOnce(Invoke(
+          [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+            // Successful decryption
+            return std::move(cipherText);
+          }));
+
+  // First packet in 1-rtt phase zero.
+  PacketNum packetNum = 2;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  // Packet should be parsed successfully.
+  EXPECT_TRUE(packet.regularPacket() != nullptr);
+
+  {
+    // Second packet is in 1-rtt phase one and should be decrypted using aead2
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke(
+            [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+              // Successful decryption
+              return std::move(cipherText);
+            }));
+    packetNum = 3;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+
+    // Packet should be parsed successfully.
+    EXPECT_TRUE(packet.regularPacket() != nullptr);
+    // The read codec should advance to phase one.
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseOne);
+  }
+
+  auto aead3 = std::make_unique<MockAead>();
+  auto rawAead3 = aead3.get();
+  codec->setNextOneRttReadCipher(std::move(aead3));
+
+  {
+    // Third packet is in 1-rtt phase zero. This is an out of order packet and
+    // should be decrypted with the aead1 not aead3.
+    EXPECT_CALL(*rawAead3, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke(
+            [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+              // Successful decryption
+              return std::move(cipherText);
+            }));
+    packetNum = 1;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseZero);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Packet should be parsed successfully.
+    EXPECT_TRUE(packet.regularPacket() != nullptr);
+    // The read codec should not advance to phase zero for an old packet.
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseOne);
+  }
+
+  {
+    // Forth packet is in 1-rtt phase one. This is in the current 1-rtt phase
+    // and should be handled by aead2.
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead3, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke(
+            [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+              // Successful decryption
+              return std::move(cipherText);
+            }));
+    packetNum = 4;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Packet should be parsed successfully.
+    EXPECT_TRUE(packet.regularPacket() != nullptr);
+    // The read codec should not advance to phase zero for an old packet.
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseOne);
+  }
+
+  {
+    // Fifth packet is in 1-rtt phase zero. Since it's in-order, it should
+    // trigger another key update
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead3, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke(
+            [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+              // Successful decryption
+              return std::move(cipherText);
+            }));
+    packetNum = 5;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseZero);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Packet should be parsed successfully.
+    EXPECT_TRUE(packet.regularPacket() != nullptr);
+    // The read codec should advance to phase zero.
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseZero);
+  }
+}
+
+TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
+  /*
+   * - Receive a packet in phase zero
+   * - Receive a packet in phase one that cannot be decrypted with next key
+   *      --> no key update
+   * - Receive a decryptable packet in phase one
+   *      --> triggers key update
+   * - Receive an out-of-order packet in phase one
+   *      --> does not check previous or next cipher.
+   * - Receive an in-order packet in phase zero that cannot be decrypted
+          --> only checks next cipher, no key update
+   */
+  auto connId = getTestConnectionId();
+  auto aead1 = std::make_unique<MockAead>();
+  auto rawAead1 = aead1.get();
+
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead1),
+      nullptr /* 0-rtt zead */,
+      nullptr /* stateless reset token*/,
+      QuicNodeType::Client);
+
+  auto aead2 = std::make_unique<MockAead>();
+  auto rawAead2 = aead2.get();
+  codec->setNextOneRttReadCipher(std::move(aead2));
+
+  EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _))
+      .Times(1)
+      .WillOnce(Invoke(
+          [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+            // Successful decryption
+            return std::move(cipherText);
+          }));
+
+  // First packet in 1-rtt phase zero.
+  PacketNum packetNum = 2;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  // Packet should be parsed successfully.
+  EXPECT_TRUE(packet.regularPacket() != nullptr);
+  // We're currently in phase zero.
+  EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseZero);
+
+  {
+    // Second packet is in 1-rtt phase one. Decryption should be attempted with
+    // aead2 and fail.
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke([](std::unique_ptr<folly::IOBuf>&, const auto&, auto) {
+          // Failed decryption
+          return folly::none;
+        }));
+    packetNum = 3;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Codec parsing should fail.
+    EXPECT_TRUE(packet.nothing());
+    // The read codec should stay in phase zero
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // Third packet is in 1-rtt phase one. It is successfully decrypted with
+    // aead2
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke(
+            [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+              // Successful decryption
+              return std::move(cipherText);
+            }));
+    packetNum = 4;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Codec parsing should succeed
+    EXPECT_TRUE(packet.regularPacket());
+    // The read codec should advance to phase one
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseOne);
+  }
+
+  auto aead3 = std::make_unique<MockAead>();
+  auto rawAead3 = aead3.get();
+  codec->setNextOneRttReadCipher(std::move(aead3));
+
+  {
+    // Forth packet is in current phase (phase one) but it is out of order and
+    // not decryptable by current cipher. It should not be checked with the
+    // previous or next cipher.
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead3, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke([](std::unique_ptr<folly::IOBuf>&, const auto&, auto) {
+          // Failed decryption
+          return folly::none;
+        }));
+    packetNum = 1;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Codec parsing should fail.
+    EXPECT_TRUE(packet.nothing());
+    // The read codec should still be in phase one
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseOne);
+  }
+
+  {
+    // Fifth packet is in next phase (phase zero) and is in order but it is not
+    // decryptable. It should not be checked with the current or previous
+    // ciphers.
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead2, _tryDecrypt(_, _, _)).Times(0);
+    EXPECT_CALL(*rawAead3, _tryDecrypt(_, _, _))
+        .Times(1)
+        .WillOnce(Invoke([](std::unique_ptr<folly::IOBuf>&, const auto&, auto) {
+          // Failed decryption
+          return folly::none;
+        }));
+    packetNum = 5;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseZero);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Codec parsing should fail.
+    EXPECT_TRUE(packet.nothing());
+    // The read codec should still be in phase one
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseOne);
+  }
+}
+
+TEST_F(QuicReadCodecTest, KeyUpdateCipherUnavailable) {
+  /*
+   * - Receive a packet in phase zero
+   * - Receive an out-of-order packet in phase one without a previous cipher
+   *      available.
+   * - Receive an in-order packet in phase one without a next cipher available.
+   */
+  auto connId = getTestConnectionId();
+  auto aead1 = std::make_unique<MockAead>();
+  auto rawAead1 = aead1.get();
+
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead1),
+      nullptr /* 0-rtt zead */,
+      nullptr /* stateless reset token*/,
+      QuicNodeType::Client);
+
+  EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _))
+      .Times(1)
+      .WillOnce(Invoke(
+          [](std::unique_ptr<folly::IOBuf>& cipherText, const auto&, auto) {
+            // Successful decryption
+            return std::move(cipherText);
+          }));
+
+  // First packet in 1-rtt phase zero.
+  PacketNum packetNum = 2;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  // Packet should be parsed successfully.
+  EXPECT_TRUE(packet.regularPacket() != nullptr);
+  // We're currently in phase zero.
+  EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseZero);
+
+  {
+    // Second packet is in 1-rtt phase one but is out of order and there is no
+    // previous cipher available.
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    packetNum = 1;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Codec parsing should fail with cipher unavailable.
+    EXPECT_TRUE(packet.cipherUnavailable());
+    // The read codec should stay in phase zero
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // Second packet is in 1-rtt phase one and is in-order but the next cipher
+    // has not been set yet.
+    EXPECT_CALL(*rawAead1, _tryDecrypt(_, _, _)).Times(0);
+    packetNum = 3;
+    streamPacket = createStreamPacket(
+        connId,
+        connId,
+        packetNum,
+        streamId,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */,
+        folly::none,
+        true,
+        ProtectionType::KeyPhaseOne);
+    packetQueue = bufToQueue(packetToBuf(streamPacket));
+    packet = codec->parsePacket(packetQueue, ackStates);
+    // Codec parsing should fail with cipher unavailable.
+    EXPECT_TRUE(packet.cipherUnavailable());
+    // The read codec should stay in phase zero
+    EXPECT_EQ(codec->getCurrentOneRttReadPhase(), ProtectionType::KeyPhaseZero);
+  }
 }

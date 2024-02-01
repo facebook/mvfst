@@ -126,7 +126,7 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
     uint64_t packetLimit,
     bool exceptCryptoStream,
     TimePoint writeLoopBeginTime) {
-  auto builder = ShortHeaderBuilder();
+  auto builder = ShortHeaderBuilder(connection.oneRttWritePhase);
   WriteQuicDataResult result;
   auto& packetsWritten = result.packetsWritten;
   auto& probesWritten = result.probesWritten;
@@ -843,6 +843,7 @@ void updateConnection(
   conn.lossState.totalPacketsSent++;
   conn.lossState.totalStreamBytesSent += streamBytesSent;
   conn.lossState.totalNewStreamBytesSent += newStreamBytesSent;
+  conn.oneRttWritePacketsSentInCurrentPhase++;
 
   if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);
@@ -1009,13 +1010,14 @@ HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType) {
   };
 }
 
-HeaderBuilder ShortHeaderBuilder() {
-  return [](const ConnectionId& /* srcConnId */,
-            const ConnectionId& dstConnId,
-            PacketNum packetNum,
-            QuicVersion,
-            const std::string&) {
-    return ShortHeader(ProtectionType::KeyPhaseZero, dstConnId, packetNum);
+HeaderBuilder ShortHeaderBuilder(ProtectionType keyPhase) {
+  return [keyPhase](
+             const ConnectionId& /* srcConnId */,
+             const ConnectionId& dstConnId,
+             PacketNum packetNum,
+             QuicVersion,
+             const std::string&) {
+    return ShortHeader(keyPhase, dstConnId, packetNum);
   };
 }
 
@@ -1902,5 +1904,19 @@ bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
       conn.oneRttWriteCipher &&
       hasAcksToSchedule(conn.ackStates.appDataAckState) &&
       conn.ackStates.appDataAckState.needsToSendAckImmediately);
+}
+
+void updateOneRttWriteCipher(
+    quic::QuicConnectionStateBase& conn,
+    std::unique_ptr<Aead> aead,
+    ProtectionType oneRttPhase) {
+  CHECK(
+      oneRttPhase == ProtectionType::KeyPhaseZero ||
+      oneRttPhase == ProtectionType::KeyPhaseOne);
+  CHECK(oneRttPhase != conn.oneRttWritePhase)
+      << "Cannot replace cipher for current write phase";
+  conn.oneRttWriteCipher = std::move(aead);
+  conn.oneRttWritePhase = oneRttPhase;
+  conn.oneRttWritePacketsSentInCurrentPhase = 0;
 }
 } // namespace quic
