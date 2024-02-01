@@ -1951,6 +1951,7 @@ void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
       conn.oneRttWritePacketsSentInCurrentPhase >
           conn.transportSettings.keyUpdatePacketCountInterval) {
     if (conn.readCodec->canInitiateKeyUpdate()) {
+      QUIC_STATS(conn.statsCallback, onKeyUpdateAttemptInitiated);
       conn.readCodec->advanceOneRttReadPhase();
 
       updateOneRttWriteCipher(

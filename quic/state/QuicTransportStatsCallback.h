@@ -163,6 +163,12 @@ class QuicTransportStatsCallback {
 
   virtual void onConnectionIdCreated(size_t encodedTimes) = 0;
 
+  virtual void onKeyUpdateAttemptInitiated() = 0;
+
+  virtual void onKeyUpdateAttemptReceived() = 0;
+
+  virtual void onKeyUpdateAttemptSucceeded() = 0;
+
   static const char* toString(SocketErrorType errorType) {
     switch (errorType) {
       case SocketErrorType::AGAIN:

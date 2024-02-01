@@ -126,6 +126,9 @@ void QuicServerTransport::setTransportStatsCallback(
     QuicTransportStatsCallback* statsCallback) noexcept {
   if (conn_) {
     conn_->statsCallback = statsCallback;
+    if (conn_->readCodec) {
+      conn_->readCodec->setConnectionStatsCallback(statsCallback);
+    }
   }
 }
 

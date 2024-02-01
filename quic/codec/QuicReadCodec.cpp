@@ -315,6 +315,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
         // This is a key update attempt
         if (nextOneRttReadCipher_) {
           peerKeyUpdateAttempt = true;
+          QUIC_STATS(statsCallback_, onKeyUpdateAttemptReceived);
           return nextOneRttReadCipher_.get();
         } else {
           // The next cipher is not yet available. We can't decrypt this packet
@@ -373,6 +374,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
     // number. This applies for both peer-initiated and self-initiated key
     // updates.
     currentOneRttReadPhaseStartPacketNum_ = shortHeader->getPacketSequenceNum();
+    QUIC_STATS(statsCallback_, onKeyUpdateAttemptSucceeded);
   }
 
   // TODO: Should we discard the previous cipher at some point? Keeping it
@@ -545,6 +547,11 @@ void QuicReadCodec::setServerConnectionId(ConnectionId connId) {
 void QuicReadCodec::setStatelessResetToken(
     StatelessResetToken statelessResetToken) {
   statelessResetToken_ = std::move(statelessResetToken);
+}
+
+void QuicReadCodec::setConnectionStatsCallback(
+    QuicTransportStatsCallback* callback) {
+  statsCallback_ = callback;
 }
 
 const ConnectionId& QuicReadCodec::getClientConnectionId() const {

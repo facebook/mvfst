@@ -15,6 +15,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/handshake/Aead.h>
 #include <quic/state/AckStates.h>
+#include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
 
@@ -152,6 +153,8 @@ class QuicReadCodec {
   const ConnectionId& getClientConnectionId() const;
   const ConnectionId& getServerConnectionId() const;
 
+  void setConnectionStatsCallback(QuicTransportStatsCallback* callback);
+
   /**
    * Returns true if the (local) transport can initiate a key update. This is
    * true if:
@@ -217,6 +220,8 @@ class QuicReadCodec {
 
   folly::Optional<StatelessResetToken> statelessResetToken_;
   folly::Optional<TimePoint> handshakeDoneTime_;
+
+  QuicTransportStatsCallback* statsCallback_{nullptr};
 };
 
 } // namespace quic

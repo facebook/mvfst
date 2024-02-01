@@ -831,6 +831,7 @@ void onServerReadDataFromOpen(
     const CryptoFactory& cryptoFactory =
         conn.serverHandshakeLayer->getCryptoFactory();
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+    conn.readCodec->setConnectionStatsCallback(conn.statsCallback);
     conn.readCodec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
         initialDestinationConnectionId, version));
     conn.readCodec->setClientConnectionId(clientConnectionId);

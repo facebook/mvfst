@@ -1701,6 +1701,7 @@ void QuicClientTransport::setTransportStatsCallback(
   statsCallback_ = std::move(statsCallback);
   if (statsCallback_) {
     conn_->statsCallback = statsCallback_.get();
+    conn_->readCodec->setConnectionStatsCallback(statsCallback_.get());
   } else {
     conn_->statsCallback = nullptr;
   }
