@@ -267,6 +267,7 @@ void QuicServerTransport::writeData() {
   // use.
   SCOPE_EXIT {
     conn_->pendingEvents.numProbePackets = {};
+    maybeInitiateKeyUpdate(*conn_);
   };
   if (conn_->initialWriteCipher) {
     auto& initialCryptoStream =

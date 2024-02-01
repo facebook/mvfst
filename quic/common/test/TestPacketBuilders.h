@@ -30,6 +30,7 @@ struct AckPacketBuilderFields {
   folly::Optional<quic::AckBlocks> maybeAckBlocks;
   folly::Optional<std::chrono::microseconds> maybeAckDelay;
   folly::Optional<const Aead*> maybeAead; // not required
+  ProtectionType shortHeaderProtectionType{ProtectionType::KeyPhaseZero};
   explicit AckPacketBuilderFields() = default;
 };
 
@@ -42,6 +43,7 @@ struct AckPacketBuilder : public AckPacketBuilderFields {
   Builder&& setAckBlocks(const quic::AckBlocks& ackBlocksIn);
   Builder&& setAckDelay(std::chrono::microseconds ackDelayIn);
   Builder&& setAead(const Aead* aeadIn);
+  Builder&& setShortHeaderProtectionType(ProtectionType protectionTypeIn);
   RegularQuicPacketBuilder::Packet build() &&;
   quic::Buf buildBuf() &&;
   explicit AckPacketBuilder() = default;

@@ -62,14 +62,14 @@ class ClientHandshake : public Handshake {
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttWriteCipher();
+  std::unique_ptr<Aead> getNextOneRttWriteCipher() override;
 
   /**
    * An API to get oneRttReadCiphers on key rotation. Each call will return a
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttReadCipher();
+  std::unique_ptr<Aead> getNextOneRttReadCipher() override;
 
   /**
    * Triggered when we have received a handshake done frame from the server.

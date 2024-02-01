@@ -843,7 +843,20 @@ void updateConnection(
   conn.lossState.totalPacketsSent++;
   conn.lossState.totalStreamBytesSent += streamBytesSent;
   conn.lossState.totalNewStreamBytesSent += newStreamBytesSent;
-  conn.oneRttWritePacketsSentInCurrentPhase++;
+
+  // Count the number of packets sent in the current phase.
+  // This is used to initiate key updates if enabled.
+  if (packet.header.getProtectionType() == conn.oneRttWritePhase) {
+    if (conn.oneRttWritePendingVerification &&
+        conn.oneRttWritePacketsSentInCurrentPhase == 0) {
+      // This is the first packet in the new phase after we have initiated a key
+      // update. We need to keep track of it to confirm the peer acks it in the
+      // same phase.
+      conn.oneRttWritePendingVerificationPacketNumber =
+          packet.header.getPacketSequenceNum();
+    }
+    conn.oneRttWritePacketsSentInCurrentPhase++;
+  }
 
   if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);
@@ -1340,7 +1353,7 @@ void writeShortClose(
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   auto header = ShortHeader(
-      ProtectionType::KeyPhaseZero,
+      connection.oneRttWritePhase,
       connId,
       getNextPacketNum(connection, PacketNumberSpace::AppData));
   writeCloseCommon(
@@ -1919,4 +1932,66 @@ void updateOneRttWriteCipher(
   conn.oneRttWritePhase = oneRttPhase;
   conn.oneRttWritePacketsSentInCurrentPhase = 0;
 }
+
+void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn) {
+  if (conn.readCodec->getCurrentOneRttReadPhase() != conn.oneRttWritePhase) {
+    // Peer has initiated a key update.
+    updateOneRttWriteCipher(
+        conn,
+        conn.handshakeLayer->getNextOneRttWriteCipher(),
+        conn.readCodec->getCurrentOneRttReadPhase());
+
+    conn.readCodec->setNextOneRttReadCipher(
+        conn.handshakeLayer->getNextOneRttReadCipher());
+  }
+}
+
+void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
+  if (conn.transportSettings.initiateKeyUpdate &&
+      conn.oneRttWritePacketsSentInCurrentPhase >
+          conn.transportSettings.keyUpdatePacketCountInterval) {
+    if (conn.readCodec->canInitiateKeyUpdate()) {
+      conn.readCodec->advanceOneRttReadPhase();
+
+      updateOneRttWriteCipher(
+          conn,
+          conn.handshakeLayer->getNextOneRttWriteCipher(),
+          conn.readCodec->getCurrentOneRttReadPhase());
+      conn.readCodec->setNextOneRttReadCipher(
+          conn.handshakeLayer->getNextOneRttReadCipher());
+      // Signal the transport that a key update has been initiated.
+      conn.oneRttWritePendingVerification = true;
+      conn.oneRttWritePendingVerificationPacketNumber.clear();
+    }
+  }
+}
+
+void maybeVerifyPendingKeyUpdate(
+    QuicConnectionStateBase& conn,
+    const OutstandingPacketWrapper& outstandingPacket,
+    const RegularQuicPacket& ackPacket) {
+  if (!(protectionTypeToEncryptionLevel(
+            outstandingPacket.packet.header.getProtectionType()) ==
+        EncryptionLevel::AppData)) {
+    // This is not an app data packet. We can't have initiated a key update yet.
+    return;
+  }
+
+  if (conn.oneRttWritePendingVerificationPacketNumber &&
+      outstandingPacket.packet.header.getPacketSequenceNum() >=
+          conn.oneRttWritePendingVerificationPacketNumber.value()) {
+    // There is a pending key update. This packet should be acked in
+    // the current phase.
+    if (ackPacket.header.getProtectionType() == conn.oneRttWritePhase) {
+      // Key update is verified.
+      conn.oneRttWritePendingVerificationPacketNumber.clear();
+      conn.oneRttWritePendingVerification = false;
+    } else {
+      throw QuicTransportException(
+          "Packet with key update was acked in the wrong phase",
+          TransportErrorCode::CRYPTO_ERROR);
+    }
+  }
+}
+
 } // namespace quic

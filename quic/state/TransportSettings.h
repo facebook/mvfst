@@ -332,6 +332,11 @@ struct TransportSettings {
   // allowing cwnd growth. 0 disables. The amount given to callbacks has the
   // current amount of stream bytes buffered subtracted from it.
   uint8_t backpressureHeadroomFactor{0};
+
+  // Whether to initiate key updates
+  bool initiateKeyUpdate{false};
+  // How many sent packets to send before initiating a key update
+  uint64_t keyUpdatePacketCountInterval{kDefaultKeyUpdatePacketCountInterval};
 };
 
 } // namespace quic

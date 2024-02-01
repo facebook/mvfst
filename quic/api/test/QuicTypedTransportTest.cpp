@@ -1295,6 +1295,173 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, HandleIncomingKeyUpdate) {
   this->destroyTransport();
 }
 
+/**
+ * Initiate a key update - Successful attempt
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateSuccess) {
+  ASSERT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  auto numberOfWrittenPacketsInPhase =
+      this->getConn().oneRttWritePacketsSentInCurrentPhase;
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+
+  {
+    // Send and receive a packet in the current phase
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    this->loopForWrites();
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello2"), ProtectionType::KeyPhaseZero));
+
+    // Both read and writer ciphers should be in phase zero.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseZero);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // Force initiate a key update
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    conn.transportSettings.initiateKeyUpdate = true;
+    conn.transportSettings.keyUpdatePacketCountInterval =
+        numberOfWrittenPacketsInPhase;
+
+    // A key update should be triggered after this write is completed.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello3"), false);
+    this->loopForWrites();
+
+    numberOfWrittenPacketsInPhase = 0;
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        numberOfWrittenPacketsInPhase);
+
+    // Both read and writer ciphers should have advanced to phase one.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
+  }
+
+  {
+    // Another key update should not be allowed until this one is verified
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    EXPECT_FALSE(conn.readCodec->canInitiateKeyUpdate());
+    EXPECT_FALSE(conn.readCodec->advanceOneRttReadPhase());
+  }
+
+  {
+    // Receiving a packet in the new phase verifies the pending key update
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello4"), ProtectionType::KeyPhaseOne));
+
+    EXPECT_TRUE(this->getConn().readCodec->canInitiateKeyUpdate());
+  }
+
+  this->getNonConstConn().outstandings.reset();
+
+  this->destroyTransport();
+}
+
+/**
+ * Initiate a key update - Failed attempt
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
+  ASSERT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  auto numberOfWrittenPacketsInPhase =
+      this->getConn().oneRttWritePacketsSentInCurrentPhase;
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+
+  {
+    // Send and receive a packet in the current phase
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    this->loopForWrites();
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello2"), ProtectionType::KeyPhaseZero));
+
+    // Both read and writer ciphers should be in phase zero.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseZero);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // Force initiate a key update.
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    conn.transportSettings.initiateKeyUpdate = true;
+    conn.transportSettings.keyUpdatePacketCountInterval =
+        numberOfWrittenPacketsInPhase;
+
+    // A key update should be triggered after this write is completed.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello3"), false);
+    const auto maybeWriteInterval = this->loopForWrites();
+    ASSERT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+    // const auto packetSentTime =
+    //     CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
+
+    numberOfWrittenPacketsInPhase = 0;
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        numberOfWrittenPacketsInPhase);
+
+    // Both read and writer ciphers should have advanced to phase one.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
+  }
+
+  {
+    // Send a packet in the new phase.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello3"), false);
+    const auto maybeWriteInterval = this->loopForWrites();
+    ASSERT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+
+    // The peer acks the new packet in the old phase. This is a CRYPTO_ERROR.
+    auto oldestOutstandingPkt =
+        this->getOldestOutstandingPacket(PacketNumberSpace::AppData);
+    auto newestOutstandingPkt =
+        this->getNewestOutstandingPacket(PacketNumberSpace::AppData);
+    quic::AckBlocks acks = {
+        {oldestOutstandingPkt->packet.header.getPacketSequenceNum(),
+         newestOutstandingPkt->packet.header.getPacketSequenceNum()}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(acks)
+            .setAckDelay(0us)
+            .setShortHeaderProtectionType(ProtectionType::KeyPhaseZero)
+            .build());
+    buf->coalesce();
+
+    // Crypto error: Packet with key update was acked in the wrong phase
+    EXPECT_THROW(this->deliverPacket(std::move(buf)), std::runtime_error);
+  }
+
+  this->getNonConstConn().outstandings.reset();
+
+  this->destroyTransport();
+}
+
 template <typename T>
 struct AckEventMatcherBuilder {
   using Builder = AckEventMatcherBuilder;

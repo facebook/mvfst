@@ -51,6 +51,12 @@ AckPacketBuilder&& AckPacketBuilder::setAead(const Aead* aeadIn) {
   return std::move(*this);
 }
 
+AckPacketBuilder&& AckPacketBuilder::setShortHeaderProtectionType(
+    ProtectionType protectionTypeIn) {
+  shortHeaderProtectionType = protectionTypeIn;
+  return std::move(*this);
+}
+
 RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   // This function sends ACK to dstConn
   auto srcConnId =
@@ -119,7 +125,7 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
         ackPacketNum,
         QuicVersion::MVFST);
   } else {
-    header = ShortHeader(ProtectionType::KeyPhaseZero, dstConnId, ackPacketNum);
+    header = ShortHeader(shortHeaderProtectionType, dstConnId, ackPacketNum);
   }
   RegularQuicPacketBuilder builder(
       CHECK_NOTNULL(dstConn)->udpSendPacketLen,

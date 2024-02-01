@@ -333,4 +333,11 @@ void updateOneRttWriteCipher(
     QuicConnectionStateBase& conn,
     std::unique_ptr<Aead> aead,
     ProtectionType oneRttPhase);
+void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn);
+void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn);
+void maybeVerifyPendingKeyUpdate(
+    QuicConnectionStateBase& conn,
+    const OutstandingPacketWrapper& outstandingPacket,
+    const RegularQuicPacket& ackPacket);
+
 } // namespace quic

@@ -372,18 +372,6 @@ void QuicClientTransport::processUdpPacketData(
         "Invalid connection id", TransportErrorCode::PROTOCOL_VIOLATION);
   }
 
-  if (conn_->readCodec->getCurrentOneRttReadPhase() !=
-      conn_->oneRttWritePhase) {
-    // Peer has initiated a key update.
-    updateOneRttWriteCipher(
-        *conn_,
-        clientConn_->clientHandshakeLayer->getNextOneRttWriteCipher(),
-        conn_->readCodec->getCurrentOneRttReadPhase());
-
-    conn_->readCodec->setNextOneRttReadCipher(
-        clientConn_->clientHandshakeLayer->getNextOneRttReadCipher());
-  }
-
   // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
   uint64_t distanceFromExpectedPacketNum =
@@ -419,6 +407,8 @@ void QuicClientTransport::processUdpPacketData(
                 // processing loop.
                 conn_->handshakeLayer->handshakeConfirmed();
               }
+              maybeVerifyPendingKeyUpdate(
+                  *conn_, outstandingPacket, regularPacket);
               switch (packetFrame.type()) {
                 case QuicWriteFrame::Type::WriteAckFrame: {
                   const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
@@ -663,6 +653,8 @@ void QuicClientTransport::processUdpPacketData(
       hasInitialOrHandshakeCiphers(*conn_)) {
     handshakeConfirmed(*conn_);
   }
+
+  maybeHandleIncomingKeyUpdate(*conn_);
 
   // Try reading bytes off of crypto, and performing a handshake.
   auto cryptoData = readDataFromCryptoStream(
@@ -923,6 +915,7 @@ void QuicClientTransport::writeData() {
   // use.
   SCOPE_EXIT {
     conn_->pendingEvents.numProbePackets = {};
+    maybeInitiateKeyUpdate(*conn_);
   };
   if (conn_->initialWriteCipher) {
     auto& initialCryptoStream =

@@ -123,7 +123,7 @@ class ServerHandshake : public Handshake {
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttWriteCipher();
+  std::unique_ptr<Aead> getNextOneRttWriteCipher() override;
 
   /**
    * An API to get oneRttReadCiphers. Each call will generate a one rtt
@@ -137,7 +137,7 @@ class ServerHandshake : public Handshake {
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttReadCipher();
+  std::unique_ptr<Aead> getNextOneRttReadCipher() override;
 
   /**
    * An edge triggered API to get the zeroRttReadCipher. Once you receive the

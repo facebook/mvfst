@@ -350,6 +350,15 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   std::unique_ptr<Aead> oneRttWriteCipher;
   ProtectionType oneRttWritePhase{ProtectionType::KeyPhaseZero};
   uint64_t oneRttWritePacketsSentInCurrentPhase = 0;
+  // Whether there is a locally-initiated key update that is pending
+  // verification. This is used to decide whether the next variable should be
+  // updated or not.
+  bool oneRttWritePendingVerification{false};
+  // In a key update is pending, this holds the first packet number sent in the
+  // current (updated) phase. The peer must acknowledge this packet in the same
+  // phase, responding in a different phase is a protocol violation. Once the
+  // packet is acked, this value will be cleared.
+  folly::Optional<PacketNum> oneRttWritePendingVerificationPacketNumber;
 
   // Write cipher for packets with initial keys.
   std::unique_ptr<Aead> initialWriteCipher;

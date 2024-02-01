@@ -1018,17 +1018,6 @@ void onServerReadDataFromOpen(
       }
     }
 
-    if (conn.readCodec->getCurrentOneRttReadPhase() != conn.oneRttWritePhase) {
-      // Peer has initiated a key update.
-      updateOneRttWriteCipher(
-          conn,
-          conn.serverHandshakeLayer->getNextOneRttWriteCipher(),
-          conn.readCodec->getCurrentOneRttReadPhase());
-
-      conn.readCodec->setNextOneRttReadCipher(
-          conn.serverHandshakeLayer->getNextOneRttReadCipher());
-    }
-
     auto& ackState = getAckState(conn, packetNumberSpace);
     uint64_t distanceFromExpectedPacketNum = addPacketToAckState(
         conn, ackState, packetNum, readData.udpPacket.timings);
@@ -1053,9 +1042,12 @@ void onServerReadDataFromOpen(
               conn,
               packetNumberSpace,
               ackFrame,
-              [&](const OutstandingPacketWrapper&,
+              [&](const OutstandingPacketWrapper& outstandingPacket,
                   const QuicWriteFrame& packetFrame,
                   const ReadAckFrame&) {
+                maybeVerifyPendingKeyUpdate(
+                    conn, outstandingPacket, regularPacket);
+
                 switch (packetFrame.type()) {
                   case QuicWriteFrame::Type::WriteStreamFrame: {
                     const WriteStreamFrame& frame =
@@ -1309,6 +1301,8 @@ void onServerReadDataFromOpen(
     if (handshakeConfirmedThisLoop) {
       handshakeConfirmed(conn);
     }
+
+    maybeHandleIncomingKeyUpdate(conn);
 
     // Update writable limit before processing the handshake data. This is so
     // that if we haven't decided whether or not to validate the peer, we won't
