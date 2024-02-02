@@ -14,7 +14,7 @@ namespace quic {
 class ThrottlingSignalProvider {
  public:
   struct ThrottlingSignal {
-    enum class State { Unknown, Throttled, Unthrottled };
+    enum class State { Unknown, Throttled, Burst };
     // If a token bucket is found to be policing/shaping the connection, this
     // stores whether at the current time, the connection is being throttled (ie
     // the bucket ran out of tokens) or not.
@@ -35,7 +35,7 @@ class ThrottlingSignalProvider {
     // The rate for which CCA can send bytes when the connection is not being
     // throttled (eg during burst or generally when the bucket has tokens).
     // Note that this value changes over time and may become stale quickly.
-    folly::Optional<uint64_t> maybeUnthrottledRateBytesPerSecond;
+    folly::Optional<uint64_t> maybeBurstRateBytesPerSecond;
   };
 
   virtual ~ThrottlingSignalProvider() = default;

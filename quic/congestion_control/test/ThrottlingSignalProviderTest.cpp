@@ -25,10 +25,9 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
  public:
   explicit SimpleThrottlingSignalProvider(
       SimulatedTBF::Config config,
-      folly::Optional<uint64_t> unthrottledRateBytesPerSecond = folly::none)
+      folly::Optional<uint64_t> burstRateBytesPerSecond = folly::none)
       : stbf_(std::move(config)),
-        unthrottledRateBytesPerSecond_(
-            std::move(unthrottledRateBytesPerSecond)) {}
+        burstRateBytesPerSecond_(std::move(burstRateBytesPerSecond)) {}
   ~SimpleThrottlingSignalProvider() override = default;
   void onPacketSent(const quic::OutstandingPacketWrapper& packet) override {
     stbf_.consumeWithBorrowNonBlockingAndUpdateState(
@@ -39,19 +38,18 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
       override {
     auto availTokens = stbf_.getNumAvailableTokensInBytes(quic::Clock::now());
     ThrottlingSignal signal = {};
-    signal.state = availTokens > 0 ? ThrottlingSignal::State::Unthrottled
+    signal.state = availTokens > 0 ? ThrottlingSignal::State::Burst
                                    : ThrottlingSignal::State::Throttled;
     signal.maybeBytesToSend.assign((uint64_t)availTokens);
     signal.maybeThrottledRateBytesPerSecond.assign(
         (uint64_t)stbf_.getRateBytesPerSecond());
-    signal.maybeUnthrottledRateBytesPerSecond.assign(
-        unthrottledRateBytesPerSecond_);
+    signal.maybeBurstRateBytesPerSecond.assign(burstRateBytesPerSecond_);
     return signal;
   }
 
  private:
   SimulatedTBF stbf_;
-  folly::Optional<uint64_t> unthrottledRateBytesPerSecond_;
+  folly::Optional<uint64_t> burstRateBytesPerSecond_;
 };
 
 TEST(ThrottlingSignalProviderTest, BasicInitSetGetTest) {
@@ -77,7 +75,7 @@ TEST(ThrottlingSignalProviderTest, BasicInitSetGetTest) {
   EXPECT_EQ(
       signal.maybeThrottledRateBytesPerSecond,
       expectedSignal.maybeThrottledRateBytesPerSecond);
-  EXPECT_FALSE(signal.maybeUnthrottledRateBytesPerSecond.has_value());
+  EXPECT_FALSE(signal.maybeBurstRateBytesPerSecond.has_value());
 }
 
 TEST(ThrottlingSignalProviderTest, TokenBasedDynamicCapOnWritableBytes) {
@@ -131,8 +129,8 @@ TEST(
     OverrideBbrBwWithThrottlingSignalProviderRates) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
 
-  // enforce an unthrottled rate of 400KBps and throttledRate of 100KBps
-  const uint64_t unthrottledRateBytesPerSecond = 400 * 1000;
+  // enforce an unthrottled/burst rate of 400KBps and throttledRate of 100KBps
+  const uint64_t burstRateBytesPerSecond = 400 * 1000;
   const uint64_t throttledRateBytesPerSecond = 100 * 1000;
   auto signalProvider = std::make_shared<SimpleThrottlingSignalProvider>(
       SimulatedTBF::Config{
@@ -140,7 +138,7 @@ TEST(
           .burstSizeBytes = 500 * 1000,
           .maybeMaxDebtQueueSizeBytes = 50 * 1000,
           .trackEmptyIntervals = false},
-      unthrottledRateBytesPerSecond);
+      burstRateBytesPerSecond);
   conn.throttlingSignalProvider = signalProvider;
   BbrCongestionController bbr(conn);
   bbr.setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));
@@ -163,12 +161,11 @@ TEST(
     ASSERT_TRUE(maybeSignal.has_value());
     ASSERT_TRUE(bbr.getBandwidth().has_value());
     if (maybeSignal.value().state ==
-        ThrottlingSignalProvider::ThrottlingSignal::State::Unthrottled) {
-      // unthrottledRateBytesPerSecond is set to 400KBps during burst, which is
+        ThrottlingSignalProvider::ThrottlingSignal::State::Burst) {
+      // burstRateBytesPerSecond is set to 400KBps during burst, which is
       // larger than send/ack rate, which is 200KBps.
       EXPECT_EQ(
-          bbr.getBandwidth().value().normalize(),
-          unthrottledRateBytesPerSecond);
+          bbr.getBandwidth().value().normalize(), burstRateBytesPerSecond);
     } else if (
         maybeSignal.value().state ==
         ThrottlingSignalProvider::ThrottlingSignal::State::Throttled) {

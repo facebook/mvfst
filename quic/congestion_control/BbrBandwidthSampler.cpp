@@ -29,13 +29,11 @@ Bandwidth BbrBandwidthSampler::getBandwidth() const noexcept {
     return bandwidth;
   }
   if (maybeThrottlingSignal.value().state ==
-          ThrottlingSignalProvider::ThrottlingSignal::State::Unthrottled &&
-      maybeThrottlingSignal.value()
-          .maybeUnthrottledRateBytesPerSecond.has_value()) {
+          ThrottlingSignalProvider::ThrottlingSignal::State::Burst &&
+      maybeThrottlingSignal.value().maybeBurstRateBytesPerSecond.has_value()) {
     return std::max(
         Bandwidth(
-            maybeThrottlingSignal.value()
-                .maybeUnthrottledRateBytesPerSecond.value(),
+            maybeThrottlingSignal.value().maybeBurstRateBytesPerSecond.value(),
             1s,
             Bandwidth::UnitType::BYTES),
         bandwidth);
