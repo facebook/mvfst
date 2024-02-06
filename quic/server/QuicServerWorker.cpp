@@ -841,7 +841,7 @@ void QuicServerWorker::dispatchPacketData(
   // route with destinationConnId chosen by the peer and IP address of the
   // peer.
   CHECK(routingData.headerForm == HeaderForm::Long);
-  auto sit = sourceAddressMap_.find({client, dstConnId});
+  auto sit = sourceAddressMap_.find(std::make_pair(client, dstConnId));
   if (sit != sourceAddressMap_.end()) {
     VLOG(4) << "Found existing connection for client=" << client << " "
             << sit->second.get();
