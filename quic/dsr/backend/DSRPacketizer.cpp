@@ -122,6 +122,11 @@ BufQuicBatchResult PacketGroupWriter::writePacketsGroup(
   // transparently.
   for (const auto& request : reqGroup.requests) {
     auto bufAccessor = getBufAccessor();
+    if (!bufAccessor) {
+      // We hit this path only when there are no free UMEM frames when we're
+      // using AF_XDP.
+      return getResult();
+    }
     auto ret = writeSingleQuicPacket(
         *bufAccessor,
         reqGroup.dcid,
@@ -210,7 +215,16 @@ void XskPacketGroupWriter::flush() {
 }
 
 BufAccessor* XskPacketGroupWriter::getBufAccessor() {
-  currentXskBuffer_ = xskContainer_->getXskBuffer(vipAddress_, clientAddress_);
+  auto maybeXskBuffer =
+      xskContainer_->getXskBuffer(vipAddress_, clientAddress_);
+  if (!maybeXskBuffer) {
+    LOG(ERROR) << "Failed to get XskBuffer, no free UMEM frames";
+    currentXskBuffer_.buffer = nullptr;
+    currentXskBuffer_.payloadLength = 0;
+    currentXskBuffer_.frameIndex = 0;
+    return nullptr;
+  }
+  currentXskBuffer_ = *maybeXskBuffer;
   auto ioBuf = folly::IOBuf::takeOwnership(
       currentXskBuffer_.buffer,
       kDefaultMaxUDPPayload,

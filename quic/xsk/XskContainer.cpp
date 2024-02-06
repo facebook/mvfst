@@ -39,13 +39,11 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
   return folly::Unit();
 }
 
-XskBuffer XskContainer::getXskBuffer(
+folly::Optional<XskBuffer> XskContainer::getXskBuffer(
     const folly::SocketAddress& src,
     const folly::SocketAddress& dst) {
   auto queueId = pickXsk(src, dst);
-  auto maybeXskBuffer =
-      queueIdToXsk_.at(queueId)->getXskBuffer(src.getIPAddress().isV6());
-  return *maybeXskBuffer;
+  return queueIdToXsk_.at(queueId)->getXskBuffer(src.getIPAddress().isV6());
 }
 
 void XskContainer::writeXskBuffer(

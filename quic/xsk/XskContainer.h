@@ -41,7 +41,7 @@ class XskContainer {
   // queue. After calling getXskBuffer, the user either returns the buffer
   // through returnBuffer if it is not used, or calls writeXskBuffer to
   // egress it.
-  XskBuffer getXskBuffer(
+  folly::Optional<XskBuffer> getXskBuffer(
       const folly::SocketAddress& src,
       const folly::SocketAddress& dst);
 
