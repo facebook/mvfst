@@ -339,16 +339,8 @@ void processClientInitialParams(
     maxUdpPayloadSize = std::min(*packetSize, maxUdpPayloadSize);
     conn.peerMaxUdpPayloadSize = maxUdpPayloadSize;
     if (conn.transportSettings.canIgnorePathMTU) {
-      if (*packetSize > kDefaultMaxUDPPayload) {
-        // A good peer should never set oversized limit, so to be safe we
-        // fallback to default
-        conn.udpSendPacketLen = kDefaultUDPSendPacketLen;
-      } else {
-        // Otherwise, canIgnorePathMTU forces us to immediately set
-        // udpSendPacketLen
-        // TODO: rename "canIgnorePathMTU" to "forciblySetPathMTU"
-        conn.udpSendPacketLen = maxUdpPayloadSize;
-      }
+      *packetSize = std::min<uint64_t>(*packetSize, kDefaultMaxUDPPayload);
+      conn.udpSendPacketLen = *packetSize;
     }
   }
 

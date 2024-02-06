@@ -4211,7 +4211,7 @@ TEST_F(QuicUnencryptedServerTransportTest, MaxReceivePacketSizeTooLarge) {
   fakeHandshake->maxRecvPacketSize = 4096;
   setupClientReadCodec();
   recvClientHello();
-  EXPECT_EQ(server->getConn().udpSendPacketLen, kDefaultUDPSendPacketLen);
+  EXPECT_EQ(server->getConn().udpSendPacketLen, kDefaultMaxUDPPayload);
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {

@@ -217,9 +217,7 @@ void processServerInitialParams(
     conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
   }
   if (conn.transportSettings.canIgnorePathMTU) {
-    if (*packetSize > kDefaultMaxUDPPayload) {
-      *packetSize = kDefaultUDPSendPacketLen;
-    }
+    *packetSize = std::min<uint64_t>(*packetSize, kDefaultMaxUDPPayload);
     conn.udpSendPacketLen = *packetSize;
   }
 
