@@ -829,7 +829,8 @@ void Bbr2CongestionController::startProbeBwDown() {
   /* Decide random round-trip bound for wait: */
   roundsSinceBwProbe_ = folly::Random::rand32() % 2;
   /* Decide the random wall clock bound for wait: between 2-3 seconds */
-  bwProbeWait_ = std::chrono::milliseconds(2 + folly::Random::rand32() % 1000);
+  bwProbeWait_ =
+      std::chrono::milliseconds(2000 + (folly::Random::rand32() % 1000));
 
   probeBWCycleStart_ = Clock::now();
   state_ = State::ProbeBw_Down;
