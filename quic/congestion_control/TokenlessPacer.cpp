@@ -136,9 +136,15 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
       QUIC_STATS(conn_.statsCallback, onPacerTimerLagged);
     }
     if (experimental_) {
-      sendBatch = (timeSinceLastWrite / writeInterval_ >= maxBurstIntervals)
-          ? batchSize_ * maxBurstIntervals
-          : batchSize_ * timeSinceLastWrite / writeInterval_;
+      if (timeSinceLastWrite / writeInterval_ >= maxBurstIntervals) {
+        sendBatch = batchSize_ * maxBurstIntervals;
+      } else {
+        // Scale the batch size and round it to the closest integer
+        auto numerator = batchSize_ * timeSinceLastWrite;
+        auto& denominator = writeInterval_;
+        sendBatch = numerator / denominator +
+            (numerator % denominator >= denominator / 2 ? 1 : 0);
+      }
     }
   }
   lastWriteTime_ = currentTime;
