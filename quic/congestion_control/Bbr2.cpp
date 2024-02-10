@@ -87,8 +87,9 @@ void Bbr2CongestionController::onPacketSent(
   addAndCheckOverflow(
       conn_.lossState.inflightBytes, packet.metadata.encodedSize);
 
-  // Maintain cwndLimited flag
-  if (conn_.lossState.inflightBytes >= cwndBytes_) {
+  // Maintain cwndLimited flag. We consider the transport being cwnd limited if
+  // we are using > 90% of the cwnd.
+  if (conn_.lossState.inflightBytes > cwndBytes_ * 9 / 10) {
     cwndLimitedInRound_ |= true;
   }
 }
@@ -527,7 +528,7 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
       break;
     case State::ProbeBw_Up:
       if (hasElapsedInPhase(minRtt_) &&
-          inflightLatest_ > getTargetInflightWithGain(1.25)) {
+          conn_.lossState.inflightBytes > getTargetInflightWithGain(1.25)) {
         startProbeBwDown();
       }
       break;
