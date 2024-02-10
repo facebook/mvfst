@@ -62,13 +62,12 @@ ssize_t LibevQuicAsyncUDPSocket::write(
   }
   sockaddr_storage addrStorage;
   address.getAddress(&addrStorage);
-
   int msg_flags = 0;
   struct msghdr msg;
 
   if (!connected_) {
     msg.msg_name = reinterpret_cast<void*>(&addrStorage);
-    msg.msg_namelen = sizeof(addrStorage);
+    msg.msg_namelen = address.getActualSize();
   } else {
     if (connectedAddress_ != address) {
       throw folly::AsyncSocketException(
