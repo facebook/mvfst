@@ -41,7 +41,10 @@ constexpr float kLossThreshold = 0.02;
 constexpr float kHeadroomFactor = 0.15;
 
 quic::Bandwidth kMinPacingRateForSendQuantum{1200 * 1000, 1s};
-constexpr uint8_t kPacingMarginPercent = 1;
+// The experimental pacer currently achieves ~99% of the target rate
+// we should not reduce the target by adding an extra margin.
+// TODO: add the margin back if the pacer performance improves further.
+constexpr uint8_t kPacingMarginPercent = 0;
 
 Bbr2CongestionController::Bbr2CongestionController(
     QuicConnectionStateBase& conn)
