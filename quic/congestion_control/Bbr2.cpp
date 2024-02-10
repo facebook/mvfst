@@ -424,9 +424,6 @@ void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();
 
   if (state_ == State::Startup && filledPipe_) {
-    if (conn_.transportSettings.ccaConfig.advanceCycleAfterStartup) {
-      cycleCount_++;
-    }
     enterDrain();
   }
 }
@@ -526,7 +523,6 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
       }
       break;
     case State::ProbeBw_Up:
-
       if (hasElapsedInPhase(minRtt_) &&
           inflightLatest_ > getTargetInflightWithGain(1.25)) {
         startProbeBwDown();
@@ -544,14 +540,7 @@ void Bbr2CongestionController::adaptUpperBounds(
     uint64_t ackedBytes,
     uint64_t inflightBytesAtLargestAckedPacket,
     uint64_t lostBytes) {
-  /* Advance probeBw round if necessary and update BBR.max_bw window and
-   * BBR.inflight_hi and BBR.bw_hi. */
-  if (state_ == State::ProbeBw_Down && roundStart_) {
-    /* end of samples from bw probing phase */
-    if (!isAppLimited()) {
-      cycleCount_++;
-    }
-  }
+  /* Update BBR.inflight_hi and BBR.bw_hi. */
 
   if (!checkInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
     if (!inflightHi_.has_value() || !bandwidthHi_.has_value()) {
@@ -836,6 +825,12 @@ void Bbr2CongestionController::startProbeBwDown() {
   state_ = State::ProbeBw_Down;
   pacingGain_ = kProbeBwDownPacingGain;
   startRound();
+
+  // This is a new ProbeBW cycle. Advance the max bw filter if we're not app
+  // limited
+  if (!isAppLimited()) {
+    cycleCount_++;
+  }
 }
 void Bbr2CongestionController::startProbeBwCruise() {
   state_ = State::ProbeBw_Cruise;
