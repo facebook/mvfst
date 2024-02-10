@@ -907,6 +907,9 @@ Bandwidth Bbr2CongestionController::getBandwidthSampleFromAck(
 }
 
 bool Bbr2CongestionController::isRenoCoexistenceProbeTime() {
+  if (!conn_.transportSettings.ccaConfig.enableRenoCoexistence) {
+    return false;
+  }
   auto renoBdpInPackets = std::min(getTargetInflightWithGain(), cwndBytes_) /
       conn_.udpSendPacketLen;
   auto roundsBeforeRenoProbe =

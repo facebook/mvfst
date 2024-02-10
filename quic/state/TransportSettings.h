@@ -75,6 +75,10 @@ struct CongestionControlConfig {
   // Used by: BBR2
   // Whether BBR2 should ignore packet loss (i.e. act more like BBR1)
   bool ignoreLoss{false};
+
+  // Used by: BBR2
+  // Whether BBR2 should enable reno coexistence.
+  bool enableRenoCoexistence{false};
 };
 
 struct DatagramConfig {

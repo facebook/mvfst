@@ -52,7 +52,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"useSmallThresholdDuringStartup\": true"
       "},"
       "\"ignoreInflightHi\": true, "
-      "\"ignoreLoss\": true"
+      "\"ignoreLoss\": true, "
+      "\"enableRenoCoexistence\": true"
       "}";
   auto config = parseCongestionControlConfig(testString);
   EXPECT_EQ(config.conservativeRecovery, true);
@@ -65,6 +66,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.leaveHeadroomForCwndLimited, true);
   EXPECT_EQ(config.ignoreInflightHi, true);
   EXPECT_EQ(config.ignoreLoss, true);
+  EXPECT_EQ(config.enableRenoCoexistence, true);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(config.ackFrequencyConfig->ackElicitingThreshold, 99);
@@ -89,6 +91,7 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.drainToTarget, false);
   EXPECT_EQ(config.ignoreInflightHi, false);
   EXPECT_EQ(config.ignoreLoss, false);
+  EXPECT_EQ(config.enableRenoCoexistence, false);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(
