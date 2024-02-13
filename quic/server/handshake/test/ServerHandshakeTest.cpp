@@ -153,18 +153,16 @@ class ServerHandshakeTest : public Test {
     try {
       setHandshakeState();
       waitForData = false;
-      auto writableBytes = getHandshakeWriteBytes();
-      while (writableBytes && !writableBytes->empty() && !waitForData) {
+      do {
+        auto writableBytes = getHandshakeWriteBytes();
+        if (writableBytes->empty()) {
+          break;
+        }
         VLOG(1) << "server->client bytes="
                 << writableBytes->computeChainDataLength();
         clientReadBuffer.append(std::move(writableBytes));
-        if (!clientReadBuffer.empty()) {
-          fizzClient->newTransportData();
-        }
-        if (!waitForData) {
-          writableBytes = getHandshakeWriteBytes();
-        }
-      }
+        fizzClient->newTransportData();
+      } while (!waitForData);
     } catch (const QuicTransportException& e) {
       VLOG(1) << "server exception " << e.what();
       ex = std::make_exception_ptr(e);
@@ -203,18 +201,16 @@ class ServerHandshakeTest : public Test {
     inRoundScope_ = true;
     evb.loop();
     waitForData = false;
-    auto writableBytes = getHandshakeWriteBytes();
-    while (writableBytes && !writableBytes->empty() && !waitForData) {
+    do {
+      auto writableBytes = getHandshakeWriteBytes();
+      if (writableBytes->empty()) {
+        break;
+      }
       VLOG(1) << "server->client bytes="
               << writableBytes->computeChainDataLength();
       clientReadBuffer.append(std::move(writableBytes));
-      if (!clientReadBuffer.empty()) {
-        fizzClient->newTransportData();
-      }
-      if (!waitForData) {
-        writableBytes = getHandshakeWriteBytes();
-      }
-    }
+      fizzClient->newTransportData();
+    } while (!waitForData);
     evb.loop();
   }
 
