@@ -40,11 +40,19 @@ struct XskBuffer {
   uint16_t payloadLength; // to be set by the caller
 };
 
+struct XskSenderConfig {
+  uint32_t numFrames;
+  uint32_t frameSize;
+  uint32_t batchSize;
+  bool zeroCopyEnabled;
+  bool useNeedWakeup;
+};
+
 class XskSender {
  public:
-  XskSender(uint32_t numFrames, uint32_t frameSize, uint32_t batchSize)
-      : numFrames_(numFrames), frameSize_(frameSize), batchSize_(batchSize) {
-    for (uint32_t i = 0; i < numFrames_; i++) {
+  explicit XskSender(const XskSenderConfig& xskSenderConfig)
+      : xskSenderConfig_(xskSenderConfig) {
+    for (uint32_t i = 0; i < xskSenderConfig_.numFrames; i++) {
       freeUmemIndices_.push(i);
     }
   }
@@ -110,9 +118,7 @@ class XskSender {
 
   std::queue<uint32_t> freeUmemIndices_;
 
-  uint32_t numFrames_;
-  uint32_t frameSize_;
-  uint32_t batchSize_;
+  XskSenderConfig xskSenderConfig_;
 
   uint32_t numPacketsSentInBatch_{0};
 

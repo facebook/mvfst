@@ -26,15 +26,16 @@ XskSender::~XskSender() {
   }
 
   if (umemArea_) {
-    free_umem(umemArea_, numFrames_, frameSize_);
+    free_umem(
+        umemArea_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
   }
 
   if (txMap_) {
-    unmap_tx_ring(txMap_, &xskOffsets_, numFrames_);
+    unmap_tx_ring(txMap_, &xskOffsets_, xskSenderConfig_.numFrames);
   }
 
   if (cxMap_) {
-    unmap_completion_ring(cxMap_, &xskOffsets_, numFrames_);
+    unmap_completion_ring(cxMap_, &xskOffsets_, xskSenderConfig_.numFrames);
   }
 }
 
@@ -42,7 +43,7 @@ folly::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
   std::lock_guard<std::mutex> guard(m_);
 
   uint32_t numFreeFrames = freeUmemIndices_.size();
-  if (numFreeFrames <= (numFrames_ / 2)) {
+  if (numFreeFrames <= (xskSenderConfig_.numFrames / 2)) {
     getFreeUmemFrames();
   }
 
@@ -53,9 +54,9 @@ folly::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
   }
 
   XskBuffer xskBuffer;
-  char* buffer = (char*)umemArea_ + size_t(*maybeFreeUmemLoc * frameSize_) +
-      sizeof(udphdr) + (isIpV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) +
-      sizeof(ethhdr);
+  char* buffer = (char*)umemArea_ +
+      size_t(*maybeFreeUmemLoc * xskSenderConfig_.frameSize) + sizeof(udphdr) +
+      (isIpV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr);
   xskBuffer.buffer = buffer;
   xskBuffer.frameIndex = *maybeFreeUmemLoc;
   xskBuffer.payloadLength = 0;
@@ -69,18 +70,19 @@ void XskSender::writeXskBuffer(
     const folly::SocketAddress& src) {
   bool isIpV6 = peer.getIPAddress().isV6();
 
-  char* buffer = (char*)umemArea_ + size_t(xskBuffer.frameIndex * frameSize_);
+  char* buffer = (char*)umemArea_ +
+      size_t(xskBuffer.frameIndex * xskSenderConfig_.frameSize);
   writeUdpPacketScaffoldingToBuffer(buffer, peer, src, xskBuffer.payloadLength);
 
   std::lock_guard<std::mutex> guard(m_);
   xdp_desc* descriptor = getTxDescriptor();
-  descriptor->addr = __u64(xskBuffer.frameIndex * frameSize_);
+  descriptor->addr = __u64(xskBuffer.frameIndex * xskSenderConfig_.frameSize);
   descriptor->len = xskBuffer.payloadLength + sizeof(udphdr) +
       (isIpV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr);
   descriptor->options = 0;
 
   numPacketsSentInBatch_++;
-  if (numPacketsSentInBatch_ >= batchSize_) {
+  if (numPacketsSentInBatch_ >= xskSenderConfig_.batchSize) {
     numPacketsSentInBatch_ = 0;
     flush();
   }
@@ -135,7 +137,7 @@ SendResult XskSender::writeUdpPacket(
     uint16_t len) {
   bool isV6 = src.getIPAddress().isV6();
   uint32_t numFreeFrames = freeUmemIndices_.size();
-  if (numFreeFrames <= (numFrames_ / 2)) {
+  if (numFreeFrames <= (xskSenderConfig_.numFrames / 2)) {
     getFreeUmemFrames();
   }
 
@@ -146,12 +148,13 @@ SendResult XskSender::writeUdpPacket(
   }
 
   // Just write to the first slot in the umem for the time being
-  char* buffer = (char*)umemArea_ + size_t(*freeUmemLoc * frameSize_);
+  char* buffer =
+      (char*)umemArea_ + size_t(*freeUmemLoc * xskSenderConfig_.frameSize);
 
   writeUdpPacketToBuffer(buffer, peer, src, (const char*)data, len);
 
   xdp_desc* descriptor = getTxDescriptor();
-  descriptor->addr = __u64(*freeUmemLoc * frameSize_);
+  descriptor->addr = __u64(*freeUmemLoc * xskSenderConfig_.frameSize);
   descriptor->len = len + sizeof(udphdr) +
       (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr);
   descriptor->options = 0;
@@ -162,7 +165,7 @@ SendResult XskSender::writeUdpPacket(
   folly::doNotOptimizeAway(descriptor);
 
   numPacketsSentInBatch_++;
-  if (numPacketsSentInBatch_ >= batchSize_) {
+  if (numPacketsSentInBatch_ >= xskSenderConfig_.batchSize) {
     numPacketsSentInBatch_ = 0;
     flush();
   }
@@ -192,7 +195,11 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::init(
 }
 
 folly::Expected<folly::Unit, std::runtime_error> XskSender::bind(int queueId) {
-  int bind_result = bind_xsk(xskFd_, queueId);
+  int bind_result = bind_xsk(
+      xskFd_,
+      queueId,
+      xskSenderConfig_.zeroCopyEnabled,
+      xskSenderConfig_.useNeedWakeup);
   if (bind_result < 0) {
     std::string errorMsg = folly::to<std::string>(
         "Failed to bind xdp socket: ", folly::errnoStr(errno));
@@ -269,7 +276,8 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   // Create umem
-  umemArea_ = create_umem(xskFd_, numFrames_, frameSize_);
+  umemArea_ = create_umem(
+      xskFd_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
 
   // The guard takes care of cleanup in case something goes wrong during
   // initialization. We disarm the guard at the end if initaliztion is
@@ -277,10 +285,11 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   auto g = folly::makeGuard([&]() {
     close_xsk(xskFd_);
     if (umemArea_) {
-      free_umem(umemArea_, numFrames_, frameSize_);
+      free_umem(
+          umemArea_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
     }
     if (cxMap_) {
-      unmap_completion_ring(cxMap_, &xskOffsets_, numFrames_);
+      unmap_completion_ring(cxMap_, &xskOffsets_, xskSenderConfig_.numFrames);
     }
   });
   if (!umemArea_) {
@@ -288,7 +297,8 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   // Set completion ring
-  int completion_ring_set_result = set_completion_ring(xskFd_, numFrames_);
+  int completion_ring_set_result =
+      set_completion_ring(xskFd_, xskSenderConfig_.numFrames);
   if (completion_ring_set_result < 0) {
     return folly::makeUnexpected(
         std::runtime_error("Failed to set completion ring"));
@@ -301,7 +311,7 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   // Set tx ring
-  int tx_ring_set_result = set_tx_ring(xskFd_, numFrames_);
+  int tx_ring_set_result = set_tx_ring(xskFd_, xskSenderConfig_.numFrames);
   if (tx_ring_set_result < 0) {
     return folly::makeUnexpected(std::runtime_error("Failed to set tx ring"));
   }
@@ -314,14 +324,15 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   // Map completion ring
-  cxMap_ = map_completion_ring(xskFd_, &xskOffsets_, numFrames_);
+  cxMap_ =
+      map_completion_ring(xskFd_, &xskOffsets_, xskSenderConfig_.numFrames);
   if (!cxMap_) {
     return folly::makeUnexpected(
         std::runtime_error("Failed to map completion ring"));
   }
 
   // Map tx ring
-  txMap_ = map_tx_ring(xskFd_, &xskOffsets_, numFrames_);
+  txMap_ = map_tx_ring(xskFd_, &xskOffsets_, xskSenderConfig_.numFrames);
   if (!txMap_) {
     return folly::makeUnexpected(std::runtime_error("Failed to map tx ring"));
   }
@@ -361,7 +372,7 @@ void XskSender::initAddresses(
 
 xdp_desc* XskSender::getTxDescriptor() {
   auto* base = (xdp_desc*)((char*)txMap_ + xskOffsets_.tx.desc);
-  xdp_desc* result = base + (txProducerIndex_ % numFrames_);
+  xdp_desc* result = base + (txProducerIndex_ % xskSenderConfig_.numFrames);
   txProducerIndex_++;
   return result;
 }
@@ -383,8 +394,8 @@ void XskSender::getFreeUmemFrames() {
   uint32_t numEntries = crProducerIndex - crConsumerIndex_;
 
   for (uint32_t i = 0; i < numEntries; i++) {
-    uint64_t* desc = baseDesc + (crConsumerIndex_ % numFrames_);
-    uint32_t frameIndex = *desc / frameSize_;
+    uint64_t* desc = baseDesc + (crConsumerIndex_ % xskSenderConfig_.numFrames);
+    uint32_t frameIndex = *desc / xskSenderConfig_.frameSize;
     freeUmemIndices_.push(frameIndex);
     crConsumerIndex_++;
   }

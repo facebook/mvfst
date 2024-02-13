@@ -61,6 +61,10 @@ int unmap_tx_ring(
     __u32 num_frames);
 
 // Returns 0 on success, negative value on failure
-int bind_xsk(int xsk_fd, int queue_id);
+int bind_xsk(
+    int xsk_fd,
+    int queue_id,
+    bool zeroCopyEnabled,
+    bool useNeedWakeup);
 
 #endif

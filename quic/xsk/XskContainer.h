@@ -62,9 +62,7 @@ class XskContainer {
       int queueId,
       const folly::MacAddress& localMac,
       const folly::MacAddress& gatewayMac,
-      uint32_t numFrames,
-      uint32_t frameSize,
-      uint32_t batchSize);
+      const XskSenderConfig& xskSenderConfig);
 
   int pickXsk(const folly::SocketAddress& src, const folly::SocketAddress& dst);
 
