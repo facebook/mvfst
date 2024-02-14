@@ -78,6 +78,10 @@ struct XskSenderConfig {
   bool useNeedWakeup;
 
   std::shared_ptr<SharedState> sharedState;
+
+  // Set this to true if we're using one AF_XDP socket per thread. This
+  // will ensure that we do no locking apart from UMEM sharing use cases.
+  bool xskPerThread{false};
 };
 
 class XskSender {

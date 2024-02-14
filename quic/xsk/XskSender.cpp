@@ -40,7 +40,8 @@ XskSender::~XskSender() {
 }
 
 folly::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
-  std::lock_guard<std::mutex> guard(m_);
+  auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
+                                             : std::unique_lock<std::mutex>(m_);
 
   uint32_t numFreeFrames = freeUmemIndices_.size();
   if (numFreeFrames <= (getNumFramesPerOwner() / 2)) {
@@ -74,7 +75,8 @@ void XskSender::writeXskBuffer(
       size_t(xskBuffer.frameIndex * xskSenderConfig_.frameSize);
   writeUdpPacketScaffoldingToBuffer(buffer, peer, src, xskBuffer.payloadLength);
 
-  std::lock_guard<std::mutex> guard(m_);
+  auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
+                                             : std::unique_lock<std::mutex>(m_);
   xdp_desc* descriptor = getTxDescriptor();
   descriptor->addr = __u64(xskBuffer.frameIndex * xskSenderConfig_.frameSize);
   descriptor->len = xskBuffer.payloadLength + sizeof(udphdr) +
@@ -89,7 +91,8 @@ void XskSender::writeXskBuffer(
 }
 
 void XskSender::returnBuffer(const XskBuffer& xskBuffer) {
-  std::lock_guard<std::mutex> guard(m_);
+  auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
+                                             : std::unique_lock<std::mutex>(m_);
   freeUmemIndices_.push(xskBuffer.frameIndex);
 }
 
@@ -135,6 +138,9 @@ SendResult XskSender::writeUdpPacket(
     const folly::SocketAddress& src,
     const void* data,
     uint16_t len) {
+  auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
+                                             : std::unique_lock<std::mutex>(m_);
+
   bool isV6 = src.getIPAddress().isV6();
   uint32_t numFreeFrames = freeUmemIndices_.size();
   if (numFreeFrames <= (xskSenderConfig_.numFrames / 2)) {
@@ -142,6 +148,8 @@ SendResult XskSender::writeUdpPacket(
   }
 
   auto freeUmemLoc = getFreeUmemIndex();
+
+  guard.release();
 
   if (!freeUmemLoc.hasValue()) {
     return SendResult::NO_FREE_DESCRIPTORS;
@@ -152,6 +160,9 @@ SendResult XskSender::writeUdpPacket(
       (char*)umemArea_ + size_t(*freeUmemLoc * xskSenderConfig_.frameSize);
 
   writeUdpPacketToBuffer(buffer, peer, src, (const char*)data, len);
+
+  guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
+                                        : std::unique_lock<std::mutex>(m_);
 
   xdp_desc* descriptor = getTxDescriptor();
   descriptor->addr = __u64(*freeUmemLoc * xskSenderConfig_.frameSize);
