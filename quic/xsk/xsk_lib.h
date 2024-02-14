@@ -67,4 +67,6 @@ int bind_xsk(
     bool zeroCopyEnabled,
     bool useNeedWakeup);
 
+int bind_xsk_shared_umem(int xsk_fd, int queue_id, int sharedXskFd);
+
 #endif

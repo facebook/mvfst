@@ -32,6 +32,8 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
         .numFrames = numFrames,
         .frameSize = frameSize,
         .batchSize = batchSize,
+        .ownerId = 0,
+        .numOwners = 1,
         .zeroCopyEnabled = true,
         .useNeedWakeup = true};
     auto createResult =

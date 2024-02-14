@@ -180,4 +180,19 @@ int bind_xsk(
   return 0;
 }
 
+int bind_xsk_shared_umem(int xsk_fd, int queue_id, int sharedXskFd) {
+  struct sockaddr_xdp sxdp = {};
+  sxdp.sxdp_family = AF_XDP;
+  sxdp.sxdp_ifindex = if_nametoindex("eth0");
+  sxdp.sxdp_queue_id = queue_id;
+  sxdp.sxdp_flags = XDP_SHARED_UMEM;
+  sxdp.sxdp_shared_umem_fd = sharedXskFd;
+
+  int err = bind(xsk_fd, (struct sockaddr*)&sxdp, sizeof(sxdp));
+  if (err) {
+    return -1;
+  }
+  return 0;
+}
+
 #endif

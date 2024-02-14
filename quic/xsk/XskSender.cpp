@@ -25,7 +25,7 @@ XskSender::~XskSender() {
     close_xsk(xskFd_);
   }
 
-  if (umemArea_) {
+  if (isPrimaryOwner() && umemArea_) {
     free_umem(
         umemArea_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
   }
@@ -34,7 +34,7 @@ XskSender::~XskSender() {
     unmap_tx_ring(txMap_, &xskOffsets_, xskSenderConfig_.numFrames);
   }
 
-  if (cxMap_) {
+  if (isPrimaryOwner() && cxMap_) {
     unmap_completion_ring(cxMap_, &xskOffsets_, xskSenderConfig_.numFrames);
   }
 }
@@ -43,7 +43,7 @@ folly::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
   std::lock_guard<std::mutex> guard(m_);
 
   uint32_t numFreeFrames = freeUmemIndices_.size();
-  if (numFreeFrames <= (xskSenderConfig_.numFrames / 2)) {
+  if (numFreeFrames <= (getNumFramesPerOwner() / 2)) {
     getFreeUmemFrames();
   }
 
@@ -195,11 +195,17 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::init(
 }
 
 folly::Expected<folly::Unit, std::runtime_error> XskSender::bind(int queueId) {
-  int bind_result = bind_xsk(
-      xskFd_,
-      queueId,
-      xskSenderConfig_.zeroCopyEnabled,
-      xskSenderConfig_.useNeedWakeup);
+  int bind_result = 0;
+  if (isPrimaryOwner()) {
+    bind_result = bind_xsk(
+        xskFd_,
+        queueId,
+        xskSenderConfig_.zeroCopyEnabled,
+        xskSenderConfig_.useNeedWakeup);
+  } else {
+    bind_result = bind_xsk_shared_umem(
+        xskFd_, queueId, xskSenderConfig_.sharedState->sharedXskFd);
+  }
   if (bind_result < 0) {
     std::string errorMsg = folly::to<std::string>(
         "Failed to bind xdp socket: ", folly::errnoStr(errno));
@@ -275,39 +281,52 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
         std::runtime_error("Failed to create xdp socket"));
   }
 
+  if (isPrimaryOwner()) {
+    xskSenderConfig_.sharedState->sharedXskFd = xskFd_;
+  }
+
   // Create umem
-  umemArea_ = create_umem(
-      xskFd_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
+  if (isPrimaryOwner()) {
+    umemArea_ = create_umem(
+        xskFd_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
+    xskSenderConfig_.sharedState->sharedUmemAddr = umemArea_;
+  } else {
+    umemArea_ = xskSenderConfig_.sharedState->sharedUmemAddr;
+  }
+
+  if (!umemArea_) {
+    return folly::makeUnexpected(std::runtime_error("Failed to create umem"));
+  }
 
   // The guard takes care of cleanup in case something goes wrong during
   // initialization. We disarm the guard at the end if initaliztion is
   // successful.
   auto g = folly::makeGuard([&]() {
     close_xsk(xskFd_);
-    if (umemArea_) {
+    if (isPrimaryOwner()) {
       free_umem(
           umemArea_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
     }
-    if (cxMap_) {
+    if (cxMap_ && isPrimaryOwner()) {
       unmap_completion_ring(cxMap_, &xskOffsets_, xskSenderConfig_.numFrames);
     }
   });
-  if (!umemArea_) {
-    return folly::makeUnexpected(std::runtime_error("Failed to create umem"));
-  }
 
-  // Set completion ring
-  int completion_ring_set_result =
-      set_completion_ring(xskFd_, xskSenderConfig_.numFrames);
-  if (completion_ring_set_result < 0) {
-    return folly::makeUnexpected(
-        std::runtime_error("Failed to set completion ring"));
-  }
+  if (isPrimaryOwner()) {
+    // Set completion ring.
+    int completion_ring_set_result =
+        set_completion_ring(xskFd_, xskSenderConfig_.numFrames);
+    if (completion_ring_set_result < 0) {
+      return folly::makeUnexpected(
+          std::runtime_error("Failed to set completion ring"));
+    }
 
-  // Set fill ring
-  int fill_ring_set_result = set_fill_ring(xskFd_);
-  if (fill_ring_set_result < 0) {
-    return folly::makeUnexpected(std::runtime_error("Failed to set fill ring"));
+    // Set fill ring
+    int fill_ring_set_result = set_fill_ring(xskFd_);
+    if (fill_ring_set_result < 0) {
+      return folly::makeUnexpected(
+          std::runtime_error("Failed to set fill ring"));
+    }
   }
 
   // Set tx ring
@@ -324,8 +343,14 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   // Map completion ring
-  cxMap_ =
-      map_completion_ring(xskFd_, &xskOffsets_, xskSenderConfig_.numFrames);
+  if (isPrimaryOwner()) {
+    cxMap_ =
+        map_completion_ring(xskFd_, &xskOffsets_, xskSenderConfig_.numFrames);
+    xskSenderConfig_.sharedState->sharedCxMap = cxMap_;
+  } else {
+    cxMap_ = xskSenderConfig_.sharedState->sharedCxMap;
+  }
+
   if (!cxMap_) {
     return folly::makeUnexpected(
         std::runtime_error("Failed to map completion ring"));
@@ -387,21 +412,54 @@ folly::Optional<uint32_t> XskSender::getFreeUmemIndex() {
 }
 
 void XskSender::getFreeUmemFrames() {
+  // We only need to perform locking here if multiple AF_XDP sockets are sharing
+  // the same UMEM, because that means that they share the completion ring.
+  auto guard = (xskSenderConfig_.numOwners > 1)
+      ? std::unique_lock<std::mutex>(xskSenderConfig_.sharedState->cxRingMutex)
+      : std::unique_lock<std::mutex>();
+
+  std::vector<std::queue<uint32_t>>& freeFramesSharedState =
+      xskSenderConfig_.sharedState->freeUmemFrames;
+
   auto* producerPtr = (uint32_t*)((char*)cxMap_ + xskOffsets_.cr.producer);
   uint32_t crProducerIndex = __atomic_load_n(producerPtr, __ATOMIC_ACQUIRE);
   folly::doNotOptimizeAway(crProducerIndex);
   auto* baseDesc = (uint64_t*)((char*)cxMap_ + xskOffsets_.cr.desc);
-  uint32_t numEntries = crProducerIndex - crConsumerIndex_;
+  uint32_t& crConsumerIndex = xskSenderConfig_.sharedState->crConsumerIndex;
+  uint32_t numEntries = crProducerIndex - crConsumerIndex;
 
   for (uint32_t i = 0; i < numEntries; i++) {
-    uint64_t* desc = baseDesc + (crConsumerIndex_ % xskSenderConfig_.numFrames);
+    uint64_t* desc = baseDesc + (crConsumerIndex % xskSenderConfig_.numFrames);
     uint32_t frameIndex = *desc / xskSenderConfig_.frameSize;
-    freeUmemIndices_.push(frameIndex);
-    crConsumerIndex_++;
+    freeFramesSharedState.at(getOwnerForFrame(frameIndex)).push(frameIndex);
+    crConsumerIndex++;
   }
 
   auto* consumerPtr = (uint32_t*)((char*)cxMap_ + xskOffsets_.cr.consumer);
-  __atomic_store_n(consumerPtr, crConsumerIndex_, __ATOMIC_RELEASE);
+  __atomic_store_n(consumerPtr, crConsumerIndex, __ATOMIC_RELEASE);
+
+  getFreeFramesFromSharedState();
+}
+
+void XskSender::getFreeFramesFromSharedState() {
+  auto& freeFramesFromSharedState =
+      xskSenderConfig_.sharedState->freeUmemFrames.at(xskSenderConfig_.ownerId);
+  while (!freeFramesFromSharedState.empty()) {
+    freeUmemIndices_.push(freeFramesFromSharedState.front());
+    freeFramesFromSharedState.pop();
+  }
+}
+
+uint32_t XskSender::getOwnerForFrame(uint32_t frameIndex) {
+  return frameIndex / getNumFramesPerOwner();
+}
+
+uint32_t XskSender::getNumFramesPerOwner() {
+  return xskSenderConfig_.numFrames / xskSenderConfig_.numOwners;
+}
+
+bool XskSender::isPrimaryOwner() {
+  return xskSenderConfig_.ownerId == 0;
 }
 
 } // namespace facebook::xdpsocket
