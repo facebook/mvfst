@@ -216,7 +216,7 @@ void XskPacketGroupWriter::flush() {
 
 BufAccessor* XskPacketGroupWriter::getBufAccessor() {
   auto maybeXskBuffer =
-      xskContainer_->getXskBuffer(vipAddress_, clientAddress_);
+      xskSender_->getXskBuffer(vipAddress_.getIPAddress().isV6());
   if (!maybeXskBuffer) {
     LOG(ERROR) << "Failed to get XskBuffer, no free UMEM frames";
     currentXskBuffer_.buffer = nullptr;
@@ -237,12 +237,12 @@ BufAccessor* XskPacketGroupWriter::getBufAccessor() {
 }
 
 void XskPacketGroupWriter::rollback() {
-  xskContainer_->returnBuffer(currentXskBuffer_, vipAddress_, clientAddress_);
+  xskSender_->returnBuffer(currentXskBuffer_);
 }
 
 bool XskPacketGroupWriter::send(uint32_t size) {
   currentXskBuffer_.payloadLength = size;
-  xskContainer_->writeXskBuffer(currentXskBuffer_, vipAddress_, clientAddress_);
+  xskSender_->writeXskBuffer(currentXskBuffer_, clientAddress_, vipAddress_);
   result_.bytesSent += size;
   result_.packetsSent++;
   return true;

@@ -47,21 +47,6 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
   return folly::Unit();
 }
 
-folly::Optional<XskBuffer> XskContainer::getXskBuffer(
-    const folly::SocketAddress& src,
-    const folly::SocketAddress& dst) {
-  auto queueId = pickXsk(src, dst);
-  return queueIdToXsk_.at(queueId)->getXskBuffer(src.getIPAddress().isV6());
-}
-
-void XskContainer::writeXskBuffer(
-    const XskBuffer& xskBuffer,
-    const folly::SocketAddress& src,
-    const folly::SocketAddress& dst) {
-  auto queueId = pickXsk(src, dst);
-  queueIdToXsk_.at(queueId)->writeXskBuffer(xskBuffer, dst, src);
-}
-
 folly::Expected<folly::Unit, std::runtime_error> XskContainer::createXskSender(
     int queueId,
     const folly::MacAddress& localMac,
@@ -83,18 +68,11 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::createXskSender(
   return folly::Unit();
 }
 
-void XskContainer::returnBuffer(
-    const XskBuffer& xskBuffer,
+XskSender* XskContainer::pickXsk(
     const folly::SocketAddress& src,
     const folly::SocketAddress& dst) {
-  auto queueId = pickXsk(src, dst);
-  queueIdToXsk_.at(queueId)->returnBuffer(xskBuffer);
-}
-
-int XskContainer::pickXsk(
-    const folly::SocketAddress& src,
-    const folly::SocketAddress& dst) {
-  return startQueue_ + (src.hash() + dst.hash()) % numQueues_;
+  auto queueId = startQueue_ + (src.hash() + dst.hash()) % numQueues_;
+  return queueIdToXsk_.at(queueId).get();
 }
 
 void XskContainer::initializeQueueParams() {

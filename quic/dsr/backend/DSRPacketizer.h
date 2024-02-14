@@ -210,10 +210,10 @@ class UdpSocketPacketGroupWriter : public PacketGroupWriter {
 class XskPacketGroupWriter : public PacketGroupWriter {
  public:
   XskPacketGroupWriter(
-      facebook::xdpsocket::XskContainer* xskContainer,
+      facebook::xdpsocket::XskSender* xskSender,
       folly::SocketAddress clientAddress,
       folly::SocketAddress vipAddress)
-      : xskContainer_(xskContainer),
+      : xskSender_(xskSender),
         clientAddress_(std::move(clientAddress)),
         vipAddress_(std::move(vipAddress)) {}
 
@@ -230,7 +230,7 @@ class XskPacketGroupWriter : public PacketGroupWriter {
 
   BufQuicBatchResult getResult() override;
 
-  facebook::xdpsocket::XskContainer* xskContainer_;
+  facebook::xdpsocket::XskSender* xskSender_;
   folly::SocketAddress clientAddress_;
   folly::SocketAddress vipAddress_;
   facebook::xdpsocket::XskBuffer currentXskBuffer_;

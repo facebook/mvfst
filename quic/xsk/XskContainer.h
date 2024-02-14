@@ -37,23 +37,7 @@ class XskContainer {
       uint32_t frameSize,
       uint32_t batchSize);
 
-  // Performs a hash of the 4-tuple to pick a buffer from the right TX
-  // queue. After calling getXskBuffer, the user either returns the buffer
-  // through returnBuffer if it is not used, or calls writeXskBuffer to
-  // egress it.
-  folly::Optional<XskBuffer> getXskBuffer(
-      const folly::SocketAddress& src,
-      const folly::SocketAddress& dst);
-
-  // Writes the buffer to the right TX queue.
-  void writeXskBuffer(
-      const XskBuffer& xskBuffer,
-      const folly::SocketAddress& src,
-      const folly::SocketAddress& dst);
-
-  // Buffer is unused, return it.
-  void returnBuffer(
-      const XskBuffer& xskBuffer,
+  XskSender* pickXsk(
       const folly::SocketAddress& src,
       const folly::SocketAddress& dst);
 
@@ -63,8 +47,6 @@ class XskContainer {
       const folly::MacAddress& localMac,
       const folly::MacAddress& gatewayMac,
       const XskSenderConfig& xskSenderConfig);
-
-  int pickXsk(const folly::SocketAddress& src, const folly::SocketAddress& dst);
 
   void initializeQueueParams();
 
