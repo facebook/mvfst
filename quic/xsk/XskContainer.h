@@ -15,6 +15,15 @@
 
 namespace facebook::xdpsocket {
 
+struct XskContainerConfig {
+  std::string interfaceName;
+  folly::MacAddress localMac;
+  folly::MacAddress gatewayMac;
+  uint32_t numFrames;
+  uint32_t frameSize;
+  uint32_t batchSize;
+};
+
 /*
  * This class is responsible for the creation and management of XDP
  * sockets. It sets up an XDP socket for each XDP TX queue and decides
@@ -30,12 +39,7 @@ class XskContainer {
   XskContainer() = default;
 
   folly::Expected<folly::Unit, std::runtime_error> init(
-      const std::string& interfaceName,
-      const folly::MacAddress& localMac,
-      const folly::MacAddress& gatewayMac,
-      uint32_t numFrames,
-      uint32_t frameSize,
-      uint32_t batchSize);
+      const XskContainerConfig& xskContainerConfig);
 
   XskSender* pickXsk(
       const folly::SocketAddress& src,
@@ -46,9 +50,7 @@ class XskContainer {
       int queueId,
       const XskSenderConfig& xskSenderConfig);
 
-  void initializeQueueParams();
-
-  std::string interfaceName_;
+  void initializeQueueParams(const std::string& interfaceName);
 
   folly::F14FastMap<uint32_t, std::unique_ptr<XskSender>> queueIdToXsk_;
   int startQueue_;

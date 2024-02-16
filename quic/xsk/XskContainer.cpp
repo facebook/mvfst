@@ -18,24 +18,18 @@
 namespace facebook::xdpsocket {
 
 folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
-    const std::string& interfaceName,
-    const folly::MacAddress& localMac,
-    const folly::MacAddress& gatewayMac,
-    uint32_t numFrames,
-    uint32_t frameSize,
-    uint32_t batchSize) {
-  interfaceName_ = interfaceName;
-  initializeQueueParams();
+    const XskContainerConfig& xskContainerConfig) {
+  initializeQueueParams(xskContainerConfig.interfaceName);
   for (int queueId = startQueue_; queueId < startQueue_ + numQueues_;
        ++queueId) {
     XskSenderConfig xskSenderConfig{
-        .numFrames = numFrames,
-        .frameSize = frameSize,
-        .batchSize = batchSize,
+        .numFrames = xskContainerConfig.numFrames,
+        .frameSize = xskContainerConfig.frameSize,
+        .batchSize = xskContainerConfig.batchSize,
         .ownerId = 0,
         .numOwners = 1,
-        .localMac = localMac,
-        .gatewayMac = gatewayMac,
+        .localMac = xskContainerConfig.localMac,
+        .gatewayMac = xskContainerConfig.gatewayMac,
         .zeroCopyEnabled = true,
         .useNeedWakeup = true};
     auto createResult = createXskSender(queueId, xskSenderConfig);
@@ -74,7 +68,7 @@ XskSender* XskContainer::pickXsk(
   return queueIdToXsk_.at(queueId).get();
 }
 
-void XskContainer::initializeQueueParams() {
+void XskContainer::initializeQueueParams(const std::string& interfaceName) {
   struct ethtool_channels ethChannels = {
       .cmd = ETHTOOL_GCHANNELS,
   };
@@ -84,7 +78,7 @@ void XskContainer::initializeQueueParams() {
               .ifru_data = reinterpret_cast<char*>(&ethChannels),
           },
   };
-  strncpy(ifr.ifr_name, interfaceName_.c_str(), IFNAMSIZ - 1);
+  strncpy(ifr.ifr_name, interfaceName.c_str(), IFNAMSIZ - 1);
 
   int sock = ::socket(AF_INET, SOCK_DGRAM, 0);
   if (::ioctl(sock, SIOCETHTOOL, &ifr) < 0) {
