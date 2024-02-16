@@ -10,39 +10,14 @@
 #include <linux/ethtool.h>
 #include <linux/sockios.h>
 #include <net/if.h>
-#include <quic/xsk/XskContainer.h>
+#include <quic/xsk/BaseXskContainer.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 
 namespace facebook::xdpsocket {
 
-folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
-    const XskContainerConfig& xskContainerConfig) {
-  initializeQueueParams(xskContainerConfig.interfaceName);
-  for (int queueId = startQueue_; queueId < startQueue_ + numQueues_;
-       ++queueId) {
-    XskSenderConfig xskSenderConfig{
-        .numFrames = xskContainerConfig.numFrames,
-        .frameSize = xskContainerConfig.frameSize,
-        .batchSize = xskContainerConfig.batchSize,
-        .ownerId = 0,
-        .numOwners = 1,
-        .localMac = xskContainerConfig.localMac,
-        .gatewayMac = xskContainerConfig.gatewayMac,
-        .zeroCopyEnabled = true,
-        .useNeedWakeup = true};
-    auto createResult = createXskSender(queueId, xskSenderConfig);
-    if (createResult.hasError()) {
-      // TODO: Clean up the already-created XDP sockets if we fail at this
-      // point.
-      return folly::makeUnexpected(createResult.error());
-    }
-  }
-  return folly::Unit();
-}
-
-folly::Expected<folly::Unit, std::runtime_error> XskContainer::createXskSender(
+folly::Expected<std::unique_ptr<XskSender>, std::runtime_error>
+BaseXskContainer::createXskSender(
     int queueId,
     const XskSenderConfig& xskSenderConfig) {
   auto xskSender = std::make_unique<XskSender>(xskSenderConfig);
@@ -57,18 +32,10 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::createXskSender(
     return folly::makeUnexpected(bindResult.error());
   }
 
-  queueIdToXsk_[queueId] = std::move(xskSender);
-  return folly::Unit();
+  return xskSender;
 }
 
-XskSender* XskContainer::pickXsk(
-    const folly::SocketAddress& src,
-    const folly::SocketAddress& dst) {
-  auto queueId = startQueue_ + (src.hash() + dst.hash()) % numQueues_;
-  return queueIdToXsk_.at(queueId).get();
-}
-
-void XskContainer::initializeQueueParams(const std::string& interfaceName) {
+void BaseXskContainer::initializeQueueParams(const std::string& interfaceName) {
   struct ethtool_channels ethChannels = {
       .cmd = ETHTOOL_GCHANNELS,
   };

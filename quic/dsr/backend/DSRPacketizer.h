@@ -25,7 +25,7 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/Aead.h>
-#include <quic/xsk/XskContainer.h>
+#include <quic/xsk/BaseXskContainer.h>
 
 namespace quic {
 

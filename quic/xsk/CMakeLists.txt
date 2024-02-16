@@ -7,7 +7,8 @@ add_library(
   mvfst_xsk
   packet_utils.cpp
   xsk_lib.cpp
-  XskContainer.cpp
+  BaseXskContainer.cpp
+  HashingXskContainer.cpp
   XskSender.cpp
 )
 
