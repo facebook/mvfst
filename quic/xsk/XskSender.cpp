@@ -192,15 +192,13 @@ SendResult XskSender::writeUdpPacket(
   return writeUdpPacket(peer, src, data->data(), len);
 }
 
-folly::Expected<folly::Unit, std::runtime_error> XskSender::init(
-    const folly::MacAddress& localMac,
-    const folly::MacAddress& gatewayMac) {
+folly::Expected<folly::Unit, std::runtime_error> XskSender::init() {
   auto xdpSocketInitResult = initXdpSocket();
   if (xdpSocketInitResult.hasError()) {
     return folly::makeUnexpected(xdpSocketInitResult.error());
   }
 
-  initAddresses(localMac, gatewayMac);
+  initAddresses(xskSenderConfig_.localMac, xskSenderConfig_.gatewayMac);
 
   return folly::Unit();
 }

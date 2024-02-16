@@ -34,10 +34,11 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
         .batchSize = batchSize,
         .ownerId = 0,
         .numOwners = 1,
+        .localMac = localMac,
+        .gatewayMac = gatewayMac,
         .zeroCopyEnabled = true,
         .useNeedWakeup = true};
-    auto createResult =
-        createXskSender(queueId, localMac, gatewayMac, xskSenderConfig);
+    auto createResult = createXskSender(queueId, xskSenderConfig);
     if (createResult.hasError()) {
       // TODO: Clean up the already-created XDP sockets if we fail at this
       // point.
@@ -49,12 +50,10 @@ folly::Expected<folly::Unit, std::runtime_error> XskContainer::init(
 
 folly::Expected<folly::Unit, std::runtime_error> XskContainer::createXskSender(
     int queueId,
-    const folly::MacAddress& localMac,
-    const folly::MacAddress& gatewayMac,
     const XskSenderConfig& xskSenderConfig) {
   auto xskSender = std::make_unique<XskSender>(xskSenderConfig);
 
-  auto initResult = xskSender->init(localMac, gatewayMac);
+  auto initResult = xskSender->init();
   if (initResult.hasError()) {
     return folly::makeUnexpected(initResult.error());
   }

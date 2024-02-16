@@ -44,8 +44,6 @@ class XskContainer {
  private:
   folly::Expected<folly::Unit, std::runtime_error> createXskSender(
       int queueId,
-      const folly::MacAddress& localMac,
-      const folly::MacAddress& gatewayMac,
       const XskSenderConfig& xskSenderConfig);
 
   void initializeQueueParams();

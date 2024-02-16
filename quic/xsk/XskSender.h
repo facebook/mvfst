@@ -74,6 +74,8 @@ struct XskSenderConfig {
   uint32_t batchSize;
   uint32_t ownerId;
   uint32_t numOwners;
+  folly::MacAddress localMac;
+  folly::MacAddress gatewayMac;
   bool zeroCopyEnabled;
   bool useNeedWakeup;
 
@@ -132,9 +134,7 @@ class XskSender {
       std::unique_ptr<folly::IOBuf>& data,
       uint16_t len);
 
-  folly::Expected<folly::Unit, std::runtime_error> init(
-      const folly::MacAddress& localMac,
-      const folly::MacAddress& gatewayMac);
+  folly::Expected<folly::Unit, std::runtime_error> init();
 
   folly::Expected<folly::Unit, std::runtime_error> bind(int queueId);
 
