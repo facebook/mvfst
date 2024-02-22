@@ -10,7 +10,7 @@
 #include <sstream>
 
 #include <folly/compression/Compression.h>
-#include <folly/dynamic.h>
+#include <folly/json/dynamic.h>
 #include <folly/logging/AsyncFileWriter.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/BaseQLogger.h>

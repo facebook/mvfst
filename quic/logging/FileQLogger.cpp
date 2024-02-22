@@ -9,7 +9,7 @@
 
 #include <fstream>
 
-#include <folly/json.h>
+#include <folly/json/json.h>
 
 namespace quic {
 

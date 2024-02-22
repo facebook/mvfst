@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/json.h>
+#include <folly/json/json.h>
 #include <glog/logging.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/TransportKnobs.h>
