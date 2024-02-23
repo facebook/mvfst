@@ -185,6 +185,18 @@ class QuicServerTransport
           handler);
 
  private:
+  class QuicEventBaseAsFollyExecutor : public folly::Executor {
+   public:
+    explicit QuicEventBaseAsFollyExecutor(quic::QuicEventBase* eventBase)
+        : eventBase_(eventBase) {}
+    void add(folly::Func f) override {
+      eventBase_->runInLoop(std::move(f));
+    }
+
+   private:
+    quic::QuicEventBase* eventBase_;
+  };
+
   void processPendingData(bool async);
   void maybeNotifyTransportReady();
   void maybeNotifyConnectionIdRetired();
@@ -196,11 +208,17 @@ class QuicServerTransport
   void registerAllTransportKnobParamHandlers();
   bool shouldWriteNewSessionTicket();
 
-  folly::EventBase* getFollyEventbase() const {
+  folly::Executor* getFollyEventbase() const {
     // TODO (jbeshay): handle nullptr
-    return getEventBase()
-        ->getTypedEventBase<FollyQuicEventBase>()
-        ->getBackingEventBase();
+    if (auto* follyEvb{
+            getEventBase()->getTypedEventBase<FollyQuicEventBase>()}) {
+      return follyEvb->getBackingEventBase();
+    } else {
+      if (!eventBaseAsFollyExecutor_) {
+        eventBaseAsFollyExecutor_.emplace(getEventBase().get());
+      }
+      return &*eventBaseAsFollyExecutor_;
+    }
   }
 
  private:
@@ -216,6 +234,7 @@ class QuicServerTransport
       uint64_t,
       std::function<void(QuicServerTransport*, TransportKnobParam::Val)>>
       transportKnobParamHandlers_;
+  mutable std::optional<QuicEventBaseAsFollyExecutor> eventBaseAsFollyExecutor_;
 
   // Container of observers for the socket / transport.
   //
