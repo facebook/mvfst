@@ -84,8 +84,8 @@ class QuicServerTransport
       bool useConnectionEndWithErrorCallback = false);
 
   QuicServerTransport(
-      std::shared_ptr<FollyQuicEventBase> evb,
-      std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> sock,
       folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
       folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -94,8 +94,8 @@ class QuicServerTransport
 
   // Testing only API:
   QuicServerTransport(
-      std::shared_ptr<FollyQuicEventBase> evb,
-      std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
+      std::shared_ptr<QuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocket> sock,
       folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCb,
       folly::MaybeManagedPtr<ConnectionCallback> connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
