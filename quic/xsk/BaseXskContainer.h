@@ -22,6 +22,7 @@ struct XskContainerConfig {
   uint32_t numFrames;
   uint32_t frameSize;
   uint32_t batchSize;
+  uint32_t numSockets;
 };
 
 class BaseXskContainer {

@@ -9,6 +9,7 @@ add_library(
   xsk_lib.cpp
   BaseXskContainer.cpp
   HashingXskContainer.cpp
+  ThreadLocalXskContainer.cpp
   XskSender.cpp
 )
 
