@@ -1102,6 +1102,22 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "CONNECTION_MIGRATION KnobParam received: "
                 << static_cast<bool>(val);
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::KEY_UPDATE_INTERVAL),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        if (val < 1000 || val > 8ul * 1000 * 1000) {
+          std::string errMsg = fmt::format(
+              "KEY_UPDATE_INTERVAL KnobParam received with invalid value: {}",
+              val);
+          throw std::runtime_error(errMsg);
+        }
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.initiateKeyUpdate = val > 0;
+        server_conn->transportSettings.keyUpdatePacketCountInterval = val;
+        VLOG(3) << "KEY_UPDATE_INTERVAL KnobParam received: " << val;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
