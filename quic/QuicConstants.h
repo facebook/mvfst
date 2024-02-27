@@ -617,8 +617,8 @@ constexpr std::chrono::milliseconds kMinIntervalBetweenSessionTickets = 100ms;
 // update. This is a conservative number below the confidentiality limit (2^23)
 // derived in the spec for packets of size up to 64k bytes:
 // https://www.rfc-editor.org/rfc/rfc9001.html#name-confidentiality-limit
-constexpr uint64_t kDefaultKeyUpdatePacketCountInterval =
-    static_cast<uint64_t>(8 * 1000 * 1000);
+constexpr uint64_t kDefaultKeyUpdatePacketCountInterval = 1ull * 1000 * 1000;
+constexpr uint64_t kFirstKeyUpdatePacketCount = 500ull;
 
 enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
   REJECT_IF_NO_EXACT_MATCH = 0,

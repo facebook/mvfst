@@ -1330,6 +1330,8 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateSuccess) {
     conn.transportSettings.initiateKeyUpdate = true;
     conn.transportSettings.keyUpdatePacketCountInterval =
         numberOfWrittenPacketsInPhase;
+    // Only do the period updates.
+    conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
     // A key update should be triggered after this write is completed.
     this->getTransport()->writeChain(
@@ -1403,6 +1405,8 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
     conn.transportSettings.initiateKeyUpdate = true;
     conn.transportSettings.keyUpdatePacketCountInterval =
         numberOfWrittenPacketsInPhase;
+    // Only do the period updates.
+    conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
     // A key update should be triggered after this write is completed.
     this->getTransport()->writeChain(
@@ -1455,6 +1459,83 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
 
     // Crypto error: Packet with key update was acked in the wrong phase
     EXPECT_THROW(this->deliverPacket(std::move(buf)), std::runtime_error);
+  }
+
+  this->getNonConstConn().outstandings.reset();
+
+  this->destroyTransport();
+}
+
+/**
+ * Initiate the first key update - Successful attempt
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateFirstKeyUpdateSuccess) {
+  ASSERT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  auto numberOfWrittenPacketsInPhase =
+      this->getConn().oneRttWritePacketsSentInCurrentPhase;
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+
+  {
+    // Send and receive a packet in the current phase
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    this->loopForWrites();
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello2"), ProtectionType::KeyPhaseZero));
+
+    // Both read and writer ciphers should be in phase zero.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseZero);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // Force initiate a key update through the firstKeyUpdatePacketCount
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    conn.transportSettings.initiateKeyUpdate = true;
+    // Trigger this update as a first update
+    conn.transportSettings.firstKeyUpdatePacketCount =
+        numberOfWrittenPacketsInPhase;
+    // Periodic interval is high enough not to be triggered
+    conn.transportSettings.keyUpdatePacketCountInterval =
+        kDefaultKeyUpdatePacketCountInterval;
+
+    // A key update should be triggered after this write is completed.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello3"), false);
+    this->loopForWrites();
+
+    numberOfWrittenPacketsInPhase = 0;
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        numberOfWrittenPacketsInPhase);
+
+    // Both read and writer ciphers should have advanced to phase one.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
+  }
+
+  {
+    // Another key update should not be allowed until this one is verified
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    EXPECT_FALSE(conn.readCodec->canInitiateKeyUpdate());
+    EXPECT_FALSE(conn.readCodec->advanceOneRttReadPhase());
+  }
+
+  {
+    // Receiving a packet in the new phase verifies the pending key update
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello4"), ProtectionType::KeyPhaseOne));
+
+    EXPECT_TRUE(this->getConn().readCodec->canInitiateKeyUpdate());
   }
 
   this->getNonConstConn().outstandings.reset();

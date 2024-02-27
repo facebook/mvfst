@@ -335,7 +335,11 @@ struct TransportSettings {
 
   // Whether to initiate key updates
   bool initiateKeyUpdate{false};
-  // How many sent packets to send before initiating a key update
+  // How many packets to send before initiating the first key update.
+  // This is reset to folly::none after the first key update is initiated.
+  folly::Optional<uint64_t> firstKeyUpdatePacketCount{
+      kFirstKeyUpdatePacketCount};
+  // How many packets to send before initiating periodic key updates
   uint64_t keyUpdatePacketCountInterval{kDefaultKeyUpdatePacketCountInterval};
   // Whether to terminate the connection when a peer initiates a key update.
   // TODO: Remove this. This is a temporary measure to gradually roll out key

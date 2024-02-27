@@ -1951,12 +1951,17 @@ void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn) {
 }
 
 void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
-  if (conn.transportSettings.initiateKeyUpdate &&
-      conn.oneRttWritePacketsSentInCurrentPhase >
-          conn.transportSettings.keyUpdatePacketCountInterval) {
-    if (conn.readCodec->canInitiateKeyUpdate()) {
+  if (conn.transportSettings.initiateKeyUpdate) {
+    auto packetsBeforeNextUpdate =
+        conn.transportSettings.firstKeyUpdatePacketCount
+        ? conn.transportSettings.firstKeyUpdatePacketCount.value()
+        : conn.transportSettings.keyUpdatePacketCountInterval;
+
+    if ((conn.oneRttWritePacketsSentInCurrentPhase > packetsBeforeNextUpdate) &&
+        conn.readCodec->canInitiateKeyUpdate()) {
       QUIC_STATS(conn.statsCallback, onKeyUpdateAttemptInitiated);
       conn.readCodec->advanceOneRttReadPhase();
+      conn.transportSettings.firstKeyUpdatePacketCount.clear();
 
       updateOneRttWriteCipher(
           conn,
