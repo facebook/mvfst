@@ -138,6 +138,14 @@ bool FizzClientHandshake::isTLSResumed() const {
   return pskType && *pskType == fizz::PskType::Resumption;
 }
 
+std::unique_ptr<std::vector<unsigned char>>
+FizzClientHandshake::getExportedKeyingMaterial(
+    const std::string& /* label */,
+    const std::vector<unsigned char>* /* context */,
+    uint16_t /* keyLength */) {
+  throw std::runtime_error("getExportedKeyingMaterial is not implemented");
+}
+
 EncryptionLevel FizzClientHandshake::getReadRecordLayerEncryptionLevel() {
   return getEncryptionLevelFromFizz(
       state_.readRecordLayer()->getEncryptionLevel());

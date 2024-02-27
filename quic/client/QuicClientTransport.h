@@ -105,6 +105,20 @@ class QuicClientTransport
    */
   bool isTLSResumed() const;
 
+  /*
+   * Export the underlying TLS key material.
+   * label is the label argument for the TLS exporter.
+   * context is the context value argument for the TLS exporter.
+   * keyLength is the length of the exported key.
+   */
+  virtual std::unique_ptr<std::vector<unsigned char>> getExportedKeyingMaterial(
+      const std::string& label,
+      const std::vector<unsigned char>* context,
+      uint16_t keyLength) {
+    return clientConn_->clientHandshakeLayer->getExportedKeyingMaterial(
+        label, context, keyLength);
+  }
+
   enum class ZeroRttAttemptState : uint8_t {
     NotAttempted = 0,
     Accepted,

@@ -37,6 +37,11 @@ class FizzClientHandshake : public ClientHandshake {
 
   bool isTLSResumed() const override;
 
+  std::unique_ptr<std::vector<unsigned char>> getExportedKeyingMaterial(
+      const std::string& label,
+      const std::vector<unsigned char>* context,
+      uint16_t keyLength) override;
+
  protected:
   folly::Optional<QuicCachedPsk> getPsk(
       const folly::Optional<std::string>& hostname) const;

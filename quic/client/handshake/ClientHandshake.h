@@ -98,6 +98,17 @@ class ClientHandshake : public Handshake {
       const ConnectionId& originalDstConnId,
       const RetryPacket& retryPacket) = 0;
 
+  /*
+   * Export the underlying TLS key material.
+   * label is the label argument for the TLS exporter.
+   * context is the context value argument for the TLS exporter.
+   * keyLength is the length of the exported key.
+   */
+  virtual std::unique_ptr<std::vector<unsigned char>> getExportedKeyingMaterial(
+      const std::string& label,
+      const std::vector<unsigned char>* context,
+      uint16_t keyLength) = 0;
+
   /**
    * Returns the negotiated transport parameters chosen by the server
    */
