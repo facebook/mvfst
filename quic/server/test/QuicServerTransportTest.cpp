@@ -41,7 +41,7 @@ folly::Optional<QuicFrame> getFrameIfPresent(
     if (!regularPacket) {
       continue;
     }
-    for (FOLLY_MAYBE_UNUSED auto& frame : regularPacket->frames) {
+    for ([[maybe_unused]] auto& frame : regularPacket->frames) {
       if (frame.type() != frameType) {
         continue;
       }

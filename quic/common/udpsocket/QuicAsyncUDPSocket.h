@@ -298,7 +298,7 @@ class QuicAsyncUDPSocket {
   T* getTypedSocket() const;
 
   static void fromMsg(
-      FOLLY_MAYBE_UNUSED ReadCallback::OnDataAvailableParams& params,
-      FOLLY_MAYBE_UNUSED struct msghdr& msg);
+      [[maybe_unused]] ReadCallback::OnDataAvailableParams& params,
+      [[maybe_unused]] struct msghdr& msg);
 };
 } // namespace quic

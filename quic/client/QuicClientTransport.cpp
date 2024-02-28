@@ -1079,7 +1079,7 @@ bool QuicClientTransport::isTLSResumed() const {
 }
 
 void QuicClientTransport::errMessage(
-    FOLLY_MAYBE_UNUSED const cmsghdr& cmsg) noexcept {
+    [[maybe_unused]] const cmsghdr& cmsg) noexcept {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   if ((cmsg.cmsg_level == SOL_IP && cmsg.cmsg_type == IP_RECVERR) ||
       (cmsg.cmsg_level == SOL_IPV6 && cmsg.cmsg_type == IPV6_RECVERR)) {

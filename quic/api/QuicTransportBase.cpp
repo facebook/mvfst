@@ -200,7 +200,7 @@ bool QuicTransportBase::error() const {
 }
 
 void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   // The caller probably doesn't need a conn callback any more because they
   // explicitly called close.
   resetConnectionCallbacks();
@@ -213,7 +213,7 @@ void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
 
 void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
   DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   VLOG(4) << __func__ << " " << *this;
   errorCode = maybeSetGenericAppError(std::move(errorCode));
   closeImpl(std::move(errorCode), false);
@@ -231,7 +231,7 @@ void QuicTransportBase::closeGracefully() {
       closeState_ == CloseState::GRACEFUL_CLOSING) {
     return;
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   resetConnectionCallbacks();
   closeState_ = CloseState::GRACEFUL_CLOSING;
   updatePacingOnClose(*conn_);
@@ -1274,7 +1274,7 @@ folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     updateReadLooper();
     updatePeekLooper(); // read can affect "peek" API
@@ -1327,7 +1327,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     updatePeekLooper();
     updateWriteLooper(true);
@@ -1374,7 +1374,7 @@ folly::
     return folly::makeUnexpected(
         ConsumeError{LocalErrorCode::CONNECTION_CLOSED, folly::none});
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     updatePeekLooper();
     updateReadLooper(); // consume may affect "read" API
@@ -1854,7 +1854,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
 void QuicTransportBase::onNetworkData(
     const folly::SocketAddress& peer,
     NetworkData&& networkData) noexcept {
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     checkForClosedStream();
     updateReadLooper();
@@ -2218,7 +2218,7 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
@@ -2287,7 +2287,7 @@ QuicSocket::WriteResult QuicTransportBase::writeBufMeta(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
@@ -2380,7 +2380,7 @@ QuicTransportBase::registerByteEventCallback(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
@@ -2488,7 +2488,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     checkForClosedStream();
     updateReadLooper();
@@ -2650,7 +2650,7 @@ void QuicTransportBase::sendPing(std::chrono::milliseconds pingTimeout) {
 void QuicTransportBase::lossTimeoutExpired() noexcept {
   CHECK_NE(closeState_, CloseState::CLOSED);
   // onLossDetectionAlarm will set packetToSend in pending events
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   try {
     onLossDetectionAlarm(*conn_, markPacketLoss);
     if (conn_->qLogger) {
@@ -2681,7 +2681,7 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
 void QuicTransportBase::ackTimeoutExpired() noexcept {
   CHECK_NE(closeState_, CloseState::CLOSED);
   VLOG(10) << __func__ << " " << *this;
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   updateAckStateOnAckTimeout(*conn_);
   pacedWriteDataToSocket();
 }
@@ -2704,7 +2704,7 @@ void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
 
   // TODO junqiw probing is not supported, so pathValidation==connMigration
   // We decide to close conn when pathValidation to migrated path fails.
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   closeImpl(QuicError(
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
       std::string("Path validation timed out")));
@@ -2712,7 +2712,7 @@ void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
 
 void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
   VLOG(4) << __func__ << " " << *this;
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   // idle timeout is expired, just close the connection and drain or
   // send connection close immediately depending on 'drain'
   DCHECK_NE(closeState_, CloseState::CLOSED);
@@ -2731,7 +2731,7 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
 }
 
 void QuicTransportBase::keepaliveTimeoutExpired() noexcept {
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   conn_->pendingEvents.sendPing = true;
   updateWriteLooper(true);
 }
@@ -3191,7 +3191,7 @@ void QuicTransportBase::writeSocketData() {
 }
 
 void QuicTransportBase::writeSocketDataAndCatch() {
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   try {
     writeSocketData();
     processCallbacksAfterWriteData();
@@ -3533,7 +3533,7 @@ void QuicTransportBase::runOnEvbAsync(
 }
 
 void QuicTransportBase::pacedWriteDataToSocket() {
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
 
   if (!isConnectionPaced(*conn_)) {
     // Not paced and connection is still open, normal write. Even if pacing is
@@ -3654,7 +3654,7 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
-  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  [[maybe_unused]] auto self = sharedGuard();
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.

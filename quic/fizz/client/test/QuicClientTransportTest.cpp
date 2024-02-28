@@ -1649,8 +1649,8 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnFirstBeforeSecondStarts(
-      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
-      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+      [[maybe_unused]] const SocketAddress& firstAddress,
+      [[maybe_unused]] const SocketAddress& secondAddress) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
     EXPECT_CALL(*sock, write(firstAddress, _));
@@ -1766,8 +1766,8 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnFirstAfterSecondStarts(
-      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
-      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+      [[maybe_unused]] const SocketAddress& firstAddress,
+      [[maybe_unused]] const SocketAddress& secondAddress) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
@@ -1893,8 +1893,8 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnSecondAfterSecondStarts(
-      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
-      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+      [[maybe_unused]] const SocketAddress& firstAddress,
+      [[maybe_unused]] const SocketAddress& secondAddress) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
@@ -2019,8 +2019,8 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnBothAfterSecondStarts(
-      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
-      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+      [[maybe_unused]] const SocketAddress& firstAddress,
+      [[maybe_unused]] const SocketAddress& secondAddress) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
@@ -2959,7 +2959,7 @@ bool verifyFramePresent(
     if (!regularPacket) {
       continue;
     }
-    for (FOLLY_MAYBE_UNUSED auto& frame : regularPacket->frames) {
+    for ([[maybe_unused]] auto& frame : regularPacket->frames) {
       if (frame.type() != frameType) {
         continue;
       }

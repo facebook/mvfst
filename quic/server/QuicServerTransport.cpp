@@ -447,7 +447,7 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
       VLOG(10) << "Got crypto event after connection closed " << *this;
       return;
     }
-    FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+    [[maybe_unused]] auto self = sharedGuard();
     updateHandshakeState(*serverConn_);
     processPendingData(false);
     // pending data may contain connection close

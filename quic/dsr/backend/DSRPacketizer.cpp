@@ -149,7 +149,7 @@ BufQuicBatchResult PacketGroupWriter::writePacketsGroup(
 
 static auto& getThreadLocalConn(size_t maxPackets = 44) {
   static thread_local QuicConnectionStateBase fakeConn{QuicNodeType::Server};
-  static thread_local bool initAccessor FOLLY_MAYBE_UNUSED = [&]() {
+  static thread_local bool initAccessor [[maybe_unused]] = [&]() {
     fakeConn.bufAccessor =
         new SimpleBufAccessor{kDefaultMaxUDPPayload * maxPackets};
     // Store this so we can use it to set the batch writer.

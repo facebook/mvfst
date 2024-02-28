@@ -23,8 +23,8 @@ T* QuicAsyncUDPSocket::getTypedSocket() const {
 }
 
 void QuicAsyncUDPSocket::fromMsg(
-    FOLLY_MAYBE_UNUSED ReadCallback::OnDataAvailableParams& params,
-    FOLLY_MAYBE_UNUSED struct msghdr& msg) {
+    [[maybe_unused]] ReadCallback::OnDataAvailableParams& params,
+    [[maybe_unused]] struct msghdr& msg) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   struct cmsghdr* cmsg;
   uint16_t* grosizeptr;
