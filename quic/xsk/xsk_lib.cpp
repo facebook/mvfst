@@ -26,6 +26,10 @@
 #define PF_XDP AF_XDP
 #endif
 
+#ifndef XDP_USE_NEED_WAKEUP
+#define XDP_USE_NEED_WAKEUP (1 << 3)
+#endif
+
 int create_xsk() {
   int fd = socket(AF_XDP, SOCK_RAW | SOCK_CLOEXEC, 0);
   if (fd < 0) {
