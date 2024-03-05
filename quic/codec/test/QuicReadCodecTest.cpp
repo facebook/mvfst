@@ -135,6 +135,55 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   EXPECT_EQ(headerOut.getToken(), token);
 }
 
+TEST_F(QuicReadCodecTest, RetryPacketInvariantTest) {
+  /**
+   * https://www.rfc-editor.org/rfc/rfc9001#section-a.4-1
+   *
+   * This shows a Retry packet that might be sent in response to the Initial
+   * packet in Appendix A.2. The integrity check includes the client-chosen
+   * connection ID value of 0x8394c8f03e515708, but that value is not included
+   * in the final Retry packet:
+   *
+   * ff000000010008f067a5502a4262b574 6f6b656e04a265ba2eff4d829058fb3f
+   * 0f2496ba
+   */
+  folly::StringPiece hexlifiedRetryPacket =
+      "ff000000010008f067a5502a4262b5746f6b656e04a265ba2eff4d829058fb3f0f2496ba";
+  AckStates ackStates;
+
+  auto encodedRetry = BufQueue(
+      folly::IOBuf::copyBuffer(folly::unhexlify(hexlifiedRetryPacket)));
+  auto result = makeUnencryptedCodec()->parsePacket(encodedRetry, ackStates);
+  EXPECT_TRUE(result.retryPacket());
+
+  // similar to above test, but don't include an integrity tag here (take
+  // hexlifiedRetryPacket and strip kRetryIntegrityTagLen bytes)
+  BufQueue encodedRetryWithNoIntegrityTag{folly::IOBuf::copyBuffer(
+      folly::unhexlify("ff000000010008f067a5502a4262b5746f6b656e"))};
+  auto codecResult = makeUnencryptedCodec()->parsePacket(
+      encodedRetryWithNoIntegrityTag, ackStates);
+  EXPECT_TRUE(codecResult.nothing());
+
+  // similar to above test, but use a shorter integrity tag len (i.e. 8 bytes
+  // instead of 16 by stripping off 8 bytes from hexlifiedRetryPacket); we
+  // should throw an exception here
+  BufQueue encodedRetryWithShortIntegrityTag{
+      folly::IOBuf::copyBuffer(folly::unhexlify(
+          "ff000000010008f067a5502a4262b5746f6b656e04a265ba2eff4d82"))};
+  codecResult = makeUnencryptedCodec()->parsePacket(
+      encodedRetryWithShortIntegrityTag, ackStates);
+  EXPECT_TRUE(codecResult.nothing());
+
+  // similar to above test, but use a longer integrity tag len (i.e. 32 bytes
+  // instead of 16); we should only consume first 16 bytes and drop the rest. we
+  // dupliate the original integrity tag and append to the encoded retry packet
+  BufQueue encodedRetryWithLongIntegrityTag{folly::IOBuf::copyBuffer(folly::unhexlify(
+      "ff000000010008f067a5502a4262b5746f6b656e04a265ba2eff4d829058fb3f0f2496ba04a265ba2eff4d829058fb3f0f2496ba"))};
+  codecResult = makeUnencryptedCodec()->parsePacket(
+      encodedRetryWithLongIntegrityTag, ackStates);
+  EXPECT_TRUE(codecResult.retryPacket());
+}
+
 TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
   LongHeader headerIn(
       LongHeader::Types::Initial,

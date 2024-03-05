@@ -339,11 +339,25 @@ TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
   LongHeader header(
       LongHeader::Types::Retry, scid, dcid, 0, version, retryToken);
 
-  std::string integrityTag =
-      "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49";
+  RetryPacket::IntegrityTagType integrityTag = {
+      0xd1,
+      0x69,
+      0x26,
+      0xd8,
+      0x1f,
+      0x6f,
+      0x9c,
+      0xa2,
+      0x95,
+      0x3a,
+      0x8a,
+      0xa4,
+      0x57,
+      0x5e,
+      0x1e,
+      0x49};
 
-  RetryPacket retryPacket(
-      std::move(header), folly::IOBuf::copyBuffer(integrityTag), initialByte);
+  RetryPacket retryPacket(std::move(header), integrityTag, initialByte);
 
   std::vector<uint8_t> odcidVec = {
       0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};

@@ -1087,8 +1087,12 @@ void QuicServerWorker::sendRetryPacket(
       folly::IOBuf::copyBuffer(encryptedTokenStr));
   Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
-  auto integrityTag = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
+  auto integrityTagBuf = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
       QuicVersion::MVFST_INVALID, pseudoRetryPacketBuf.get());
+  folly::io::Cursor cursor{integrityTagBuf.get()};
+
+  RetryPacket::IntegrityTagType integrityTag = {0};
+  cursor.pull(integrityTag.data(), integrityTag.size());
 
   // Create the actual retry packet
   RetryPacketBuilder builder(
@@ -1096,7 +1100,7 @@ void QuicServerWorker::sendRetryPacket(
       srcConnId, /* dst conn id */
       QuicVersion::MVFST_INVALID,
       std::move(encryptedTokenStr),
-      std::move(integrityTag));
+      integrityTag);
 
   auto retryData = std::move(builder).buildPacket();
   auto retryDataLen = retryData->computeChainDataLength();

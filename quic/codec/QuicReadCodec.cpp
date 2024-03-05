@@ -107,11 +107,9 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   auto longHeader = std::move(parsedLongHeader.header);
 
   if (type == LongHeader::Types::Retry) {
-    Buf integrityTag;
-    cursor.clone(integrityTag, kRetryIntegrityTagLen);
+    auto integrityTag = cursor.read<RetryPacket::IntegrityTagType>();
     queue.move();
-    return RetryPacket(
-        std::move(longHeader), std::move(integrityTag), initialByte);
+    return RetryPacket(std::move(longHeader), integrityTag, initialByte);
   }
 
   uint64_t packetNumberOffset = cursor.getCurrentPosition();

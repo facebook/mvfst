@@ -542,12 +542,12 @@ RetryPacketBuilder::RetryPacketBuilder(
     ConnectionId destinationConnectionId,
     QuicVersion quicVersion,
     std::string&& retryToken,
-    Buf&& integrityTag)
+    RetryPacket::IntegrityTagType integrityTag)
     : sourceConnectionId_(sourceConnectionId),
       destinationConnectionId_(destinationConnectionId),
       quicVersion_(quicVersion),
       retryToken_(std::move(retryToken)),
-      integrityTag_(std::move(integrityTag)),
+      integrityTag_(integrityTag),
       remainingBytes_(kDefaultUDPSendPacketLen) {
   writeRetryPacket();
 }
@@ -575,7 +575,7 @@ void RetryPacketBuilder::writeRetryPacket() {
   } else {
     remainingBytes_ -= kRetryIntegrityTagLen;
     BufAppender appender2(packetBuf_.get(), kRetryIntegrityTagLen);
-    appender2.insert(std::move(integrityTag_));
+    appender2.push(integrityTag_.data(), integrityTag_.size());
   }
 }
 

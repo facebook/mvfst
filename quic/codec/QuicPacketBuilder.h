@@ -412,7 +412,7 @@ class RetryPacketBuilder {
       ConnectionId destinationConnectionId,
       QuicVersion quicVersion,
       std::string&& retryToken,
-      Buf&& integrityTag);
+      RetryPacket::IntegrityTagType integrityTag);
 
   uint32_t remainingSpaceInPkt();
 
@@ -433,7 +433,7 @@ class RetryPacketBuilder {
   ConnectionId destinationConnectionId_;
   QuicVersion quicVersion_;
   std::string retryToken_;
-  Buf integrityTag_;
+  RetryPacket::IntegrityTagType integrityTag_;
 
   uint32_t remainingBytes_;
 };

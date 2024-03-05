@@ -1155,16 +1155,17 @@ struct RegularPacket {
 };
 
 struct RetryPacket {
+  using IntegrityTagType = std::array<uint8_t, kRetryIntegrityTagLen>;
   RetryPacket(
       LongHeader&& longHeaderIn,
-      Buf integrityTagIn,
+      IntegrityTagType integrityTagIn,
       uint8_t initialByteIn)
       : header(std::move(longHeaderIn)),
-        integrityTag(std::move(integrityTagIn)),
+        integrityTag(integrityTagIn),
         initialByte(initialByteIn) {}
 
   LongHeader header;
-  Buf integrityTag;
+  std::array<uint8_t, kRetryIntegrityTagLen> integrityTag;
   uint8_t initialByte;
 };
 

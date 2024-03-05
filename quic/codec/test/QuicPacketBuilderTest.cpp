@@ -644,15 +644,26 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   auto srcConnId = getTestConnectionId(0), dstConnId = getTestConnectionId(1);
   auto quicVersion = static_cast<QuicVersion>(0xff00001d);
   std::string retryToken = "token";
-  Buf integrityTag = folly::IOBuf::copyBuffer(
-      "\xaa\xbb\xcc\xdd\xee\xff\x11\x22\x33\x44\x55\x66\x77\x88\x99\x11");
+  RetryPacket::IntegrityTagType integrityTag = {
+      0xaa,
+      0xbb,
+      0xcc,
+      0xdd,
+      0xee,
+      0xff,
+      0x11,
+      0x22,
+      0x33,
+      0x44,
+      0x55,
+      0x66,
+      0x77,
+      0x88,
+      0x99,
+      0x11};
 
   RetryPacketBuilder builder(
-      srcConnId,
-      dstConnId,
-      quicVersion,
-      std::string(retryToken),
-      integrityTag->clone());
+      srcConnId, dstConnId, quicVersion, std::string(retryToken), integrityTag);
 
   EXPECT_TRUE(builder.canBuildPacket());
   Buf retryPacket = std::move(builder).buildPacket();
@@ -699,7 +710,10 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   // integrity tag
   Buf integrityTagObtained;
   cursor.clone(integrityTagObtained, kRetryIntegrityTagLen);
-  EXPECT_TRUE(folly::IOBufEqualTo()(integrityTagObtained, integrityTag));
+  EXPECT_TRUE(folly::IOBufEqualTo()(
+      *integrityTagObtained,
+      folly::IOBuf::wrapBufferAsValue(
+          integrityTag.data(), integrityTag.size())));
 }
 
 TEST_F(QuicPacketBuilderTest, RetryPacketGiganticToken) {
@@ -709,15 +723,26 @@ TEST_F(QuicPacketBuilderTest, RetryPacketGiganticToken) {
   for (uint32_t i = 0; i < 500; i++) {
     retryToken += "aaaaaaaaaa";
   }
-  Buf integrityTag = folly::IOBuf::copyBuffer(
-      "\xaa\xbb\xcc\xdd\xee\xff\x11\x22\x33\x44\x55\x66\x77\x88\x99\x11");
+  RetryPacket::IntegrityTagType integrityTag = {
+      0xaa,
+      0xbb,
+      0xcc,
+      0xdd,
+      0xee,
+      0xff,
+      0x11,
+      0x22,
+      0x33,
+      0x44,
+      0x55,
+      0x66,
+      0x77,
+      0x88,
+      0x99,
+      0x11};
 
   RetryPacketBuilder builder(
-      srcConnId,
-      dstConnId,
-      quicVersion,
-      std::string(retryToken),
-      integrityTag->clone());
+      srcConnId, dstConnId, quicVersion, std::move(retryToken), integrityTag);
 
   EXPECT_FALSE(builder.canBuildPacket());
 }
