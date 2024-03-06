@@ -150,6 +150,8 @@ class QuicReadCodec {
   void setClientConnectionId(ConnectionId connId);
   void setServerConnectionId(ConnectionId connId);
   void setStatelessResetToken(StatelessResetToken statelessResetToken);
+  void setCryptoEqual(
+      std::function<bool(folly::ByteRange, folly::ByteRange)> cryptoEqual);
   const ConnectionId& getClientConnectionId() const;
   const ConnectionId& getServerConnectionId() const;
 
@@ -219,6 +221,7 @@ class QuicReadCodec {
   std::unique_ptr<PacketNumberCipher> handshakeHeaderCipher_;
 
   folly::Optional<StatelessResetToken> statelessResetToken_;
+  std::function<bool(folly::ByteRange, folly::ByteRange)> cryptoEqual_;
   folly::Optional<TimePoint> handshakeDoneTime_;
 
   QuicTransportStatsCallback* statsCallback_{nullptr};

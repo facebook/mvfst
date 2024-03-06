@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <fizz/crypto/Utils.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 
 #include <quic/fizz/handshake/FizzBridge.h>
@@ -79,4 +80,8 @@ std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
   }
 }
 
+std::function<bool(folly::ByteRange, folly::ByteRange)>
+FizzCryptoFactory::getCryptoEqualFunction() const {
+  return fizz::CryptoUtils::equal;
+}
 } // namespace quic

@@ -7,7 +7,6 @@
 
 #include <quic/codec/QuicReadCodec.h>
 
-#include <fizz/crypto/Utils.h>
 #include <folly/io/Cursor.h>
 #include <quic/codec/Decode.h>
 #include <quic/codec/PacketNumber.h>
@@ -418,8 +417,13 @@ CodecResult QuicReadCodec::parsePacket(
     if (statelessResetToken_ && dataLength > sizeof(StatelessResetToken)) {
       const uint8_t* tokenSource =
           data->data() + (dataLength - sizeof(StatelessResetToken));
+      if (!cryptoEqual_) {
+        throw QuicInternalException(
+            "crypto constant time comparison function is not set.",
+            LocalErrorCode::INTERNAL_ERROR);
+      }
       // Only allocate & copy the token if it matches the token we have
-      if (fizz::CryptoUtils::equal(
+      if (cryptoEqual_(
               folly::ByteRange(tokenSource, sizeof(StatelessResetToken)),
               folly::ByteRange(
                   statelessResetToken_->data(), sizeof(StatelessResetToken)))) {
@@ -545,6 +549,11 @@ void QuicReadCodec::setServerConnectionId(ConnectionId connId) {
 void QuicReadCodec::setStatelessResetToken(
     StatelessResetToken statelessResetToken) {
   statelessResetToken_ = std::move(statelessResetToken);
+}
+
+void QuicReadCodec::setCryptoEqual(
+    std::function<bool(folly::ByteRange, folly::ByteRange)> cryptoEqual) {
+  cryptoEqual_ = std::move(cryptoEqual);
 }
 
 void QuicReadCodec::setConnectionStatsCallback(

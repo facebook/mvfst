@@ -56,6 +56,7 @@ std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
   if (sourceToken) {
     codec->setStatelessResetToken(*sourceToken);
   }
+  codec->setCryptoEqual(cryptoFactory.getCryptoEqualFunction());
   return codec;
 }
 

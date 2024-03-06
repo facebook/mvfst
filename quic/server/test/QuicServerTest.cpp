@@ -25,6 +25,7 @@
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
@@ -347,6 +348,8 @@ void QuicServerWorkerTest::testSendReset(
         codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
         StatelessResetToken token = generateStatelessResetToken();
         codec.setStatelessResetToken(token);
+        FizzCryptoFactory cryptoFactory;
+        codec.setCryptoEqual(cryptoFactory.getCryptoEqualFunction());
         overridePacketWithToken(*buf, token);
         AckStates ackStates;
         auto packetQueue = bufToQueue(buf->clone());
@@ -2888,6 +2891,8 @@ void QuicServerTest::testReset(Buf packet) {
   codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
   StatelessResetToken token = generateStatelessResetToken();
   codec.setStatelessResetToken(token);
+  FizzCryptoFactory cryptoFactory;
+  codec.setCryptoEqual(cryptoFactory.getCryptoEqualFunction());
   AckStates ackStates;
   auto packetBuf = serverData->clone();
   overridePacketWithToken(*packetBuf, token);

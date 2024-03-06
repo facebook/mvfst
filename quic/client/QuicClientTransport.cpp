@@ -782,6 +782,9 @@ void QuicClientTransport::processUdpPacketData(
       if (clientConn_->statelessResetToken) {
         conn_->readCodec->setStatelessResetToken(
             clientConn_->statelessResetToken.value());
+        auto& cryptoFactory = handshakeLayer->getCryptoFactory();
+        conn_->readCodec->setCryptoEqual(
+            cryptoFactory.getCryptoEqualFunction());
       }
     }
 
