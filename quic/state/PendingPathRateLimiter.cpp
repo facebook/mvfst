@@ -12,8 +12,12 @@
 namespace quic {
 
 void PendingPathRateLimiter::onPacketSent(uint64_t sentBytes) {
-  DCHECK_GE(credit_, sentBytes);
-  credit_ -= sentBytes;
+  // Allow for up to one packet's worth of data to go into "negative" credit.
+  if (sentBytes > credit_) {
+    credit_ = 0;
+  } else {
+    credit_ -= sentBytes;
+  }
 }
 
 uint64_t PendingPathRateLimiter::currentCredit(

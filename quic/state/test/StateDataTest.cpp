@@ -288,5 +288,32 @@ TEST_F(PendingPathRateLimiterTest, TestCreditRefreshOnInfrequentSends) {
       maxWindowBytes);
 }
 
+TEST_F(PendingPathRateLimiterTest, TestOnPacketSentTooMuchData) {
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+
+  limiter_.onPacketSent(12334583456456);
+  EXPECT_EQ(limiter_.currentCredit(now, std::chrono::microseconds{kRtt}), 0);
+}
+
+TEST_F(
+    PendingPathRateLimiterTest,
+    TestOnPacketSentTooMuchDataCreditRestoresAfterTime) {
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+
+  limiter_.onPacketSent(12334583456456);
+  EXPECT_EQ(limiter_.currentCredit(now, std::chrono::microseconds{kRtt}), 0);
+
+  auto delta =
+      std::chrono::microseconds{kRtt} + std::chrono::microseconds{1000};
+  now += delta;
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+}
+
 } // namespace test
 } // namespace quic
