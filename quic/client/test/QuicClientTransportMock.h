@@ -59,6 +59,10 @@ class QuicClientTransportMock : public QuicClientTransport {
   MOCK_METHOD((void), writeData, ());
   MOCK_METHOD((void), closeSecondSocket, ());
   MOCK_METHOD((void), setHappyEyeballsEnabled, (bool));
+  MOCK_METHOD(
+      (WriteResult),
+      writeChain,
+      (StreamId, Buf, bool, ByteEventCallback*));
 };
 
 } // namespace quic::test
