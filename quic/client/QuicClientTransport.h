@@ -103,7 +103,7 @@ class QuicClientTransport
   /**
    * Returns whether or not TLS is resumed.
    */
-  bool isTLSResumed() const;
+  virtual bool isTLSResumed() const;
 
   /*
    * Export the underlying TLS key material.
@@ -127,7 +127,7 @@ class QuicClientTransport
   /**
    * Returns the state of the 0RTT attempt if there was one.
    */
-  ZeroRttAttemptState getZeroRttState() {
+  virtual ZeroRttAttemptState getZeroRttState() {
     if (!clientConn_->zeroRttRejected.has_value()) {
       return ZeroRttAttemptState::NotAttempted;
     }
