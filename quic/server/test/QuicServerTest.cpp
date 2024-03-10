@@ -1719,9 +1719,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverReInitHandler) {
 
   EXPECT_CALL(*takeoverSock, bind(_, _));
   EXPECT_CALL(*takeoverSock, resumeRead(_));
-  EXPECT_CALL(*takeoverSock, address()).WillOnce(Invoke([&]() {
-    return takeoverAddr;
-  }));
+  EXPECT_CALL(*takeoverSock, address()).WillOnce(ReturnRef(takeoverAddr));
   takeoverWorker_->overrideTakeoverHandlerAddress(
       std::move(takeoverSock), takeoverAddr);
   takeoverSocket_ = takeoverSock.get();
