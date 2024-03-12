@@ -138,6 +138,12 @@ void Bbr2CongestionController::onPacketAckOrLoss(
   }
 
   if (ackEvent) {
+    if (ackEvent->implicit) {
+      // Implicit acks should not be used for bandwidth or rtt estimation
+      setCwnd(ackEvent->ackedBytes, 0);
+      return;
+    }
+
     if (appLimited_ &&
         appLimitedLastSendTime_ <= ackEvent->largestNewlyAckedPacketSentTime) {
       appLimited_ = false;
