@@ -122,17 +122,12 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   /**
    * Set SO_RCVBUF option on the socket, if not zero. Default is zero.
    */
-  void setRcvBuf(int /*rcvBuf*/) override {
-    LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
-  }
+  void setRcvBuf(int rcvBuf) override;
 
   /**
    * Set SO_SNDBUF option on the socket, if not zero. Default is zero.
    */
-  void setSndBuf(int /*sndBuf*/) override {
-    LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
-  }
-
+  void setSndBuf(int sndBuf) override;
   /**
    * Set Dont-Fragment (DF) but ignore Path MTU.
    *
@@ -188,6 +183,8 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   bool connected_{false};
   bool reuseAddr_{false};
   bool reusePort_{false};
+  int rcvBuf_{0};
+  int sndBuf_{0};
 
   ReadCallback* readCallback_{nullptr};
   ErrMessageCallback* errMessageCallback_ = nullptr;

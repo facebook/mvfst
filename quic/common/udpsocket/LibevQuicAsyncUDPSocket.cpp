@@ -225,6 +225,28 @@ void LibevQuicAsyncUDPSocket::init(sa_family_t family) {
         errno);
   }
 
+  if (rcvBuf_ > 0) {
+    // Set the size of the buffer for the received messages in rx_queues.
+    int value = rcvBuf_;
+    if (::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value)) != 0) {
+      throw folly::AsyncSocketException(
+          folly::AsyncSocketException::NOT_OPEN,
+          "failed to set SO_RCVBUF on the socket",
+          errno);
+    }
+  }
+
+  if (sndBuf_ > 0) {
+    // Set the size of the buffer for the sent messages in tx_queues.
+    int value = sndBuf_;
+    if (::setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &value, sizeof(value)) != 0) {
+      throw folly::AsyncSocketException(
+          folly::AsyncSocketException::NOT_OPEN,
+          "failed to set SO_SNDBUF on the socket",
+          errno);
+    }
+  }
+
   fd_ = fd;
   ownership_ = FDOwnership::OWNS;
 }
@@ -421,6 +443,14 @@ void LibevQuicAsyncUDPSocket::readWatcherCallback(
   CHECK(sock->getEventBase()->isInEventBaseThread())
       << "Watcher callback on wrong event base";
   sock->evHandleSocketRead();
+}
+
+void LibevQuicAsyncUDPSocket::setRcvBuf(int rcvBuf) {
+  rcvBuf_ = rcvBuf;
+}
+
+void LibevQuicAsyncUDPSocket::setSndBuf(int sndBuf) {
+  sndBuf_ = sndBuf;
 }
 
 } // namespace quic
