@@ -42,6 +42,10 @@ class FizzClientHandshake : public ClientHandshake {
       const std::vector<unsigned char>* context,
       uint16_t keyLength) override;
 
+  const fizz::client::State& getState() const {
+    return state_;
+  }
+
  protected:
   folly::Optional<QuicCachedPsk> getPsk(
       const folly::Optional<std::string>& hostname) const;
