@@ -123,6 +123,8 @@ class Bbr2CongestionController : public CongestionController {
   void raiseInflightHiSlope();
   void probeInflightHiUpward(uint64_t ackedBytes);
 
+  void updatePacingAndCwndGain();
+
   [[nodiscard]] uint64_t getTargetInflightWithGain(float gain = 1.0) const;
   [[nodiscard]] uint64_t getTargetInflightWithHeadroom() const;
   [[nodiscard]] uint64_t getBDPWithGain(float gain = 1.0) const;

@@ -34,6 +34,17 @@ TEST_F(TransportSettingsFunctionsTest, ParseDifferentBoolFormats) {
   EXPECT_EQ(config.ackFrequencyConfig.has_value(), false);
 }
 
+TEST_F(TransportSettingsFunctionsTest, ParseFloats) {
+  std::string testString =
+      "{"
+      "\"overrideCruisePacingGain\": 7.9, "
+      "\"overrideCruiseCwndGain\": -0.1 "
+      "}";
+  auto config = parseCongestionControlConfig(testString);
+  EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
+  EXPECT_EQ(config.overrideCruiseCwndGain, -0.1f);
+}
+
 TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   std::string testString =
       "{"
@@ -53,7 +64,9 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "},"
       "\"ignoreInflightHi\": true, "
       "\"ignoreLoss\": true, "
-      "\"enableRenoCoexistence\": true"
+      "\"enableRenoCoexistence\": true, "
+      "\"overrideCruisePacingGain\": 7.9, "
+      "\"overrideCruiseCwndGain\": -0.1 "
       "}";
   auto config = parseCongestionControlConfig(testString);
   EXPECT_EQ(config.conservativeRecovery, true);
@@ -67,6 +80,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.ignoreInflightHi, true);
   EXPECT_EQ(config.ignoreLoss, true);
   EXPECT_EQ(config.enableRenoCoexistence, true);
+  EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
+  EXPECT_EQ(config.overrideCruiseCwndGain, -0.1f);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(config.ackFrequencyConfig->ackElicitingThreshold, 99);
@@ -92,6 +107,8 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.ignoreInflightHi, false);
   EXPECT_EQ(config.ignoreLoss, false);
   EXPECT_EQ(config.enableRenoCoexistence, false);
+  EXPECT_EQ(config.overrideCruisePacingGain, -1.0f);
+  EXPECT_EQ(config.overrideCruiseCwndGain, -1.0f);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(

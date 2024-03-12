@@ -84,6 +84,17 @@ quic::CongestionControlConfig parseCongestionControlConfig(
     }
   }
 
+  // Parse optional float fields
+  const std::array<std::pair<std::string, float&>, 2> floatFields = {
+      {{"overrideCruisePacingGain", ccaConfig.overrideCruisePacingGain},
+       {"overrideCruiseCwndGain", ccaConfig.overrideCruiseCwndGain}}};
+
+  for (const auto& [name, field] : floatFields) {
+    if (auto val = ccaConfigDyn.get_ptr(name)) {
+      field = static_cast<float>(val->asDouble());
+    }
+  }
+
   // Parse ack frequency config if present
   if (auto ackFrequencyConfigDyn = ccaConfigDyn.get_ptr("ackFrequencyConfig")) {
     populateAckFrequencyConfig(*ackFrequencyConfigDyn, ccaConfig);
