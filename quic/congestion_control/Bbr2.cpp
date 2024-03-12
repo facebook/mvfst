@@ -387,7 +387,7 @@ void Bbr2CongestionController::updateCongestionSignals(
   if (state_ == State::ProbeBw_Up) {
     return;
   }
-  if (lossBytesInRound_ > 0 && !conn_.transportSettings.ccaConfig.ignoreLoss) {
+  if (lossBytesInRound_ > 0) {
     // InitLowerBounds
     if (!bandwidthLo_.has_value()) {
       bandwidthLo_ = maxBwFilter_.GetBest();
@@ -747,10 +747,12 @@ void Bbr2CongestionController::boundCwndForProbeRTT() {
 void Bbr2CongestionController::boundBwForModel() {
   bandwidth_ = maxBwFilter_.GetBest();
   if (state_ != State::Startup) {
-    if (bandwidthLo_.has_value()) {
+    if (bandwidthLo_.has_value() &&
+        !conn_.transportSettings.ccaConfig.ignoreLoss) {
       bandwidth_ = std::min(bandwidth_, *bandwidthLo_);
     }
-    if (bandwidthHi_.has_value()) {
+    if (bandwidthHi_.has_value() &&
+        !conn_.transportSettings.ccaConfig.ignoreInflightHi) {
       bandwidth_ = std::min(bandwidth_, *bandwidthHi_);
     }
   }
