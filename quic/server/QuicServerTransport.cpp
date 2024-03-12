@@ -715,6 +715,15 @@ QuicServerTransport::getPeerCertificate() const {
   return nullptr;
 }
 
+const std::shared_ptr<const folly::AsyncTransportCertificate>
+QuicServerTransport::getSelfCertificate() const {
+  const auto handshakeLayer = serverConn_->serverHandshakeLayer;
+  if (handshakeLayer) {
+    return handshakeLayer->getState().serverCert();
+  }
+  return nullptr;
+}
+
 void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
   if (knobBlob->length() > 0) {
     std::string serializedKnobs = std::string(

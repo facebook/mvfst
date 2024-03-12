@@ -158,6 +158,9 @@ class QuicServerTransport
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;
 
+  const std::shared_ptr<const folly::AsyncTransportCertificate>
+  getSelfCertificate() const override;
+
   virtual CipherInfo getOneRttCipherInfo() const;
 
   /* Log a collection of statistics that are meant to be sampled consistently

@@ -387,6 +387,15 @@ class QuicSocket {
   }
 
   /**
+   * Get the cert presented by self
+   */
+  FOLLY_NODISCARD virtual const std::shared_ptr<
+      const folly::AsyncTransportCertificate>
+  getSelfCertificate() const {
+    return nullptr;
+  }
+
+  /**
    * Determine if transport is open and ready to read or write.
    *
    * return true iff the transport is open and ready, false otherwise.

@@ -5251,5 +5251,58 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   EXPECT_EQ(server->getConn().dsrPacketCount, 6);
 }
 
+class QuicServerTransportCertTest : public QuicServerTransportTest {
+ protected:
+  class MockCert : public fizz::Cert {
+    std::string getIdentity() const override {
+      return "";
+    }
+  };
+};
+
+TEST_F(QuicServerTransportCertTest, TestGetPeerCertificate) {
+  auto& conn = getFakeHandshakeLayer()->conn_;
+
+  // have handshake layer, but no client cert
+  EXPECT_NE(conn.serverHandshakeLayer, nullptr);
+  EXPECT_EQ(server->getPeerCertificate(), nullptr);
+
+  // have client cert
+  auto mockCert = std::make_shared<MockCert>();
+  const_cast<fizz::server::State&>(conn.serverHandshakeLayer->getState())
+      .clientCert() = mockCert;
+  EXPECT_EQ(server->getPeerCertificate(), mockCert);
+
+  // no handshake layer
+  auto* serverHandshakeLayer = conn.serverHandshakeLayer;
+  conn.serverHandshakeLayer = nullptr;
+  EXPECT_EQ(server->getPeerCertificate(), nullptr);
+
+  // to prevent crash
+  conn.serverHandshakeLayer = serverHandshakeLayer;
+}
+
+TEST_F(QuicServerTransportCertTest, TestGetSelfCertificate) {
+  auto& conn = getFakeHandshakeLayer()->conn_;
+
+  // have handshake layer, but no server cert
+  EXPECT_NE(conn.serverHandshakeLayer, nullptr);
+  EXPECT_EQ(server->getSelfCertificate(), nullptr);
+
+  // have server cert
+  auto mockCert = std::make_shared<MockCert>();
+  const_cast<fizz::server::State&>(conn.serverHandshakeLayer->getState())
+      .serverCert() = mockCert;
+  EXPECT_EQ(server->getSelfCertificate(), mockCert);
+
+  // no handshake layer
+  auto* serverHandshakeLayer = conn.serverHandshakeLayer;
+  conn.serverHandshakeLayer = nullptr;
+  EXPECT_EQ(server->getSelfCertificate(), nullptr);
+
+  // to prevent crash
+  conn.serverHandshakeLayer = serverHandshakeLayer;
+}
+
 } // namespace test
 } // namespace quic
