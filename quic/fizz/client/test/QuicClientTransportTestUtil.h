@@ -173,7 +173,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
       transportParams = quicCachedPsk->transportParams;
     }
 
-    getFizzState().sni() = hostname;
+    const_cast<fizz::client::State&>(getState()).sni() = hostname;
 
     connected_ = true;
     writeDataToQuicStream(

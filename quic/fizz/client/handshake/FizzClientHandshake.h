@@ -52,11 +52,6 @@ class FizzClientHandshake : public ClientHandshake {
 
   void onNewCachedPsk(fizz::client::NewCachedPsk& newCachedPsk) noexcept;
 
-  // For tests.
-  fizz::client::State& getFizzState() {
-    return state_;
-  }
-
  private:
   folly::Optional<CachedServerTransportParameters> connectImpl(
       folly::Optional<std::string> hostname) override;
