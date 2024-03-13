@@ -532,7 +532,7 @@ folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
   spaceLeft = builder.remainingSpaceInPkt();
   if (spaceLeft > 0) {
     auto largestAckedPacket = ackState.acks.back().end;
-    uint8_t receiveTimestampsExponentToUse =
+    uint64_t receiveTimestampsExponentToUse =
         recvTimestampsConfig.receiveTimestampsExponent;
     countTimestampRanges = fillPacketReceiveTimestamps(
         ackFrameMetaData,
