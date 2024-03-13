@@ -355,6 +355,30 @@ void LibevQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
 void LibevQuicAsyncUDPSocket::setErrMessageCallback(
     ErrMessageCallback* errMessageCallback) {
   errMessageCallback_ = errMessageCallback;
+  int optname4 = 0;
+  int optname6 = 0;
+#if defined(IP_RECVERR)
+  optname4 = IP_RECVERR;
+#endif
+#if defined(IPV6_RECVERR)
+  optname6 = IPV6_RECVERR;
+#endif
+  errMessageCallback_ = errMessageCallback;
+  int err = (errMessageCallback_ != nullptr);
+  if (optname4 && address().getFamily() == AF_INET &&
+      ::setsockopt(fd_, IPPROTO_IP, optname4, &err, sizeof(err))) {
+    throw folly::AsyncSocketException(
+        folly::AsyncSocketException::NOT_OPEN,
+        "Failed to set IP_RECVERR",
+        errno);
+  }
+  if (optname6 && address().getFamily() == AF_INET6 &&
+      ::setsockopt(fd_, IPPROTO_IPV6, optname6, &err, sizeof(err))) {
+    throw folly::AsyncSocketException(
+        folly::AsyncSocketException::NOT_OPEN,
+        "Failed to set IPV6_RECVERR",
+        errno);
+  }
 }
 
 int LibevQuicAsyncUDPSocket::getGRO() {
@@ -418,7 +442,85 @@ int LibevQuicAsyncUDPSocket::getFD() {
 void LibevQuicAsyncUDPSocket::evHandleSocketRead() {
   CHECK(readCallback_);
   CHECK(readCallback_->shouldOnlyNotify());
+
+  // Read any errors first. If there are errors, do not notify the read
+  // callback.
+  // Note: I don't see the motivation for returning here if the fd is not closed
+  // but doing this to maintain consistent behavior with folly's AsyncUDPSocket
+  if (handleSocketErrors()) {
+    return;
+  }
+
+  // An error callback could close the socket, in which case we should not read
+  // from it.
+  if (fd_ == -1) {
+    return;
+  }
+
+  // Let the callback read from the socket
   readCallback_->onNotifyDataAvailable(*this);
+}
+
+size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
+#ifdef MSG_ERRQUEUE
+  if (errMessageCallback_ == nullptr) {
+    return 0;
+  }
+  std::array<uint8_t, 1024> ctrl;
+  unsigned char data;
+  struct msghdr msg;
+  iovec entry;
+
+  entry.iov_base = &data;
+  entry.iov_len = sizeof(data);
+  msg.msg_iov = &entry;
+  msg.msg_iovlen = 1;
+  msg.msg_name = nullptr;
+  msg.msg_namelen = 0;
+  msg.msg_control = ctrl.data();
+  msg.msg_controllen = sizeof(ctrl);
+  msg.msg_flags = 0;
+
+  ssize_t ret;
+  size_t num = 0;
+  while (fd_ != -1) {
+    ret = ::recvmsg(fd_, &msg, MSG_ERRQUEUE);
+    VLOG(5)
+        << "LibevQuicAsyncUDPSocket::handleSocketErrors(): recvmsg returned "
+        << ret;
+
+    if (ret < 0) {
+      if (errno != EAGAIN) {
+        auto errnoCopy = errno;
+        LOG(ERROR) << "::recvmsg exited with code " << ret
+                   << ", errno: " << errnoCopy;
+        folly::AsyncSocketException ex(
+            folly::AsyncSocketException::INTERNAL_ERROR,
+            "MSG_ERRQUEUE recvmsg() failed",
+            errnoCopy);
+        // We can't receive errors so unset the callback.
+        ErrMessageCallback* callback = errMessageCallback_;
+        errMessageCallback_ = nullptr;
+        callback->errMessageError(ex);
+      }
+      return num;
+    }
+
+    for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+         cmsg != nullptr && cmsg->cmsg_len != 0;
+         cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+      ++num;
+      errMessageCallback_->errMessage(*cmsg);
+      if (fd_ == -1) {
+        // once the socket is closed there is no use for more read errors.
+        return num;
+      }
+    }
+  }
+  return num;
+#else
+  return 0;
+#endif
 }
 
 void LibevQuicAsyncUDPSocket::updateReadWatcher() {

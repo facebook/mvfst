@@ -170,6 +170,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   void updateReadWatcher();
   void evHandleSocketRead();
+  size_t handleSocketErrors();
 
   int fd_{-1};
   folly::SocketAddress localAddress_;
@@ -187,6 +188,6 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   int sndBuf_{0};
 
   ReadCallback* readCallback_{nullptr};
-  ErrMessageCallback* errMessageCallback_ = nullptr;
+  ErrMessageCallback* errMessageCallback_{nullptr};
 };
 } // namespace quic
