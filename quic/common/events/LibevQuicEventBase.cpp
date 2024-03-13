@@ -21,9 +21,9 @@ void libEvTimeoutCallback(
   wrapper->timeoutExpired();
 }
 
-void libEvCheckCallback(
+void libEvPrepareCallback(
     struct ev_loop* /* loop */,
-    ev_check* w,
+    ev_prepare* w,
     int /* revents */) {
   auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
   CHECK(self != nullptr);
@@ -48,13 +48,13 @@ class FunctionLoopCallback : public quic::QuicEventBaseLoopCallback {
 namespace quic {
 LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
   loopThreadId_.store(std::this_thread::get_id(), std::memory_order_release);
-  ev_check_init(&checkWatcher_, libEvCheckCallback);
-  checkWatcher_.data = this;
-  ev_check_start(ev_loop_, &checkWatcher_);
+  ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
+  prepareWatcher_.data = this;
+  ev_prepare_start(ev_loop_, &prepareWatcher_);
 }
 
 LibevQuicEventBase::~LibevQuicEventBase() {
-  ev_check_stop(ev_loop_, &checkWatcher_);
+  ev_prepare_stop(ev_loop_, &prepareWatcher_);
 }
 
 void LibevQuicEventBase::runInLoop(

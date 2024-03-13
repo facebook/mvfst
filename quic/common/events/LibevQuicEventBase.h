@@ -194,7 +194,9 @@ class LibevQuicEventBase
   folly::IntrusiveList<LoopCallbackWrapper, &LoopCallbackWrapper::listHook_>*
       runOnceCallbackWrappers_{nullptr};
 
-  ev_check checkWatcher_;
+  // ev_prepare is supposed to run before the loop goes to sleep.
+  // We're using it to execute delayed work given to us via runInLoop.
+  ev_prepare prepareWatcher_;
   std::atomic<std::thread::id> loopThreadId_;
 };
 } // namespace quic
