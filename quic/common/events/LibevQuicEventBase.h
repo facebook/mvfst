@@ -94,7 +94,7 @@ class LibevQuicEventBase
   }
 
   void terminateLoopSoon() override {
-    LOG(WARNING) << __func__ << " is not implemented in LibevQuicEventBase";
+    ev_break(ev_loop_, EVBREAK_ALL);
   }
 
   [[nodiscard]] std::chrono::milliseconds getTimerTickInterval()
