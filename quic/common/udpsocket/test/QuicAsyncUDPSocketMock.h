@@ -87,4 +87,87 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD((void), setDFAndTurnOffPMTU, ());
 };
 
+class MockErrMessageCallback
+    : public quic::QuicAsyncUDPSocket::ErrMessageCallback {
+ public:
+  ~MockErrMessageCallback() override = default;
+
+  MOCK_METHOD(void, errMessage_, (const cmsghdr&));
+  void errMessage(const cmsghdr& cmsg) noexcept override {
+    try {
+      errMessage_(cmsg);
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+
+  MOCK_METHOD(void, errMessageError_, (const folly::AsyncSocketException&));
+  void errMessageError(
+      const folly::AsyncSocketException& ex) noexcept override {
+    try {
+      errMessageError_(ex);
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+};
+
+class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
+ public:
+  ~MockUDPReadCallback() override = default;
+
+  MOCK_METHOD(void, getReadBuffer_, (void**, size_t*));
+  void getReadBuffer(void** buf, size_t* len) noexcept override {
+    try {
+      getReadBuffer_(buf, len);
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+
+  MOCK_METHOD(bool, shouldOnlyNotify, ());
+  MOCK_METHOD(void, onNotifyDataAvailable_, (quic::QuicAsyncUDPSocket&));
+  void onNotifyDataAvailable(quic::QuicAsyncUDPSocket& sock) noexcept override {
+    try {
+      onNotifyDataAvailable_(sock);
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+
+  MOCK_METHOD(
+      void,
+      onDataAvailable_,
+      (const folly::SocketAddress&, size_t, bool, OnDataAvailableParams));
+  void onDataAvailable(
+      const folly::SocketAddress& client,
+      size_t len,
+      bool truncated,
+      OnDataAvailableParams params) noexcept override {
+    try {
+      onDataAvailable_(client, len, truncated, params);
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+
+  MOCK_METHOD(void, onReadError_, (const folly::AsyncSocketException&));
+  void onReadError(const folly::AsyncSocketException& ex) noexcept override {
+    try {
+      onReadError_(ex);
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+
+  MOCK_METHOD(void, onReadClosed_, ());
+  void onReadClosed() noexcept override {
+    try {
+      onReadClosed_();
+    } catch (std::exception) {
+      // Swallow exception from mock function to keep linter happy.
+    }
+  }
+};
+
 } // namespace quic::test
