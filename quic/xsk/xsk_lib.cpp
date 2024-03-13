@@ -44,7 +44,7 @@ int close_xsk(int fd) {
 
 void* create_umem(int xsk_fd, __u32 num_frames, __u32 frame_size) {
   void* umem_area = mmap(
-      NULL,
+      nullptr,
       num_frames * frame_size,
       PROT_READ | PROT_WRITE,
       MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
@@ -117,7 +117,7 @@ void* map_completion_ring(
     struct xdp_mmap_offsets* off,
     __u32 num_frames) {
   void* map = mmap(
-      NULL,
+      nullptr,
       off->cr.desc + num_frames * sizeof(__u64),
       PROT_READ | PROT_WRITE,
       MAP_SHARED | MAP_POPULATE,
@@ -139,7 +139,7 @@ int unmap_completion_ring(
 
 void* map_tx_ring(int xsk_fd, struct xdp_mmap_offsets* off, __u32 num_frames) {
   void* map = mmap(
-      NULL,
+      nullptr,
       off->tx.desc + num_frames * sizeof(struct xdp_desc),
       PROT_READ | PROT_WRITE,
       MAP_SHARED | MAP_POPULATE,
