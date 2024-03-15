@@ -299,7 +299,6 @@ enum class LocalErrorCode : uint64_t {
   CWND_OVERFLOW = 0x40000007,
   INFLIGHT_BYTES_OVERFLOW = 0x40000008,
   LOST_BYTES_OVERFLOW = 0x40000009,
-  CONGESTION_CONTROL_ERROR = 0x4000000A,
   // This is a retryable error. When encountering this error,
   // the user should retry the request.
   NEW_VERSION_NEGOTIATED = 0x4000000A,
@@ -322,6 +321,7 @@ enum class LocalErrorCode : uint64_t {
   KNOB_FRAME_UNSUPPORTED = 0x4000001B,
   PACER_NOT_AVAILABLE = 0x4000001C,
   RTX_POLICIES_LIMIT_EXCEEDED = 0x4000001D,
+  CONGESTION_CONTROL_ERROR = 0x4000001E,
 };
 
 enum class QuicNodeType : bool {
