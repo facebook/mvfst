@@ -111,9 +111,9 @@ class QuicClientTransport
    * context is the context value argument for the TLS exporter.
    * keyLength is the length of the exported key.
    */
-  virtual std::unique_ptr<std::vector<unsigned char>> getExportedKeyingMaterial(
+  virtual folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const std::vector<unsigned char>* context,
+      const folly::Optional<folly::ByteRange>& context,
       uint16_t keyLength) {
     return clientConn_->clientHandshakeLayer->getExportedKeyingMaterial(
         label, context, keyLength);

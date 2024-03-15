@@ -40,6 +40,17 @@ class Handshake {
    */
   virtual std::unique_ptr<Aead> getNextOneRttWriteCipher() = 0;
 
+  /*
+   * Export the underlying TLS key material.
+   * label is the label argument for the TLS exporter.
+   * context is the context value argument for the TLS exporter.
+   * keyLength is the length of the exported key.
+   */
+  virtual folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+      const std::string& label,
+      const folly::Optional<folly::ByteRange>& context,
+      uint16_t keyLength) = 0;
+
   virtual void handshakeConfirmed() {
     LOG(FATAL) << "Not implemented";
   }

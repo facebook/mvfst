@@ -10,6 +10,7 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <cstdint>
 
 namespace quic {
 ServerHandshake::ServerHandshake(QuicConnectionStateBase* conn)
@@ -182,6 +183,14 @@ bool ServerHandshake::isHandshakeDone() {
 
 const fizz::server::State& ServerHandshake::getState() const {
   return state_;
+}
+
+folly::Optional<std::vector<uint8_t>>
+ServerHandshake::getExportedKeyingMaterial(
+    const std::string& /* label */,
+    const folly::Optional<folly::ByteRange>& /* context */,
+    uint16_t /* keyLength */) {
+  throw std::runtime_error("Not implemented");
 }
 
 const folly::Optional<std::string>& ServerHandshake::getApplicationProtocol()

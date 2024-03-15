@@ -297,19 +297,24 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
 };
 
-TEST_F(ClientHandshakeTest, TestGetExporterMasterSecret) {
+TEST_F(ClientHandshakeTest, TestGetExportedKeyingMaterial) {
   // Sanity check. getExportedKeyingMaterial () should return nullptr prior to
   // an handshake.
-  auto ekm =
-      handshake->getExportedKeyingMaterial("EXPORTER-Some-Label", nullptr, 32);
-  EXPECT_TRUE(ekm == nullptr);
+  auto ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", folly::none, 32);
+  EXPECT_TRUE(!ekm.has_value());
 
   clientServerRound();
   serverClientRound();
   handshake->handshakeConfirmed();
-  ekm =
-      handshake->getExportedKeyingMaterial("EXPORTER-Some-Label", nullptr, 32);
-  ASSERT_TRUE(ekm != nullptr);
+  ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", folly::none, 32);
+  ASSERT_TRUE(ekm.has_value());
+  EXPECT_EQ(ekm->size(), 32);
+
+  ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", folly::ByteRange(), 32);
+  ASSERT_TRUE(ekm.has_value());
   EXPECT_EQ(ekm->size(), 32);
 }
 

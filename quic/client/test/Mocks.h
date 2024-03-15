@@ -56,10 +56,10 @@ class MockClientHandshake : public ClientHandshake {
   MOCK_METHOD(const CryptoFactory&, getCryptoFactory, (), (const));
   MOCK_METHOD(bool, isTLSResumed, (), (const));
   MOCK_METHOD(
-      std::unique_ptr<std::vector<unsigned char>>,
+      folly::Optional<std::vector<uint8_t>>,
       getExportedKeyingMaterial,
       (const std::string& label,
-       const std::vector<unsigned char>* context,
+       const folly::Optional<folly::ByteRange>& context,
        uint16_t keyLength),
       ());
   MOCK_METHOD(folly::Optional<bool>, getZeroRttRejected, ());

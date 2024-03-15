@@ -193,6 +193,14 @@ class ServerHandshake : public Handshake {
   const fizz::server::State& getState() const;
 
   /**
+   * Returns the exporter master secret from the handshake.
+   */
+  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+      const std::string& label,
+      const folly::Optional<folly::ByteRange>& context,
+      uint16_t keyLength) override;
+
+  /**
    * Returns the negotiated ALPN from the handshake.
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
