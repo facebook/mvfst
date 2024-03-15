@@ -367,6 +367,26 @@ class ServerHandshakeTest : public Test {
   bool waitForData{false};
 };
 
+TEST_F(ServerHandshakeTest, TestGetExportedKeyingMaterial) {
+  // Sanity check. getExportedKeyingMaterial() should return nullptr prior to
+  // an handshake.
+  auto ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", folly::none, 32);
+  EXPECT_TRUE(!ekm.has_value());
+
+  clientServerRound();
+  serverClientRound();
+  ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", folly::none, 32);
+  ASSERT_TRUE(ekm.has_value());
+  EXPECT_EQ(ekm->size(), 32);
+
+  ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", folly::ByteRange(), 32);
+  ASSERT_TRUE(ekm.has_value());
+  EXPECT_EQ(ekm->size(), 32);
+}
+
 TEST_F(ServerHandshakeTest, TestHandshakeSuccess) {
   clientServerRound();
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Handshake);

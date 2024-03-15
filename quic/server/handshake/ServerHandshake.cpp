@@ -187,10 +187,25 @@ const fizz::server::State& ServerHandshake::getState() const {
 
 folly::Optional<std::vector<uint8_t>>
 ServerHandshake::getExportedKeyingMaterial(
-    const std::string& /* label */,
-    const folly::Optional<folly::ByteRange>& /* context */,
-    uint16_t /* keyLength */) {
-  throw std::runtime_error("Not implemented");
+    const std::string& label,
+    const folly::Optional<folly::ByteRange>& context,
+    uint16_t keyLength) {
+  const auto cipherSuite = state_.cipher();
+  const auto& ems = state_.exporterMasterSecret();
+  if (!ems.hasValue() || !cipherSuite.hasValue()) {
+    return folly::none;
+  }
+
+  auto ekm = fizz::Exporter::getExportedKeyingMaterial(
+      *state_.context()->getFactory(),
+      cipherSuite.value(),
+      ems.value()->coalesce(),
+      label,
+      context == folly::none ? nullptr : folly::IOBuf::wrapBuffer(*context),
+      keyLength);
+
+  std::vector<uint8_t> result(ekm->coalesce());
+  return result;
 }
 
 const folly::Optional<std::string>& ServerHandshake::getApplicationProtocol()
