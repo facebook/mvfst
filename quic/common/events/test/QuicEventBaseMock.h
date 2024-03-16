@@ -32,7 +32,9 @@ class QuicEventBaseMock : public QuicEventBase {
       runInEventBaseThread,
       (folly::Function<void()>),
       (noexcept));
-  MOCK_METHOD((bool), isInEventBaseThread, (), (const));
+  bool isInEventBaseThread() const override {
+    return true;
+  }
   MOCK_METHOD(
       (void),
       scheduleTimeout,
