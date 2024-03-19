@@ -89,7 +89,7 @@ void QuicServerWorker::bind(
     case SetEventCallback::RECVMSG_MULTISHOT:
       socket_->setRecvmsgMultishotCallback(this);
       break;
-  };
+  }
   // TODO this totally doesn't work, we can't apply socket options before
   // bind, since bind creates the fd.
   if (socketOptions_) {
