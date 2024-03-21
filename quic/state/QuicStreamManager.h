@@ -468,15 +468,6 @@ class QuicStreamManager {
    */
   bool setStreamPriority(StreamId id, Priority priority);
 
-  // TODO figure out a better interface here.
-  /*
-   * Returns a mutable reference to the container holding the writable stream
-   * IDs.
-   */
-  auto& writableStreams() {
-    return writableStreams_;
-  }
-
   auto& writableDSRStreams() {
     return writableDSRStreams_;
   }
