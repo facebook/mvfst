@@ -64,8 +64,6 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&eventbase_);
   }
   void SetUp() override {
-    folly::ssl::init();
-
     // Fizz is the hostname for the server cert.
     hostname = "Fizz";
     serverCtx = test::createServerCtx();

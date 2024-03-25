@@ -20,7 +20,6 @@
 #include <folly/io/async/SSLContext.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncTransport.h>
-#include <folly/ssl/Init.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
@@ -74,7 +73,6 @@ class ServerHandshakeTest : public Test {
   }
 
   void SetUp() override {
-    folly::ssl::init();
     // This client context is used outside the context of QUIC in this test, so
     // we have to manually configure the QUIC record customizations.
     clientCtx = quic::test::createClientCtx();

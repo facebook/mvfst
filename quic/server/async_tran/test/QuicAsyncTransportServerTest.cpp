@@ -32,7 +32,6 @@ class QuicAsyncTransportServerTest : public Test {
  public:
   void SetUp() override {
     clientEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
-    folly::ssl::init();
     createServer();
     createClient();
   }

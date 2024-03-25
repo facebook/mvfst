@@ -23,7 +23,6 @@
 #include <folly/io/async/SSLContext.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncTransport.h>
-#include <folly/ssl/Init.h>
 
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/state/ClientStateMachine.h>
@@ -74,7 +73,6 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   }
 
   void SetUp() override {
-    folly::ssl::init();
     dg.reset(new DelayedHolder());
     serverCtx = ::quic::test::createServerCtx();
     serverCtx->setECHDecrypter(getECHDecrypter());

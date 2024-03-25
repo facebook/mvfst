@@ -26,7 +26,6 @@
 #include <fizz/server/FizzServerContext.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
 
-#include <folly/ssl/Init.h>
 #include <quic/codec/QuicConnectionId.h>
 
 namespace quic {
