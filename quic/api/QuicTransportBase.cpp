@@ -3222,10 +3222,12 @@ void QuicTransportBase::setTransportSettings(
     if (useSinglePacketInplaceBatchWriter(
             transportSettings.maxBatchSize, transportSettings.dataPathType)) {
       createBufAccessor(conn_->udpSendPacketLen);
-    } else {
-      // Reset client's batching mode only if SinglePacketInplaceBatchWriter
-      // is not in use.
-      conn_->transportSettings.dataPathType = DataPathType::ChainedMemory;
+    } else if (
+        transportSettings.dataPathType ==
+        quic::DataPathType::ContinuousMemory) {
+      // Create generic buf for in-place batch writer.
+      createBufAccessor(
+          conn_->udpSendPacketLen * transportSettings.maxBatchSize);
     }
   }
 
