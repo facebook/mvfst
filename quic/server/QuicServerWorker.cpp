@@ -949,10 +949,15 @@ void QuicServerWorker::sendResetPacket(
     return;
   }
   auto packetSize = networkData.getTotalData();
+  if (packetSize <= kMinStatelessPacketSize) {
+    // We must decrease the packet size to prevent reset loops. If it's already
+    // too small, we can't send one.
+    return;
+  }
   auto resetSize = std::min<uint16_t>(packetSize, kDefaultMaxUDPPayload);
   // Per the spec, less than 43 we should respond with packet size - 1.
   if (packetSize < 43) {
-    resetSize = std::max<uint16_t>(packetSize - 1, kMinStatelessPacketSize);
+    resetSize = packetSize - 1;
   } else {
     resetSize = std::max<uint16_t>(
         folly::Random::secureRand32() % resetSize, kMinStatelessPacketSize);

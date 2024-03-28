@@ -373,7 +373,7 @@ void QuicServerWorkerTest::testSendReset(
 }
 
 TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
-  auto data = folly::IOBuf::copyBuffer("data");
+  auto data = folly::IOBuf::copyBuffer("data_longer_than_minimum_length");
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   PacketNum num = 2;
   // create packet with connId with different hostId encoded
@@ -388,7 +388,7 @@ TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
 
 TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
-  auto data = folly::IOBuf::copyBuffer("data");
+  auto data = folly::IOBuf::copyBuffer("data_longer_than_minimum_length");
   PacketNum num = 2;
   // create packet with connId with different hostId encoded
   worker_->stopPacketForwarding();
@@ -399,6 +399,32 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
       getTestConnectionId(hostId_),
       std::move(shortHeaderConnId),
       PacketDropReason::CANNOT_FORWARD_DATA);
+}
+
+TEST_F(QuicServerWorkerTest, SmallPacketTestNoReset) {
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto data = folly::IOBuf::copyBuffer("data_short");
+  PacketNum num = 2;
+  // create packet with connId with different hostId encoded
+  ShortHeader shortHeaderConnId(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(hostId_ + 1), num);
+  PacketDropReason dropReason = PacketDropReason::ROUTING_ERROR_WRONG_HOST;
+
+  EXPECT_CALL(*quicStats_, onPacketDropped(dropReason)).Times(1);
+  EXPECT_CALL(*socketPtr_, write(_, _)).Times(0);
+
+  RoutingData routingData(
+      HeaderForm::Short,
+      false,
+      false,
+      shortHeaderConnId.getConnectionId(),
+      folly::none);
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now()),
+      folly::none);
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, RateLimit) {
