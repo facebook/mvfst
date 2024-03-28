@@ -322,7 +322,8 @@ void Bbr2CongestionController::setCwnd(
 
 void Bbr2CongestionController::checkProbeRttDone() {
   auto timeNow = Clock::now();
-  if (probeRttDoneTimestamp_ && timeNow > *probeRttDoneTimestamp_) {
+  if ((probeRttDoneTimestamp_ && timeNow > *probeRttDoneTimestamp_) ||
+      conn_.lossState.inflightBytes == 0) {
     // Schedule the next ProbeRTT
     probeRttMinTimestamp_ = timeNow;
     restoreCwnd();
