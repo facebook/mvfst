@@ -147,6 +147,9 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     if (appLimited_ &&
         appLimitedLastSendTime_ <= ackEvent->largestNewlyAckedPacketSentTime) {
       appLimited_ = false;
+      if (conn_.qLogger) {
+        conn_.qLogger->addAppUnlimitedUpdate();
+      }
     }
 
     if (inPacketConservation_ &&
@@ -219,6 +222,9 @@ bool Bbr2CongestionController::isAppLimited() const {
 void Bbr2CongestionController::setAppLimited() noexcept {
   appLimited_ = true;
   appLimitedLastSendTime_ = Clock::now();
+  if (conn_.qLogger) {
+    conn_.qLogger->addAppLimitedUpdate();
+  }
 }
 
 // Internals
