@@ -281,6 +281,11 @@ struct TransportSettings {
   // updates. If there has been less than 2SRTTs between flow control updates
   // this will double the target window.
   bool autotuneReceiveConnFlowControl{false};
+  // Stream level receive flow control window autotuning.
+  // The logic is simple - double the flow control window every time we receive
+  // a stream blocked from the sender and there has been less than 2SRTTs since
+  // last flow control update.
+  bool autotuneReceiveStreamFlowControl{false};
   // Enable a keepalive timer. This schedules a timer to send a PING ~15%
   // before an idle timeout. To work effectively this means the idle timer
   // has to be set to something >> the RTT of the connection.

@@ -480,6 +480,46 @@ TEST_F(QuicFlowControlTest, SendingStreamWindowUpdate) {
   EXPECT_EQ(*stream.flowControlState.timeOfLastFlowControlUpdate, sendTime);
 }
 
+TEST_F(QuicFlowControlTest, TestStreamFlowControlAutotuneDisabled) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.conn.transportSettings.useNewStreamBlockedCondition = true;
+  stream.currentReadOffset = 300;
+  stream.flowControlState.windowSize = 500;
+  stream.flowControlState.advertisedMaxOffset = 400;
+  stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
+  stream.conn.lossState.srtt = 10ms;
+
+  // The window size should not change.
+  handleStreamBlocked(stream);
+  auto frameOffset = generateMaxStreamDataFrame(stream).maximumData;
+  EXPECT_EQ(stream.flowControlState.windowSize, 500);
+  EXPECT_EQ(
+      frameOffset,
+      stream.currentReadOffset + stream.flowControlState.windowSize);
+}
+
+TEST_F(QuicFlowControlTest, TestStreamFlowControlAutotuneEnabled) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.conn.transportSettings.useNewStreamBlockedCondition = true;
+  stream.currentReadOffset = 300;
+  stream.flowControlState.windowSize = 500;
+  stream.flowControlState.advertisedMaxOffset = 400;
+  stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
+  stream.conn.lossState.srtt = 10ms;
+
+  stream.conn.transportSettings.autotuneReceiveStreamFlowControl = true;
+
+  // The window size should double.
+  handleStreamBlocked(stream);
+  auto frameOffset = generateMaxStreamDataFrame(stream).maximumData;
+  EXPECT_EQ(stream.flowControlState.windowSize, 1000);
+  EXPECT_EQ(
+      frameOffset,
+      stream.currentReadOffset + stream.flowControlState.windowSize);
+}
+
 TEST_F(QuicFlowControlTest, LostConnectionWindowUpdate) {
   conn_.flowControlState.windowSize = 500;
   conn_.flowControlState.advertisedMaxOffset = 400;

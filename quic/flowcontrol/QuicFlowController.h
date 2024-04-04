@@ -11,8 +11,19 @@
 
 namespace quic {
 
+void maybeIncreaseFlowControlWindow(
+    const folly::Optional<TimePoint>& timeOfLastFlowControlUpdate,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt,
+    uint64_t& windowSize);
+
 void maybeIncreaseConnectionFlowControlWindow(
     QuicConnectionStateBase::ConnectionFlowControlState& flowControlState,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt);
+
+void maybeIncreaseStreamFlowControlWindow(
+    QuicStreamState::StreamFlowControlState& flowControlState,
     TimePoint updateTime,
     std::chrono::microseconds srtt);
 
