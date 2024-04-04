@@ -256,8 +256,20 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
   if (stream.finalWriteOffset && stream.hasSentFIN()) {
     return;
   }
-  if (getSendStreamFlowControlBytesWire(stream) == 0 &&
-      (!stream.writeBuffer.empty() || stream.writeBufMeta.length > 0)) {
+
+  bool shouldEmitStreamBlockedFrame = false;
+  if (stream.conn.transportSettings.useNewStreamBlockedCondition) {
+    // If we've exhausted the flow control window after the write, emit a
+    // preemptive stream blocked frame.
+    shouldEmitStreamBlockedFrame =
+        getSendStreamFlowControlBytesWire(stream) == 0;
+  } else {
+    shouldEmitStreamBlockedFrame =
+        getSendStreamFlowControlBytesWire(stream) == 0 &&
+        (!stream.writeBuffer.empty() || stream.writeBufMeta.length > 0);
+  }
+
+  if (shouldEmitStreamBlockedFrame) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
     if (stream.conn.qLogger) {

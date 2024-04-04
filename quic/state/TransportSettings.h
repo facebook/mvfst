@@ -355,6 +355,8 @@ struct TransportSettings {
   // TODO: Remove this. This is a temporary measure to gradually roll out key
   // update support.
   bool rejectIncomingKeyUpdates{false};
+  // Temporary flag to test new stream blocked condition.
+  bool useNewStreamBlockedCondition{false};
 };
 
 } // namespace quic

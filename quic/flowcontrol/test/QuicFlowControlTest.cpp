@@ -351,18 +351,18 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterAPIWrite) {
 TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterSocketWrite) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
+  stream.conn.transportSettings.useNewStreamBlockedCondition = true;
   stream.currentWriteOffset = 200;
   stream.flowControlState.peerAdvertisedMaxOffset = 400;
 
   maybeWriteBlockAfterSocketWrite(stream);
   EXPECT_FALSE(conn_.streamManager->hasBlocked());
 
-  // Don't add a blocked if there is nothing to write even the stream is
-  // flow control limited.
+  // Stream is preemtively blocked if we exhausted the flow control.
   stream.currentWriteOffset = 400;
+  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(1);
   maybeWriteBlockAfterSocketWrite(stream);
-  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(0);
-  EXPECT_FALSE(conn_.streamManager->hasBlocked());
+  EXPECT_TRUE(conn_.streamManager->hasBlocked());
 
   // Now write something
   stream.writeBuffer.append(IOBuf::copyBuffer("1234"));
