@@ -1140,6 +1140,19 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "USE_NEW_STREAM_BLOCKED_CONDITION KnobParam received: "
                 << useNewStreamBlockedCondition;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        bool autotuneReceiveStreamFlowControl =
+            static_cast<bool>(std::get<uint64_t>(value));
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.autotuneReceiveStreamFlowControl =
+            autotuneReceiveStreamFlowControl;
+        VLOG(3) << "AUTOTUNE_RECV_STREAM_FLOW_CONTROL KnobParam received: "
+                << autotuneReceiveStreamFlowControl;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

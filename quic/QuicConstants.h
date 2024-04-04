@@ -192,7 +192,9 @@ BETTER_ENUM(
     // Control server-initiated key update interval
     KEY_UPDATE_INTERVAL = 0x10007,
     // Controls new stream blocked condition.
-    USE_NEW_STREAM_BLOCKED_CONDITION = 0x10008)
+    USE_NEW_STREAM_BLOCKED_CONDITION = 0x10008,
+    // Controls autotune flow control on streams.
+    AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
