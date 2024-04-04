@@ -1127,6 +1127,19 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         server_conn->transportSettings.keyUpdatePacketCountInterval = val;
         VLOG(3) << "KEY_UPDATE_INTERVAL KnobParam received: " << val;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        bool useNewStreamBlockedCondition =
+            static_cast<bool>(std::get<uint64_t>(value));
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.useNewStreamBlockedCondition =
+            useNewStreamBlockedCondition;
+        VLOG(3) << "USE_NEW_STREAM_BLOCKED_CONDITION KnobParam received: "
+                << useNewStreamBlockedCondition;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

@@ -4834,6 +4834,25 @@ TEST_F(QuicServerTransportTest, TestConnMigrationKnobHandler) {
   EXPECT_EQ(transportSettings.disableMigration, true);
 }
 
+TEST_F(QuicServerTransportTest, TestNewStreamBlockedConditionKnobHandler) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  // useNewStreamBlockedCondition is disabled by default
+  ASSERT_FALSE(transportSettings.useNewStreamBlockedCondition);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
+        uint64_t(1)}});
+  EXPECT_TRUE(transportSettings.useNewStreamBlockedCondition);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
+        uint64_t(0)}});
+  EXPECT_FALSE(transportSettings.useNewStreamBlockedCondition);
+}
+
 TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
   auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();

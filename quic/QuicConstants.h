@@ -190,7 +190,9 @@ BETTER_ENUM(
     // Control connection migration
     CONNECTION_MIGRATION = 0x10006,
     // Control server-initiated key update interval
-    KEY_UPDATE_INTERVAL = 0x10007)
+    KEY_UPDATE_INTERVAL = 0x10007,
+    // Controls new stream blocked condition.
+    USE_NEW_STREAM_BLOCKED_CONDITION = 0x10008)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
