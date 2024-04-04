@@ -347,6 +347,40 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterAPIWrite) {
   maybeWriteBlockAfterAPIWrite(stream);
   EXPECT_TRUE(conn_.streamManager->hasBlocked());
 }
+TEST_F(QuicFlowControlTest, UpdateFlowControlClearsStreamBlockedFlag) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.conn.transportSettings.useNewStreamBlockedCondition = true;
+  stream.currentWriteOffset = 400;
+  stream.flowControlState.peerAdvertisedMaxOffset = 400;
+
+  // The flag is off initially.
+  EXPECT_FALSE(stream.flowControlState.pendingBlockedFrame);
+
+  // Stream blocked.
+  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(1);
+  maybeWriteBlockAfterSocketWrite(stream);
+  EXPECT_TRUE(conn_.streamManager->hasBlocked());
+  EXPECT_TRUE(stream.flowControlState.pendingBlockedFrame);
+
+  // Stream still blocked, a peding blocked frame flag.
+  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(0);
+  maybeWriteBlockAfterSocketWrite(stream);
+  EXPECT_TRUE(conn_.streamManager->hasBlocked());
+  EXPECT_TRUE(stream.flowControlState.pendingBlockedFrame);
+
+  // A flow control update resets the pendingBlockedFrame flag
+  uint64_t newMaximumData = 800;
+  handleStreamWindowUpdate(stream, newMaximumData, 123 /* PacketNum */);
+  EXPECT_FALSE(stream.flowControlState.pendingBlockedFrame);
+
+  // Stream blocked again.
+  stream.currentWriteOffset = 800;
+  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(1);
+  maybeWriteBlockAfterSocketWrite(stream);
+  EXPECT_TRUE(conn_.streamManager->hasBlocked());
+  EXPECT_TRUE(stream.flowControlState.pendingBlockedFrame);
+}
 
 TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterSocketWrite) {
   StreamId id = 3;
@@ -364,9 +398,10 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterSocketWrite) {
   maybeWriteBlockAfterSocketWrite(stream);
   EXPECT_TRUE(conn_.streamManager->hasBlocked());
 
-  // Now write something
+  // Now write something - onStreamFlowControlBlocked() is not called because
+  // we've already issued a blocked stream frame.
   stream.writeBuffer.append(IOBuf::copyBuffer("1234"));
-  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(1);
+  EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(0);
   maybeWriteBlockAfterSocketWrite(stream);
   EXPECT_TRUE(conn_.streamManager->hasBlocked());
 

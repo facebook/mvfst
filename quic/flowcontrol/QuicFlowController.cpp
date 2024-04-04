@@ -269,9 +269,11 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
         (!stream.writeBuffer.empty() || stream.writeBufMeta.length > 0);
   }
 
-  if (shouldEmitStreamBlockedFrame) {
+  if (shouldEmitStreamBlockedFrame &&
+      !stream.flowControlState.pendingBlockedFrame) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
+    stream.flowControlState.pendingBlockedFrame = true;
     if (stream.conn.qLogger) {
       stream.conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(stream.flowControlState.peerAdvertisedMaxOffset));
@@ -286,6 +288,7 @@ void handleStreamWindowUpdate(
     PacketNum packetNum) {
   if (stream.flowControlState.peerAdvertisedMaxOffset <= maximumData) {
     stream.flowControlState.peerAdvertisedMaxOffset = maximumData;
+    stream.flowControlState.pendingBlockedFrame = false;
     if (stream.flowControlState.peerAdvertisedMaxOffset >
         stream.currentWriteOffset + stream.writeBuffer.chainLength() +
             stream.writeBufMeta.length) {

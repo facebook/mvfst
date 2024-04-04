@@ -335,6 +335,11 @@ struct QuicStreamState : public QuicStreamLike {
     uint64_t peerAdvertisedMaxOffset{0};
     // Time at which the last flow control update was sent by the transport.
     folly::Optional<TimePoint> timeOfLastFlowControlUpdate;
+    // A flag indicating if the stream has a pending blocked frame to the peer
+    // (blocked frame sent, but a stream flow control update has not been
+    // received yet). Set when we write a blocked data frame on the stream;
+    // cleared when we receive a flow control update for the stream.
+    bool pendingBlockedFrame{false};
   };
 
   StreamFlowControlState flowControlState;

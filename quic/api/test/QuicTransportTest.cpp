@@ -1788,6 +1788,8 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto buf1 = buf->clone();
   buf1->trimEnd(50);
   stream->flowControlState.peerAdvertisedMaxOffset = 200;
+  // Reset the pendingBlockedFrame as if we received a flow control update.
+  stream->flowControlState.pendingBlockedFrame = false;
   EXPECT_CALL(*mockQLogger, addTransportStateUpdate(getFlowControlEvent(200)));
   conn.streamManager->updateWritableStreams(*stream);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
