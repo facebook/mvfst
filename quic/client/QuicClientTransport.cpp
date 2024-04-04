@@ -138,7 +138,7 @@ void QuicClientTransport::processUdpPacket(
 
         throw QuicInternalException(
             "Received version negotiation packet",
-            LocalErrorCode::CONNECTION_ABANDONED);
+            LocalErrorCode::NEW_VERSION_NEGOTIATED);
       }
     }
 
