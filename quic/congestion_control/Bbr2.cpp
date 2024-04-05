@@ -119,7 +119,8 @@ void Bbr2CongestionController::onPacketAckOrLoss(
             << ")";
   };
 
-  if (lossEvent && lossEvent->lostPackets > 0) {
+  if (lossEvent && lossEvent->lostPackets > 0 &&
+      conn_.transportSettings.ccaConfig.conservativeRecovery) {
     // The pseudo code in BBRHandleLostPacket is included in
     // updateProbeBwCyclePhase. No need to repeat it here.
 
@@ -127,6 +128,9 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     // non-persistent congestion
     saveCwnd();
     inPacketConservation_ = true;
+    // Mark the connection as app-limited so bw samples during recovery are not
+    // taken into account.
+    setAppLimited();
     packetConservationStartTime_ = Clock::now();
     if (lossEvent->persistentCongestion) {
       cwndBytes_ = kMinCwndInMssForBbr * conn_.udpSendPacketLen;
@@ -280,7 +284,7 @@ void Bbr2CongestionController::setCwnd(
   auto inflightMax = addQuantizationBudget(
       getBDPWithGain(cwndGain_) + maxExtraAckedFilter_.GetBest());
   // BBRModulateCwndForRecovery()
-  if (lostBytes > 0) {
+  if (lostBytes > 0 && !conn_.transportSettings.ccaConfig.ignoreLoss) {
     cwndBytes_ = std::max(
         cwndBytes_ - std::min(lostBytes, cwndBytes_),
         kMinCwndInMssForBbr * conn_.udpSendPacketLen);

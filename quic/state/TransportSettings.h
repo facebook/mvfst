@@ -16,7 +16,7 @@
 namespace quic {
 
 struct CongestionControlConfig {
-  // Used by: BBR1
+  // Used by: BBR1, BBR2
   bool conservativeRecovery{false};
 
   // Used by: BBR1
