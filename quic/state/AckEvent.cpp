@@ -13,8 +13,7 @@
 namespace quic {
 
 void AckEvent::AckPacket::DetailsPerStream::recordFrameDelivered(
-    const WriteStreamFrame& frame,
-    const bool retransmission) {
+    const WriteStreamFrame& frame) {
   if (!frame.len) { // may be FIN only
     return;
   }
@@ -23,18 +22,13 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameDelivered(
       std::make_tuple(frame.streamId),
       std::make_tuple());
   auto& outstandingPacketStreamDetails = it->second;
-  outstandingPacketStreamDetails.streamBytesAcked += frame.len;
-  if (retransmission) {
-    outstandingPacketStreamDetails.streamBytesAckedByRetrans += frame.len;
-  }
   if (frame.fromBufMeta) {
     outstandingPacketStreamDetails.streamPacketIdx = frame.streamPacketIdx;
   }
 }
 
 void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
-    const WriteStreamFrame& frame,
-    const bool /* retransmission */) {
+    const WriteStreamFrame& frame) {
   if (!frame.len) { // may be FIN only
     return;
   }
@@ -49,20 +43,6 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
   if (frame.fromBufMeta) {
     outstandingPacketStreamDetails.streamPacketIdx = frame.streamPacketIdx;
   }
-}
-
-void AckEvent::AckPacket::DetailsPerStream::recordDeliveryOffsetUpdate(
-    StreamId streamId,
-    uint64_t newOffset) {
-  auto [it, inserted] = emplace(
-      std::piecewise_construct, std::make_tuple(streamId), std::make_tuple());
-
-  auto& outstandingPacketStreamDetails = it->second;
-  CHECK(
-      !outstandingPacketStreamDetails.maybeNewDeliveryOffset.has_value() ||
-      outstandingPacketStreamDetails.maybeNewDeliveryOffset.value() <
-          newOffset);
-  outstandingPacketStreamDetails.maybeNewDeliveryOffset = newOffset;
 }
 
 AckEvent::AckPacket::AckPacket(

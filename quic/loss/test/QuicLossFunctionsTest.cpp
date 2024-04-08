@@ -2534,7 +2534,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
                  .build();
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{0, 10, 100, false, true, folly::none, 9}, false);
+      WriteStreamFrame{0, 10, 100, false, true, folly::none, 9});
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
@@ -2625,7 +2625,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
                  .build();
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{0, 10, 100, false, true}, false);
+      WriteStreamFrame{0, 10, 100, false, true});
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(0)
@@ -2714,7 +2714,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   // Ack a different stream.
   detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{4, 10, 100, false, true}, false);
+      WriteStreamFrame{4, 10, 100, false, true});
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(20)
@@ -2794,7 +2794,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   // Ack a different stream.
   detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{4, 10, 100, false, true}, false);
+      WriteStreamFrame{4, 10, 100, false, true});
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
@@ -2866,7 +2866,7 @@ TEST_F(
                  .build();
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{4, 10, 100, false, true}, false);
+      WriteStreamFrame{4, 10, 100, false, true});
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
@@ -2948,7 +2948,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
         op.packet.header.getPacketSequenceNum()};
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     if (op.packet.header.getPacketSequenceNum() != 4) {
-      detailsPerStream.recordFrameDelivered(f, false);
+      detailsPerStream.recordFrameDelivered(f);
       ack.ackedPackets.emplace_back(
           CongestionController::AckEvent::AckPacket::Builder()
               .setPacketNum(op.packet.header.getPacketSequenceNum())
@@ -2986,7 +2986,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame f{0, 10, 100, false, true, folly::none, 5};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(f, false);
+  detailsPerStream.recordFrameDelivered(f);
   op.packet.frames.emplace_back(f);
   op.isDSRPacket = true;
   conn->outstandings.dsrCount++;
@@ -3062,7 +3062,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
     WriteStreamFrame f{0, 10, 100, false, false, folly::none, 0};
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     if (op.packet.header.getPacketSequenceNum() != 4) {
-      detailsPerStream.recordFrameDelivered(f, false);
+      detailsPerStream.recordFrameDelivered(f);
       ack.ackedPackets.emplace_back(
           CongestionController::AckEvent::AckPacket::Builder()
               .setPacketNum(op.packet.header.getPacketSequenceNum())
@@ -3087,7 +3087,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
     WriteStreamFrame f{
         4, 10, 100, false, true, folly::none, conn->outstandings.dsrCount++};
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-    detailsPerStream.recordFrameDelivered(f, false);
+    detailsPerStream.recordFrameDelivered(f);
     ack.ackedPackets.emplace_back(
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(op.packet.header.getPacketSequenceNum())
@@ -3103,7 +3103,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame f{0, 10, 100, false, false, folly::none, 0};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(f, false);
+  detailsPerStream.recordFrameDelivered(f);
   op.packet.frames.emplace_back(f);
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()

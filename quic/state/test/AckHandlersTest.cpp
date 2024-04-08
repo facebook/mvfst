@@ -4672,11 +4672,9 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
   // this ensures the rest of our test does not modify it inadvertently
   const auto detailsPerStream = [&]() {
     AckEvent::AckPacket::DetailsPerStream detailsPerStreamL;
-    detailsPerStreamL.recordFrameAlreadyDelivered(s1f1, true);
-    detailsPerStreamL.recordFrameDelivered(s1f2, false);
-    detailsPerStreamL.recordFrameDelivered(s1f3, true);
-    detailsPerStreamL.recordDeliveryOffsetUpdate(
-        s1Id, s1f3.offset + s1f3.len - 1);
+    detailsPerStreamL.recordFrameAlreadyDelivered(s1f1);
+    detailsPerStreamL.recordFrameDelivered(s1f2);
+    detailsPerStreamL.recordFrameDelivered(s1f3);
     return detailsPerStreamL;
   }();
 
@@ -4684,9 +4682,6 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
   const auto&& getDefaultBuilder = [&]() {
     return AckEventStreamDetailsMatcherBuilder()
         .setStreamID(s1Id)
-        .setStreamBytesAcked(s1f2.len + s1f3.len)
-        .setStreamBytesAckedByRetrans(s1f3.len)
-        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len - 1)
         .addDupAckedStreamInterval(s1f1.offset, s1f1.offset + s1f1.len - 1);
   };
 
@@ -4707,82 +4702,6 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
     EXPECT_THAT(
         detailsPerStream,
         UnorderedElementsAre(getDefaultBuilder().setStreamID(s1Id).build()));
-  }
-
-  // wrong stream bytes acked
-  {
-    EXPECT_THAT(
-        detailsPerStream,
-        Not(UnorderedElementsAre(
-            getDefaultBuilder()
-                .setStreamBytesAcked(s1f2.len + s1f3.len + 1)
-                .build())));
-
-    // prove that matcher works if fixed
-    EXPECT_THAT(
-        detailsPerStream,
-        UnorderedElementsAre(getDefaultBuilder()
-                                 .setStreamBytesAcked(s1f2.len + s1f3.len)
-                                 .build()));
-  }
-
-  // wrong stream bytes acked (empty)
-  {
-    EXPECT_THAT(
-        detailsPerStream,
-        Not(UnorderedElementsAre(
-            getDefaultBuilder().setStreamBytesAcked(0).build())));
-  }
-
-  // wrong stream bytes acked by retransmission
-  {
-    EXPECT_THAT(
-        detailsPerStream,
-        Not(UnorderedElementsAre(getDefaultBuilder()
-                                     .setStreamBytesAckedByRetrans(s1f3.len + 1)
-                                     .build())));
-
-    // prove that matcher works if fixed
-    EXPECT_THAT(
-        detailsPerStream,
-        UnorderedElementsAre(getDefaultBuilder()
-                                 .setStreamBytesAckedByRetrans(s1f3.len)
-                                 .build()));
-  }
-
-  // wrong stream bytes acked by retransmission (empty)
-  {
-    EXPECT_THAT(
-        detailsPerStream,
-        Not(UnorderedElementsAre(
-            getDefaultBuilder().setStreamBytesAckedByRetrans(0).build())));
-  }
-
-  // wrong new delivery offset
-  {
-    EXPECT_THAT(
-        detailsPerStream,
-        Not(UnorderedElementsAre(
-            getDefaultBuilder()
-                .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len + 1)
-                .build())));
-
-    // prove that matcher works if fixed
-    EXPECT_THAT(
-        detailsPerStream,
-        UnorderedElementsAre(
-            getDefaultBuilder()
-                .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len - 1)
-                .build()));
-  }
-
-  // wrong new delivery offset (empty)
-  {
-    EXPECT_THAT(
-        detailsPerStream,
-        Not(UnorderedElementsAre(getDefaultBuilder()
-                                     .setMaybeNewDeliveryOffset(folly::none)
-                                     .build())));
   }
 
   // wrong dup acked stream intervals (add f3)
@@ -4902,16 +4821,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f1
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
-                      .setStreamBytesAcked(s1f1.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                       .build(),
                   // s2f1
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
-                      .setStreamBytesAcked(s2f1.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                       .build())),
           // pkt2
           Field(
@@ -4920,16 +4833,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f2
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
-                      .setStreamBytesAcked(s1f2.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                       .build(),
                   // s2f2
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
-                      .setStreamBytesAcked(s2f2.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s2f2.offset + s2f2.len - 1)
                       .build())),
           // pkt3
           Field(
@@ -4938,16 +4845,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f3
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
-                      .setStreamBytesAcked(s1f3.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len - 1)
                       .build(),
                   // s2f3
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
-                      .setStreamBytesAcked(s2f3.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s2f3.offset + s2f3.len - 1)
                       .build())),
           // pkt4
           Field(
@@ -4956,9 +4857,6 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s3f1
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s3Id)
-                      .setStreamBytesAcked(s3f1.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                       .build())),
           // pkt5
           Field(
@@ -4967,16 +4865,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f4 w/ EOR
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
-                      .setStreamBytesAcked(s1f4.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                       .build(),
                   // s2f4 w/ EOR
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
-                      .setStreamBytesAcked(s2f4.len)
-                      .setStreamBytesAckedByRetrans(0)
-                      .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                       .build()))));
 }
 
@@ -5067,16 +4959,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketIndividualAcks) {
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build()))));
   }
 
@@ -5096,16 +4982,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketIndividualAcks) {
                     // s1f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                         .build(),
                     // s2f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f2.offset + s2f2.len - 1)
                         .build()))));
   }
 
@@ -5125,16 +5005,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketIndividualAcks) {
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len - 1)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f3.offset + s2f3.len - 1)
                         .build()))));
   }
 
@@ -5154,9 +5028,6 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketIndividualAcks) {
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build()))));
   }
 
@@ -5176,16 +5047,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketIndividualAcks) {
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 }
@@ -5291,18 +5156,12 @@ TEST_F(
                     // s1f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f1 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f1 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt3
             Field(
@@ -5311,18 +5170,12 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f1 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f1 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt4
             Field(
@@ -5331,9 +5184,6 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build())),
             // pkt5
             Field(
@@ -5342,18 +5192,12 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f1 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f1 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -5373,18 +5217,12 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 }
@@ -5491,16 +5329,10 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build())),
             // pkt3
             Field(
@@ -5509,18 +5341,12 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt4
             Field(
@@ -5529,10 +5355,7 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // not affected by out of order
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build())),
             // pkt5
             Field(
@@ -5541,18 +5364,12 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -5572,18 +5389,12 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 }
@@ -5690,16 +5501,10 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build())),
             // pkt2
             Field(
@@ -5708,16 +5513,10 @@ TEST_F(
                     // s1f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                         .build(),
                     // s2f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f2.offset + s2f2.len - 1)
                         .build())),
             // pkt3
             Field(
@@ -5726,16 +5525,10 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len - 1)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f3.offset + s2f3.len - 1)
                         .build())),
             // pkt5
             Field(
@@ -5744,16 +5537,10 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 
@@ -5773,9 +5560,6 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build()))));
   }
 }
@@ -5874,16 +5658,10 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build()))));
   }
 
@@ -5903,18 +5681,12 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -5934,9 +5706,6 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build()))));
   }
 
@@ -5956,18 +5725,12 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -5987,18 +5750,12 @@ TEST_F(
                     // s1f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 }
@@ -6101,16 +5858,10 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketPacketTwoRetrans) {
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build())),
             // pkt3
             Field(
@@ -6119,18 +5870,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketPacketTwoRetrans) {
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt4
             Field(
@@ -6139,10 +5884,7 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketPacketTwoRetrans) {
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // not affected by out of order
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build())),
             // pkt5
             Field(
@@ -6151,18 +5893,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketPacketTwoRetrans) {
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -6193,18 +5929,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketPacketTwoRetrans) {
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(s1f2.len) // retrans
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(s1f2.len) // retrans
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 }
@@ -6313,16 +6043,10 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build())),
             // pkt3
             Field(
@@ -6331,18 +6055,12 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt4
             Field(
@@ -6351,10 +6069,7 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // not affected by out of order
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build())),
             // pkt5
             Field(
@@ -6363,18 +6078,12 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -6407,18 +6116,12 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build())),
             // pkt6
             Field(
@@ -6427,10 +6130,7 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0) // original arrived
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // no change, since already ACKed by original
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making f2
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -6439,10 +6139,7 @@ TEST_F(
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(0) // original arrived
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // no change, since already ACKed by original
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making f2
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -6557,16 +6254,10 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build())),
             // pkt3
             Field(
@@ -6575,18 +6266,12 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt4
             Field(
@@ -6595,10 +6280,7 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // not affected by out of order
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build())),
             // pkt5
             Field(
@@ -6607,18 +6289,12 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -6649,18 +6325,12 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(s1f2.len)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(s2f2.len)
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 
@@ -6680,10 +6350,7 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0) // retrans ACKed earlier
-                        .setStreamBytesAckedByRetrans(0) // retrans ACK earlier
                         // no change, since already ACKed by retrans
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // orig ACKed after retrans, thus making f2 dupacked
                         .addDupAckedStreamInterval(
                             s1f2.offset, s1f2.offset + s1f2.len - 1)
@@ -6691,10 +6358,7 @@ TEST_F(
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(0) // retrans ACKed earlier
-                        .setStreamBytesAckedByRetrans(0) // retrans ACK earlier
                         // no change, since already ACKed by retrans
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // orig ACKed after retrans, thus making f2 dupacked
                         .addDupAckedStreamInterval(
                             s2f2.offset, s2f2.offset + s2f2.len - 1)
@@ -6806,16 +6470,10 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build())),
             // pkt3
             Field(
@@ -6824,18 +6482,12 @@ TEST_F(
                     // s1f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f3
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f3.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build())),
             // pkt4
             Field(
@@ -6844,10 +6496,7 @@ TEST_F(
                     // s3f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s3Id)
-                        .setStreamBytesAcked(s3f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // not affected by out of order
-                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
                         .build())),
             // pkt5
             Field(
@@ -6856,18 +6505,12 @@ TEST_F(
                     // s1f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build(),
                     // s2f4 w/ EOR
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f4.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // no update due to out of order, f2 not received yet
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -6898,18 +6541,12 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f2.len)
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // f1 - f4 now done, delivery offset = end of f4
-                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
                         .build()))));
   }
 
@@ -6929,10 +6566,7 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0) // original arrived
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // no change, since already ACKed by original
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making f2
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -6941,10 +6575,7 @@ TEST_F(
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(0) // original arrived
-                        .setStreamBytesAckedByRetrans(0) // original arrived
                         // no change, since already ACKed by original
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making f2
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -7009,9 +6640,6 @@ TEST_F(AckEventForAppDataTest, AckEventRetransHasNewFrame) {
                     // s1f1 + s1f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len + s1f2.len)
-                        .setStreamBytesAckedByRetrans(s1f1.len)
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                         .build()))));
   }
 }
@@ -7070,23 +6698,16 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(
-                    AckEventStreamDetailsMatcherBuilder()
-                        .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
-                        .build())),
+                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
+                                         .setStreamID(s1Id)
+                                         .build())),
             // pkt2
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len) // only f2
-                        .setStreamBytesAckedByRetrans(0) // f1 ACKed earlier
                         // moved forward to f2
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                         // retrans ACKed after original, thus making f1
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -7149,13 +6770,9 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(
-                    AckEventStreamDetailsMatcherBuilder()
-                        .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
-                        .build()))));
+                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
+                                         .setStreamID(s1Id)
+                                         .build()))));
   }
 
   // deliver ACK for packet2
@@ -7173,9 +6790,6 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                         // p1 acked earlier, thus making f1 dupacked
                         .addDupAckedStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
@@ -7238,13 +6852,9 @@ TEST_F(
             // pkt2
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(
-                    AckEventStreamDetailsMatcherBuilder()
-                        .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len + s1f2.len)
-                        .setStreamBytesAckedByRetrans(s1f1.len)
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
-                        .build()))));
+                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
+                                         .setStreamID(s1Id)
+                                         .build()))));
   }
 
   // deliver ACK for packet1
@@ -7262,10 +6872,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0) // p2 ACKed earlier
-                        .setStreamBytesAckedByRetrans(0) // p2 ACKed earlier
                         // no change, since already advanced by p2
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // orig ACKed after retrans, thus making f1 dupacked
                         .addDupAckedStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
@@ -7330,15 +6937,9 @@ TEST_F(AckEventForAppDataTest, AckEventRetransHasNewStreamFrame) {
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(s1f1.len)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build()))));
   }
 }
@@ -7399,22 +7000,15 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(
-                    AckEventStreamDetailsMatcherBuilder()
-                        .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
-                        .build())),
+                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
+                                         .setStreamID(s1Id)
+                                         .build())),
             // pkt2
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making f1
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -7422,9 +7016,6 @@ TEST_F(
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build()))));
   }
 }
@@ -7485,13 +7076,9 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(
-                    AckEventStreamDetailsMatcherBuilder()
-                        .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
-                        .build()))));
+                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
+                                         .setStreamID(s1Id)
+                                         .build()))));
   }
 
   // deliver ACK for packet 2
@@ -7509,9 +7096,6 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making f1
                         // dupacked
                         .addDupAckedStreamInterval(
@@ -7519,9 +7103,6 @@ TEST_F(
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build()))));
   }
 }
@@ -7585,15 +7166,9 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(s1f1.len)
-                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len - 1)
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
-                        .setStreamBytesAcked(s2f1.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len - 1)
                         .build()))));
   }
 
@@ -7612,10 +7187,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0) // p2 ACKed earlier
-                        .setStreamBytesAckedByRetrans(0) // p2 ACKed earlier
                         // no change, since already advanced by p2
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // orig ACKed after retrans, thus making f1 dupacked
                         .addDupAckedStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
@@ -7685,10 +7257,7 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f2.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // missing f1, so delivery offset cannot increase
-                        .setMaybeNewDeliveryOffset(folly::none)
                         .build()))));
   }
 
@@ -7720,21 +7289,14 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f1.len)
-                        .setStreamBytesAckedByRetrans(0)
                         // since f2 ACKed already, advance to there
-                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len - 1)
                         .build())),
             // pkt3
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(
-                    AckEventStreamDetailsMatcherBuilder()
-                        .setStreamID(s1Id)
-                        .setStreamBytesAcked(s1f3.len)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
-                        .build()))));
+                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
+                                         .setStreamID(s1Id)
+                                         .build()))));
   }
 
   // deliver ACK for packet 4
@@ -7752,9 +7314,6 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        .setStreamBytesAcked(0)
-                        .setStreamBytesAckedByRetrans(0)
-                        .setMaybeNewDeliveryOffset(folly::none)
                         // retrans ACKed after original, thus making dupacks
                         // for both f1 and f3 (in ACKed packets p1 and p3)
                         .addDupAckedStreamInterval(

@@ -16,27 +16,6 @@ AckEventStreamDetailsMatcherBuilder::setStreamID(const uint64_t streamIdIn) {
 }
 
 AckEventStreamDetailsMatcherBuilder&&
-AckEventStreamDetailsMatcherBuilder::setStreamBytesAcked(
-    const uint64_t ackedIn) {
-  maybeStreamBytesAcked = ackedIn;
-  return std::move(*this);
-}
-
-AckEventStreamDetailsMatcherBuilder&&
-AckEventStreamDetailsMatcherBuilder::setStreamBytesAckedByRetrans(
-    const uint64_t ackedByRetransIn) {
-  maybeStreamBytesAckedByRetrans = ackedByRetransIn;
-  return std::move(*this);
-}
-
-AckEventStreamDetailsMatcherBuilder&&
-AckEventStreamDetailsMatcherBuilder::setMaybeNewDeliveryOffset(
-    const folly::Optional<uint64_t>& maybeNewDeliveryOffsetIn) {
-  maybeNewDeliveryOffset = maybeNewDeliveryOffsetIn;
-  return std::move(*this);
-}
-
-AckEventStreamDetailsMatcherBuilder&&
 AckEventStreamDetailsMatcherBuilder::addDupAckedStreamInterval(
     const DupAckedStreamIntervals::interval_type& interval) {
   dupAckedStreamIntervals.insert(interval);

@@ -180,10 +180,7 @@ struct AckEvent {
     OutstandingPacketMetadata outstandingPacketMetadata;
 
     struct StreamDetails {
-      uint64_t streamBytesAcked{0};
-      uint64_t streamBytesAckedByRetrans{0};
       folly::Optional<uint64_t> streamPacketIdx;
-      folly::Optional<uint64_t> maybeNewDeliveryOffset;
 
       // definition for DupAckedStreamIntervalSet
       // we expect this to be rare, any thus only allocate a single position
@@ -218,13 +215,8 @@ struct AckEvent {
        * an ACKed packet had already been marked as delivered.
        *
        * @param frame          The frame that is being processed.
-       * @param retransmission Whether this frame was being retransmitted in the
-       *                       packet being processed. If true, the frame was
-       *                       previously sent in some earlier packet.
        */
-      void recordFrameDelivered(
-          const WriteStreamFrame& frame,
-          const bool retransmission);
+      void recordFrameDelivered(const WriteStreamFrame& frame);
 
       /**
        * Record that a frame had already been marked as delivered.
@@ -243,21 +235,8 @@ struct AckEvent {
        *
        * @param frame          The frame that is being processed and that was
        *                       marked as delivered by some previous packet.
-       * @param retransmission Whether this frame was being retransmitted in the
-       *                       packet being processed. If true, the frame was
-       *                       previously sent in some earlier packet. This is
-       *                       generally expected to be true for the "already
-       *                       delivered" scenario; the exception would be
-       *                       packet reordering.
        */
-      void recordFrameAlreadyDelivered(
-          const WriteStreamFrame& frame,
-          const bool retransmission);
-
-      /**
-       * Record a delivery offset update (increase) for a stream ID.
-       */
-      void recordDeliveryOffsetUpdate(StreamId streamId, uint64_t newOffset);
+      void recordFrameAlreadyDelivered(const WriteStreamFrame& frame);
 
       [[nodiscard]] auto at(StreamId id) const {
         return MapType::at(id);

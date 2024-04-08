@@ -396,43 +396,16 @@ AckEvent processAckFrame(
         const auto& preAckVisitorState = maybePreAckVisitorState.value();
         const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
 
-        // determine if this frame was a retransmission
-        const bool retransmission = ([&outstandingPacket, &ackedFrame]() {
-          // in some cases (some unit tests), stream details are not available
-          // in these cases, we assume it is not a retransmission
-          if (const auto* maybeStreamDetails = folly::get_ptr(
-                  outstandingPacket.metadata.detailsPerStream,
-                  ackedFrame.streamId)) {
-            const auto& maybeFirstNewStreamByteOffset =
-                maybeStreamDetails->maybeFirstNewStreamByteOffset;
-            return (
-                !maybeFirstNewStreamByteOffset.has_value() ||
-                maybeFirstNewStreamByteOffset.value() > ackedFrame.offset);
-          }
-          return false; // assume not a retransmission
-        })();
-
         // check for change in ACK IntervalSet version
         CHECK(maybeAckedStreamState);
         if (preAckVisitorState.ackIntervalSetVersion !=
             getAckIntervalSetVersion(*maybeAckedStreamState)) {
           // we were able to fill in a hole in the ACK interval
-          detailsPerStream.recordFrameDelivered(ackedFrame, retransmission);
-
-          // check for change in delivery offset
-          const auto maybeLargestDeliverableOffset =
-              getLargestDeliverableOffset(*maybeAckedStreamState);
-          if (preAckVisitorState.maybeLargestDeliverableOffset !=
-              maybeLargestDeliverableOffset) {
-            CHECK(maybeLargestDeliverableOffset.has_value());
-            detailsPerStream.recordDeliveryOffsetUpdate(
-                ackedFrame.streamId, maybeLargestDeliverableOffset.value());
-          }
+          detailsPerStream.recordFrameDelivered(ackedFrame);
         } else {
           // we got an ACK of a frame that was already marked as delivered
           // when handling the ACK of some earlier packet; mark as such
-          detailsPerStream.recordFrameAlreadyDelivered(
-              ackedFrame, retransmission);
+          detailsPerStream.recordFrameAlreadyDelivered(ackedFrame);
 
           // should be no change in delivery offset
           DCHECK(

@@ -27,10 +27,6 @@ struct AckEventStreamDetailsMatcherBuilder {
   explicit AckEventStreamDetailsMatcherBuilder() = default;
 
   Builder&& setStreamID(const uint64_t streamIdIn);
-  Builder&& setStreamBytesAcked(const uint64_t ackedIn);
-  Builder&& setStreamBytesAckedByRetrans(const uint64_t ackedByRetransIn);
-  Builder&& setMaybeNewDeliveryOffset(
-      const folly::Optional<uint64_t>& maybeNewDeliveryOffsetIn);
   Builder&& addDupAckedStreamInterval(
       const DupAckedStreamIntervals::interval_type& intervalIn);
   Builder&& addDupAckedStreamInterval(
@@ -41,26 +37,13 @@ struct AckEventStreamDetailsMatcherBuilder {
   auto build() && {
     return ::testing::Pair(
         *CHECK_NOTNULL(maybeStreamId.get_pointer()),
-        ::testing::AllOf(
-            ::testing::Field(
-                &AckEvent::AckPacket::StreamDetails::streamBytesAcked,
-                *CHECK_NOTNULL(maybeStreamBytesAcked.get_pointer())),
-            ::testing::Field(
-                &AckEvent::AckPacket::StreamDetails::streamBytesAckedByRetrans,
-                *CHECK_NOTNULL(maybeStreamBytesAckedByRetrans.get_pointer())),
-            ::testing::Field(
-                &AckEvent::AckPacket::StreamDetails::maybeNewDeliveryOffset,
-                maybeNewDeliveryOffset),
-            ::testing::Field(
-                &AckEvent::AckPacket::StreamDetails::dupAckedStreamIntervals,
-                dupAckedStreamIntervals)));
+        ::testing::Field(
+            &AckEvent::AckPacket::StreamDetails::dupAckedStreamIntervals,
+            dupAckedStreamIntervals));
   }
 
  private:
   folly::Optional<uint64_t> maybeStreamId;
-  folly::Optional<uint64_t> maybeStreamBytesAcked;
-  folly::Optional<uint64_t> maybeStreamBytesAckedByRetrans;
-  folly::Optional<uint64_t> maybeNewDeliveryOffset;
   DupAckedStreamIntervals dupAckedStreamIntervals;
 };
 
