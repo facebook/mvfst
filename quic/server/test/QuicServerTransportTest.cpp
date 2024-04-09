@@ -1849,6 +1849,7 @@ TEST_P(
   EXPECT_EQ(
       event->dropReason,
       PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 0);
 }
 
 TEST_P(
@@ -1872,6 +1873,8 @@ TEST_P(
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 0);
+
   // Receive second packet first
   deliverData(std::move(secondPacket));
 
@@ -1884,6 +1887,7 @@ TEST_P(
 
   // No migration for reordered packet
   EXPECT_EQ(server->getConn().peerAddress, peerAddress);
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 0);
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
@@ -1898,6 +1902,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
       0 /* largestAcked */));
 
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 0);
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 0);
 
   auto peerAddress = server->getConn().peerAddress;
   auto congestionController = server->getConn().congestionController.get();
@@ -1912,6 +1917,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 1);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
@@ -1962,6 +1968,21 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(server->pathValidationTimeout().isTimerCallbackScheduled());
+
+  // receiving data from the original peer address should not increment
+  // numMigrations counter
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
+  auto nextPacketData = packetToBuf(createStreamPacket(
+      *clientConnectionId,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++,
+      6,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  deliverData(std::move(nextPacketData), false);
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 1);
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
@@ -1975,6 +1996,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 0);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 0);
 
   auto peerAddress = server->getConn().peerAddress;
@@ -1989,6 +2011,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
+  EXPECT_EQ(server->getConn().migrationState.numMigrations, 1);
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
@@ -2190,6 +2213,8 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
     EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
     deliverData(packetData->clone(), false, &newPeer);
   }
+  EXPECT_EQ(
+      server->getConn().migrationState.numMigrations, maxNumMigrationsAllowed);
 
   folly::SocketAddress newPeer("200.101.102.103", 23456);
   try {

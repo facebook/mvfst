@@ -579,7 +579,6 @@ void onConnectionMigration(
     throw QuicTransportException(
         "Too many migrations", TransportErrorCode::INVALID_MIGRATION);
   }
-  ++conn.migrationState.numMigrations;
 
   bool hasPendingPathChallenge = conn.pendingEvents.pathChallenge.has_value();
   // Clear any pending path challenge frame that is not sent
@@ -591,6 +590,7 @@ void onConnectionMigration(
       previousPeerAddresses.end(),
       newPeerAddress);
   if (it == previousPeerAddresses.end()) {
+    ++conn.migrationState.numMigrations;
     // send new path challenge
     conn.pendingEvents.pathChallenge.emplace(folly::Random::secureRand64());
 
