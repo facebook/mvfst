@@ -50,6 +50,11 @@ class TestQuicTransport
     closeUdpSocket();
   }
 
+  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+      const override {
+    return folly::none;
+  }
+
   QuicVersion getVersion() {
     auto& conn = getConnectionState();
     return conn.version.value_or(*conn.originalVersion);

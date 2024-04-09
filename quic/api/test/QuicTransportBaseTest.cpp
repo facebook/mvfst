@@ -261,6 +261,11 @@ class TestQuicTransport
     closeUdpSocket();
   }
 
+  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+      const override {
+    return folly::none;
+  }
+
   std::chrono::milliseconds getLossTimeoutRemainingTime() {
     return lossTimeout_.getTimerCallbackTimeRemaining();
   }

@@ -168,6 +168,9 @@ class QuicServerTransport
    */
   void logTimeBasedStats() const;
 
+  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+      const override;
+
  protected:
   // From QuicSocket
   SocketObserverContainer* getSocketObserverContainer() const override {

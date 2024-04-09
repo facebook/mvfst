@@ -1201,4 +1201,16 @@ void QuicServerTransport::logTimeBasedStats() const {
   }
 }
 
+folly::Optional<std::vector<TransportParameter>>
+QuicServerTransport::getPeerTransportParams() const {
+  if (serverConn_ && serverConn_->serverHandshakeLayer) {
+    auto maybeParams =
+        serverConn_->serverHandshakeLayer->getClientTransportParams();
+    if (maybeParams) {
+      return maybeParams->parameters;
+    }
+  }
+  return folly::none;
+}
+
 } // namespace quic

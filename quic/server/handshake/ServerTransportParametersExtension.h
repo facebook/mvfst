@@ -121,8 +121,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     return exts;
   }
 
-  folly::Optional<ClientTransportParameters> getClientTransportParams() {
-    return std::move(clientTransportParameters_);
+  const folly::Optional<ClientTransportParameters>& getClientTransportParams() {
+    return clientTransportParameters_;
   }
 
  private:

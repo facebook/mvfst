@@ -18,6 +18,7 @@
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/congestion_control/Bandwidth.h>
+#include <quic/handshake/TransportParameters.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/QuicConnectionStats.h>
@@ -276,6 +277,11 @@ class QuicSocket {
     // Stream write error (if one occured)
     folly::Optional<QuicErrorCode> streamWriteError;
   };
+
+  // Returns folly::none before the handshake is complete, otherwise is always
+  // non-empty.
+  virtual folly::Optional<std::vector<TransportParameter>>
+  getPeerTransportParams() const = 0;
 
   /**
    * Sets connection setup callback. This callback must be set before using the

@@ -201,6 +201,9 @@ class QuicClientTransport
     conn_->bufAccessor = bufAccessor_.get();
   }
 
+  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+      const override;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(

@@ -51,6 +51,11 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(const folly::SocketAddress&, getPeerAddress, (), (const));
   MOCK_METHOD(const folly::SocketAddress&, getOriginalPeerAddress, (), (const));
   MOCK_METHOD(const folly::SocketAddress&, getLocalAddress, (), (const));
+  MOCK_METHOD(
+      folly::Optional<std::vector<TransportParameter>>,
+      getPeerTransportParams,
+      (),
+      (const));
   MOCK_METHOD(std::shared_ptr<QuicEventBase>, getEventBase, (), (const));
   MOCK_METHOD(
       (folly::Expected<size_t, LocalErrorCode>),

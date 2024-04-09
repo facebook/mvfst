@@ -1736,6 +1736,18 @@ void QuicClientTransport::maybeSendTransportKnobs() {
   }
 }
 
+folly::Optional<std::vector<TransportParameter>>
+QuicClientTransport::getPeerTransportParams() const {
+  if (clientConn_ && clientConn_->clientHandshakeLayer) {
+    auto maybeParams =
+        clientConn_->clientHandshakeLayer->getServerTransportParams();
+    if (maybeParams) {
+      return maybeParams->parameters;
+    }
+  }
+  return folly::none;
+}
+
 void QuicClientTransport::RecvmmsgStorage::resize(size_t numPackets) {
   if (msgs.size() != numPackets) {
     msgs.resize(numPackets);
