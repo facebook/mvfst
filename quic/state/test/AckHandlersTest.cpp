@@ -5575,6 +5575,12 @@ TEST_F(
 TEST_F(
     AckEventForAppDataTest,
     AckEventMultiStreamPacketTwoAcksPacketTwoOutOfOrderIndividualAcks) {
+  getConn()->lossState.srtt = 1s;
+  getConn()->lossState.lrtt = 1s;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
   // two streams, both writing "hey whats up!" split across four frames
   auto s1Id =
       getConn()->streamManager->createNextBidirectionalStream().value()->id;
