@@ -153,7 +153,6 @@ TEST_F(StateDataTest, SingleLostPacketEvent) {
       false,
       1234,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -178,7 +177,6 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       false,
       1234,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -196,7 +194,6 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       0,
       false,
       1357,
-      0,
       0,
       LossState(),
       0,

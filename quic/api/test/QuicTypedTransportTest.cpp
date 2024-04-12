@@ -631,7 +631,6 @@ TYPED_TEST(
       .Times(1)
       .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
-        EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
         EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
       }));
 
@@ -687,12 +686,10 @@ TYPED_TEST(
       .Times(2)
       .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
-        EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
         EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
       }))
       .WillOnce(Invoke([&](auto& outstandingPacket) {
         EXPECT_EQ(5, outstandingPacket.metadata.totalPacketsSent);
-        EXPECT_EQ(2, outstandingPacket.metadata.packetsInflight);
         EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
       }));
 
@@ -772,7 +769,6 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
         .Times(2)
         .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
-          EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
           EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
           EXPECT_NE(0us, outstandingPacket.metadata.totalAppLimitedTimeUsecs);
           firstPacketTotalAppLimitedTimeUsecs =
@@ -780,7 +776,6 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
         }))
         .WillOnce(Invoke([&](auto& outstandingPacket) {
           EXPECT_EQ(5, outstandingPacket.metadata.totalPacketsSent);
-          EXPECT_EQ(2, outstandingPacket.metadata.packetsInflight);
           EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
           EXPECT_EQ(
               firstPacketTotalAppLimitedTimeUsecs,

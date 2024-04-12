@@ -266,7 +266,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       isHandshake,
       encodedSize,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -795,7 +794,6 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
       0,
       0,
       false,
-      0,
       0,
       0,
       LossState(),
@@ -1856,7 +1854,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
               false /* isHandshake */,
               0 /* totalBytesSent */,
               0 /* inflightBytes */,
-              0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))
@@ -1891,7 +1888,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
               false /* isHandshake */,
               0 /* totalBytesSent */,
               0 /* inflightBytes */,
-              0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))
@@ -1925,7 +1921,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
               false /* isHandshake */,
               0 /* totalBytesSent */,
               0 /* inflightBytes */,
-              0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))

@@ -37,7 +37,6 @@ class CopaTest : public Test {
           false,
           totalSentBytes,
           0,
-          0,
           LossState(),
           0,
           OutstandingPacketMetadata::DetailsPerStream()));
@@ -63,7 +62,6 @@ class CopaTest : public Test {
         false,
         totalSent,
         inflight,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());

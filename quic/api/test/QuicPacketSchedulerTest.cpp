@@ -48,7 +48,6 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       true,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -77,7 +76,6 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       true,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -99,7 +97,6 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       0,
       0,
       false,
-      0,
       0,
       0,
       LossState(),

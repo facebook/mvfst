@@ -545,7 +545,6 @@ OutstandingPacketWrapper makeTestingWritePacket(
       false,
       totalBytesSent,
       inflightBytes,
-      0,
       LossState(),
       writeCount,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -580,7 +579,6 @@ CongestionController::AckEvent makeAck(
               false /* isHandshake */,
               0 /* totalBytesSent */,
               0 /* inflightBytes */,
-              0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))

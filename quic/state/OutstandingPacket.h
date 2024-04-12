@@ -30,8 +30,6 @@ struct OutstandingPacketMetadata {
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
   uint64_t inflightBytes;
-  // Packets in flight on this connection including this packet itself.
-  uint64_t packetsInflight;
   // Total number of packets sent on this connection.
   uint32_t totalPacketsSent{0};
   // Total number of ack-eliciting packets sent on this connection.
@@ -123,7 +121,6 @@ struct OutstandingPacketMetadata {
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
-      uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
       DetailsPerStream detailsPerStream,
@@ -134,7 +131,6 @@ struct OutstandingPacketMetadata {
         isHandshake(isHandshakeIn),
         totalBytesSent(totalBytesSentIn),
         inflightBytes(inflightBytesIn),
-        packetsInflight(packetsInflightIn),
         totalPacketsSent(lossStateIn.totalPacketsSent),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
         writeCount(writeCount),
@@ -210,7 +206,6 @@ struct OutstandingPacket {
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
-      uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
       Metadata::DetailsPerStream detailsPerStream,
@@ -223,7 +218,6 @@ struct OutstandingPacket {
             isHandshakeIn,
             totalBytesSentIn,
             inflightBytesIn,
-            packetsInflightIn,
             lossStateIn,
             writeCount,
             std::move(detailsPerStream),
@@ -246,7 +240,6 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
-      uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
       Metadata::DetailsPerStream detailsPerStream,
@@ -261,7 +254,6 @@ struct OutstandingPacketWrapper : OutstandingPacket {
             isHandshakeIn,
             totalBytesSentIn,
             inflightBytesIn,
-            packetsInflightIn,
             lossStateIn,
             writeCount,
             std::move(detailsPerStream),

@@ -74,7 +74,6 @@ auto emplacePackets(
         false /* handshake */,
         packetNum,
         packetNum + 1,
-        packetNum + 1,
         quic::LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -194,7 +193,6 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
         false,
         packetNum,
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -289,7 +287,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       false /* handshake */,
       0,
       1,
-      1,
       quic::LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -368,7 +365,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       0,
       false /* handshake */,
       0,
-      1,
       1,
       quic::LossState(),
       0,
@@ -455,7 +451,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
       false /* handshake */,
       0,
       1,
-      1,
       quic::LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -537,7 +532,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
       0,
       false /* handshake */,
       0,
-      1,
       1,
       quic::LossState(),
       0,
@@ -624,7 +618,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
         false,
         packetNum,
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
@@ -707,7 +700,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         false,
         packetNum,
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
@@ -770,7 +762,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         0,
         false,
         packetNum,
-        0,
         0,
         LossState(),
         0,
@@ -843,7 +834,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
         0,
         false,
         packetNum,
-        0,
         0,
         LossState(),
         0,
@@ -948,7 +938,6 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
         0,
         false,
         packetNum,
-        0,
         0,
         LossState(),
         0,
@@ -1105,7 +1094,6 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
         false,
         packetNum,
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -1223,7 +1211,6 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         false,
         packetNum,
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -1245,7 +1232,6 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         0,
         false,
         packetNum,
-        0,
         0,
         LossState(),
         0,
@@ -1343,7 +1329,6 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       false,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1364,7 +1349,6 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       0,
       0,
       false,
-      0,
       0,
       0,
       LossState(),
@@ -1440,7 +1424,6 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       false,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1499,7 +1482,6 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       false,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1515,7 +1497,6 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       0,
       0,
       false,
-      0,
       0,
       0,
       LossState(),
@@ -1560,7 +1541,6 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
         0,
         packetNum % 2 && GetParam().pnSpace != PacketNumberSpace::AppData,
         packetNum / 2,
-        0,
         0,
         LossState(),
         0,
@@ -1773,7 +1753,6 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
       false,
       1,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1838,7 +1817,6 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
       false,
       1,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1901,7 +1879,6 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
         false,
         1 * (packetNum + 1),
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -1962,7 +1939,6 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       false,
       1,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1975,7 +1951,6 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       0,
       false,
       1,
-      0,
       0,
       LossState(),
       0,
@@ -2042,7 +2017,6 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
       false,
       1,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -2059,7 +2033,6 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
       0,
       false,
       1,
-      0,
       0,
       LossState(),
       0,
@@ -2112,7 +2085,6 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
       0,
       false,
       1,
-      0,
       0,
       LossState(),
       0,
@@ -2189,7 +2161,6 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       false,
       1,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -2240,7 +2211,6 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       100,
       false,
       conn.lossState.totalBytesSent + 111,
-      0,
       0,
       LossState(),
       0,
@@ -2310,7 +2280,6 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -2444,7 +2413,6 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -2576,7 +2544,6 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -3316,7 +3283,6 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -3423,7 +3389,6 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -3537,7 +3502,6 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -3773,7 +3737,6 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        0 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -3917,7 +3880,6 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         false /* isHandshakeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
         0 /* inflightBytesIn */,
-        packetNum + 1 /* packetsInflightIn */,
         LossState(),
         getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -4020,7 +3982,6 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
         false /* handshake */,
         packetNum,
         packetNum + 1,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
@@ -4300,7 +4261,6 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
       0,
       0,
       false,
-      0,
       0,
       0,
       LossState(),

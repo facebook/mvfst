@@ -893,7 +893,6 @@ void updateConnection(
       // conn.outstandings.numOutstanding() + 1 since we're emplacing here
       conn.lossState.totalBytesSent,
       conn.lossState.inflightBytes + encodedSize,
-      conn.outstandings.numOutstanding() + 1,
       conn.lossState,
       conn.writeCount,
       std::move(detailsPerStream),
