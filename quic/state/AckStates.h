@@ -28,6 +28,8 @@ struct AckState : WriteAckFrameState {
   folly::Optional<PacketNum> largestAckedByPeer;
   // Largest received packet number at the time we sent our last close message.
   folly::Optional<PacketNum> largestReceivedAtLastCloseSent;
+  // Packet sequence number for largest non-dsr packet acked by peer.
+  folly::Optional<uint64_t> largestNonDsrSequenceNumberAckedByPeer;
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
   // Incremented for each non-DSR packet.

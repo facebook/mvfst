@@ -310,7 +310,15 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
   conn.transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = startTime + 20ms;
 
-  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam().pnSpace);
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
+  ackState.largestAckedByPeer = 4;
+  detectLossPackets(
+      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
@@ -383,7 +391,15 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
   conn.transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = startTime + 20ms;
 
-  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam().pnSpace);
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
+  ackState.largestAckedByPeer = 4;
+  detectLossPackets(
+      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
@@ -462,7 +478,15 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
   conn.transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = startTime + 20ms;
 
-  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam().pnSpace);
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
+  ackState.largestAckedByPeer = 4;
+  detectLossPackets(
+      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
@@ -538,7 +562,15 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
   conn.transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = startTime + 20ms;
 
-  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam().pnSpace);
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
+  ackState.largestAckedByPeer = 4;
+  detectLossPackets(
+      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
@@ -694,9 +726,16 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 3);
 
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 3;
+  ackState.largestAckedByPeer = 3;
   detectLossPackets(
       conn,
-      3,
+      ackState,
       [](auto&, auto&, bool) {},
       startTime + 250ms,
       GetParam().pnSpace);
@@ -4148,8 +4187,15 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
                   MockLegacyObserver::getLossPacketMatcher(1, true, false),
                   MockLegacyObserver::getLossPacketMatcher(2, true, false)))))
       .Times(1);
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
+  ackState.largestAckedByPeer = 4;
   detectLossPackets(
-      conn, 4, [](auto&, auto&, bool) {}, checkTime, GetParam().pnSpace);
+      conn, ackState, [](auto&, auto&, bool) {}, checkTime, GetParam().pnSpace);
 
   // now we get acks for packets marked lost, triggering spuriousLossDetected
   EXPECT_CALL(
@@ -4231,8 +4277,16 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
                   MockLegacyObserver::getLossPacketMatcher(8, false, true),
                   MockLegacyObserver::getLossPacketMatcher(9, false, true)))))
       .Times(1);
+
+  // Update the ackState
+  // Both largestAckedByPeer (packet num) and
+  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
+  // exercise loss by reorder path
+  auto& ackState = getAckState(conn, GetParam().pnSpace);
+  ackState.largestNonDsrSequenceNumberAckedByPeer = 10;
+  ackState.largestAckedByPeer = 10;
   detectLossPackets(
-      conn, 10, [](auto&, auto&, bool) {}, checkTime, GetParam().pnSpace);
+      conn, ackState, [](auto&, auto&, bool) {}, checkTime, GetParam().pnSpace);
 
   // now we get acks for packets marked lost, triggering spuriousLossDetected
   EXPECT_CALL(

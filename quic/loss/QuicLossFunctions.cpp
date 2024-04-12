@@ -272,8 +272,8 @@ bool processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
-    const InlineMap<StreamId, PacketNum, 20>& largestDsrAcked,
-    const folly::Optional<PacketNum>& largestNonDsrAcked,
+    const InlineMap<StreamId, PacketNum, 20>& largestDsrAckedSequenceNumber,
+    const folly::Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
     const TimePoint& lossTime,
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
@@ -300,6 +300,15 @@ bool processOutstandingsForLoss(
     auto maybeStreamFrame = pkt.packet.frames.empty()
         ? nullptr
         : pkt.packet.frames.front().asWriteStreamFrame();
+
+    // Use the translated virtual number for the current packet if it's a DSR
+    // packet, or the non DSR sequence number otherwise.
+    if (maybeCurrentStreamPacketIdx.has_value()) {
+      currentPacketNum = *maybeCurrentStreamPacketIdx;
+    } else if (pkt.nonDsrPacketSequenceNumber.has_value()) {
+      currentPacketNum = pkt.nonDsrPacketSequenceNumber.value();
+    }
+
     // For DSR we use the stream packet index (monotonic index of packets
     // within a stream) to determine reordering loss. This effectively puts
     // DSR packets on their own packet number timeline.
@@ -312,30 +321,17 @@ bool processOutstandingsForLoss(
         // not declare reorder loss.
         CHECK(pkt.isDSRPacket);
         return folly::get_default(
-            largestDsrAcked,
+            largestDsrAckedSequenceNumber,
             maybeStreamFrame->streamId,
             *maybeCurrentStreamPacketIdx);
       } else {
-        // If the packet being considered is a non-DSR packet, the
-        // straightforward case is to use the largest non-DSR ACKed.
-        // If DSR packets have been ACKed, we need to use the largest
-        // non-DSR ACKed. If there were no non-DSR ACKed, we shouldn't
-        // declare reorder loss.
-        if (largestDsrAcked.empty()) {
-          return largestNonDsrAcked.value();
-        } else {
-          return largestNonDsrAcked.value_or(currentPacketNum);
-        }
+        // If the packet being considered is a non-DSR packet, use the largest
+        // non-DSR ACKed sequence number. If there were no non-DSR ACKed, we
+        // shouldn't declare reorder loss.
+        return largestNonDsrAckedSequenceNumber.value_or(currentPacketNum);
       }
     }();
 
-    // Use the translated virtual number for the current packet if it's a DSR
-    // packet, or the non DSR sequence number otherwise.
-    if (maybeCurrentStreamPacketIdx.has_value()) {
-      currentPacketNum = *maybeCurrentStreamPacketIdx;
-    } else if (pkt.nonDsrPacketSequenceNumber.has_value()) {
-      currentPacketNum = pkt.nonDsrPacketSequenceNumber.value();
-    }
     // The max ensures that we don't overflow on the subtraction if the largest
     // ACKed is smaller.
     largestAckedForComparison =
@@ -406,7 +402,7 @@ bool processOutstandingsForLoss(
  */
 folly::Optional<CongestionController::LossEvent> detectLossPackets(
     QuicConnectionStateBase& conn,
-    const folly::Optional<PacketNum> largestAcked,
+    const AckState& ackState,
     const LossVisitor& lossVisitor,
     const TimePoint lossTime,
     const PacketNumberSpace pnSpace,
@@ -418,7 +414,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       conn.transportSettings.timeReorderingThreshDividend /
       conn.transportSettings.timeReorderingThreshDivisor;
   VLOG(10) << __func__ << " outstanding=" << conn.outstandings.numOutstanding()
-           << " largestAcked=" << largestAcked.value_or(0)
+           << " largestAcked=" << ackState.largestAckedByPeer.value_or(0)
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
@@ -438,43 +434,47 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   // sender, which avoids the problem of "natural" reordering caused by
   // multiple DSR senders. Similarly track the largest non-DSR ACKed, for the
   // reason but when DSR packets are reordered "before" non-DSR packets.
-  InlineMap<StreamId, PacketNum, 20> largestDsrAcked;
-  folly::Optional<PacketNum> largestNonDsrAcked;
+  // These two variables hold DSR and non-DSR sequence numbers not actual packet
+  // numbers
+  InlineMap<StreamId, PacketNum, 20> largestDsrAckedSeqNo;
+  folly::Optional<PacketNum> largestNonDsrAckedSeqNo;
   if (ackEvent) {
     for (const auto& ackPacket : ackEvent->ackedPackets) {
       for (auto& [stream, details] : ackPacket.detailsPerStream) {
         if (details.streamPacketIdx) {
-          largestDsrAcked[stream] = std::max(
+          largestDsrAckedSeqNo[stream] = std::max(
               folly::get_default(
-                  largestDsrAcked, stream, *details.streamPacketIdx),
+                  largestDsrAckedSeqNo, stream, *details.streamPacketIdx),
               *details.streamPacketIdx);
         } else {
-          largestNonDsrAcked = std::max(
-              largestNonDsrAcked.value_or(0),
+          largestNonDsrAckedSeqNo = std::max(
+              largestNonDsrAckedSeqNo.value_or(0),
               ackPacket.nonDsrPacketSequenceNumber);
         }
       }
       // If there are no streams, then it's not a DSR packet.
       if (ackPacket.detailsPerStream.empty()) {
-        largestNonDsrAcked = std::max(
-            largestNonDsrAcked.value_or(0),
+        largestNonDsrAckedSeqNo = std::max(
+            largestNonDsrAckedSeqNo.value_or(0),
             ackPacket.nonDsrPacketSequenceNumber);
       }
     }
   }
   // This covers the case where there's no ackedPackets.
-  if (largestDsrAcked.empty() && largestAcked.has_value()) {
-    largestNonDsrAcked = largestNonDsrAcked.value_or(largestAcked.value());
+  if (largestDsrAckedSeqNo.empty() &&
+      ackState.largestNonDsrSequenceNumberAckedByPeer.has_value()) {
+    largestNonDsrAckedSeqNo = largestNonDsrAckedSeqNo.value_or(
+        ackState.largestNonDsrSequenceNumberAckedByPeer.value());
   }
 
   bool shouldSetTimer = false;
-  if (largestAcked.has_value()) {
+  if (ackState.largestAckedByPeer.has_value()) {
     shouldSetTimer = processOutstandingsForLoss(
         conn,
-        *largestAcked,
+        *ackState.largestAckedByPeer,
         pnSpace,
-        largestDsrAcked,
-        largestNonDsrAcked,
+        largestDsrAckedSeqNo,
+        largestNonDsrAckedSeqNo,
         lossTime,
         rttSample,
         lossVisitor,
@@ -537,20 +537,26 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
     const LossVisitor& lossVisitor,
     CongestionController::AckEvent& ack,
     PacketNumberSpace pnSpace) {
-  auto& largestAcked = getAckState(conn, pnSpace).largestAckedByPeer;
+  auto& ackState = getAckState(conn, pnSpace);
   if (ack.largestNewlyAckedPacket.has_value()) {
     conn.lossState.ptoCount = 0;
-    largestAcked = std::max<PacketNum>(
-        largestAcked.value_or(*ack.largestNewlyAckedPacket),
+    // Update the largest acked packet number
+    ackState.largestAckedByPeer = std::max<PacketNum>(
+        ackState.largestAckedByPeer.value_or(*ack.largestNewlyAckedPacket),
         *ack.largestNewlyAckedPacket);
+
+    // Update the largest non-DSR acked sequence number
+    auto largestNewlyAckedPacket = ack.getLargestNewlyAckedPacket();
+    if (largestNewlyAckedPacket &&
+        largestNewlyAckedPacket->nonDsrPacketSequenceNumber) {
+      ackState.largestNonDsrSequenceNumberAckedByPeer = std::max<uint64_t>(
+          ackState.largestNonDsrSequenceNumberAckedByPeer.value_or(
+              largestNewlyAckedPacket->nonDsrPacketSequenceNumber),
+          largestNewlyAckedPacket->nonDsrPacketSequenceNumber);
+    }
   }
   auto lossEvent = detectLossPackets(
-      conn,
-      getAckState(conn, pnSpace).largestAckedByPeer,
-      lossVisitor,
-      ack.ackTime,
-      pnSpace,
-      &ack);
+      conn, ackState, lossVisitor, ack.ackTime, pnSpace, &ack);
   conn.pendingEvents.setLossDetectionAlarm =
       conn.outstandings.numOutstanding() > 0;
   VLOG(10) << __func__ << " largestAckedInPacket="
