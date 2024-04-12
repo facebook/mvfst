@@ -237,7 +237,6 @@ OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
       *CHECK_NOTNULL(maybeEncodedBodySize.get_pointer()),
       *CHECK_NOTNULL(maybeIsHandshake.get_pointer()),
       *CHECK_NOTNULL(maybeTotalBytesSent.get_pointer()),
-      *CHECK_NOTNULL(maybeTotalBodyBytesSent.get_pointer()),
       *CHECK_NOTNULL(maybeInflightBytes.get_pointer()),
       *CHECK_NOTNULL(maybePacketsInflight.get_pointer()),
       CHECK_NOTNULL(maybeLossState.get_pointer())->get(),

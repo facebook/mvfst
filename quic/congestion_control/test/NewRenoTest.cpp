@@ -34,7 +34,6 @@ CongestionController::LossEvent createLossEvent(
         10,
         0,
         0,
-        0,
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream()));
@@ -70,7 +69,6 @@ CongestionController::AckEvent createAckEvent(
           ackedSize,
           0,
           0,
-          0,
           LossState(),
           0,
           OutstandingPacketMetadata::DetailsPerStream())));
@@ -92,7 +90,6 @@ OutstandingPacketWrapper createPacket(
       0,
       false,
       size,
-      0,
       inflight,
       0,
       LossState(),

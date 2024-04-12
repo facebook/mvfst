@@ -27,9 +27,6 @@ struct OutstandingPacketMetadata {
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
-  // Total sent body bytes on this connection including this packet itself when
-  // this packet is sent.
-  uint64_t totalBodyBytesSent;
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
   uint64_t inflightBytes;
@@ -125,7 +122,6 @@ struct OutstandingPacketMetadata {
       uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
-      uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
@@ -137,7 +133,6 @@ struct OutstandingPacketMetadata {
         encodedBodySize(encodedBodySizeIn),
         isHandshake(isHandshakeIn),
         totalBytesSent(totalBytesSentIn),
-        totalBodyBytesSent(totalBodyBytesSentIn),
         inflightBytes(inflightBytesIn),
         packetsInflight(packetsInflightIn),
         totalPacketsSent(lossStateIn.totalPacketsSent),
@@ -214,7 +209,6 @@ struct OutstandingPacket {
       uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
-      uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
@@ -228,7 +222,6 @@ struct OutstandingPacket {
             encodedBodySizeIn,
             isHandshakeIn,
             totalBytesSentIn,
-            totalBodyBytesSentIn,
             inflightBytesIn,
             packetsInflightIn,
             lossStateIn,
@@ -252,7 +245,6 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
-      uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
@@ -268,7 +260,6 @@ struct OutstandingPacketWrapper : OutstandingPacket {
             encodedBodySizeIn,
             isHandshakeIn,
             totalBytesSentIn,
-            totalBodyBytesSentIn,
             inflightBytesIn,
             packetsInflightIn,
             lossStateIn,

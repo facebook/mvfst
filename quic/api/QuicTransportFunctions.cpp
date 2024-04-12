@@ -892,7 +892,6 @@ void updateConnection(
       // conn.lossState.inflightBytes isn't updated until below
       // conn.outstandings.numOutstanding() + 1 since we're emplacing here
       conn.lossState.totalBytesSent,
-      conn.lossState.totalBodyBytesSent,
       conn.lossState.inflightBytes + encodedSize,
       conn.outstandings.numOutstanding() + 1,
       conn.lossState,

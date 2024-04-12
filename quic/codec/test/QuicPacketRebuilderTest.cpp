@@ -37,7 +37,6 @@ OutstandingPacketWrapper makeDummyOutstandingPacket(
       totalBytesSentOnConnection,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());

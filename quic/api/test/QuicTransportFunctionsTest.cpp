@@ -1418,10 +1418,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
           ->metadata.totalBytesSent);
   EXPECT_EQ(
-      13000 + 500,
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
-          ->metadata.totalBodyBytesSent);
-  EXPECT_EQ(
       16000 + 555,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
           ->metadata.inflightBytes);

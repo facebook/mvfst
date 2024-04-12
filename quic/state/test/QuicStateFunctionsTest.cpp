@@ -1095,7 +1095,6 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1105,7 +1104,6 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       1217,
       0,
       false,
-      0,
       0,
       0,
       0,
@@ -1121,7 +1119,6 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1134,7 +1131,6 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1144,7 +1140,6 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       6665,
       6000,
       false,
-      0,
       0,
       0,
       0,
