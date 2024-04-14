@@ -801,9 +801,8 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
     if (!res) {
       return cryptoDataWritten;
     }
-    VLOG(4) << "Wrote retransmitted crypto"
-            << " offset=" << buffer.offset << " bytes=" << res->len << " "
-            << conn_;
+    VLOG(4) << "Wrote retransmitted crypto" << " offset=" << buffer.offset
+            << " bytes=" << res->len << " " << conn_;
     cryptoDataWritten = true;
   }
 

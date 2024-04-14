@@ -108,7 +108,8 @@ void writeChecksum(
 
   // This is going to point to the beginning of the UDP header
   auto* payload =
-      (uint32_t*)(packet + (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr));
+      (uint32_t*)(packet + (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) +
+                  sizeof(ethhdr));
 
   uint64_t sum = (len + 17) << 8;
 
@@ -152,8 +153,8 @@ void writeChecksum(
     checksum = 0xFFFF;
   }
 
-  auto* upd_hdr =
-      (udphdr*)(packet + (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr));
+  auto* upd_hdr = (udphdr*)(packet + (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) +
+                            sizeof(ethhdr));
   upd_hdr->check = checksum;
 }
 

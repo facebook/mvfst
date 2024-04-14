@@ -92,8 +92,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
              << " lastSentPacketTime="
              << lastSentPacketTime.time_since_epoch().count()
              << " now=" << now.time_since_epoch().count()
-             << " alarm=" << alarmDuration.count() << "us"
-             << " deadline="
+             << " alarm=" << alarmDuration.count() << "us" << " deadline="
              << (lastSentPacketTime + alarmDuration).time_since_epoch().count()
              << " " << conn;
   }

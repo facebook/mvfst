@@ -1424,8 +1424,8 @@ TEST_F(QuicReadCodecTest, KeyUpdateInitiate) {
     // Initiate a key update
     ASSERT_TRUE(codec->canInitiateKeyUpdate());
     ASSERT_TRUE(codec->advanceOneRttReadPhase());
-    // Set a next read cipher to ensure that key updates are blocked by
-    // verification not by the lack of the next cipher
+    //  Set a next read cipher to ensure that key updates are blocked by
+    //  verification not by the lack of the next cipher
     codec->setNextOneRttReadCipher(std::make_unique<MockAead>());
 
     // No further key update can be initiated until a packet is received in

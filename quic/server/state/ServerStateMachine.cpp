@@ -1257,8 +1257,8 @@ void onServerReadDataFromOpen(
         }
         case QuicFrame::Type::DatagramFrame: {
           DatagramFrame& frame = *quicFrame.asDatagramFrame();
-          VLOG(10) << "Server received datagram data: "
-                   << " len=" << frame.length;
+          VLOG(10) << "Server received datagram data: " << " len="
+                   << frame.length;
           // Datagram isn't retransmittable. But we would like to ack them
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;

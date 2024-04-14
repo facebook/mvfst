@@ -238,8 +238,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
       } else if (
           ack.ackTime - lastCwndDoubleTime_.value() > conn_.lossState.srtt) {
         VLOG(10) << __func__ << " doubling cwnd per RTT from=" << cwndBytes_
-                 << " due to slow start"
-                 << " " << conn_;
+                 << " due to slow start" << " " << conn_;
         addAndCheckOverflow(cwndBytes_, cwndBytes_);
         lastCwndDoubleTime_ = ack.ackTime;
       }
@@ -340,11 +339,9 @@ uint64_t Copa::getBytesInFlight() const noexcept {
   return conn_.lossState.inflightBytes;
 }
 
-void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
-}
+void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */ }
 
-void Copa::setAppLimited() { /* unsupported */
-}
+void Copa::setAppLimited() { /* unsupported */ }
 
 bool Copa::isAppLimited() const noexcept {
   return false; // not supported

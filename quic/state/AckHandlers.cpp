@@ -112,8 +112,7 @@ AckEvent processAckFrame(
       VLOG(10) << __func__ << " less than all outstanding packets outstanding="
                << conn.outstandings.numOutstanding() << " range=["
                << ackBlockIt->startPacket << ", " << ackBlockIt->endPacket
-               << "]"
-               << " " << conn;
+               << "]" << " " << conn;
       ackBlockIt++;
       break;
     }

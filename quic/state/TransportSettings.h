@@ -37,9 +37,9 @@ struct CongestionControlConfig {
   // haven't reached the drain target.
   bool drainToTarget{false};
 
-  // Used by: Cubic
-  // If true, exiting hystart switches to additive increase rather than Cubic
-  // congestion avoidance, similar to Linux kernel behavior.
+  //  Used by: Cubic
+  //  If true, exiting hystart switches to additive increase rather than Cubic
+  //  congestion avoidance, similar to Linux kernel behavior.
   bool additiveIncreaseAfterHystart{false};
 
   // Used by: Cubic

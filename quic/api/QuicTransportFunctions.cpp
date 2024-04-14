@@ -1747,8 +1747,7 @@ bool hasAckDataToWrite(const QuicConnectionStateBase& conn) {
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (cryptoHasWritableData(conn)) {
     VLOG(10) << nodeToString(conn.nodeType)
-             << " needs write because of crypto stream"
-             << " " << conn;
+             << " needs write because of crypto stream" << " " << conn;
     return WriteDataReason::CRYPTO_STREAM;
   }
   if (!conn.oneRttWriteCipher &&

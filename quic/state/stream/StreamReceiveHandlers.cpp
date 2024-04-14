@@ -43,8 +43,8 @@ void receiveReadStreamFrameSMHandler(
       appendDataToReadBuffer(
           stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
       if (isAllDataReceived(stream)) {
-        VLOG(10) << "Open: Transition to Closed"
-                 << " stream=" << stream.id << " " << stream.conn;
+        VLOG(10) << "Open: Transition to Closed" << " stream=" << stream.id
+                 << " " << stream.conn;
         stream.recvState = StreamRecvState::Closed;
         if (stream.inTerminalStates()) {
           stream.conn.streamManager->addClosed(stream.id);

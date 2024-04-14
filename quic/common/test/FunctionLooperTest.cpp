@@ -244,8 +244,8 @@ TEST(FunctionLooperTest, TimerTickSize) {
   auto evb = std::make_shared<FollyQuicEventBase>(&backingEvb);
   QuicTimer::SharedPtr pacingTimer =
       std::make_shared<HighResQuicTimer>(evb->getBackingEventBase(), 123ms);
-  FunctionLooper::Ptr looper(new FunctionLooper(
-      evb, [&]() {}, LooperType::ReadLooper));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(evb, [&]() {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
 }
@@ -255,8 +255,8 @@ TEST(FunctionLooperTest, TimerTickSizeAfterNewEvb) {
   auto evb = std::make_shared<FollyQuicEventBase>(&backingEvb);
   QuicTimer::SharedPtr pacingTimer =
       std::make_shared<HighResQuicTimer>(evb->getBackingEventBase(), 123ms);
-  FunctionLooper::Ptr looper(new FunctionLooper(
-      evb, [&]() {}, LooperType::ReadLooper));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(evb, [&]() {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
   looper->detachEventBase();

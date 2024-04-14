@@ -177,11 +177,9 @@ uint64_t NewReno::getBytesInFlight() const noexcept {
   return conn_.lossState.inflightBytes;
 }
 
-void NewReno::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
-}
+void NewReno::setAppIdle(bool, TimePoint) noexcept { /* unsupported */ }
 
-void NewReno::setAppLimited() { /* unsupported */
-}
+void NewReno::setAppLimited() { /* unsupported */ }
 
 bool NewReno::isAppLimited() const noexcept {
   return false; // unsupported

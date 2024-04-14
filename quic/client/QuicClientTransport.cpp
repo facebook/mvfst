@@ -616,8 +616,8 @@ void QuicClientTransport::processUdpPacketData(
       }
       case QuicFrame::Type::DatagramFrame: {
         DatagramFrame& frame = *quicFrame.asDatagramFrame();
-        VLOG(10) << "Client received datagram data: "
-                 << "len=" << frame.length << " " << *this;
+        VLOG(10) << "Client received datagram data: " << "len=" << frame.length
+                 << " " << *this;
         // Datagram isn't retransmittable. But we would like to ack them early.
         // So, make Datagram frames count towards ack policy
         pktHasRetransmittableData = true;

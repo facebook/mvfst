@@ -970,8 +970,8 @@ QuicTransportBase::setPeekCallbackInternal(
     peekCbIt = peekCallbacks_.emplace(id, PeekCallbackData(cb)).first;
   }
   if (!cb) {
-    VLOG(10) << "Resetting the peek callback to nullptr "
-             << "stream=" << id << " peekCb=" << peekCbIt->second.peekCb;
+    VLOG(10) << "Resetting the peek callback to nullptr " << "stream=" << id
+             << " peekCb=" << peekCbIt->second.peekCb;
   }
   peekCbIt->second.peekCb = cb;
   updatePeekLooper();
@@ -2624,8 +2624,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setPingCallback(
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  VLOG(4) << "Setting ping callback "
-          << " cb=" << cb << " " << *this;
+  VLOG(4) << "Setting ping callback " << " cb=" << cb << " " << *this;
 
   pingCallback_ = cb;
   return folly::unit;
@@ -2763,8 +2762,8 @@ void QuicTransportBase::scheduleAckTimeout() {
           timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
       auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
-               << " factoredRtt=" << factoredRtt.count() << "us"
-               << " " << *this;
+               << " factoredRtt=" << factoredRtt.count() << "us" << " "
+               << *this;
       scheduleTimeout(&ackTimeout_, timeoutMs);
     }
   } else {
@@ -2993,8 +2992,7 @@ QuicTransportBase::setDatagramCallback(DatagramCallback* cb) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  VLOG(4) << "Setting datagram callback "
-          << " cb=" << cb << " " << *this;
+  VLOG(4) << "Setting datagram callback " << " cb=" << cb << " " << *this;
 
   datagramCallback_ = cb;
   updateReadLooper();

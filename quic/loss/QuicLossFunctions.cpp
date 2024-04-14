@@ -415,8 +415,8 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       conn.transportSettings.timeReorderingThreshDivisor;
   VLOG(10) << __func__ << " outstanding=" << conn.outstandings.numOutstanding()
            << " largestAcked=" << ackState.largestAckedByPeer.value_or(0)
-           << " delayUntilLost=" << delayUntilLost.count() << "us"
-           << " " << conn;
+           << " delayUntilLost=" << delayUntilLost.count() << "us" << " "
+           << conn;
   CongestionController::LossEvent lossEvent(lossTime);
   folly::Optional<SocketObserverInterface::LossEvent> observerLossEvent;
   {
@@ -511,8 +511,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     // are unacked, so we can set the early retransmit timer for them.
     VLOG(10) << __func__ << " early retransmit timer outstanding="
              << conn.outstandings.packets.empty() << " delayUntilLost"
-             << delayUntilLost.count() << "us"
-             << " " << conn;
+             << delayUntilLost.count() << "us" << " " << conn;
     getLossTime(conn, pnSpace) = delayUntilLost + earliest->metadata.time;
   }
   if (lossEvent.largestLostPacketNum.hasValue()) {
