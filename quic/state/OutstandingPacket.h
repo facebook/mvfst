@@ -55,7 +55,6 @@ struct OutstandingPacketMetadata {
     using StreamIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
     StreamIntervals streamIntervals;
 
-    bool finObserved{false};
     uint64_t streamBytesSent{0};
     uint64_t newStreamBytesSent{0};
     folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
@@ -75,9 +74,6 @@ struct OutstandingPacketMetadata {
         streamDetails.streamIntervals.insert(
             StreamDetails::StreamIntervals::interval_type(
                 frame.offset, frame.offset + frame.len - 1));
-      }
-      if (frame.fin) {
-        streamDetails.finObserved = true;
       }
       streamDetails.streamBytesSent += frame.len;
       if (newData) {

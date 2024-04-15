@@ -1756,7 +1756,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
   const auto streamMatcher = testing::Pair(
       stream->id,
       testing::AllOf(
-          testing::Field(&PacketStreamDetails::finObserved, false),
           testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
           testing::Field(&PacketStreamDetails::newStreamBytesSent, frameLen),
           testing::Field(
@@ -1801,7 +1800,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
   const auto streamMatcher = testing::Pair(
       stream->id,
       testing::AllOf(
-          testing::Field(&PacketStreamDetails::finObserved, true),
           testing::Field(&PacketStreamDetails::streamBytesSent, 15),
           testing::Field(&PacketStreamDetails::newStreamBytesSent, 15),
           testing::Field(
@@ -1848,7 +1846,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
     const auto streamMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(&PacketStreamDetails::streamBytesSent, frame1Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, frame1Len),
             testing::Field(
@@ -1888,7 +1885,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
     const auto streamMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(&PacketStreamDetails::streamBytesSent, frame1Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
@@ -1934,7 +1930,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
     const auto streamMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(
                 &PacketStreamDetails::streamBytesSent, frame1Len + frame2Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, frame2Len),
@@ -1976,7 +1971,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
     const auto streamMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(
                 &PacketStreamDetails::streamBytesSent, frame1Len + frame2Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
@@ -2038,12 +2032,10 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   // Should be two packets at this point, each with 1 frame of data
   EXPECT_THAT(conn->outstandings.packets, SizeIs(2));
   {
-    auto getStreamDetailsMatcher = [&stream, &frameLen](
-                                       auto frameOffset, bool finObserved) {
+    auto getStreamDetailsMatcher = [&stream, &frameLen](auto frameOffset) {
       return testing::Pair(
           stream->id,
           testing::AllOf(
-              testing::Field(&PacketStreamDetails::finObserved, finObserved),
               testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
               testing::Field(
                   &PacketStreamDetails::newStreamBytesSent, frameLen),
@@ -2063,8 +2055,8 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
             testing::Field(
                 &OutstandingPacketMetadata::detailsPerStream,
-                testing::UnorderedElementsAre(getStreamDetailsMatcher(
-                    frame1Offset, false /* finObserved */)))));
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame1Offset)))));
     const auto pkt2Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
         testing::AllOf(
@@ -2072,8 +2064,8 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                 &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
             testing::Field(
                 &OutstandingPacketMetadata::detailsPerStream,
-                testing::UnorderedElementsAre(getStreamDetailsMatcher(
-                    frame2Offset, true /* finObserved */)))));
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame2Offset)))));
     EXPECT_THAT(
         conn->outstandings.packets, ElementsAre(pkt1Matcher, pkt2Matcher));
   }
@@ -2099,7 +2091,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
     auto streamDetailsMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, true),
             testing::Field(&PacketStreamDetails::streamBytesSent, frameLen * 2),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
@@ -2183,7 +2174,6 @@ TEST_F(
       return testing::Pair(
           stream->id,
           testing::AllOf(
-              testing::Field(&PacketStreamDetails::finObserved, false),
               testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
               testing::Field(
                   &PacketStreamDetails::newStreamBytesSent, frameLen),
@@ -2248,7 +2238,6 @@ TEST_F(
     auto streamDetailsMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(&PacketStreamDetails::streamBytesSent, frameLen * 2),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
@@ -2337,7 +2326,6 @@ TEST_F(
       return testing::Pair(
           stream->id,
           testing::AllOf(
-              testing::Field(&PacketStreamDetails::finObserved, false),
               testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
               testing::Field(
                   &PacketStreamDetails::newStreamBytesSent, frameLen),
@@ -2402,7 +2390,6 @@ TEST_F(
     auto streamDetailsMatcher = testing::Pair(
         stream->id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(&PacketStreamDetails::streamBytesSent, frameLen * 2),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
@@ -2481,7 +2468,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
     auto stream1DetailsMatcher = testing::Pair(
         stream1Id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(&PacketStreamDetails::streamBytesSent, stream1Len),
             testing::Field(
                 &PacketStreamDetails::newStreamBytesSent, stream1Len),
@@ -2495,7 +2481,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
     auto stream2DetailsMatcher = testing::Pair(
         stream2Id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, true),
+
             testing::Field(&PacketStreamDetails::streamBytesSent, stream2Len),
             testing::Field(
                 &PacketStreamDetails::newStreamBytesSent, stream2Len),
@@ -2509,7 +2495,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
     auto stream3DetailsMatcher = testing::Pair(
         stream3Id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, true),
             testing::Field(&PacketStreamDetails::streamBytesSent, stream3Len),
             testing::Field(
                 &PacketStreamDetails::newStreamBytesSent, stream3Len),
@@ -2556,7 +2541,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
     auto stream1DetailsMatcher = testing::Pair(
         stream1Id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, false),
             testing::Field(&PacketStreamDetails::streamBytesSent, stream1Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
@@ -2569,7 +2553,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
     auto stream2DetailsMatcher = testing::Pair(
         stream2Id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, true),
             testing::Field(&PacketStreamDetails::streamBytesSent, stream2Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
@@ -2582,7 +2565,6 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
     auto stream3DetailsMatcher = testing::Pair(
         stream3Id,
         testing::AllOf(
-            testing::Field(&PacketStreamDetails::finObserved, true),
             testing::Field(&PacketStreamDetails::streamBytesSent, stream3Len),
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
