@@ -19,6 +19,13 @@ using AckVisitor = std::function<void(
     const QuicWriteFrame&,
     const ReadAckFrame&)>;
 
+using AckedPacketVisitor = std::function<void(
+    const OutstandingPacketWrapper&)>; // outstanding packet acked
+
+using AckedFrameVisitor = std::function<void(
+    const OutstandingPacketWrapper&, // outstanding packet acked
+    const QuicWriteFrame&)>; // outstanding frame acked
+
 /**
  * Processes an ack frame and removes any outstanding packets
  * from the connection that have already been sent.
@@ -29,7 +36,8 @@ AckEvent processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& ackFrame,
-    const AckVisitor& ackVisitor,
+    const AckedPacketVisitor& ackedPacketVisitor,
+    const AckedFrameVisitor& ackedFrameVisitor,
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime);
 

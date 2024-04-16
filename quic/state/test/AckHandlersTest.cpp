@@ -230,7 +230,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
+      [](auto&) {},
+      [&](const auto&, const auto& packetFrame) {
         auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
@@ -323,7 +324,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 30ms);
 
@@ -402,7 +404,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 30ms);
 
@@ -487,7 +490,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 30ms);
 
@@ -569,7 +573,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 30ms);
 
@@ -650,7 +655,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
 
@@ -742,7 +748,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 260ms);
 
@@ -791,7 +798,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
       conn,
       GetParam().pnSpace,
       ackFrame1,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 600ms);
 
@@ -861,7 +869,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
 
@@ -883,7 +892,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
       conn,
       GetParam().pnSpace,
       ackFrame1,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
 
@@ -902,7 +912,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
       conn,
       GetParam().pnSpace,
       ackFrame2,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
 
@@ -977,7 +988,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
+      [](auto&) {},
+      [&](const auto&, const auto& packetFrame) {
         auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
@@ -1036,7 +1048,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&, auto, auto) {},
+      [](auto&) {},
+      [](auto&, auto) {},
       [](auto&, auto&, auto) {},
       Clock::now());
   itr = std::find_if(
@@ -1053,7 +1066,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&, auto, auto) {},
+      [](auto&) {},
+      [](auto&, auto) {},
       [](auto&, auto&, auto) {},
       Clock::now() + 2 * calculatePTO(conn));
 
@@ -1130,7 +1144,8 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
+      [](auto&) {},
+      [&](const auto&, const auto& packetFrame) {
         auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
@@ -1266,7 +1281,8 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
+      [](auto&) {},
+      [&](const auto&, const auto& packetFrame) {
         auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
@@ -1364,9 +1380,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       conn,
       GetParam().pnSpace,
       firstReceivedAck,
-      [&](const auto& outstandingPacket,
-          const auto& packetFrame,
-          const ReadAckFrame&) {
+      [](const auto&) {},
+      [&](const auto& outstandingPacket, const auto& packetFrame) {
         auto ackedPacketNum =
             outstandingPacket.packet.header.getPacketSequenceNum();
         EXPECT_EQ(ackedPacketNum, firstReceivedAck.largestAcked);
@@ -1393,7 +1408,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       conn,
       GetParam().pnSpace,
       secondReceivedAck,
-      [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
+      [](const auto&) {},
+      [&](const auto&, const auto& packetFrame) {
         const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
         if (frame) {
           commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
@@ -1437,7 +1453,8 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
@@ -1458,7 +1475,8 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
 }
@@ -1515,7 +1533,8 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
   EXPECT_EQ(1, conn.outstandings.packets.size());
@@ -1558,7 +1577,8 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto&, const ReadAckFrame&) {},
+      [](auto&) {},
+      [&](const auto&, const auto&) {},
       testLossHandler(lostPackets),
       Clock::now());
   // When [3, 7] are acked, [0, 2] may also be marked loss if they are in the
@@ -1765,14 +1785,14 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   uint16_t ackVisitorCounter = 0;
   // A counting ack visitor
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
-                                const auto& /* packetFrame */,
-                                const auto& /* readAckFrame */) {
+                                const auto& /* packetFrame */) {
     ackVisitorCounter++;
   };
   processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       countingAckVisitor,
       [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
@@ -1832,14 +1852,14 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   uint16_t ackVisitorCounter = 0;
   // A counting ack visitor
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
-                                const auto& /* packetFrame */,
-                                const auto& /* readAckFrame */) {
+                                const auto& /* packetFrame */) {
     ackVisitorCounter++;
   };
   processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       countingAckVisitor,
       [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
@@ -1914,7 +1934,8 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto&, const auto&) { /* ackVisitor */ },
+      [](auto&) {},
+      [&](const auto&, const auto&) { /* ackVisitor */ },
       [&](auto&, auto&, bool) { /* lossVisitor */ },
       Clock::now());
 }
@@ -1967,8 +1988,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   // A counting ack visitor
   uint16_t ackVisitorCounter = 0;
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
-                                const auto& /* packetFrame */,
-                                const auto& /* readAckFrame */) {
+                                const auto& /* packetFrame */) {
     ackVisitorCounter++;
   };
 
@@ -1980,6 +2000,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       conn,
       GetParam().pnSpace,
       ackFrame1,
+      [](auto&) {},
       countingAckVisitor,
       [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
@@ -1994,6 +2015,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       conn,
       GetParam().pnSpace,
       ackFrame2,
+      [](auto&) {},
       countingAckVisitor,
       [&](auto& /* conn */, auto& /* packet */, bool /* processed */
       ) { /* no-op */ },
@@ -2053,14 +2075,14 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
 
   uint16_t ackVisitorCounter = 0;
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
-                                const auto& /* packetFrame */,
-                                const auto& /* readAckFrame */) {
+                                const auto& /* packetFrame */) {
     ackVisitorCounter++;
   };
   processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       countingAckVisitor,
       [&](auto& /* conn */, auto& /* packet */, bool /* processed */
       ) { /* no-op */ },
@@ -2103,7 +2125,8 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](const auto&, const auto&, const auto&) { /* ackVisitor */ },
+      [](auto&) {},
+      [&](const auto&, const auto&) { /* ackVisitor */ },
       [&](auto&, auto&, bool) { /* lossVisitor */ },
       receiveTime);
   EXPECT_EQ(10us, conn.lossState.mrtt);
@@ -2177,14 +2200,14 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   conn.lossState.largestSent = 2;
   // A counting ack visitor
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
-                                const auto& /* packetFrame */,
-                                const auto& /* readAckFrame */) {
+                                const auto& /* packetFrame */) {
     ackVisitorCounter++;
   };
   processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       countingAckVisitor,
       [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
@@ -2230,7 +2253,8 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [&](auto&, auto, auto) { /* ackVisitor */ },
+      [](auto&) {},
+      [&](auto&, auto) { /* ackVisitor */ },
       [&](auto&, auto&, auto) { /* lossVisitor */ },
       receiveTime);
   EXPECT_EQ(2468 + 111, conn.lossState.totalBytesSentAtLastAck);
@@ -2365,7 +2389,8 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
   checkAck(ackEvent);
@@ -2497,7 +2522,8 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
   checkAck(ackEvent);
@@ -2611,7 +2637,8 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
   checkAck(ackEvent);
@@ -2666,9 +2693,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestamps) {
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       [](const auto& /*outstandingPacket*/,
-         const auto& /*frame*/,
-         const auto& /*readAckFrame*/) { /* ack visitor */ },
+         const auto& /*frame*/) { /* ack visitor */ },
       [](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
       ackTime);
@@ -2761,9 +2788,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsGaps) {
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       [](const auto& /*outstandingPacket*/,
-         const auto& /*frame*/,
-         const auto& /*readAckFrame*/) { /* ack visitor */ },
+         const auto& /*frame*/) { /* ack visitor */ },
       [](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
       ackTime);
@@ -2822,9 +2849,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
         conn,
         GetParam().pnSpace,
         ackFrame,
+        [](auto&) {},
         [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/,
-           const auto& /*readAckFrame*/) { /* ack visitor */ },
+           const auto& /*frame*/) { /* ack visitor */ },
         [](auto& /*conn*/, auto& /* packet */, bool /* processed */
         ) { /* no-op lossVisitor */ },
         ackTime);
@@ -2850,9 +2877,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
         conn,
         GetParam().pnSpace,
         ackFrame,
+        [](auto&) {},
         [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/,
-           const auto& /*readAckFrame*/) { /* ack visitor */ },
+           const auto& /*frame*/) { /* ack visitor */ },
         [](auto& /*conn*/, auto& /* packet */, bool /* processed */
         ) { /* no-op lossVisitor */ },
         ackTime);
@@ -2915,9 +2942,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
         conn,
         GetParam().pnSpace,
         ackFrame,
+        [](auto&) {},
         [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/,
-           const auto& /*readAckFrame*/) { /* ack visitor */ },
+           const auto& /*frame*/) { /* ack visitor */ },
         [](auto& /*conn*/, auto& /* packet */, bool /* processed */
         ) { /* no-op lossVisitor */ },
         ackTime);
@@ -3030,9 +3057,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
         conn,
         GetParam().pnSpace,
         ackFrame,
+        [](auto&) {},
         [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/,
-           const auto& /*readAckFrame*/) { /* ack visitor */ },
+           const auto& /*frame*/) { /* ack visitor */ },
         [](auto& /*conn*/, auto& /* packet */, bool /* processed */
         ) { /* no-op lossVisitor */ },
         ackTime);
@@ -3084,9 +3111,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
         conn,
         GetParam().pnSpace,
         ackFrame2,
+        [](auto&) {},
         [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/,
-           const auto& /*readAckFrame*/) { /* ack visitor */ },
+           const auto& /*frame*/) { /* ack visitor */ },
         [](auto& /*conn*/, auto& /* packet */, bool /* processed */
         ) { /* no-op lossVisitor */ },
         ackTime);
@@ -3157,9 +3184,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsMaxCheck) {
       conn,
       GetParam().pnSpace,
       ackFrame,
+      [](auto&) {},
       [](const auto& /*outstandingPacket*/,
-         const auto& /*frame*/,
-         const auto& /*readAckFrame*/) { /* ack visitor */ },
+         const auto& /*frame*/) { /* ack visitor */ },
       [](auto& /*conn*/, auto& /* packet */, bool /* processed */
       ) { /* no-op lossVisitor */ },
       ackTime);
@@ -3345,7 +3372,8 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
 }
@@ -3449,7 +3477,8 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
 }
@@ -3580,7 +3609,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         ackTime);
   }
@@ -3636,7 +3666,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         ackTime);
   }
@@ -3692,7 +3723,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         ackTime);
   }
@@ -3815,7 +3847,8 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         ackTime);
   }
@@ -3839,7 +3872,8 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         ackTime);
   }
@@ -3940,7 +3974,8 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
 }
@@ -4052,7 +4087,8 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
         conn,
         GetParam().pnSpace,
         ackData.ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         ackData.ackTime);
   }
@@ -4140,7 +4176,8 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         startTime + 30ms);
   }
@@ -4233,7 +4270,8 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](const auto&, const auto&, const auto&) {},
+        [](auto&) {},
+        [](const auto&, const auto&) {},
         [](auto&, auto&, bool) {},
         startTime + 510ms);
   }
@@ -4277,7 +4315,8 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](const auto&, const auto&, const auto&) {},
+      [](auto&) {},
+      [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackReceiveTime);
   EXPECT_EQ(conn.lossState.lrtt, 1us);
@@ -4436,9 +4475,9 @@ class AckEventForAppDataTest : public Test {
         *conn_,
         PacketNumberSpace::AppData,
         ackFrame,
+        [](auto&) {},
         [&](const OutstandingPacketWrapper& /* packet */,
-            const QuicWriteFrame& packetFrame,
-            const ReadAckFrame&) {
+            const QuicWriteFrame& packetFrame) {
           switch (packetFrame.type()) {
             case QuicWriteFrame::Type::WriteStreamFrame: {
               const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();

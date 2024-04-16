@@ -710,13 +710,15 @@ TEST_F(BbrTest, BytesCounting) {
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = packetNum;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
-  auto ackVisitor = [&](auto&, auto&, auto&) {};
-  auto lossVisitor = [&](auto&, auto&, bool) {};
+  auto ackPacketVisitor = [](auto&) {};
+  auto ackFrameVisitor = [](auto&, auto&) {};
+  auto lossVisitor = [](auto&, auto&, bool) {};
   processAckFrame(
       conn,
       PacketNumberSpace::AppData,
       ackFrame,
-      ackVisitor,
+      ackPacketVisitor,
+      ackFrameVisitor,
       lossVisitor,
       Clock::now());
   EXPECT_EQ(1200, conn.lossState.totalBytesAcked);

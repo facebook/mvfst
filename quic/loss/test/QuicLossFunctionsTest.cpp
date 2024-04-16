@@ -394,7 +394,8 @@ TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {
       *conn,
       PacketNumberSpace::Initial,
       ackFrame,
-      [&](auto&, auto&, auto&) {},
+      [](auto&) {},
+      [&](auto&, auto&) {},
       lossVisitor,
       Clock::now());
 
@@ -850,14 +851,16 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
     testLossMarkFuncCalled = true;
   };
 
-  auto ackVisitor = [&](auto&, auto&, auto&) {};
+  auto ackPacketVisitor = [](auto&) {};
+  auto ackFrameVisitor = [&](auto&, auto&) {};
 
   // process and remove the acked packet.
   processAckFrame(
       *conn,
       PacketNumberSpace::AppData,
       ackFrame,
-      ackVisitor,
+      ackPacketVisitor,
+      ackFrameVisitor,
       testLossMarkFunc,
       Clock::now());
 

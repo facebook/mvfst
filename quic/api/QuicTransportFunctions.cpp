@@ -1832,7 +1832,10 @@ void implicitAckCryptoStream(
       conn,
       packetNumSpace,
       implicitAck,
-      [&](auto&, auto& packetFrame, auto&) {
+      [](const auto&) {
+        // ackedPacketVisitor. No action needed.
+      },
+      [&](auto&, auto& packetFrame) {
         switch (packetFrame.type()) {
           case QuicWriteFrame::Type::WriteCryptoFrame: {
             const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();

@@ -383,6 +383,78 @@ void QuicClientTransport::processUdpPacketData(
   bool pktHasRetransmittableData = false;
   bool pktHasCryptoData = false;
 
+  AckedPacketVisitor ackedPacketVisitor =
+      [&](const OutstandingPacketWrapper& outstandingPacket) {
+        auto outstandingProtectionType =
+            outstandingPacket.packet.header.getProtectionType();
+        if (outstandingProtectionType == ProtectionType::KeyPhaseZero) {
+          // If we received an ack for data that we sent in 1-rtt from
+          // the server, we can assume that the server had successfully
+          // derived the 1-rtt keys and hence received the client
+          // finished message. We can mark the handshake as confirmed and
+          // drop the handshake cipher and outstanding packets after the
+          // processing loop.
+          conn_->handshakeLayer->handshakeConfirmed();
+        }
+        maybeVerifyPendingKeyUpdate(*conn_, outstandingPacket, regularPacket);
+      };
+
+  AckedFrameVisitor ackedFrameVisitor =
+      [&](const OutstandingPacketWrapper& outstandingPacket,
+          const QuicWriteFrame& packetFrame) {
+        auto outstandingProtectionType =
+            outstandingPacket.packet.header.getProtectionType();
+        switch (packetFrame.type()) {
+          case QuicWriteFrame::Type::WriteAckFrame: {
+            const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+            DCHECK(!frame.ackBlocks.empty());
+            VLOG(4) << "Client received ack for largestAcked="
+                    << frame.ackBlocks.front().end << " " << *this;
+            commonAckVisitorForAckFrame(ackState, frame);
+            break;
+          }
+          case QuicWriteFrame::Type::RstStreamFrame: {
+            const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+            VLOG(4) << "Client received ack for reset frame stream="
+                    << frame.streamId << " " << *this;
+
+            auto stream = conn_->streamManager->getStream(frame.streamId);
+            if (stream) {
+              sendRstAckSMHandler(*stream);
+            }
+            break;
+          }
+          case QuicWriteFrame::Type::WriteStreamFrame: {
+            const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
+
+            auto ackedStream = conn_->streamManager->getStream(frame.streamId);
+            VLOG(4) << "Client got ack for stream=" << frame.streamId
+                    << " offset=" << frame.offset << " fin=" << frame.fin
+                    << " data=" << frame.len
+                    << " closed=" << (ackedStream == nullptr) << " " << *this;
+            if (ackedStream) {
+              sendAckSMHandler(*ackedStream, frame);
+            }
+            break;
+          }
+          case QuicWriteFrame::Type::WriteCryptoFrame: {
+            const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
+            auto cryptoStream = getCryptoStream(
+                *conn_->cryptoState,
+                protectionTypeToEncryptionLevel(outstandingProtectionType));
+            processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
+            break;
+          }
+          case QuicWriteFrame::Type::PingFrame:
+            conn_->pendingEvents.cancelPingTimeout = true;
+            break;
+          case QuicWriteFrame::Type::QuicSimpleFrame:
+          default:
+            // ignore other frames.
+            break;
+        }
+      };
+
   for (auto& quicFrame : regularPacket.frames) {
     switch (quicFrame.type()) {
       case QuicFrame::Type::ReadAckFrame: {
@@ -393,78 +465,8 @@ void QuicClientTransport::processUdpPacketData(
             *conn_,
             pnSpace,
             ackFrame,
-            [&](const OutstandingPacketWrapper& outstandingPacket,
-                const QuicWriteFrame& packetFrame,
-                const ReadAckFrame&) {
-              auto outstandingProtectionType =
-                  outstandingPacket.packet.header.getProtectionType();
-              if (outstandingProtectionType == ProtectionType::KeyPhaseZero) {
-                // If we received an ack for data that we sent in 1-rtt from
-                // the server, we can assume that the server had successfully
-                // derived the 1-rtt keys and hence received the client
-                // finished message. We can mark the handshake as confirmed and
-                // drop the handshake cipher and outstanding packets after the
-                // processing loop.
-                conn_->handshakeLayer->handshakeConfirmed();
-              }
-              maybeVerifyPendingKeyUpdate(
-                  *conn_, outstandingPacket, regularPacket);
-              switch (packetFrame.type()) {
-                case QuicWriteFrame::Type::WriteAckFrame: {
-                  const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
-                  DCHECK(!frame.ackBlocks.empty());
-                  VLOG(4) << "Client received ack for largestAcked="
-                          << frame.ackBlocks.front().end << " " << *this;
-                  commonAckVisitorForAckFrame(ackState, frame);
-                  break;
-                }
-                case QuicWriteFrame::Type::RstStreamFrame: {
-                  const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
-                  VLOG(4) << "Client received ack for reset frame stream="
-                          << frame.streamId << " " << *this;
-
-                  auto stream = conn_->streamManager->getStream(frame.streamId);
-                  if (stream) {
-                    sendRstAckSMHandler(*stream);
-                  }
-                  break;
-                }
-                case QuicWriteFrame::Type::WriteStreamFrame: {
-                  const WriteStreamFrame& frame =
-                      *packetFrame.asWriteStreamFrame();
-
-                  auto ackedStream =
-                      conn_->streamManager->getStream(frame.streamId);
-                  VLOG(4) << "Client got ack for stream=" << frame.streamId
-                          << " offset=" << frame.offset << " fin=" << frame.fin
-                          << " data=" << frame.len
-                          << " closed=" << (ackedStream == nullptr) << " "
-                          << *this;
-                  if (ackedStream) {
-                    sendAckSMHandler(*ackedStream, frame);
-                  }
-                  break;
-                }
-                case QuicWriteFrame::Type::WriteCryptoFrame: {
-                  const WriteCryptoFrame& frame =
-                      *packetFrame.asWriteCryptoFrame();
-                  auto cryptoStream = getCryptoStream(
-                      *conn_->cryptoState,
-                      protectionTypeToEncryptionLevel(
-                          outstandingProtectionType));
-                  processCryptoStreamAck(
-                      *cryptoStream, frame.offset, frame.len);
-                  break;
-                }
-                case QuicWriteFrame::Type::PingFrame:
-                  conn_->pendingEvents.cancelPingTimeout = true;
-                  break;
-                case QuicWriteFrame::Type::QuicSimpleFrame:
-                default:
-                  // ignore other frames.
-                  break;
-              }
-            },
+            ackedPacketVisitor,
+            ackedFrameVisitor,
             markPacketLoss,
             udpPacketTimings.receiveTimePoint));
         break;

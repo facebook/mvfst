@@ -51,7 +51,8 @@ AckEvent processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& frame,
-    const AckVisitor& ackVisitor,
+    const AckedPacketVisitor& ackedPacketVisitor,
+    const AckedFrameVisitor& ackedFrameVisitor,
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime) {
   const auto nowTime = Clock::now();
@@ -335,6 +336,10 @@ AckEvent processAckFrame(
        packetWithHandlerContextItr != packetsWithHandlerContext.rend();
        packetWithHandlerContextItr++) {
     auto& outstandingPacket = packetWithHandlerContextItr->outstandingPacket;
+
+    // run the ACKed packet visitor
+    ackedPacketVisitor(outstandingPacket);
+
     const auto processAllFrames = packetWithHandlerContextItr->processAllFrames;
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     for (auto& packetFrame : outstandingPacket.packet.frames) {
@@ -387,8 +392,8 @@ AckEvent processAckFrame(
             getLargestDeliverableOffset(*maybeAckedStreamState)};
       }(packetFrame);
 
-      // run the ACK visitor
-      ackVisitor(outstandingPacket, packetFrame, frame);
+      // run the ACKed frame visitor
+      ackedFrameVisitor(outstandingPacket, packetFrame);
 
       // Part 2 and 3: Process current state relative to the PreAckVistorState.
       if (maybePreAckVisitorState.has_value()) {

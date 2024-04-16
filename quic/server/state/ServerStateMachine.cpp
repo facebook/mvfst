@@ -1024,6 +1024,70 @@ void onServerReadDataFromOpen(
     bool isNonProbingPacket = false;
     bool handshakeConfirmedThisLoop = false;
 
+    AckedPacketVisitor ackedPacketVisitor =
+        [&](const OutstandingPacketWrapper& outstandingPacket) {
+          maybeVerifyPendingKeyUpdate(conn, outstandingPacket, regularPacket);
+        };
+
+    AckedFrameVisitor ackedFrameVisitor =
+        [&](const OutstandingPacketWrapper&,
+            const QuicWriteFrame& packetFrame) {
+          switch (packetFrame.type()) {
+            case QuicWriteFrame::Type::WriteStreamFrame: {
+              const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
+              VLOG(4) << "Server received ack for stream=" << frame.streamId
+                      << " offset=" << frame.offset << " fin=" << frame.fin
+                      << " len=" << frame.len << " " << conn;
+              auto ackedStream = conn.streamManager->getStream(frame.streamId);
+              if (ackedStream) {
+                sendAckSMHandler(*ackedStream, frame);
+              }
+              break;
+            }
+            case QuicWriteFrame::Type::WriteCryptoFrame: {
+              const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
+              auto cryptoStream =
+                  getCryptoStream(*conn.cryptoState, encryptionLevel);
+              processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
+              break;
+            }
+            case QuicWriteFrame::Type::RstStreamFrame: {
+              const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+              VLOG(4) << "Server received ack for reset stream="
+                      << frame.streamId << " " << conn;
+              auto stream = conn.streamManager->getStream(frame.streamId);
+              if (stream) {
+                sendRstAckSMHandler(*stream);
+              }
+              break;
+            }
+            case QuicWriteFrame::Type::WriteAckFrame: {
+              const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+              DCHECK(!frame.ackBlocks.empty());
+              VLOG(4) << "Server received ack for largestAcked="
+                      << frame.ackBlocks.front().end << " " << conn;
+              commonAckVisitorForAckFrame(ackState, frame);
+              break;
+            }
+            case QuicWriteFrame::Type::PingFrame:
+              conn.pendingEvents.cancelPingTimeout = true;
+              return;
+            case QuicWriteFrame::Type::QuicSimpleFrame: {
+              const QuicSimpleFrame& frame = *packetFrame.asQuicSimpleFrame();
+              // ACK of HandshakeDone is a server-specific behavior.
+              if (frame.asHandshakeDoneFrame()) {
+                // Call handshakeConfirmed outside of the packet
+                // processing loop to avoid a re-entrancy.
+                handshakeConfirmedThisLoop = true;
+              }
+              break;
+            }
+            default: {
+              break;
+            }
+          }
+        };
+
     for (auto& quicFrame : regularPacket.frames) {
       switch (quicFrame.type()) {
         case QuicFrame::Type::ReadAckFrame: {
@@ -1035,74 +1099,8 @@ void onServerReadDataFromOpen(
               conn,
               packetNumberSpace,
               ackFrame,
-              [&](const OutstandingPacketWrapper& outstandingPacket,
-                  const QuicWriteFrame& packetFrame,
-                  const ReadAckFrame&) {
-                maybeVerifyPendingKeyUpdate(
-                    conn, outstandingPacket, regularPacket);
-
-                switch (packetFrame.type()) {
-                  case QuicWriteFrame::Type::WriteStreamFrame: {
-                    const WriteStreamFrame& frame =
-                        *packetFrame.asWriteStreamFrame();
-                    VLOG(4)
-                        << "Server received ack for stream=" << frame.streamId
-                        << " offset=" << frame.offset << " fin=" << frame.fin
-                        << " len=" << frame.len << " " << conn;
-                    auto ackedStream =
-                        conn.streamManager->getStream(frame.streamId);
-                    if (ackedStream) {
-                      sendAckSMHandler(*ackedStream, frame);
-                    }
-                    break;
-                  }
-                  case QuicWriteFrame::Type::WriteCryptoFrame: {
-                    const WriteCryptoFrame& frame =
-                        *packetFrame.asWriteCryptoFrame();
-                    auto cryptoStream =
-                        getCryptoStream(*conn.cryptoState, encryptionLevel);
-                    processCryptoStreamAck(
-                        *cryptoStream, frame.offset, frame.len);
-                    break;
-                  }
-                  case QuicWriteFrame::Type::RstStreamFrame: {
-                    const RstStreamFrame& frame =
-                        *packetFrame.asRstStreamFrame();
-                    VLOG(4) << "Server received ack for reset stream="
-                            << frame.streamId << " " << conn;
-                    auto stream = conn.streamManager->getStream(frame.streamId);
-                    if (stream) {
-                      sendRstAckSMHandler(*stream);
-                    }
-                    break;
-                  }
-                  case QuicWriteFrame::Type::WriteAckFrame: {
-                    const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
-                    DCHECK(!frame.ackBlocks.empty());
-                    VLOG(4) << "Server received ack for largestAcked="
-                            << frame.ackBlocks.front().end << " " << conn;
-                    commonAckVisitorForAckFrame(ackState, frame);
-                    break;
-                  }
-                  case QuicWriteFrame::Type::PingFrame:
-                    conn.pendingEvents.cancelPingTimeout = true;
-                    return;
-                  case QuicWriteFrame::Type::QuicSimpleFrame: {
-                    const QuicSimpleFrame& frame =
-                        *packetFrame.asQuicSimpleFrame();
-                    // ACK of HandshakeDone is a server-specific behavior.
-                    if (frame.asHandshakeDoneFrame()) {
-                      // Call handshakeConfirmed outside of the packet
-                      // processing loop to avoid a re-entrancy.
-                      handshakeConfirmedThisLoop = true;
-                    }
-                    break;
-                  }
-                  default: {
-                    break;
-                  }
-                }
-              },
+              ackedPacketVisitor,
+              ackedFrameVisitor,
               markPacketLoss,
               readData.udpPacket.timings.receiveTimePoint));
           break;
