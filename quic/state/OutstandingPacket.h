@@ -30,8 +30,6 @@ struct OutstandingPacketMetadata {
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
   uint64_t inflightBytes;
-  // Total number of packets sent on this connection.
-  uint32_t totalPacketsSent{0};
   // Total number of ack-eliciting packets sent on this connection.
   uint32_t totalAckElicitingPacketsSent{0};
   // Write Count is the value of the monotonically increasing counter which
@@ -127,7 +125,6 @@ struct OutstandingPacketMetadata {
         isHandshake(isHandshakeIn),
         totalBytesSent(totalBytesSentIn),
         inflightBytes(inflightBytesIn),
-        totalPacketsSent(lossStateIn.totalPacketsSent),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
         writeCount(writeCount),
         detailsPerStream(std::move(detailsPerStream)),
