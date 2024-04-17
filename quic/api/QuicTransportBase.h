@@ -523,6 +523,26 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
+  class ExcessWriteTimeout : public QuicTimerCallback {
+   public:
+    ~ExcessWriteTimeout() override = default;
+
+    explicit ExcessWriteTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->excessWriteTimeoutExpired();
+    }
+
+    void callbackCanceled() noexcept override {
+      // Do nothing.
+      return;
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
   class PathValidationTimeout : public QuicTimerCallback {
    public:
     ~PathValidationTimeout() override = default;
@@ -781,6 +801,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void keepaliveTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
+  void excessWriteTimeoutExpired() noexcept;
 
   void setIdleTimer();
   void scheduleAckTimeout();
@@ -899,6 +920,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   KeepaliveTimeout keepaliveTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
+  ExcessWriteTimeout excessWriteTimeout_;
   FunctionLooper::Ptr readLooper_;
   FunctionLooper::Ptr peekLooper_;
   FunctionLooper::Ptr writeLooper_;

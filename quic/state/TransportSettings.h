@@ -362,6 +362,7 @@ struct TransportSettings {
   bool rejectIncomingKeyUpdates{false};
   // Temporary flag to test new stream blocked condition.
   bool useNewStreamBlockedCondition{false};
+  bool scheduleTimerForExcessWrites{false};
 };
 
 } // namespace quic

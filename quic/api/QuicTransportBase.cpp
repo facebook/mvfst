@@ -55,6 +55,7 @@ QuicTransportBase::QuicTransportBase(
       keepaliveTimeout_(this),
       drainTimeout_(this),
       pingTimeout_(this),
+      excessWriteTimeout_(this),
       readLooper_(new FunctionLooper(
           evb_,
           [this]() { invokeReadDataAndCallbacks(); },
@@ -372,6 +373,7 @@ void QuicTransportBase::closeImpl(
   cancelTimeout(&idleTimeout_);
   cancelTimeout(&keepaliveTimeout_);
   cancelTimeout(&pingTimeout_);
+  cancelTimeout(&excessWriteTimeout_);
 
   VLOG(10) << "Stopping read looper due to immediate close " << *this;
   readLooper_->stop();
@@ -2692,6 +2694,13 @@ void QuicTransportBase::pingTimeoutExpired() noexcept {
   }
 }
 
+void QuicTransportBase::excessWriteTimeoutExpired() noexcept {
+  auto writeDataReason = shouldWriteData(*conn_);
+  if (writeDataReason != WriteDataReason::NO_WRITE) {
+    pacedWriteDataToSocket();
+  }
+}
+
 void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
   CHECK(conn_->outstandingPathValidation);
 
@@ -3541,6 +3550,16 @@ void QuicTransportBase::pacedWriteDataToSocket() {
     // timeout, we should do a normal write to flush out the residue from
     // pacing write.
     writeSocketDataAndCatch();
+
+    if (conn_->transportSettings.scheduleTimerForExcessWrites) {
+      // If we still have data to write, yield the event loop now but schedule a
+      // timeout to come around and write again as soon as possible.
+      auto writeDataReason = shouldWriteData(*conn_);
+      if (writeDataReason != WriteDataReason::NO_WRITE &&
+          !excessWriteTimeout_.isTimerCallbackScheduled()) {
+        scheduleTimeout(&excessWriteTimeout_, 0ms);
+      }
+    }
     return;
   }
 
