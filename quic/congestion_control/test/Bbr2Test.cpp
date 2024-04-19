@@ -126,8 +126,9 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
             .setPacketNum(pkt.getPacketSequenceNum())
             .setNonDsrPacketSequenceNumber(
                 pkt.nonDsrPacketSequenceNumber.value())
-            .setOutstandingPacketMetadata(std::move(pkt.metadata))
-            .setLastAckedPacketInfo(std::move(pkt.lastAckedPacketInfo))
+            .setOutstandingPacketMetadata(pkt.metadata)
+            .setLastAckedPacketInfo(
+                pkt.lastAckedPacketInfo ? &*pkt.lastAckedPacketInfo : nullptr)
             .setAppLimited(pkt.isAppLimited)
             .setDetailsPerStream(
                 CongestionController::AckEvent::AckPacket::DetailsPerStream())

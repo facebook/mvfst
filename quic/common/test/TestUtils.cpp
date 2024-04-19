@@ -568,20 +568,21 @@ CongestionController::AckEvent makeAck(
 
   ack.ackedBytes = ackedSize;
   ack.largestNewlyAckedPacket = seq;
+  OutstandingPacketMetadata opm(
+      sentTime,
+      ackedSize /* encodedSize */,
+      ackedSize /* encodedBodySize */,
+      false /* isHandshake */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
+      LossState() /* lossState */,
+      0 /* writeCount */,
+      OutstandingPacketMetadata::DetailsPerStream());
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(seq)
           .setNonDsrPacketSequenceNumber(seq)
-          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
-              sentTime,
-              ackedSize /* encodedSize */,
-              ackedSize /* encodedBodySize */,
-              false /* isHandshake */,
-              0 /* totalBytesSent */,
-              0 /* inflightBytes */,
-              LossState() /* lossState */,
-              0 /* writeCount */,
-              OutstandingPacketMetadata::DetailsPerStream()))
+          .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
   ack.largestNewlyAckedPacketSentTime = sentTime;
@@ -718,8 +719,11 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
       .setPacketNum(outstandingPacket.packet.header.getPacketSequenceNum())
       .setNonDsrPacketSequenceNumber(
           outstandingPacket.packet.header.getPacketSequenceNum())
-      .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
-      .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
+      .setOutstandingPacketMetadata(outstandingPacket.metadata)
+      .setLastAckedPacketInfo(
+          outstandingPacket.lastAckedPacketInfo
+              ? &*outstandingPacket.lastAckedPacketInfo
+              : nullptr)
       .setAppLimited(outstandingPacket.isAppLimited)
       .setDetailsPerStream(
           CongestionController::AckEvent::AckPacket::DetailsPerStream())

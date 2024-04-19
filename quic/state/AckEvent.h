@@ -280,11 +280,10 @@ struct AckEvent {
       Builder&& setNonDsrPacketSequenceNumber(
           uint64_t nonDsrPacketSequenceNumberIn);
       Builder&& setOutstandingPacketMetadata(
-          OutstandingPacketMetadata&& outstandingPacketMetadataIn);
+          OutstandingPacketMetadata& outstandingPacketMetadataIn);
       Builder&& setDetailsPerStream(DetailsPerStream&& detailsPerStreamIn);
       Builder&& setLastAckedPacketInfo(
-          folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>&&
-              lastAckedPacketInfoIn);
+          OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfoIn);
       Builder&& setAppLimited(bool appLimitedIn);
       Builder&& setReceiveDeltaTimeStamp(
           folly::Optional<std::chrono::microseconds>&&
@@ -295,10 +294,10 @@ struct AckEvent {
      private:
       folly::Optional<quic::PacketNum> packetNum;
       folly::Optional<uint64_t> nonDsrPacketSequenceNumber;
-      folly::Optional<OutstandingPacketMetadata> outstandingPacketMetadata;
+      OutstandingPacketMetadata* outstandingPacketMetadata{nullptr};
       folly::Optional<DetailsPerStream> detailsPerStream;
-      folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
-          lastAckedPacketInfo;
+      OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfo{
+          nullptr};
       folly::Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
       bool isAppLimited{false};
     };
@@ -307,8 +306,8 @@ struct AckEvent {
     explicit AckPacket(
         quic::PacketNum packetNumIn,
         uint64_t nonDsrPacketSequenceNumberIn,
-        OutstandingPacketMetadata&& outstandingPacketMetadataIn,
-        DetailsPerStream&& detailsPerStreamIn,
+        const OutstandingPacketMetadata& outstandingPacketMetadataIn, // NOLINT
+        const DetailsPerStream& detailsPerStreamIn, // NOLINT
         folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
             lastAckedPacketInfoIn,
         bool isAppLimitedIn,

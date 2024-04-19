@@ -1846,20 +1846,21 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .setLargestAckedPacket(1)
                  .build();
+  OutstandingPacketMetadata opm(
+      currentTime + 12s /* sentTime */,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
+      false /* isHandshake */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
+      LossState() /* lossState */,
+      0 /* writeCount */,
+      OutstandingPacketMetadata::DetailsPerStream());
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
           .setNonDsrPacketSequenceNumber(1)
-          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
-              currentTime + 12s /* sentTime */,
-              0 /* encodedSize */,
-              0 /* encodedBodySize */,
-              false /* isHandshake */,
-              0 /* totalBytesSent */,
-              0 /* inflightBytes */,
-              LossState() /* lossState */,
-              0 /* writeCount */,
-              OutstandingPacketMetadata::DetailsPerStream()))
+          .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
@@ -1880,20 +1881,21 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .setLargestAckedPacket(1)
                  .build();
+  OutstandingPacketMetadata opm(
+      currentTime + 4s /* sentTime */,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
+      false /* isHandshake */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
+      LossState() /* lossState */,
+      0 /* writeCount */,
+      OutstandingPacketMetadata::DetailsPerStream());
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
           .setNonDsrPacketSequenceNumber(1)
-          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
-              currentTime + 4s /* sentTime */,
-              0 /* encodedSize */,
-              0 /* encodedBodySize */,
-              false /* isHandshake */,
-              0 /* totalBytesSent */,
-              0 /* inflightBytes */,
-              LossState() /* lossState */,
-              0 /* writeCount */,
-              OutstandingPacketMetadata::DetailsPerStream()))
+          .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
@@ -1913,20 +1915,21 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .setLargestAckedPacket(1)
                  .build();
+  OutstandingPacketMetadata opm(
+      currentTime + 12s /* sentTime */,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
+      false /* isHandshake */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
+      LossState() /* lossState */,
+      0 /* writeCount */,
+      OutstandingPacketMetadata::DetailsPerStream());
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
           .setNonDsrPacketSequenceNumber(1)
-          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
-              currentTime + 12s /* sentTime */,
-              0 /* encodedSize */,
-              0 /* encodedBodySize */,
-              false /* isHandshake */,
-              0 /* totalBytesSent */,
-              0 /* inflightBytes */,
-              LossState() /* lossState */,
-              0 /* writeCount */,
-              OutstandingPacketMetadata::DetailsPerStream()))
+          .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
@@ -2584,9 +2587,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
           .setPacketNum(9)
           .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .build());
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
   ackState.largestAckedByPeer =
@@ -2677,9 +2680,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
           .setPacketNum(0)
           .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .build());
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
@@ -2769,18 +2772,18 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
           .setPacketNum(20)
           .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .build());
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(19)
           .setNonDsrPacketSequenceNumber(19 - 6)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .build());
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
   ackState.largestAckedByPeer =
@@ -2851,9 +2854,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
           .setPacketNum(9)
           .setNonDsrPacketSequenceNumber(9)
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .build());
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
@@ -2926,17 +2929,17 @@ TEST_F(
           .setPacketNum(9)
           .setNonDsrPacketSequenceNumber(9)
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .build());
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(0)
           .setNonDsrPacketSequenceNumber(0)
-          .setOutstandingPacketMetadata(std::move(
+          .setOutstandingPacketMetadata(
               getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata))
+                  ->metadata)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
@@ -3011,7 +3014,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
               .setPacketNum(op.packet.header.getPacketSequenceNum())
               .setNonDsrPacketSequenceNumber(0)
               .setDetailsPerStream(std::move(detailsPerStream))
-              .setOutstandingPacketMetadata(std::move(op.metadata))
+              .setOutstandingPacketMetadata(op.metadata)
               .build());
     }
     op.packet.frames.emplace_back(f);
@@ -3034,7 +3037,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
             .setNonDsrPacketSequenceNumber(
                 op.nonDsrPacketSequenceNumber.value())
             .setDetailsPerStream({})
-            .setOutstandingPacketMetadata(std::move(op.metadata))
+            .setOutstandingPacketMetadata(op.metadata)
             .build());
   }
   // Add one more DSR packet from the same stream, ACKed
@@ -3052,7 +3055,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
           .setPacketNum(op.packet.header.getPacketSequenceNum())
           .setNonDsrPacketSequenceNumber(0)
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(op.metadata))
+          .setOutstandingPacketMetadata(op.metadata)
           .build());
 
   ASSERT_EQ(9, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
@@ -3129,7 +3132,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
               .setNonDsrPacketSequenceNumber(
                   op.nonDsrPacketSequenceNumber.value())
               .setDetailsPerStream(std::move(detailsPerStream))
-              .setOutstandingPacketMetadata(std::move(op.metadata))
+              .setOutstandingPacketMetadata(op.metadata)
               .build());
     }
     op.packet.frames.emplace_back(f);
@@ -3153,7 +3156,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
             .setPacketNum(op.packet.header.getPacketSequenceNum())
             .setNonDsrPacketSequenceNumber(0)
             .setDetailsPerStream(std::move(detailsPerStream))
-            .setOutstandingPacketMetadata(std::move(op.metadata))
+            .setOutstandingPacketMetadata(op.metadata)
             .build());
     op.packet.frames.emplace_back(f);
     op.isDSRPacket = true;
@@ -3170,7 +3173,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
           .setPacketNum(op.packet.header.getPacketSequenceNum())
           .setNonDsrPacketSequenceNumber(op.nonDsrPacketSequenceNumber.value())
           .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(std::move(op.metadata))
+          .setOutstandingPacketMetadata(op.metadata)
           .build());
 
   ASSERT_EQ(9, conn->outstandings.packetCount[PacketNumberSpace::AppData]);

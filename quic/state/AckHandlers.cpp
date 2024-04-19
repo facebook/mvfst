@@ -426,10 +426,12 @@ AckEvent processAckFrame(
                 outstandingPacket.packet.header.getPacketSequenceNum())
             .setNonDsrPacketSequenceNumber(
                 outstandingPacket.nonDsrPacketSequenceNumber.value_or(0))
-            .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
+            .setOutstandingPacketMetadata(outstandingPacket.metadata)
             .setDetailsPerStream(std::move(detailsPerStream))
             .setLastAckedPacketInfo(
-                std::move(outstandingPacket.lastAckedPacketInfo))
+                outstandingPacket.lastAckedPacketInfo
+                    ? &outstandingPacket.lastAckedPacketInfo.value()
+                    : nullptr)
             .setAppLimited(outstandingPacket.isAppLimited)
             .setReceiveDeltaTimeStamp(
                 maybeRxTimestamp != packetReceiveTimeStamps.end()

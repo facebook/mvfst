@@ -48,16 +48,16 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
 AckEvent::AckPacket::AckPacket(
     quic::PacketNum packetNumIn,
     uint64_t nonDsrPacketSequenceNumberIn,
-    OutstandingPacketMetadata&& outstandingPacketMetadataIn,
-    DetailsPerStream&& detailsPerStreamIn,
+    const OutstandingPacketMetadata& outstandingPacketMetadataIn, // NOLINT
+    const DetailsPerStream& detailsPerStreamIn, // NOLINT
     folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
         lastAckedPacketInfoIn,
     bool isAppLimitedIn,
     folly::Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec)
     : packetNum(packetNumIn),
       nonDsrPacketSequenceNumber(nonDsrPacketSequenceNumberIn),
-      outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
-      detailsPerStream(std::move(detailsPerStreamIn)),
+      outstandingPacketMetadata(outstandingPacketMetadataIn), // NOLINT
+      detailsPerStream(detailsPerStreamIn), // NOLINT
       lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
       receiveRelativeTimeStampUsec(std::move(receiveRelativeTimeStampUsec)),
       isAppLimited(isAppLimitedIn) {}
@@ -77,8 +77,8 @@ AckEvent::AckPacket::Builder::setNonDsrPacketSequenceNumber(
 
 AckEvent::AckPacket::Builder&&
 AckEvent::AckPacket::Builder::setOutstandingPacketMetadata(
-    OutstandingPacketMetadata&& outstandingPacketMetadataIn) {
-  outstandingPacketMetadata = std::move(outstandingPacketMetadataIn);
+    OutstandingPacketMetadata& outstandingPacketMetadataIn) {
+  outstandingPacketMetadata = &outstandingPacketMetadataIn;
   return std::move(*this);
 }
 
@@ -91,9 +91,8 @@ AckEvent::AckPacket::Builder::setDetailsPerStream(
 
 AckEvent::AckPacket::Builder&&
 AckEvent::AckPacket::Builder::setLastAckedPacketInfo(
-    folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>&&
-        lastAckedPacketInfoIn) {
-  lastAckedPacketInfo = std::move(lastAckedPacketInfoIn);
+    OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfoIn) {
+  lastAckedPacketInfo = lastAckedPacketInfoIn;
   return std::move(*this);
 }
 
@@ -112,14 +111,17 @@ AckEvent::AckPacket::Builder::setReceiveDeltaTimeStamp(
 
 AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
   CHECK(packetNum.has_value());
-  CHECK(outstandingPacketMetadata.has_value());
+  CHECK(outstandingPacketMetadata);
   CHECK(detailsPerStream.has_value());
   return AckEvent::AckPacket(
       packetNum.value(),
       nonDsrPacketSequenceNumber.value(),
-      std::move(outstandingPacketMetadata.value()),
-      std::move(detailsPerStream.value()),
-      std::move(lastAckedPacketInfo),
+      *outstandingPacketMetadata,
+      detailsPerStream.value(),
+      lastAckedPacketInfo
+          ? folly::Optional<OutstandingPacket::LastAckedPacketInfo>(
+                *lastAckedPacketInfo)
+          : folly::none,
       isAppLimited,
       std::move(receiveRelativeTimeStampUsec));
 }
