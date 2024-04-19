@@ -19,11 +19,23 @@ getPreviousOutstandingPacket(
   return std::find_if(
       from, conn.outstandings.packets.rend(), [=](const auto& op) {
         return !op.declaredLost &&
-            packetNumberSpace == op.packet.header.getPacketNumberSpace();
+            packetNumberSpace == op.packet.header.getPacketNumberSpace() &&
+            !op.metadata.scheduledForDestruction;
       });
 }
 std::deque<quic::OutstandingPacketWrapper>::reverse_iterator
 getPreviousOutstandingPacketIncludingLost(
+    quic::QuicConnectionStateBase& conn,
+    quic::PacketNumberSpace packetNumberSpace,
+    std::deque<quic::OutstandingPacketWrapper>::reverse_iterator from) {
+  return std::find_if(
+      from, conn.outstandings.packets.rend(), [=](const auto& op) {
+        return packetNumberSpace == op.packet.header.getPacketNumberSpace() &&
+            !op.metadata.scheduledForDestruction;
+      });
+}
+std::deque<quic::OutstandingPacketWrapper>::reverse_iterator
+getPreviousOutstandingPacketIncludingLostAndDeleted(
     quic::QuicConnectionStateBase& conn,
     quic::PacketNumberSpace packetNumberSpace,
     std::deque<quic::OutstandingPacketWrapper>::reverse_iterator from) {
@@ -293,6 +305,13 @@ getLastOutstandingPacketIncludingLost(
   return getPreviousOutstandingPacketIncludingLost(
       conn, packetNumberSpace, conn.outstandings.packets.rbegin());
 }
+std::deque<OutstandingPacketWrapper>::reverse_iterator
+getLastOutstandingPacketIncludingLostAndDeleted(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace packetNumberSpace) {
+  return getPreviousOutstandingPacketIncludingLostAndDeleted(
+      conn, packetNumberSpace, conn.outstandings.packets.rbegin());
+}
 
 std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(
     QuicConnectionStateBase& conn,
@@ -301,7 +320,8 @@ std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(
   return std::find_if(
       from, conn.outstandings.packets.end(), [=](const auto& op) {
         return !op.declaredLost &&
-            packetNumberSpace == op.packet.header.getPacketNumberSpace();
+            packetNumberSpace == op.packet.header.getPacketNumberSpace() &&
+            !op.metadata.scheduledForDestruction;
       });
 }
 

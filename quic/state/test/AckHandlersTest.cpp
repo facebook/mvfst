@@ -639,16 +639,12 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
 
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
+  std::unordered_set<quic::PacketNum> packetNumsDestroyed;
   EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
       .Times(3)
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
-      }))
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
-      }))
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
+      .WillRepeatedly(Invoke([&](auto& outstandingPacket) {
+        packetNumsDestroyed.insert(
+            outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
   processAckFrame(
@@ -659,6 +655,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
       [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       Clock::now());
+  EXPECT_THAT(packetNumsDestroyed, UnorderedElementsAre(1, 2, 3));
 
   EXPECT_EQ(conn.outstandings.packets.size(), 0);
 }
@@ -735,13 +732,13 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
   ackFrame.largestAcked = 3;
   ackFrame.ackBlocks.emplace_back(2, 3);
 
+  std::unordered_set<quic::PacketNum> packetsDestroyed;
+
   EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
       .Times(2)
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(3, outstandingPacket.packet.header.getPacketSequenceNum());
-      }))
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(2, outstandingPacket.packet.header.getPacketSequenceNum());
+      .WillRepeatedly(Invoke([&](auto& outstandingPacket) {
+        packetsDestroyed.insert(
+            outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
   processAckFrame(
@@ -752,6 +749,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
       [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 260ms);
+
+  EXPECT_THAT(packetsDestroyed, UnorderedElementsAre(2, 3));
 
   // Send and ACK another packet #4, which should clear both #1 and #4.
   {
@@ -784,14 +783,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
   ackFrame1.largestAcked = 4;
   ackFrame1.ackBlocks.emplace_back(4, 4);
 
+  std::unordered_map<quic::PacketNum, bool> packetNumToDeclaredLost;
+
   EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_))
       .Times(2)
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(1, outstandingPacket.packet.header.getPacketSequenceNum());
-        EXPECT_EQ(true, outstandingPacket.declaredLost);
-      }))
-      .WillOnce(Invoke([&](auto& outstandingPacket) {
-        EXPECT_EQ(4, outstandingPacket.packet.header.getPacketSequenceNum());
+      .WillRepeatedly(Invoke([&](auto& outstandingPacket) {
+        quic::PacketNum packetNum =
+            outstandingPacket.packet.header.getPacketSequenceNum();
+        bool declatedLost = outstandingPacket.declaredLost;
+        packetNumToDeclaredLost[packetNum] = declatedLost;
       }));
 
   processAckFrame(
@@ -802,6 +802,10 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
       [](const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       startTime + 600ms);
+
+  EXPECT_THAT(
+      packetNumToDeclaredLost,
+      UnorderedElementsAre(Pair(1, true), Pair(4, false)));
 
   EXPECT_EQ(conn.outstandings.packets.size(), 0);
 }

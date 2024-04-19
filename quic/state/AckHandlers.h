@@ -27,6 +27,14 @@ using AckedFrameVisitor = std::function<void(
     const QuicWriteFrame&)>; // outstanding frame acked
 
 /**
+ * Processes an ack frame and removes any outstanding packets.
+ */
+void removeOutstandingsForAck(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace,
+    const ReadAckFrame& frame);
+
+/**
  * Processes an ack frame and removes any outstanding packets
  * from the connection that have already been sent.
  *

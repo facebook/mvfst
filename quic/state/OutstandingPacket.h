@@ -47,6 +47,8 @@ struct OutstandingPacketMetadata {
   // due to reordering
   folly::Optional<uint32_t> lossReorderDistance;
 
+  bool scheduledForDestruction{false};
+
   struct StreamDetails {
     template <class T>
     using IntervalSetVec = SmallVec<T, 4 /* stack size */>;

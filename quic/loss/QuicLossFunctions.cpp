@@ -283,6 +283,11 @@ bool processOutstandingsForLoss(
   bool shouldSetTimer = false;
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   while (iter != conn.outstandings.packets.end()) {
+    if (iter->metadata.scheduledForDestruction) {
+      iter++;
+      continue;
+    }
+
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
     folly::Optional<uint64_t> maybeCurrentStreamPacketIdx;
@@ -501,6 +506,9 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   auto earliest = getFirstOutstandingPacket(conn, pnSpace);
   for (; earliest != conn.outstandings.packets.end();
        earliest = getNextOutstandingPacket(conn, pnSpace, earliest + 1)) {
+    if (earliest->metadata.scheduledForDestruction) {
+      earliest++;
+    }
     if (!earliest->associatedEvent ||
         conn.outstandings.packetEvents.count(*earliest->associatedEvent)) {
       break;

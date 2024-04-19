@@ -22,14 +22,76 @@ namespace {
  */
 struct OutstandingPacketWithHandlerContext {
   explicit OutstandingPacketWithHandlerContext(
-      OutstandingPacketWrapper outstandingPacketIn)
-      : outstandingPacket(std::move(outstandingPacketIn)) {}
+      OutstandingPacketWrapper* outstandingPacketIn)
+      : outstandingPacket(outstandingPacketIn) {}
 
-  OutstandingPacketWrapper outstandingPacket;
+  OutstandingPacketWrapper* outstandingPacket;
   bool processAllFrames{false};
 };
 
 } // namespace
+
+void removeOutstandingsForAck(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace,
+    const ReadAckFrame& frame) {
+  auto currentPacketIt =
+      getLastOutstandingPacketIncludingLostAndDeleted(conn, pnSpace);
+
+  auto ackBlockIt = frame.ackBlocks.cbegin();
+  while (ackBlockIt != frame.ackBlocks.cend() &&
+         currentPacketIt != conn.outstandings.packets.rend()) {
+    // In reverse order, find the first outstanding packet that has a packet
+    // number LE the endPacket of the current ack range.
+    auto rPacketIt = std::lower_bound(
+        currentPacketIt,
+        conn.outstandings.packets.rend(),
+        ackBlockIt->endPacket,
+        [&](const auto& packetWithTime, const auto& val) {
+          return packetWithTime.packet.header.getPacketSequenceNum() > val;
+        });
+    if (rPacketIt == conn.outstandings.packets.rend()) {
+      return;
+    }
+
+    auto eraseEnd = rPacketIt;
+    while (rPacketIt != conn.outstandings.packets.rend()) {
+      auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
+      auto currentPacketNumberSpace =
+          rPacketIt->packet.header.getPacketNumberSpace();
+      if (pnSpace != currentPacketNumberSpace) {
+        // When the next packet is not in the same packet number space, we need
+        // to skip it in current ack processing. If the iterator has moved, that
+        // means we have found packets in the current space that are acked by
+        // this ack block. So the code erases the current iterator range and
+        // move the iterator to be the next search point.
+        if (rPacketIt != eraseEnd) {
+          auto nextElem = conn.outstandings.packets.erase(
+              rPacketIt.base(), eraseEnd.base());
+          rPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem) + 1;
+          eraseEnd = rPacketIt;
+        } else {
+          rPacketIt++;
+          eraseEnd = rPacketIt;
+        }
+        continue;
+      }
+      if (currentPacketNum < ackBlockIt->startPacket) {
+        break;
+      }
+      conn.outstandings.scheduledForDestructionCount--;
+      rPacketIt++;
+    }
+    if (rPacketIt != eraseEnd) {
+      auto nextElem =
+          conn.outstandings.packets.erase(rPacketIt.base(), eraseEnd.base());
+      currentPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem);
+    } else {
+      currentPacketIt = rPacketIt;
+    }
+    ackBlockIt++;
+  }
+}
 
 /**
  * Process ack frame and acked outstanding packets.
@@ -118,7 +180,6 @@ AckEvent processAckFrame(
       break;
     }
 
-    auto eraseEnd = rPacketIt;
     while (rPacketIt != conn.outstandings.packets.rend()) {
       auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
       auto currentPacketNumberSpace =
@@ -129,20 +190,14 @@ AckEvent processAckFrame(
         // means we have found packets in the current space that are acked by
         // this ack block. So the code erases the current iterator range and
         // move the iterator to be the next search point.
-        if (rPacketIt != eraseEnd) {
-          auto nextElem = conn.outstandings.packets.erase(
-              rPacketIt.base(), eraseEnd.base());
-          rPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem) + 1;
-          eraseEnd = rPacketIt;
-        } else {
-          rPacketIt++;
-          eraseEnd = rPacketIt;
-        }
+        rPacketIt++;
         continue;
       }
       if (currentPacketNum < ackBlockIt->startPacket) {
         break;
       }
+      rPacketIt->metadata.scheduledForDestruction = true;
+      conn.outstandings.scheduledForDestructionCount++;
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace << " handshake="
                << (int)((rPacketIt->metadata.isHandshake) ? 1 : 0) << " "
@@ -292,32 +347,23 @@ AckEvent processAckFrame(
       ack.totalBytesAcked = conn.lossState.totalBytesAcked;
 
       {
+        OutstandingPacketWrapper* wrapper = &(*rPacketIt);
         auto tmpIt = packetsWithHandlerContext.emplace(
             std::find_if(
                 packetsWithHandlerContext.rbegin(),
                 packetsWithHandlerContext.rend(),
                 [&currentPacketNum](const auto& packetWithHandlerContext) {
-                  return packetWithHandlerContext.outstandingPacket.packet
+                  return packetWithHandlerContext.outstandingPacket->packet
                              .header.getPacketSequenceNum() > currentPacketNum;
                 })
                 .base(),
-            std::move(*rPacketIt));
+            OutstandingPacketWithHandlerContext(wrapper));
         tmpIt->processAllFrames = needsProcess;
       }
 
       rPacketIt++;
     }
-    // Done searching for acked outstanding packets in current ack block. Erase
-    // the current iterator range which is the last batch of continuous
-    // outstanding packets that are in this ack block. Move the iterator to be
-    // the next search point.
-    if (rPacketIt != eraseEnd) {
-      auto nextElem =
-          conn.outstandings.packets.erase(rPacketIt.base(), eraseEnd.base());
-      currentPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem);
-    } else {
-      currentPacketIt = rPacketIt;
-    }
+    currentPacketIt = rPacketIt;
     ackBlockIt++;
   }
 
@@ -338,11 +384,11 @@ AckEvent processAckFrame(
     auto& outstandingPacket = packetWithHandlerContextItr->outstandingPacket;
 
     // run the ACKed packet visitor
-    ackedPacketVisitor(outstandingPacket);
+    ackedPacketVisitor(*outstandingPacket);
 
     const auto processAllFrames = packetWithHandlerContextItr->processAllFrames;
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-    for (auto& packetFrame : outstandingPacket.packet.frames) {
+    for (auto& packetFrame : outstandingPacket->packet.frames) {
       if (!processAllFrames &&
           packetFrame.type() != QuicWriteFrame::Type::WriteAckFrame) {
         continue; // skip processing this frame
@@ -393,7 +439,7 @@ AckEvent processAckFrame(
       }(packetFrame);
 
       // run the ACKed frame visitor
-      ackedFrameVisitor(outstandingPacket, packetFrame);
+      ackedFrameVisitor(*outstandingPacket, packetFrame);
 
       // Part 2 and 3: Process current state relative to the PreAckVistorState.
       if (maybePreAckVisitorState.has_value()) {
@@ -419,20 +465,20 @@ AckEvent processAckFrame(
       }
     }
     auto maybeRxTimestamp = packetReceiveTimeStamps.find(
-        outstandingPacket.packet.header.getPacketSequenceNum());
+        outstandingPacket->packet.header.getPacketSequenceNum());
     ack.ackedPackets.emplace_back(
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(
-                outstandingPacket.packet.header.getPacketSequenceNum())
+                outstandingPacket->packet.header.getPacketSequenceNum())
             .setNonDsrPacketSequenceNumber(
-                outstandingPacket.nonDsrPacketSequenceNumber.value_or(0))
-            .setOutstandingPacketMetadata(outstandingPacket.metadata)
+                outstandingPacket->nonDsrPacketSequenceNumber.value_or(0))
+            .setOutstandingPacketMetadata(outstandingPacket->metadata)
             .setDetailsPerStream(std::move(detailsPerStream))
             .setLastAckedPacketInfo(
-                outstandingPacket.lastAckedPacketInfo
-                    ? &outstandingPacket.lastAckedPacketInfo.value()
+                outstandingPacket->lastAckedPacketInfo
+                    ? &outstandingPacket->lastAckedPacketInfo.value()
                     : nullptr)
-            .setAppLimited(outstandingPacket.isAppLimited)
+            .setAppLimited(outstandingPacket->isAppLimited)
             .setReceiveDeltaTimeStamp(
                 maybeRxTimestamp != packetReceiveTimeStamps.end()
                     ? folly::make_optional(
@@ -509,6 +555,8 @@ AckEvent processAckFrame(
     }
   }
 
+  removeOutstandingsForAck(conn, pnSpace, frame);
+
   return ack;
 }
 
@@ -527,7 +575,8 @@ void clearOldOutstandingPackets(
       if (time < opItr->metadata.time) {
         break;
       }
-      if (opItr->packet.header.getPacketNumberSpace() != pnSpace) {
+      if (opItr->packet.header.getPacketNumberSpace() != pnSpace ||
+          opItr->metadata.scheduledForDestruction) {
         if (eraseBegin != opItr) {
           // We want to keep [eraseBegin, opItr) within a single PN space.
           opItr = conn.outstandings.packets.erase(eraseBegin, opItr);

@@ -65,10 +65,15 @@ struct OutstandingsInfo {
   // declared lost, this counter will be decreased.
   uint64_t dsrCount{0};
 
+  // We just use this to get the correct number of outstanding packets. We
+  // subtract the number of packets declared lost and scheduled for destruction
+  // from the number of packets in the outstanding packets list.
+  uint64_t scheduledForDestructionCount{0};
+
   // Number of packets outstanding and not declared lost.
   uint64_t numOutstanding() {
-    CHECK_GE(packets.size(), declaredLostCount);
-    return packets.size() - declaredLostCount;
+    CHECK_GE(packets.size(), declaredLostCount + scheduledForDestructionCount);
+    return packets.size() - declaredLostCount - scheduledForDestructionCount;
   }
 
   // Total number of cloned packets.
