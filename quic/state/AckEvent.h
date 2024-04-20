@@ -19,32 +19,6 @@ struct AckEvent {
   struct AckPacket;
 
   /**
-   * Returns the AckPacket associated with the AckEvent's RttSample.
-   *
-   * Can be used to get packet metadata, including send time, app limited state,
-   * and other aspects. For RTT measurements, this can be used to determine the
-   * number of packets / bytes inflight at the time the corresponding packet was
-   * sent, which in turn can be used to infer whether the RTT measurement could
-   * have been subject to self-induced congestion.
-   *
-   * If the OutstandingPacketWrapper with the largestAckedPacket packet number
-   * had already been acked or removed from the list of list of
-   * OutstandingPackets, either due to being marked lost or acked by an earlier
-   * AckEvent, then this information will be unavailable.
-   *
-   * Equivalent to getLargestAckedPacket() unless this is an implicit AckEvent
-   * (for which RttSamples are unavailable); this helper exists to make it
-   * easier to find this information.
-   */
-  [[nodiscard]] const AckPacket* FOLLY_NULLABLE
-  getRttSampleAckedPacket() const {
-    if (!rttSample) {
-      return nullptr;
-    }
-    return getLargestAckedPacket();
-  }
-
-  /**
    * Returns the AckPacket associated with the largestAckedPacket.
    *
    * The largestAckedPacket is included in the AckFrame received from sender.

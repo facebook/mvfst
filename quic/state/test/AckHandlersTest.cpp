@@ -2336,12 +2336,6 @@ TEST_P(AckHandlersTest, AckEventCreation) {
     EXPECT_EQ(ul(9), ack.largestNewlyAckedPacket);
     EXPECT_EQ(getSentTime(9), ack.largestNewlyAckedPacketSentTime);
     EXPECT_THAT(
-        ack.getRttSampleAckedPacket(),
-        Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
-    EXPECT_THAT(
-        ack.getRttSampleAckedPacket(),
-        Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
-    EXPECT_THAT(
         ack.getLargestNewlyAckedPacket(),
         Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
 
@@ -2470,9 +2464,6 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
     EXPECT_EQ(ul(9), ack.largestNewlyAckedPacket);
     EXPECT_EQ(getSentTime(9), ack.largestNewlyAckedPacketSentTime);
     EXPECT_THAT(
-        ack.getRttSampleAckedPacket(),
-        Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
-    EXPECT_THAT(
         ack.getLargestAckedPacket(),
         Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
     EXPECT_THAT(
@@ -2598,12 +2589,6 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
     EXPECT_EQ(ul(9), ack.largestAckedPacket);
     EXPECT_EQ(ul(9), ack.largestNewlyAckedPacket);
     EXPECT_EQ(getSentTime(9), ack.largestNewlyAckedPacketSentTime);
-    EXPECT_THAT(
-        ack.getRttSampleAckedPacket(),
-        Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
-    EXPECT_THAT(
-        ack.getRttSampleAckedPacket(),
-        Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
     EXPECT_THAT(
         ack.getLargestNewlyAckedPacket(),
         Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
@@ -3347,9 +3332,6 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
         EXPECT_EQ(getSentTime(9), ack->largestNewlyAckedPacketSentTime);
         EXPECT_THAT(
-            ack->getRttSampleAckedPacket(),
-            Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
-        EXPECT_THAT(
             ack->getLargestAckedPacket(),
             Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
         EXPECT_THAT(
@@ -3453,9 +3435,6 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         EXPECT_EQ(ul(9), ack->largestAckedPacket);
         EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
         EXPECT_EQ(getSentTime(9), ack->largestNewlyAckedPacketSentTime);
-        EXPECT_THAT(
-            ack->getRttSampleAckedPacket(),
-            Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
         EXPECT_THAT(
             ack->getLargestAckedPacket(),
             Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
@@ -3571,10 +3550,6 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
           EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
           EXPECT_EQ(getSentTime(9), ack->largestNewlyAckedPacketSentTime);
           EXPECT_THAT(
-              ack->getRttSampleAckedPacket(),
-              Pointee(
-                  getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
-          EXPECT_THAT(
               ack->getLargestAckedPacket(),
               Pointee(
                   getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
@@ -3643,7 +3618,6 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
           EXPECT_EQ(ul(9), ack->largestAckedPacket);
           EXPECT_EQ(ul(4), ack->largestNewlyAckedPacket); // 4 = newly acked
           EXPECT_EQ(getSentTime(4), ack->largestNewlyAckedPacketSentTime);
-          EXPECT_THAT(ack->getRttSampleAckedPacket(), IsNull()); // unavailable
           EXPECT_THAT(ack->getLargestAckedPacket(), IsNull()); // unavailable
           EXPECT_THAT(
               ack->getLargestNewlyAckedPacket(),
@@ -3699,7 +3673,6 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
           EXPECT_EQ(ul(9), ack->largestAckedPacket);
           EXPECT_EQ(ul(6), ack->largestNewlyAckedPacket); // 6 = newly acked
           EXPECT_EQ(getSentTime(6), ack->largestNewlyAckedPacketSentTime);
-          EXPECT_THAT(ack->getRttSampleAckedPacket(), IsNull()); // unavailable
           EXPECT_THAT(ack->getLargestAckedPacket(), IsNull()); // unavailable
           EXPECT_THAT(
               ack->getLargestNewlyAckedPacket(),
@@ -3809,10 +3782,6 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
           EXPECT_EQ(ul(3), ack->largestAckedPacket);
           EXPECT_EQ(ul(3), ack->largestNewlyAckedPacket);
           EXPECT_EQ(getSentTime(3), ack->largestNewlyAckedPacketSentTime);
-          EXPECT_THAT(
-              ack->getRttSampleAckedPacket(),
-              Pointee(
-                  getAckPacketMatcher(3, getWriteCount(3), getSentTime(3))));
           EXPECT_THAT(
               ack->getLargestAckedPacket(),
               Pointee(
@@ -3950,7 +3919,6 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
         EXPECT_EQ(getSentTime(9), ack->largestNewlyAckedPacketSentTime);
         EXPECT_TRUE(ack->largestNewlyAckedPacketAppLimited);
-        EXPECT_THAT(ack->getRttSampleAckedPacket(), IsNull());
         EXPECT_THAT(
             ack->getLargestAckedPacket(),
             Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
