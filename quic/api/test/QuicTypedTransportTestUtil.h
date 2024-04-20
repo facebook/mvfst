@@ -66,8 +66,11 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     //
     // we include "lost" to protect against the unusual case of the test somehow
     // causing a packet that was just written to be immediately marked lost.
-    const auto it = quic::getLastOutstandingPacketIncludingLost(
-        getNonConstConn(), PacketNumberSpace::AppData);
+    const auto it = quic::getLastOutstandingPacket(
+        getNonConstConn(),
+        PacketNumberSpace::AppData,
+        true /* includeDeclaredLost */);
+
     if (it == getConn().outstandings.packets.rend()) {
       return folly::none;
     }

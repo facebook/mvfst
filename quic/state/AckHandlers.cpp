@@ -35,8 +35,11 @@ void removeOutstandingsForAck(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& frame) {
-  auto currentPacketIt =
-      getLastOutstandingPacketIncludingLostAndDeleted(conn, pnSpace);
+  auto currentPacketIt = getLastOutstandingPacket(
+      conn,
+      pnSpace,
+      true /* includeDeclaredLost */,
+      true /* includeScheduledForDestruction */);
 
   auto ackBlockIt = frame.ackBlocks.cbegin();
   while (ackBlockIt != frame.ackBlocks.cend() &&
@@ -132,7 +135,11 @@ AckEvent processAckFrame(
   // temporary storage to enable packets to be processed in sent order
   SmallVec<OutstandingPacketWithHandlerContext, 50> packetsWithHandlerContext;
 
-  auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
+  auto currentPacketIt = getLastOutstandingPacket(
+      conn,
+      pnSpace,
+      true /* includeDeclaredLost */,
+      true /* includeScheduledForDestruction */);
 
   // Store first outstanding packet number to ignore old receive timestamps.
   const auto& firstOutstandingPacket =
