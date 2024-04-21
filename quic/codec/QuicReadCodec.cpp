@@ -429,16 +429,12 @@ CodecResult QuicReadCodec::parsePacket(
                   statelessResetToken_->data(), sizeof(StatelessResetToken)))) {
         token = StatelessResetToken();
         memcpy(token->data(), tokenSource, token->size());
+        return StatelessReset(*token);
       }
     }
   }
-
-  auto maybeShortHeaderPacket = tryParseShortHeaderPacket(
+  return tryParseShortHeaderPacket(
       std::move(data), ackStates, dstConnIdSize, cursor);
-  if (token && maybeShortHeaderPacket.nothing()) {
-    return StatelessReset(*token);
-  }
-  return maybeShortHeaderPacket;
 }
 
 bool QuicReadCodec::canInitiateKeyUpdate() const {
