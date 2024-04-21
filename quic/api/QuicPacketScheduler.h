@@ -25,11 +25,15 @@ namespace quic {
 struct SchedulingResult {
   folly::Optional<PacketEvent> packetEvent;
   folly::Optional<PacketBuilderInterface::Packet> packet;
+  size_t shortHeaderPadding;
 
   explicit SchedulingResult(
       folly::Optional<PacketEvent> packetEventIn,
-      folly::Optional<PacketBuilderInterface::Packet> packetIn)
-      : packetEvent(std::move(packetEventIn)), packet(std::move(packetIn)) {}
+      folly::Optional<PacketBuilderInterface::Packet> packetIn,
+      size_t shortHeaderPaddingIn = 0)
+      : packetEvent(std::move(packetEventIn)),
+        packet(std::move(packetIn)),
+        shortHeaderPadding(shortHeaderPaddingIn) {}
 };
 
 /**

@@ -41,13 +41,31 @@ class QuicTransportStatsCallback {
   // packet level metrics
   virtual void onPacketReceived() = 0;
 
+  virtual void onPacketsReceived(uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) {
+      onPacketReceived();
+    }
+  }
+
   virtual void onDuplicatedPacketReceived() = 0;
 
   virtual void onOutOfOrderPacketReceived() = 0;
 
   virtual void onPacketProcessed() = 0;
 
+  virtual void onPacketsProcessed(uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) {
+      onPacketProcessed();
+    }
+  }
+
   virtual void onPacketSent() = 0;
+
+  virtual void onPacketsSent(uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) {
+      onPacketSent();
+    }
+  }
 
   virtual void onDSRPacketSent(size_t pktSize) = 0;
 
@@ -154,6 +172,13 @@ class QuicTransportStatsCallback {
   virtual void onDatagramDroppedOnRead() = 0;
 
   virtual void onShortHeaderPadding(size_t padSize) = 0;
+
+  virtual void onShortHeaderPaddingBatch(uint32_t n, size_t padSize) {
+    for (uint32_t i = 0; i + 1 < n; i++) {
+      onShortHeaderPadding(0);
+    }
+    onShortHeaderPadding(padSize);
+  }
 
   virtual void onPacerTimerLagged() = 0;
 

@@ -2715,8 +2715,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .Times(kDefaultWriteConnectionDataPacketLimit * 2);
-  EXPECT_CALL(*quicStats_, onWrite(_))
-      .Times(kDefaultWriteConnectionDataPacketLimit * 2);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
   res = writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2926,7 +2925,7 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   // Artificially Block the stream
   stream1->flowControlState.peerAdvertisedMaxOffset = 10;
   // writes blocked frame in additionally
-  EXPECT_CALL(*quicStats_, onWrite(_)).Times(2);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
   writeQuicDataToSocket(
       *rawSocket,
       *conn,

@@ -239,6 +239,7 @@ FrameScheduler::FrameScheduler(
 SchedulingResult FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
+  size_t shortHeaderPadding = 0;
   builder.encodePacketHeader();
   // We need to keep track of writable bytes after writing header.
   writableBytes = writableBytes > builder.getHeaderBytes()
@@ -322,12 +323,13 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
         for (size_t i = 0; i < paddingIncrement; i++) {
           writeFrame(PaddingFrame(), builder);
         }
-        QUIC_STATS(conn_.statsCallback, onShortHeaderPadding, paddingIncrement);
+        shortHeaderPadding = paddingIncrement;
       }
     }
   }
 
-  return SchedulingResult(folly::none, std::move(builder).buildPacket());
+  return SchedulingResult(
+      folly::none, std::move(builder).buildPacket(), shortHeaderPadding);
 }
 
 void FrameScheduler::writeNextAcks(PacketBuilderInterface& builder) {
@@ -942,7 +944,9 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
     if (rebuildResult) {
       return SchedulingResult(
-          std::move(rebuildResult), std::move(*internalBuilder).buildPacket());
+          std::move(rebuildResult),
+          std::move(*internalBuilder).buildPacket(),
+          0);
     } else if (
         conn_.transportSettings.dataPathType ==
         DataPathType::ContinuousMemory) {
@@ -961,7 +965,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
       buf->trimEnd(buf->length() - prevSize);
     }
   }
-  return SchedulingResult(folly::none, folly::none);
+  return SchedulingResult(folly::none, folly::none, 0);
 }
 
 folly::StringPiece CloningScheduler::name() const {

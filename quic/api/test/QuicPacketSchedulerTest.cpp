@@ -2390,12 +2390,12 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   NiceMock<MockQuicStats> quicStats;
   conn.statsCallback = &quicStats;
 
-  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
   auto result1 = scheduler.scheduleFramesForPacket(
       std::move(builder1), conn.udpSendPacketLen);
-  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
+  EXPECT_GT(result1.shortHeaderPadding, 0);
   auto result2 = scheduler.scheduleFramesForPacket(
       std::move(builder2), conn.udpSendPacketLen);
+  EXPECT_GT(result2.shortHeaderPadding, 0);
 
   auto headerLength1 = result1.packet->header.computeChainDataLength();
   auto bodyLength1 = result1.packet->body.computeChainDataLength();
@@ -2451,9 +2451,9 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
   NiceMock<MockQuicStats> quicStats;
   conn.statsCallback = &quicStats;
 
-  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
   auto result = scheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
+  EXPECT_GT(result.shortHeaderPadding, 0);
 
   auto headerLength = result.packet->header.computeChainDataLength();
   auto bodyLength = result.packet->body.computeChainDataLength();
@@ -2506,9 +2506,9 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
   NiceMock<MockQuicStats> quicStats;
   conn.statsCallback = &quicStats;
 
-  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
   auto result = scheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
+  EXPECT_EQ(result.shortHeaderPadding, 0);
 
   auto headerLength = result.packet->header.computeChainDataLength();
   auto bodyLength = result.packet->body.computeChainDataLength();

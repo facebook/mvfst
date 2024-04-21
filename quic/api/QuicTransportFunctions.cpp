@@ -308,11 +308,6 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   }
   // TODO: I think we should add an API that doesn't need a buffer.
   bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
-  // update stats and connection
-  if (ret) {
-    QUIC_STATS(connection.statsCallback, onWrite, encodedSize);
-    QUIC_STATS(connection.statsCallback, onPacketSent);
-  }
   return DataPathResult::makeWriteResult(
       ret, std::move(result), encodedSize, encodedBodySize);
 }
@@ -384,11 +379,6 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
             << " encodedBodySize=" << encodedBodySize;
   }
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
-  if (ret) {
-    // update stats and connection
-    QUIC_STATS(connection.statsCallback, onWrite, encodedSize);
-    QUIC_STATS(connection.statsCallback, onPacketSent);
-  }
   return DataPathResult::makeWriteResult(
       ret, std::move(result), encodedSize, encodedBodySize);
 }
@@ -1522,6 +1512,22 @@ WriteQuicDataResult writeConnectionDataToSocket(
       : connection.transportSettings.maxBatchSize;
 
   uint64_t bytesWritten = 0;
+  uint64_t shortHeaderPadding = 0;
+  uint64_t shortHeaderPaddingCount = 0;
+  SCOPE_EXIT {
+    auto nSent = ioBufBatch.getPktSent();
+    if (nSent > 0) {
+      QUIC_STATS(connection.statsCallback, onPacketsSent, nSent);
+      QUIC_STATS(connection.statsCallback, onWrite, bytesWritten);
+      if (shortHeaderPadding > 0) {
+        QUIC_STATS(
+            connection.statsCallback,
+            onShortHeaderPaddingBatch,
+            shortHeaderPaddingCount,
+            shortHeaderPadding);
+      }
+    }
+  };
 
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
          ((ioBufBatch.getPktSent() < batchSize) ||
@@ -1565,6 +1571,10 @@ WriteQuicDataResult writeConnectionDataToSocket(
     // pretend write was also successful but packet is lost somewhere in the
     // network.
     bytesWritten += ret.encodedSize;
+    if (ret.result && ret.result->shortHeaderPadding > 0) {
+      shortHeaderPaddingCount++;
+      shortHeaderPadding += ret.result->shortHeaderPadding;
+    }
 
     auto& result = ret.result;
     updateConnection(

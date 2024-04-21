@@ -317,7 +317,8 @@ class QuicClientTransport
   };
 
   void adjustGROBuffers();
-  void trackDatagramReceived(size_t len);
+  void maybeQlogDatagram(size_t len);
+  void trackDatagramsReceived(uint32_t totalPackets, uint32_t totalPacketLen);
 
   /**
    * Send quic transport knobs defined by transportSettings.knobs to peer. This

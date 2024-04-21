@@ -848,6 +848,7 @@ void onServerReadDataFromOpen(
   }
   BufQueue udpData;
   udpData.append(std::move(readData.udpPacket.buf));
+  uint64_t processedPacketsTotal = 0;
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
@@ -1367,7 +1368,10 @@ void onServerReadDataFromOpen(
       conn.readCodec->setInitialHeaderCipher(nullptr);
       implicitAckCryptoStream(conn, EncryptionLevel::Initial);
     }
-    QUIC_STATS(conn.statsCallback, onPacketProcessed);
+    processedPacketsTotal++;
+  }
+  if (processedPacketsTotal > 0) {
+    QUIC_STATS(conn.statsCallback, onPacketsProcessed, processedPacketsTotal);
   }
   VLOG_IF(4, !udpData.empty())
       << "Leaving " << udpData.chainLength()
