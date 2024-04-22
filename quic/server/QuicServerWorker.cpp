@@ -651,7 +651,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->setCongestionControllerFactory(ccFactory_);
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
     if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
-      transportSettings_.initCwndInMss = 35;
+      transportSettings_.initCwndInMss = 30;
     }
 
     auto transportSettings = transportSettingsOverrideFn_
