@@ -89,6 +89,11 @@ struct CongestionControlConfig {
   // Use a different cwnd gain during ProbeBW Cruise and Refill.
   // If value < 0, use the default cwnd gain.
   float overrideCruiseCwndGain{-1.0};
+
+  // Used by: BBR2
+  // Use a different pacing gain during Startup.
+  // If value < 0, use the default pacing gain.
+  float overrideStartupPacingGain{-1.0};
 };
 
 struct DatagramConfig {

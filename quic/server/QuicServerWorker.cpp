@@ -653,6 +653,11 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
       transportSettings_.initCwndInMss = 30;
     }
+    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL3) {
+      // Use twice the default pacing gain to make BBRv2's startup behavior
+      // similar to BBRv1's.
+      transportSettings_.ccaConfig.overrideStartupPacingGain = 2 * 2.89;
+    }
 
     auto transportSettings = transportSettingsOverrideFn_
         ? transportSettingsOverrideFn_(

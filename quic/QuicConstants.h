@@ -348,6 +348,7 @@ enum class QuicVersion : uint32_t {
   // MVFST_EXPERIMENTAL2 enables including and using cwnd hints in 0-rtt session
   // tickets in QuicServerWorker.cpp
   MVFST_EXPERIMENTAL2 = 0xfaceb011, // Experimental alias for MVFST
+  // MVFST_EXPERIMENTAL3 is used to apply a 2x pace scaling for BBRv2
   MVFST_EXPERIMENTAL3 = 0xfaceb013, // Experimental alias for MVFST
 };
 

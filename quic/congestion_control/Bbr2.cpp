@@ -948,7 +948,10 @@ void Bbr2CongestionController::getStats(
 void Bbr2CongestionController::updatePacingAndCwndGain() {
   switch (state_) {
     case State::Startup:
-      pacingGain_ = kStartupPacingGain;
+      pacingGain_ =
+          conn_.transportSettings.ccaConfig.overrideStartupPacingGain > 0
+          ? conn_.transportSettings.ccaConfig.overrideStartupPacingGain
+          : kStartupPacingGain;
       cwndGain_ = kStartupCwndGain;
       break;
     case State::Drain:
