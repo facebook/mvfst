@@ -139,9 +139,9 @@ ssize_t GSOInplacePacketBatchWriter::write(
   auto& buf = scopedBufAccessor.buf();
   CHECK(!buf->isChained());
   CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail())
-      << "lastPacketEnd_=" << (long)lastPacketEnd_
-      << " data=" << (long long)buf->data()
-      << " tail=" << (long long)buf->tail();
+      << "lastPacketEnd_=" << (uintptr_t)lastPacketEnd_
+      << " data=" << (uintptr_t)buf->data()
+      << " tail=" << (uintptr_t)buf->tail();
   uint64_t diffToEnd = buf->tail() - lastPacketEnd_;
   CHECK(
       diffToEnd <= conn_.udpSendPacketLen ||
