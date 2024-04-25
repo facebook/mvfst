@@ -89,7 +89,9 @@ struct MaxPacingRateKnobState {
 };
 
 struct QuicServerConnectionState : public QuicConnectionStateBase {
-  ~QuicServerConnectionState() override = default;
+  ~QuicServerConnectionState() override {
+    streamManager->clearOpenStreams();
+  }
 
   ServerState state;
 

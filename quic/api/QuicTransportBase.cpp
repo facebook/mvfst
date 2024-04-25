@@ -387,11 +387,6 @@ void QuicTransportBase::closeImpl(
 
   // Clear out all the streams, we don't need them any more. When the peer
   // receives the conn close they will implicitly reset all the streams.
-  QUIC_STATS_FOR_EACH(
-      conn_->streamManager->streams().cbegin(),
-      conn_->streamManager->streams().cend(),
-      conn_->statsCallback,
-      onQuicStreamClosed);
   conn_->streamManager->clearOpenStreams();
 
   // Clear out all the buffered datagrams

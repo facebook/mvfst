@@ -4757,5 +4757,45 @@ TEST_F(
       expectedSignal.maybeBytesToSend, congestionControlWritableBytes(*conn));
 }
 
+TEST_F(
+    QuicTransportFunctionsTest,
+    onQuicStreamClosedNotCalledOnStreamClearing) {
+  {
+    auto conn = createConn();
+    EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+    EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(1);
+    auto stream = conn->streamManager->createNextBidirectionalStream().value();
+    EXPECT_EQ(stream->id, 1);
+    EXPECT_EQ(conn->streamManager->streamCount(), 1);
+    conn->streamManager->clearOpenStreams();
+    EXPECT_EQ(conn->streamManager->streamCount(), 0);
+  }
+}
+
+TEST_F(QuicTransportFunctionsTest, onQuicStreamClosedCalledOnConnClosure) {
+  {
+    auto conn = createConn();
+    EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+    EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(1);
+    auto stream = conn->streamManager->createNextBidirectionalStream().value();
+    EXPECT_EQ(stream->id, 1);
+    EXPECT_EQ(conn->streamManager->streamCount(), 1);
+    conn.reset();
+  }
+}
+
+TEST_F(QuicTransportFunctionsTest, onQuicStreamClosed) {
+  auto conn = createConn();
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(1);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  EXPECT_EQ(stream->id, 1);
+  EXPECT_EQ(conn->streamManager->streamCount(), 1);
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  conn->streamManager->removeClosedStream(stream->id);
+  EXPECT_EQ(conn->streamManager->streamCount(), 0);
+}
+
 } // namespace test
 } // namespace quic

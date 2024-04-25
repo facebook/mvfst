@@ -22,6 +22,7 @@
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
@@ -4287,6 +4288,26 @@ TEST_P(QuicTransportImplTestBase, BackgroundModeChangeWithStreamChanges) {
   CHECK_NOTNULL(manager.getStream(stream2Id))->recvState =
       StreamRecvState::Closed;
   manager.removeClosedStream(stream2Id);
+}
+
+class QuicTransportImplTestCounters : public QuicTransportImplTest {};
+
+TEST_F(QuicTransportImplTestCounters, TransportResetClosesStreams) {
+  MockQuicStats quicStats;
+  auto transportSettings = transport->getTransportSettings();
+  auto& conn = transport->getConnectionState();
+  conn.statsCallback = &quicStats;
+
+  EXPECT_CALL(quicStats, onNewQuicStream()).Times(2);
+  EXPECT_CALL(quicStats, onQuicStreamClosed()).Times(2);
+
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+
+  EXPECT_EQ(stream1, 1);
+  EXPECT_EQ(stream2, 5);
+  EXPECT_EQ(conn.streamManager->streamCount(), 2);
+  transport.reset();
 }
 
 class QuicTransportImplTestWithGroups : public QuicTransportImplTestBase {};

@@ -7,6 +7,7 @@
 
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
+#include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -777,6 +778,24 @@ void QuicStreamManager::addToStreamPriorityMap(
 
   // Notify observer (if set)
   notifyStreamPriorityChanges();
+}
+
+void QuicStreamManager::clearOpenStreams() {
+  QUIC_STATS_FOR_EACH(
+      streams().cbegin(),
+      streams().cend(),
+      conn_.statsCallback,
+      onQuicStreamClosed);
+
+  openBidirectionalLocalStreams_.clear();
+  openUnidirectionalLocalStreams_.clear();
+  openBidirectionalPeerStreams_.clear();
+  openUnidirectionalPeerStreams_.clear();
+  openBidirectionalLocalStreamGroups_.clear();
+  openUnidirectionalLocalStreamGroups_.clear();
+  peerUnidirectionalStreamGroupsSeen_.clear();
+  peerBidirectionalStreamGroupsSeen_.clear();
+  streams_.clear();
 }
 
 } // namespace quic

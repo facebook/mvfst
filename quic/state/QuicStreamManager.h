@@ -406,17 +406,7 @@ class QuicStreamManager {
   /*
    * Clear all the currently open streams.
    */
-  void clearOpenStreams() {
-    openBidirectionalLocalStreams_.clear();
-    openUnidirectionalLocalStreams_.clear();
-    openBidirectionalPeerStreams_.clear();
-    openUnidirectionalPeerStreams_.clear();
-    openBidirectionalLocalStreamGroups_.clear();
-    openUnidirectionalLocalStreamGroups_.clear();
-    peerUnidirectionalStreamGroupsSeen_.clear();
-    peerBidirectionalStreamGroupsSeen_.clear();
-    streams_.clear();
-  }
+  void clearOpenStreams();
 
   /*
    * Return a const reference to the underlying container holding the stream
