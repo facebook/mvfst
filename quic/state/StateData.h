@@ -13,6 +13,7 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
+#include <quic/common/CircularDeque.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
 #include <quic/congestion_control/ThrottlingSignalProvider.h>
@@ -658,9 +659,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     uint32_t maxReadBufferSize{kDefaultMaxDatagramsBuffered};
     uint32_t maxWriteBufferSize{kDefaultMaxDatagramsBuffered};
     // Buffers Incoming Datagrams
-    std::deque<ReadDatagram> readBuffer;
+    CircularDeque<ReadDatagram> readBuffer;
     // Buffers Outgoing Datagrams
-    std::deque<BufQueue> writeBuffer;
+    CircularDeque<BufQueue> writeBuffer;
   };
 
   DatagramState datagramState;

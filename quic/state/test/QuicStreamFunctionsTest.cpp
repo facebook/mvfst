@@ -26,7 +26,7 @@ namespace test {
 
 constexpr uint8_t kStreamIncrement = 0x04;
 
-using PeekIterator = std::deque<StreamBuffer>::const_iterator;
+using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
 
 class QuicStreamFunctionsTest : public Test {
  public:

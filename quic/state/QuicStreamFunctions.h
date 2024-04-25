@@ -73,7 +73,7 @@ Buf readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount = 0);
  * Invokes provided callback on the existing data.
  * Does not affect stream state (as opposed to read).
  */
-using PeekIterator = std::deque<StreamBuffer>::const_iterator;
+using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
 void peekDataFromQuicStream(
     QuicStreamState& state,
     const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
