@@ -45,7 +45,7 @@ enum class TokenType : uint8_t { RetryToken = 0, NewToken };
 
 constexpr uint8_t kHeaderFormMask = 0x80;
 constexpr auto kMaxPacketNumEncodingSize = 4;
-constexpr auto kNumInitialAckBlocksPerFrame = 3;
+constexpr auto kNumInitialAckBlocksPerFrame = 32;
 
 template <class T>
 using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame>;
