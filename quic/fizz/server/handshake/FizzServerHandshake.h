@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <quic/common/CircularDeque.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/server/handshake/ServerHandshake.h>
 
@@ -49,7 +48,7 @@ class FizzServerHandshake : public ServerHandshake {
   void writeNewSessionTicketToCrypto(const AppToken& appToken) override;
 
   using PendingEvent = fizz::WriteNewSessionTicket;
-  CircularDeque<PendingEvent> pendingEvents_;
+  std::deque<PendingEvent> pendingEvents_;
 
   std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
 

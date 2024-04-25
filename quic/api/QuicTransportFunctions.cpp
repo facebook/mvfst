@@ -457,7 +457,7 @@ void handleRetransmissionWritten(
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    CircularDeque<StreamBuffer>::iterator lossBufferIter) {
+    std::deque<StreamBuffer>::iterator lossBufferIter) {
   auto bufferLen = lossBufferIter->data.chainLength();
   Buf bufWritten;
   if (frameLen == bufferLen && frameFin == lossBufferIter->eof) {
