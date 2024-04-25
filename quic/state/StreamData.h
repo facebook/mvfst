@@ -119,7 +119,7 @@ struct QuicStreamLike {
   // offset ACKed. This allows us to track which delivery callbacks can be
   // called.
   template <class T>
-  using IntervalSetVec = SmallVec<T, 32>;
+  using IntervalSetVec = SmallVec<T, 3>;
   using AckedIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
   AckedIntervals ackedIntervals;
 
