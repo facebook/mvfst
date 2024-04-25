@@ -402,6 +402,15 @@ class QuicSocket {
   }
 
   /**
+   * Derive exported key material (RFC5705) from the transport's TLS layer, if
+   * the transport is capable.
+   */
+  virtual folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+      const std::string& label,
+      const folly::Optional<folly::ByteRange>& context,
+      uint16_t keyLength) const = 0;
+
+  /**
    * Determine if transport is open and ready to read or write.
    *
    * return true iff the transport is open and ready, false otherwise.

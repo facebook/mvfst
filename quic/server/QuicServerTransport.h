@@ -163,6 +163,20 @@ class QuicServerTransport
 
   virtual CipherInfo getOneRttCipherInfo() const;
 
+  /*
+   * Export the underlying TLS key material.
+   * label is the label argument for the TLS exporter.
+   * context is the context value argument for the TLS exporter.
+   * keyLength is the length of the exported key.
+   */
+  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+      const std::string& label,
+      const folly::Optional<folly::ByteRange>& context,
+      uint16_t keyLength) const override {
+    return serverConn_->serverHandshakeLayer->getExportedKeyingMaterial(
+        label, context, keyLength);
+  }
+
   /* Log a collection of statistics that are meant to be sampled consistently
    * over time, rather than driven by transport events.
    */

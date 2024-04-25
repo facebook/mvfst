@@ -179,6 +179,13 @@ class TestQuicTransport
     return observerContainer_.get();
   }
 
+  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+      const std::string&,
+      const folly::Optional<folly::ByteRange>&,
+      uint16_t) const override {
+    return folly::none;
+  }
+
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   bool closed{false};

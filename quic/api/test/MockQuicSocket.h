@@ -56,6 +56,11 @@ class MockQuicSocket : public QuicSocket {
       getPeerTransportParams,
       (),
       (const));
+  MOCK_METHOD(
+      (folly::Optional<std::vector<uint8_t>>),
+      getExportedKeyingMaterial,
+      (const std::string&, const folly::Optional<folly::ByteRange>&, uint16_t),
+      (const));
   MOCK_METHOD(std::shared_ptr<QuicEventBase>, getEventBase, (), (const));
   MOCK_METHOD(
       (folly::Expected<size_t, LocalErrorCode>),
