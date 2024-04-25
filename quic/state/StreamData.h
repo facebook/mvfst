@@ -102,7 +102,7 @@ struct QuicStreamLike {
 
   // List of bytes that have been read and buffered. We need to buffer
   // bytes in case we get bytes out of order.
-  std::deque<StreamBuffer> readBuffer;
+  CircularDeque<StreamBuffer> readBuffer;
 
   // List of bytes that have been written to the QUIC layer.
   BufQueue writeBuffer{};
@@ -125,7 +125,7 @@ struct QuicStreamLike {
 
   // Stores a list of buffers which have been marked as loss by loss detector.
   // Each one represents one StreamFrame that was written.
-  std::deque<StreamBuffer> lossBuffer;
+  CircularDeque<StreamBuffer> lossBuffer;
 
   // Current offset of the start bytes in the write buffer.
   // This changes when we pop stuff off the writeBuffer.
@@ -485,7 +485,7 @@ struct QuicStreamState : public QuicStreamLike {
   folly::F14FastMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
 
   // WriteBufferMetas that's already marked lost. They will be retransmitted.
-  std::deque<WriteBufferMeta> lossBufMetas;
+  CircularDeque<WriteBufferMeta> lossBufMetas;
 
   uint64_t streamLossCount{0};
 

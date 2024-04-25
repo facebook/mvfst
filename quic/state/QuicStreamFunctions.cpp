@@ -151,8 +151,8 @@ void appendDataToReadBufferCommon(
   // Start overlap will point to the first buffer that overlaps with the
   // current buffer and End overlap will point to the last buffer that overlaps.
   // They must always be set together.
-  folly::Optional<std::deque<StreamBuffer>::iterator> startOverlap;
-  folly::Optional<std::deque<StreamBuffer>::iterator> endOverlap;
+  folly::Optional<decltype(stream.readBuffer)::iterator> startOverlap;
+  folly::Optional<decltype(stream.readBuffer)::iterator> endOverlap;
 
   StreamBuffer* current = &buffer;
   bool currentAlreadyInserted = false;
