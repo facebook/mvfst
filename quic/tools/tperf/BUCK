@@ -1,0 +1,83 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+
+oncall("traffic_protocols")
+
+cpp_binary(
+    name = "tperf",
+    srcs = [
+        "tperf.cpp",
+    ],
+    deps = [
+        ":pacing_observer",
+        ":tperf_dsr_sender",
+        ":tperf_qlogger",
+        "//fizz/crypto:utils",
+        "//folly:memcpy-use",  # @manual
+        "//folly/init:init",
+        "//folly/io/async:async_base",
+        "//folly/portability:gflags",
+        "//folly/stats:histogram",
+        "//quic:constants",
+        "//quic/client:client",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/congestion_control:server_congestion_controller_factory",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/server:accept_observer",
+        "//quic/server:server",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "tperf_dsr_sender",
+    srcs = [
+        "TperfDSRSender.cpp",
+    ],
+    headers = [
+        "TperfDSRSender.h",
+    ],
+    deps = [
+        "//quic/dsr/backend/test:test_utils",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/dsr:dsr_packetization_request_sender",
+        "//quic/dsr:types",
+        "//quic/dsr/backend:dsr_packetizer",
+        "//quic/server:server",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "tperf_qlogger",
+    srcs = [
+        "TperfQLogger.cpp",
+    ],
+    headers = [
+        "TperfQLogger.h",
+    ],
+    exported_deps = [
+        ":pacing_observer",
+        "//quic/logging:file_qlogger",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "pacing_observer",
+    headers = [
+        "PacingObserver.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic/congestion_control:bandwidth",
+        "//quic/logging:qlogger",
+        "//quic/state:quic_state_machine",
+    ],
+)

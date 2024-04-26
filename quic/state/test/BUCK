@@ -1,0 +1,187 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "MockQuicStats.h",
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/state:quic_state_machine",
+        "//quic/state:stats_callback",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStateMachineTest",
+    srcs = [
+        "StateDataTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        "//quic/common/test:test_utils",
+        "//quic/state:loss_state",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStreamFunctionsTest",
+    srcs = [
+        "QuicStreamFunctionsTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//quic/client:state_and_handshake",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+        "//quic/state:quic_stream_utilities",
+        "//quic/state:stream_functions",
+    ],
+)
+
+cpp_unittest(
+    name = "AckHandlersTest",
+    srcs = [
+        "AckHandlersTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":ack_event_test_util",
+        ":mocks",
+        "//quic:constants",
+        "//quic/api/test:mocks",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/logging/test:mocks",
+        "//quic/server/state:server",
+        "//quic/state:ack_handler",
+        "//quic/state:outstanding_packet",
+        "//quic/state:quic_state_machine",
+        "//quic/state/stream:stream",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStateFunctionsTest",
+    srcs = [
+        "QuicStateFunctionsTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+        "//quic/state:outstanding_packet",
+        "//quic/state:state_functions",
+        "//quic/state/stream:stream",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicPacingFunctionsTest",
+    srcs = [
+        "QuicPacingFunctionsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/state:pacing_functions",
+    ],
+)
+
+cpp_unittest(
+    name = "TransportSettingsFunctionsTest",
+    srcs = [
+        "TransportSettingsFunctionsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/state:transport_settings_functions",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStreamManagerTest",
+    srcs = [
+        "QuicPriorityQueueTest.cpp",
+        "QuicStreamManagerTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+        "//quic/state:quic_priority_queue",
+        "//quic/state:quic_state_machine",
+        "//quic/state:quic_stream_utilities",
+    ],
+)
+
+cpp_unittest(
+    name = "PacketEventTest",
+    srcs = [
+        "PacketEventTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/state:packet_event",
+    ],
+)
+
+cpp_unittest(
+    name = "OutstandingPacketTest",
+    srcs = [
+        "OutstandingPacketTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        "//quic:constants",
+        "//quic/api/test:mocks",
+        "//quic/common/test:test_utils",
+        "//quic/logging/test:mocks",
+        "//quic/state:outstanding_packet",
+        "//quic/state/stream:stream",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "ack_event_test_util",
+    srcs = [
+        "AckEventTestUtil.cpp",
+    ],
+    headers = [
+        "AckEventTestUtil.h",
+    ],
+    exported_deps = [
+        "fbsource//third-party/googletest:gmock",
+        "fbsource//third-party/googletest:gtest",
+        "//quic/state:ack_event",
+    ],
+)
+
+cpp_benchmark(
+    name = "quic_priority_queue_benchmark",
+    srcs = ["QuicPriorityQueueBenchmark.cpp"],
+    deps = [
+        "//common/init:init",
+        "//folly:benchmark",
+        "//quic/state:quic_priority_queue",
+    ],
+)

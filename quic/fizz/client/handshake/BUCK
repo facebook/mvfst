@@ -1,0 +1,57 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "fizz_client_handshake",
+    srcs = [
+        "FizzClientHandshake.cpp",
+        "FizzClientQuicHandshakeContext.cpp",
+    ],
+    headers = [
+        "FizzClientExtensions.h",
+        "FizzClientHandshake.h",
+        "FizzClientQuicHandshakeContext.h",
+    ],
+    deps = [
+        "//fizz/client:early_data_rejection",
+        "//fizz/client:ech_policy",
+        "//fizz/crypto/aead:evpcipher",
+        "//fizz/protocol:exporter",
+        "//fizz/protocol:protocol",
+        "//quic/codec:pktbuilder",
+    ],
+    exported_deps = [
+        ":psk_cache",
+        "//fizz/client:client_extensions",
+        "//fizz/client:fizz_client_context",
+        "//fizz/client:protocol",
+        "//fizz/protocol:default_certificate_verifier",
+        "//quic/client:client_extension",
+        "//quic/client:state_and_handshake",
+        "//quic/fizz/handshake:fizz_handshake",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "psk_cache",
+    headers = [
+        "QuicPskCache.h",
+    ],
+    exported_deps = [
+        "//fizz/client:psk_cache",
+        "//folly:optional",
+        "//quic/client:cached_server_tp",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "token_cache",
+    headers = [
+        "QuicTokenCache.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//folly:string",
+    ],
+)

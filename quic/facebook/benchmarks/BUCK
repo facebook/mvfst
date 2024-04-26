@@ -1,0 +1,41 @@
+load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
+
+oncall("traffic_protocols")
+
+cpp_benchmark(
+    name = "QuicInteger",
+    srcs = [
+        "QuicIntegerBenchmark.cpp",
+    ],
+    deps = [
+        "//common/init:init",
+        "//folly:benchmark",
+        "//folly/io:iobuf",
+        "//folly/lang:bits",
+        "//quic/codec:types",
+    ],
+)
+
+cpp_benchmark(
+    name = "mvfst_benchmark",
+    srcs = ["MvfstBenchmark.cpp"],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//folly/experimental/coro:baton",
+        "//folly/experimental/coro:blocking_wait",
+        "//folly/experimental/coro:generator",
+        "//folly/init:init",
+        "//quic:constants",
+        "//quic/client:client",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/server:server",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)

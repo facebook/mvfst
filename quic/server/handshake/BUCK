@@ -1,0 +1,122 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "server_handshake",
+    srcs = [
+        "ServerHandshake.cpp",
+    ],
+    headers = [
+        "ServerHandshake.h",
+        "ServerHandshakeFactory.h",
+    ],
+    deps = [
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/state:stream_functions",
+    ],
+    exported_deps = [
+        ":app_token",
+        ":server_extension",
+        "//fizz/protocol:default_certificate_verifier",
+        "//fizz/server:fizz_server",
+        "//fizz/server:fizz_server_context",
+        "//folly/io:iobuf",
+        "//folly/io/async:delayed_destruction",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/handshake:handshake",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "server_extension",
+    headers = [
+        "ServerTransportParametersExtension.h",
+    ],
+    exported_deps = [
+        ":stateless_reset_generator",
+        "//fizz/server:server_extensions",
+        "//quic/fizz/handshake:fizz_handshake",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "app_token",
+    srcs = [
+        "AppToken.cpp",
+    ],
+    headers = [
+        "AppToken.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic/handshake:transport_parameters",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "default_app_token_validator",
+    srcs = [
+        "DefaultAppTokenValidator.cpp",
+    ],
+    headers = [
+        "DefaultAppTokenValidator.h",
+    ],
+    deps = [
+        "//fizz/server:resumption_state",
+        "//folly:network_address",
+        "//quic:constants",
+        "//quic/api:transport",
+        "//quic/fizz/server/handshake:handshake_app_token",
+        "//quic/handshake:transport_parameters",
+        "//quic/server/state:server",
+    ],
+    exported_deps = [
+        "//fizz/server:protocol",
+        "//folly:function",
+        "//folly:optional",
+        "//folly/io:iobuf",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "stateless_reset_generator",
+    srcs = [
+        "StatelessResetGenerator.cpp",
+    ],
+    headers = [
+        "StatelessResetGenerator.h",
+    ],
+    deps = [
+        "//folly:range",
+    ],
+    exported_deps = [
+        "//fizz/crypto:hkdf",
+        "//fizz/crypto:hmac_sha256",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "token_generator",
+    srcs = [
+        "TokenGenerator.cpp",
+    ],
+    headers = [
+        "TokenGenerator.h",
+    ],
+    deps = [
+        "//folly:range",
+        "//quic/codec:decode",
+    ],
+    exported_deps = [
+        "//fizz/server:aead_token_cipher",
+        "//folly/io:iobuf",
+        "//quic/codec:types",
+    ],
+)

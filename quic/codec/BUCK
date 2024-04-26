@@ -1,0 +1,200 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "types",
+    srcs = [
+        "DefaultConnectionIdAlgo.cpp",
+        "QuicConnectionId.cpp",
+        "QuicInteger.cpp",
+        "Types.cpp",
+    ],
+    headers = [
+        "ConnectionIdAlgo.h",
+        "DefaultConnectionIdAlgo.h",
+        "QuicConnectionId.h",
+        "QuicInteger.h",
+        "Types.h",
+    ],
+    deps = [
+        "//folly:random",
+    ],
+    exported_deps = [
+        ":packet_number",
+        "//folly:conv",
+        "//folly:expected",
+        "//folly:network_address",
+        "//folly:optional",
+        "//folly:string",
+        "//folly/hash:hash",
+        "//folly/io:iobuf",
+        "//folly/lang:bits",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/common:buf_util",
+        "//quic/common:circular_deque",
+        "//quic/common:interval_set",
+        "//quic/common:network_data",
+        "//quic/common:small_collections",
+        "//quic/common:variant",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "packet_number",
+    srcs = [
+        "PacketNumber.cpp",
+    ],
+    headers = [
+        "PacketNumber.h",
+    ],
+    deps = [
+        "//folly:conv",
+        "//folly/lang:bits",
+        "//quic:constants",
+        "//quic:exception",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "packet_number_cipher",
+    srcs = [
+        "PacketNumberCipher.cpp",
+    ],
+    deps = [
+        ":decode",
+        ":types",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//folly/io:iobuf",
+        "//quic/common:buf_util",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "decode",
+    srcs = [
+        "Decode.cpp",
+    ],
+    headers = [
+        "Decode.h",
+    ],
+    compiler_flags = [
+        "-fstrict-aliasing",
+    ],
+    deps = [
+        "//folly:string",
+        "//quic:exception",
+    ],
+    exported_deps = [
+        ":packet_number",
+        ":types",
+        "//folly/io:iobuf",
+        "//quic:constants",
+        "//quic/state:transport_settings",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "pktbuilder",
+    srcs = [
+        "QuicPacketBuilder.cpp",
+    ],
+    headers = [
+        "QuicPacketBuilder.h",
+    ],
+    compiler_flags = [
+        "-fstrict-aliasing",
+    ],
+    deps = [
+        "//folly:random",
+    ],
+    exported_deps = [
+        ":packet_number",
+        ":types",
+        "//folly:portability",
+        "//quic/common:buf_accessor",
+        "//quic/common:buf_util",
+        "//quic/handshake:handshake",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "pktrebuilder",
+    srcs = [
+        "QuicPacketRebuilder.cpp",
+    ],
+    headers = [
+        "QuicPacketRebuilder.h",
+    ],
+    deps = [
+        ":codec",
+        "//quic/flowcontrol:flow_control",
+        "//quic/state:simple_frame_functions",
+        "//quic/state:state_functions",
+        "//quic/state:stream_functions",
+    ],
+    exported_deps = [
+        ":pktbuilder",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "header_codec",
+    srcs = [
+        "QuicHeaderCodec.cpp",
+    ],
+    headers = [
+        "QuicHeaderCodec.h",
+    ],
+    deps = [
+        ":decode",
+        "//quic:exception",
+    ],
+    exported_deps = [
+        ":packet_number",
+        ":types",
+        "//folly:optional",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "codec",
+    srcs = [
+        "QuicReadCodec.cpp",
+        "QuicWriteCodec.cpp",
+    ],
+    headers = [
+        "QuicReadCodec.h",
+        "QuicWriteCodec.h",
+    ],
+    deps = [
+        "//folly/io:iobuf",
+        "//quic:exception",
+    ],
+    exported_deps = [
+        ":decode",
+        ":packet_number",
+        ":packet_number_cipher",
+        ":pktbuilder",
+        ":types",
+        "//folly:optional",
+        "//quic:constants",
+        "//quic/common:buf_util",
+        "//quic/common:circular_deque",
+        "//quic/common:interval_set",
+        "//quic/handshake:aead",
+        "//quic/state:ack_states",
+        "//quic/state:stats_callback",
+        "//quic/state:transport_settings",
+    ],
+)

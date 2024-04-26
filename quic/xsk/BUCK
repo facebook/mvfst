@@ -1,0 +1,62 @@
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "xsk_lib",
+    srcs = [
+        "packet_utils.cpp",
+        "xsk_lib.cpp",
+    ],
+    headers = [
+        "packet_utils.h",
+        "xsk_lib.h",
+    ],
+    deps = [
+        "//folly:benchmark",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+    ],
+    external_deps = [
+        ("glibc", None, "rt"),
+    ],
+)
+
+cpp_library(
+    name = "xsk_container",
+    srcs = [
+        "BaseXskContainer.cpp",
+        "HashingXskContainer.cpp",
+        "ThreadLocalXskContainer.cpp",
+    ],
+    headers = [
+        "BaseXskContainer.h",
+        "HashingXskContainer.h",
+        "ThreadLocalXskContainer.h",
+    ],
+    deps = [
+    ],
+    exported_deps = [
+        ":xsk_sender",
+        "//folly:thread_local",
+        "//folly/container:f14_hash",
+    ],
+)
+
+cpp_library(
+    name = "xsk_sender",
+    srcs = ["XskSender.cpp"],
+    headers = [
+        "XskSender.h",
+    ],
+    deps = [
+        "//folly:benchmark",
+        "//folly:string",
+    ],
+    exported_deps = [
+        ":xsk_lib",
+        "//folly:expected",
+        "//folly:network_address",
+        "//folly/container:f14_hash",
+        "//folly/io:iobuf",
+    ],
+)

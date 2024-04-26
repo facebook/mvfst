@@ -1,0 +1,61 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "server_connection_id_rejector",
+    headers = [
+        "ServerConnectionIdRejector.h",
+    ],
+    exported_deps = [
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "server",
+    srcs = [
+        "ServerStateMachine.cpp",
+    ],
+    headers = [
+        "ServerStateMachine.h",
+    ],
+    deps = [
+        "//quic/api:transport",
+        "//quic/common:buf_util",
+        "//quic/congestion_control:pacer",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/fizz/server/handshake:handshake_app_token",
+        "//quic/handshake:transport_parameters",
+        "//quic/logging:qlogger_constants",
+        "//quic/server/handshake:token_generator",
+        "//quic/state:datagram_handler",
+        "//quic/state:pacing_functions",
+        "//quic/state:stats_callback",
+        "//quic/state/stream:stream",
+    ],
+    exported_deps = [
+        ":server_connection_id_rejector",
+        "//folly:exception_wrapper",
+        "//folly:network_address",
+        "//folly:overload",
+        "//folly:random",
+        "//folly/io/async:async_socket_exception",
+        "//quic:exception",
+        "//quic/codec:types",
+        "//quic/common:network_data",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/congestion_control:cubic",
+        "//quic/flowcontrol:flow_control",
+        "//quic/loss:loss",
+        "//quic/server/handshake:server_handshake",
+        "//quic/state:ack_handler",
+        "//quic/state:quic_state_machine",
+        "//quic/state:simple_frame_functions",
+        "//quic/state:state_functions",
+        "//quic/state:stream_functions",
+    ],
+    exported_external_deps = [
+        "glog",
+    ],
+)

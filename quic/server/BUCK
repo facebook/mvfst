@@ -1,0 +1,112 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "accept_observer",
+    headers = [
+        "AcceptObserver.h",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "server",
+    srcs = [
+        "QuicServer.cpp",
+        "QuicServerBackendIoUring.cpp",
+        "QuicServerPacketRouter.cpp",
+        "QuicServerTransport.cpp",
+        "QuicServerWorker.cpp",
+    ],
+    headers = [
+        "QuicReusePortUDPSocketFactory.h",
+        "QuicServer.h",
+        "QuicServerPacketRouter.h",
+        "QuicServerTransport.h",
+        "QuicServerTransportFactory.h",
+        "QuicServerWorker.h",
+        "QuicSharedUDPSocketFactory.h",
+        "QuicUDPSocketFactory.h",
+    ],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        ":accept_observer",
+        "//common/network:mvfst_hooks",  # @manual
+        "//folly:conv",
+        "//folly:optional",
+        "//folly/chrono:conv",
+        "//folly/experimental/io:io_uring_backend",
+        "//folly/io:iobuf",
+        "//folly/io/async:event_base_manager",
+        "//folly/portability:gflags",
+        "//folly/system:thread_id",
+        "//quic/codec:header_codec",
+        "//quic/common:socket_util",
+        "//quic/congestion_control:bbr",
+        "//quic/congestion_control:copa",
+        "//quic/dsr/frontend:write_functions",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/handshake:app_token",
+        "//quic/server/handshake:default_app_token_validator",
+        "//quic/server/handshake:stateless_reset_generator",
+        "//quic/server/handshake:token_generator",
+        "//quic/server/third-party:siphash",
+        "//quic/state:transport_settings_functions",
+    ],
+    exported_deps = [
+        ":rate_limiter",
+        "//fizz/record:record",
+        "//fizz/server:fizz_server_context",
+        "//folly:random",
+        "//folly:small_vector",
+        "//folly:thread_local",
+        "//folly/container:evicting_cache_map",
+        "//folly/container:f14_hash",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_transport_certificate",
+        "//folly/io/async:async_udp_socket",
+        "//folly/io/async:scoped_event_base_thread",
+        "//quic:constants",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common:buf_accessor",
+        "//quic/common:transport_knobs",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/events:highres_quic_timer",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/congestion_control:server_congestion_controller_factory",
+        "//quic/server/handshake:server_extension",
+        "//quic/server/state:server",
+        "//quic/server/state:server_connection_id_rejector",
+        "//quic/state:quic_connection_stats",
+        "//quic/state:stats_callback",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "rate_limiter",
+    srcs = ["SlidingWindowRateLimiter.cpp"],
+    headers = [
+        "RateLimiter.h",
+        "SlidingWindowRateLimiter.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_handshake_socket_holder",
+    srcs = [],
+    headers = [
+        "QuicHandshakeSocketHolder.h",
+    ],
+    exported_deps = [
+        ":server",
+        "//quic/api:transport",
+    ],
+)

@@ -1,0 +1,119 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "client",
+    srcs = [
+        "QuicClientTransport.cpp",
+    ],
+    headers = [
+        "QuicClientTransport.h",
+    ],
+    deps = [
+        ":client_extension",
+        "//folly/portability:sockets",
+        "//quic:constants",
+        "//quic/api:loop_detector_callback",
+        "//quic/flowcontrol:flow_control",
+        "//quic/handshake:handshake",
+        "//quic/happyeyeballs:happyeyeballs",
+        "//quic/logging:qlogger_constants",
+        "//quic/loss:loss",
+        "//quic/state:ack_handler",
+        "//quic/state:datagram_handler",
+        "//quic/state:pacing_functions",
+        "//quic/state:simple_frame_functions",
+        "//quic/state/stream:stream",
+    ],
+    exported_deps = [
+        ":state_and_handshake",
+        "//folly:network_address",
+        "//folly:random",
+        "//folly/io:socket_option_map",
+        "//folly/net:net_ops",
+        "//quic/api:transport",
+        "//quic/common:buf_accessor",
+        "//quic/common:buf_util",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/state:quic_connection_stats",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "state_and_handshake",
+    srcs = [
+        "handshake/ClientHandshake.cpp",
+        "state/ClientStateMachine.cpp",
+    ],
+    headers = [
+        "handshake/ClientHandshake.h",
+        "handshake/ClientHandshakeFactory.h",
+        "state/ClientStateMachine.h",
+    ],
+    deps = [
+        ":cached_server_tp",
+        ":client_extension",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common:time_util",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/loss:loss",
+        "//quic/state:quic_stream_utilities",
+        "//quic/state:stream_functions",
+    ],
+    exported_deps = [
+        "//folly:exception_wrapper",
+        "//folly/io:iobuf",
+        "//folly/io/async:delayed_destruction",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/common:network_data",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/congestion_control:cubic",
+        "//quic/flowcontrol:flow_control",
+        "//quic/handshake:aead",
+        "//quic/handshake:handshake",
+        "//quic/handshake:transport_parameters",
+        "//quic/state:quic_state_machine",
+        "//quic/state:state_functions",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "client_extension",
+    headers = [
+        "handshake/ClientTransportParametersExtension.h",
+    ],
+    exported_deps = [
+        "//quic/handshake:transport_parameters",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "cached_server_tp",
+    headers = [
+        "handshake/CachedServerTransportParameters.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "client_async_transport",
+    srcs = [
+        "QuicClientAsyncTransport.cpp",
+    ],
+    headers = [
+        "QuicClientAsyncTransport.h",
+    ],
+    deps = [
+        "//folly:conv",
+        "//folly/experimental/symbolizer:symbolizer",
+    ],
+    exported_deps = [
+        "//quic/api:stream_async_transport",
+        "//quic/client:client",
+    ],
+)

@@ -1,0 +1,348 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "bandwidth",
+    srcs = [
+        "Bandwidth.cpp",
+    ],
+    headers = [
+        "Bandwidth.h",
+    ],
+    deps = [
+        "//folly:conv",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "congestion_controller",
+    headers = [
+        "CongestionController.h",
+    ],
+    exported_deps = [
+        ":bandwidth",
+        "//quic:constants",
+        "//quic/state:outstanding_packet",
+        "//quic/state:packet_event",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "congestion_control_functions",
+    srcs = [
+        "CongestionControlFunctions.cpp",
+    ],
+    headers = [
+        "CongestionControlFunctions.h",
+    ],
+    deps = [
+        "//quic:constants",
+        "//quic/common:time_util",
+    ],
+    exported_deps = [
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "congestion_controller_factory",
+    srcs = [
+        "CongestionControllerFactory.cpp",
+    ],
+    headers = [
+        "CongestionControllerFactory.h",
+    ],
+    deps = [
+        ":bbr",
+        ":bbr2",
+        ":bbr_bandwidth_sampler",
+        ":bbr_rtt_sampler",
+        ":copa",
+        ":copa2",
+        ":cubic",
+        ":newreno",
+        ":static_cwnd_congestion_controller",
+    ],
+    exported_deps = [
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "static_cwnd_congestion_controller",
+    srcs = [
+        "StaticCwndCongestionController.cpp",
+    ],
+    headers = [
+        "StaticCwndCongestionController.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+    ],
+    exported_deps = [
+        ":congestion_controller",
+        "//quic/state:ack_event",
+        "//quic/state:transport_settings",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "server_congestion_controller_factory",
+    srcs = [
+        "ServerCongestionControllerFactory.cpp",
+    ],
+    headers = [
+        "ServerCongestionControllerFactory.h",
+    ],
+    deps = [
+        ":bbr",
+        ":bbr2",
+        ":bbr_bandwidth_sampler",
+        ":bbr_rtt_sampler",
+        ":bbr_testing",
+        ":copa",
+        ":copa2",
+        ":cubic",
+        ":newreno",
+        ":static_cwnd_congestion_controller",
+    ],
+    exported_deps = [
+        ":congestion_controller_factory",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "cubic",
+    srcs = [
+        "QuicCubic.cpp",
+    ],
+    headers = [
+        "QuicCubic.h",
+    ],
+    deps = [
+        "//folly:chrono",
+        "//quic/logging:qlogger_constants",
+        "//quic/state:state_functions",
+    ],
+    exported_deps = [
+        ":congestion_control_functions",
+        ":congestion_controller",
+        "//quic:exception",
+        "//quic/state:ack_event",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "newreno",
+    srcs = [
+        "NewReno.cpp",
+    ],
+    headers = [
+        "NewReno.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//quic/logging:qlogger_constants",
+    ],
+    exported_deps = [
+        ":congestion_controller",
+        "//quic:exception",
+        "//quic/state:ack_event",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "copa",
+    srcs = [
+        "Copa.cpp",
+    ],
+    headers = [
+        "Copa.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//quic/common:time_util",
+        "//quic/logging:qlogger_constants",
+    ],
+    exported_deps = [
+        ":congestion_controller",
+        "//folly:optional",
+        "//quic:exception",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:ack_event",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "copa2",
+    srcs = [
+        "Copa2.cpp",
+    ],
+    headers = [
+        "Copa2.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//quic/logging:qlogger_constants",
+    ],
+    exported_deps = [
+        ":congestion_controller",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:ack_event",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "bbr",
+    srcs = [
+        "Bbr.cpp",
+    ],
+    headers = [
+        "Bbr.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//folly:random",
+        "//quic:constants",
+        "//quic/common:time_util",
+        "//quic/logging:qlogger_constants",
+        "//quic/state:ack_frequency_functions",
+    ],
+    exported_deps = [
+        ":bandwidth",
+        ":congestion_controller",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:quic_state_machine",
+        "//quic/state:transport_settings",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "bbr2",
+    srcs = [
+        "Bbr2.cpp",
+    ],
+    headers = [
+        "Bbr2.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+    ],
+    exported_deps = [
+        ":bandwidth",
+        ":congestion_controller",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:quic_state_machine",
+        "//quic/state:transport_settings",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "bbr_rtt_sampler",
+    srcs = [
+        "BbrRttSampler.cpp",
+    ],
+    headers = [
+        "BbrRttSampler.h",
+    ],
+    exported_deps = [
+        ":bbr",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "bbr_bandwidth_sampler",
+    srcs = [
+        "BbrBandwidthSampler.cpp",
+    ],
+    headers = [
+        "BbrBandwidthSampler.h",
+    ],
+    deps = [
+        "//quic/logging:qlogger_constants",
+    ],
+    exported_deps = [
+        ":bbr",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "bbr_testing",
+    srcs = [
+        "BbrTesting.cpp",
+    ],
+    headers = [
+        "BbrTesting.h",
+    ],
+    exported_deps = [
+        ":bbr",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "pacer",
+    srcs = [
+        "TokenlessPacer.cpp",
+    ],
+    headers = [
+        "Pacer.h",
+        "TokenlessPacer.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+    ],
+    exported_deps = [
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "packet_processor",
+    headers = [
+        "PacketProcessor.h",
+    ],
+    exported_deps = [
+        ":congestion_controller",
+        "//folly/io:socket_option_map",
+        "//quic/state:outstanding_packet",
+        "//quic/state:packet_event",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "simulated_tbf",
+    srcs = [
+        "SimulatedTBF.cpp",
+    ],
+    headers = [
+        "SimulatedTBF.h",
+    ],
+    deps = [
+        "//quic:exception",
+    ],
+    exported_deps = [
+        "//folly:token_bucket",
+        "//quic:constants",
+    ],
+    exported_external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "throttling_signal_provider",
+    headers = [
+        "ThrottlingSignalProvider.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+    ],
+)

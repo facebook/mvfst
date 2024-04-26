@@ -1,0 +1,165 @@
+load("@fbsource//xplat/security/lionhead:defs.bzl", "EXTERNAL_USERS", "Metadata", "Severity")
+load("//security/lionhead/harnesses:defs.bzl", "cpp_lionhead_harness")
+
+oncall("traffic_protocols")
+
+cpp_lionhead_harness(
+    name = "mvfst_ParseFrameFuzzer",
+    srcs = ["ParseFrameFuzzer.cpp"],
+    ftest_name = ("mvfst", "ParseFrameFuzz"),
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_HIGH_PRI_TASK,
+        severity_service_takeover = Severity.FILE_HIGH_PRI_TASK,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead/utils/lib_ftest:lib",
+        "//folly/io:iobuf",
+        "//quic/codec:decode",
+    ],
+)
+
+cpp_lionhead_harness(
+    name = "QuicReadCodecFuzzer",
+    srcs = ["QuicReadCodecFuzzer.cpp"],
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_HIGH_PRI_TASK,
+        severity_service_takeover = Severity.FILE_HIGH_PRI_TASK,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead:utils",
+        "//folly:singleton",
+        "//folly/init:init",
+        "//folly/io:iobuf",
+        "//quic/codec:codec",
+    ],
+)
+
+cpp_lionhead_harness(
+    name = "QuicInitPacketTokenExtractorFuzzer",
+    srcs = ["QuicInitPacketTokenExtractorFuzzer.cpp"],
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_HIGH_PRI_TASK,
+        severity_service_takeover = Severity.FILE_HIGH_PRI_TASK,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead:utils",
+        "//folly:singleton",
+        "//folly/init:init",
+        "//folly/io:iobuf",
+        "//quic/facebook/utils:mvfst_quic_utils",
+    ],
+)
+
+cpp_lionhead_harness(
+    name = "QuicHeaderCodecFuzzer",
+    srcs = ["QuicHeaderCodecFuzzer.cpp"],
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_HIGH_PRI_TASK,
+        severity_service_takeover = Severity.FILE_HIGH_PRI_TASK,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead:utils",
+        "//folly:singleton",
+        "//folly/init:init",
+        "//folly/io:iobuf",
+        "//quic/codec:header_codec",
+    ],
+)
+
+cpp_lionhead_harness(
+    name = "mvfst_read_codec",
+    srcs = [
+        "QuicReadCodecFuzzer.cpp",
+    ],
+    context_task = "T131981406",  #TODO: This is a template task. Please create your own copy and insert meaningful context for this fuzzer. Otherwise, security engineers will not know how to handle security issues found by this harness.
+    disable_afl = True,
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_SECURITY_SEV,
+        severity_service_takeover = Severity.FILE_SECURITY_SEV,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead:utils",
+        "//folly:singleton",
+        "//folly/init:init",
+        "//folly/io:iobuf",
+        "//quic/codec:codec",
+    ],
+)
+
+cpp_lionhead_harness(
+    name = "mvfst_server_transport",
+    srcs = [
+        "ServerTransportFuzzer.cpp",
+    ],
+    context_task = "T131981406",  #TODO: This is a template task. Please create your own copy and insert meaningful context for this fuzzer. Otherwise, security engineers will not know how to handle security issues found by this harness.
+    disable_afl = True,
+    ftest_name = ("QuicServerTransport", "basic_fuzzer"),
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_SECURITY_SEV,
+        severity_service_takeover = Severity.FILE_SECURITY_SEV,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead/utils/lib_ftest:lib",
+        "//fizz/crypto/aead/test:mocks",
+        "//fizz/facebook/fuzzer:fuzz_factory",
+        "//quic/api/test:mocks",
+        "//quic/client:client",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/handshake/test:mocks",
+        "//quic/server:server",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_lionhead_harness(
+    name = "mvfst_server_transport_example_input",
+    srcs = [
+        "ServerTransportFuzzer.cpp",
+    ],
+    context_task = "T131981406",  #TODO: This is a template task. Please create your own copy and insert meaningful context for this fuzzer. Otherwise, security engineers will not know how to handle security issues found by this harness.
+    disable_afl = True,
+    ftest_name = ("QuicServerTransport", "example_based_fuzzer"),
+    metadata = Metadata(
+        exposure = EXTERNAL_USERS,
+        project = "oncall_traffic_protocols",
+        severity_denial_of_service = Severity.FILE_SECURITY_SEV,
+        severity_service_takeover = Severity.FILE_SECURITY_SEV,
+    ),
+    deps = [
+        "fbsource//xplat/security/lionhead/utils/lib_ftest:lib",
+        "//fizz/crypto/aead/test:mocks",
+        "//fizz/facebook/fuzzer:fuzz_factory",
+        "//quic/api/test:mocks",
+        "//quic/client:client",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/handshake/test:mocks",
+        "//quic/server:server",
+        "//quic/server/state:server",
+    ],
+)

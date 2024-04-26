@@ -1,0 +1,77 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "jump_starter",
+    srcs = [
+        "JumpStarter.cpp",
+    ],
+    headers = [
+        "JumpStarter.h",
+    ],
+    deps = [
+        "//justknobs:justknobs",
+        "//quic/api:transport",
+        "//quic/congestion_control:bbr",
+        "//quic/congestion_control:bbr_bandwidth_sampler",
+        "//quic/congestion_control:bbr_rtt_sampler",
+        "//quic/congestion_control:cubic",
+    ],
+    exported_deps = [
+        "//folly:cpp_attributes",
+        "//folly:network_address",
+        "//folly:optional",
+        "//folly:synchronized",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/state:quic_connection_stats",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "jump_starter_update_observer",
+    headers = [
+        "JumpStarterUpdateObserver.h",
+    ],
+    exported_deps = [
+        ":jump_starter",
+        "//quic/api:transport",
+        "//quic/observer:socket_observer_types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "localized_jump_starter",
+    srcs = [
+        "LocalizedJumpStarter.cpp",
+    ],
+    headers = [
+        "LocalizedJumpStarter.h",
+    ],
+    modular_headers = False,
+    deps = [
+        "//common/network:dc_info",
+        "//common/network:util",
+        "//common/stats:macros",
+        "//common/stats:thread_cached_service_data",
+        "//fb303:service_data",
+    ],
+    exported_deps = [
+        ":jump_starter",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "file_qlogger_util",
+    srcs = [
+        "FileQLoggerUtil.cpp",
+    ],
+    headers = [
+        "FileQLoggerUtil.h",
+    ],
+    deps = [
+        "//common/strings:string_util",
+        "//folly/portability:filesystem",
+        "//quic/logging:file_qlogger",
+    ],
+)

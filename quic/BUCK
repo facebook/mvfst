@@ -1,0 +1,43 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "constants",
+    srcs = [
+        "QuicConstants.cpp",
+    ],
+    headers = [
+        "QuicConstants.h",
+    ],
+    deps = [
+        "//folly/lang:assume",
+    ],
+    exported_deps = [
+        "//folly/chrono:clock",
+        "//folly/io:iobuf",
+        "//quic/common/third-party:better_enums",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "exception",
+    srcs = [
+        "QuicException.cpp",
+    ],
+    headers = [
+        "QuicException.h",
+    ],
+    deps = [
+        "//fizz/record:record",
+    ],
+    exported_deps = [
+        ":constants",
+        "//folly:optional",
+        "//folly:range",
+        "//quic/common:variant",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)

@@ -1,0 +1,74 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "write_codec",
+    srcs = [
+        "WriteCodec.cpp",
+    ],
+    headers = [
+        "WriteCodec.h",
+    ],
+    deps = [
+        "//folly:optional",
+    ],
+    exported_deps = [
+        ":packet_builder",
+        "//quic/dsr:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "packet_builder",
+    headers = [
+        "PacketBuilder.h",
+    ],
+    exported_deps = [
+        "//quic/codec:packet_number",
+        "//quic/codec:types",
+        "//quic/dsr:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "scheduler",
+    srcs = [
+        "Scheduler.cpp",
+    ],
+    headers = [
+        "Scheduler.h",
+    ],
+    deps = [
+        ":write_codec",
+        "//quic/flowcontrol:flow_control",
+        "//quic/state:state_functions",
+        "//quic/state:stream_functions",
+    ],
+    exported_deps = [
+        ":packet_builder",
+        "//quic/server/state:server",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "write_functions",
+    srcs = [
+        "WriteFunctions.cpp",
+    ],
+    headers = [
+        "WriteFunctions.h",
+    ],
+    deps = [
+        "//folly:scope_guard",
+    ],
+    exported_deps = [
+        ":scheduler",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/dsr:dsr_packetization_request_sender",
+        "//quic/handshake:aead",
+        "//quic/server/state:server",
+    ],
+)

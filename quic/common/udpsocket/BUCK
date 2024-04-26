@@ -1,0 +1,68 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "quic_async_udp_socket",
+    srcs = [
+        "QuicAsyncUDPSocket.cpp",
+    ],
+    headers = [
+        "QuicAsyncUDPSocket.h",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+        "//folly:range",
+        "//folly/io:iobuf",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:async_socket_exception",
+        "//folly/portability:sockets",
+        "//quic/common:network_data",
+        "//quic/common/events:eventbase",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_async_udp_socket_impl",
+    srcs = [
+        "QuicAsyncUDPSocketImpl.cpp",
+    ],
+    headers = [
+        "QuicAsyncUDPSocketImpl.h",
+    ],
+    exported_deps = [
+        ":quic_async_udp_socket",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "folly_async_udp_socket",
+    srcs = [
+        "FollyQuicAsyncUDPSocket.cpp",
+    ],
+    headers = [
+        "FollyQuicAsyncUDPSocket.h",
+    ],
+    exported_deps = [
+        ":quic_async_udp_socket_impl",
+        "//folly/io/async:async_udp_socket",
+        "//folly/net:network_socket",
+        "//quic/common:network_data",
+        "//quic/common/events:folly_eventbase",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "libev_async_udp_socket",
+    srcs = [
+        "LibevQuicAsyncUDPSocket.cpp",
+    ],
+    headers = [
+        "LibevQuicAsyncUDPSocket.h",
+    ],
+    exported_deps = [
+        ":quic_async_udp_socket_impl",
+        "//quic/common:network_data",
+        "//quic/common/events:libev_eventbase",
+    ],
+)

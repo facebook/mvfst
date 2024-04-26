@@ -1,0 +1,68 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/client:cached_server_tp",
+        "//quic/client:client",
+        "//quic/client:state_and_handshake",
+        "//quic/client/connector:connector",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/handshake:handshake",
+        "//quic/handshake:transport_parameters",
+    ],
+)
+
+cpp_unittest(
+    name = "ClientStateMachineTest",
+    srcs = [
+        "ClientStateMachineTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":mocks",
+        "//quic/api:transport",
+        "//quic/api/test:mocks",
+        "//quic/client:cached_server_tp",
+        "//quic/client:state_and_handshake",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/handshake:handshake",
+        "//quic/handshake:transport_parameters",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicConnectorTest",
+    srcs = [
+        "QuicConnectorTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//quic/client/connector:connector",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "QuicClientTransportMock",
+    headers = [
+        "QuicClientTransportMock.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/client:client",
+    ],
+)

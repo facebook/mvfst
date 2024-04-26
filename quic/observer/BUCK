@@ -1,0 +1,35 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "socket_observer_container",
+    headers = ["SocketObserverContainer.h"],
+    exported_deps = [
+        ":socket_observer_interface",
+        "//folly:observer_container",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "socket_observer_interface",
+    srcs = [
+        "SocketObserverInterface.cpp",
+    ],
+    headers = ["SocketObserverInterface.h"],
+    exported_deps = [
+        "//quic:exception",
+        "//quic/common:small_collections",
+        "//quic/state:ack_event",
+        "//quic/state:outstanding_packet",
+        "//quic/state:quic_stream_utilities",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "socket_observer_types",
+    headers = ["SocketObserverTypes.h"],
+    exported_deps = [
+        ":socket_observer_container",
+    ],
+)

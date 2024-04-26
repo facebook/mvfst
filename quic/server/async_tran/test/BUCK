@@ -1,0 +1,26 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "QuicAsyncTransportServerTest",
+    srcs = [
+        "QuicAsyncTransportServerTest.cpp",
+    ],
+    deps = [
+        "//folly/futures:core",
+        "//folly/io/async:async_transport",
+        "//folly/io/async/test:mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/client:client",
+        "//quic/client:client_async_transport",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/server:server",
+        "//quic/server/async_tran:server_async_transport",
+        "//quic/server/test:mocks",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "QuicPacketUtilsTest",
+    srcs = [
+        "QuicPacketUtilsTest.cpp",
+    ],
+    deps = [
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/codec:codec",
+        "//quic/common/test:test_utils",
+        "//quic/facebook/utils:mvfst_quic_utils",
+        "//quic/fizz/handshake:fizz_handshake",
+    ],
+)

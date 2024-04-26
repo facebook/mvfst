@@ -1,0 +1,37 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "StreamStateMachineTest",
+    srcs = [
+        "StreamStateMachineTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+    ],
+)
+
+cpp_unittest(
+    name = "StreamStateFunctionsTest",
+    srcs = [
+        "StreamStateFunctionsTest.cpp",
+    ],
+    deps = [
+        "//quic/common/test:test_utils",
+        "//quic/dsr:types",
+        "//quic/dsr/test:mocks",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/logging:file_qlogger",
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+    ],
+)

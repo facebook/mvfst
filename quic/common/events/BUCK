@@ -1,0 +1,76 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "eventbase",
+    headers = [
+        "QuicEventBase.h",
+    ],
+    exported_deps = [
+        "//folly:function",
+        "//folly:glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_timer",
+    srcs = [
+    ],
+    headers = [
+        "QuicTimer.h",
+    ],
+    exported_deps = [
+        ":eventbase",
+        "//folly/io/async:delayed_destruction",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "folly_eventbase",
+    srcs = [
+        "FollyQuicEventBase.cpp",
+    ],
+    headers = [
+        "FollyQuicEventBase.h",
+    ],
+    exported_deps = [
+        ":eventbase",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_base_fwd",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "highres_quic_timer",
+    srcs = [
+        "HighResQuicTimer.cpp",
+    ],
+    headers = [
+        "HighResQuicTimer.h",
+    ],
+    exported_deps = [
+        ":quic_timer",
+        "//folly/experimental:timerfd",
+        "//folly/io/async:async_base",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "libev_eventbase",
+    srcs = [
+        "LibevQuicEventBase.cpp",
+    ],
+    headers = [
+        "LibevQuicEventBase.h",
+    ],
+    exported_deps = [
+        ":eventbase",
+        ":quic_timer",
+        "//folly:glog",
+        "//folly:intrusive_list",
+    ],
+    exported_external_deps = [
+        "libev",
+    ],
+)

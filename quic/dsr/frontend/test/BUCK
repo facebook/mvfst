@@ -1,0 +1,79 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/dsr/frontend:packet_builder",
+    ],
+)
+
+cpp_unittest(
+    name = "write_codec_test",
+    srcs = [
+        "WriteCodecTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/portability:gtest",
+        "//quic:constants",
+        "//quic/common/test:test_utils",
+        "//quic/dsr/frontend:write_codec",
+        "//quic/dsr/test:test_common",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/handshake/test:mocks",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_unittest(
+    name = "packet_builder_test",
+    srcs = [
+        "PacketBuilderTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/dsr:types",
+        "//quic/dsr/frontend:packet_builder",
+        "//quic/dsr/test:test_common",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/handshake/test:mocks",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_unittest(
+    name = "scheduler_test",
+    srcs = [
+        "SchedulerTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/portability:gtest",
+        "//quic/dsr/frontend:scheduler",
+        "//quic/dsr/test:mocks",
+        "//quic/dsr/test:test_common",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_unittest(
+    name = "write_functions_test",
+    srcs = [
+        "WriteFunctionsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/dsr/frontend:write_functions",
+        "//quic/dsr/test:test_common",
+        "//quic/state/test:mocks",
+    ],
+)
