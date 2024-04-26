@@ -1,0 +1,31 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "loss",
+    srcs = [
+        "QuicLossFunctions.cpp",
+    ],
+    headers = [
+        "QuicLossFunctions.h",
+    ],
+    deps = [
+        "//folly:small_vector",
+        "//quic/state:stream_functions",
+    ],
+    exported_deps = [
+        "//folly:chrono",
+        "//folly:optional",
+        "//quic:constants",
+        "//quic/codec:types",
+        "//quic/common:time_util",
+        "//quic/congestion_control:congestion_controller",
+        "//quic/flowcontrol:flow_control",
+        "//quic/logging:qlogger_constants",
+        "//quic/observer:socket_observer_types",
+        "//quic/state:quic_state_machine",
+        "//quic/state:simple_frame_functions",
+        "//quic/state:state_functions",
+    ],
+)

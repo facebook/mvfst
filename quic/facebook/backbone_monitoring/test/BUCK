@@ -1,0 +1,34 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "TTLdMarkerTest",
+    srcs = [
+        "TTLdMarkerTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/facebook/backbone_monitoring:ttld_marker",
+    ],
+)
+
+cpp_unittest(
+    name = "RetransmitsScubaReporterTest",
+    srcs = [
+        "RetransmitsScubaReporterTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/facebook/backbone_monitoring:retransmits_scuba_reporter",
+    ],
+)

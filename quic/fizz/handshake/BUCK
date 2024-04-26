@@ -1,0 +1,41 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "fizz_handshake",
+    srcs = [
+        "FizzBridge.cpp",
+        "FizzCryptoFactory.cpp",
+        "FizzPacketNumberCipher.cpp",
+        "FizzRetryIntegrityTagGenerator.cpp",
+        "QuicFizzFactory.cpp",
+    ],
+    headers = [
+        "FizzBridge.h",
+        "FizzCryptoFactory.h",
+        "FizzPacketNumberCipher.h",
+        "FizzRetryIntegrityTagGenerator.h",
+        "FizzTransportParameters.h",
+        "QuicFizzFactory.h",
+    ],
+    deps = [
+        "//fizz/crypto:utils",
+        "//fizz/crypto/aead:evpcipher",
+    ],
+    exported_deps = [
+        "//fizz/crypto/aead:aead",
+        "//fizz/protocol:openssl_factory",
+        "//fizz/protocol:types",
+        "//fizz/record:record",
+        "//folly/ssl:openssl_ptr_types",
+        "//quic:constants",
+        "//quic/codec:packet_number_cipher",
+        "//quic/codec:types",
+        "//quic/common:buf_util",
+        "//quic/handshake:aead",
+        "//quic/handshake:handshake",
+        "//quic/handshake:retry_integrity_tag_generator",
+        "//quic/handshake:transport_parameters",
+    ],
+)

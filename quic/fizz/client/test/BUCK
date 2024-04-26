@@ -1,0 +1,58 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "quic_client_transport_test_util",
+    headers = [
+        "QuicClientTransportTestUtil.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api:transport",
+        "//quic/api/test:mocks",
+        "//quic/client:client",
+        "//quic/codec:types",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicClientTransportTest",
+    srcs = [
+        "QuicClientTransportTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":quic_client_transport_test_util",
+        "//fizz/crypto/aead/test:mocks",
+        "//fizz/protocol/clock/test:mock_clock",
+        "//folly/futures:core",
+        "//folly/io:iobuf",
+        "//folly/io:socket_option_map",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic:constants",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/events:highres_quic_timer",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/fizz/client/handshake/test:mock_psk_cache",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/handshake:transport_parameters",
+        "//quic/handshake/test:mocks",
+        "//quic/happyeyeballs:happyeyeballs",
+        "//quic/logging:file_qlogger",
+        "//quic/logging/test:mocks",
+        "//quic/samples/echo:echo_handler",
+        "//quic/server:server",
+    ],
+)

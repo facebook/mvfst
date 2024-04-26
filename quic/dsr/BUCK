@@ -1,0 +1,25 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "types",
+    srcs = [
+        "Types.cpp",
+    ],
+    headers = [
+        "Types.h",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+        "//folly:optional",
+        "//quic/codec:types",
+        "//quic/server/state:server",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "dsr_packetization_request_sender",
+    headers = ["DSRPacketizationRequestSender.h"],
+)

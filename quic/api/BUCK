@@ -1,0 +1,130 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "quic_batch_writer",
+    srcs = [
+        "QuicBatchWriter.cpp",
+        "QuicBatchWriterFactory.cpp",
+        "QuicGsoBatchWriters.cpp",
+    ],
+    headers = [
+        "QuicBatchWriter.h",
+        "QuicBatchWriterFactory.h",
+        "QuicGsoBatchWriters.h",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+        "//folly:portability",
+        "//folly/io:iobuf",
+        "//quic:constants",
+        "//quic/common/events:eventbase",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "transport",
+    srcs = [
+        "IoBufQuicBatch.cpp",
+        "QuicPacketScheduler.cpp",
+        "QuicTransportBase.cpp",
+        "QuicTransportFunctions.cpp",
+    ],
+    headers = [
+        "IoBufQuicBatch.h",
+        "QuicPacketScheduler.h",
+        "QuicSocket.h",
+        "QuicTransportBase.h",
+        "QuicTransportFunctions.h",
+    ],
+    deps = [
+        ":loop_detector_callback",
+        "//folly:chrono",
+        "//folly:scope_guard",
+        "//quic/common:socket_util",
+        "//quic/common:time_util",
+        "//quic/congestion_control:pacer",
+        "//quic/happyeyeballs:happyeyeballs",
+        "//quic/logging:qlogger_constants",
+        "//quic/loss:loss",
+        "//quic/state:ack_frequency_functions",
+        "//quic/state:ack_handler",
+        "//quic/state:pacing_functions",
+        "//quic/state:simple_frame_functions",
+        "//quic/state/stream:stream",
+    ],
+    exported_deps = [
+        ":quic_batch_writer",
+        "//folly:exception_wrapper",
+        "//folly:expected",
+        "//folly:maybe_managed_ptr",
+        "//folly:optional",
+        "//folly:portability",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_transport_certificate",
+        "//folly/lang:assume",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/client:state_and_handshake",
+        "//quic/codec:codec",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:pktrebuilder",
+        "//quic/codec:types",
+        "//quic/common:looper",
+        "//quic/common:network_data",
+        "//quic/common:small_collections",
+        "//quic/common/events:eventbase",
+        "//quic/common/events:quic_timer",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/congestion_control:bandwidth",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/congestion_control:copa",
+        "//quic/congestion_control:cubic",
+        "//quic/congestion_control:newreno",
+        "//quic/flowcontrol:flow_control",
+        "//quic/handshake:transport_parameters",
+        "//quic/observer:socket_observer_container",
+        "//quic/observer:socket_observer_types",
+        "//quic/state:quic_connection_stats",
+        "//quic/state:quic_priority_queue",
+        "//quic/state:quic_state_machine",
+        "//quic/state:quic_stream_utilities",
+        "//quic/state:retransmission_policy",
+        "//quic/state:state_functions",
+        "//quic/state:stats_callback",
+        "//quic/state:stream_functions",
+    ],
+    exported_external_deps = [
+        "boost",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "loop_detector_callback",
+    headers = ["LoopDetectorCallback.h"],
+    exported_deps = [
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "stream_async_transport",
+    srcs = [
+        "QuicStreamAsyncTransport.cpp",
+    ],
+    headers = [
+        "QuicStreamAsyncTransport.h",
+    ],
+    deps = [
+        "//folly/io:iobuf",
+        "//quic/common/events:folly_eventbase",
+    ],
+    exported_deps = [
+        ":transport",
+        "//folly/io/async:async_transport",
+        "//quic/common/events:eventbase",
+    ],
+)

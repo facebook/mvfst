@@ -1,0 +1,62 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "aead",
+    headers = [
+        "Aead.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//folly/io:iobuf",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "handshake",
+    srcs = [
+        "CryptoFactory.cpp",
+        "HandshakeLayer.cpp",
+    ],
+    headers = [
+        "CryptoFactory.h",
+        "HandshakeLayer.h",
+    ],
+    exported_deps = [
+        ":aead",
+        "//quic:constants",
+        "//quic/codec:packet_number_cipher",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "transport_parameters",
+    srcs = [
+        "TransportParameters.cpp",
+    ],
+    headers = [
+        "TransportParameters.h",
+    ],
+    deps = [
+        "//quic/common:buf_util",
+        "//quic/state:quic_state_machine",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "retry_integrity_tag_generator",
+    headers = [
+        "RetryIntegrityTagGenerator.h",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//quic:constants",
+    ],
+)

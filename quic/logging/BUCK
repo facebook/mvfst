@@ -1,0 +1,71 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "qlogger_constants",
+    srcs = [
+        "QLoggerConstants.cpp",
+    ],
+    headers = [
+        "QLoggerConstants.h",
+    ],
+    exported_deps = [
+        "//folly:string",
+        "//quic:constants",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "qlogger",
+    srcs = [
+        "QLogger.cpp",
+    ],
+    headers = [
+        "QLogger.h",
+    ],
+    exported_deps = [
+        ":qlogger_constants",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "base_qlogger",
+    srcs = [
+        "BaseQLogger.cpp",
+        "QLoggerTypes.cpp",
+    ],
+    headers = [
+        "BaseQLogger.h",
+        "QLoggerTypes.h",
+    ],
+    deps = [
+        "//quic:exception",
+    ],
+    exported_deps = [
+        ":qlogger",
+        ":qlogger_constants",
+        "//folly/json:dynamic",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "file_qlogger",
+    srcs = [
+        "FileQLogger.cpp",
+    ],
+    headers = [
+        "FileQLogger.h",
+    ],
+    exported_deps = [
+        ":base_qlogger",
+        ":qlogger_constants",
+        "//folly/compression:compression",
+        "//folly/json:dynamic",
+        "//folly/logging:logging",
+        "//quic/codec:types",
+    ],
+)

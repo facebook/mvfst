@@ -1,0 +1,52 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "echo_handler",
+    headers = [
+        "EchoClient.h",
+        "EchoHandler.h",
+        "EchoServer.h",
+        "EchoTransportServer.h",
+        "LogQuicStats.h",
+    ],
+    exported_deps = [
+        "//folly:synchronized",
+        "//folly/fibers:core",
+        "//folly/io/async:scoped_event_base_thread",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/api:transport",
+        "//quic/client:client",
+        "//quic/codec:types",
+        "//quic/common:buf_util",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/server:server",
+        "//quic/state:stats_callback",
+    ],
+    exported_external_deps = [
+        "glog",
+    ],
+)
+
+cpp_binary(
+    name = "echo",
+    srcs = [
+        "main.cpp",
+    ],
+    deps = [
+        ":echo_handler",
+        "//fizz/crypto:utils",
+        "//folly/init:init",
+        "//folly/portability:gflags",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)

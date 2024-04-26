@@ -1,0 +1,17 @@
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "quicfingerprint",
+    srcs = [
+        "QuicFingerprint.cpp",
+    ],
+    headers = [
+        "QuicFingerprint.h",
+    ],
+    deps = [
+    ],
+    exported_deps = [
+        "//proxygen/lib/http/session:quic_protocol_info",
+        "//quic/handshake:transport_parameters",
+    ],
+)

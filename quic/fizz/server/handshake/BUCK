@@ -1,0 +1,46 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "fizz_server_handshake",
+    srcs = [
+        "FizzServerHandshake.cpp",
+        "FizzServerQuicHandshakeContext.cpp",
+    ],
+    headers = [
+        "FizzServerHandshake.h",
+        "FizzServerQuicHandshakeContext.h",
+    ],
+    deps = [
+        ":handshake_app_token",
+        "//fizz/protocol:protocol",
+        "//quic/server/state:server",
+    ],
+    exported_deps = [
+        "//fizz/server:fizz_server_context",
+        "//fizz/server:protocol",
+        "//quic/common:circular_deque",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/server/handshake:server_handshake",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "handshake_app_token",
+    srcs = [
+        "AppToken.cpp",
+    ],
+    headers = [
+        "AppToken.h",
+    ],
+    deps = [
+        "//fizz/server:protocol",
+        "//quic/fizz/handshake:fizz_handshake",
+    ],
+    exported_deps = [
+        "//fizz/record:record",
+        "//folly:optional",
+        "//quic/server/handshake:app_token",
+    ],
+)

@@ -1,0 +1,69 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "JumpStarterTest",
+    srcs = [
+        "JumpStarterTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/api/test:test_quic_transport",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/congestion_control:cubic",
+        "//quic/facebook/jump_start:jump_starter",
+        "//quic/state:quic_state_machine",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "LocalizedJumpStarterTest",
+    srcs = [
+        "LocalizedJumpStarterTest.cpp",
+    ],
+    deps = [
+        "//common/network:util",
+        "//folly/portability:gtest",
+        "//quic/facebook/jump_start:localized_jump_starter",
+        "//quic/state:quic_state_machine",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "JumpStarterUpdateObserverTest",
+    srcs = [
+        "JumpStarterUpdateObserverTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/api/test:test_quic_transport",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/facebook/jump_start:jump_starter_update_observer",
+        "//quic/state:quic_state_machine",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "FileQloggerUtilTest",
+    srcs = [
+        "FileQloggerUtilTest.cpp",
+    ],
+    deps = [
+        "//folly:file",
+        "//folly:format",
+        "//folly/portability:filesystem",
+        "//quic/facebook/jump_start:file_qlogger_util",
+        "//quic/logging:file_qlogger",
+    ],
+)

@@ -1,0 +1,339 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "outstanding_packet",
+    headers = [
+        "OutstandingPacket.h",
+    ],
+    exported_deps = [
+        ":loss_state",
+        ":packet_event",
+        "//folly/io:socket_option_map",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "loss_state",
+    headers = [
+        "LossState.h",
+    ],
+    exported_deps = [
+        "//quic/codec:types",
+        "//quic/common:enum_array",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "transport_settings",
+    headers = [
+        "TransportSettings.h",
+    ],
+    exported_deps = [
+        ":quic_priority_queue",
+        "//folly:optional",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "ack_states",
+    headers = [
+        "AckStates.h",
+    ],
+    exported_deps = [
+        "//folly:random",
+        "//quic:constants",
+        "//quic/codec:types",
+        "//quic/common:interval_set",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "packet_event",
+    srcs = [
+        "PacketEvent.cpp",
+    ],
+    headers = [
+        "PacketEvent.h",
+    ],
+    deps = [
+        "//folly/hash:hash",
+    ],
+    exported_deps = [
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_stream_utilities",
+    srcs = [
+        "QuicStreamUtilities.cpp",
+    ],
+    headers = [
+        "QuicStreamUtilities.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_priority_queue",
+    srcs = ["QuicPriorityQueue.cpp"],
+    headers = ["QuicPriorityQueue.h"],
+    exported_deps = [
+        "//folly/container:f14_hash",
+        "//quic/codec:types",
+    ],
+    exported_external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_state_machine",
+    srcs = [
+        "PendingPathRateLimiter.cpp",
+        "QuicStreamManager.cpp",
+        "StateData.cpp",
+    ],
+    headers = [
+        "PendingPathRateLimiter.h",
+        "QuicStreamManager.h",
+        "QuicStreamPrioritiesObserver.h",
+        "QuicStreamUtilities.h",
+        "StateData.h",
+        "StreamData.h",
+    ],
+    exported_deps = [
+        ":ack_event",
+        ":ack_states",
+        ":loss_state",
+        ":outstanding_packet",
+        ":packet_event",
+        ":quic_connection_stats",
+        ":quic_priority_queue",
+        ":retransmission_policy",
+        ":stats_callback",
+        ":transport_settings",
+        "//folly:optional",
+        "//folly/container:f14_hash",
+        "//folly/io:iobuf",
+        "//folly/io/async:delayed_destruction",
+        "//quic:constants",
+        "//quic/codec:codec",
+        "//quic/codec:types",
+        "//quic/common:buf_accessor",
+        "//quic/common:circular_deque",
+        "//quic/common:small_collections",
+        "//quic/congestion_control:congestion_controller",
+        "//quic/congestion_control:packet_processor",
+        "//quic/congestion_control:throttling_signal_provider",
+        "//quic/dsr:dsr_packetization_request_sender",
+        "//quic/handshake:handshake",
+        "//quic/logging:qlogger",
+        "//quic/observer:socket_observer_types",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "ack_handler",
+    srcs = [
+        "AckHandlers.cpp",
+    ],
+    headers = [
+        "AckHandlers.h",
+    ],
+    deps = [
+        ":state_functions",
+        ":stream_functions",
+        "//folly:map_util",
+        "//quic/loss:loss",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+        "//quic:constants",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "stream_functions",
+    srcs = [
+        "QuicStreamFunctions.cpp",
+    ],
+    headers = [
+        "QuicStreamFunctions.h",
+    ],
+    deps = [
+        ":quic_stream_utilities",
+        "//folly/io:iobuf",
+        "//quic:exception",
+        "//quic/flowcontrol:flow_control",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "state_functions",
+    srcs = [
+        "QuicStateFunctions.cpp",
+    ],
+    headers = [
+        "QuicStateFunctions.h",
+    ],
+    deps = [
+        ":stream_functions",
+        "//quic/common:time_util",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+        "//quic:constants",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:types",
+        "//quic/common:network_data",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "stats_callback",
+    headers = [
+        "QuicTransportStatsCallback.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//folly/functional:invoke",
+        "//quic:constants",
+        "//quic:exception",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "pacing_functions",
+    srcs = [
+        "QuicPacingFunctions.cpp",
+    ],
+    headers = [
+        "QuicPacingFunctions.h",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "simple_frame_functions",
+    srcs = [
+        "SimpleFrameFunctions.cpp",
+    ],
+    headers = [
+        "SimpleFrameFunctions.h",
+    ],
+    deps = [
+        ":state_functions",
+        ":stream_functions",
+        "//quic:constants",
+        "//quic/state/stream:stream",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_connection_stats",
+    srcs = [
+    ],
+    headers = [
+        "QuicConnectionStats.h",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+        "//quic:constants",
+        "//quic/congestion_control:congestion_controller",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "datagram_handler",
+    srcs = [
+        "DatagramHandlers.cpp",
+    ],
+    headers = [
+        "DatagramHandlers.h",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "ack_event",
+    srcs = [
+        "AckEvent.cpp",
+    ],
+    headers = [
+        "AckEvent.h",
+    ],
+    deps = [
+        "//folly:map_util",
+    ],
+    exported_deps = [
+        ":outstanding_packet",
+        "//folly:optional",
+        "//quic/codec:types",
+        "//quic/common:small_collections",
+        "//quic/congestion_control:congestion_controller",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "ack_frequency_functions",
+    srcs = [
+        "QuicAckFrequencyFunctions.cpp",
+    ],
+    headers = [
+        "QuicAckFrequencyFunctions.h",
+    ],
+    deps = [
+        "//quic/common:time_util",
+    ],
+    exported_deps = [
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "retransmission_policy",
+    headers = [
+        "QuicStreamGroupRetransmissionPolicy.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "transport_settings_functions",
+    srcs = [
+        "TransportSettingsFunctions.cpp",
+    ],
+    headers = [
+        "TransportSettingsFunctions.h",
+    ],
+    exported_deps = [
+        ":transport_settings",
+        "//folly/json:dynamic",
+    ],
+)

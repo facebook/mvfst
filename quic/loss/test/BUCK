@@ -1,0 +1,33 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "QuicLossFunctionsTest",
+    srcs = [
+        "QuicLossFunctionsTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "//folly/io/async/test:mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api:transport",
+        "//quic/api/test:mocks",
+        "//quic/client:state_and_handshake",
+        "//quic/codec:types",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/dsr:types",
+        "//quic/dsr/test:mocks",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/logging/test:mocks",
+        "//quic/loss:loss",
+        "//quic/server/state:server",
+        "//quic/state:ack_event",
+        "//quic/state/stream:stream",
+        "//quic/state/test:mocks",
+    ],
+)

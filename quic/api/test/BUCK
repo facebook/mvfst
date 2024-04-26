@@ -1,0 +1,237 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "MockQuicSocket.h",
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic:exception",
+        "//quic/api:loop_detector_callback",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common:network_data",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/events:quic_timer",
+        "//quic/dsr:types",
+        "//quic/server:server",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicSocketTest",
+    srcs = [
+        "QuicSocketTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//quic/api:transport",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTransportTest",
+    srcs = [
+        "QuicTransportTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        ":test_quic_transport",
+        "//folly:random",
+        "//folly/io:iobuf",
+        "//quic:constants",
+        "//quic/api:transport",
+        "//quic/common:buf_util",
+        "//quic/common/events:highres_quic_timer",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/congestion_control:static_cwnd_congestion_controller",
+        "//quic/dsr:types",
+        "//quic/dsr/test:mocks",
+        "//quic/handshake/test:mocks",
+        "//quic/logging/test:mocks",
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTransportBaseTest",
+    srcs = [
+        "QuicTransportBaseTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+        "//quic/state:datagram_handler",
+        "//quic/state:quic_stream_utilities",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTransportFunctionsTest",
+    srcs = [
+        "QuicTransportFunctionsTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//quic/api:transport",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/logging:file_qlogger",
+        "//quic/logging:qlogger_constants",
+        "//quic/server/state:server",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicPacketSchedulerTest",
+    srcs = [
+        "QuicPacketSchedulerTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":mocks",
+        "//folly/portability:gtest",
+        "//quic/api:transport",
+        "//quic/client:state_and_handshake",
+        "//quic/codec:pktbuilder",
+        "//quic/codec/test:mocks",
+        "//quic/common/test:test_utils",
+        "//quic/dsr:types",
+        "//quic/dsr/test:mocks",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "IoBufQuicBatchTest",
+    srcs = [
+        "IoBufQuicBatchTest.cpp",
+    ],
+    deps = [
+        "//quic/api:transport",
+        "//quic/client:state_and_handshake",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicBatchWriterTest",
+    srcs = [
+        "QuicBatchWriterTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "//quic/api:quic_batch_writer",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStreamAsyncTransportTest",
+    srcs = [
+        "QuicStreamAsyncTransportTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly:move_wrapper",
+        "//folly/container:f14_hash",
+        "//folly/futures:core",
+        "//folly/io/async/test:mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api:stream_async_transport",
+        "//quic/client:client",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/server:server",
+        "//quic/server/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTypedTransportTest",
+    srcs = [
+        "QuicTypedTransportTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        ":quic_typed_transport_test_util",
+        "//quic/codec:types",
+        "//quic/congestion_control:static_cwnd_congestion_controller",
+        "//quic/fizz/client/test:quic_client_transport_test_util",
+        "//quic/server/test:quic_server_transport_test_util",
+        "//quic/state:ack_event",
+        "//quic/state:outstanding_packet",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_typed_transport_test_util",
+    headers = [
+        "QuicTypedTransportTestUtil.h",
+    ],
+    exported_deps = [
+        "//quic/api:transport",
+        "//quic/common/test:test_packet_builders",
+        "//quic/common/test:test_utils",
+        "//quic/state:quic_state_machine",
+        "//quic/state:state_functions",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "test_quic_transport",
+    headers = [
+        "TestQuicTransport.h",
+    ],
+    exported_deps = [
+        "//quic/api:transport",
+        "//quic/common/test:test_utils",
+        "//quic/dsr/frontend:write_functions",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+    ],
+)

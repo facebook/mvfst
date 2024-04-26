@@ -1,0 +1,57 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "fizz_client_handshake_test",
+    srcs = [
+        "FizzClientHandshakeTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mock_psk_cache",
+        "//fizz/client/test:mocks",
+        "//fizz/crypto/test:TestUtil",
+        "//fizz/protocol/clock/test:mock_clock",
+        "//fizz/protocol/ech:decrypter",
+        "//fizz/protocol/test:mocks",
+        "//fizz/server:protocol",
+        "//fizz/server/test:mocks",
+        "//folly:fbstring",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:ssl_context",
+        "//folly/io/async/test:mocks",
+        "//quic/client:client_extension",
+        "//quic/client:state_and_handshake",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/state:quic_state_machine",
+        "//quic/state:stream_functions",
+    ],
+)
+
+cpp_unittest(
+    name = "FizzClientExtensionsTest",
+    srcs = [
+        "FizzClientExtensionsTest.cpp",
+    ],
+    deps = [
+        "//fizz/protocol/test:test_messages",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "mock_psk_cache",
+    headers = [
+        "MockQuicPskCache.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//folly/portability:gmock",
+        "//quic/fizz/client/handshake:psk_cache",
+    ],
+)

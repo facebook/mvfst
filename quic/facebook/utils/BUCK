@@ -1,0 +1,20 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mvfst_quic_utils",
+    srcs = [
+        "QuicPacketUtils.cpp",
+    ],
+    headers = [
+        "QuicPacketUtils.h",
+    ],
+    deps = [
+        "//quic/codec:codec",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//quic/codec:types",
+    ],
+)

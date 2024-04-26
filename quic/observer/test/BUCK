@@ -1,0 +1,16 @@
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+oncall("traffic_protocols")
+
+cpp_unittest(
+    name = "SocketObserverInterfaceTest",
+    srcs = [
+        "SocketObserverInterfaceTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//quic/common/test:test_packet_builders",
+        "//quic/common/test:test_utils",
+        "//quic/observer:socket_observer_interface",
+    ],
+)

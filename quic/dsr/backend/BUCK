@@ -1,0 +1,31 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "dsr_packetizer",
+    srcs = ["DSRPacketizer.cpp"],
+    headers = ["DSRPacketizer.h"],
+    deps = [
+        "//quic/api:quic_batch_writer",
+    ],
+    exported_deps = [
+        "//fizz/crypto/aead:aead",
+        "//fizz/protocol:factory",
+        "//fizz/protocol:openssl_factory",
+        "//fizz/protocol:protocol",
+        "//fizz/record:record",
+        "//folly:hash",
+        "//folly:network_address",
+        "//folly/container:evicting_cache_map",
+        "//folly/io/async:async_udp_socket",
+        "//quic/api:transport",
+        "//quic/codec:packet_number_cipher",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:types",
+        "//quic/dsr:types",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/handshake:aead",
+        "//quic/xsk:xsk_container",
+    ],
+)

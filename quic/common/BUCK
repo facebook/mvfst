@@ -1,0 +1,184 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "interval_set",
+    headers = [
+        "IntervalSet.h",
+        "IntervalSet-inl.h",
+    ],
+    exported_deps = [
+        "//folly:likely",
+        "//folly:optional",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "looper",
+    srcs = [
+        "FunctionLooper.cpp",
+    ],
+    headers = [
+        "FunctionLooper.h",
+    ],
+    deps = [
+        "//folly:scope_guard",
+    ],
+    exported_deps = [
+        "//folly:function",
+        "//folly:optional",
+        "//folly/io/async:delayed_destruction",
+        "//quic:constants",
+        "//quic/common/events:eventbase",
+        "//quic/common/events:quic_timer",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "variant",
+    headers = [
+        "Variant.h",
+    ],
+    exported_deps = [
+    ],
+)
+
+mvfst_cpp_library(
+    name = "buf_accessor",
+    srcs = [
+        "BufAccessor.cpp",
+    ],
+    headers = [
+        "BufAccessor.h",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "buf_util",
+    srcs = [
+        "BufUtil.cpp",
+    ],
+    headers = [
+        "BufUtil.h",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "enum_array",
+    headers = [
+        "EnumArray.h",
+    ],
+    exported_deps = [
+        "//folly:portability",
+    ],
+    exported_external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "socket_util",
+    headers = [
+        "SocketUtil.h",
+    ],
+    exported_deps = [
+        "//folly/io:socket_option_map",
+        "//folly/net:net_ops",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "small_collections",
+    headers = [
+        "SmallCollections.h",
+    ],
+    exported_deps = [
+        "//folly:small_vector",
+        "//folly/container:heap_vector_types",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "circular_deque",
+    headers = [
+        "CircularDeque.h",
+        "CircularDeque-inl.h",
+    ],
+    exported_deps = [
+        "//folly:likely",
+        "//folly:portability",
+        "//folly:scope_guard",
+        "//folly/memory:malloc",
+    ],
+    exported_external_deps = [
+        "boost",
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "network_data",
+    headers = [
+        "NetworkData.h",
+    ],
+    exported_deps = [
+        ":time_points",
+        "//folly:optional",
+        "//folly/io:iobuf",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "time_points",
+    headers = [
+        "TimePoints.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "time_util",
+    headers = [
+        "TimeUtil.h",
+    ],
+    exported_deps = [
+        "//folly:traits",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "transport_knobs",
+    srcs = [
+        "TransportKnobs.cpp",
+    ],
+    headers = [
+        "TransportKnobs.h",
+    ],
+    deps = [
+        "//folly/json:dynamic",
+        "//quic:constants",
+    ],
+    exported_deps = [
+        "//folly:optional",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)

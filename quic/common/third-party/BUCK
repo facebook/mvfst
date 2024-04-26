@@ -1,0 +1,10 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "better_enums",
+    headers = [
+        "enum.h",
+    ],
+)

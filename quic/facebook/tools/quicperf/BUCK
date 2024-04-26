@@ -1,0 +1,155 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
+load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
+
+oncall("traffic_protocols")
+
+cpp_binary(
+    name = "quicperf_client",
+    srcs = [
+        "QuicPerfClient.cpp",
+        "QuicPerfCommonCmdFlags.cpp",
+    ],
+    headers = [
+        "QuicPerfCommonCmdFlags.h",
+    ],
+    deps = [
+        ":mns_client",
+        ":mvfst_client",  # @manual
+        ":quicperf_client_funcs",
+        ":quicperf_utils",
+        "//fizz/crypto:utils",
+        "//folly/init:init",
+        "//folly/portability:gflags",
+        "//quic:constants",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+fb_native.configured_alias(
+    name = "quicperf_mobile_client",
+    actual = ":quicperf_client",
+    platform = "fbsource//xplat/mobilenetwork/platform:mvfst-mobile",
+)
+
+cpp_binary(
+    name = "quicperf_server",
+    srcs = [
+        "QuicPerfCommonCmdFlags.cpp",
+        "QuicPerfServer.cpp",
+    ],
+    headers = [
+        "QuicPerfCommonCmdFlags.h",
+    ],
+    deps = [
+        ":mvfst_quicperf_server",  # @manual
+        ":quicperf_utils",
+        "//fizz/crypto:utils",
+        "//folly/init:init",
+        "//folly/portability:gflags",
+        "//quic:constants",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "mvfst_quicperf_server",
+    srcs = [
+        "MvfstQuicPerfServer.cpp",
+    ],
+    headers = [
+        "MvfstQuicPerfServer.h",
+    ],
+    deps = [
+        "//folly/io:iobuf",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:server_congestion_controller_factory",
+    ],
+    exported_deps = [
+        "//quic/server:accept_observer",
+        "//quic/server:server",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "mns_client",
+    srcs = [
+        "MNSQuicPerfClient.cpp",
+    ],
+    headers = [
+        "MNSQuicPerfClient.h",
+    ],
+    deps = [
+        "//folly/lang:bits",
+    ],
+    exported_deps = [
+        "fbsource//xplat/mobilenetwork:dnsresolver",
+        "fbsource//xplat/mobilenetwork:http_client",  # @manual
+        ":quicperf_client_funcs",
+        ":quicperf_utils",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "mvfst_client",
+    srcs = [
+        "MvfstQuicPerfClient.cpp",
+    ],
+    headers = [
+        "MvfstQuicPerfClient.h",
+    ],
+    deps = [
+        "//quic/common/events:highres_quic_timer",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+    ],
+    exported_deps = [
+        ":quicperf_client_funcs",
+        ":quicperf_utils",
+        "//quic/client:client",
+        "//quic/common/events:folly_eventbase",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quicperf_client_funcs",
+    srcs = [
+        "QuicPerfClientFunc.cpp",
+    ],
+    headers = [
+        "QuicPerfClientFunc.h",
+    ],
+    exported_deps = [
+        ":quicperf_utils",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quicperf_utils",
+    headers = [
+        "QuicPerfUtils.h",
+    ],
+    exported_deps = [
+        "//folly:string",
+        "//folly/portability:time",
+        "//folly/stats:tdigest",
+        "//quic:constants",
+    ],
+)

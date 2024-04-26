@@ -1,0 +1,26 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "server_async_transport",
+    srcs = [
+        "QuicAsyncTransportAcceptor.cpp",
+        "QuicAsyncTransportServer.cpp",
+        "QuicServerAsyncTransport.cpp",
+    ],
+    headers = [
+        "QuicAsyncTransportAcceptor.h",
+        "QuicAsyncTransportServer.h",
+        "QuicServerAsyncTransport.h",
+    ],
+    deps = [
+        "//folly:conv",
+    ],
+    exported_deps = [
+        "//folly/io/async:async_transport",
+        "//folly/io/async:scoped_event_base_thread",
+        "//quic/api:stream_async_transport",
+        "//quic/server:server",
+    ],
+)
