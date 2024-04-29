@@ -118,8 +118,8 @@ void QuicConnector::cleanUp() {
 void QuicConnector::cleanUpAndCloseSocket() {
   if (quicClient_) {
     auto error = QuicError(
-        quic::QuicErrorCode(quic::LocalErrorCode::SHUTTING_DOWN),
-        std::string("shutting down"));
+        quic::QuicErrorCode(quic::TransportErrorCode::NO_ERROR),
+        std::string("closing the connection"));
     quicClient_->close(std::move(error));
   }
   cleanUp();

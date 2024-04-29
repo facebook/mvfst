@@ -298,7 +298,13 @@ enum class LocalErrorCode : uint64_t {
   STREAM_CLOSED = 0x40000002,
   STREAM_NOT_EXISTS = 0x40000003,
   CREATING_EXISTING_STREAM = 0x40000004,
+
+  // Should be used when we're closing the connection locally because of an
+  // error.
+  // If there is no error and connection need to be closed, use
+  // TransportErrorCode::NO_ERROR instead.
   SHUTTING_DOWN = 0x40000005,
+
   RESET_CRYPTO_STREAM = 0x40000006,
   CWND_OVERFLOW = 0x40000007,
   INFLIGHT_BYTES_OVERFLOW = 0x40000008,
