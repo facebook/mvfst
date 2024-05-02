@@ -63,6 +63,7 @@ class QuicClientTransportMock : public QuicClientTransport {
       (WriteResult),
       writeChain,
       (StreamId, Buf, bool, ByteEventCallback*));
+  MOCK_METHOD((uint64_t), maxWritableOnConn, (), (const));
 };
 
 } // namespace quic::test
