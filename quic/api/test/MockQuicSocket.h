@@ -394,5 +394,6 @@ class MockQuicSocket : public QuicSocket {
       getPeerCertificate,
       (),
       (const));
+  MOCK_METHOD((uint64_t), maxWritableOnConn, (), (const));
 };
 } // namespace quic

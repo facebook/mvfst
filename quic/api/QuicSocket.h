@@ -559,6 +559,12 @@ class QuicSocket {
       StreamId id) const = 0;
 
   /**
+   * Similar to getMaxWritableOnStream() above, but returns the value for the
+   * whole connection.
+   */
+  [[nodiscard]] virtual uint64_t maxWritableOnConn() const = 0;
+
+  /**
    * Sets the flow control window for the connection.
    * Use setStreamFlowControlWindow for per Stream flow control.
    */
