@@ -182,6 +182,23 @@ class LibevQuicEventBase
     folly::IntrusiveListHook listHook_;
   };
 
+  class FunctionLoopCallback : public quic::QuicEventBaseLoopCallback {
+   public:
+    explicit FunctionLoopCallback(folly::Function<void()>&& func)
+        : func_(std::move(func)) {}
+
+    void runLoopCallback() noexcept override {
+      func_();
+      delete this;
+    }
+
+    friend class LibevQuicEventBase;
+
+   private:
+    folly::Function<void()> func_;
+    folly::IntrusiveListHook listHook_;
+  };
+
   struct ev_loop* ev_loop_{EV_DEFAULT};
 
   folly::IntrusiveList<LoopCallbackWrapper, &LoopCallbackWrapper::listHook_>
@@ -193,6 +210,9 @@ class LibevQuicEventBase
   // iteration.
   folly::IntrusiveList<LoopCallbackWrapper, &LoopCallbackWrapper::listHook_>*
       runOnceCallbackWrappers_{nullptr};
+
+  folly::IntrusiveList<FunctionLoopCallback, &FunctionLoopCallback::listHook_>
+      functionLoopCallbacks_;
 
   // ev_prepare is supposed to run before the loop goes to sleep.
   // We're using it to execute delayed work given to us via runInLoop.

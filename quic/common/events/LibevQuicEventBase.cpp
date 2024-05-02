@@ -29,20 +29,6 @@ void libEvPrepareCallback(
   CHECK(self != nullptr);
   self->checkCallbacks();
 }
-
-class FunctionLoopCallback : public quic::QuicEventBaseLoopCallback {
- public:
-  explicit FunctionLoopCallback(folly::Function<void()>&& func)
-      : func_(std::move(func)) {}
-  void runLoopCallback() noexcept override {
-    func_();
-    delete this;
-  }
-
- private:
-  folly::Function<void()> func_;
-};
-
 } // namespace
 
 namespace quic {
@@ -55,6 +41,14 @@ LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
 
 LibevQuicEventBase::~LibevQuicEventBase() {
   ev_prepare_stop(ev_loop_, &prepareWatcher_);
+
+  struct FunctionLoopCallbackDisposer {
+    void operator()(FunctionLoopCallback* callback) {
+      delete callback;
+    }
+  };
+
+  functionLoopCallbacks_.clear_and_dispose(FunctionLoopCallbackDisposer());
 }
 
 void LibevQuicEventBase::runInLoop(
@@ -62,6 +56,7 @@ void LibevQuicEventBase::runInLoop(
     bool thisIteration) {
   CHECK(isInEventBaseThread());
   auto wrapper = new FunctionLoopCallback(std::move(cb));
+  functionLoopCallbacks_.push_back(*wrapper);
   runInLoop(wrapper, thisIteration);
 }
 
