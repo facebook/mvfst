@@ -6,6 +6,7 @@
  */
 
 #include <quic/congestion_control/Bbr.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/QuicServerTransport.h>
@@ -1211,6 +1212,19 @@ QuicServerTransport::getPeerTransportParams() const {
     }
   }
   return folly::none;
+}
+
+void QuicServerTransport::setCongestionControl(CongestionControlType type) {
+  if (!conn_->congestionControllerFactory) {
+    // If you are hitting this, update your application to call
+    // setCongestionControllerFactory() on the transport to share one factory
+    // for all transports.
+    conn_->congestionControllerFactory =
+        std::make_shared<ServerCongestionControllerFactory>();
+    LOG(WARNING)
+        << "A congestion controller factory is not set. Using a default per-transport instance.";
+  }
+  QuicTransportBase::setCongestionControl(type);
 }
 
 } // namespace quic

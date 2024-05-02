@@ -1771,6 +1771,19 @@ QuicClientTransport::getPeerTransportParams() const {
   return folly::none;
 }
 
+void QuicClientTransport::setCongestionControl(CongestionControlType type) {
+  if (!conn_->congestionControllerFactory) {
+    // If you are hitting this, update your application to call
+    // setCongestionControllerFactory() on the transport and share one factory
+    // for all transports.
+    conn_->congestionControllerFactory =
+        std::make_shared<DefaultCongestionControllerFactory>();
+    LOG(WARNING)
+        << "A congestion controller factory is not set. Using a default per-transport instance.";
+  }
+  QuicTransportBase::setCongestionControl(type);
+}
+
 void QuicClientTransport::RecvmmsgStorage::resize(size_t numPackets) {
   if (msgs.size() != numPackets) {
     msgs.resize(numPackets);

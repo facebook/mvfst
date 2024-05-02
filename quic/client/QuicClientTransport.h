@@ -155,6 +155,8 @@ class QuicClientTransport
 
   void setSupportedVersions(const std::vector<QuicVersion>& versions) override;
 
+  void setCongestionControl(CongestionControlType type) override;
+
   /**
    * Set socket options for the underlying socket.
    * Options are being set before and after bind, and not at the time of
