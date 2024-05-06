@@ -10,9 +10,9 @@ mvfst_cpp_library(
         "//quic/api:quic_batch_writer",
     ],
     exported_deps = [
+        "//fizz/backend:openssl",
         "//fizz/crypto/aead:aead",
         "//fizz/protocol:factory",
-        "//fizz/protocol:openssl_factory",
         "//fizz/protocol:protocol",
         "//fizz/record:record",
         "//folly:hash",

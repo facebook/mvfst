@@ -7,9 +7,9 @@
 
 #pragma once
 
+#include <fizz/backend/openssl/OpenSSLFactory.h>
 #include <fizz/crypto/aead/Aead.h>
 #include <fizz/protocol/Factory.h>
-#include <fizz/protocol/OpenSSLFactory.h>
 #include <fizz/protocol/Protocol.h>
 #include <fizz/record/Types.h>
 #include <folly/Hash.h>

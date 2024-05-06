@@ -7,9 +7,9 @@
 
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 
-#include <fizz/crypto/aead/AESGCM128.h>
+#include <fizz/backend/openssl/crypto/aead/AESGCM128.h>
+#include <fizz/backend/openssl/crypto/aead/OpenSSLEVPCipher.h>
 #include <fizz/crypto/aead/Aead.h>
-#include <fizz/crypto/aead/OpenSSLEVPCipher.h>
 
 namespace quic {
 
@@ -36,7 +36,7 @@ FizzRetryIntegrityTagGenerator::getRetryIntegrityTag(
     QuicVersion version,
     const folly::IOBuf* pseudoRetryPacket) {
   std::unique_ptr<fizz::Aead> retryCipher =
-      fizz::OpenSSLEVPCipher::makeCipher<fizz::AESGCM128>();
+      fizz::openssl::OpenSSLEVPCipher::makeCipher<fizz::openssl::AESGCM128>();
   fizz::TrafficKey trafficKey;
   trafficKey.key = folly::IOBuf::copyBuffer(retryPacketKey(version));
   trafficKey.iv = folly::IOBuf::copyBuffer(retryPacketNonce(version));

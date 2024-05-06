@@ -649,8 +649,9 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
     fizz::ech::ECHConfigContentDraft echConfigContent;
     echConfigContent.key_config.config_id = 0xFB;
     echConfigContent.key_config.kem_id = fizz::hpke::KEMId::secp256r1;
-    echConfigContent.key_config.public_key = fizz::detail::encodeECPublicKey(
-        ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey));
+    echConfigContent.key_config.public_key =
+        fizz::openssl::detail::encodeECPublicKey(
+            ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey));
     echConfigContent.key_config.cipher_suites = {suite};
     echConfigContent.maximum_name_length = 100;
     echConfigContent.public_name = folly::IOBuf::copyBuffer("public.dummy.com");
@@ -673,7 +674,8 @@ TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   EXPECT_CALL(*echPolicy, getConfig(_))
       .WillOnce(Return(std::vector<fizz::ech::ECHConfig>{getECHConfig()}));
 
-  auto kex = std::make_unique<fizz::OpenSSLECKeyExchange<fizz::P256>>();
+  auto kex = std::make_unique<
+      fizz::openssl::OpenSSLECKeyExchange<fizz::openssl::P256>>();
   kex->setPrivateKey(fizz::test::getPrivateKey(fizz::test::kP256Key));
   echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>();
   echDecrypter->addDecryptionConfig(

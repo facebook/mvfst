@@ -7,8 +7,8 @@
 
 #pragma once
 
+#include <fizz/backend/openssl/crypto/Sha256.h>
 #include <fizz/crypto/Hkdf.h>
-#include <fizz/crypto/Sha256.h>
 #include <quic/codec/Types.h>
 
 namespace quic {

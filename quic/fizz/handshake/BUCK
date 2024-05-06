@@ -21,11 +21,10 @@ mvfst_cpp_library(
     ],
     deps = [
         "//fizz/crypto:utils",
-        "//fizz/crypto/aead:evpcipher",
     ],
     exported_deps = [
+        "//fizz/backend:openssl",
         "//fizz/crypto/aead:aead",
-        "//fizz/protocol:openssl_factory",
         "//fizz/protocol:types",
         "//fizz/record:record",
         "//folly/ssl:openssl_ptr_types",

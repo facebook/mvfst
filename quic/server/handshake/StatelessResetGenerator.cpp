@@ -19,7 +19,7 @@ StatelessResetGenerator::StatelessResetGenerator(
     StatelessResetSecret secret,
     const std::string& addressStr)
     : addressStr_(std::move(addressStr)),
-      hkdf_(fizz::HkdfImpl::create<fizz::Sha256>()) {
+      hkdf_(fizz::HkdfImpl::create<fizz::openssl::Sha256>()) {
   extractedSecret_ = hkdf_.extract(kSalt, folly::range(secret));
 }
 

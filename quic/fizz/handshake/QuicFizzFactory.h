@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <fizz/protocol/OpenSSLFactory.h>
+#include <fizz/backend/openssl/OpenSSLFactory.h>
 
 namespace quic {
 
-class QuicFizzFactory : public fizz::OpenSSLFactory {
+class QuicFizzFactory : public fizz::openssl::OpenSSLFactory {
   std::unique_ptr<fizz::PlaintextReadRecordLayer> makePlaintextReadRecordLayer()
       const override;
 

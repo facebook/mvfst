@@ -98,8 +98,8 @@ mvfst_cpp_library(
         "TestUtils.h",
     ],
     deps = [
+        "//fizz/backend:openssl",
         "//fizz/crypto/test:TestUtil",
-        "//fizz/protocol:openssl_certificate",
         "//fizz/protocol/clock/test:mock_clock",
         "//fizz/protocol/test:mocks",
         "//quic/api:transport",

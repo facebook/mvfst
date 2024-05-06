@@ -96,8 +96,8 @@ mvfst_cpp_library(
         "//folly:range",
     ],
     exported_deps = [
+        "//fizz/backend:openssl",
         "//fizz/crypto:hkdf",
-        "//fizz/crypto:hmac_sha256",
         "//quic/codec:types",
     ],
 )

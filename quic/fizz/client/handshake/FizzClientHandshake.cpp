@@ -19,8 +19,6 @@
 #include <fizz/client/EarlyDataRejectionPolicy.h>
 #include <fizz/protocol/Protocol.h>
 
-#include <fizz/crypto/aead/AESGCM128.h>
-
 namespace quic {
 
 FizzClientHandshake::FizzClientHandshake(

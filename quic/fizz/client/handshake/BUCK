@@ -14,9 +14,9 @@ mvfst_cpp_library(
         "FizzClientQuicHandshakeContext.h",
     ],
     deps = [
+        "//fizz/backend:openssl",
         "//fizz/client:early_data_rejection",
         "//fizz/client:ech_policy",
-        "//fizz/crypto/aead:evpcipher",
         "//fizz/protocol:exporter",
         "//fizz/protocol:protocol",
         "//quic/codec:pktbuilder",
