@@ -55,12 +55,13 @@ struct Priority {
 extern const Priority kDefaultPriority;
 
 /**
- * Priority queue for Quic streams.  It represents each level/incremental bucket
- * as an entry in a vector.  Each entry holds a set of streams (sorted by
- * stream ID, ascending).  There is also a map of all streams currently in the
- * queue, mapping from ID -> bucket index.  The interface is almost identical
- * to std::set (insert, erase, count, clear), except that insert takes an
- * optional priority parameter.
+ * Priority queue for Quic streams. This is based on
+ * https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority-03. It
+ * represents each level/incremental bucket as an entry in a vector.  Each entry
+ * holds a set of streams (sorted by stream ID, ascending).  There is also a map
+ * of all streams currently in the queue, mapping from ID -> bucket index.  The
+ * interface is almost identical to std::set (insert, erase, count, clear),
+ * except that insert takes an optional priority parameter.
  */
 struct PriorityQueue {
   struct Level {
