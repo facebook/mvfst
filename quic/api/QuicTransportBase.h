@@ -709,6 +709,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  protected:
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);
+  void updateSocketTosSettings();
   void processCallbacksAfterWriteData();
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();

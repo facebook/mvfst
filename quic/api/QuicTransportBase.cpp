@@ -3291,6 +3291,8 @@ void QuicTransportBase::setTransportSettings(
     conn_->datagramState.maxWriteBufferSize =
         conn_->transportSettings.datagramConfig.writeBufSize;
   }
+
+  updateSocketTosSettings();
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -3324,6 +3326,24 @@ void QuicTransportBase::updateCongestionControlSettings(
   conn_->transportSettings.copaDeltaParam = transportSettings.copaDeltaParam;
   conn_->transportSettings.copaUseRttStanding =
       transportSettings.copaUseRttStanding;
+}
+
+void QuicTransportBase::updateSocketTosSettings() {
+  const auto initialTosValue = conn_->socketTos.value;
+  if (conn_->transportSettings.enableEcnOnEgress) {
+    if (conn_->transportSettings.useL4sEcn) {
+      conn_->socketTos.fields.ecn = kEcnECT1;
+    } else {
+      conn_->socketTos.fields.ecn = kEcnECT0;
+    }
+  } else {
+    conn_->socketTos.fields.ecn = 0;
+  }
+
+  if (socket_ && socket_->isBound() &&
+      conn_->socketTos.value != initialTosValue) {
+    socket_->setTosOrTrafficClass(conn_->socketTos.value);
+  }
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>

@@ -5848,6 +5848,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
       folly::none,
       folly::SocketAddress("127.0.0.1", 12345),
       transportSettings,
+      0, // tosValue
       &errMessageCallback,
       &readCallback,
       folly::emptySocketOptionMap);

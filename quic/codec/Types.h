@@ -1196,6 +1196,15 @@ struct RegularQuicWritePacket : public RegularPacket {
       : RegularPacket(std::move(headerIn)) {}
 };
 
+enum class ECNState : uint8_t {
+  NotAttempted, // ECN marking disabled
+  AttemptingECN, // ECN enabled, but not yet negotiated
+  ValidatedECN, // ECN enabled, and negotiated successfully
+  AttemptingL4S, // L4S enabled, but not yet negotiated
+  ValidatedL4S, // L4S enabled, and negotiated successfully
+  FailedValidation, // ECN or L4S was enabled, but failed validation
+};
+
 /**
  * Returns whether the header is long or short from the initial byte of
  * the QUIC packet.

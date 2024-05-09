@@ -1577,6 +1577,7 @@ void QuicClientTransport::start(
         conn_->localAddress,
         conn_->peerAddress,
         conn_->transportSettings,
+        conn_->socketTos.value,
         this,
         this,
         socketOptions_);
@@ -1705,6 +1706,7 @@ void QuicClientTransport::onNetworkSwitch(
         conn_->localAddress,
         conn_->peerAddress,
         conn_->transportSettings,
+        conn_->socketTos.value,
         this,
         this,
         socketOptions_);

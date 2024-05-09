@@ -5156,5 +5156,83 @@ TEST_F(QuicTransportTest, GetMaxWritableBufferSpaceLimitedTwoStreams) {
   EXPECT_EQ(*maxWritable2, transportSettings.totalBufferSpaceAvailable);
 }
 
+TEST_F(QuicTransportTest, UpdateSocketTosSettingsNoECN) {
+  // Pretend the socket is bound so the transport can attempt to set ToS.
+  EXPECT_CALL(*socket_, isBound).WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*socket_, setRecvTos).Times(0);
+  EXPECT_CALL(*socket_, setTosOrTrafficClass(_)).Times(0);
+
+  TransportSettings transportSettings;
+  transportSettings.readEcnOnIngress = false;
+  transportSettings.enableEcnOnEgress = false;
+  transport_->setTransportSettings(transportSettings);
+
+  auto& conn = transport_->getConnectionState();
+  EXPECT_EQ(conn.socketTos.fields.ecn, 0);
+}
+
+TEST_F(QuicTransportTest, UpdateSocketTosSettingsClassicECN) {
+  // Pretend the socket is bound so the transport can attempt to set ToS.
+  EXPECT_CALL(*socket_, isBound).WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*socket_, setRecvTos).Times(0);
+  EXPECT_CALL(*socket_, setTosOrTrafficClass(kEcnECT0)).Times(1);
+
+  TransportSettings transportSettings;
+  transportSettings.readEcnOnIngress = false;
+  transportSettings.enableEcnOnEgress = true;
+  transportSettings.useL4sEcn = false;
+  transport_->setTransportSettings(transportSettings);
+
+  auto& conn = transport_->getConnectionState();
+  EXPECT_EQ(conn.socketTos.fields.ecn, kEcnECT0);
+}
+
+TEST_F(QuicTransportTest, UpdateSocketTosSettingsL4SECN) {
+  // Pretend the socket is bound so the transport can attempt to set ToS.
+  EXPECT_CALL(*socket_, isBound).WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*socket_, setRecvTos).Times(0);
+  EXPECT_CALL(*socket_, setTosOrTrafficClass(kEcnECT1)).Times(1);
+
+  TransportSettings transportSettings;
+  transportSettings.readEcnOnIngress = false;
+  transportSettings.enableEcnOnEgress = true;
+  transportSettings.useL4sEcn = true;
+  transport_->setTransportSettings(transportSettings);
+
+  auto& conn = transport_->getConnectionState();
+  EXPECT_EQ(conn.socketTos.fields.ecn, kEcnECT1);
+
+  // Setting the same transport settings should not trigger any calls to the
+  // socket
+  EXPECT_CALL(*socket_, setTosOrTrafficClass(_)).Times(0);
+  transport_->setTransportSettings(transportSettings);
+
+  // Disabling ECN should trigger a call to update the socket's tos.
+  EXPECT_CALL(*socket_, setTosOrTrafficClass(0)).Times(1);
+  transportSettings.enableEcnOnEgress = false;
+  transport_->setTransportSettings(transportSettings);
+}
+
+TEST_F(QuicTransportTest, UpdateSocketTosSettingsDoNotSetTosOnUnboundSocket) {
+  // Pretend the socket is bound so the transport can attempt to set ToS.
+  EXPECT_CALL(*socket_, isBound).WillRepeatedly(Return(false));
+
+  EXPECT_CALL(*socket_, setRecvTos).Times(0);
+  EXPECT_CALL(*socket_, setTosOrTrafficClass(0)).Times(0);
+
+  TransportSettings transportSettings;
+  transportSettings.readEcnOnIngress = false;
+  transportSettings.enableEcnOnEgress = true;
+  transportSettings.useL4sEcn = false;
+  transport_->setTransportSettings(transportSettings);
+
+  // The socket tos should still have been updated
+  auto& conn = transport_->getConnectionState();
+  EXPECT_EQ(conn.socketTos.fields.ecn, kEcnECT0);
+}
+
 } // namespace test
 } // namespace quic

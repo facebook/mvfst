@@ -368,6 +368,13 @@ struct TransportSettings {
   // Temporary flag to test new stream blocked condition.
   bool useNewStreamBlockedCondition{false};
   bool scheduleTimerForExcessWrites{false};
+
+  // Whether to read ECN bits from ingress packets
+  bool readEcnOnIngress{false};
+  // Whether to enable ECN on egress packets
+  bool enableEcnOnEgress{false};
+  // Whether to use L4S ECN (enableEcnOnEgress must be enabled)
+  bool useL4sEcn{false};
 };
 
 } // namespace quic
