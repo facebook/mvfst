@@ -117,6 +117,9 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
 
 Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet);
 
+ReceivedUdpPacket packetToReceivedUdpPacket(
+    const RegularQuicPacketBuilder::Packet& packetIn);
+
 Buf packetToBufCleartext(
     RegularQuicPacketBuilder::Packet& packet,
     const Aead& cleartextCipher,

@@ -287,8 +287,7 @@ class QuicClientTransport
    */
   void processUdpPacketData(
       const folly::SocketAddress& peer,
-      const ReceivedUdpPacket::Timings& udpPacketTimings,
-      BufQueue& udpPacketData);
+      ReceivedUdpPacket& udpPacket);
 
   void startCryptoHandshake();
 

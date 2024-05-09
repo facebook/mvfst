@@ -731,15 +731,14 @@ void onServerReadDataFromOpen(
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Open);
   // Don't bother parsing if the data is empty.
-  if (!readData.udpPacket.buf ||
-      readData.udpPacket.buf->computeChainDataLength() == 0) {
+  if (readData.udpPacket.buf.empty()) {
     return;
   }
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
     firstPacketFromPeer = true;
 
-    folly::io::Cursor cursor(readData.udpPacket.buf.get());
+    folly::io::Cursor cursor(readData.udpPacket.buf.front());
     auto initialByte = cursor.readBE<uint8_t>();
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
@@ -848,8 +847,7 @@ void onServerReadDataFromOpen(
         initialDestinationConnectionId, version);
     conn.peerAddress = conn.originalPeerAddress;
   }
-  BufQueue udpData;
-  udpData.append(std::move(readData.udpPacket.buf));
+  BufQueue& udpData = readData.udpPacket.buf;
   uint64_t processedPacketsTotal = 0;
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
@@ -1385,8 +1383,7 @@ void onServerReadDataFromClosed(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Closed);
-  BufQueue udpData;
-  udpData.append(std::move(readData.udpPacket.buf));
+  BufQueue& udpData = readData.udpPacket.buf;
   auto packetSize = udpData.empty() ? 0 : udpData.chainLength();
   if (!conn.readCodec) {
     // drop data. We closed before we even got the first packet. This is

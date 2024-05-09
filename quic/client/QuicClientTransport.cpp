@@ -123,8 +123,7 @@ void QuicClientTransport::processUdpPacket(
     ReceivedUdpPacket&& udpPacket) {
   // Process the arriving UDP packet, which may have coalesced QUIC packets.
   {
-    BufQueue udpData;
-    udpData.append(std::move(udpPacket.buf));
+    BufQueue& udpData = udpPacket.buf;
 
     if (!conn_->version) {
       // We only check for version negotiation packets before the version
@@ -145,7 +144,7 @@ void QuicClientTransport::processUdpPacket(
     for (uint16_t processedPackets = 0;
          !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
          processedPackets++) {
-      processUdpPacketData(peer, udpPacket.timings, udpData);
+      processUdpPacketData(peer, udpPacket);
     }
     VLOG_IF(4, !udpData.empty())
         << "Leaving " << udpData.chainLength()
@@ -156,23 +155,23 @@ void QuicClientTransport::processUdpPacket(
   // Process any deferred pending 1RTT and handshake packets if we have keys.
   if (conn_->readCodec->getOneRttReadCipher() &&
       !clientConn_->pendingOneRttData.empty()) {
-    BufQueue pendingPacket;
-    for (auto& pendingData : clientConn_->pendingOneRttData) {
-      pendingPacket.append(std::move(pendingData.udpPacket.buf));
-      processUdpPacketData(
-          pendingData.peer, pendingData.udpPacket.timings, pendingPacket);
-      pendingPacket.move();
+    for (auto& pendingPacket : clientConn_->pendingOneRttData) {
+      // The first loop should try to process any leftover data in the incoming
+      // buffer.
+      pendingPacket.udpPacket.buf.append(udpPacket.buf.move());
+
+      processUdpPacketData(pendingPacket.peer, pendingPacket.udpPacket);
     }
     clientConn_->pendingOneRttData.clear();
   }
   if (conn_->readCodec->getHandshakeReadCipher() &&
       !clientConn_->pendingHandshakeData.empty()) {
-    BufQueue pendingPacket;
-    for (auto& pendingData : clientConn_->pendingHandshakeData) {
-      pendingPacket.append(std::move(pendingData.udpPacket.buf));
-      processUdpPacketData(
-          pendingData.peer, pendingData.udpPacket.timings, pendingPacket);
-      pendingPacket.move();
+    for (auto& pendingPacket : clientConn_->pendingHandshakeData) {
+      // The first loop should try to process any leftover data in the incoming
+      // buffer.
+      pendingPacket.udpPacket.buf.append(udpPacket.buf.move());
+
+      processUdpPacketData(pendingPacket.peer, pendingPacket.udpPacket);
     }
     clientConn_->pendingHandshakeData.clear();
   }
@@ -180,14 +179,13 @@ void QuicClientTransport::processUdpPacket(
 
 void QuicClientTransport::processUdpPacketData(
     const folly::SocketAddress& peer,
-    const ReceivedUdpPacket::Timings& udpPacketTimings,
-    BufQueue& udpPacketData) {
-  auto packetSize = udpPacketData.chainLength();
+    ReceivedUdpPacket& udpPacket) {
+  auto packetSize = udpPacket.buf.chainLength();
   if (packetSize == 0) {
     return;
   }
   auto parsedPacket = conn_->readCodec->parsePacket(
-      udpPacketData, conn_->ackStates, conn_->clientConnectionId->size());
+      udpPacket.buf, conn_->ackStates, conn_->clientConnectionId->size());
   StatelessReset* statelessReset = parsedPacket.statelessReset();
   if (statelessReset) {
     const auto& token = clientConn_->statelessResetToken;
@@ -270,7 +268,7 @@ void QuicClientTransport::processUdpPacketData(
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
         ReceivedUdpPacket(
-            std::move(cipherUnavailable->packet), udpPacketTimings),
+            std::move(cipherUnavailable->packet), udpPacket.timings),
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
@@ -375,7 +373,7 @@ void QuicClientTransport::processUdpPacketData(
   // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
   uint64_t distanceFromExpectedPacketNum =
-      addPacketToAckState(*conn_, ackState, packetNum, udpPacketTimings);
+      addPacketToAckState(*conn_, ackState, packetNum, udpPacket.timings);
   if (distanceFromExpectedPacketNum > 0) {
     QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
   }
@@ -468,7 +466,7 @@ void QuicClientTransport::processUdpPacketData(
             ackedPacketVisitor,
             ackedFrameVisitor,
             markPacketLoss,
-            udpPacketTimings.receiveTimePoint));
+            udpPacket.timings.receiveTimePoint));
         break;
       }
       case QuicFrame::Type::RstStreamFrame: {
@@ -623,7 +621,7 @@ void QuicClientTransport::processUdpPacketData(
         // Datagram isn't retransmittable. But we would like to ack them early.
         // So, make Datagram frames count towards ack policy
         pktHasRetransmittableData = true;
-        handleDatagram(*conn_, frame, udpPacketTimings.receiveTimePoint);
+        handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
         break;
       }
       case QuicFrame::Type::ImmediateAckFrame: {
@@ -1460,10 +1458,10 @@ void QuicClientTransport::onNotifyDataAvailable(
 
     // track the received packets
     for (const auto& packet : networkData.getPackets()) {
-      if (!packet.buf) {
+      if (packet.buf.empty()) {
         continue;
       }
-      auto len = packet.buf->computeChainDataLength();
+      auto len = packet.buf.chainLength();
       maybeQlogDatagram(len);
       totalPackets++;
       totalPacketLen += len;

@@ -519,9 +519,7 @@ void QuicServerTransport::processPendingData(bool async) {
       for (auto& pendingPacket : *pendingData) {
         serverPtr->onNetworkData(
             pendingPacket.peer,
-            NetworkData(
-                std::move(pendingPacket.udpPacket.buf),
-                pendingPacket.udpPacket.timings.receiveTimePoint));
+            NetworkData(std::move(pendingPacket.udpPacket)));
         if (serverPtr->closeState_ == CloseState::CLOSED) {
           // The pending data could potentially contain a connection close, or
           // the app could have triggered a connection close with an error. It

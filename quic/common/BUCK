@@ -134,9 +134,9 @@ mvfst_cpp_library(
         "NetworkData.h",
     ],
     exported_deps = [
+        ":buf_util",
         ":time_points",
         "//folly:optional",
-        "//folly/io:iobuf",
         "//quic:constants",
     ],
 )

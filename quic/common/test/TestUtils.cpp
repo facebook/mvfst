@@ -399,6 +399,12 @@ Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
   return packetBuf;
 }
 
+ReceivedUdpPacket packetToReceivedUdpPacket(
+    const RegularQuicPacketBuilder::Packet& writePacket) {
+  ReceivedUdpPacket packet(packetToBuf(writePacket));
+  return packet;
+}
+
 Buf packetToBufCleartext(
     RegularQuicPacketBuilder::Packet& packet,
     const Aead& cleartextCipher,

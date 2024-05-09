@@ -273,10 +273,10 @@ class TestQuicTransport
 
   void onReadData(const folly::SocketAddress&, ReceivedUdpPacket&& udpPacket)
       override {
-    if (!udpPacket.buf) {
+    if (udpPacket.buf.empty()) {
       return;
     }
-    folly::io::Cursor cursor(udpPacket.buf.get());
+    folly::io::Cursor cursor(udpPacket.buf.front());
     while (!cursor.isAtEnd()) {
       // create server chosen connId with processId = 0 and workerId = 0
       ServerConnectionIdParams params(0, 0, 0);

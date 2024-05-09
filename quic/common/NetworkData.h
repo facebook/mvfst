@@ -8,8 +8,8 @@
 #pragma once
 
 #include <folly/Optional.h>
-#include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/BufUtil.h>
 #include <quic/common/TimePoints.h>
 
 #include <memory>
@@ -59,7 +59,7 @@ struct ReceivedUdpPacket {
   ReceivedUdpPacket(Buf&& bufIn, Timings timingsIn)
       : buf(std::move(bufIn)), timings(std::move(timingsIn)) {}
 
-  Buf buf;
+  BufQueue buf;
   Timings timings;
 };
 
@@ -72,6 +72,12 @@ struct NetworkData {
       packets_.emplace_back(std::move(buf));
       packets_.back().timings.receiveTimePoint = receiveTimePointIn;
     }
+  }
+
+  explicit NetworkData(ReceivedUdpPacket&& udpPacket)
+      : receiveTimePoint_(udpPacket.timings.receiveTimePoint) {
+    totalData_ = udpPacket.buf.chainLength();
+    packets_.push_back(std::move(udpPacket));
   }
 
   NetworkData(
@@ -92,7 +98,7 @@ struct NetworkData {
         totalData_([this]() {
           size_t result = 0;
           for (const auto& packet : packets_) {
-            result += packet.buf->computeChainDataLength();
+            result += packet.buf.chainLength();
           }
           return result;
         }()) {}
@@ -104,7 +110,7 @@ struct NetworkData {
   void addPacket(ReceivedUdpPacket&& packetIn) {
     packets_.emplace_back(std::move(packetIn));
     packets_.back().timings.receiveTimePoint = receiveTimePoint_;
-    totalData_ += packets_.back().buf->computeChainDataLength();
+    totalData_ += packets_.back().buf.chainLength();
   }
 
   [[nodiscard]] const std::vector<ReceivedUdpPacket>& getPackets() const {
@@ -134,9 +140,9 @@ struct NetworkData {
     std::unique_ptr<folly::IOBuf> buf;
     for (auto& packet : packets_) {
       if (buf) {
-        buf->prependChain(std::move(packet.buf));
+        buf->prependChain(packet.buf.move());
       } else {
-        buf = std::move(packet.buf);
+        buf = packet.buf.move();
       }
     }
     return buf;

@@ -452,12 +452,11 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   FollyAsyncUDPSocketAlias::ReadCallback* getTakeoverHandlerCallback() {
     return takeoverCB_.get();
   }
-
+  // Handle the network data for a udp packet
   // public so that it can be called by tests as well.
   void handleNetworkData(
       const folly::SocketAddress& client,
-      Buf data,
-      const TimePoint& receiveTime,
+      ReceivedUdpPacket& packet,
       bool isForwardedData = false) noexcept;
 
   /**

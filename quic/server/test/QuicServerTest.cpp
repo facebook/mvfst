@@ -49,7 +49,7 @@ namespace test {
 MATCHER_P(NetworkDataMatches, networkData, "") {
   for (size_t i = 0; i < arg.getPackets().size(); ++i) {
     folly::IOBufEqualTo eq;
-    bool equals = eq(*arg.getPackets()[i].buf, networkData);
+    bool equals = eq(*arg.getPackets()[i].buf.front(), networkData);
     if (equals) {
       return true;
     }
@@ -988,8 +988,8 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
   while (builder.remainingSpaceInPkt() > 0) {
     writeFrame(PaddingFrame(), builder);
   }
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  worker_->handleNetworkData(blockedSrcPort, std::move(packet), Clock::now());
+  auto packet = packetToReceivedUdpPacket(std::move(builder).buildPacket());
+  worker_->handleNetworkData(blockedSrcPort, packet);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1007,8 +1007,8 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   while (builder.remainingSpaceInPkt() > 0) {
     writeFrame(PaddingFrame(), builder);
   }
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
+  auto packet = packetToReceivedUdpPacket(std::move(builder).buildPacket());
+  worker_->handleNetworkData(kClientAddr, packet);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1022,11 +1022,11 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   RegularQuicPacketBuilder initialBuilder(
       kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
   initialBuilder.encodePacketHeader();
-  auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
+  auto initialPacket =
+      packetToReceivedUdpPacket((std::move(initialBuilder).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
       .Times(1);
-  worker_->handleNetworkData(
-      kClientAddr, std::move(initialPacket), Clock::now());
+  worker_->handleNetworkData(kClientAddr, initialPacket);
   eventbase_.loopIgnoreKeepAlive();
 
   // Initial with any packet number should also increate the counting
@@ -1036,12 +1036,11 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   RegularQuicPacketBuilder initialBuilderBigNum(
       kDefaultUDPSendPacketLen, std::move(initialHeaderBigNum), 0);
   initialBuilderBigNum.encodePacketHeader();
-  auto initialPacketBigNum =
-      packetToBuf(std::move(initialBuilderBigNum).buildPacket());
+  auto initialPacketBigNum = packetToReceivedUdpPacket(
+      (std::move(initialBuilderBigNum).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
       .Times(1);
-  worker_->handleNetworkData(
-      kClientAddr, std::move(initialPacketBigNum), Clock::now());
+  worker_->handleNetworkData(kClientAddr, initialPacketBigNum);
   eventbase_.loopIgnoreKeepAlive();
 
   LongHeader handshakeHeader(
@@ -1049,10 +1048,10 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   RegularQuicPacketBuilder handshakeBuilder(
       kDefaultUDPSendPacketLen, std::move(handshakeHeader), 0);
   handshakeBuilder.encodePacketHeader();
-  auto handshakePacket = packetToBuf(std::move(handshakeBuilder).buildPacket());
+  auto handshakePacket =
+      packetToReceivedUdpPacket((std::move(handshakeBuilder).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(_)).Times(0);
-  worker_->handleNetworkData(
-      kClientAddr, std::move(handshakePacket), Clock::now());
+  worker_->handleNetworkData(kClientAddr, handshakePacket);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1073,8 +1072,8 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   while (builder.remainingSpaceInPkt() > 0) {
     writeFrame(PaddingFrame(), builder);
   }
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
+  auto packet = packetToReceivedUdpPacket((std::move(builder).buildPacket()));
+  worker_->handleNetworkData(kClientAddr, packet);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1203,8 +1202,8 @@ TEST_F(QuicServerWorkerTest, PacketAfterShutdown) {
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   builder.encodePacketHeader();
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
+  auto packet = packetToReceivedUdpPacket((std::move(builder).buildPacket()));
+  worker_->handleNetworkData(kClientAddr, packet);
   eventbase_.terminateLoopSoon();
   t.join();
 }
@@ -1984,7 +1983,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
           // the original data should be extracted after processing takeover
           // protocol related information
           EXPECT_EQ(networkData->getPackets().size(), 1);
-          EXPECT_TRUE(eq(*data, *(networkData->getPackets()[0].buf)));
+          EXPECT_TRUE(eq(*data, *(networkData->getPackets()[0].buf.front())));
           EXPECT_TRUE(isForwardedData);
         };
         EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
@@ -2182,7 +2181,7 @@ class QuicServerTest : public Test {
                       auto, const auto& networkData) mutable {
                     EXPECT_GT(networkData.getPackets().size(), 0);
                     EXPECT_TRUE(folly::IOBufEqualTo()(
-                        *networkData.getPackets()[0].buf, *expected));
+                        *networkData.getPackets()[0].buf.front(), *expected));
                     std::unique_lock<std::mutex> lg(m);
                     calledOnNetworkData = true;
                     cv.notify_one();
@@ -2349,7 +2348,7 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
       .WillOnce(Invoke([&](auto, const auto& networkData) {
         EXPECT_GT(networkData.getPackets().size(), 0);
         EXPECT_TRUE(folly::IOBufEqualTo()(
-            *networkData.getPackets()[0].buf, *initialData));
+            *networkData.getPackets()[0].buf.front(), *initialData));
       }));
 
   static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
@@ -2454,7 +2453,7 @@ class QuicServerTakeoverTest : public Test {
                   [&, expected = data.get()](auto, const auto& networkData) {
                     EXPECT_GT(networkData.getPackets().size(), 0);
                     EXPECT_TRUE(folly::IOBufEqualTo()(
-                        *networkData.getPackets()[0].buf, *expected));
+                        *networkData.getPackets()[0].buf.front(), *expected));
                     baton.post();
                   }));
           return transport;
@@ -2562,7 +2561,7 @@ class QuicServerTakeoverTest : public Test {
             Invoke([&, expected = data.get()](auto, const auto& networkData) {
               EXPECT_GT(networkData.getPackets().size(), 0);
               EXPECT_TRUE(folly::IOBufEqualTo()(
-                  *networkData.getPackets()[0].buf, *expected));
+                  *networkData.getPackets()[0].buf.front(), *expected));
               b1.post();
             }));
     // new quic server receives the packet and forwards it
@@ -3029,7 +3028,7 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
                 [&, expected = data.get()](auto, const auto& networkData) {
                   EXPECT_GT(networkData.getPackets().size(), 0);
                   EXPECT_TRUE(folly::IOBufEqualTo()(
-                      *networkData.getPackets()[0].buf, *expected));
+                      *networkData.getPackets()[0].buf.front(), *expected));
                   b.post();
                 }));
         return transport;
@@ -3072,7 +3071,8 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
                            const NetworkData& networkData) noexcept {
     EXPECT_GT(networkData.getPackets().size(), 0);
     EXPECT_EQ(peer, reader->getSocket().address());
-    EXPECT_TRUE(folly::IOBufEqualTo()(*data, *networkData.getPackets()[0].buf));
+    EXPECT_TRUE(
+        folly::IOBufEqualTo()(*data, *networkData.getPackets()[0].buf.front()));
     b1.post();
   };
   EXPECT_CALL(*transport, onNetworkData(_, _)).WillOnce(Invoke(verifyZeroRtt));
@@ -3126,7 +3126,7 @@ TEST_F(QuicServerTest, ZeroRttBeforeInitial) {
             .Times(2)
             .WillRepeatedly(Invoke([&](auto, auto& networkData) {
               for (const auto& packet : networkData.getPackets()) {
-                receivedData.emplace_back(packet.buf->clone());
+                receivedData.emplace_back(packet.buf.clone());
               }
               if (receivedData.size() == 2) {
                 b.post();

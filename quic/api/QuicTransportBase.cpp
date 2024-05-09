@@ -1876,7 +1876,7 @@ void QuicTransportBase::onNetworkData(
             SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
                 Builder()
                     .setPacketReceiveTime(packet.timings.receiveTimePoint)
-                    .setPacketNumBytes(packet.buf->computeChainDataLength())
+                    .setPacketNumBytes(packet.buf.chainLength())
                     .build());
       }
 
