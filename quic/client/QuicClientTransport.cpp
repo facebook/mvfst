@@ -1194,12 +1194,12 @@ void QuicClientTransport::recvMsg(
     msg.msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     bool useGRO = sock.getGRO() > 0;
-    bool useTS = sock.getTimestamping() > 0;
+    bool checkCmsgs = useGRO || sock.getTimestamping() > 0 || sock.getRecvTos();
     char control
         [QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace] =
             {};
 
-    if (useGRO || useTS) {
+    if (checkCmsgs) {
       msg.msg_control = control;
       msg.msg_controllen = sizeof(control);
 
@@ -1231,7 +1231,7 @@ void QuicClientTransport::recvMsg(
       break;
     }
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    if (useGRO) {
+    if (checkCmsgs) {
       QuicAsyncUDPSocket::fromMsg(params, msg);
 
       // truncated
@@ -1301,11 +1301,11 @@ void QuicClientTransport::recvMmsg(
   int flags = 0;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   bool useGRO = sock.getGRO() > 0;
-  bool useTS = sock.getTimestamping() > 0;
+  bool checkCmsgs = useGRO || sock.getTimestamping() > 0 || sock.getRecvTos();
   std::vector<std::array<
       char,
       QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace>>
-      controlVec((useGRO || useTS) ? numPackets : 0);
+      controlVec(checkCmsgs ? numPackets : 0);
 
   // we need to consider MSG_TRUNC too
   if (useGRO) {
@@ -1332,7 +1332,7 @@ void QuicClientTransport::recvMmsg(
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    if (useGRO || useTS) {
+    if (checkCmsgs) {
       ::memset(controlVec[i].data(), 0, controlVec[i].size());
       msg->msg_control = controlVec[i].data();
       msg->msg_controllen = controlVec[i].size();
@@ -1377,7 +1377,7 @@ void QuicClientTransport::recvMmsg(
     }
     QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    if (useGRO || useTS) {
+    if (checkCmsgs) {
       QuicAsyncUDPSocket::fromMsg(params, msg.msg_hdr);
 
       // truncated

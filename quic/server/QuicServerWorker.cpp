@@ -99,6 +99,9 @@ void QuicServerWorker::bind(
         address.getFamily(),
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
   }
+  if (transportSettings_.readEcnOnIngress) {
+    socket_->setRecvTos(true);
+  }
   socket_->bind(address, bindOptions);
   if (socketOptions_) {
     applySocketOptions(
