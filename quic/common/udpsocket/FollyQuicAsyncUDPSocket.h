@@ -114,6 +114,14 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   int getGRO() override;
   bool setGRO(bool bVal) override;
 
+  // receive tos cmsgs
+  // if true, the IPv6 Traffic Class/IPv4 Type of Service field should be
+  // populated in OnDataAvailableParams.
+  void setRecvTos(bool recvTos) override;
+  bool getRecvTos() override;
+
+  void setTosOrTrafficClass(uint8_t tos) override;
+
   /**
    * Returns the socket server is bound to
    */

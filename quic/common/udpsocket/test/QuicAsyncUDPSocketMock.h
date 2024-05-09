@@ -85,6 +85,9 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD((int), getFD, ());
   MOCK_METHOD((const folly::SocketAddress&), address, (), (const));
   MOCK_METHOD((void), setDFAndTurnOffPMTU, ());
+  MOCK_METHOD((void), setRecvTos, (bool));
+  MOCK_METHOD((bool), getRecvTos, ());
+  MOCK_METHOD((void), setTosOrTrafficClass, (uint8_t));
 };
 
 class MockErrMessageCallback

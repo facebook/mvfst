@@ -84,6 +84,21 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   int getGRO() override;
   bool setGRO(bool bVal) override;
 
+  // receive tos cmsgs
+  // if true, the IPv6 Traffic Class/IPv4 Type of Service field should be
+  // populated in OnDataAvailableParams.
+  void setRecvTos(bool /*recvTos*/) override {
+    LOG(WARNING) << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+  }
+
+  bool getRecvTos() override {
+    return false;
+  }
+
+  void setTosOrTrafficClass(uint8_t /*tos*/) override {
+    LOG(WARNING) << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+  }
+
   /**
    * Returns the socket server is bound to
    */

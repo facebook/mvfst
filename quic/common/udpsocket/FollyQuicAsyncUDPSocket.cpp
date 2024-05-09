@@ -115,6 +115,18 @@ bool FollyQuicAsyncUDPSocket::setGRO(bool bVal) {
   return follySocket_.setGRO(bVal);
 }
 
+void FollyQuicAsyncUDPSocket::setRecvTos(bool recvTos) {
+  follySocket_.setRecvTos(recvTos);
+}
+
+bool FollyQuicAsyncUDPSocket::getRecvTos() {
+  return follySocket_.getRecvTos();
+}
+
+void FollyQuicAsyncUDPSocket::setTosOrTrafficClass(uint8_t tos) {
+  follySocket_.setTosOrTrafficClass(tos);
+}
+
 [[nodiscard]] const folly::SocketAddress& FollyQuicAsyncUDPSocket::address()
     const {
   return follySocket_.address();

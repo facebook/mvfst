@@ -214,6 +214,14 @@ class QuicAsyncUDPSocket {
   virtual int getGRO() = 0;
   virtual bool setGRO(bool /* bVal */) = 0;
 
+  // receive tos cmsgs
+  // if true, the IPv6 Traffic Class/IPv4 Type of Service field should be
+  // populated in OnDataAvailableParams.
+  virtual void setRecvTos(bool recvTos) = 0;
+  virtual bool getRecvTos() = 0;
+
+  virtual void setTosOrTrafficClass(uint8_t tos) = 0;
+
   /**
    * Returns the socket server is bound to
    */
