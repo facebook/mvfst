@@ -1165,8 +1165,6 @@ void QuicClientTransport::recvMsg(
     NetworkData& networkData,
     folly::Optional<folly::SocketAddress>& server,
     size_t& totalData) {
-  uint32_t totalPacketLen = 0;
-  uint32_t totalPackets = 0;
   for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
@@ -1282,10 +1280,9 @@ void QuicClientTransport::recvMsg(
       networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
     }
     maybeQlogDatagram(bytesRead);
-    totalPackets++;
-    totalPacketLen += bytesRead;
   }
-  trackDatagramsReceived(totalPackets, totalPacketLen);
+  trackDatagramsReceived(
+      networkData.getPackets().size(), networkData.getTotalData());
 }
 
 void QuicClientTransport::recvMmsg(
@@ -1360,8 +1357,6 @@ void QuicClientTransport::recvMmsg(
   }
 
   CHECK_LE(numMsgsRecvd, numPackets);
-  uint32_t totalPacketLen = 0;
-  uint32_t totalPackets = 0;
   for (uint16_t i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
     auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
@@ -1431,10 +1426,9 @@ void QuicClientTransport::recvMmsg(
     }
 
     maybeQlogDatagram(bytesRead);
-    totalPackets++;
-    totalPacketLen += bytesRead;
   }
-  trackDatagramsReceived(totalPackets, totalPacketLen);
+  trackDatagramsReceived(
+      networkData.getPackets().size(), networkData.getTotalData());
 }
 
 void QuicClientTransport::onNotifyDataAvailable(
@@ -1449,8 +1443,6 @@ void QuicClientTransport::onNotifyDataAvailable(
   networkData.reserve(numPackets);
   size_t totalData = 0;
   folly::Optional<folly::SocketAddress> server;
-  uint32_t totalPacketLen = 0;
-  uint32_t totalPackets = 0;
 
   if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
     const auto result = sock.recvmmsgNetworkData(
@@ -1463,10 +1455,9 @@ void QuicClientTransport::onNotifyDataAvailable(
       }
       auto len = packet.buf.chainLength();
       maybeQlogDatagram(len);
-      totalPackets++;
-      totalPacketLen += len;
     }
-    trackDatagramsReceived(totalPackets, totalPacketLen);
+    trackDatagramsReceived(
+        networkData.getPackets().size(), networkData.getTotalData());
 
     // Propagate errors
     // TODO(bschlinker): Investigate generalization of loopDetectorCallback
