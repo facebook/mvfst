@@ -1946,10 +1946,6 @@ void updateOneRttWriteCipher(
 void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn) {
   if (conn.readCodec->getCurrentOneRttReadPhase() != conn.oneRttWritePhase) {
     // Peer has initiated a key update.
-    if (conn.transportSettings.rejectIncomingKeyUpdates) {
-      throw QuicTransportException(
-          "key update attempt rejected", TransportErrorCode::CRYPTO_ERROR);
-    }
     updateOneRttWriteCipher(
         conn,
         conn.handshakeLayer->getNextOneRttWriteCipher(),

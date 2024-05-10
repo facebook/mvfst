@@ -361,10 +361,7 @@ struct TransportSettings {
       kFirstKeyUpdatePacketCount};
   // How many packets to send before initiating periodic key updates
   uint64_t keyUpdatePacketCountInterval{kDefaultKeyUpdatePacketCountInterval};
-  // Whether to terminate the connection when a peer initiates a key update.
-  // TODO: Remove this. This is a temporary measure to gradually roll out key
-  // update support.
-  bool rejectIncomingKeyUpdates{false};
+
   // Temporary flag to test new stream blocked condition.
   bool useNewStreamBlockedCondition{false};
   bool scheduleTimerForExcessWrites{false};
