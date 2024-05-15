@@ -130,6 +130,8 @@ AckEvent processAckFrame(
                  .setPacketNumberSpace(pnSpace)
                  .setLargestAckedPacket(frame.largestAcked)
                  .setIsImplicitAck(frame.implicit)
+                 .setEcnCounts(
+                     frame.ecnECT0Count, frame.ecnECT1Count, frame.ecnCECount)
                  .build();
 
   // temporary storage to enable packets to be processed in sent order

@@ -160,6 +160,16 @@ AckEvent::Builder&& AckEvent::Builder::setIsImplicitAck(bool isImplicitAckIn) {
   return std::move(*this);
 }
 
+AckEvent::Builder&& AckEvent::Builder::setEcnCounts(
+    uint32_t ecnECT0CountIn,
+    uint32_t ecnECT1CountIn,
+    uint32_t ecnCECountIn) {
+  ecnECT0Count = ecnECT0CountIn;
+  ecnECT1Count = ecnECT1CountIn;
+  ecnCECount = ecnCECountIn;
+  return std::move(*this);
+}
+
 AckEvent AckEvent::Builder::build() && {
   return AckEvent(std::move(*this));
 }
@@ -173,6 +183,9 @@ AckEvent::AckEvent(AckEvent::BuilderFields&& builderFields)
           *CHECK_NOTNULL(builderFields.maybePacketNumberSpace.get_pointer())),
       largestAckedPacket(
           *CHECK_NOTNULL(builderFields.maybeLargestAckedPacket.get_pointer())),
+      ecnECT0Count(builderFields.ecnECT0Count),
+      ecnECT1Count(builderFields.ecnECT1Count),
+      ecnCECount(builderFields.ecnCECount),
       implicit(builderFields.isImplicitAck) {}
 
 } // namespace quic

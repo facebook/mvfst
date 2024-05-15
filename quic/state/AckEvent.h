@@ -102,6 +102,11 @@ struct AckEvent {
   // include bytea acked via implicit ACKs.
   uint64_t totalBytesAcked{0};
 
+  // ECN mark counts reported by the peer up to and including this ACK.
+  uint32_t ecnECT0Count{0};
+  uint32_t ecnECT1Count{0};
+  uint32_t ecnCECount{0};
+
   // the highest packet number newly acked during processing of this event.
   //
   // this may not be the same as the largestAckedPacket if the
@@ -299,7 +304,9 @@ struct AckEvent {
     folly::Optional<PacketNumberSpace> maybePacketNumberSpace;
     folly::Optional<PacketNum> maybeLargestAckedPacket;
     bool isImplicitAck{false};
-    folly::Optional<std::chrono::microseconds> maybeReceiveDeltaTimestamp;
+    uint32_t ecnECT0Count{0};
+    uint32_t ecnECT1Count{0};
+    uint32_t ecnCECount{0};
     explicit BuilderFields() = default;
   };
 
@@ -310,6 +317,10 @@ struct AckEvent {
     Builder&& setPacketNumberSpace(PacketNumberSpace packetNumberSpaceIn);
     Builder&& setLargestAckedPacket(PacketNum largestAckedPacketIn);
     Builder&& setIsImplicitAck(bool isImplicitAckIn);
+    Builder&& setEcnCounts(
+        uint32_t ecnECT0CountIn,
+        uint32_t ecnECT1CountIn,
+        uint32_t ecnCECountIn);
     AckEvent build() &&;
     explicit Builder() = default;
   };
