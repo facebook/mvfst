@@ -400,7 +400,7 @@ uint64_t addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
     const PacketNum packetNum,
-    const ReceivedUdpPacket::Timings& timings) {
+    const ReceivedUdpPacket& udpPacket) {
   PacketNum expectedNextPacket = 0;
   if (ackState.largestRecvdPacketNum) {
     expectedNextPacket = *ackState.largestRecvdPacketNum + 1;
@@ -413,11 +413,11 @@ uint64_t addPacketToAckState(
     QUIC_STATS(conn.statsCallback, onDuplicatedPacketReceived);
   }
   if (ackState.largestRecvdPacketNum == packetNum) {
-    ackState.largestRecvdPacketTime = timings.receiveTimePoint;
+    ackState.largestRecvdPacketTime = udpPacket.timings.receiveTimePoint;
   }
   static_assert(Clock::is_steady, "Needs steady clock");
 
-  ackState.lastRecvdPacketInfo.assign({packetNum, timings});
+  ackState.lastRecvdPacketInfo.assign({packetNum, udpPacket.timings});
 
   if (packetNum >= expectedNextPacket) {
     if (ackState.recvdPacketInfos.size() ==
@@ -425,7 +425,22 @@ uint64_t addPacketToAckState(
       ackState.recvdPacketInfos.pop_front();
     }
     ackState.recvdPacketInfos.emplace_back(
-        WriteAckFrameState::ReceivedPacket{packetNum, timings});
+        WriteAckFrameState::ReceivedPacket{packetNum, udpPacket.timings});
+  }
+
+  auto ecnValue = udpPacket.tosValue & 0b11;
+  switch (ecnValue) {
+    case kEcnCE:
+      ackState.ecnCECountReceived++;
+      break;
+    case kEcnECT1:
+      ackState.ecnECT1CountReceived++;
+      break;
+    case kEcnECT0:
+      ackState.ecnECT0CountReceived++;
+      break;
+    default:
+      break;
   }
 
   if (expectedNextPacket) {

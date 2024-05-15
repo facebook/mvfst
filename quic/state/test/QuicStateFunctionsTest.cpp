@@ -58,12 +58,12 @@ RegularQuicWritePacket makeTestLongPacket(LongHeader::Types type) {
 class AddPacketToAckStateTest : public TestWithParam<PacketNumberSpace> {
  public:
   /**
-   * Build a ReceivedUdpPacket::Timings structure with minimal fields set.
+   * Build a ReceivedUdpPacket structure with minimal fields set.
    */
-  static ReceivedUdpPacket::Timings buildPacketTimingsMinimal() {
-    ReceivedUdpPacket::Timings timings;
-    timings.receiveTimePoint = Clock::now();
-    return timings;
+  static ReceivedUdpPacket buildPacketMinimal() {
+    ReceivedUdpPacket packet;
+    packet.timings.receiveTimePoint = Clock::now();
+    return packet;
   }
 };
 
@@ -78,10 +78,7 @@ TEST_P(AddPacketToAckStateTest, FirstPacketNotOutOfOrder) {
    */
   PacketNum firstPacket = folly::Random::rand32(1, 100);
   EXPECT_FALSE(addPacketToAckState(
-      conn,
-      getAckState(conn, GetParam()),
-      firstPacket,
-      buildPacketTimingsMinimal()));
+      conn, getAckState(conn, GetParam()), firstPacket, buildPacketMinimal()));
 }
 
 TEST_P(AddPacketToAckStateTest, ReceiveNew) {
@@ -92,10 +89,7 @@ TEST_P(AddPacketToAckStateTest, ReceiveNew) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived + 1;
   auto distance = addPacketToAckState(
-      conn,
-      getAckState(conn, GetParam()),
-      newReceived,
-      buildPacketTimingsMinimal());
+      conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   EXPECT_EQ(distance, 0);
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
@@ -110,10 +104,7 @@ TEST_P(AddPacketToAckStateTest, ReceiveNewWithGap) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived + 3;
   auto distance = addPacketToAckState(
-      conn,
-      getAckState(conn, GetParam()),
-      newReceived,
-      buildPacketTimingsMinimal());
+      conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   EXPECT_EQ(distance, 2); // newReceived is 2 after the expected pkt num
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
@@ -128,10 +119,7 @@ TEST_P(AddPacketToAckStateTest, ReceiveOld) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived - 1;
   auto distance = addPacketToAckState(
-      conn,
-      getAckState(conn, GetParam()),
-      newReceived,
-      buildPacketTimingsMinimal());
+      conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   EXPECT_EQ(distance, 2); // newReceived is 2 before the expected pkt num
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
@@ -146,14 +134,77 @@ TEST_P(AddPacketToAckStateTest, ReceiveOldWithGap) {
       *getAckState(conn, GetParam()).largestRecvdPacketNum;
   PacketNum newReceived = currentLargestReceived - 5;
   auto distance = addPacketToAckState(
-      conn,
-      getAckState(conn, GetParam()),
-      newReceived,
-      buildPacketTimingsMinimal());
+      conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   EXPECT_EQ(distance, 6); // newReceived is 6 before the expected pkt num
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
+}
+
+TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  getAckState(conn, GetParam()).largestRecvdPacketNum = 100;
+  auto nextPacketNum = *getAckState(conn, GetParam()).largestRecvdPacketNum;
+
+  {
+    // No ECN values seen yet.
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT0CountReceived, 0);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT1CountReceived, 0);
+  }
+
+  {
+    auto packet = buildPacketMinimal();
+    packet.tosValue = kEcnECT0;
+    auto distance = addPacketToAckState(
+        conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
+    EXPECT_EQ(distance, 0);
+
+    // Seen 1 ECT0, 0 ECT1, 0 CE.
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT0CountReceived, 1);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT1CountReceived, 0);
+  }
+
+  {
+    auto packet = buildPacketMinimal();
+    packet.tosValue = kEcnECT1;
+    auto distance = addPacketToAckState(
+        conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
+    EXPECT_EQ(distance, 0);
+
+    // Seen 1 ECT0, 1 ECT1, 0 CE.
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT0CountReceived, 1);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT1CountReceived, 1);
+  }
+
+  {
+    auto packet = buildPacketMinimal();
+    packet.tosValue = kEcnCE;
+    auto distance = addPacketToAckState(
+        conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
+    EXPECT_EQ(distance, 0);
+
+    // Seen 1 ECT0, 1 ECT1, 1 CE.
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 1);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT0CountReceived, 1);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT1CountReceived, 1);
+  }
+
+  {
+    auto packet = buildPacketMinimal();
+    packet.tosValue = kEcnCE;
+    auto distance = addPacketToAckState(
+        conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
+    EXPECT_EQ(distance, 0);
+
+    // Seen 1 ECT0, 1 ECT1, 2 CE.
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 2);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT0CountReceived, 1);
+    EXPECT_EQ(getAckState(conn, GetParam()).ecnECT1CountReceived, 1);
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(

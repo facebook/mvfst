@@ -739,5 +739,5 @@ constexpr uint8_t kDefaultReceiveTimestampsExponent = 3;
 // ECN field values
 constexpr uint8_t kEcnECT1 = 0b01;
 constexpr uint8_t kEcnECT0 = 0b10;
-constexpr uint8_t kEcnECE = 0b11;
+constexpr uint8_t kEcnCE = 0b11;
 } // namespace quic

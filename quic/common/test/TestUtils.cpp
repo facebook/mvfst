@@ -503,10 +503,10 @@ void updateAckState(
     bool pkHasRetransmittableData,
     bool pkHasCryptoData,
     TimePoint receiveTimePoint) {
-  ReceivedUdpPacket::Timings packetTimings;
-  packetTimings.receiveTimePoint = receiveTimePoint;
-  uint64_t distance = addPacketToAckState(
-      conn, getAckState(conn, pnSpace), packetNum, packetTimings);
+  ReceivedUdpPacket packet;
+  packet.timings.receiveTimePoint = receiveTimePoint;
+  uint64_t distance =
+      addPacketToAckState(conn, getAckState(conn, pnSpace), packetNum, packet);
   updateAckSendStateOnRecvPacket(
       conn,
       getAckState(conn, pnSpace),

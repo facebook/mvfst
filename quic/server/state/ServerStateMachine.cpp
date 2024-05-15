@@ -1015,8 +1015,8 @@ void onServerReadDataFromOpen(
     }
 
     auto& ackState = getAckState(conn, packetNumberSpace);
-    uint64_t distanceFromExpectedPacketNum = addPacketToAckState(
-        conn, ackState, packetNum, readData.udpPacket.timings);
+    uint64_t distanceFromExpectedPacketNum =
+        addPacketToAckState(conn, ackState, packetNum, readData.udpPacket);
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }

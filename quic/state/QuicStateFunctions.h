@@ -69,7 +69,7 @@ uint64_t addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
     const PacketNum packetNum,
-    const ReceivedUdpPacket::Timings& timings);
+    const ReceivedUdpPacket& udpPacket);
 
 std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(
     QuicConnectionStateBase& conn,

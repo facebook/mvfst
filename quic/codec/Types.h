@@ -251,6 +251,10 @@ struct WriteAckFrameState {
   // element in the deque (e.g., entries are not added for packets that
   // arrive out of order relative to previously received packets).
   CircularDeque<ReceivedPacket> recvdPacketInfos;
+  // The count of ECN marks seen on received packets.
+  uint32_t ecnECT0CountReceived{0};
+  uint32_t ecnECT1CountReceived{0};
+  uint32_t ecnCECountReceived{0};
 };
 
 struct WriteAckFrameMetaData {
