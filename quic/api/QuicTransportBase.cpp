@@ -1924,6 +1924,10 @@ void QuicTransportBase::onNetworkData(
       // Received data could contain valid path response, in which case
       // path validation timeout should be canceled
       schedulePathValidationTimeout();
+
+      // If ECN is enabled, make sure that the packet marking is happening as
+      // expected
+      validateECNState();
     } else {
       // In the closed state, we would want to write a close if possible
       // however the write looper will not be set.
@@ -3334,11 +3338,14 @@ void QuicTransportBase::updateSocketTosSettings() {
   if (conn_->transportSettings.enableEcnOnEgress) {
     if (conn_->transportSettings.useL4sEcn) {
       conn_->socketTos.fields.ecn = kEcnECT1;
+      conn_->ecnState = ECNState::AttemptingL4S;
     } else {
       conn_->socketTos.fields.ecn = kEcnECT0;
+      conn_->ecnState = ECNState::AttemptingECN;
     }
   } else {
     conn_->socketTos.fields.ecn = 0;
+    conn_->ecnState = ECNState::NotAttempted;
   }
 
   if (socket_ && socket_->isBound() &&
@@ -3945,6 +3952,78 @@ void QuicTransportBase::updatePacketProcessorsPrewriteRequests() {
     conn_->socketCmsgsState.additionalCmsgs.reset();
   }
   conn_->socketCmsgsState.targetWriteCount = conn_->writeCount;
+}
+
+void QuicTransportBase::validateECNState() {
+  if (conn_->ecnState == ECNState::NotAttempted ||
+      conn_->ecnState == ECNState::FailedValidation) {
+    // Verification not needed
+    return;
+  }
+  const auto& minExpectedMarkedPacketsCount =
+      conn_->ackStates.appDataAckState.minimumExpectedEcnMarksEchoed;
+  if (minExpectedMarkedPacketsCount < 10) {
+    // We wait for 10 ack-eliciting app data packets to be marked before trying
+    // to validate ECN.
+    return;
+  }
+  const auto& maxExpectedMarkedPacketsCount = conn_->lossState.totalPacketsSent;
+
+  auto markedPacketCount = conn_->ackStates.appDataAckState.ecnCECountEchoed;
+
+  if (conn_->ecnState == ECNState::AttemptingECN ||
+      conn_->ecnState == ECNState::ValidatedECN) {
+    // Check the number of marks seen (ECT0 + CE). ECT1 should be zero.
+    markedPacketCount += conn_->ackStates.appDataAckState.ecnECT0CountEchoed;
+
+    if (markedPacketCount >= minExpectedMarkedPacketsCount &&
+        markedPacketCount <= maxExpectedMarkedPacketsCount &&
+        conn_->ackStates.appDataAckState.ecnECT1CountEchoed == 0) {
+      if (conn_->ecnState != ECNState::ValidatedECN) {
+        conn_->ecnState = ECNState::ValidatedECN;
+        VLOG(4) << fmt::format(
+            "ECN validation successful. Marked {} of {} expected",
+            markedPacketCount,
+            minExpectedMarkedPacketsCount);
+      }
+    } else {
+      conn_->ecnState = ECNState::FailedValidation;
+      VLOG(4) << fmt::format(
+          "ECN validation failed. Marked {} of {} expected",
+          markedPacketCount,
+          minExpectedMarkedPacketsCount);
+    }
+  } else if (
+      conn_->ecnState == ECNState::AttemptingL4S ||
+      conn_->ecnState == ECNState::ValidatedL4S) {
+    // Check the number of marks seen (ECT1 + CE). ECT0 should be zero.
+    markedPacketCount += conn_->ackStates.appDataAckState.ecnECT1CountEchoed;
+
+    if (markedPacketCount >= minExpectedMarkedPacketsCount &&
+        markedPacketCount <= maxExpectedMarkedPacketsCount &&
+        conn_->ackStates.appDataAckState.ecnECT0CountEchoed == 0) {
+      if (conn_->ecnState != ECNState::ValidatedL4S) {
+        conn_->ecnState = ECNState::ValidatedL4S;
+        VLOG(4) << fmt::format(
+            "L4S validation successful. Marked {} of {} expected",
+            markedPacketCount,
+            minExpectedMarkedPacketsCount);
+      }
+    } else {
+      conn_->ecnState = ECNState::FailedValidation;
+      VLOG(4) << fmt::format(
+          "L4S validation failed. Marked {} of {} expected",
+          markedPacketCount,
+          minExpectedMarkedPacketsCount);
+    }
+  }
+
+  if (conn_->ecnState == ECNState::FailedValidation) {
+    conn_->socketTos.fields.ecn = 0;
+    CHECK(socket_ && socket_->isBound());
+    socket_->setTosOrTrafficClass(conn_->socketTos.value);
+    VLOG(4) << "ECN validation failed. Disabling ECN";
+  }
 }
 
 folly::Optional<folly::SocketCmsgMap>

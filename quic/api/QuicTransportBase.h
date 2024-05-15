@@ -1003,6 +1003,16 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   bool isTimeoutScheduled(QuicTimerCallback* callback) const;
 
+  /**
+   * Helper function to validate that the number of ECN packet marks match the
+   * expected value, depending on the ECN state of the connection.
+   *
+   * If ECN is enabled, this function validates it's working correctly. If ECN
+   * is not enabled or has already failed validation, this function does
+   * nothing.
+   */
+  void validateECNState();
+
  private:
   /**
    * Helper functions to handle new streams.

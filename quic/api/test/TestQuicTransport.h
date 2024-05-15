@@ -186,6 +186,10 @@ class TestQuicTransport
     return folly::none;
   }
 
+  void validateECN() {
+    QuicTransportBase::validateECNState();
+  }
+
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   bool closed{false};

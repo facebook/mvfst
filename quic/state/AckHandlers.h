@@ -76,4 +76,32 @@ void parseAckReceiveTimestamps(
     const quic::ReadAckFrame& frame,
     folly::F14FastMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
     folly::Optional<PacketNum> firstPacketNum);
+
+/**
+ * Update the outgoing ECN marking count for an outstanding packet that has been
+ * acked. If a packet is acked and the connection is using ECN/L4S, this
+ * function updates the ackState to expect more ECN marks to be echoed by the
+ * peer.
+ *
+ * Note: that we don't track the value of the actual mark sent in the packet.
+ * (1) This is fine because we do not allow the ECN mark to change during the
+ * lifetime of a connection. It can only be turned off if ECN marking validation
+ * fails.
+ * (2) This avoids adding more fields to the outstanding packet metadata.
+ *
+ * Note: Since only ack-eliciting packets are tracked as outstanding packets,
+ * the ECN count tracked by this function is only a minimum. Non-ack eliciting
+ * packets that are acked will not hit this function.
+ */
+void incrementEcnCountForAckedPacket(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace);
+
+/**
+ * Update the ECN counts echoed by the pear in its ACK frame
+ */
+void updateEcnCountEchoed(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace,
+    const ReadAckFrame& readAckFrame);
 } // namespace quic

@@ -276,6 +276,9 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
   conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
       getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
+  // To enable accounting of sent marked packets
+  conn.ecnState = ECNState::ValidatedL4S;
+
   ReadAckFrame ackFrame;
   auto ackReceiveTime = packetSendTime + 1ms;
   ackFrame.largestAcked = 5;
@@ -296,6 +299,14 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
   EXPECT_EQ(ackEvent.ecnECT0Count, 100);
   EXPECT_EQ(ackEvent.ecnECT1Count, 200);
   EXPECT_EQ(ackEvent.ecnCECount, 300);
+
+  if (GetParam().pnSpace == PacketNumberSpace::AppData) {
+    auto& ackState = getAckState(conn, GetParam().pnSpace);
+    EXPECT_EQ(ackState.minimumExpectedEcnMarksEchoed, 1);
+    EXPECT_EQ(ackState.ecnECT0CountEchoed, 100);
+    EXPECT_EQ(ackState.ecnECT1CountEchoed, 200);
+    EXPECT_EQ(ackState.ecnCECountEchoed, 300);
+  }
 }
 
 TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {

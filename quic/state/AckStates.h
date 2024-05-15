@@ -45,6 +45,16 @@ struct AckState : WriteAckFrameState {
   bool needsToSendAckImmediately{false};
   // Count of outstanding packets received with retransmittable data.
   uint8_t numRxPacketsRecvd{0};
+  // Out of the outstanding packets acked by the peer, how many were sent when
+  // the connection is using ECN marking. This is used to verify that the peer
+  // is correctly echoing the ECN marking in its ACKs. Note that this is a
+  // minimum count because it only tracks ack-eliciting packets that we sent
+  // (non-ack eliciting packets are not tracked as outstanding packets)
+  uint32_t minimumExpectedEcnMarksEchoed{0};
+  // The counts of ECN counts echoed by the peer.
+  uint32_t ecnECT0CountEchoed{0};
+  uint32_t ecnECT1CountEchoed{0};
+  uint32_t ecnCECountEchoed{0};
 };
 
 struct AckStates {
