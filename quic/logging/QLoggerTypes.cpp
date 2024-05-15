@@ -220,7 +220,11 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
   }
   d["acked_ranges"] = ackRangeDynamic;
   d["frame_type"] = toQlogString(frameType);
-  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+  if (frameType == FrameType::ACK_ECN) {
+    d["ecn_ect0"] = ecnECT0Count;
+    d["ecn_ect1"] = ecnECT1Count;
+    d["ecn_ce"] = ecnCECount;
+  } else if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     if (maybeLatestRecvdPacketTime.has_value()) {
       d["latest_recvd_packet_time"] =
           maybeLatestRecvdPacketTime.value().count();
@@ -243,6 +247,7 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
     d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
   }
   d["ack_delay"] = ackDelay.count();
+
   return d;
 }
 
@@ -256,7 +261,11 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
   }
   d["acked_ranges"] = ackRangeDynamic;
   d["frame_type"] = toQlogString(frameType);
-  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+  if (frameType == FrameType::ACK_ECN) {
+    d["ecn_ect0"] = ecnECT0Count;
+    d["ecn_ect1"] = ecnECT1Count;
+    d["ecn_ce"] = ecnCECount;
+  } else if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     if (maybeLatestRecvdPacketTime.has_value()) {
       d["latest_recvd_packet_time"] =
           maybeLatestRecvdPacketTime.value().count();

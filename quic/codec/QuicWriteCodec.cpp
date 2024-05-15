@@ -395,6 +395,20 @@ folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
   WriteAckFrame ackFrame;
   ackFrame.frameType = frameType;
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
+
+  // Reserve space for ECN counts if enabled
+  QuicInteger ecnECT0Count(ackFrameMetaData.ackState.ecnECT0CountReceived);
+  QuicInteger ecnECT1Count(ackFrameMetaData.ackState.ecnECT1CountReceived);
+  QuicInteger ecnCECount(ackFrameMetaData.ackState.ecnCECountReceived);
+  if (frameType == FrameType::ACK_ECN) {
+    ackFrame.ecnECT0Count = ackFrameMetaData.ackState.ecnECT0CountReceived;
+    ackFrame.ecnECT1Count = ackFrameMetaData.ackState.ecnECT1CountReceived;
+    ackFrame.ecnCECount = ackFrameMetaData.ackState.ecnCECountReceived;
+    spaceLeft -=
+        (ecnECT0Count.getSize() + ecnECT1Count.getSize() +
+         ecnCECount.getSize());
+  }
+
   ackFrame.ackBlocks.reserve(spaceLeft / 4);
 
   // We could technically split the range if the size of the representation of
@@ -470,6 +484,11 @@ folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
     currentSeqNum = it->start;
   }
   ackFrame.ackDelay = ackFrameMetaData.ackDelay;
+  if (frameType == FrameType::ACK_ECN) {
+    builder.write(ecnECT0Count);
+    builder.write(ecnECT1Count);
+    builder.write(ecnCECount);
+  }
   return ackFrame;
 }
 

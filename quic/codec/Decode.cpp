@@ -341,30 +341,20 @@ ReadAckFrame decodeAckFrameWithECN(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
-  // TODO this is incomplete
   auto readAckFrame = decodeAckFrame(cursor, header, params);
-  // TODO we simply ignore ECN blocks in ACK-ECN frames for now.
+  readAckFrame.frameType = FrameType::ACK_ECN;
   auto ect_0 = decodeQuicInteger(cursor);
-  if (!ect_0) {
-    throw QuicTransportException(
-        "Bad ECT(0) value",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::ACK_ECN);
-  }
   auto ect_1 = decodeQuicInteger(cursor);
-  if (!ect_1) {
+  auto ce = decodeQuicInteger(cursor);
+  if (!ect_0 || !ect_1 || !ce) {
     throw QuicTransportException(
-        "Bad ECT(1) value",
+        "Bad ECN value",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK_ECN);
   }
-  auto ect_ce = decodeQuicInteger(cursor);
-  if (!ect_ce) {
-    throw QuicTransportException(
-        "Bad ECT-CE value",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::ACK_ECN);
-  }
+  readAckFrame.ecnECT0Count = ect_0->first;
+  readAckFrame.ecnECT1Count = ect_1->first;
+  readAckFrame.ecnCECount = ce->first;
   return readAckFrame;
 }
 

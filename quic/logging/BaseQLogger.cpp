@@ -162,7 +162,10 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
             frame.frameType,
             frame.maybeLatestRecvdPacketTime,
             frame.maybeLatestRecvdPacketNum,
-            frame.recvdPacketsTimestampRanges));
+            frame.recvdPacketsTimestampRanges,
+            frame.ecnECT0Count,
+            frame.ecnECT1Count,
+            frame.ecnCECount));
         break;
       }
       case QuicFrame::Type::ReadStreamFrame: {
@@ -287,7 +290,10 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
             frame.frameType,
             frame.maybeLatestRecvdPacketTime,
             frame.maybeLatestRecvdPacketNum,
-            frame.recvdPacketsTimestampRanges));
+            frame.recvdPacketsTimestampRanges,
+            frame.ecnECT0Count,
+            frame.ecnECT1Count,
+            frame.ecnCECount));
         break;
       }
       case QuicWriteFrame::Type::WriteStreamFrame: {

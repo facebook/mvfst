@@ -190,6 +190,9 @@ struct ReadAckFrame {
   folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
   folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  uint32_t ecnECT0Count{0};
+  uint32_t ecnECT1Count{0};
+  uint32_t ecnCECount{0};
   bool operator==(const ReadAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;
@@ -208,6 +211,9 @@ struct WriteAckFrame {
   folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
   folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  uint32_t ecnECT0Count{0};
+  uint32_t ecnECT1Count{0};
+  uint32_t ecnCECount{0};
   bool operator==(const WriteAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;

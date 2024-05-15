@@ -48,7 +48,8 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
     folly::Optional<QuicInteger> firstAckBlockLength = folly::none,
     std::vector<NormalizedAckBlock> ackBlocks = {},
     bool useRealValuesForLargestAcked = false,
-    bool useRealValuesForAckDelay = false) {
+    bool useRealValuesForAckDelay = false,
+    bool addEcnCounts = false) {
   std::unique_ptr<folly::IOBuf> ackFrame = folly::IOBuf::create(0);
   BufAppender wcursor(ackFrame.get(), 10);
   auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
@@ -75,6 +76,14 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
   for (size_t i = 0; i < ackBlocks.size(); ++i) {
     ackBlocks[i].gap.encode(appenderOp);
     ackBlocks[i].blockLen.encode(appenderOp);
+  }
+  if (addEcnCounts) {
+    QuicInteger ect0(1); // ECT-0 count
+    QuicInteger ect1(2); // ECT-1 count
+    QuicInteger ce(3); // CE count
+    ect0.encode(appenderOp);
+    ect1.encode(appenderOp);
+    ce.encode(appenderOp);
   }
   return ackFrame;
 }
@@ -249,6 +258,40 @@ TEST_F(DecodeTest, ValidAckFrame) {
   EXPECT_EQ(ackFrame.largestAcked, 1000);
   // Since 100 is the encoded value, we use the decoded value.
   EXPECT_EQ(ackFrame.ackDelay.count(), 100 << kDefaultAckDelayExponent);
+}
+
+TEST_F(DecodeTest, AckEcnFrame) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(1);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks,
+      false, // useRealValuesForLargestAcked
+      false, // useRealValuesForAckDelay
+      true); // addEcnCounts
+  folly::io::Cursor cursor(result.get());
+  auto ackFrame = decodeAckFrameWithECN(
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
+  EXPECT_EQ(ackFrame.largestAcked, 1000);
+  // Since 100 is the encoded value, we use the decoded value.
+  EXPECT_EQ(ackFrame.ackDelay.count(), 100 << kDefaultAckDelayExponent);
+
+  // These values are hardcoded in the createAckFrame function
+  EXPECT_EQ(ackFrame.ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame.ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame.ecnCECount, 3);
 }
 
 TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {

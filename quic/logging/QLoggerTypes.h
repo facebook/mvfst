@@ -197,6 +197,10 @@ class ReadAckFrameLog : public QLogFrame {
   folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
   folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  uint32_t ecnECT0Count;
+  uint32_t ecnECT1Count;
+  uint32_t ecnCECount;
+
   ReadAckFrameLog(
       const ReadAckFrame::Vec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
@@ -204,13 +208,19 @@ class ReadAckFrameLog : public QLogFrame {
       folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn =
           folly::none,
       folly::Optional<PacketNum> maybeLatestRecvdPacketNumIn = folly::none,
-      RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {})
+      RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
+      uint32_t ecnECT0CountIn = 0,
+      uint32_t ecnECT1CountIn = 0,
+      uint32_t ecnCECountIn = 0)
       : ackBlocks{ackBlocksIn},
         ackDelay{ackDelayIn},
         frameType{frameTypeIn},
         maybeLatestRecvdPacketTime{maybeLatestRecvdPacketTimeIn},
         maybeLatestRecvdPacketNum{maybeLatestRecvdPacketNumIn},
-        recvdPacketsTimestampRanges(recvdPacketsTimestampRangesIn) {}
+        recvdPacketsTimestampRanges(std::move(recvdPacketsTimestampRangesIn)),
+        ecnECT0Count(ecnECT0CountIn),
+        ecnECT1Count(ecnECT1CountIn),
+        ecnCECount(ecnCECountIn) {}
   ~ReadAckFrameLog() override = default;
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
@@ -223,6 +233,9 @@ class WriteAckFrameLog : public QLogFrame {
   folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
   folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  uint32_t ecnECT0Count;
+  uint32_t ecnECT1Count;
+  uint32_t ecnCECount;
 
   WriteAckFrameLog(
       const WriteAckFrame::AckBlockVec& ackBlocksIn,
@@ -231,14 +244,19 @@ class WriteAckFrameLog : public QLogFrame {
       folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn =
           folly::none,
       folly::Optional<PacketNum> maybeLatestRecvdPacketNumIn = folly::none,
-      RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {})
+      RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
+      uint32_t ecnECT0CountIn = 0,
+      uint32_t ecnECT1CountIn = 0,
+      uint32_t ecnCECountIn = 0)
       : ackBlocks{ackBlocksIn},
         ackDelay{ackDelayIn},
         frameType{frameTypeIn},
-
         maybeLatestRecvdPacketTime{maybeLatestRecvdPacketTimeIn},
         maybeLatestRecvdPacketNum{maybeLatestRecvdPacketNumIn},
-        recvdPacketsTimestampRanges{recvdPacketsTimestampRangesIn} {}
+        recvdPacketsTimestampRanges{std::move(recvdPacketsTimestampRangesIn)},
+        ecnECT0Count(ecnECT0CountIn),
+        ecnECT1Count(ecnECT1CountIn),
+        ecnCECount(ecnCECountIn) {}
   ~WriteAckFrameLog() override = default;
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };

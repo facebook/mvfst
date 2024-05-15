@@ -609,17 +609,25 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
             .maxReceiveTimestampsPerAck
       : 0;
 
-  // If ack_receive_timestamps are not enabled on *either* end-points OR
-  // the peer requests 0 timestamps, we fall-back to using FrameType::ACK
-  if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
-    ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK);
-  } else {
+  if (conn_.transportSettings.readEcnOnIngress) {
+    // If ECN is enabled and we can use it, this will currently take
+    // priority over sending receive timestamps. There is currently no provision
+    // for a frame time that includes both ECN counts and receive timestamps.
+    // TODO: explore design changes for an ACK frame that supports both ECN and
+    // receive timestamps
+    ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK_ECN);
+  } else if (
+      isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0)) {
+    // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the peer
+    // requests at least 1 timestamp
     ackWriteResult = writeAckFrameWithReceivedTimestamps(
         meta,
         builder,
         conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
             .value(),
         peerRequestedTimestampsCount);
+  } else {
+    ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK);
   }
   if (!ackWriteResult) {
     return folly::none;
