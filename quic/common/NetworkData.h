@@ -56,21 +56,30 @@ struct ReceivedUdpPacket {
 
   ReceivedUdpPacket() = default;
   explicit ReceivedUdpPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
-  ReceivedUdpPacket(Buf&& bufIn, Timings timingsIn)
-      : buf(std::move(bufIn)), timings(std::move(timingsIn)) {}
+  ReceivedUdpPacket(Buf&& bufIn, Timings timingsIn, uint8_t tosValueIn)
+      : buf(std::move(bufIn)),
+        timings(std::move(timingsIn)),
+        tosValue(tosValueIn) {}
 
   BufQueue buf;
   Timings timings;
+
+  // ToS / TClass value
+  uint8_t tosValue{0};
 };
 
 struct NetworkData {
   NetworkData() = default;
-  NetworkData(Buf&& buf, const TimePoint& receiveTimePointIn)
+  NetworkData(
+      Buf&& buf,
+      const TimePoint& receiveTimePointIn,
+      uint8_t tosValueIn)
       : receiveTimePoint_(receiveTimePointIn) {
     if (buf) {
       totalData_ = buf->computeChainDataLength();
       packets_.emplace_back(std::move(buf));
       packets_.back().timings.receiveTimePoint = receiveTimePointIn;
+      packets_.back().tosValue = tosValueIn;
     }
   }
 

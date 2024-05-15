@@ -268,7 +268,9 @@ void QuicClientTransport::processUdpPacketData(
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
         ReceivedUdpPacket(
-            std::move(cipherUnavailable->packet), udpPacket.timings),
+            std::move(cipherUnavailable->packet),
+            udpPacket.timings,
+            udpPacket.tosValue),
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
@@ -1190,7 +1192,9 @@ void QuicClientTransport::recvMsg(
     msg.msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     bool useGRO = sock.getGRO() > 0;
-    bool checkCmsgs = useGRO || sock.getTimestamping() > 0 || sock.getRecvTos();
+    bool useTs = sock.getTimestamping() > 0;
+    bool recvTos = sock.getRecvTos();
+    bool checkCmsgs = useGRO || useTs || recvTos;
     char control
         [QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace] =
             {};
@@ -1266,18 +1270,21 @@ void QuicClientTransport::recvMsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedUdpPacket(std::move(tmp)));
+          networkData.addPacket(ReceivedUdpPacket(
+              std::move(tmp), ReceivedUdpPacket::Timings{}, params.tos));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
+          networkData.addPacket(ReceivedUdpPacket(
+              std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
         }
       }
     } else {
-      networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
+      networkData.addPacket(ReceivedUdpPacket(
+          std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
     }
     maybeQlogDatagram(bytesRead);
   }
@@ -1296,7 +1303,9 @@ void QuicClientTransport::recvMmsg(
   int flags = 0;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   bool useGRO = sock.getGRO() > 0;
-  bool checkCmsgs = useGRO || sock.getTimestamping() > 0 || sock.getRecvTos();
+  bool useTs = sock.getTimestamping() > 0;
+  bool recvTos = sock.getRecvTos();
+  bool checkCmsgs = useGRO || useTs || recvTos;
   std::vector<std::array<
       char,
       QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace>>
@@ -1411,18 +1420,21 @@ void QuicClientTransport::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedUdpPacket(std::move(tmp)));
+          networkData.addPacket(ReceivedUdpPacket(
+              std::move(tmp), ReceivedUdpPacket::Timings{}, params.tos));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
+          networkData.addPacket(ReceivedUdpPacket(
+              std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
         }
       }
     } else {
-      networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
+      networkData.addPacket(ReceivedUdpPacket(
+          std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
     }
 
     maybeQlogDatagram(bytesRead);

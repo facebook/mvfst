@@ -1440,7 +1440,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
   transport_->getConnectionState().streamManager->addClosed(id);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
   EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
@@ -1484,7 +1484,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
   transport_->getConnectionState().streamManager->addClosed(id);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
   EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
@@ -1528,7 +1528,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
   transport_->getConnectionState().streamManager->addClosed(id);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
   EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
@@ -1571,7 +1571,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
   transport_->getConnectionState().streamManager->addClosed(id);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   EXPECT_CALL(*cb1, closeStarted(transport_.get(), _));
   EXPECT_CALL(*cb2, closeStarted(transport_.get(), _));
@@ -2804,7 +2804,7 @@ TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   EXPECT_CALL(writeCallback_, onStreamWriteReady(streamState->id, _)).Times(0);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   // Check that write-side APIs return an error
   auto res2 = transport_->notifyPendingWriteOnStream(streamId, &writeCallback_);
@@ -3072,7 +3072,7 @@ TEST_F(QuicTransportTest, FlowControlCallbacks) {
       .WillOnce(Invoke([&](auto) { transport_->createBidirectionalStream(); }));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   EXPECT_FALSE(conn.streamManager->popFlowControlUpdated().has_value());
 }
@@ -3985,7 +3985,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnAsync) {
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
@@ -4011,7 +4011,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NoPacingTimerNoPacing) {
@@ -4066,7 +4066,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferUseTotalSpace) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferOveruseSpace) {
@@ -4090,7 +4090,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferOveruseSpace) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(
@@ -4125,7 +4125,7 @@ TEST_F(
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
@@ -4143,7 +4143,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _));
 
@@ -4155,7 +4155,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
       num);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
@@ -4177,7 +4177,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -4200,7 +4200,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
       num);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncStreamBlocked) {
@@ -4217,7 +4217,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncStreamBlocked) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 
   PacketNum num = 10;
   handleStreamWindowUpdate(
@@ -4227,7 +4227,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncStreamBlocked) {
 
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteConnTwice) {
@@ -4297,7 +4297,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnDuringClose) {
       num);
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteStreamDuringClose) {
@@ -4326,7 +4326,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamDuringClose) {
       .WillOnce(Invoke([&](auto, auto) { transport_->close(folly::none); }));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
-      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
 TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
@@ -4450,7 +4450,7 @@ TEST_F(QuicTransportTest, CancelAckTimeout) {
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = false;
   transport_->onNetworkData(
       SocketAddress("::1", 10128),
-      NetworkData(IOBuf::copyBuffer("MTA New York Service"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
 }
 
@@ -4461,8 +4461,7 @@ TEST_F(QuicTransportTest, ScheduleAckTimeout) {
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
-      NetworkData(
-          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
   EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
       transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
@@ -4476,8 +4475,7 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutSRTTFactor) {
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
-      NetworkData(
-          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
   EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
       transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
@@ -4495,8 +4493,7 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutAckFreq) {
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
-      NetworkData(
-          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
   EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
       transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
@@ -4512,8 +4509,7 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutFromMaxAckDelay) {
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
-      NetworkData(
-          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
   EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_NEAR(
       transport_->getAckTimeout()->getTimerCallbackTimeRemaining().count(),
@@ -4527,8 +4523,7 @@ TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
       SocketAddress("::1", 10003),
-      NetworkData(
-          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
   EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   // We need to send some packets, otherwise loss timer won't be scheduled
   auto stream = transport_->createBidirectionalStream().value();

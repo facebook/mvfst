@@ -315,6 +315,13 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
   return std::move(*this);
 }
 
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
+    setPacketTos(const uint8_t tosIn) {
+  maybePacketTos = tosIn;
+  return std::move(*this);
+}
+
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
     build() && {
@@ -327,7 +334,8 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
     : packetReceiveTime(
           *CHECK_NOTNULL(builderFields.maybePacketReceiveTime.get_pointer())),
       packetNumBytes(
-          *CHECK_NOTNULL(builderFields.maybePacketNumBytes.get_pointer())) {}
+          *CHECK_NOTNULL(builderFields.maybePacketNumBytes.get_pointer())),
+      packetTos(*CHECK_NOTNULL(builderFields.maybePacketTos.get_pointer())) {}
 
 SocketObserverInterface::PacketsReceivedEvent::Builder&&
 SocketObserverInterface::PacketsReceivedEvent::Builder::setReceiveLoopTime(

@@ -288,7 +288,7 @@ void QuicServerWorkerTest::createQuicConnectionDuringShedding(
   worker_->dispatchPacketData(
       addr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
@@ -315,7 +315,7 @@ void QuicServerWorkerTest::createQuicConnection(
   worker_->dispatchPacketData(
       addr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
@@ -367,7 +367,7 @@ void QuicServerWorkerTest::testSendReset(
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(packet->clone(), Clock::now()),
+      NetworkData(packet->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 }
@@ -422,7 +422,7 @@ TEST_F(QuicServerWorkerTest, SmallPacketTestNoReset) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 }
@@ -457,7 +457,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
@@ -489,7 +489,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->dispatchPacketData(
       caddr2,
       std::move(routingData2),
-      NetworkData(data2->clone(), Clock::now()),
+      NetworkData(data2->clone(), Clock::now(), 0),
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
@@ -506,7 +506,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->dispatchPacketData(
       caddr3,
       std::move(routingData3),
-      NetworkData(data2->clone(), Clock::now()),
+      NetworkData(data2->clone(), Clock::now(), 0),
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
@@ -543,7 +543,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
@@ -575,7 +575,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   worker_->dispatchPacketData(
       caddr2,
       std::move(routingData2),
-      NetworkData(data2->clone(), Clock::now()),
+      NetworkData(data2->clone(), Clock::now(), 0),
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
@@ -592,7 +592,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   worker_->dispatchPacketData(
       caddr3,
       std::move(routingData3),
-      NetworkData(data3->clone(), Clock::now()),
+      NetworkData(data3->clone(), Clock::now(), 0),
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
@@ -626,7 +626,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   worker_->dispatchPacketData(
       caddr4,
       std::move(routingData4),
-      NetworkData(data4->clone(), Clock::now()),
+      NetworkData(data4->clone(), Clock::now(), 0),
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr4, connId4)), 1);
@@ -709,7 +709,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 
@@ -727,7 +727,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData3),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 
@@ -827,7 +827,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 
@@ -861,7 +861,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 
@@ -898,7 +898,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->dispatchPacketData(
       clientAddr2,
       std::move(routingData3),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       folly::none);
   eventbase_.loopIgnoreKeepAlive();
 
@@ -944,7 +944,7 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()),
+      NetworkData(data->clone(), Clock::now(), 0),
       version);
   eventbase_.loopIgnoreKeepAlive();
 }
@@ -1099,7 +1099,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   // To force dropping path, set initial to false
   RoutingData routingData(
       HeaderForm::Long, false /* isInitial */, false, dstConnId, srcConnId);
-  NetworkData networkData(std::move(packet), Clock::now());
+  NetworkData networkData(std::move(packet), Clock::now(), 0);
 
   EXPECT_CALL(*rawConnIdAlgo, canParseNonConst(_)).WillOnce(Return(true));
   EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
@@ -1136,7 +1136,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   RoutingData routingData(HeaderForm::Long, true, false, dstConnId, srcConnId);
-  NetworkData networkData(std::move(packet), Clock::now());
+  NetworkData networkData(std::move(packet), Clock::now(), 0);
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
   eventbase_.loopIgnoreKeepAlive();
@@ -1164,7 +1164,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   RoutingData routingData(HeaderForm::Long, true, false, dstConnId, srcConnId);
-  NetworkData networkData(std::move(packet), Clock::now());
+  NetworkData networkData(std::move(packet), Clock::now(), 0);
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
   eventbase_.loopIgnoreKeepAlive();
@@ -1510,7 +1510,7 @@ class QuicServerWorkerRetryTest : public QuicServerWorkerTest {
     worker_->dispatchPacketData(
         clientAddr,
         std::move(routingData),
-        NetworkData(initialPacket->clone(), Clock::now()),
+        NetworkData(initialPacket->clone(), Clock::now(), 0),
         version);
     eventbase_.loopIgnoreKeepAlive();
   }
@@ -2283,7 +2283,7 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
     EXPECT_CALL(
         *stats,
         onPacketDropped(PacketDropReason(PacketDropReason::SERVER_SHUTDOWN)));
-    NetworkData networkData(folly::IOBuf::copyBuffer("wat"), Clock::now());
+    NetworkData networkData(folly::IOBuf::copyBuffer("wat"), Clock::now(), 0);
     RoutingData routingData(
         HeaderForm::Long,
         true,
@@ -2336,7 +2336,7 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
       folly::IOBuf::create(kMinInitialPacketSize));
   initialData->append(kMinInitialPacketSize);
   memset(initialData->writableData(), 'd', kMinInitialPacketSize);
-  NetworkData networkData(initialData->clone(), Clock::now());
+  NetworkData networkData(initialData->clone(), Clock::now(), 0);
   RoutingData routingData(
       HeaderForm::Long,
       true,

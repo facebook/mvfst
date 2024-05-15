@@ -346,6 +346,7 @@ void QuicServerWorker::onDataAvailable(
     QUIC_STATS(statsCallback_, onRead, len);
     ReceivedUdpPacket udpPacket(std::move(data));
     udpPacket.timings.receiveTimePoint = packetReceiveTime;
+    udpPacket.tosValue = params.tos;
     handleNetworkData(client, udpPacket);
   } else {
     // if we receive a truncated packet
@@ -369,6 +370,7 @@ void QuicServerWorker::onDataAvailable(
         DCHECK_EQ(data->length(), remaining);
         ReceivedUdpPacket udpPacket(std::move(data));
         udpPacket.timings.receiveTimePoint = packetReceiveTime;
+        udpPacket.tosValue = params.tos;
         handleNetworkData(client, udpPacket);
         break;
       }
@@ -383,6 +385,7 @@ void QuicServerWorker::onDataAvailable(
       remaining -= params.gro;
       ReceivedUdpPacket udpPacket(std::move(tmp));
       udpPacket.timings.receiveTimePoint = packetReceiveTime;
+      udpPacket.tosValue = params.tos;
       handleNetworkData(client, udpPacket);
     }
   }

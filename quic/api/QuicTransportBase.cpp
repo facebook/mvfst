@@ -1877,6 +1877,7 @@ void QuicTransportBase::onNetworkData(
                 Builder()
                     .setPacketReceiveTime(packet.timings.receiveTimePoint)
                     .setPacketNumBytes(packet.buf.chainLength())
+                    .setPacketTos(packet.tosValue)
                     .build());
       }
 

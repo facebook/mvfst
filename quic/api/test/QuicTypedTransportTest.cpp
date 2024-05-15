@@ -1723,12 +1723,20 @@ struct ReceivedUdpPacketMatcherBuilder {
     maybeExpectedPacketNumBytes = expectedPacketNumBytes;
     return std::move(*this);
   }
+  Builder&& setExpectedTosValue(const uint8_t expectedTosValue) {
+    maybeExpectedTosValue = expectedTosValue;
+    return std::move(*this);
+  }
+
   auto build() && {
     CHECK(maybeExpectedPacketReceiveTime.has_value());
     const auto& packetReceiveTime = *maybeExpectedPacketReceiveTime;
 
     CHECK(maybeExpectedPacketNumBytes.has_value());
     const auto& packetNumBytes = *maybeExpectedPacketNumBytes;
+
+    CHECK(maybeExpectedTosValue.has_value());
+    const auto& packetTosValue = *maybeExpectedTosValue;
 
     if constexpr (std::is_base_of_v<T, QuicClientTransportTestBase>) {
       return testing::AllOf(
@@ -1739,12 +1747,20 @@ struct ReceivedUdpPacketMatcherBuilder {
               testing::AnyOf(
                   testing::Eq(packetReceiveTime),
                   testing::Ge(TimePoint::clock::now()))),
-          testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
+          testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)),
+          testing::Field(&Obj::packetTos, testing::Eq(packetTosValue)));
     } else if constexpr (std::is_base_of_v<T, QuicServerTransportTestBase>) {
       return testing::AllOf(
           testing::Field(
-              &Obj::packetReceiveTime, testing::Eq(packetReceiveTime)),
-          testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
+              "packetReceiveTime",
+              &Obj::packetReceiveTime,
+              testing::Eq(packetReceiveTime)),
+          testing::Field(
+              "packetNumBytes",
+              &Obj::packetNumBytes,
+              testing::Eq(packetNumBytes)),
+          testing::Field(
+              "packetTos", &Obj::packetTos, testing::Eq(packetTosValue)));
     } else {
       FAIL(); // unhandled typed test
     }
@@ -1753,6 +1769,7 @@ struct ReceivedUdpPacketMatcherBuilder {
 
   folly::Optional<TimePoint> maybeExpectedPacketReceiveTime;
   folly::Optional<uint64_t> maybeExpectedPacketNumBytes;
+  folly::Optional<uint8_t> maybeExpectedTosValue;
 };
 
 template <typename T>
@@ -4951,6 +4968,7 @@ TYPED_TEST(
       this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(100));
   const auto pkt1RecvTime = TimePoint::clock::now();
   const auto pkt1NumBytes = pkt1->computeChainDataLength();
+  const uint8_t packetTosValue = kEcnECT0;
   {
     const auto matcher = testing::AllOf(
         testing::Field(
@@ -4963,13 +4981,14 @@ TYPED_TEST(
             testing::ElementsAre(ReceivedUdpPacketMatcherBuilder<TypeParam>()
                                      .setExpectedPacketReceiveTime(pkt1RecvTime)
                                      .setExpectedPacketNumBytes(pkt1NumBytes)
+                                     .setExpectedTosValue(packetTosValue)
                                      .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
     EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
   }
-  this->deliverPacket(std::move(pkt1), pkt1RecvTime);
+  this->deliverPacket(std::move(pkt1), pkt1RecvTime, packetTosValue);
 
   // deliver pkt2 with stream data from the remote
   auto pkt2 =
@@ -4989,13 +5008,14 @@ TYPED_TEST(
             testing::ElementsAre(ReceivedUdpPacketMatcherBuilder<TypeParam>()
                                      .setExpectedPacketReceiveTime(pkt2RecvTime)
                                      .setExpectedPacketNumBytes(pkt2NumBytes)
+                                     .setExpectedTosValue(packetTosValue)
                                      .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
     EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
   }
-  this->deliverPacket(std::move(pkt2), pkt2RecvTime);
+  this->deliverPacket(std::move(pkt2), pkt2RecvTime, packetTosValue);
 
   this->destroyTransport();
 }
@@ -5045,33 +5065,46 @@ TYPED_TEST(
   pktBatch1.emplace_back(std::move(pkt2));
   const auto pktBatch1RecvTime = TimePoint::clock::now();
   const auto pktBatch1NumBytes = pkt1NumBytes + pkt2NumBytes;
+
+  const uint8_t packetTosValue = kEcnECT1;
   {
     const auto matcher = testing::AllOf(
         testing::Field(
-            &Event::receiveLoopTime, testing::Ge(TimePoint::clock::now())),
-        testing::Field(&Event::numPacketsReceived, testing::Eq(2)),
+            "receiveLoopTime",
+            &Event::receiveLoopTime,
+            testing::Ge(TimePoint::clock::now())),
         testing::Field(
-            &Event::numBytesReceived, testing::Eq(pktBatch1NumBytes)),
-        testing::Field(&Event::receivedPackets, testing::SizeIs(2)),
+            "numPacketsReceived", &Event::numPacketsReceived, testing::Eq(2)),
         testing::Field(
+            "numBytesReceived",
+            &Event::numBytesReceived,
+            testing::Eq(pktBatch1NumBytes)),
+        testing::Field(
+            "receivedPacketsCount",
+            &Event::receivedPackets,
+            testing::SizeIs(2)),
+        testing::Field(
+            "receivedPacketsElements",
             &Event::receivedPackets,
             testing::ElementsAre(
                 // pkt1
                 ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch1RecvTime)
                     .setExpectedPacketNumBytes(pkt1NumBytes)
+                    .setExpectedTosValue(packetTosValue)
                     .build(),
                 // pkt2
                 ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch1RecvTime)
                     .setExpectedPacketNumBytes(pkt2NumBytes)
+                    .setExpectedTosValue(packetTosValue)
                     .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
     EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
   }
-  this->deliverPackets(std::move(pktBatch1), pktBatch1RecvTime);
+  this->deliverPackets(std::move(pktBatch1), pktBatch1RecvTime, packetTosValue);
 
   // deliver pkt3 and pkt4 at same time with stream data from the remote
   auto pkt3 =
@@ -5103,18 +5136,20 @@ TYPED_TEST(
                 ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch2RecvTime)
                     .setExpectedPacketNumBytes(pkt3NumBytes)
+                    .setExpectedTosValue(packetTosValue)
                     .build(),
                 // pkt2
                 ReceivedUdpPacketMatcherBuilder<TypeParam>()
                     .setExpectedPacketReceiveTime(pktBatch2RecvTime)
                     .setExpectedPacketNumBytes(pkt4NumBytes)
+                    .setExpectedTosValue(packetTosValue)
                     .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
     EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
   }
-  this->deliverPackets(std::move(pktBatch2), pktBatch2RecvTime);
+  this->deliverPackets(std::move(pktBatch2), pktBatch2RecvTime, packetTosValue);
 
   this->destroyTransport();
 }

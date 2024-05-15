@@ -707,7 +707,9 @@ static void handleCipherUnavailable(
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;
     pendingReadData.udpPacket = ReceivedUdpPacket(
-        std::move(originalData->packet), readData.udpPacket.timings);
+        std::move(originalData->packet),
+        readData.udpPacket.timings,
+        readData.udpPacket.tosValue);
     pendingData->emplace_back(std::move(pendingReadData));
     VLOG(10) << "Adding pending data to "
              << toString(originalData->protectionType)

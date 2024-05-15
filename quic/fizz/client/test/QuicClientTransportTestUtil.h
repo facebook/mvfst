@@ -384,12 +384,22 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   virtual ~QuicClientTransportTestBase() = default;
 
   struct TestReadData {
-    std::unique_ptr<folly::IOBuf> data;
+    ReceivedUdpPacket udpPacket;
     folly::SocketAddress addr;
     folly::Optional<int> err;
 
     TestReadData(folly::ByteRange dataIn, folly::SocketAddress addrIn)
-        : data(folly::IOBuf::copyBuffer(dataIn)), addr(std::move(addrIn)) {}
+        : udpPacket(folly::IOBuf::copyBuffer(dataIn)),
+          addr(std::move(addrIn)) {}
+
+    TestReadData(
+        const ReceivedUdpPacket&& udpPacketIn,
+        folly::SocketAddress addrIn)
+        : udpPacket(
+              udpPacketIn.buf.clone(),
+              udpPacketIn.timings,
+              udpPacketIn.tosValue),
+          addr(std::move(addrIn)) {}
 
     explicit TestReadData(int errIn) : err(errIn) {}
   };
@@ -441,8 +451,8 @@ class QuicClientTransportTestBase : public virtual testing::Test {
             errno = *socketReads[0].err;
             return -1;
           }
-          auto testData = std::move(socketReads[0].data);
-          testData->coalesce();
+          auto& udpPacket = socketReads[0].udpPacket;
+          auto testData = std::move(udpPacket.buf.front());
           size_t testDataLen = testData->length();
           memcpy(
               msg->msg_iov[0].iov_base, testData->data(), testData->length());
@@ -451,9 +461,18 @@ class QuicClientTransportTestBase : public virtual testing::Test {
                 static_cast<sockaddr_storage*>(msg->msg_name));
             msg->msg_namelen = msg_len;
           }
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+          // Populate ToS control message as IPv6 TClass
+          auto cmsg = CMSG_FIRSTHDR(msg);
+          cmsg->cmsg_level = SOL_IPV6;
+          cmsg->cmsg_type = IPV6_TCLASS;
+          memcpy(
+              CMSG_DATA(cmsg), &udpPacket.tosValue, sizeof(udpPacket.tosValue));
+#endif
           socketReads.pop_front();
           return testDataLen;
         }));
+    ON_CALL(*sock, getRecvTos()).WillByDefault(testing::Return(true));
     EXPECT_EQ(client->getConn().selfConnectionIds.size(), 1);
     EXPECT_EQ(
         client->getConn().selfConnectionIds[0].connId,
@@ -769,15 +788,44 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     deliverData(peer == nullptr ? serverAddr : *peer, data, writes);
   }
 
+  void deliverDataWithoutErrorCheck(
+      const folly::SocketAddress& addr,
+      const ReceivedUdpPacket&& udpPacket,
+      bool writes = true) {
+    ASSERT_TRUE(networkReadCallback);
+    socketReads.emplace_back(std::move(udpPacket), addr);
+    networkReadCallback->onNotifyDataAvailable(*sock);
+    if (writes) {
+      loopForWrites();
+    }
+  }
+
+  void deliverData(
+      const folly::SocketAddress& addr,
+      const ReceivedUdpPacket&& udpPacket,
+      bool writes = true) {
+    deliverDataWithoutErrorCheck(addr, std::move(udpPacket), writes);
+    if (client->getConn().localConnectionError) {
+      bool idleTimeout = false;
+      const LocalErrorCode* localError =
+          client->getConn().localConnectionError->code.asLocalErrorCode();
+      if (localError) {
+        idleTimeout = (*localError == LocalErrorCode::IDLE_TIMEOUT);
+      }
+      if (!idleTimeout) {
+        throw std::runtime_error(
+            toString(client->getConn().localConnectionError->code));
+      }
+    }
+  }
+
   void deliverData(
       NetworkData&& data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     for (const auto& packet : data.getPackets()) {
       deliverData(
-          peer == nullptr ? serverAddr : *peer,
-          packet.buf.clone()->coalesce(),
-          writes);
+          peer == nullptr ? serverAddr : *peer, std::move(packet), writes);
     }
   }
 

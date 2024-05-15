@@ -232,15 +232,20 @@ class SocketObserverInterface {
       // Number of bytes in the received packet.
       const uint64_t packetNumBytes;
 
+      // TOS value
+      const uint8_t packetTos;
+
       struct BuilderFields {
         folly::Optional<TimePoint> maybePacketReceiveTime;
         folly::Optional<uint64_t> maybePacketNumBytes;
+        folly::Optional<uint8_t> maybePacketTos;
         explicit BuilderFields() = default;
       };
 
       struct Builder : public BuilderFields {
         Builder&& setPacketReceiveTime(const TimePoint packetReceiveTimeIn);
         Builder&& setPacketNumBytes(const uint64_t packetNumBytesIn);
+        Builder&& setPacketTos(const uint8_t packettos);
         ReceivedUdpPacket build() &&;
         explicit Builder() = default;
       };

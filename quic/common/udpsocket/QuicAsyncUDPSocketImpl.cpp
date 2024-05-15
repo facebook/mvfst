@@ -167,7 +167,8 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedUdpPacket(std::move(tmp), timings));
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
@@ -175,11 +176,12 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
           networkData.addPacket(
-              ReceivedUdpPacket(std::move(readBuffer), timings));
+              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
         }
       }
     } else {
-      networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer), timings));
+      networkData.addPacket(
+          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
     }
   }
 

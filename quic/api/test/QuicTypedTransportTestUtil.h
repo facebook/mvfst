@@ -160,7 +160,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
                 pnSpace,
                 oldestOutstandingPkt->packet.header.getPacketSequenceNum(),
                 newestOutstandingPkt->packet.header.getPacketSequenceNum()),
-            recvTime),
+            recvTime,
+            0),
         false /* loopForWrites */);
   }
 
@@ -180,9 +181,10 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   void deliverPacket(
       Buf&& buf,
       quic::TimePoint recvTime = TimePoint::clock::now(),
+      uint8_t tosValue = 0,
       bool loopForWrites = true) {
     QuicTransportTestClass::deliverData(
-        NetworkData(std::move(buf), recvTime), loopForWrites);
+        NetworkData(std::move(buf), recvTime, tosValue), loopForWrites);
   }
 
   /**
@@ -190,8 +192,10 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    */
   void deliverPacketNoWrites(
       Buf&& buf,
-      quic::TimePoint recvTime = TimePoint::clock::now()) {
-    deliverPacket(std::move(buf), recvTime, false /* loopForWrites */);
+      quic::TimePoint recvTime = TimePoint::clock::now(),
+      uint8_t tosValue = 0) {
+    deliverPacket(
+        std::move(buf), recvTime, tosValue, false /* loopForWrites */);
   }
 
   /**
@@ -200,9 +204,20 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   void deliverPackets(
       std::vector<Buf>&& bufs,
       quic::TimePoint recvTime = TimePoint::clock::now(),
+      uint8_t tosValue = 0,
       bool loopForWrites = true) {
-    QuicTransportTestClass::deliverData(
-        NetworkData(std::move(bufs), recvTime), loopForWrites);
+    auto networkData = NetworkData();
+    // This overrides the timing in added packets.
+    networkData.setReceiveTimePoint(recvTime);
+    for (auto& buf : bufs) {
+      auto udpPacket = ReceivedUdpPacket(
+          std::move(buf),
+          ReceivedUdpPacket::Timings{}, // NetworkData receiveTimePoint will
+                                        // override this
+          tosValue);
+      networkData.addPacket(std::move(udpPacket));
+    }
+    QuicTransportTestClass::deliverData(std::move(networkData), loopForWrites);
   }
 
   /**

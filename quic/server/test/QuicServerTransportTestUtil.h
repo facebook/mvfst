@@ -490,7 +490,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
       folly::SocketAddress* peer = nullptr) {
     data->coalesce();
     deliverDataWithoutErrorCheck(
-        NetworkData(std::move(data), Clock::now()), writes, peer);
+        NetworkData(ReceivedUdpPacket(std::move(data))), writes, peer);
   }
 
   void deliverData(
@@ -517,7 +517,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     data->coalesce();
-    deliverData(NetworkData(std::move(data), Clock::now()), writes, peer);
+    deliverData(NetworkData(ReceivedUdpPacket(std::move(data))), writes, peer);
   }
 
   void loopForWrites() {
