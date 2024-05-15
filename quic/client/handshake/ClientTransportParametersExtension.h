@@ -75,7 +75,8 @@ struct ClientTransportParametersExtension {
     res.push_back(encodeIntegerParameter(
         TpId::active_connection_id_limit, activeConnectionLimit_));
     if (encodingVersion_ == QuicVersion::QUIC_V1 ||
-        encodingVersion_ == QuicVersion::QUIC_V1_ALIAS) {
+        encodingVersion_ == QuicVersion::QUIC_V1_ALIAS ||
+        encodingVersion_ == QuicVersion::QUIC_V1_ALIAS2) {
       res.push_back(encodeConnIdParameter(
           TpId::initial_source_connection_id, initialSourceCid_));
     }

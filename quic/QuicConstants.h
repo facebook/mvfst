@@ -347,6 +347,7 @@ enum class QuicVersion : uint32_t {
   MVFST = 0xfaceb002,
   QUIC_V1 = 0x00000001,
   QUIC_V1_ALIAS = 0xfaceb003,
+  QUIC_V1_ALIAS2 = 0xfaceb004,
   // MVFST_EXPERIMENTAL used to set initial congestion window
   MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST
   MVFST_ALIAS = 0xfaceb010,
