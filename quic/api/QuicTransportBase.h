@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
+#include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/FunctionLooper.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/events/QuicEventBase.h>
@@ -1012,6 +1013,12 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * nothing.
    */
   void validateECNState();
+
+  WriteQuicDataResult handleInitialWriteDataCommon(
+      const ConnectionId& srcConnId,
+      const ConnectionId& dstConnId,
+      uint64_t packetLimit,
+      const std::string& token = "");
 
  private:
   /**

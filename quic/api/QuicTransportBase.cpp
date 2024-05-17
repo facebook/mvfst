@@ -4036,4 +4036,36 @@ QuicTransportBase::getAdditionalCmsgsForAsyncUDPSocket() {
   return folly::none;
 }
 
+WriteQuicDataResult QuicTransportBase::handleInitialWriteDataCommon(
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    uint64_t packetLimit,
+    const std::string& token) {
+  CHECK(conn_->initialWriteCipher);
+  auto version = conn_->version.value_or(*(conn_->originalVersion));
+  auto& initialCryptoStream =
+      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
+  CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
+  auto& numProbePackets =
+      conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
+  if ((initialCryptoStream.retransmissionBuffer.size() &&
+       conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
+       numProbePackets) ||
+      initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
+    CHECK(conn_->initialHeaderCipher);
+    return writeCryptoAndAckDataToSocket(
+        *socket_,
+        *conn_,
+        srcConnId /* src */,
+        dstConnId /* dst */,
+        LongHeader::Types::Initial,
+        *conn_->initialWriteCipher,
+        *conn_->initialHeaderCipher,
+        version,
+        packetLimit,
+        token);
+  }
+  return WriteQuicDataResult{};
+}
+
 } // namespace quic

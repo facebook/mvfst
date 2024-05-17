@@ -274,31 +274,9 @@ void QuicServerTransport::writeData() {
     maybeInitiateKeyUpdate(*conn_);
   };
   if (conn_->initialWriteCipher) {
-    auto& initialCryptoStream =
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
-    CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
-    auto& numProbePackets =
-        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
-    if ((numProbePackets && initialCryptoStream.retransmissionBuffer.size() &&
-         conn_->outstandings.packetCount[PacketNumberSpace::Initial]) ||
-        initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
-      CHECK(conn_->initialWriteCipher);
-      CHECK(conn_->initialHeaderCipher);
-
-      auto res = writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          destConnId /* dst */,
-          LongHeader::Types::Initial,
-          *conn_->initialWriteCipher,
-          *conn_->initialHeaderCipher,
-          version,
-          packetLimit);
-
-      packetLimit -= res.packetsWritten;
-      serverConn_->numHandshakeBytesSent += res.bytesWritten;
-    }
+    auto res = handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit);
+    packetLimit -= res.packetsWritten;
+    serverConn_->numHandshakeBytesSent += res.bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }

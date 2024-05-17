@@ -81,9 +81,9 @@ using WritableBytesFunc =
 // Encapsulating the return value for the write functions.
 // Useful because probes can go over the packet limit.
 struct WriteQuicDataResult {
-  uint64_t packetsWritten{};
-  uint64_t probesWritten{};
-  uint64_t bytesWritten{};
+  uint64_t packetsWritten{0};
+  uint64_t probesWritten{0};
+  uint64_t bytesWritten{0};
 };
 
 /**

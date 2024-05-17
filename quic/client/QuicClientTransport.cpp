@@ -858,9 +858,8 @@ void QuicClientTransport::onReadData(
 void QuicClientTransport::writeData() {
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
-  const ConnectionId& destConnId = conn_->serverConnectionId
-      ? *conn_->serverConnectionId
-      : *clientConn_->initialDestinationConnectionId;
+  const ConnectionId& destConnId = conn_->serverConnectionId.value_or(
+      *clientConn_->initialDestinationConnectionId);
 
   if (closeState_ == CloseState::CLOSED) {
     auto rtt = clientConn_->lossState.srtt == 0us
@@ -923,32 +922,12 @@ void QuicClientTransport::writeData() {
     maybeInitiateKeyUpdate(*conn_);
   };
   if (conn_->initialWriteCipher) {
-    auto& initialCryptoStream =
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
-    CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
-    auto& numProbePackets =
-        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
-    if ((initialCryptoStream.retransmissionBuffer.size() &&
-         conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
-         numProbePackets) ||
-        initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
-      CHECK(conn_->initialHeaderCipher);
-      std::string& token = clientConn_->retryToken.empty()
-          ? clientConn_->newToken
-          : clientConn_->retryToken;
-      packetLimit -= writeCryptoAndAckDataToSocket(
-                         *socket_,
-                         *conn_,
-                         srcConnId /* src */,
-                         destConnId /* dst */,
-                         LongHeader::Types::Initial,
-                         *conn_->initialWriteCipher,
-                         *conn_->initialHeaderCipher,
-                         version,
-                         packetLimit,
-                         token)
-                         .packetsWritten;
-    }
+    const std::string& token = clientConn_->retryToken.empty()
+        ? clientConn_->newToken
+        : clientConn_->retryToken;
+    packetLimit -=
+        handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit, token)
+            .packetsWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
