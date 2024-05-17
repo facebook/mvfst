@@ -1090,8 +1090,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       [](auto& op) {
-        return op.packet.header.getPacketSequenceNum() == 15 ||
-            op.packet.header.getPacketSequenceNum() == 16;
+        auto seqno = op.packet.header.getPacketSequenceNum();
+        return seqno == 15 || seqno == 16;
       });
   EXPECT_TRUE(itr != conn.outstandings.packets.end());
   EXPECT_TRUE(itr->declaredLost);
@@ -1114,8 +1114,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       [](auto& op) {
-        return op.packet.header.getPacketSequenceNum() == 15 ||
-            op.packet.header.getPacketSequenceNum() == 16;
+        auto seqno = op.packet.header.getPacketSequenceNum();
+        return seqno == 15 || seqno == 16;
       });
   EXPECT_TRUE(itr == conn.outstandings.packets.end());
 
