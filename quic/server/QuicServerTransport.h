@@ -220,6 +220,7 @@ class QuicServerTransport
   };
 
   void processPendingData(bool async);
+  void maybeUpdateCongestionControllerFromTicket();
   void maybeNotifyTransportReady();
   void maybeNotifyConnectionIdRetired();
   void maybeNotifyConnectionIdBound();

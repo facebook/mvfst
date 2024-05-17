@@ -372,6 +372,12 @@ struct TransportSettings {
   bool enableEcnOnEgress{false};
   // Whether to use L4S ECN (enableEcnOnEgress must be enabled)
   bool useL4sEcn{false};
+
+  // Jumpstart values for personalized cwnd
+  // TODO: Remove this once we settle on the final values
+  uint64_t cwndWeakJumpstart{36000};
+  uint64_t cwndModerateJumpstart{48000};
+  uint64_t cwndStrongJumpstart{72000};
 };
 
 } // namespace quic
