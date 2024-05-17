@@ -682,6 +682,11 @@ void QuicClientTransport::processUdpPacketData(
         }
         QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
         handshakeLayer->removePsk(hostname_);
+        if (!handshakeLayer->getCanResendZeroRtt().value_or(false)) {
+          throw QuicTransportException(
+              "Zero-rtt attempted but the early parameters do not match the handshake parameters",
+              TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+        }
       } else if (clientConn_->zeroRttRejected.has_value()) {
         if (conn_->qLogger) {
           conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);

@@ -91,6 +91,12 @@ class ClientHandshake : public Handshake {
   folly::Optional<bool> getZeroRttRejected();
 
   /**
+   * If zero-rtt is rejected, this will indicate whether zero-rtt data can be
+   * resent on the connection or the connection has to be closed.
+   */
+  folly::Optional<bool> getCanResendZeroRtt() const;
+
+  /**
    * API used to verify that the integrity token present in the retry packet
    * matches what we would expect
    */
@@ -141,6 +147,7 @@ class ClientHandshake : public Handshake {
    * Setters for the concrete implementation so that it can be tested.
    */
   void setZeroRttRejectedForTest(bool rejected);
+  void setCanResendZeroRttForTest(bool canResendZeroRtt);
 
   /**
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
@@ -172,6 +179,7 @@ class ClientHandshake : public Handshake {
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
 
   folly::Optional<bool> zeroRttRejected_;
+  folly::Optional<bool> canResendZeroRtt_;
 
   bool waitForData_{false};
   bool earlyDataAttempted_{false};

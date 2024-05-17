@@ -118,6 +118,10 @@ folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
   return zeroRttRejected_;
 }
 
+folly::Optional<bool> ClientHandshake::getCanResendZeroRtt() const {
+  return canResendZeroRtt_;
+}
+
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(kind, secret);
   std::unique_ptr<PacketNumberCipher> packetNumberCipher =
@@ -219,15 +223,11 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // TODO: we need to deal with HRR based rejection as well, however we don't
   // have an API right now.
   if (earlyDataAttempted_ && !earlyDataAccepted) {
-    if (matchEarlyParameters()) {
-      zeroRttRejected_ = true;
-    } else {
-      // TODO: support app retry of zero rtt data.
-      error_ = folly::make_exception_wrapper<QuicInternalException>(
-          "Changing parameters when early data attempted not supported",
-          LocalErrorCode::EARLY_DATA_REJECTED);
-      return;
-    }
+    zeroRttRejected_ = true;
+
+    // If the early parameters don't match. The transport needs to update the
+    // parameters or terminate the connection to force the client to retry.
+    canResendZeroRtt_ = matchEarlyParameters();
   } else if (earlyDataAttempted_ && earlyDataAccepted) {
     zeroRttRejected_ = false;
   }
@@ -253,6 +253,10 @@ ClientHandshake::getClientTransportParameters() const {
 
 void ClientHandshake::setZeroRttRejectedForTest(bool rejected) {
   zeroRttRejected_ = rejected;
+}
+
+void ClientHandshake::setCanResendZeroRttForTest(bool canResendZeroRtt) {
+  canResendZeroRtt_ = canResendZeroRtt;
 }
 
 } // namespace quic

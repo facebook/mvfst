@@ -761,6 +761,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamFlowControlWindow);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
+  // The psk should be removed from the cache on rejection.
+  EXPECT_FALSE(pskCache_->getPsk(hostname).has_value());
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
@@ -5096,7 +5098,8 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
-  mockClientHandshake->setZeroRttRejected(false);
+  mockClientHandshake->setZeroRttRejected(
+      false /*rejected*/, false /*canResendZeroRtt*/);
   recvServerHello();
 
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
@@ -5173,7 +5176,8 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
-  mockClientHandshake->setZeroRttRejected(false);
+  mockClientHandshake->setZeroRttRejected(
+      false /*rejected*/, false /*canResendZeroRtt*/);
   recvServerHello();
 
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
@@ -5251,7 +5255,8 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
-  mockClientHandshake->setZeroRttRejected(true);
+  mockClientHandshake->setZeroRttRejected(
+      true /*rejected*/, true /*canResendZeroRtt*/);
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   recvServerHello();
   verifyTransportParameters(
@@ -5302,7 +5307,51 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
-  mockClientHandshake->setZeroRttRejected(true);
+  mockClientHandshake->setZeroRttRejected(
+      true /*rejected*/, true /*canResendZeroRtt*/);
+  EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
+  EXPECT_THROW(recvServerHello(), std::runtime_error);
+}
+
+TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionCannotResendZeroRttData) {
+  EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
+      .WillOnce(InvokeWithoutArgs([]() {
+        QuicCachedPsk quicCachedPsk;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
+            kDefaultStreamFlowControlWindow;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
+            kDefaultStreamFlowControlWindow;
+        quicCachedPsk.transportParams.initialMaxStreamDataUni =
+            kDefaultStreamFlowControlWindow;
+        quicCachedPsk.transportParams.initialMaxData =
+            kDefaultConnectionFlowControlWindow;
+        quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
+        quicCachedPsk.transportParams.maxRecvPacketSize =
+            kDefaultUDPReadBufferSize;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
+        return quicCachedPsk;
+      }));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
+  startClient();
+  EXPECT_TRUE(performedValidation);
+
+  socketWrites.clear();
+  auto streamId = client->createBidirectionalStream().value();
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  loopForWrites();
+  EXPECT_TRUE(zeroRttPacketsOutstanding());
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
+  mockClientHandshake->setZeroRttRejected(
+      true /*rejected*/, false /*canResendZeroRtt*/);
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   EXPECT_THROW(recvServerHello(), std::runtime_error);
 }

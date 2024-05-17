@@ -533,9 +533,11 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   }
 
   std::shared_ptr<QuicPskCache> getPskCache() override {
-    auto pskCache = std::make_shared<BasicQuicPskCache>();
-    pskCache->putPsk(hostname, psk);
-    return pskCache;
+    if (!pskCache_) {
+      pskCache_ = std::make_shared<BasicQuicPskCache>();
+      pskCache_->putPsk(hostname, psk);
+    }
+    return pskCache_;
   }
 
   void connect() override {
@@ -561,6 +563,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   }
 
   QuicCachedPsk psk;
+  std::shared_ptr<QuicPskCache> pskCache_;
 };
 
 TEST_F(ClientHandshakeZeroRttTest, TestZeroRttSuccess) {
@@ -617,11 +620,20 @@ class ClientHandshakeZeroRttRejectFail : public ClientHandshakeZeroRttTest {
 };
 
 TEST_F(ClientHandshakeZeroRttRejectFail, TestZeroRttRejectionParamsDontMatch) {
+  // Before the handshake, we have not check the early params.
+  ASSERT_FALSE(handshake->getCanResendZeroRtt().has_value());
   clientServerRound();
+  // The server hasn't rejected zero-rtt yet so we should still have the psk.
+  ASSERT_TRUE(pskCache_->getPsk(hostname).has_value());
+
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Initial);
   expectHandshakeCipher(false);
   expectZeroRttCipher(true, false);
-  EXPECT_THROW(serverClientRound(), QuicInternalException);
+  EXPECT_NO_THROW(serverClientRound());
+  // After the handshake with rtt rejection, we should have checked the early
+  // params and marked them as invalid
+  ASSERT_TRUE(handshake->getCanResendZeroRtt().has_value());
+  EXPECT_FALSE(handshake->getCanResendZeroRtt().value());
 }
 
 class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {

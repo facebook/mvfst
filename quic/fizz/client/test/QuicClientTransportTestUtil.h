@@ -283,8 +283,9 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
         std::move(oneRttReadHeaderCipher));
   }
 
-  void setZeroRttRejected(bool rejected) {
+  void setZeroRttRejected(bool rejected, bool canResendZeroRtt) {
     setZeroRttRejectedForTest(rejected);
+    setCanResendZeroRttForTest(canResendZeroRtt);
     if (rejected) {
       createServerTransportParameters();
     }
