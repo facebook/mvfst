@@ -4068,4 +4068,33 @@ WriteQuicDataResult QuicTransportBase::handleInitialWriteDataCommon(
   return WriteQuicDataResult{};
 }
 
+WriteQuicDataResult QuicTransportBase::handleHandshakeWriteDataCommon(
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    uint64_t packetLimit) {
+  auto version = conn_->version.value_or(*(conn_->originalVersion));
+  CHECK(conn_->handshakeWriteCipher);
+  auto& handshakeCryptoStream =
+      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
+  CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
+  auto& numProbePackets =
+      conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
+  if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
+       handshakeCryptoStream.retransmissionBuffer.size() && numProbePackets) ||
+      handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
+    CHECK(conn_->handshakeWriteHeaderCipher);
+    return writeCryptoAndAckDataToSocket(
+        *socket_,
+        *conn_,
+        srcConnId /* src */,
+        dstConnId /* dst */,
+        LongHeader::Types::Handshake,
+        *conn_->handshakeWriteCipher,
+        *conn_->handshakeWriteHeaderCipher,
+        version,
+        packetLimit);
+  }
+  return WriteQuicDataResult{};
+}
+
 } // namespace quic

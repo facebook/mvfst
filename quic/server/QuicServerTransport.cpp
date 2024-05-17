@@ -282,31 +282,10 @@ void QuicServerTransport::writeData() {
     }
   }
   if (conn_->handshakeWriteCipher) {
-    auto& handshakeCryptoStream =
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
-    CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
-    auto& numProbePackets =
-        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
-    if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
-         handshakeCryptoStream.retransmissionBuffer.size() &&
-         numProbePackets) ||
-        handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
-      CHECK(conn_->handshakeWriteCipher);
-      CHECK(conn_->handshakeWriteHeaderCipher);
-      auto res = writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          destConnId /* dst */,
-          LongHeader::Types::Handshake,
-          *conn_->handshakeWriteCipher,
-          *conn_->handshakeWriteHeaderCipher,
-          version,
-          packetLimit);
-
-      packetLimit -= res.packetsWritten;
-      serverConn_->numHandshakeBytesSent += res.bytesWritten;
-    }
+    auto res =
+        handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit);
+    packetLimit -= res.packetsWritten;
+    serverConn_->numHandshakeBytesSent += res.bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }

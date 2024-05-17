@@ -1020,6 +1020,11 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       uint64_t packetLimit,
       const std::string& token = "");
 
+  WriteQuicDataResult handleHandshakeWriteDataCommon(
+      const ConnectionId& srcConnId,
+      const ConnectionId& dstConnId,
+      uint64_t packetLimit);
+
  private:
   /**
    * Helper functions to handle new streams.
