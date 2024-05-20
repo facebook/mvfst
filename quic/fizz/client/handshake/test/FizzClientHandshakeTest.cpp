@@ -88,6 +88,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
                                 .setCertificateVerifier(verifier)
                                 .setPskCache(getPskCache())
                                 .setECHPolicy(getECHPolicy())
+                                .setECHRetryCallback(getECHRetryCallback())
                                 .build();
     conn.reset(new QuicClientConnectionState(handshakeFactory));
     conn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
@@ -130,6 +131,11 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   }
 
   virtual std::shared_ptr<fizz::client::test::MockECHPolicy> getECHPolicy() {
+    return nullptr;
+  }
+
+  virtual std::shared_ptr<fizz::client::test::MockECHRetryCallback>
+  getECHRetryCallback() {
     return nullptr;
   }
 
@@ -655,6 +661,11 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
     return echPolicy;
   }
 
+  std::shared_ptr<fizz::client::test::MockECHRetryCallback>
+  getECHRetryCallback() override {
+    return echCallback;
+  }
+
   fizz::ech::ECHConfigContentDraft getECHConfigContent() {
     fizz::ech::HpkeSymmetricCipherSuite suite{
         fizz::hpke::KDFId::Sha256, fizz::hpke::AeadId::TLS_AES_128_GCM_SHA256};
@@ -678,11 +689,13 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
   }
 
   std::shared_ptr<fizz::client::test::MockECHPolicy> echPolicy;
+  std::shared_ptr<fizz::client::test::MockECHRetryCallback> echCallback;
   std::shared_ptr<fizz::ech::ECHConfigManager> echDecrypter;
 };
 
 TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   echPolicy = std::make_shared<fizz::client::test::MockECHPolicy>();
+  echCallback = std::make_shared<fizz::client::test::MockECHRetryCallback>();
   EXPECT_CALL(*echPolicy, getConfig(_))
       .WillOnce(Return(std::vector<fizz::ech::ECHConfig>{getECHConfig()}));
 
