@@ -348,12 +348,11 @@ enum class QuicVersion : uint32_t {
   QUIC_V1 = 0x00000001,
   QUIC_V1_ALIAS = 0xfaceb003,
   QUIC_V1_ALIAS2 = 0xfaceb004,
-  // MVFST_EXPERIMENTAL used to set initial congestion window
+  // MVFST_EXPERIMENTAL enables including and using cwnd hints in 0-rtt session
+  // tickets in QuicServerWorker.cpp
   MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST
   MVFST_ALIAS = 0xfaceb010,
   MVFST_INVALID = 0xfaceb00f,
-  // MVFST_EXPERIMENTAL2 enables including and using cwnd hints in 0-rtt session
-  // tickets in QuicServerWorker.cpp
   MVFST_EXPERIMENTAL2 = 0xfaceb011, // Experimental alias for MVFST
   // MVFST_EXPERIMENTAL3 is used to apply a 2x pace scaling for BBRv2
   MVFST_EXPERIMENTAL3 = 0xfaceb013, // Experimental alias for MVFST

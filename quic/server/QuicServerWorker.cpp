@@ -660,9 +660,6 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     }
     trans->setCongestionControllerFactory(ccFactory_);
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
-    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
-      transportSettings_.initCwndInMss = 30;
-    }
     if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL3) {
       // Use twice the default pacing gain to make BBRv2's startup behavior
       // similar to BBRv1's.
@@ -681,7 +678,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
         << (transportSettings.dataPathType == DataPathType::ContinuousMemory
                 ? "ContinuousMemory"
                 : "ChainedMemory");
-    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL2) {
+    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
       transportSettings.includeCwndHintsInSessionTicket = true;
       transportSettings.useCwndHintsInSessionTicket = true;
     }
