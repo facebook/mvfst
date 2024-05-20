@@ -322,6 +322,8 @@ class ServerHandshakeTest : public Test {
 
   void operator()(fizz::EndOfData&) {}
 
+  void operator()(fizz::client::ECHRetryAvailable&) {}
+
   class DelayedHolder : public folly::DelayedDestruction {};
 
   std::unique_ptr<DelayedHolder, folly::DelayedDestruction::Destructor> dg;

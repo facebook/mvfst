@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <fizz/client/Actions.h>
+#include <fizz/client/AsyncFizzClient.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 
@@ -46,11 +48,17 @@ class FizzClientHandshake : public ClientHandshake {
     return state_;
   }
 
+  void setECHRetryCallback(fizz::client::ECHRetryCallback* cb) {
+    echRetryCallback_ = cb;
+  }
+
  protected:
   folly::Optional<QuicCachedPsk> getPsk(
       const folly::Optional<std::string>& hostname) const;
 
   void onNewCachedPsk(fizz::client::NewCachedPsk& newCachedPsk) noexcept;
+
+  void echRetryAvailable(fizz::client::ECHRetryAvailable& retry);
 
  private:
   folly::Optional<CachedServerTransportParameters> connectImpl(
@@ -74,6 +82,8 @@ class FizzClientHandshake : public ClientHandshake {
   std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
 
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext_;
+
+  fizz::client::ECHRetryCallback* echRetryCallback_{nullptr};
 };
 
 } // namespace quic

@@ -230,6 +230,13 @@ void FizzClientHandshake::onNewCachedPsk(
   fizzContext_->putPsk(state_.sni(), std::move(quicCachedPsk));
 }
 
+void FizzClientHandshake::echRetryAvailable(
+    fizz::client::ECHRetryAvailable& retry) {
+  if (echRetryCallback_) {
+    echRetryCallback_->retryAvailable(retry);
+  }
+}
+
 class FizzClientHandshake::ActionMoveVisitor {
  public:
   explicit ActionMoveVisitor(FizzClientHandshake& client) : client_(client) {}
@@ -349,6 +356,10 @@ class FizzClientHandshake::ActionMoveVisitor {
     }
   }
 
+  void operator()(fizz::client::ECHRetryAvailable& retry) {
+    client_.echRetryAvailable(retry);
+  }
+
  private:
   FizzClientHandshake& client_;
 };
@@ -389,6 +400,9 @@ void FizzClientHandshake::processActions(fizz::client::Actions actions) {
         break;
       case fizz::client::Action::Type::SecretAvailable_E:
         visitor(*action.asSecretAvailable());
+        break;
+      case fizz::client::Action::Type::ECHRetryAvailable_E:
+        visitor(*action.asECHRetryAvailable());
         break;
     }
   }

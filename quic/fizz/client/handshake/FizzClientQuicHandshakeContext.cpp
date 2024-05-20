@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <fizz/client/AsyncFizzClient.h>
 #include <fizz/client/ECHPolicy.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
@@ -16,22 +17,26 @@ FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
     std::shared_ptr<const fizz::CertificateVerifier> verifier,
     std::shared_ptr<QuicPskCache> pskCache,
-    std::shared_ptr<fizz::client::ECHPolicy> echPolicy)
+    std::shared_ptr<fizz::client::ECHPolicy> echPolicy,
+    std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback_)
     : context_(std::move(context)),
       verifier_(std::move(verifier)),
       pskCache_(std::move(pskCache)),
-      echPolicy_(std::move(echPolicy)) {}
+      echPolicy_(std::move(echPolicy)),
+      echRetryCallback_(std::move(echRetryCallback_)) {}
 
 FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
     std::shared_ptr<const fizz::CertificateVerifier> verifier,
     std::shared_ptr<QuicPskCache> pskCache,
     std::unique_ptr<FizzCryptoFactory> cryptoFactory,
-    std::shared_ptr<fizz::client::ECHPolicy> echPolicy)
+    std::shared_ptr<fizz::client::ECHPolicy> echPolicy,
+    std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback)
     : context_(std::move(context)),
       verifier_(std::move(verifier)),
       pskCache_(std::move(pskCache)),
       echPolicy_(std::move(echPolicy)),
+      echRetryCallback_(std::move(echRetryCallback)),
       cryptoFactory_(std::move(cryptoFactory)) {}
 
 std::unique_ptr<ClientHandshake>
@@ -40,8 +45,12 @@ FizzClientQuicHandshakeContext::makeClientHandshake(
   if (!cryptoFactory_) {
     cryptoFactory_ = std::make_unique<FizzCryptoFactory>();
   }
-  return std::make_unique<FizzClientHandshake>(
+  auto handshake = std::make_unique<FizzClientHandshake>(
       conn, shared_from_this(), std::move(cryptoFactory_));
+  if (echRetryCallback_) {
+    handshake->setECHRetryCallback(echRetryCallback_.get());
+  }
+  return handshake;
 }
 
 folly::Optional<QuicCachedPsk> FizzClientQuicHandshakeContext::getPsk(
@@ -92,7 +101,8 @@ FizzClientQuicHandshakeContext::Builder::build() && {
           std::move(verifier_),
           std::move(pskCache_),
           std::move(cryptoFactory_),
-          std::move(echPolicy_)));
+          std::move(echPolicy_),
+          std::move(echRetryCallback_)));
 }
 
 } // namespace quic
