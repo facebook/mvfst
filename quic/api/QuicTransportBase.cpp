@@ -2091,7 +2091,8 @@ StreamDirectionality QuicTransportBase::getStreamDirectionality(
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::notifyPendingWriteOnConnection(WriteCallback* wcb) {
+QuicTransportBase::notifyPendingWriteOnConnection(
+    QuicSocket::WriteCallback* wcb) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
@@ -2130,7 +2131,9 @@ QuicTransportBase::unregisterStreamWriteCallback(StreamId id) {
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
+QuicTransportBase::notifyPendingWriteOnStream(
+    StreamId id,
+    QuicSocket::WriteCallback* wcb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
