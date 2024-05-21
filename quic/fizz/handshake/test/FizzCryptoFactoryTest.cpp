@@ -41,9 +41,9 @@ class FizzCryptoFactoryTest : public Test {
       trafficKey_ = std::move(trafficKey);
     }));
     EXPECT_CALL(*mockAead, keyLength())
-        .WillRepeatedly(Return(fizz::openssl::AESGCM128::kKeyLength));
+        .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));
     EXPECT_CALL(*mockAead, ivLength())
-        .WillRepeatedly(Return(fizz::openssl::AESGCM128::kIVLength));
+        .WillRepeatedly(Return(fizz::AESGCM128::kIVLength));
     return mockAead;
   }
 
@@ -54,7 +54,7 @@ class FizzCryptoFactoryTest : public Test {
           packetCipherKey_ = folly::IOBuf::copyBuffer(key);
         }));
     EXPECT_CALL(*mockPacketNumberCipher, keyLength())
-        .WillRepeatedly(Return(fizz::openssl::AESGCM128::kKeyLength));
+        .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));
     return mockPacketNumberCipher;
   }
 
