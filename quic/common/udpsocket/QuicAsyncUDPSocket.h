@@ -69,6 +69,16 @@ class QuicAsyncUDPSocket {
         const folly::AsyncSocketException&) noexcept = 0;
   };
 
+  class WriteCallback {
+   public:
+    /**
+     * Invoked when the socket is writable.
+     */
+    virtual void onSocketWritable() noexcept = 0;
+
+    virtual ~WriteCallback() = default;
+  };
+
   virtual ~QuicAsyncUDPSocket() = default;
 
   // Initializes underlying socket fd. This is called in bind() and connect()
@@ -121,6 +131,23 @@ class QuicAsyncUDPSocket {
    * Pause reading datagrams
    */
   virtual void pauseRead() = 0;
+
+  /**
+   * Start listening to writable events on the socket.
+   */
+  virtual folly::Expected<folly::Unit, folly::AsyncSocketException> resumeWrite(
+      WriteCallback* /* cb */) {
+    return folly::unit;
+  }
+
+  /**
+   * Pause writable events.
+   */
+  virtual void pauseWrite() {}
+
+  [[nodiscard]] virtual bool isWritableCallbackSet() const {
+    return false;
+  }
 
   /**
    * Send the data in buffer to destination. Returns the return code from
