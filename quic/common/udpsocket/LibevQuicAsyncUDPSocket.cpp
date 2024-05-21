@@ -24,8 +24,9 @@ LibevQuicAsyncUDPSocket::LibevQuicAsyncUDPSocket(
   CHECK(evb_) << "EventBase must be QuicLibevEventBase";
   CHECK(evb_->isInEventBaseThread());
 
-  ev_init(&readWatcher_, LibevQuicAsyncUDPSocket::readWatcherCallback);
-  readWatcher_.data = this;
+  ev_init(
+      &sockEventsWatcher_, LibevQuicAsyncUDPSocket::sockEventsWatcherCallback);
+  sockEventsWatcher_.data = this;
 }
 
 LibevQuicAsyncUDPSocket::~LibevQuicAsyncUDPSocket() {
@@ -33,14 +34,14 @@ LibevQuicAsyncUDPSocket::~LibevQuicAsyncUDPSocket() {
     LibevQuicAsyncUDPSocket::close();
   }
   if (evb_) {
-    ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
+    ev_io_stop(evb_->getLibevLoop(), &sockEventsWatcher_);
   }
+  events_ = EV_NONE;
 }
 
 void LibevQuicAsyncUDPSocket::pauseRead() {
   readCallback_ = nullptr;
-
-  updateReadWatcher();
+  removeEvent(EV_READ);
 }
 
 void LibevQuicAsyncUDPSocket::resumeRead(ReadCallback* cb) {
@@ -49,8 +50,23 @@ void LibevQuicAsyncUDPSocket::resumeRead(ReadCallback* cb) {
       << "Socket must be initialized before a read callback is attached";
   CHECK(cb) << "A non-null callback is required to resume read";
   readCallback_ = cb;
+  addEvent(EV_READ);
+}
 
-  updateReadWatcher();
+folly::Expected<folly::Unit, folly::AsyncSocketException>
+LibevQuicAsyncUDPSocket::resumeWrite(WriteCallback* cob) {
+  CHECK(!writeCallback_) << "A write callback is already installed";
+  CHECK_NE(fd_, -1)
+      << "Socket must be initialized before a write callback is attached";
+  CHECK(cob) << "A non-null callback is required to resume write";
+  writeCallback_ = cob;
+  addEvent(EV_WRITE);
+  return folly::unit;
+}
+
+void LibevQuicAsyncUDPSocket::pauseWrite() {
+  writeCallback_ = nullptr;
+  removeEvent(EV_WRITE);
 }
 
 ssize_t LibevQuicAsyncUDPSocket::write(
@@ -147,8 +163,9 @@ void LibevQuicAsyncUDPSocket::close() {
 
     cob->onReadClosed();
   }
-
-  updateReadWatcher();
+  writeCallback_ = nullptr;
+  removeEvent(EV_READ | EV_WRITE);
+  events_ = EV_NONE;
 
   if (fd_ != -1 && ownership_ == FDOwnership::OWNS) {
     ::close(fd_);
@@ -430,8 +447,12 @@ void LibevQuicAsyncUDPSocket::applyOptions(
 void LibevQuicAsyncUDPSocket::setFD(int fd, FDOwnership ownership) {
   fd_ = fd;
   ownership_ = ownership;
-
-  updateReadWatcher();
+  if (readCallback_) {
+    addEvent(EV_READ);
+  }
+  if (writeCallback_) {
+    addEvent(EV_WRITE);
+  }
 }
 
 int LibevQuicAsyncUDPSocket::getFD() {
@@ -459,6 +480,11 @@ void LibevQuicAsyncUDPSocket::evHandleSocketRead() {
 
   // Let the callback read from the socket
   readCallback_->onNotifyDataAvailable(*this);
+}
+
+void LibevQuicAsyncUDPSocket::evHandleSocketWritable() {
+  CHECK(writeCallback_);
+  writeCallback_->onSocketWritable();
 }
 
 size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
@@ -523,28 +549,41 @@ size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
 #endif
 }
 
-void LibevQuicAsyncUDPSocket::updateReadWatcher() {
+void LibevQuicAsyncUDPSocket::addEvent(int event) {
   CHECK(evb_) << "EventBase not initialized";
-  ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
+  ev_io_stop(evb_->getLibevLoop(), &sockEventsWatcher_);
+  events_ |= event;
 
-  if (readCallback_) {
-    ev_io_set(&readWatcher_, fd_, EV_READ);
-    ev_io_start(evb_->getLibevLoop(), &readWatcher_);
-  }
+  ev_io_set(&sockEventsWatcher_, fd_, events_);
+  ev_io_start(evb_->getLibevLoop(), &sockEventsWatcher_);
+}
+
+void LibevQuicAsyncUDPSocket::removeEvent(int event) {
+  CHECK(evb_) << "EventBase not initialized";
+  ev_io_stop(evb_->getLibevLoop(), &sockEventsWatcher_);
+  events_ &= ~event;
+
+  ev_io_set(&sockEventsWatcher_, fd_, events_);
+  ev_io_start(evb_->getLibevLoop(), &sockEventsWatcher_);
 }
 
 // STATIC PRIVATE
-void LibevQuicAsyncUDPSocket::readWatcherCallback(
+void LibevQuicAsyncUDPSocket::sockEventsWatcherCallback(
     struct ev_loop* /*loop*/,
     ev_io* w,
-    int /*revents*/) {
+    int events) {
   auto sock = static_cast<LibevQuicAsyncUDPSocket*>(w->data);
   CHECK(sock)
       << "Watcher callback does not have a valid LibevQuicAsyncUDPSocket pointer";
   CHECK(sock->getEventBase()) << "Socket does not have an event base attached";
   CHECK(sock->getEventBase()->isInEventBaseThread())
       << "Watcher callback on wrong event base";
-  sock->evHandleSocketRead();
+  if (events & EV_READ) {
+    sock->evHandleSocketRead();
+  }
+  if (events & EV_WRITE) {
+    sock->evHandleSocketWritable();
+  }
 }
 
 void LibevQuicAsyncUDPSocket::setRcvBuf(int rcvBuf) {
@@ -553,6 +592,10 @@ void LibevQuicAsyncUDPSocket::setRcvBuf(int rcvBuf) {
 
 void LibevQuicAsyncUDPSocket::setSndBuf(int sndBuf) {
   sndBuf_ = sndBuf;
+}
+
+bool LibevQuicAsyncUDPSocket::isWritableCallbackSet() const {
+  return writeCallback_ != nullptr;
 }
 
 } // namespace quic

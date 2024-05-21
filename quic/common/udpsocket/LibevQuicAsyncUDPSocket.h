@@ -180,11 +180,27 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   int getFD() override;
 
- private:
-  static void readWatcherCallback(struct ev_loop* loop, ev_io* w, int revents);
+  /**
+   * Start listening to writable events on the socket.
+   */
+  folly::Expected<folly::Unit, folly::AsyncSocketException> resumeWrite(
+      WriteCallback* /* cob */) override;
 
-  void updateReadWatcher();
+  /**
+   * Pause writable events.
+   */
+  void pauseWrite() override;
+
+  [[nodiscard]] bool isWritableCallbackSet() const override;
+
+ private:
+  static void
+  sockEventsWatcherCallback(struct ev_loop* loop, ev_io* w, int revents);
+
+  void addEvent(int event);
+  void removeEvent(int event);
   void evHandleSocketRead();
+  void evHandleSocketWritable();
   size_t handleSocketErrors();
 
   int fd_{-1};
@@ -193,7 +209,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   FDOwnership ownership_;
 
   std::shared_ptr<LibevQuicEventBase> evb_{nullptr};
-  ev_io readWatcher_;
+  ev_io sockEventsWatcher_;
 
   bool bound_{false};
   bool connected_{false};
@@ -203,6 +219,8 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   int sndBuf_{0};
 
   ReadCallback* readCallback_{nullptr};
+  WriteCallback* writeCallback_{nullptr};
   ErrMessageCallback* errMessageCallback_{nullptr};
+  int events_{EV_NONE};
 };
 } // namespace quic
