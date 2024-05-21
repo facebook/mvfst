@@ -1529,6 +1529,8 @@ WriteQuicDataResult writeConnectionDataToSocket(
     }
   };
 
+  quic::TimePoint sentTime = Clock::now();
+
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
          ((ioBufBatch.getPktSent() < batchSize) ||
           writeLoopTimeLimit(writeLoopBeginTime, connection))) {
@@ -1581,7 +1583,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
         connection,
         std::move(result->packetEvent),
         std::move(result->packet->packet),
-        Clock::now(),
+        sentTime,
         folly::to<uint32_t>(ret.encodedSize),
         folly::to<uint32_t>(ret.encodedBodySize),
         false /* isDSRPacket */);
