@@ -378,6 +378,7 @@ struct TransportSettings {
   uint64_t cwndWeakJumpstart{36000};
   uint64_t cwndModerateJumpstart{48000};
   uint64_t cwndStrongJumpstart{72000};
+  bool useSockWritableEvents{false};
 };
 
 } // namespace quic

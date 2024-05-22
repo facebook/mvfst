@@ -36,7 +36,9 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
  *    This is needed in order for QUIC to be able to live beyond the lifetime
  *    of the object that holds it to send graceful close messages to the peer.
  */
-class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
+class QuicTransportBase : public QuicSocket,
+                          QuicStreamPrioritiesObserver,
+                          QuicAsyncUDPSocket::WriteCallback {
  public:
   QuicTransportBase(
       std::shared_ptr<QuicEventBase> evb,
@@ -1024,6 +1026,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       const ConnectionId& srcConnId,
       const ConnectionId& dstConnId,
       uint64_t packetLimit);
+
+  void onSocketWritable() noexcept override;
+  void maybeStopWriteLooperAndArmSocketWritableEvent();
 
  private:
   /**

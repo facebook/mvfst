@@ -105,6 +105,12 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
   MOCK_METHOD((void), setRecvTos, (bool));
   MOCK_METHOD((bool), getRecvTos, ());
   MOCK_METHOD((void), setTosOrTrafficClass, (uint8_t));
+  MOCK_METHOD((bool), isWritableCallbackSet, (), (const));
+  MOCK_METHOD(
+      (folly::Expected<folly::Unit, folly::AsyncSocketException>),
+      resumeWrite,
+      (WriteCallback*));
+  MOCK_METHOD((void), pauseWrite, ());
 };
 
 } // namespace quic::test

@@ -1122,8 +1122,14 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
     writeLooper_->stop();
     return;
   }
-  // TODO: Also listens to write event from libevent. Only schedule write when
-  // the socket itself is writable.
+
+  // If socket writable events are in use, do nothing if we are already waiting
+  // for the write event.
+  if (conn_->transportSettings.useSockWritableEvents &&
+      socket_->isWritableCallbackSet()) {
+    return;
+  }
+
   auto writeDataReason = shouldWriteData(*conn_);
   if (writeDataReason != WriteDataReason::NO_WRITE) {
     VLOG(10) << nodeToString(conn_->nodeType)
@@ -3567,8 +3573,42 @@ void QuicTransportBase::runOnEvbAsync(
       true);
 }
 
+void QuicTransportBase::onSocketWritable() noexcept {
+  // Remove the writable callback.
+  socket_->pauseWrite();
+
+  // Try to write.
+  // If write fails again, pacedWriteDataToSocket() will re-arm the write event
+  // and stop the write looper.
+  writeLooper_->run(true /* thisIteration */);
+}
+
+void QuicTransportBase::maybeStopWriteLooperAndArmSocketWritableEvent() {
+  if (!socket_) {
+    return;
+  }
+  if (conn_->transportSettings.useSockWritableEvents &&
+      !socket_->isWritableCallbackSet()) {
+    // Check if all data has been written and we're not limited by flow
+    // control/congestion control.
+    bool haveDataToWrite = shouldWriteData(*conn_) != WriteDataReason::NO_WRITE;
+    bool connHasWriteWindow =
+        (conn_->congestionController->getWritableBytes() > 0) &&
+        (getSendConnFlowControlBytesAPI(*conn_) > 0);
+    if (haveDataToWrite && connHasWriteWindow) {
+      // Re-arm the write event and stop the write
+      // looper.
+      socket_->resumeWrite(this);
+      writeLooper_->stop();
+    }
+  }
+}
+
 void QuicTransportBase::pacedWriteDataToSocket() {
   [[maybe_unused]] auto self = sharedGuard();
+  SCOPE_EXIT {
+    self->maybeStopWriteLooperAndArmSocketWritableEvent();
+  };
 
   if (!isConnectionPaced(*conn_)) {
     // Not paced and connection is still open, normal write. Even if pacing is
