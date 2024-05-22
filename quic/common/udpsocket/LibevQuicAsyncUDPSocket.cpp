@@ -24,9 +24,11 @@ LibevQuicAsyncUDPSocket::LibevQuicAsyncUDPSocket(
   CHECK(evb_) << "EventBase must be QuicLibevEventBase";
   CHECK(evb_->isInEventBaseThread());
 
-  ev_init(
-      &sockEventsWatcher_, LibevQuicAsyncUDPSocket::sockEventsWatcherCallback);
-  sockEventsWatcher_.data = this;
+  ev_init(&readWatcher_, LibevQuicAsyncUDPSocket::sockEventsWatcherCallback);
+  readWatcher_.data = this;
+
+  ev_init(&writeWatcher_, LibevQuicAsyncUDPSocket::sockEventsWatcherCallback);
+  writeWatcher_.data = this;
 }
 
 LibevQuicAsyncUDPSocket::~LibevQuicAsyncUDPSocket() {
@@ -34,9 +36,9 @@ LibevQuicAsyncUDPSocket::~LibevQuicAsyncUDPSocket() {
     LibevQuicAsyncUDPSocket::close();
   }
   if (evb_) {
-    ev_io_stop(evb_->getLibevLoop(), &sockEventsWatcher_);
+    ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
+    ev_io_stop(evb_->getLibevLoop(), &writeWatcher_);
   }
-  events_ = EV_NONE;
 }
 
 void LibevQuicAsyncUDPSocket::pauseRead() {
@@ -165,7 +167,6 @@ void LibevQuicAsyncUDPSocket::close() {
   }
   writeCallback_ = nullptr;
   removeEvent(EV_READ | EV_WRITE);
-  events_ = EV_NONE;
 
   if (fd_ != -1 && ownership_ == FDOwnership::OWNS) {
     ::close(fd_);
@@ -266,6 +267,11 @@ void LibevQuicAsyncUDPSocket::init(sa_family_t family) {
 
   fd_ = fd;
   ownership_ = FDOwnership::OWNS;
+
+  // Update the watchers
+  removeEvent(EV_READ | EV_WRITE);
+  ev_io_set(&readWatcher_, fd_, EV_READ);
+  ev_io_set(&writeWatcher_, fd_, EV_WRITE);
 }
 
 void LibevQuicAsyncUDPSocket::bind(const folly::SocketAddress& address) {
@@ -447,6 +453,12 @@ void LibevQuicAsyncUDPSocket::applyOptions(
 void LibevQuicAsyncUDPSocket::setFD(int fd, FDOwnership ownership) {
   fd_ = fd;
   ownership_ = ownership;
+
+  // Update the watchers
+  removeEvent(EV_READ | EV_WRITE);
+  ev_io_set(&readWatcher_, fd_, EV_READ);
+  ev_io_set(&writeWatcher_, fd_, EV_WRITE);
+
   if (readCallback_) {
     addEvent(EV_READ);
   }
@@ -551,20 +563,24 @@ size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
 
 void LibevQuicAsyncUDPSocket::addEvent(int event) {
   CHECK(evb_) << "EventBase not initialized";
-  ev_io_stop(evb_->getLibevLoop(), &sockEventsWatcher_);
-  events_ |= event;
-
-  ev_io_set(&sockEventsWatcher_, fd_, events_);
-  ev_io_start(evb_->getLibevLoop(), &sockEventsWatcher_);
+  if (event & EV_READ) {
+    ev_io_start(evb_->getLibevLoop(), &readWatcher_);
+  }
+  if (event & EV_WRITE) {
+    ev_io_start(evb_->getLibevLoop(), &writeWatcher_);
+  }
 }
 
 void LibevQuicAsyncUDPSocket::removeEvent(int event) {
   CHECK(evb_) << "EventBase not initialized";
-  ev_io_stop(evb_->getLibevLoop(), &sockEventsWatcher_);
-  events_ &= ~event;
 
-  ev_io_set(&sockEventsWatcher_, fd_, events_);
-  ev_io_start(evb_->getLibevLoop(), &sockEventsWatcher_);
+  if (event & EV_READ) {
+    ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
+  }
+
+  if (event & EV_WRITE) {
+    ev_io_stop(evb_->getLibevLoop(), &writeWatcher_);
+  }
 }
 
 // STATIC PRIVATE

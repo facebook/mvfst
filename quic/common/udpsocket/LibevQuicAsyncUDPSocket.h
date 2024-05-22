@@ -209,7 +209,8 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   FDOwnership ownership_;
 
   std::shared_ptr<LibevQuicEventBase> evb_{nullptr};
-  ev_io sockEventsWatcher_;
+  ev_io readWatcher_;
+  ev_io writeWatcher_;
 
   bool bound_{false};
   bool connected_{false};
@@ -221,6 +222,5 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   ReadCallback* readCallback_{nullptr};
   WriteCallback* writeCallback_{nullptr};
   ErrMessageCallback* errMessageCallback_{nullptr};
-  int events_{EV_NONE};
 };
 } // namespace quic
