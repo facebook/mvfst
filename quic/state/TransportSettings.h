@@ -379,6 +379,10 @@ struct TransportSettings {
   uint64_t cwndModerateJumpstart{48000};
   uint64_t cwndStrongJumpstart{72000};
   bool useSockWritableEvents{false};
+  // use backpressure single packet batch writer. Only works for
+  // QuicBatchingMode::BATCHING_MODE_NONE and DataPathType::ChainedMemory
+  // and requires useSockWritableEvents to be enabled.
+  bool enableWriterBackpressure{false};
 };
 
 } // namespace quic

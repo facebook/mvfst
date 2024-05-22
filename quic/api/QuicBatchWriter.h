@@ -122,6 +122,26 @@ class SinglePacketInplaceBatchWriter : public IOBufBatchWriter {
   QuicConnectionStateBase& conn_;
 };
 
+class SinglePacketBackpressureBatchWriter : public IOBufBatchWriter {
+ public:
+  explicit SinglePacketBackpressureBatchWriter(QuicConnectionStateBase& conn);
+  ~SinglePacketBackpressureBatchWriter() override;
+
+  void reset() override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t size,
+      const folly::SocketAddress& /*unused*/,
+      QuicAsyncUDPSocket* /*unused*/) override;
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override;
+
+ private:
+  QuicConnectionStateBase& conn_;
+  // whether the last write attempt was successful.
+  bool lastWriteSuccessful_{true};
+};
+
 class SendmmsgPacketBatchWriter : public BatchWriter {
  public:
   explicit SendmmsgPacketBatchWriter(size_t maxBufs);

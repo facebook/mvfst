@@ -125,6 +125,8 @@ std::string_view writeDataReasonString(WriteDataReason reason) {
       return "Datagram";
     case WriteDataReason::NO_WRITE:
       return "NoWrite";
+    case WriteDataReason::BUFFERED_WRITE:
+      return "BufferedWrite";
   }
   folly::assume_unreachable();
 }

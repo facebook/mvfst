@@ -154,6 +154,7 @@ uint64_t writeZeroRttDataToSocket(
 WriteDataReason shouldWriteData(QuicConnectionStateBase& conn);
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
+bool hasBufferedDataToWrite(const QuicConnectionStateBase& conn);
 
 /**
  * Invoked when the written stream data was new stream data.

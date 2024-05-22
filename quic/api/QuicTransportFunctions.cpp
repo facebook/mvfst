@@ -1460,7 +1460,12 @@ WriteQuicDataResult writeConnectionDataToSocket(
     connection.writeDebugState.noWriteReason = NoWriteReason::WRITE_OK;
   }
 
-  if (!scheduler.hasData()) {
+  // Note: if a write is pending, it will be taken over by the batch writer when
+  // it's created. So this check has to be done before creating the batch
+  // writer.
+  bool pendingBufferedWrite = hasBufferedDataToWrite(connection);
+
+  if (!scheduler.hasData() && !pendingBufferedWrite) {
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
     }
@@ -1492,6 +1497,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
   auto batchWriter = BatchWriterFactory::makeBatchWriter(
       connection.transportSettings.batchingMode,
       connection.transportSettings.maxBatchSize,
+      connection.transportSettings.enableWriterBackpressure,
       connection.transportSettings.dataPathType,
       connection,
       *connection.gsoSupported);
@@ -1505,6 +1511,16 @@ WriteQuicDataResult writeConnectionDataToSocket(
       connection.peerAddress,
       connection.statsCallback,
       happyEyeballsState);
+
+  // If we have a pending write to retry. Flush that first and make sure it
+  // succeeds before scheduling any new data.
+  if (pendingBufferedWrite) {
+    if (!ioBufBatch.flush()) {
+      // Could not flush retried data. Return empty write result and wait for
+      // next retry.
+      return {0, 0, 0};
+    }
+  }
 
   auto batchSize = connection.transportSettings.batchingMode ==
           QuicBatchingMode::BATCHING_MODE_NONE
@@ -1734,6 +1750,11 @@ WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
     QUIC_STATS(conn.statsCallback, onCwndBlocked);
     return WriteDataReason::NO_WRITE;
   }
+
+  if (hasBufferedDataToWrite(conn)) {
+    return WriteDataReason::BUFFERED_WRITE;
+  }
+
   return hasNonAckDataToWrite(conn);
 }
 
@@ -1754,6 +1775,10 @@ bool hasAckDataToWrite(const QuicConnectionStateBase& conn) {
                          << conn.pendingEvents.scheduleAckTimeout << " "
                          << conn;
   return writeAcks;
+}
+
+bool hasBufferedDataToWrite(const QuicConnectionStateBase& conn) {
+  return (bool)conn.pendingWriteBatch_.buf;
 }
 
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {

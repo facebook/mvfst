@@ -39,6 +39,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingNone) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_NONE,
       kBatchNum,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -70,6 +71,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBase) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -99,6 +101,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -140,6 +143,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       1,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -176,6 +180,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       kBatchNum,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -213,6 +218,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsg) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG,
       kBatchNum,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -255,6 +261,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
       kBatchNum,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -300,6 +307,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
       3 * kBatchNum,
+      false, /* enable backpressure */
       DataPathType::ChainedMemory,
       conn_,
       gsoSupported_);
@@ -347,6 +355,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -369,6 +378,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterAppendLimit) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -399,6 +409,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -433,6 +444,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -481,6 +493,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteOne) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -521,6 +534,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -568,6 +582,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
       batchSize,
+      false, /* enable backpressure */
       DataPathType::ContinuousMemory,
       conn_,
       gsoSupported_);
@@ -614,6 +629,7 @@ class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
     return quic::BatchWriterFactory::makeBatchWriter(
         batchingMode,
         conn_.transportSettings.maxBatchSize,
+        conn_.transportSettings.enableWriterBackpressure,
         conn_.transportSettings.dataPathType,
         conn_,
         false /* gsoSupported_ */);
@@ -745,6 +761,105 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestWrite) {
       }));
   EXPECT_EQ(appendSize, batchWriter->write(sock, folly::SocketAddress()));
   EXPECT_TRUE(batchWriter->empty());
+}
+
+struct SinglePacketBackpressureBatchWriterTest : public ::testing::Test {
+  SinglePacketBackpressureBatchWriterTest()
+      : conn_(FizzServerQuicHandshakeContext::Builder().build()),
+        qEvb_(std::make_shared<FollyQuicEventBase>(&evb_)),
+        sock_(qEvb_) {
+    conn_.transportSettings.dataPathType = DataPathType::ChainedMemory;
+    conn_.transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_NONE;
+    conn_.transportSettings.maxBatchSize = 1;
+    conn_.transportSettings.enableWriterBackpressure = true;
+    conn_.transportSettings.useSockWritableEvents = true;
+  }
+
+  BatchWriterPtr makeBatchWriter() {
+    return quic::BatchWriterFactory::makeBatchWriter(
+        conn_.transportSettings.batchingMode,
+        conn_.transportSettings.maxBatchSize,
+        conn_.transportSettings.enableWriterBackpressure,
+        conn_.transportSettings.dataPathType,
+        conn_,
+        false /* gsoSupported */);
+  }
+
+ protected:
+  QuicServerConnectionState conn_;
+  folly::EventBase evb_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
+  quic::test::MockAsyncUDPSocket sock_;
+};
+
+TEST_F(SinglePacketBackpressureBatchWriterTest, TestAppendRequestsFlush) {
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketBackpressureBatchWriter*>(
+      batchWriter.get()));
+  EXPECT_TRUE(batchWriter->empty());
+
+  auto buf = folly::IOBuf::copyBuffer("append attempt");
+  EXPECT_TRUE(batchWriter->append(
+      std::move(buf),
+      buf->computeChainDataLength(),
+      folly::SocketAddress(),
+      &sock_));
+}
+
+TEST_F(SinglePacketBackpressureBatchWriterTest, TestFailedWriteCachedOnEAGAIN) {
+  auto batchWriter = makeBatchWriter();
+  CHECK(batchWriter);
+  CHECK(dynamic_cast<quic::SinglePacketBackpressureBatchWriter*>(
+      batchWriter.get()));
+  EXPECT_TRUE(batchWriter->empty());
+
+  std::string testString = "append attempt";
+  auto buf = folly::IOBuf::copyBuffer(testString);
+
+  EXPECT_TRUE(batchWriter->append(
+      std::move(buf),
+      buf->computeChainDataLength(),
+      folly::SocketAddress(),
+      &sock_));
+
+  EXPECT_CALL(sock_, write(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const auto& /* addr */,
+                           const std::unique_ptr<folly::IOBuf>& /*buf*/) {
+        errno = EAGAIN;
+        return 0;
+      }));
+  // The write fails
+  EXPECT_EQ(batchWriter->write(sock_, folly::SocketAddress()), 0);
+
+  // Resetting does not clear the cached buffer from the writer but the buffer
+  // is not yet cached in the transport.
+  batchWriter->reset();
+  EXPECT_FALSE(conn_.pendingWriteBatch_.buf);
+
+  // Destroying the writer caches the buffer in the transport.
+  batchWriter = nullptr;
+  EXPECT_TRUE(conn_.pendingWriteBatch_.buf);
+
+  // A new batch writer picks up the cached buffer from the transport
+  batchWriter = makeBatchWriter();
+  EXPECT_FALSE(conn_.pendingWriteBatch_.buf);
+
+  // The write succeeds
+  EXPECT_CALL(sock_, write(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const auto& /* addr */,
+                           const std::unique_ptr<folly::IOBuf>& buf) {
+        return buf->computeChainDataLength();
+      }));
+  EXPECT_EQ(
+      batchWriter->write(sock_, folly::SocketAddress()), testString.size());
+
+  // Nothing is cached in the transport after the writer is reset and destroyed.
+  batchWriter->reset();
+  batchWriter = nullptr;
+  EXPECT_FALSE(conn_.pendingWriteBatch_.buf);
 }
 
 } // namespace testing

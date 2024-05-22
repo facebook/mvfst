@@ -3591,11 +3591,14 @@ void QuicTransportBase::maybeStopWriteLooperAndArmSocketWritableEvent() {
       !socket_->isWritableCallbackSet()) {
     // Check if all data has been written and we're not limited by flow
     // control/congestion control.
-    bool haveDataToWrite = shouldWriteData(*conn_) != WriteDataReason::NO_WRITE;
+    auto writeReason = shouldWriteData(*conn_);
+    bool haveBufferToRetry = writeReason == WriteDataReason::BUFFERED_WRITE;
+    bool haveNewDataToWrite =
+        (writeReason != WriteDataReason::NO_WRITE) && !haveBufferToRetry;
     bool connHasWriteWindow =
         (conn_->congestionController->getWritableBytes() > 0) &&
         (getSendConnFlowControlBytesAPI(*conn_) > 0);
-    if (haveDataToWrite && connHasWriteWindow) {
+    if (haveBufferToRetry || (haveNewDataToWrite && connHasWriteWindow)) {
       // Re-arm the write event and stop the write
       // looper.
       socket_->resumeWrite(this);

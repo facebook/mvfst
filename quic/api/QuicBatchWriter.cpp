@@ -86,6 +86,50 @@ bool SinglePacketInplaceBatchWriter::empty() const {
   return buf->length() == 0;
 }
 
+// SinglePacketBackpressureBatchWriter
+SinglePacketBackpressureBatchWriter::SinglePacketBackpressureBatchWriter(
+    QuicConnectionStateBase& conn)
+    : conn_(conn) {
+  // If we have a write to retry from a previous attempt, pick that up.
+  if (conn_.pendingWriteBatch_.buf) {
+    buf_.swap(conn_.pendingWriteBatch_.buf);
+    lastWriteSuccessful_ = false;
+  }
+}
+
+SinglePacketBackpressureBatchWriter::~SinglePacketBackpressureBatchWriter() {
+  if (buf_ && !buf_->empty()) {
+    conn_.pendingWriteBatch_.buf.swap(buf_);
+  }
+}
+
+void SinglePacketBackpressureBatchWriter::reset() {
+  // Only clear the buffer if it's been written successfully.
+  // Otherwise, retain it so it can be retried.
+  if (lastWriteSuccessful_) {
+    buf_.reset(nullptr);
+  }
+}
+
+bool SinglePacketBackpressureBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& buf,
+    size_t /* unused */,
+    const folly::SocketAddress& /*unused*/,
+    QuicAsyncUDPSocket* /*unused*/) {
+  buf_ = std::move(buf);
+
+  // needs to be flushed
+  return true;
+}
+
+ssize_t SinglePacketBackpressureBatchWriter::write(
+    QuicAsyncUDPSocket& sock,
+    const folly::SocketAddress& address) {
+  auto written = sock.write(address, buf_);
+  lastWriteSuccessful_ = written > 0;
+  return written;
+}
+
 // SendmmsgPacketBatchWriter
 SendmmsgPacketBatchWriter::SendmmsgPacketBatchWriter(size_t maxBufs)
     : maxBufs_(maxBufs) {

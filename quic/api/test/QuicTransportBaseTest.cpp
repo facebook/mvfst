@@ -334,6 +334,11 @@ class TestQuicTransport
         conn_->transportSettings.writeConnectionDataPacketsLimit);
   }
 
+  // This is to expose the protected pacedWriteDataToSocket() function
+  void pacedWriteDataToSocketThroughTransportBase() {
+    pacedWriteDataToSocket();
+  }
+
   bool hasWriteCipher() const {
     return conn_->oneRttWriteCipher != nullptr;
   }
@@ -4822,6 +4827,82 @@ TEST_P(QuicTransportImplTestBase, TestOnSocketWritable) {
   // Write looper is running.
   EXPECT_TRUE(transport->writeLooper()->isRunning());
 
+  transport.reset();
+}
+
+TEST_P(
+    QuicTransportImplTestBase,
+    TestBackpressureWriterArmsSocketWritableEvent) {
+  transport->setServerConnectionId();
+  auto transportSettings = transport->getTransportSettings();
+
+  transportSettings.useSockWritableEvents = true;
+  transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_NONE;
+  transportSettings.maxBatchSize = 1;
+  transportSettings.dataPathType = DataPathType::ChainedMemory;
+  transportSettings.enableWriterBackpressure = true;
+
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+
+  // Create a stream with outgoing data.
+  auto streamId = transport->createBidirectionalStream().value();
+  const auto& conn = transport->transportConn;
+  auto stream = transport->getStream(streamId);
+  std::string testString = "hello";
+  stream->writeBuffer.append(IOBuf::copyBuffer(testString));
+  conn->flowControlState.sumCurStreamBufferLen = testString.length();
+
+  // Insert streamId into the list.
+  conn->streamManager->addWritable(*stream);
+  conn->streamManager->updateWritableStreams(*stream);
+
+  // Mock arming the write callback
+  bool writeCallbackArmed = false;
+  EXPECT_CALL(*socketPtr, isWritableCallbackSet()).WillRepeatedly(Invoke([&]() {
+    return writeCallbackArmed;
+  }));
+  EXPECT_CALL(*socketPtr, resumeWrite(_))
+      .WillOnce(Invoke([&](QuicAsyncUDPSocket::WriteCallback*) {
+        writeCallbackArmed = true;
+        return folly::makeExpected<folly::AsyncSocketException>(folly::Unit());
+      }));
+
+  // Fail the first write loop.
+  EXPECT_CALL(*socketPtr, write(_, _))
+      .Times(2) // We attempt to flush the batch twice inside the write loop.
+                // Fail both.
+      .WillRepeatedly(Invoke([&](const auto& /* addr */,
+                                 const std::unique_ptr<folly::IOBuf>& /*buf*/) {
+        errno = EAGAIN;
+        return 0;
+      }));
+
+  transport->writeLooper()->run(true /* thisIteration */);
+  EXPECT_TRUE(transport->writeLooper()->isRunning());
+
+  // A write attempt will cache the failed write, stop the write looper, and arm
+  // the write callback.
+  transport->pacedWriteDataToSocketThroughTransportBase();
+
+  // The transport has cached the failed write buffer.
+  EXPECT_TRUE(conn->pendingWriteBatch_.buf);
+  // Write looper stopped.
+  EXPECT_FALSE(transport->writeLooper()->isRunning());
+  // Write callback armed.
+  EXPECT_TRUE(writeCallbackArmed);
+
+  // Reset will make one write attempt. We don't care what happens to it
+  EXPECT_CALL(*socketPtr, write(_, _))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](const auto& /* addr */,
+                                 const std::unique_ptr<folly::IOBuf>& buf) {
+        errno = 0;
+        return buf->computeChainDataLength();
+      }));
   transport.reset();
 }
 

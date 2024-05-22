@@ -677,6 +677,7 @@ enum class WriteDataReason {
   PATHCHALLENGE,
   PING,
   DATAGRAM,
+  BUFFERED_WRITE,
 };
 
 enum class NoWriteReason {

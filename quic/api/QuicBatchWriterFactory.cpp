@@ -32,11 +32,17 @@ BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t batchSize) {
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
+    bool enableBackpressure,
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
     bool gsoSupported) {
   return makeBatchWriterHelper(
-      batchingMode, batchSize, dataPathType, conn, gsoSupported);
+      batchingMode,
+      batchSize,
+      enableBackpressure,
+      dataPathType,
+      conn,
+      gsoSupported);
 }
 
 } // namespace quic
