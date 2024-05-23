@@ -27,7 +27,7 @@ Buf FizzCryptoFactory::makeInitialTrafficSecret(
       folly::range(initialSecret),
       label,
       folly::IOBuf::create(0),
-      fizz::openssl::Sha256::HashLen);
+      fizz::Sha256::HashLen);
   return trafficSecret;
 }
 

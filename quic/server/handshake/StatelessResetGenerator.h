@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <fizz/backend/openssl/crypto/Sha256.h>
+#include <fizz/crypto/Crypto.h>
 #include <fizz/crypto/Hkdf.h>
 #include <quic/codec/Types.h>
 
