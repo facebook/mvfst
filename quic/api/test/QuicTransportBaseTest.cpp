@@ -574,6 +574,14 @@ class TestQuicTransport
     QuicTransportBase::maybeStopWriteLooperAndArmSocketWritableEvent();
   }
 
+  void closeImpl(
+      folly::Optional<QuicError> error,
+      bool drainConnection = true,
+      bool sendCloseImmediately = true) {
+    QuicTransportBase::closeImpl(
+        std::move(error), drainConnection, sendCloseImmediately);
+  }
+
   void onSocketWritable() noexcept override {
     QuicTransportBase::onSocketWritable();
   }
@@ -4903,6 +4911,40 @@ TEST_P(
         errno = 0;
         return buf->computeChainDataLength();
       }));
+  transport.reset();
+}
+
+TEST_P(
+    QuicTransportImplTestBase,
+    TestMaybeStopWriteLooperAndArmSocketWritableEventOnClosedSocket) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.useSockWritableEvents = true;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+
+  // Create a stream with outgoing data.
+  auto streamId = transport->createBidirectionalStream().value();
+  const auto& conn = transport->transportConn;
+  auto stream = transport->getStream(streamId);
+  stream->writeBuffer.append(IOBuf::copyBuffer("hello"));
+
+  // Insert streamId into the list.
+  conn->streamManager->addWritable(*stream);
+  conn->streamManager->updateWritableStreams(*stream);
+
+  // Write looper is running.
+  transport->writeLooper()->run(true /* thisIteration */);
+  EXPECT_TRUE(transport->writeLooper()->isRunning());
+
+  // Close the socket.
+  transport->closeImpl((QuicError(
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+      std::string("writeSocketDataAndCatch()  error"))));
+  transport->maybeStopWriteLooperAndArmSocketWritableEvent();
+
   transport.reset();
 }
 

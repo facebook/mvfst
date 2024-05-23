@@ -3584,7 +3584,7 @@ void QuicTransportBase::onSocketWritable() noexcept {
 }
 
 void QuicTransportBase::maybeStopWriteLooperAndArmSocketWritableEvent() {
-  if (!socket_) {
+  if (!socket_ || (closeState_ == CloseState::CLOSED)) {
     return;
   }
   if (conn_->transportSettings.useSockWritableEvents &&
@@ -3595,9 +3595,14 @@ void QuicTransportBase::maybeStopWriteLooperAndArmSocketWritableEvent() {
     bool haveBufferToRetry = writeReason == WriteDataReason::BUFFERED_WRITE;
     bool haveNewDataToWrite =
         (writeReason != WriteDataReason::NO_WRITE) && !haveBufferToRetry;
+    bool haveCongestionControlWindow = true;
+    if (conn_->congestionController) {
+      haveCongestionControlWindow =
+          conn_->congestionController->getWritableBytes() > 0;
+    }
+    bool haveFlowControlWindow = getSendConnFlowControlBytesAPI(*conn_) > 0;
     bool connHasWriteWindow =
-        (conn_->congestionController->getWritableBytes() > 0) &&
-        (getSendConnFlowControlBytesAPI(*conn_) > 0);
+        haveCongestionControlWindow && haveFlowControlWindow;
     if (haveBufferToRetry || (haveNewDataToWrite && connHasWriteWindow)) {
       // Re-arm the write event and stop the write
       // looper.
