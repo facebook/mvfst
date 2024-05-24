@@ -240,7 +240,8 @@ OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
       *CHECK_NOTNULL(maybeInflightBytes.get_pointer()),
       CHECK_NOTNULL(maybeLossState.get_pointer())->get(),
       *CHECK_NOTNULL(maybeWriteCount.get_pointer()),
-      *CHECK_NOTNULL(maybeDetailsPerStream.get_pointer()),
+      OutstandingPacketWrapper::Metadata::DetailsPerStream(
+          *CHECK_NOTNULL(maybeDetailsPerStream.get_pointer())),
       *CHECK_NOTNULL(maybeTotalAppLimitedTimeUsecs.get_pointer())};
 }
 

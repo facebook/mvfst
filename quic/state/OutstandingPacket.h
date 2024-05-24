@@ -119,7 +119,7 @@ struct OutstandingPacketMetadata {
       uint64_t inflightBytesIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      DetailsPerStream detailsPerStream,
+      DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecsIn = 0us)
       : time(timeIn),
         encodedSize(encodedSizeIn),
@@ -203,7 +203,7 @@ struct OutstandingPacket {
       uint64_t inflightBytesIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      Metadata::DetailsPerStream detailsPerStream,
+      Metadata::DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecs = 0us)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
@@ -237,7 +237,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       uint64_t inflightBytesIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      Metadata::DetailsPerStream detailsPerStream,
+      Metadata::DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecs = 0us,
       std::function<void(const quic::OutstandingPacketWrapper&)>
           packetDestroyFn = nullptr)
