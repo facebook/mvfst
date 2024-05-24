@@ -258,11 +258,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
   OutstandingPacketWrapper(const OutstandingPacketWrapper& source) = delete;
   OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
 
-  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) noexcept
-      : OutstandingPacket(std::move(static_cast<OutstandingPacket&>(rhs))) {
-    packetDestroyFn_ = rhs.packetDestroyFn_;
-    rhs.packetDestroyFn_ = nullptr;
-  }
+  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) noexcept = default;
 
   OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
     // If this->packetDestroyFn_ is populated, then this OutstandingPacket is
@@ -273,8 +269,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       packetDestroyFn_(*this);
     }
 
-    packetDestroyFn_ = rhs.packetDestroyFn_;
-    rhs.packetDestroyFn_ = nullptr;
+    packetDestroyFn_ = std::move(rhs.packetDestroyFn_);
     OutstandingPacket::operator=(std::move(rhs));
     return *this;
   }

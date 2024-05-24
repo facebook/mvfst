@@ -887,7 +887,7 @@ void updateConnection(
       conn.writeCount,
       std::move(detailsPerStream),
       conn.appLimitedTracker.getTotalAppLimitedTime(),
-      packetDestroyFn);
+      std::move(packetDestroyFn));
 
   pkt.metadata.cmsgs = conn.socketCmsgsState.additionalCmsgs;
 
