@@ -286,7 +286,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
     auto destIter = CircularDequeIterator<T>(this, destIndex);
     allocateWithValueFrom(begin(), destIter);
     moveOrCopy(begin() + 1, pos, begin());
-    index = index == 0 ? index = lastGoodIndex : index - 1;
+    index = index == 0 ? lastGoodIndex : index - 1;
     storage_[index] = T(std::forward<Args>(args)...);
     begin_ = destIndex;
   }
