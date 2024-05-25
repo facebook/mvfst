@@ -130,6 +130,8 @@ class Cubic : public CongestionController {
   void onPacketLossInRecovery(const LossEvent& loss);
   void onPersistentCongestion();
 
+  void onEcnCongestionEvent(const AckEvent& ack);
+
   float pacingGain() const noexcept;
 
   void startHystartRttRound(TimePoint time) noexcept;
@@ -143,10 +145,6 @@ class Cubic : public CongestionController {
 
   QuicConnectionStateBase& conn_;
   uint64_t cwndBytes_;
-  // the value of cwndBytes_ at last loss event
-  folly::Optional<uint64_t> lossCwndBytes_;
-  // the value of ssthresh_ at the last loss event
-  folly::Optional<uint64_t> lossSsthresh_;
   uint64_t ssthresh_;
 
   struct HystartState {
@@ -203,6 +201,9 @@ class Cubic : public CongestionController {
   SteadyState steadyState_;
   RecoveryState recoveryState_;
   bool isCwndBlocked_{true};
+
+  TimePoint l4sCwndReducedTimestamp_;
+  uint64_t lastCECount_{0};
 };
 
 folly::StringPiece cubicStateToString(CubicStates state);

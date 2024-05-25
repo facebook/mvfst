@@ -8,6 +8,7 @@
 #include <quic/congestion_control/QuicCubic.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/state/QuicStateFunctions.h>
 
@@ -316,8 +317,6 @@ void Cubic::cubicReduction(TimePoint lossTime) noexcept {
         folly::to_integral(cwndBytes_ * steadyState_.lastMaxReductionFactor);
   }
   steadyState_.lastReductionTime = lossTime;
-  lossCwndBytes_ = cwndBytes_;
-  lossSsthresh_ = ssthresh_;
   cwndBytes_ = boundedCwnd(
       cwndBytes_ * steadyState_.reductionFactor,
       conn_.udpSendPacketLen,
@@ -417,7 +416,10 @@ CongestionControlType Cubic::type() const noexcept {
 
 float Cubic::pacingGain() const noexcept {
   double pacingGain = 1.0f;
-  if (state_ == CubicStates::Hystart) {
+  if (conn_.ecnState == ECNState::AttemptingL4S ||
+      conn_.ecnState == ECNState::ValidatedL4S) {
+    return pacingGain;
+  } else if (state_ == CubicStates::Hystart) {
     pacingGain = kCubicHystartPacingGain;
   } else if (state_ == CubicStates::FastRecovery) {
     pacingGain = kCubicRecoveryPacingGain;
@@ -444,6 +446,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
   }
   VLOG(15) << "Cubic Hystart increase cwnd=" << cwndBytes_ << ", by "
            << ack.ackedBytes;
+
   cwndBytes_ = boundedCwnd(
       cwndBytes_ + ack.ackedBytes,
       conn_.udpSendPacketLen,
@@ -485,6 +488,10 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       }
     }
   };
+
+  if (ack.ecnCECount > lastCECount_) {
+    onEcnCongestionEvent(ack);
+  }
 
   if (cwndBytes_ >= ssthresh_) {
     exitReason = Cubic::ExitReason::SSTHRESH;
@@ -582,6 +589,14 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     }
     return;
   }
+
+  // If we have new CE marks echoed, let the L4S handler update the cwnd first.
+  if (ack.ecnCECount > lastCECount_) {
+    onEcnCongestionEvent(ack);
+  }
+
+  // From here on, the cwnd can only increase
+
   if (conn_.transportSettings.ccaConfig.onlyGrowCwndWhenLimited &&
       !isCwndBlocked_) {
     return;
@@ -690,6 +705,22 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
           kPacketAckedInRecovery,
           cubicStateToString(state_).str());
     }
+  }
+}
+
+void Cubic::onEcnCongestionEvent(const AckEvent& ack) {
+  if (conn_.ecnState == ECNState::ValidatedL4S && conn_.ecnL4sTracker &&
+      conn_.ecnL4sTracker->getL4sWeight() >
+          conn_.transportSettings.ccaConfig.l4sCETarget) {
+    if (ack.largestNewlyAckedPacketSentTime > l4sCwndReducedTimestamp_) {
+      CHECK(conn_.ecnL4sTracker);
+      auto distanceToTarget = conn_.ecnL4sTracker->getL4sWeight() -
+          conn_.transportSettings.ccaConfig.l4sCETarget;
+      ssthresh_ = (1.0 - distanceToTarget / 2) * cwndBytes_;
+      cubicReduction(ack.ackTime);
+      l4sCwndReducedTimestamp_ = ack.ackTime;
+    }
+    lastCECount_ = ack.ecnCECount;
   }
 }
 

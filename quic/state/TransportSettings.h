@@ -94,6 +94,12 @@ struct CongestionControlConfig {
   // Use a different pacing gain during Startup.
   // If value < 0, use the default pacing gain.
   float overrideStartupPacingGain{-1.0};
+
+  // Used by: Cubic
+  // The target fraction of packets to be marked with CE per-RTT when l4s is
+  // used This helps accommodate minor packet bursts that can be caused by pacer
+  // bursts
+  float l4sCETarget{0.02f};
 };
 
 struct DatagramConfig {

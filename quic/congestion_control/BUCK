@@ -121,6 +121,7 @@ mvfst_cpp_library(
         "QuicCubic.h",
     ],
     deps = [
+        ":ecn_l4s_tracker",
         "//folly:chrono",
         "//quic/logging:qlogger_constants",
         "//quic/state:state_functions",
