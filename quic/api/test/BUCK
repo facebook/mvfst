@@ -52,6 +52,7 @@ cpp_unittest(
         "//quic/common/events:highres_quic_timer",
         "//quic/common/test:test_utils",
         "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/congestion_control:ecn_l4s_tracker",
         "//quic/congestion_control:static_cwnd_congestion_controller",
         "//quic/dsr:types",
         "//quic/dsr/test:mocks",

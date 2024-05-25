@@ -13,6 +13,7 @@
 #include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/congestion_control/Pacer.h>
 #include <quic/congestion_control/TokenlessPacer.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -4054,6 +4055,10 @@ void QuicTransportBase::validateECNState() {
         markedPacketCount <= maxExpectedMarkedPacketsCount &&
         conn_->ackStates.appDataAckState.ecnECT0CountEchoed == 0) {
       if (conn_->ecnState != ECNState::ValidatedL4S) {
+        if (!conn_->ecnL4sTracker) {
+          conn_->ecnL4sTracker = std::make_shared<EcnL4sTracker>(*conn_);
+          addPacketProcessor(conn_->ecnL4sTracker);
+        }
         conn_->ecnState = ECNState::ValidatedL4S;
         VLOG(4) << fmt::format(
             "L4S validation successful. Marked {} of {} expected",
@@ -4074,6 +4079,15 @@ void QuicTransportBase::validateECNState() {
     CHECK(socket_ && socket_->isBound());
     socket_->setTosOrTrafficClass(conn_->socketTos.value);
     VLOG(4) << "ECN validation failed. Disabling ECN";
+    if (conn_->ecnL4sTracker) {
+      conn_->packetProcessors.erase(
+          std::remove(
+              conn_->packetProcessors.begin(),
+              conn_->packetProcessors.end(),
+              conn_->ecnL4sTracker),
+          conn_->packetProcessors.end());
+      conn_->ecnL4sTracker.reset();
+    }
   }
 }
 

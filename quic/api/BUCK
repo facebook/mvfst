@@ -46,6 +46,7 @@ mvfst_cpp_library(
         "//folly:scope_guard",
         "//quic/common:socket_util",
         "//quic/common:time_util",
+        "//quic/congestion_control:ecn_l4s_tracker",
         "//quic/congestion_control:pacer",
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/logging:qlogger_constants",

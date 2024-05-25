@@ -19,6 +19,7 @@
 #include <quic/common/events/HighResQuicTimer.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
+#include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/dsr/Types.h>
 #include <quic/dsr/test/Mocks.h>
@@ -5380,6 +5381,7 @@ TEST_F(QuicTransportTest, ValidateECNFailure) {
   // ==== From valdiated to failed ===========
   {
     conn.ecnState = ECNState::ValidatedECN;
+    conn.ecnL4sTracker = std::make_shared<EcnL4sTracker>(conn);
     conn.socketTos.fields.ecn = kEcnECT0;
     // Marked less than expected.
     // Expected 10. 9 ECT0 + 0 CE
@@ -5392,6 +5394,7 @@ TEST_F(QuicTransportTest, ValidateECNFailure) {
     transport_->validateECN();
     EXPECT_EQ(conn.ecnState, ECNState::FailedValidation);
     EXPECT_EQ(conn.socketTos.fields.ecn, 0);
+    EXPECT_FALSE(conn.ecnL4sTracker);
   }
 
   {
@@ -5429,6 +5432,7 @@ TEST_F(QuicTransportTest, ValidateECNFailure) {
 
 TEST_F(QuicTransportTest, ValidateL4SSuccess) {
   auto& conn = transport_->getConnectionState();
+  ASSERT_FALSE(conn.ecnL4sTracker);
 
   {
     conn.ecnState = ECNState::AttemptingL4S;
@@ -5453,6 +5457,7 @@ TEST_F(QuicTransportTest, ValidateL4SSuccess) {
     conn.ackStates.appDataAckState.ecnCECountEchoed = 1;
     transport_->validateECN();
     EXPECT_EQ(conn.ecnState, ECNState::ValidatedL4S);
+    EXPECT_TRUE(conn.ecnL4sTracker);
   }
 
   {
