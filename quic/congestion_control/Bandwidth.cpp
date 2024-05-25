@@ -65,6 +65,10 @@ bool operator==(const Bandwidth& lhs, const Bandwidth& rhs) {
   return (lhs.units * rhs.interval) == (rhs.units * lhs.interval);
 }
 
+bool operator!=(const Bandwidth& lhs, const Bandwidth& rhs) {
+  return !(lhs == rhs);
+}
+
 std::ostream& operator<<(std::ostream& os, const Bandwidth& bandwidth) {
   os << bandwidth.describe();
   return os;

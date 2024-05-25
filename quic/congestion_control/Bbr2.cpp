@@ -758,6 +758,7 @@ void Bbr2CongestionController::boundCwndForProbeRTT() {
 }
 
 void Bbr2CongestionController::boundBwForModel() {
+  Bandwidth previousBw = bandwidth_;
   bandwidth_ = maxBwFilter_.GetBest();
   if (state_ != State::Startup) {
     if (bandwidthLo_.has_value() &&
@@ -769,7 +770,7 @@ void Bbr2CongestionController::boundBwForModel() {
       bandwidth_ = std::min(bandwidth_, *bandwidthHi_);
     }
   }
-  if (conn_.qLogger) {
+  if (conn_.qLogger && previousBw != bandwidth_) {
     conn_.qLogger->addBandwidthEstUpdate(bandwidth_.units, bandwidth_.interval);
   }
 }

@@ -102,6 +102,7 @@ bool operator<=(const Bandwidth& lhs, const Bandwidth& rhs);
 bool operator>(const Bandwidth& lhs, const Bandwidth& rhs);
 bool operator>=(const Bandwidth& lhs, const Bandwidth& rhs);
 bool operator==(const Bandwidth& lhs, const Bandwidth& rhs);
+bool operator!=(const Bandwidth& lhs, const Bandwidth& rhs);
 
 template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value>>
 Bandwidth operator*(T t, const Bandwidth& bandwidth) noexcept;
