@@ -215,3 +215,14 @@ cpp_unittest(
         "//quic/state/test:mocks",
     ],
 )
+
+cpp_unittest(
+    name = "EcnL4sTrackerTest",
+    srcs = [
+        "EcnL4sTrackerTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/congestion_control:ecn_l4s_tracker",
+    ],
+)

@@ -346,3 +346,20 @@ mvfst_cpp_library(
         "//folly:optional",
     ],
 )
+
+mvfst_cpp_library(
+    name = "ecn_l4s_tracker",
+    srcs = [
+        "EcnL4sTracker.cpp",
+    ],
+    headers = [
+        "EcnL4sTracker.h",
+    ],
+    deps = [
+        "//quic:exception",
+    ],
+    exported_deps = [
+        ":packet_processor",
+        "//quic/state:quic_state_machine",
+    ],
+)
