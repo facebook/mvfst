@@ -349,13 +349,14 @@ void QuicTransportBase::closeImpl(
                         << *this;
   if (errorCode) {
     conn_->localConnectionError = errorCode;
-    std::string errorStr = conn_->localConnectionError->message;
-    std::string errorCodeStr = errorCode->message;
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionClose(
-          errorStr, errorCodeStr, drainConnection, sendCloseImmediately);
+          conn_->localConnectionError->message,
+          errorCode->message,
+          drainConnection,
+          sendCloseImmediately);
     }
-  } else {
+  } else if (conn_->qLogger) {
     auto reason = folly::to<std::string>(
         "Server: ",
         kNoError,
@@ -363,10 +364,8 @@ void QuicTransportBase::closeImpl(
         isReset,
         ", Peer: isAbandon: ",
         isAbandon);
-    if (conn_->qLogger) {
-      conn_->qLogger->addConnectionClose(
-          kNoError, reason, drainConnection, sendCloseImmediately);
-    }
+    conn_->qLogger->addConnectionClose(
+        kNoError, std::move(reason), drainConnection, sendCloseImmediately);
   }
   cancelLossTimeout();
   cancelTimeout(&ackTimeout_);
