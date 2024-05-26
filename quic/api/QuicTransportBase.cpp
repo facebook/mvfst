@@ -409,9 +409,9 @@ void QuicTransportBase::closeImpl(
     // This connection was open, update the stats for close.
     QUIC_STATS(conn_->statsCallback, onConnectionClose, cancelCode.code);
 
-    processConnectionCallbacks(cancelCode);
+    processConnectionCallbacks(std::move(cancelCode));
   } else {
-    processConnectionSetupCallbacks(cancelCode);
+    processConnectionSetupCallbacks(std::move(cancelCode));
   }
 
   // can't invoke connection callbacks any more.
@@ -489,17 +489,15 @@ bool QuicTransportBase::processCancelCode(const QuicError& cancelCode) {
 }
 
 void QuicTransportBase::processConnectionSetupCallbacks(
-    const QuicError& cancelCode) {
+    QuicError&& cancelCode) {
   // connSetupCallback_ could be null if start() was never
   // invoked and the transport was destroyed or if the app initiated close.
   if (connSetupCallback_) {
-    connSetupCallback_->onConnectionSetupError(
-        QuicError(cancelCode.code, cancelCode.message));
+    connSetupCallback_->onConnectionSetupError(std::move(cancelCode));
   }
 }
 
-void QuicTransportBase::processConnectionCallbacks(
-    const QuicError& cancelCode) {
+void QuicTransportBase::processConnectionCallbacks(QuicError&& cancelCode) {
   // connCallback_ could be null if start() was never
   // invoked and the transport was destroyed or if the app initiated close.
   if (!connCallback_) {
@@ -514,7 +512,7 @@ void QuicTransportBase::processConnectionCallbacks(
   if (bool noError = processCancelCode(cancelCode)) {
     connCallback_->onConnectionEnd();
   } else {
-    connCallback_->onConnectionError(cancelCode);
+    connCallback_->onConnectionError(std::move(cancelCode));
   }
 }
 

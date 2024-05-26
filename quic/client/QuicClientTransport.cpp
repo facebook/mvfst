@@ -1081,9 +1081,10 @@ void QuicClientTransport::errMessage(
     auto errStr = folly::errnoStr(serr->ee_errno);
     if (!happyEyeballsState.shouldWriteToFirstSocket &&
         !happyEyeballsState.shouldWriteToSecondSocket) {
-      runOnEvbAsync([errString = std::move(errStr)](auto self) {
-        auto quicError =
-            QuicError(QuicErrorCode(LocalErrorCode::CONNECT_FAILED), errString);
+      runOnEvbAsync([errString = std::move(errStr)](auto self) mutable {
+        auto quicError = QuicError(
+            QuicErrorCode(LocalErrorCode::CONNECT_FAILED),
+            std::move(errString));
         auto clientPtr = static_cast<QuicClientTransport*>(self.get());
         clientPtr->closeImpl(std::move(quicError), false, false);
       });

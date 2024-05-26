@@ -26,8 +26,8 @@ namespace quic {
 DECLARE_VARIANT_TYPE(QuicErrorCode, QUIC_ERROR_CODE)
 
 struct QuicError {
-  QuicError(QuicErrorCode codeIn, const std::string& messageIn)
-      : code(codeIn), message(messageIn) {}
+  QuicError(QuicErrorCode codeIn, std::string&& messageIn)
+      : code(codeIn), message(std::move(messageIn)) {}
   explicit QuicError(QuicErrorCode codeIn) : code(codeIn) {}
   bool operator==(const QuicError& other) const {
     return code == other.code && message == other.message;

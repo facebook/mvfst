@@ -868,8 +868,8 @@ class QuicTransportBase : public QuicSocket,
   }
 
   bool processCancelCode(const QuicError& cancelCode);
-  void processConnectionSetupCallbacks(const QuicError& cancelCode);
-  void processConnectionCallbacks(const QuicError& cancelCode);
+  void processConnectionSetupCallbacks(QuicError&& cancelCode);
+  void processConnectionCallbacks(QuicError&& cancelCode);
 
   /**
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
