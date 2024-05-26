@@ -1223,9 +1223,7 @@ enum class ECNState : uint8_t {
  */
 HeaderForm getHeaderForm(uint8_t headerValue);
 
-std::string toString(LongHeader::Types type);
-
-std::string toString(QuicErrorCode code);
+std::string_view toString(LongHeader::Types type);
 
 inline std::ostream& operator<<(
     std::ostream& os,
@@ -1248,18 +1246,18 @@ inline std::ostream& operator<<(std::ostream& os, const PacketHeader& header) {
   return os;
 }
 
-std::string toString(PacketNumberSpace pnSpace);
+std::string_view toString(PacketNumberSpace pnSpace);
 
-std::string toString(FrameType frame);
+std::string_view toString(FrameType frame);
 
-std::string toString(QuicVersion version);
+std::string_view toString(QuicVersion version);
 
 inline std::ostream& operator<<(std::ostream& os, PacketNumberSpace pnSpace) {
   return os << toString(pnSpace);
 }
 
-std::string toString(ProtectionType protectionType);
+std::string_view toString(ProtectionType protectionType);
 
-std::string toString(TokenType type);
+std::string_view toString(TokenType type);
 
 } // namespace quic

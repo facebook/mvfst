@@ -333,15 +333,16 @@ Buf QuicAddrValidationToken::getPlaintextToken() const {
 }
 
 Buf RetryToken::genAeadAssocData() const {
-  return folly::IOBuf::copyBuffer(
-      toString(tokenType) + originalDstConnId.hex() + clientIp.str());
+  return folly::IOBuf::copyBuffer(folly::to<std::string>(
+      toString(tokenType), originalDstConnId.hex() + clientIp.str()));
 }
 
 Buf NewToken::genAeadAssocData() const {
-  return folly::IOBuf::copyBuffer(toString(tokenType) + clientIp.str());
+  return folly::IOBuf::copyBuffer(
+      folly::to<std::string>(toString(tokenType), clientIp.str()));
 }
 
-std::string toString(PacketNumberSpace pnSpace) {
+std::string_view toString(PacketNumberSpace pnSpace) {
   switch (pnSpace) {
     case PacketNumberSpace::Initial:
       return "InitialSpace";
@@ -354,7 +355,7 @@ std::string toString(PacketNumberSpace pnSpace) {
   folly::assume_unreachable();
 }
 
-std::string toString(ProtectionType protectionType) {
+std::string_view toString(ProtectionType protectionType) {
   switch (protectionType) {
     case ProtectionType::Initial:
       return "Initial";
@@ -371,7 +372,7 @@ std::string toString(ProtectionType protectionType) {
   folly::assume_unreachable();
 }
 
-std::string toString(FrameType frame) {
+std::string_view toString(FrameType frame) {
   switch (frame) {
     case FrameType::PADDING:
       return "PADDING";
@@ -453,7 +454,7 @@ std::string toString(FrameType frame) {
   return "UNKNOWN";
 }
 
-std::string toString(QuicVersion version) {
+std::string_view toString(QuicVersion version) {
   switch (version) {
     case QuicVersion::VERSION_NEGOTIATION:
       return "VERSION_NEGOTIATION";
@@ -480,7 +481,7 @@ std::string toString(QuicVersion version) {
   return "UNKNOWN";
 }
 
-std::string toString(LongHeader::Types type) {
+std::string_view toString(LongHeader::Types type) {
   switch (type) {
     case LongHeader::Types::Initial:
       return "INITIAL";
@@ -495,7 +496,7 @@ std::string toString(LongHeader::Types type) {
   return "UNKNOWN";
 }
 
-std::string toString(TokenType type) {
+std::string_view toString(TokenType type) {
   switch (type) {
     case TokenType::RetryToken:
       return "RetryToken";
