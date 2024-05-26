@@ -17,7 +17,7 @@ void populateAckFrequencyConfig(
         CongestionControlConfig::AckFrequencyConfig();
   }
   // Parse known boolean fields
-  const std::array<std::pair<std::string, bool&>, 1> boolFields = {{
+  const std::array<std::pair<std::string_view, bool&>, 1> boolFields = {{
       {"useSmallThresholdDuringStartup",
        dstCcaConfig.ackFrequencyConfig->useSmallThresholdDuringStartup},
   }};
@@ -29,7 +29,7 @@ void populateAckFrequencyConfig(
   }
 
   // Parse known uint64 fields
-  const std::array<std::pair<std::string, uint64_t&>, 2> uint64Fields = {{
+  const std::array<std::pair<std::string_view, uint64_t&>, 2> uint64Fields = {{
       {"ackElicitingThreshold",
        dstCcaConfig.ackFrequencyConfig->ackElicitingThreshold},
       {"reorderingThreshold",
@@ -43,7 +43,7 @@ void populateAckFrequencyConfig(
   }
 
   // Parse known uint32 fields
-  const std::array<std::pair<std::string, uint32_t&>, 1> uint32Fields = {{
+  const std::array<std::pair<std::string_view, uint32_t&>, 1> uint32Fields = {{
       {"minRttDivisor", dstCcaConfig.ackFrequencyConfig->minRttDivisor},
   }};
 
@@ -64,7 +64,7 @@ quic::CongestionControlConfig parseCongestionControlConfig(
   quic::CongestionControlConfig ccaConfig;
 
   // Parse known boolean fields
-  const std::array<std::pair<std::string, bool&>, 11> boolFields = {
+  const std::array<std::pair<std::string_view, bool&>, 11> boolFields = {
       {{"conservativeRecovery", ccaConfig.conservativeRecovery},
        {"largeProbeRttCwnd", ccaConfig.largeProbeRttCwnd},
        {"enableAckAggregationInStartup",
@@ -85,7 +85,7 @@ quic::CongestionControlConfig parseCongestionControlConfig(
   }
 
   // Parse optional float fields
-  const std::array<std::pair<std::string, float&>, 3> floatFields = {
+  const std::array<std::pair<std::string_view, float&>, 3> floatFields = {
       {{"overrideCruisePacingGain", ccaConfig.overrideCruisePacingGain},
        {"overrideCruiseCwndGain", ccaConfig.overrideCruiseCwndGain},
        {"overrideStartupPacingGain", ccaConfig.overrideStartupPacingGain}}};
