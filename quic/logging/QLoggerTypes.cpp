@@ -530,7 +530,7 @@ QLogAppLimitedUpdateEvent::QLogAppLimitedUpdateEvent(
 folly::dynamic QLogAppLimitedUpdateEvent::toDynamic() const {
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "APP_LIMITED_UPDATE",
+      "app_limited_update",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
   data["app_limited"] = limited ? kAppLimited : kAppUnlimited;
@@ -550,7 +550,7 @@ QLogBandwidthEstUpdateEvent::QLogBandwidthEstUpdateEvent(
 folly::dynamic QLogBandwidthEstUpdateEvent::toDynamic() const {
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "BANDIWDTH_EST_UPDATE",
+      "bandwidth_est_update",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
   data["bandwidth_bytes"] = bytes;
