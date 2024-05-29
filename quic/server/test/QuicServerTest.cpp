@@ -515,7 +515,13 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
 }
 
 TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
-  worker_->setUnfinishedHandshakeLimit([]() { return 2; });
+  // When running this test with other tests, the global unfinished handshake
+  // count is affected. We need to offset the count appropriately.
+  auto currentUnfinishedHandshakeCount = worker_->getUnfinishedHandshakeCount();
+
+  worker_->setUnfinishedHandshakeLimit([currentUnfinishedHandshakeCount]() {
+    return currentUnfinishedHandshakeCount + 2;
+  });
   EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
 
   NiceMock<MockConnectionSetupCallback> connSetupCb1;
