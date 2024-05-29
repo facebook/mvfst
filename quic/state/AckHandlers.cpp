@@ -82,6 +82,8 @@ void removeOutstandingsForAck(
       if (currentPacketNum < ackBlockIt->startPacket) {
         break;
       }
+      CHECK(rPacketIt->metadata.scheduledForDestruction);
+      CHECK_GT(conn.outstandings.scheduledForDestructionCount, 0);
       conn.outstandings.scheduledForDestructionCount--;
       rPacketIt++;
     }
