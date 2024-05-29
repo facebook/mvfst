@@ -347,6 +347,9 @@ class QuicClientTransport
   // Callback function to invoke when the client receives a new token
   std::function<void(std::string)> newTokenCallback_;
 
+  // Output buf/accessor to be used for continuous memory writes.
+  std::unique_ptr<BufAccessor> bufAccessor_;
+
   // Container of observers for the socket / transport.
   //
   // This member MUST be last in the list of members to ensure it is destroyed
@@ -354,7 +357,5 @@ class QuicClientTransport
   // can inspect any socket / transport state available through public methods
   // when destruction of the transport begins.
   const WrappedSocketObserverContainer wrappedObserverContainer_;
-  // Output buf/accessor to be used for continuous memory writes.
-  std::unique_ptr<BufAccessor> bufAccessor_;
 };
 } // namespace quic
