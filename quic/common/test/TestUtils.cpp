@@ -131,7 +131,7 @@ std::shared_ptr<fizz::client::FizzClientContext> createClientCtx() {
 std::shared_ptr<fizz::server::FizzServerContext> createServerCtx() {
   auto cert = readCert();
   auto certManager = std::make_unique<fizz::server::CertManager>();
-  certManager->addCert(std::move(cert), true);
+  certManager->addCertAndSetDefault(std::move(cert));
   auto serverCtx = std::make_shared<fizz::server::FizzServerContext>();
   serverCtx->setFactory(std::make_shared<QuicFizzFactory>());
   serverCtx->setCertManager(std::move(certManager));
@@ -248,7 +248,7 @@ QuicCachedPsk setupZeroRttOnClientCtx(
 void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx) {
   auto cert = readCert();
   auto certManager = std::make_unique<fizz::server::CertManager>();
-  certManager->addCert(std::move(cert), true);
+  certManager->addCertAndSetDefault(std::move(cert));
   ctx.setCertManager(std::move(certManager));
 }
 
