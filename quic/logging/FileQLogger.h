@@ -112,6 +112,8 @@ class FileQLogger : public BaseQLogger {
       quic::StreamId streamId,
       uint8_t urgency,
       bool incremental) override;
+  void addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe)
+      override;
 
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;

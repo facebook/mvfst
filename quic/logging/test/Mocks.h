@@ -68,5 +68,9 @@ class MockQLogger : public QLogger {
   MOCK_METHOD(void, setDcid, (folly::Optional<ConnectionId>));
   MOCK_METHOD(void, setScid, (folly::Optional<ConnectionId>));
   MOCK_METHOD(void, addPriorityUpdate, (quic::StreamId, uint8_t, bool));
+  MOCK_METHOD(
+      void,
+      addL4sWeightUpdate,
+      (double l4sWeight, uint32_t newEct1, uint32_t newCe));
 };
 } // namespace quic::test

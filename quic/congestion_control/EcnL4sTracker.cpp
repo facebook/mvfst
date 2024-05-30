@@ -53,6 +53,11 @@ void EcnL4sTracker::onPacketAck(const AckEvent* ackEvent) {
       }
       auto frac = newCEEchoed / (newCEEchoed + newECT1Echoed);
       l4sWeight_ += kL4sWeightEwmaGain * (frac - l4sWeight_);
+
+      if (conn_.qLogger && newCEEchoed > 0) {
+        conn_.qLogger->addL4sWeightUpdate(
+            l4sWeight_, newECT1Echoed, newCEEchoed);
+      }
     }
 
     lastUpdateTime_ = ackEvent->ackTime;

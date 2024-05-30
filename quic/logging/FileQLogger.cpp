@@ -499,6 +499,16 @@ void FileQLogger::addPriorityUpdate(
       streamId, urgency, incremental, refTime));
 }
 
+void FileQLogger::addL4sWeightUpdate(
+    double l4sWeight,
+    uint32_t newEct1,
+    uint32_t newCe) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now().time_since_epoch());
+  handleEvent(std::make_unique<quic::QLogL4sWeightUpdateEvent>(
+      l4sWeight, newEct1, newCe, refTime));
+}
+
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   if (streaming_) {
     return;

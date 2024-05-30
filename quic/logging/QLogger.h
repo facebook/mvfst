@@ -122,6 +122,8 @@ class QLogger {
       quic::StreamId streamId,
       uint8_t urgency,
       bool incremental) = 0;
+  virtual void
+  addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe) = 0;
 
   virtual void setDcid(folly::Optional<ConnectionId> connID) = 0;
   virtual void setScid(folly::Optional<ConnectionId> connID) = 0;
