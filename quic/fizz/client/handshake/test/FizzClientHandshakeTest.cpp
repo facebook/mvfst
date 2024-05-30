@@ -699,8 +699,8 @@ TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   EXPECT_CALL(*echPolicy, getConfig(_))
       .WillOnce(Return(std::vector<fizz::ech::ECHConfig>{getECHConfig()}));
 
-  auto kex = std::make_unique<
-      fizz::openssl::OpenSSLECKeyExchange<fizz::openssl::P256>>();
+  auto kex = fizz::openssl::makeOpenSSLECKeyExchange<fizz::P256>();
+
   kex->setPrivateKey(fizz::test::getPrivateKey(fizz::test::kP256Key));
   echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>();
   echDecrypter->addDecryptionConfig(
