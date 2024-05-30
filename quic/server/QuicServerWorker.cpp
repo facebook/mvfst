@@ -13,6 +13,7 @@
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
 #include <atomic>
+#include <chrono>
 #include <memory>
 
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
@@ -309,14 +310,19 @@ void QuicServerWorker::onDataAvailable(
   auto originalPacketReceiveTime = packetReceiveTime;
   if (params.ts) {
     // This is the software system time from the datagram.
-    auto packetNowDuration =
+    auto packetRxEpochUs =
         folly::to<std::chrono::microseconds>(params.ts.value()[0]);
-    auto wallNowDuration =
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::system_clock::now().time_since_epoch());
-    auto durationSincePacketNow = wallNowDuration - packetNowDuration;
-    if (packetNowDuration != 0us && durationSincePacketNow > 0us) {
-      packetReceiveTime -= durationSincePacketNow;
+    if (packetRxEpochUs != 0us) {
+      auto now = std::chrono::system_clock::now();
+      auto nowEpochUs = std::chrono::duration_cast<std::chrono::microseconds>(
+          now.time_since_epoch());
+      auto rxDelayUs = nowEpochUs - packetRxEpochUs;
+      if (rxDelayUs >= 0us) {
+        packetReceiveTime -= rxDelayUs;
+        QUIC_STATS(statsCallback_, onRxDelaySample, rxDelayUs.count());
+      } else {
+        VLOG(10) << "Negative rx delay: " << rxDelayUs.count() << "us";
+      }
     }
   }
   // System time can move backwards, so we want to make sure that the receive

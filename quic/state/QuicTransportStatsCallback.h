@@ -41,6 +41,8 @@ class QuicTransportStatsCallback {
   // packet level metrics
   virtual void onPacketReceived() = 0;
 
+  virtual void onRxDelaySample(uint64_t rxDelay) = 0;
+
   virtual void onPacketsReceived(uint32_t n) {
     for (uint32_t i = 0; i < n; i++) {
       onPacketReceived();

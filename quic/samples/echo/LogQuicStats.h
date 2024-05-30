@@ -25,6 +25,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
+  void onRxDelaySample(uint64_t /* rxDelay */) override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
   void onDuplicatedPacketReceived() override {
     VLOG(2) << prefix_ << __func__;
   }

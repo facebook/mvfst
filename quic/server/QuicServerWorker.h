@@ -574,6 +574,10 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       const folly::SocketAddress& client,
       LongHeaderInvariant& invariant);
 
+  void recordRxDelay(
+      const std::chrono::system_clock::time_point& currentTime,
+      const timespec& socketRxTime);
+
   /**
    * Helper method to extract and log routing info from the given (dest) connId
    */
