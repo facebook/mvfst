@@ -125,7 +125,7 @@ void BbrBandwidthSampler::onPacketAcked(
     }
     Bandwidth measuredBandwidth = sendRate > ackRate ? sendRate : ackRate;
 
-    // This is a valid sample if the packet was sent while app-limited or
+    // This is a valid sample if the packet was sent while not app-limited or
     // it's higher than the current sample.
     if (!ackedPacket.isAppLimited || measuredBandwidth > latestSample_) {
       latestSample_ = measuredBandwidth;
