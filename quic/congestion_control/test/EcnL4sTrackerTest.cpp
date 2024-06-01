@@ -8,6 +8,8 @@
 #include <quic/congestion_control/EcnL4sTracker.h>
 
 #include <folly/portability/GTest.h>
+#include <quic/api/test/MockQuicSocket.h>
+#include <quic/api/test/Mocks.h>
 
 using namespace testing;
 
@@ -229,6 +231,53 @@ TEST_F(EcnL4sTrackerTest, NoUpdateWithNoNewMarks) {
         l4sTracker_->getL4sWeight(),
         1.0 + kL4sWeightEwmaGain * (0.1 - 1.0)); // 0.1 is 1 CE/(9 ECT1 + 1 CE)
   }
+}
+
+TEST_F(EcnL4sTrackerTest, NewMarksNotifyObserver) {
+  MockQuicSocket mockSocket;
+  const auto observerContainer =
+      std::make_shared<SocketObserverContainer>(&mockSocket);
+  conn_->observerContainer = observerContainer;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::l4sWeightUpdatedEvents);
+  auto observer = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  observerContainer->addObserver(observer.get());
+
+  conn_->ecnState = ECNState::ValidatedL4S;
+  conn_->lossState.srtt = 10ms;
+  auto nextAckTime = Clock::now() + 10ms;
+  {
+    // No CE marks seen in first rtt. The weight should be 0.
+    // This is under rttVirtMin so it won't trigger weight calculation.
+    auto ack = buildAckEvent(nextAckTime, 0 /*ECT0*/, 10 /*ECT1*/, 0 /*CE*/);
+    ack.rttSample = 10ms;
+
+    l4sTracker_->onPacketAck(&ack);
+    EXPECT_EQ(l4sTracker_->getL4sWeight(), 0.0);
+  }
+
+  {
+    // First CE mark is after one rtt later. The weight should initialized
+    // with 1.0 and updated in ewma using fraction of marked packets.
+    auto unscaledWeight = 1.0 +
+        kL4sWeightEwmaGain * (0.05 - 1.0); // 0.05 is 1 CE/(19 ECT1 + 1 CE)
+    EXPECT_CALL(*observer, l4sWeightUpdated(_, _))
+        .WillOnce(Invoke(
+            [&](auto, const MockLegacyObserver::L4sWeightUpdateEvent& event) {
+              EXPECT_EQ(event.l4sWeight, unscaledWeight);
+              EXPECT_EQ(event.newECT1Echoed, 19);
+              EXPECT_EQ(event.newCEEchoed, 1);
+            }));
+
+    nextAckTime += 10ms;
+    auto ack = buildAckEvent(nextAckTime, 0 /*ECT0*/, 19 /*ECT1*/, 1 /*CE*/);
+    ack.rttSample = 10ms;
+    l4sTracker_->onPacketAck(&ack);
+    auto scaledWeight = unscaledWeight * conn_->lossState.srtt / kRttVirtMin;
+    EXPECT_EQ(l4sTracker_->getL4sWeight(), scaledWeight);
+  }
+
+  observerContainer->removeObserver(observer.get());
 }
 
 } // namespace quic::test

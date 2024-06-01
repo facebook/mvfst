@@ -39,6 +39,7 @@ class SocketObserverInterface {
     streamEvents = 9,
     acksProcessedEvents = 10,
     packetsReceivedEvents = 11,
+    l4sWeightUpdatedEvents = 12,
   };
   virtual ~SocketObserverInterface() = default;
 
@@ -418,6 +419,19 @@ class SocketObserverInterface {
   using StreamOpenEvent = StreamEvent;
   using StreamCloseEvent = StreamEvent;
 
+  struct L4sWeightUpdateEvent {
+    explicit L4sWeightUpdateEvent(
+        double l4sWeightIn,
+        uint32_t newECT1EchoedIn,
+        uint32_t newCEEchoedIn)
+        : l4sWeight(l4sWeightIn),
+          newECT1Echoed(newECT1EchoedIn),
+          newCEEchoed(newCEEchoedIn) {}
+    double l4sWeight;
+    uint32_t newECT1Echoed;
+    uint32_t newCEEchoed;
+  };
+
   /**
    * Events.
    */
@@ -585,6 +599,17 @@ class SocketObserverInterface {
   virtual void streamClosed(
       QuicSocket*, /* socket */
       const StreamCloseEvent& /* event */) {}
+
+  /**
+   * l4sWeightUpdated() is invoked when l4s in enabled and new CE markings are
+   * echoed by the peer
+   *
+   * @param socket   Socket associated with the event
+   * @param event    Event with the new weight and received ECN marks
+   */
+  virtual void l4sWeightUpdated(
+      QuicSocket* /* socket */,
+      const L4sWeightUpdateEvent& /* event */) noexcept {}
 };
 
 } // namespace quic

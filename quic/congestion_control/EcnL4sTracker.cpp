@@ -54,9 +54,26 @@ void EcnL4sTracker::onPacketAck(const AckEvent* ackEvent) {
       auto frac = newCEEchoed / (newCEEchoed + newECT1Echoed);
       l4sWeight_ += kL4sWeightEwmaGain * (frac - l4sWeight_);
 
-      if (conn_.qLogger && newCEEchoed > 0) {
-        conn_.qLogger->addL4sWeightUpdate(
-            l4sWeight_, newECT1Echoed, newCEEchoed);
+      if (newCEEchoed > 0) {
+        // Log in qlogger
+        if (conn_.qLogger) {
+          conn_.qLogger->addL4sWeightUpdate(
+              l4sWeight_, newECT1Echoed, newCEEchoed);
+        }
+
+        // Inform observers
+        auto observerContainer = conn_.getSocketObserverContainer();
+        if (observerContainer &&
+            observerContainer->hasObserversForEvent<
+                SocketObserverInterface::Events::l4sWeightUpdatedEvents>()) {
+          observerContainer->invokeInterfaceMethod<
+              SocketObserverInterface::Events::l4sWeightUpdatedEvents>(
+              [event = quic::SocketObserverInterface::L4sWeightUpdateEvent(
+                   l4sWeight_, newECT1Echoed, newCEEchoed)](
+                  auto observer, auto observed) {
+                observer->l4sWeightUpdated(observed, event);
+              });
+        }
       }
     }
 

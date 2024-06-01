@@ -223,6 +223,7 @@ cpp_unittest(
     ],
     deps = [
         "//folly/portability:gtest",
+        "//quic/api/test:mocks",
         "//quic/congestion_control:ecn_l4s_tracker",
     ],
 )

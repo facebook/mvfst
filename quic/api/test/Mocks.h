@@ -396,6 +396,11 @@ class MockLegacyObserver : public LegacyObserver {
       streamClosed,
       (QuicSocket*, const StreamCloseEvent&),
       (noexcept));
+  MOCK_METHOD(
+      (void),
+      l4sWeightUpdated,
+      (QuicSocket*, const L4sWeightUpdateEvent&),
+      (noexcept));
 
   static auto getLossPacketNum(PacketNum packetNum) {
     return testing::Field(
