@@ -84,6 +84,10 @@ void EcnL4sTracker::onPacketAck(const AckEvent* ackEvent) {
 }
 
 double EcnL4sTracker::getL4sWeight() const {
+  return l4sWeight_;
+}
+
+double EcnL4sTracker::getNormalizedL4sWeight() const {
   // Normalize the weight over the srtt
   return l4sWeight_ * conn_.lossState.srtt / rttVirt_;
 }

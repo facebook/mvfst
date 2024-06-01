@@ -149,7 +149,8 @@ TEST_F(EcnL4sTrackerTest, WeightScaledForShortRTT) {
         kL4sWeightEwmaGain * (0.05 - 1.0); // 0.05 is 1 CE/(19 ECT1 + 1 CE)
     auto scaledWeight = unscaledWeight * conn_->lossState.srtt / kRttVirtMin;
 
-    EXPECT_EQ(l4sTracker_->getL4sWeight(), scaledWeight);
+    EXPECT_EQ(l4sTracker_->getL4sWeight(), unscaledWeight);
+    EXPECT_EQ(l4sTracker_->getNormalizedL4sWeight(), scaledWeight);
   }
 }
 
@@ -274,7 +275,9 @@ TEST_F(EcnL4sTrackerTest, NewMarksNotifyObserver) {
     ack.rttSample = 10ms;
     l4sTracker_->onPacketAck(&ack);
     auto scaledWeight = unscaledWeight * conn_->lossState.srtt / kRttVirtMin;
-    EXPECT_EQ(l4sTracker_->getL4sWeight(), scaledWeight);
+
+    EXPECT_EQ(l4sTracker_->getL4sWeight(), unscaledWeight);
+    EXPECT_EQ(l4sTracker_->getNormalizedL4sWeight(), scaledWeight);
   }
 
   observerContainer->removeObserver(observer.get());

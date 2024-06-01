@@ -21,7 +21,12 @@ class EcnL4sTracker : public PacketProcessor {
 
   void onPacketAck(const AckEvent* FOLLY_NULLABLE /* ackEvent */) override;
 
+  // The latest l4s weight calculated by the tracker.
   [[nodiscard]] double getL4sWeight() const;
+
+  // The latest l4s weight normalized by the RTT. This is the value
+  // the congestion controller uses to react to the ECN markings once per RTT.
+  [[nodiscard]] double getNormalizedL4sWeight() const;
 
  private:
   QuicConnectionStateBase& conn_;
