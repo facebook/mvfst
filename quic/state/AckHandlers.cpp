@@ -6,6 +6,7 @@
  */
 
 #include <folly/MapUtil.h>
+#include <folly/tracing/StaticTracepoint.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicStateFunctions.h>
@@ -138,6 +139,11 @@ AckEvent processAckFrame(
                      frame.ecnECT0Count, frame.ecnECT1Count, frame.ecnCECount)
                  .build();
 
+  FOLLY_SDT(
+      quic,
+      process_ack_frame_num_outstanding,
+      conn.outstandings.numOutstanding());
+
   // temporary storage to enable packets to be processed in sent order
   SmallVec<OutstandingPacketWithHandlerContext, 50> packetsWithHandlerContext;
 
@@ -161,6 +167,13 @@ AckEvent processAckFrame(
   folly::Optional<LegacyObserver::SpuriousLossEvent> spuriousLossEvent;
   // Used for debug only.
   const auto originalPacketCount = conn.outstandings.packetCount;
+  const auto originalNumOutstanding = conn.outstandings.numOutstanding();
+  SCOPE_EXIT {
+    FOLLY_SDT(
+        quic,
+        process_ack_frame_num_erased,
+        originalNumOutstanding - conn.outstandings.numOutstanding());
+  };
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
     if (socketObserverContainer &&

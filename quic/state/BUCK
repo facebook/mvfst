@@ -155,6 +155,7 @@ mvfst_cpp_library(
         ":state_functions",
         ":stream_functions",
         "//folly:map_util",
+        "//folly/tracing:static_tracepoint",
         "//quic/loss:loss",
     ],
     exported_deps = [
