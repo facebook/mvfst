@@ -2841,9 +2841,8 @@ void QuicTransportBase::setSupportedVersions(
   conn_->supportedVersions = versions;
 }
 
-void QuicTransportBase::setAckRxTimestampsDisabled(
-    bool disableAckRxTimestamps) {
-  if (disableAckRxTimestamps) {
+void QuicTransportBase::setAckRxTimestampsEnabled(bool enableAckRxTimestamps) {
+  if (!enableAckRxTimestamps) {
     conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.clear();
   }
 }

@@ -245,7 +245,7 @@ class QuicTransportBase : public QuicSocket,
 
   virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
 
-  virtual void setAckRxTimestampsDisabled(bool disableAckRxTimestamps);
+  virtual void setAckRxTimestampsEnabled(bool enableAckRxTimestamps);
 
   void setConnectionSetupCallback(
       folly::MaybeManagedPtr<ConnectionSetupCallback> callback) final;
