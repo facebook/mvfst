@@ -374,6 +374,10 @@ struct TransportSettings {
 
   // Whether to read ECN bits from ingress packets
   bool readEcnOnIngress{false};
+
+  // DSCP value to use for outgoing packet. The two least significant bits of
+  // the ToS field are for ECN controlled by the following two options.
+  uint8_t dscpValue{0};
   // Whether to enable ECN on egress packets
   bool enableEcnOnEgress{false};
   // Whether to use L4S ECN (enableEcnOnEgress must be enabled)

@@ -3303,7 +3303,7 @@ void QuicTransportBase::setTransportSettings(
         conn_->transportSettings.datagramConfig.writeBufSize;
   }
 
-  updateSocketTosSettings();
+  updateSocketTosSettings(conn_->transportSettings.dscpValue);
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -3339,8 +3339,9 @@ void QuicTransportBase::updateCongestionControlSettings(
       transportSettings.copaUseRttStanding;
 }
 
-void QuicTransportBase::updateSocketTosSettings() {
+void QuicTransportBase::updateSocketTosSettings(uint8_t dscpValue) {
   const auto initialTosValue = conn_->socketTos.value;
+  conn_->socketTos.fields.dscp = dscpValue;
   if (conn_->transportSettings.enableEcnOnEgress) {
     if (conn_->transportSettings.useL4sEcn) {
       conn_->socketTos.fields.ecn = kEcnECT1;

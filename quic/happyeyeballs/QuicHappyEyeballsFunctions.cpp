@@ -159,6 +159,12 @@ void happyEyeballsSetUpSocket(
     initSockAndApplyOpts();
     socket.bind(addr);
   }
+  // This is called before applySocketOptions to allow the configured socket
+  // options to override the ToS value from transport settings. This is
+  // necessary for applications that currently rely on configuring DSCP through
+  // socket options directly.
+  socket.setTosOrTrafficClass(socketTos);
+
   applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
 
@@ -180,8 +186,6 @@ void happyEyeballsSetUpSocket(
   if (transportSettings.enableSocketErrMsgCallback) {
     socket.setErrMessageCallback(errMsgCallback);
   }
-
-  socket.setTosOrTrafficClass(socketTos);
 
   socket.resumeRead(readCallback);
 }

@@ -712,7 +712,7 @@ class QuicTransportBase : public QuicSocket,
  protected:
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);
-  void updateSocketTosSettings();
+  void updateSocketTosSettings(uint8_t dscpValue);
   void processCallbacksAfterWriteData();
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();
