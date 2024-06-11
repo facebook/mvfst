@@ -30,7 +30,6 @@ class Copa2Test : public Test {
         std::move(packet),
         Clock::now(),
         size,
-        false,
         totalSent,
         inflight,
         0,

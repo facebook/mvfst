@@ -33,7 +33,6 @@ OutstandingPacketWrapper makeDummyOutstandingPacket(
       Clock::now(),
       1000,
       0,
-      false,
       totalBytesSentOnConnection,
       0,
       LossState(),

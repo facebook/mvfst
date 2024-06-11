@@ -54,7 +54,6 @@ struct OutstandingPacketBuilderFields {
   folly::Optional<TimePoint> maybeTime;
   folly::Optional<uint32_t> maybeEncodedSize;
   folly::Optional<uint32_t> maybeEncodedBodySize;
-  folly::Optional<bool> maybeIsHandshake;
   folly::Optional<uint64_t> maybeTotalBytesSent;
   folly::Optional<uint64_t> maybeTotalBodyBytesSent;
   folly::Optional<uint64_t> maybeInflightBytes;
@@ -73,7 +72,6 @@ struct OutstandingPacketBuilder : public OutstandingPacketBuilderFields {
   Builder&& setTime(const TimePoint& timeIn);
   Builder&& setEncodedSize(const uint32_t& encodedSizeIn);
   Builder&& setEncodedBodySize(const uint32_t& encodedBodySizeIn);
-  Builder&& setIsHandshake(const bool& isHandshakeIn);
   Builder&& setTotalBytesSent(const uint64_t& totalBytesSentIn);
   Builder&& setTotalBodyBytesSent(const uint64_t& totalBodyBytesSentIn);
   Builder&& setInflightBytes(const uint64_t& inflightBytesIn);

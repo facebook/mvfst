@@ -3288,36 +3288,6 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToImmediateAck) {
   EXPECT_EQ(1, conn->outstandings.packets.size());
 }
 
-TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {
-  auto conn = createConn();
-  auto cryptoStream = &conn->cryptoState->initialStream;
-  auto buf = buildRandomInputData(200);
-  writeDataToQuicStream(*cryptoStream, buf->clone());
-  EventBase evb;
-  std::shared_ptr<FollyQuicEventBase> qEvb =
-      std::make_shared<FollyQuicEventBase>(&evb);
-  auto socket =
-      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
-  auto rawSocket = socket.get();
-  auto res = writeCryptoAndAckDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      LongHeader::Types::Initial,
-      *conn->initialWriteCipher,
-      *conn->initialHeaderCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
-
-  EXPECT_EQ(1, res.packetsWritten);
-  EXPECT_EQ(0, res.probesWritten);
-  EXPECT_GE(res.bytesWritten, buf->computeChainDataLength());
-  ASSERT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
-                  ->metadata.isHandshake);
-}
-
 TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
   auto conn = createConn();
   auto cryptoStream = &conn->cryptoState->initialStream;
@@ -3345,8 +3315,6 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
   EXPECT_EQ(0, res.probesWritten);
   EXPECT_EQ(conn->udpSendPacketLen, res.bytesWritten);
   ASSERT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
-                  ->metadata.isHandshake);
   ASSERT_EQ(1, cryptoStream->retransmissionBuffer.size());
   ASSERT_TRUE(cryptoStream->writeBuffer.empty());
 

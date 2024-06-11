@@ -54,7 +54,6 @@ class SocketObserverInterfaceTest : public ::testing::Test {
         .setTime(TimePoint())
         .setEncodedSize(0)
         .setEncodedBodySize(0)
-        .setIsHandshake(false)
         .setTotalBytesSent(0)
         .setTotalBodyBytesSent(0)
         .setInflightBytes(0)

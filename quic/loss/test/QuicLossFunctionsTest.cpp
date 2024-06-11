@@ -194,7 +194,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     folly::Optional<uint16_t> forcedSize,
     bool isDsr) {
   folly::Optional<PacketHeader> header;
-  bool isHandshake = false;
   switch (packetType) {
     case PacketType::Initial:
       header = LongHeader(
@@ -203,7 +202,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           *conn.serverConnectionId,
           conn.ackStates.initialAckState->nextPacketNum,
           *conn.version);
-      isHandshake = true;
       break;
     case PacketType::Handshake:
       header = LongHeader(
@@ -212,7 +210,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           *conn.serverConnectionId,
           conn.ackStates.handshakeAckState->nextPacketNum,
           *conn.version);
-      isHandshake = true;
       break;
     case PacketType::ZeroRtt:
       header = LongHeader(
@@ -263,7 +260,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       time,
       encodedSize,
       encodedBodySize,
-      isHandshake,
       encodedSize,
       0,
       LossState(),
@@ -735,9 +731,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
        iter <
        getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake) + 5;
        iter++) {
-    if (iter->metadata.isHandshake) {
-      conn->outstandings.packetCount[PacketNumberSpace::Handshake]--;
-    }
+    conn->outstandings.packetCount[PacketNumberSpace::Handshake]--;
   }
   auto firstHandshakeOpIter =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake);
@@ -794,7 +788,6 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
       now,
       0,
       0,
-      false,
       0,
       0,
       LossState(),
@@ -1850,7 +1843,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
       currentTime + 12s /* sentTime */,
       0 /* encodedSize */,
       0 /* encodedBodySize */,
-      false /* isHandshake */,
       0 /* totalBytesSent */,
       0 /* inflightBytes */,
       LossState() /* lossState */,
@@ -1885,7 +1877,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
       currentTime + 4s /* sentTime */,
       0 /* encodedSize */,
       0 /* encodedBodySize */,
-      false /* isHandshake */,
       0 /* totalBytesSent */,
       0 /* inflightBytes */,
       LossState() /* lossState */,
@@ -1919,7 +1910,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
       currentTime + 12s /* sentTime */,
       0 /* encodedSize */,
       0 /* encodedBodySize */,
-      false /* isHandshake */,
       0 /* totalBytesSent */,
       0 /* inflightBytes */,
       LossState() /* lossState */,

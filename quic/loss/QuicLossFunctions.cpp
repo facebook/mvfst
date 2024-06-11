@@ -373,8 +373,7 @@ bool processOutstandingsForLoss(
       CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
       --conn.outstandings.packetCount[currentPacketNumberSpace];
     }
-    VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
-             << " handshake=" << pkt.metadata.isHandshake << " " << conn;
+    VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum;
     // Rather than erasing here, instead mark the packet as lost so we can
     // determine if this was spurious later.
     conn.lossState.totalPacketsMarkedLost++;

@@ -225,9 +225,7 @@ AckEvent processAckFrame(
       rPacketIt->metadata.scheduledForDestruction = true;
       conn.outstandings.scheduledForDestructionCount++;
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
-               << " space=" << currentPacketNumberSpace << " handshake="
-               << (int)((rPacketIt->metadata.isHandshake) ? 1 : 0) << " "
-               << conn;
+               << " space=" << currentPacketNumberSpace << conn;
       // If we hit a packet which has been lost we need to count the spurious
       // loss and ignore all other processing.
       if (rPacketIt->declaredLost) {

@@ -173,12 +173,6 @@ OutstandingPacketBuilder&& OutstandingPacketBuilder::setEncodedBodySize(
   return std::move(*this);
 }
 
-OutstandingPacketBuilder&& OutstandingPacketBuilder::setIsHandshake(
-    const bool& isHandshakeIn) {
-  maybeIsHandshake = isHandshakeIn;
-  return std::move(*this);
-}
-
 OutstandingPacketBuilder&& OutstandingPacketBuilder::setTotalBytesSent(
     const uint64_t& totalBytesSentIn) {
   maybeTotalBytesSent = totalBytesSentIn;
@@ -235,7 +229,6 @@ OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
       *CHECK_NOTNULL(maybeTime.get_pointer()),
       *CHECK_NOTNULL(maybeEncodedSize.get_pointer()),
       *CHECK_NOTNULL(maybeEncodedBodySize.get_pointer()),
-      *CHECK_NOTNULL(maybeIsHandshake.get_pointer()),
       *CHECK_NOTNULL(maybeTotalBytesSent.get_pointer()),
       *CHECK_NOTNULL(maybeInflightBytes.get_pointer()),
       CHECK_NOTNULL(maybeLossState.get_pointer())->get(),

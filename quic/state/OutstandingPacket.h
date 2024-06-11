@@ -22,8 +22,6 @@ struct OutstandingPacketMetadata {
   uint32_t encodedSize;
   // Size of only the body within the packet sent on the wire.
   uint32_t encodedBodySize;
-  // Whether this packet has any data from stream 0
-  bool isHandshake;
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
@@ -114,7 +112,6 @@ struct OutstandingPacketMetadata {
       TimePoint timeIn,
       uint32_t encodedSizeIn,
       uint32_t encodedBodySizeIn,
-      bool isHandshakeIn,
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
       const LossState& lossStateIn,
@@ -124,7 +121,6 @@ struct OutstandingPacketMetadata {
       : time(timeIn),
         encodedSize(encodedSizeIn),
         encodedBodySize(encodedBodySizeIn),
-        isHandshake(isHandshakeIn),
         totalBytesSent(totalBytesSentIn),
         inflightBytes(inflightBytesIn),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
@@ -198,7 +194,6 @@ struct OutstandingPacket {
       TimePoint timeIn,
       uint32_t encodedSizeIn,
       uint32_t encodedBodySizeIn,
-      bool isHandshakeIn,
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
       const LossState& lossStateIn,
@@ -210,7 +205,6 @@ struct OutstandingPacket {
             timeIn,
             encodedSizeIn,
             encodedBodySizeIn,
-            isHandshakeIn,
             totalBytesSentIn,
             inflightBytesIn,
             lossStateIn,
@@ -232,7 +226,6 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       TimePoint timeIn,
       uint32_t encodedSizeIn,
       uint32_t encodedBodySizeIn,
-      bool isHandshakeIn,
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
       const LossState& lossStateIn,
@@ -246,7 +239,6 @@ struct OutstandingPacketWrapper : OutstandingPacket {
             timeIn,
             encodedSizeIn,
             encodedBodySizeIn,
-            isHandshakeIn,
             totalBytesSentIn,
             inflightBytesIn,
             lossStateIn,

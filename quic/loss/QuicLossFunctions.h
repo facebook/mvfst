@@ -287,7 +287,6 @@ void markZeroRttPacketsLost(
         iter->packet.header.getProtectionType() == ProtectionType::ZeroRtt;
     if (isZeroRttPacket) {
       auto& pkt = *iter;
-      DCHECK(!pkt.metadata.isHandshake);
       bool processed = pkt.associatedEvent &&
           !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
       lossVisitor(conn, pkt.packet, processed);

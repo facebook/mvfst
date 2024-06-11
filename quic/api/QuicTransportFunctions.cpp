@@ -623,7 +623,6 @@ void updateConnection(
   auto packetNum = packet.header.getPacketSequenceNum();
   // AckFrame, PaddingFrame and Datagrams are not retx-able.
   bool retransmittable = false;
-  bool isHandshake = false;
   bool isPing = false;
   uint32_t connWindowUpdateSent = 0;
   uint32_t ackFrameCounter = 0;
@@ -683,9 +682,6 @@ void updateConnection(
         auto protectionType = packet.header.getProtectionType();
         // NewSessionTicket is sent in crypto frame encrypted with 1-rtt key,
         // however, it is not part of handshake
-        isHandshake =
-            (protectionType == ProtectionType::Initial ||
-             protectionType == ProtectionType::Handshake);
         auto encryptionLevel = protectionTypeToEncryptionLevel(protectionType);
         handleStreamWritten(
             conn,
@@ -877,7 +873,6 @@ void updateConnection(
       sentTime,
       encodedSize,
       encodedBodySize,
-      isHandshake,
       // these numbers should all _include_ the current packet
       // conn.lossState.inflightBytes isn't updated until below
       // conn.outstandings.numOutstanding() + 1 since we're emplacing here
