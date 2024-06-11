@@ -28,7 +28,7 @@ class FizzAead final : public Aead {
     return std::unique_ptr<FizzAead>(new FizzAead(std::move(fizzAeadIn)));
   }
 
-  folly::Optional<TrafficKey> getKey() const override;
+  Optional<TrafficKey> getKey() const override;
 
   /**
    * Simply forward all calls to fizz::Aead.
@@ -49,7 +49,7 @@ class FizzAead final : public Aead {
     return fizzAead->decrypt(
         std::move(ciphertext), associatedData, seqNum, options);
   }
-  folly::Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
+  Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {

@@ -94,7 +94,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
 }
 
 template <typename BufOp = BufAppender>
-folly::Optional<PacketNumEncodingResult> encodeShortHeaderHelper(
+Optional<PacketNumEncodingResult> encodeShortHeaderHelper(
     const ShortHeader& shortHeader,
     BufOp& bufop,
     uint32_t& spaceCounter,
@@ -104,7 +104,7 @@ folly::Optional<PacketNumEncodingResult> encodeShortHeaderHelper(
   if (spaceCounter <
       1U + packetNumberEncoding.length + shortHeader.getConnectionId().size()) {
     spaceCounter = 0;
-    return folly::none;
+    return none;
   }
   uint8_t initialByte =
       ShortHeader::kFixedBitMask | (packetNumberEncoding.length - 1);

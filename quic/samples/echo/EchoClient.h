@@ -251,7 +251,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     auto sendMessageInStream = [&]() {
       if (message == "/close") {
-        quicClient_->close(folly::none);
+        quicClient_->close(none);
         closed = true;
         return;
       }

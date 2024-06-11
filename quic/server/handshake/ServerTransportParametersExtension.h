@@ -123,7 +123,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     return exts;
   }
 
-  const folly::Optional<ClientTransportParameters>& getClientTransportParams() {
+  const Optional<ClientTransportParameters>& getClientTransportParams() {
     return clientTransportParameters_;
   }
 
@@ -139,7 +139,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
-  folly::Optional<ClientTransportParameters> clientTransportParameters_;
+  Optional<ClientTransportParameters> clientTransportParameters_;
   StatelessResetToken token_;
   ConnectionId initialSourceCid_;
   ConnectionId originalDestinationCid_;

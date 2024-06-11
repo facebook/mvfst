@@ -346,7 +346,7 @@ void BbrCongestionController::handleAckInProbeBw(
   }
 
   // To avoid calculating target cwnd with 1.0 gain twice.
-  folly::Optional<uint64_t> targetCwndCache;
+  Optional<uint64_t> targetCwndCache;
 
   // If not in background mode, pacingGain_ < 1.0 means BBR is draining the
   // network queue. If inflight bytes is below the target, then draining is
@@ -679,12 +679,11 @@ uint64_t BbrCongestionController::getCongestionWindow() const noexcept {
   return cwnd_;
 }
 
-folly::Optional<Bandwidth> BbrCongestionController::getBandwidth()
-    const noexcept {
+Optional<Bandwidth> BbrCongestionController::getBandwidth() const noexcept {
   if (bandwidthSampler_) {
     return bandwidthSampler_->getBandwidth();
   }
-  return folly::none;
+  return none;
 }
 
 void BbrCongestionController::detectBottleneckBandwidth(bool appLimitedSample) {

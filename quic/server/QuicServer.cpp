@@ -415,7 +415,7 @@ void QuicServer::routeDataToWorker(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
-    folly::Optional<QuicVersion> quicVersion,
+    Optional<QuicVersion> quicVersion,
     folly::EventBase*,
     bool isForwardedData) {
   // figure out worker idx

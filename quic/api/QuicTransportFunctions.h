@@ -24,7 +24,7 @@ namespace quic {
 struct DataPathResult {
   bool buildSuccess{false};
   bool writeSuccess{false};
-  folly::Optional<SchedulingResult> result;
+  Optional<SchedulingResult> result;
   uint64_t encodedSize{0};
   uint64_t encodedBodySize{0};
 
@@ -202,7 +202,7 @@ bool handleStreamBufMetaWritten(
  */
 void updateConnection(
     QuicConnectionStateBase& conn,
-    folly::Optional<PacketEvent> packetEvent,
+    Optional<PacketEvent> packetEvent,
     RegularQuicWritePacket packet,
     TimePoint time,
     uint32_t encodedSize,
@@ -229,7 +229,7 @@ void writeCloseCommon(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
-    folly::Optional<QuicError> closeDetails,
+    Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher);
 
@@ -243,7 +243,7 @@ void writeLongClose(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     LongHeader::Types headerType,
-    folly::Optional<QuicError> closeDetails,
+    Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion);
@@ -256,7 +256,7 @@ void writeShortClose(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
-    folly::Optional<QuicError> closeDetails,
+    Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher);
 

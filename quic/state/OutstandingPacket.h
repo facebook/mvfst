@@ -36,7 +36,7 @@ struct OutstandingPacketMetadata {
 
   // Has value if the packet is lost by timeout. The value is the loss timeout
   // dividend that was used to declare this packet.
-  folly::Optional<DurationRep> lossTimeoutDividend;
+  Optional<DurationRep> lossTimeoutDividend;
 
   // Has value if the packet is lost by reorder. The value is the distance
   // between this packet and the acknowleded packet when it was declared lost
@@ -49,7 +49,7 @@ struct OutstandingPacketMetadata {
 
     uint64_t streamBytesSent{0};
     uint64_t newStreamBytesSent{0};
-    folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
+    Optional<uint64_t> maybeFirstNewStreamByteOffset;
   };
 
   using MapType = InlineMap<StreamId, StreamDetails, 1>;
@@ -102,7 +102,7 @@ struct OutstandingPacketMetadata {
   // was sent.
   std::chrono::microseconds totalAppLimitedTimeUsecs{0};
 
-  folly::Optional<uint16_t> lossReorderDistance;
+  Optional<uint16_t> lossReorderDistance;
 
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
@@ -172,13 +172,13 @@ struct OutstandingPacket {
           totalBytesSent(totalBytesSentIn),
           totalBytesAcked(totalBytesAckedIn) {}
   };
-  folly::Optional<LastAckedPacketInfo> lastAckedPacketInfo;
+  Optional<LastAckedPacketInfo> lastAckedPacketInfo;
 
   // PacketEvent associated with this OutstandingPacketWrapper. This will be a
-  // folly::none if the packet isn't a clone and hasn't been cloned.
-  folly::Optional<PacketEvent> associatedEvent;
+  // none if the packet isn't a clone and hasn't been cloned.
+  Optional<PacketEvent> associatedEvent;
 
-  folly::Optional<uint64_t> nonDsrPacketSequenceNumber;
+  Optional<uint64_t> nonDsrPacketSequenceNumber;
 
   // Whether this is a DSR packet. A DSR packet's stream data isn't written
   // by transport directly.

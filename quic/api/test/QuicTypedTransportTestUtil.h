@@ -54,7 +54,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    *
    * @return    Interval of newly written AppData packet numbers, or none.
    */
-  folly::Optional<NewOutstandingPacketInterval> loopForWrites() {
+  Optional<NewOutstandingPacketInterval> loopForWrites() {
     // store the next packet number
     const auto preSendNextAppDataPacketNum =
         getNextPacketNum(getConn(), PacketNumberSpace::AppData);
@@ -72,7 +72,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         true /* includeDeclaredLost */);
 
     if (it == getConn().outstandings.packets.rend()) {
-      return folly::none;
+      return none;
     }
     const auto& packet = it->packet;
     const auto& metadata = it->metadata;
@@ -82,7 +82,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     // if packet number of last AppData packet < nextAppDataPacketNum, then
     // we sent nothing new and we have nothing to do...
     if (lastAppDataPacketNum < preSendNextAppDataPacketNum) {
-      return folly::none;
+      return none;
     }
 
     // we sent new AppData packets
@@ -235,8 +235,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   quic::Buf buildPeerPacketWithStreamData(
       const quic::StreamId streamId,
       Buf data,
-      folly::Optional<ProtectionType> shortHeaderProtectionOverride =
-          folly::none) {
+      Optional<ProtectionType> shortHeaderProtectionOverride = none) {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
@@ -248,7 +247,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         // // the following technically ignores lost ACK packets from peer, but
         // // should meet the needs of the majority of tests...
         // getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(0),
-        folly::none /* longHeaderOverride */,
+        none /* longHeaderOverride */,
         false /* eof */,
         shortHeaderProtectionOverride));
     buf->coalesce();
@@ -269,7 +268,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         *data /* stream data */,
         0 /* cipherOverhead */,
         0 /* largest acked */,
-        folly::none /* longHeaderOverride */,
+        none /* longHeaderOverride */,
         true /* eof */));
 
     buf->coalesce();
@@ -389,7 +388,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      folly::Optional<NewOutstandingPacketInterval> maybeWriteInterval,
+      Optional<NewOutstandingPacketInterval> maybeWriteInterval,
       std::chrono::microseconds ackDelay = 0us) {
     CHECK(maybeWriteInterval.has_value());
     return buildAckPacketForSentAppDataPackets(
@@ -413,8 +412,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      std::vector<folly::Optional<NewOutstandingPacketInterval>>
-          maybeWriteIntervals,
+      std::vector<Optional<NewOutstandingPacketInterval>> maybeWriteIntervals,
       std::chrono::microseconds ackDelay = 0us) {
     std::vector<NewOutstandingPacketInterval> writeIntervals;
     for (const auto& maybeWriteInterval : maybeWriteIntervals) {
@@ -462,13 +460,13 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Returns the first outstanding packet with containing frame of type T.
    */
   template <QuicWriteFrame::Type Type>
-  folly::Optional<quic::PacketNum> getFirstOutstandingPacketWithFrame() {
+  Optional<quic::PacketNum> getFirstOutstandingPacketWithFrame() {
     auto packetItr = std::find_if(
         getNonConstConn().outstandings.packets.begin(),
         getNonConstConn().outstandings.packets.end(),
         findFrameInPacketFunc<Type>());
     if (packetItr == getNonConstConn().outstandings.packets.end()) {
-      return folly::none;
+      return none;
     }
     return packetItr->packet.header.getPacketSequenceNum();
   }
@@ -535,8 +533,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
 
    private:
     QuicTypedTransportTestBase* const testObj;
-    folly::Optional<quic::StreamId> maybeStreamId;
-    folly::Optional<std::vector<quic::PacketNum>> maybePacketNums;
+    Optional<quic::StreamId> maybeStreamId;
+    Optional<std::vector<quic::PacketNum>> maybePacketNums;
   };
 
   auto getNewStreamBytesInPackets() {
@@ -699,7 +697,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Return the number of packets written in the write interval.
    */
   static uint64_t getNumPacketsWritten(
-      const folly::Optional<NewOutstandingPacketInterval>& maybeWriteInterval) {
+      const Optional<NewOutstandingPacketInterval>& maybeWriteInterval) {
     if (!maybeWriteInterval.has_value()) {
       return 0;
     }
@@ -710,7 +708,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Return the number of packets written in the write interval.
    */
   static uint64_t getNumPacketsWritten(
-      const std::vector<folly::Optional<NewOutstandingPacketInterval>>&
+      const std::vector<Optional<NewOutstandingPacketInterval>>&
           maybeWriteIntervals) {
     uint64_t sum = 0;
     for (const auto& maybeWriteInterval : maybeWriteIntervals) {
@@ -738,7 +736,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Returns a vector of packet numbers written in one or more intervals.
    */
   static std::vector<quic::PacketNum> getPacketNumsFromIntervals(
-      const std::vector<folly::Optional<NewOutstandingPacketInterval>>&
+      const std::vector<Optional<NewOutstandingPacketInterval>>&
           maybeWriteIntervals) {
     std::vector<NewOutstandingPacketInterval> writeIntervals;
     for (const auto& maybeWriteInterval : maybeWriteIntervals) {

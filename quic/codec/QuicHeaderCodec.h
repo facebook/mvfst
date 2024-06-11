@@ -7,19 +7,19 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 
 struct ParsedHeaderResult {
   bool isVersionNegotiation;
-  folly::Optional<PacketHeader> parsedHeader;
+  Optional<PacketHeader> parsedHeader;
 
   ParsedHeaderResult(
       bool isVersionNegotiationIn,
-      folly::Optional<PacketHeader> parsedHeaderIn);
+      Optional<PacketHeader> parsedHeaderIn);
 };
 
 folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(

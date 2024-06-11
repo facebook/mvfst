@@ -146,7 +146,7 @@ TEST_F(QuicOpenStateTest, AckStream) {
   auto conn = createConn();
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
@@ -181,7 +181,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   auto conn = createConn();
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
@@ -247,7 +247,7 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   quic::test::MockAsyncUDPSocket socket(qEvb);
-  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
 
   auto buf1 = IOBuf::copyBuffer("Alice");

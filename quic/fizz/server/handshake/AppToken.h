@@ -11,13 +11,13 @@
 
 #include <fizz/record/Types.h>
 
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 
 std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken);
 
-folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf);
+Optional<AppToken> decodeAppToken(const folly::IOBuf& buf);
 
 } // namespace quic
 

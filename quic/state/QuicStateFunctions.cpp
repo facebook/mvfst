@@ -353,7 +353,7 @@ bool hasReceivedUdpPackets(const QuicConnectionStateBase& conn) noexcept {
       appDataAckState.largestRecvdPacketNum;
 }
 
-folly::Optional<TimePoint>& getLossTime(
+Optional<TimePoint>& getLossTime(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept {
   return conn.lossState.lossTimes[pnSpace];
@@ -363,17 +363,17 @@ bool canSetLossTimerForAppData(const QuicConnectionStateBase& conn) noexcept {
   return conn.oneRttWriteCipher != nullptr;
 }
 
-std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestLossTimer(
+std::pair<Optional<TimePoint>, PacketNumberSpace> earliestLossTimer(
     const QuicConnectionStateBase& conn) noexcept {
   bool considerAppData = canSetLossTimerForAppData(conn);
   return earliestTimeAndSpace(conn.lossState.lossTimes, considerAppData);
 }
 
-std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
-    const EnumArray<PacketNumberSpace, folly::Optional<TimePoint>>& times,
+std::pair<Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
+    const EnumArray<PacketNumberSpace, Optional<TimePoint>>& times,
     bool considerAppData) noexcept {
-  std::pair<folly::Optional<TimePoint>, PacketNumberSpace> res = {
-      folly::none, PacketNumberSpace::Initial};
+  std::pair<Optional<TimePoint>, PacketNumberSpace> res = {
+      none, PacketNumberSpace::Initial};
   for (PacketNumberSpace pns : times.keys()) {
     if (!times[pns]) {
       continue;

@@ -11,7 +11,7 @@
 #include <quic/server/state/ServerStateMachine.h>
 
 #include <fizz/server/ResumptionState.h>
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 
 #include <gtest/gtest.h>
 
@@ -21,7 +21,7 @@ namespace quic {
 namespace test {
 
 void expectAppTokenEqual(
-    const folly::Optional<AppToken>& decodedAppToken,
+    const Optional<AppToken>& decodedAppToken,
     const AppToken& appToken) {
   EXPECT_TRUE(decodedAppToken.has_value());
 

@@ -104,8 +104,7 @@ class FileQLogger : public BaseQLogger {
   void addStreamStateUpdate(
       StreamId id,
       std::string update,
-      folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation)
-      override;
+      Optional<std::chrono::milliseconds> timeSinceStreamCreation) override;
   virtual void addConnectionMigrationUpdate(bool intentionalMigration) override;
   virtual void addPathValidationEvent(bool success) override;
   void addPriorityUpdate(
@@ -123,8 +122,8 @@ class FileQLogger : public BaseQLogger {
       std::chrono::microseconds startTime,
       std::chrono::microseconds endTime) const;
 
-  void setDcid(folly::Optional<ConnectionId> connID) override;
-  void setScid(folly::Optional<ConnectionId> connID) override;
+  void setDcid(Optional<ConnectionId> connID) override;
+  void setScid(Optional<ConnectionId> connID) override;
 
  private:
   void setupStream();

@@ -46,14 +46,14 @@ struct RoutingData {
 
   //
   // Source connection may not be present for short header packets.
-  folly::Optional<ConnectionId> sourceConnId;
+  Optional<ConnectionId> sourceConnId;
 
   RoutingData(
       HeaderForm headerFormIn,
       bool isInitialIn,
       bool is0RttIn,
       ConnectionId destinationConnIdIn,
-      folly::Optional<ConnectionId> sourceConnIdIn)
+      Optional<ConnectionId> sourceConnIdIn)
       : headerForm(headerFormIn),
         isInitial(isInitialIn),
         is0Rtt(is0RttIn),

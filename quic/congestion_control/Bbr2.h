@@ -50,7 +50,7 @@ class Bbr2CongestionController : public CongestionController {
 
   FOLLY_NODISCARD bool isAppLimited() const override;
 
-  FOLLY_NODISCARD folly::Optional<Bandwidth> getBandwidth() const override;
+  FOLLY_NODISCARD Optional<Bandwidth> getBandwidth() const override;
 
   void setAppLimited() noexcept override;
 
@@ -143,22 +143,22 @@ class Bbr2CongestionController : public CongestionController {
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>
       maxBwFilter_;
   Bandwidth bandwidth_;
-  folly::Optional<Bandwidth> bandwidthHi_, bandwidthLo_;
+  Optional<Bandwidth> bandwidthHi_, bandwidthLo_;
   uint64_t cycleCount_{0}; // TODO: this can be one bit
 
   // Data Volume Model Parameters
   std::chrono::microseconds minRtt_{kDefaultMinRtt};
-  folly::Optional<TimePoint> minRttTimestamp_;
+  Optional<TimePoint> minRttTimestamp_;
 
-  folly::Optional<TimePoint> probeRttMinTimestamp_;
+  Optional<TimePoint> probeRttMinTimestamp_;
   std::chrono::microseconds probeRttMinValue_{kDefaultMinRtt};
-  folly::Optional<TimePoint> probeRttDoneTimestamp_;
+  Optional<TimePoint> probeRttDoneTimestamp_;
 
   bool probeRttExpired_{false};
 
   uint64_t sendQuantum_{64 * 1024};
-  folly::Optional<uint64_t> inflightLo_, inflightHi_;
-  folly::Optional<TimePoint> extraAckedStartTimestamp_;
+  Optional<uint64_t> inflightLo_, inflightHi_;
+  Optional<TimePoint> extraAckedStartTimestamp_;
   uint64_t extraAckedDelivered_{0};
   WindowedFilter<uint64_t, MaxFilter<uint64_t>, uint64_t, uint64_t>
       maxExtraAckedFilter_;

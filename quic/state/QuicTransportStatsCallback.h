@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <folly/functional/Invoke.h>
+#include <quic/common/Optional.h>
 #include <string>
 
 #include <quic/QuicConstants.h>
@@ -102,8 +102,7 @@ class QuicTransportStatsCallback {
   // connection level metrics:
   virtual void onNewConnection() = 0;
 
-  virtual void onConnectionClose(
-      folly::Optional<QuicErrorCode> code = folly::none) = 0;
+  virtual void onConnectionClose(Optional<QuicErrorCode> code = none) = 0;
 
   virtual void onConnectionCloseZeroBytesWritten() = 0;
 

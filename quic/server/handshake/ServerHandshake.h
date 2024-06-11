@@ -180,7 +180,7 @@ class ServerHandshake : public Handshake {
   /**
    * Returns the negotiated transport parameters from the client.
    */
-  virtual folly::Optional<ClientTransportParameters> getClientTransportParams();
+  virtual Optional<ClientTransportParameters> getClientTransportParams();
 
   /**
    * Returns whether all the events that the handshake needs are complete.
@@ -195,15 +195,15 @@ class ServerHandshake : public Handshake {
   /**
    * Returns the exporter master secret from the handshake.
    */
-  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const folly::Optional<folly::ByteRange>& context,
+      const Optional<folly::ByteRange>& context,
       uint16_t keyLength) override;
 
   /**
    * Returns the negotiated ALPN from the handshake.
    */
-  const folly::Optional<std::string>& getApplicationProtocol() const override;
+  const Optional<std::string>& getApplicationProtocol() const override;
 
   /**
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
@@ -245,7 +245,7 @@ class ServerHandshake : public Handshake {
   /**
    * Returns the AppToken seen in session ticket if the session was resumed.
    */
-  const folly::Optional<Buf>& getAppToken() const;
+  const Optional<Buf>& getAppToken() const;
 
  protected:
   Phase phase_{Phase::Handshake};
@@ -275,7 +275,7 @@ class ServerHandshake : public Handshake {
   folly::IOBufQueue appDataReadBuf_{folly::IOBufQueue::cacheChainLength()};
 
   HandshakeCallback* callback_{nullptr};
-  folly::Optional<std::pair<std::string, TransportErrorCode>> error_;
+  Optional<std::pair<std::string, TransportErrorCode>> error_;
 
   std::unique_ptr<Aead> handshakeReadCipher_;
   std::unique_ptr<Aead> oneRttReadCipher_;

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/Optional.h>
 #include <quic/common/udpsocket/LibevQuicAsyncUDPSocket.h>
 
 #include <cstring>
@@ -128,7 +129,7 @@ int LibevQuicAsyncUDPSocket::writem(
 }
 
 void LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
-    folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&
+    folly::Function<Optional<folly::SocketCmsgMap>()>&&
     /* additionalCmsgsFunc */) {
   LOG(WARNING)
       << "Setting an additional cmsgs function is not implemented for LibevQuicAsyncUDPSocket";

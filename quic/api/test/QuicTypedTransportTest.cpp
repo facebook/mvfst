@@ -126,10 +126,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TransportInfoRttSignals) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      folly::none,
-      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -327,10 +326,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayEqual) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      folly::none,
-      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -388,10 +386,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      folly::none,
-      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -399,7 +396,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   //                                     ||   [ Value Expected ]   |
   //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
   //  -----|-------------|---------------||------- |----------------|----------
-  //    1  | 25ms (26 ms)|     25ms      ||   25   |  folly::none   | (1)
+  //    1  | 25ms (26 ms)|     25ms      ||   25   |  none   | (1)
   {
     const auto rtt = 25ms;
     const auto ackDelay = 26ms;
@@ -414,7 +411,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
       EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
-      EXPECT_EQ(folly::none, tInfo.maybeMinRttNoAckDelay); // unavailable
+      EXPECT_EQ(none, tInfo.maybeMinRttNoAckDelay); // unavailable
     } else {
       FAIL(); // unhandled typed test
     }
@@ -451,10 +448,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleZeroTime) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      folly::none,
-      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -724,8 +720,7 @@ TYPED_TEST(
 
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(this->buildAckPacketForSentAppDataPackets(
-      std::vector<
-          folly::Optional<typename TestFixture::NewOutstandingPacketInterval>>{
+      std::vector<Optional<typename TestFixture::NewOutstandingPacketInterval>>{
           maybeWrittenPackets1, maybeWrittenPackets2}));
   this->destroyTransport();
 }
@@ -1012,7 +1007,7 @@ TYPED_TEST(
   {
     // Send two packets with no marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
-      return folly::none;
+      return none;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();
     const auto bufLength = 1700; // Two packets
@@ -1095,8 +1090,7 @@ TYPED_TEST(
 
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(this->buildAckPacketForSentAppDataPackets(
-      std::vector<
-          folly::Optional<typename TestFixture::NewOutstandingPacketInterval>>{
+      std::vector<Optional<typename TestFixture::NewOutstandingPacketInterval>>{
           maybeWrittenPackets1, maybeWrittenPackets2}));
   auto stream = this->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_TRUE(stream);
@@ -1246,7 +1240,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, HandleIncomingKeyUpdate) {
         // // the following technically ignores lost ACK packets from peer, but
         // // should meet the needs of the majority of tests...
         // getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(0),
-        folly::none /* longHeaderOverride */,
+        none /* longHeaderOverride */,
         false /* eof */,
         ProtectionType::KeyPhaseZero));
     pktBuf->coalesce();
@@ -1529,7 +1523,7 @@ struct AckEventMatcherBuilder {
     return std::move(*this);
   }
   Builder&& setExpectedAckedIntervals(
-      std::vector<folly::Optional<
+      std::vector<Optional<
           typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
           expectedAckedIntervalsOpt) {
     std::vector<
@@ -1563,13 +1557,13 @@ struct AckEventMatcherBuilder {
     maybeLargestNewlyAckedPacket = largestNewlyAckedPacketIn;
     return std::move(*this);
   }
-  Builder&& setRtt(const folly::Optional<std::chrono::microseconds>& rttIn) {
+  Builder&& setRtt(const Optional<std::chrono::microseconds>& rttIn) {
     maybeRtt = rttIn;
     CHECK(!noRtt);
     return std::move(*this);
   }
   Builder&& setRttNoAckDelay(
-      const folly::Optional<std::chrono::microseconds>& rttNoAckDelayIn) {
+      const Optional<std::chrono::microseconds>& rttNoAckDelayIn) {
     maybeRttNoAckDelay = rttNoAckDelayIn;
     CHECK(!noRtt);
     CHECK(!noRttWithNoAckDelay);
@@ -1680,16 +1674,16 @@ struct AckEventMatcherBuilder {
   }
   explicit AckEventMatcherBuilder() = default;
 
-  folly::Optional<std::vector<
+  Optional<std::vector<
       typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
       maybeExpectedAckedIntervals;
-  folly::Optional<uint64_t> maybeExpectedNumAckedPackets;
-  folly::Optional<TimePoint> maybeAckTime;
-  folly::Optional<std::chrono::microseconds> maybeAckDelay;
-  folly::Optional<quic::PacketNum> maybeLargestAckedPacket;
-  folly::Optional<quic::PacketNum> maybeLargestNewlyAckedPacket;
-  folly::Optional<std::chrono::microseconds> maybeRtt;
-  folly::Optional<std::chrono::microseconds> maybeRttNoAckDelay;
+  Optional<uint64_t> maybeExpectedNumAckedPackets;
+  Optional<TimePoint> maybeAckTime;
+  Optional<std::chrono::microseconds> maybeAckDelay;
+  Optional<quic::PacketNum> maybeLargestAckedPacket;
+  Optional<quic::PacketNum> maybeLargestNewlyAckedPacket;
+  Optional<std::chrono::microseconds> maybeRtt;
+  Optional<std::chrono::microseconds> maybeRttNoAckDelay;
   bool noRtt{false};
   bool noRttWithNoAckDelay{false};
 };
@@ -1752,9 +1746,9 @@ struct ReceivedUdpPacketMatcherBuilder {
   }
   explicit ReceivedUdpPacketMatcherBuilder() = default;
 
-  folly::Optional<TimePoint> maybeExpectedPacketReceiveTime;
-  folly::Optional<uint64_t> maybeExpectedPacketNumBytes;
-  folly::Optional<uint8_t> maybeExpectedTosValue;
+  Optional<TimePoint> maybeExpectedPacketReceiveTime;
+  Optional<uint64_t> maybeExpectedPacketNumBytes;
+  Optional<uint8_t> maybeExpectedTosValue;
 };
 
 template <typename T>
@@ -1851,13 +1845,12 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(
-                  SocketObserverInterface::CloseStartedEvent{folly::none}),
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{defaultError}))));
   EXPECT_CALL(*observer, closing(transport, _));
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(observer.get());
   EXPECT_CALL(*observer, destroyed(transport, IsNull()));
   this->destroyTransport();
@@ -1891,12 +1884,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(
-                  SocketObserverInterface::CloseStartedEvent{folly::none}),
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{defaultError}))));
-  transport->close(folly::none);
+  transport->close(none);
 
   // wait for the drain
   EXPECT_CALL(*observer, closing(transport, _));
@@ -1941,12 +1933,11 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(
-                  SocketObserverInterface::CloseStartedEvent{folly::none}),
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{defaultError}))));
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(observer.get());
 
   // destroy transport without waiting for drain
@@ -1982,8 +1973,7 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(
-                  SocketObserverInterface::CloseStartedEvent{folly::none}),
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{testError}))));
@@ -2024,8 +2014,7 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(
-                  SocketObserverInterface::CloseStartedEvent{folly::none}),
+              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{testError}))));
@@ -3003,10 +2992,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+            testing::Eq(Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
     EXPECT_CALL(
         *obs2,
@@ -3027,10 +3016,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))),
+            testing::Lt(Optional<uint64_t>(cwndInBytes - strLength))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),
@@ -3049,7 +3038,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3061,7 +3050,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3077,10 +3066,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))));
+            testing::Lt(Optional<uint64_t>(cwndInBytes - strLength))));
 
     EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
     EXPECT_CALL(*obs2, appRateLimited(transport, appRateLimitedMatcher))
@@ -3090,7 +3079,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
         });
@@ -3101,7 +3090,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
         });
@@ -3452,10 +3441,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+            testing::Eq(Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
     EXPECT_CALL(
         *obs2,
@@ -3476,10 +3465,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(0))),
+            testing::Eq(Optional<uint64_t>(0))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),
@@ -3498,7 +3487,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3510,7 +3499,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3598,10 +3587,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+            testing::Eq(Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
     EXPECT_CALL(
         *obs2,
@@ -3622,10 +3611,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(0))), // CWND exhausted
+            testing::Eq(Optional<uint64_t>(0))), // CWND exhausted
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(packetsExpectedWritten)),
@@ -3644,7 +3633,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3656,7 +3645,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3691,10 +3680,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Lt(Optional<uint64_t>(cwndInBytes))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(packetsExpectedWritten)),
@@ -3713,7 +3702,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3725,7 +3714,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
@@ -3741,10 +3730,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(cwndInBytes))));
+            testing::Lt(Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
     EXPECT_CALL(*obs2, appRateLimited(transport, appRateLimitedMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo(),
@@ -3753,7 +3742,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
         });
@@ -3764,7 +3753,7 @@ TYPED_TEST(
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(
-              folly::Optional<uint64_t>(std::max(
+              Optional<uint64_t>(std::max(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
         });
@@ -3841,10 +3830,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(folly::none))),
+            testing::Eq(Optional<uint64_t>(none))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(folly::none))),
+            testing::Eq(Optional<uint64_t>(none))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),
@@ -4105,7 +4094,7 @@ TYPED_TEST(
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::AnyOf(
-                          testing::Eq(0ms), testing::Eq(folly::none)))))))));
+                          testing::Eq(0ms), testing::Eq(none)))))))));
   EXPECT_CALL(
       *observerWithAcks2,
       acksProcessed(
@@ -4118,7 +4107,7 @@ TYPED_TEST(
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::AnyOf(
-                          testing::Eq(0ms), testing::Eq(folly::none)))))))));
+                          testing::Eq(0ms), testing::Eq(none)))))))));
 
   const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
   auto buf = quic::test::packetToBuf(
@@ -4201,7 +4190,7 @@ TYPED_TEST(
                       getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::Eq(folly::none))))))));
+                      testing::Eq(none))))))));
   EXPECT_CALL(
       *observerWithAcks2,
       acksProcessed(
@@ -4213,7 +4202,7 @@ TYPED_TEST(
                       getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::Eq(folly::none))))))));
+                      testing::Eq(none))))))));
 
   const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
   auto buf = quic::test::packetToBuf(

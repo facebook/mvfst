@@ -52,7 +52,7 @@ enum class TestFrameType : uint8_t {
 Buf encodeStreamBuffer(
     StreamId id,
     StreamBuffer data,
-    folly::Optional<StreamGroupId> groupId = folly::none) {
+    Optional<StreamGroupId> groupId = none) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
   if (!groupId) {
@@ -262,9 +262,9 @@ class TestQuicTransport
     closeUdpSocket();
   }
 
-  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+  Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override {
-    return folly::none;
+    return none;
   }
 
   std::chrono::milliseconds getLossTimeoutRemainingTime() {
@@ -406,7 +406,7 @@ class TestQuicTransport
   void addDataToStream(
       StreamId id,
       StreamBuffer data,
-      folly::Optional<StreamGroupId> groupId = folly::none) {
+      Optional<StreamGroupId> groupId = none) {
     auto buf = encodeStreamBuffer(id, std::move(data), std::move(groupId));
     SocketAddress addr("127.0.0.1", 1000);
     onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0));
@@ -509,7 +509,7 @@ class TestQuicTransport
   }
 
   void closeWithoutWrite() {
-    closeImpl(folly::none, false, false);
+    closeImpl(none, false, false);
   }
 
   void invokeWriteSocketData() {
@@ -559,11 +559,11 @@ class TestQuicTransport
     return observerContainer_.get();
   }
 
-  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string&,
-      const folly::Optional<folly::ByteRange>&,
+      const Optional<folly::ByteRange>&,
       uint16_t) const override {
-    return folly::none;
+    return none;
   }
 
   void updateWriteLooper(bool thisIteration) {
@@ -1813,7 +1813,7 @@ TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadFin) {
 TEST_P(QuicTransportImplTestBase, CloseTransportCleansupOutstandingCounters) {
   transport->transportConn->outstandings
       .packetCount[PacketNumberSpace::Handshake] = 200;
-  transport->closeNow(folly::none);
+  transport->closeNow(none);
   EXPECT_EQ(
       0,
       transport->transportConn->outstandings
@@ -1837,7 +1837,7 @@ TEST_P(QuicTransportImplTestBase, DeliveryCallbackUnsetAll) {
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
 
-  transport->close(folly::none);
+  transport->close(none);
 }
 
 TEST_P(QuicTransportImplTestBase, DeliveryCallbackUnsetOne) {
@@ -1857,7 +1857,7 @@ TEST_P(QuicTransportImplTestBase, DeliveryCallbackUnsetOne) {
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(_, _));
 
-  transport->close(folly::none);
+  transport->close(none);
 }
 
 TEST_P(QuicTransportImplTestBase, ByteEventCallbacksManagementSingleStream) {
@@ -2049,7 +2049,7 @@ TEST_P(QuicTransportImplTestBase, RegisterTxDeliveryCallbackLowerThanExpected) {
   EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream, 20)));
   EXPECT_CALL(dcb1, onCanceled(_, _));
   EXPECT_CALL(dcb2, onCanceled(_, _));
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&txcb3);
@@ -2072,7 +2072,7 @@ TEST_F(
   EXPECT_CALL(dcb, onCanceled(_, _));
   transport->registerTxCallback(stream, 2, &txcb);
   transport->registerDeliveryCallback(stream, 2, &dcb);
-  transport->close(folly::none);
+  transport->close(none);
   qEvb->loopOnce();
   Mock::VerifyAndClearExpectations(&txcb);
   Mock::VerifyAndClearExpectations(&dcb);
@@ -2269,7 +2269,7 @@ TEST_P(QuicTransportImplTestBase, RegisterDeliveryCallbackAsyncDeliveryTx) {
   Mock::VerifyAndClearExpectations(&txcb2);
 
   EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream, 10)));
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
@@ -2315,7 +2315,7 @@ TEST_P(QuicTransportImplTestBase, RegisterDeliveryCallbackAsyncDeliveryAck) {
   Mock::VerifyAndClearExpectations(&txcb2);
 
   EXPECT_CALL(txcb2, onByteEventCanceled(getAckMatcher(stream, 10)));
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
@@ -2389,7 +2389,7 @@ TEST_P(QuicTransportImplTestBase, CancelAllByteEventCallbacks) {
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
 
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
@@ -2465,7 +2465,7 @@ TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksForStream) {
   EXPECT_CALL(dcb1, onCanceled(stream1, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(_, 20));
 
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
@@ -2624,7 +2624,7 @@ TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksForStreamWithOffset) {
   EXPECT_CALL(dcb2, onCanceled(stream2, 15));
   EXPECT_CALL(dcb2, onCanceled(stream2, 20));
 
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
@@ -2725,7 +2725,7 @@ TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksTx) {
   EXPECT_CALL(dcb2, onCanceled(stream2, 10));
   EXPECT_CALL(dcb2, onCanceled(stream2, 15));
 
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
@@ -2807,7 +2807,7 @@ TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksDelivery) {
   EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 10)));
   EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 15)));
 
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
@@ -2822,7 +2822,7 @@ TEST_P(
       wcb,
       onConnectionWriteError(IsError(GenericApplicationErrorCode::NO_ERROR)));
   transport->notifyPendingWriteOnConnection(&wcb);
-  transport->close(folly::none);
+  transport->close(none);
   qEvb->loopOnce();
 }
 
@@ -2838,7 +2838,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("Bye")));
   } else {
-    transport->close(folly::none);
+    transport->close(none);
   }
   qEvb->loopOnce();
 }
@@ -2862,7 +2862,7 @@ TEST_P(QuicTransportImplTestBase, TestNotifyPendingWriteOnCloseWithoutError) {
       onStreamWriteError(
           stream, IsError(GenericApplicationErrorCode::NO_ERROR)));
   transport->notifyPendingWriteOnStream(stream, &wcb);
-  transport->close(folly::none);
+  transport->close(none);
   qEvb->loopOnce();
 }
 
@@ -2879,7 +2879,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("Bye")));
   } else {
-    transport->close(folly::none);
+    transport->close(none);
   }
   qEvb->loopOnce();
 }
@@ -2985,7 +2985,7 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
   transport->transportConn->streamManager->addTx(stream);
   transport->transportConn->streamManager->addDeliverable(stream);
   transport->closeStream(stream);
-  transport->close(folly::none);
+  transport->close(none);
 
   ASSERT_TRUE(transport->transportClosed);
   EXPECT_FALSE(transport->createBidirectionalStream());
@@ -3879,7 +3879,7 @@ TEST_P(QuicTransportImplTestBase, StreamWriteCallbackUnregister) {
         EXPECT_TRUE(transport->unregisterStreamWriteCallback(stream));
         wcb.reset();
       }));
-  transport->close(folly::none);
+  transport->close(none);
   qEvb->loopOnce();
 }
 
@@ -3991,7 +3991,7 @@ TEST_P(QuicTransportImplTestBase, ObserverDetachAfterClose) {
 
   EXPECT_CALL(*cb, closeStarted(transport.get(), _));
   EXPECT_CALL(*cb, closing(transport.get(), _));
-  transport->close(folly::none);
+  transport->close(none);
   Mock::VerifyAndClearExpectations(cb.get());
 
   EXPECT_CALL(*cb, observerDetach(transport.get()));

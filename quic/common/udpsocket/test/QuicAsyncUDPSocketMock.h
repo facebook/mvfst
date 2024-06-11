@@ -55,7 +55,7 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
       (uint64_t,
        uint16_t,
        NetworkData&,
-       folly::Optional<folly::SocketAddress>&,
+       Optional<folly::SocketAddress>&,
        size_t&));
   MOCK_METHOD((int), getGSO, ());
   MOCK_METHOD((int), getGRO, ());
@@ -69,7 +69,7 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD(
       (void),
       setAdditionalCmsgsFunc,
-      (folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&));
+      (folly::Function<Optional<folly::SocketCmsgMap>()>&&));
   MOCK_METHOD((int), getTimestamping, ());
   MOCK_METHOD((void), setReuseAddr, (bool));
   MOCK_METHOD((void), setDFAndTurnOffPMTU, (bool));

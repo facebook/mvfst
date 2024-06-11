@@ -42,10 +42,10 @@ struct NormalizedAckBlock {
 
 template <class LargestAckedType = uint64_t>
 std::unique_ptr<folly::IOBuf> createAckFrame(
-    folly::Optional<QuicInteger> largestAcked,
-    folly::Optional<QuicInteger> ackDelay = folly::none,
-    folly::Optional<QuicInteger> numAdditionalBlocks = folly::none,
-    folly::Optional<QuicInteger> firstAckBlockLength = folly::none,
+    Optional<QuicInteger> largestAcked,
+    Optional<QuicInteger> ackDelay = none,
+    Optional<QuicInteger> numAdditionalBlocks = none,
+    Optional<QuicInteger> firstAckBlockLength = none,
     std::vector<NormalizedAckBlock> ackBlocks = {},
     bool useRealValuesForLargestAcked = false,
     bool useRealValuesForAckDelay = false,
@@ -90,12 +90,12 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
 
 template <class StreamIdType = StreamId>
 std::unique_ptr<folly::IOBuf> createStreamFrame(
-    folly::Optional<QuicInteger> streamId,
-    folly::Optional<QuicInteger> offset = folly::none,
-    folly::Optional<QuicInteger> dataLength = folly::none,
+    Optional<QuicInteger> streamId,
+    Optional<QuicInteger> offset = none,
+    Optional<QuicInteger> dataLength = none,
     Buf data = nullptr,
     bool useRealValuesForStreamId = false,
-    folly::Optional<QuicInteger> groupId = folly::none) {
+    Optional<QuicInteger> groupId = none) {
   std::unique_ptr<folly::IOBuf> streamFrame = folly::IOBuf::create(0);
   BufAppender wcursor(streamFrame.get(), 10);
   auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
@@ -122,8 +122,8 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
 }
 
 std::unique_ptr<folly::IOBuf> createCryptoFrame(
-    folly::Optional<QuicInteger> offset = folly::none,
-    folly::Optional<QuicInteger> dataLength = folly::none,
+    Optional<QuicInteger> offset = none,
+    Optional<QuicInteger> dataLength = none,
     Buf data = nullptr) {
   std::unique_ptr<folly::IOBuf> cryptoFrame = folly::IOBuf::create(0);
   BufAppender wcursor(cryptoFrame.get(), 10);
@@ -141,10 +141,10 @@ std::unique_ptr<folly::IOBuf> createCryptoFrame(
 }
 
 std::unique_ptr<folly::IOBuf> createAckFrequencyFrame(
-    folly::Optional<QuicInteger> sequenceNumber,
-    folly::Optional<QuicInteger> packetTolerance,
-    folly::Optional<QuicInteger> maxAckDelay,
-    folly::Optional<QuicInteger> reorderThreshold) {
+    Optional<QuicInteger> sequenceNumber,
+    Optional<QuicInteger> packetTolerance,
+    Optional<QuicInteger> maxAckDelay,
+    Optional<QuicInteger> reorderThreshold) {
   QuicInteger intFrameType(static_cast<uint64_t>(FrameType::ACK_FREQUENCY));
   std::unique_ptr<folly::IOBuf> ackFrequencyFrame = folly::IOBuf::create(0);
   BufAppender wcursor(ackFrequencyFrame.get(), 50);
@@ -437,11 +437,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
 
   auto result1 = createAckFrame(
-      largestAcked,
-      folly::none,
-      numAdditionalBlocks,
-      firstAckBlockLength,
-      ackBlocks);
+      largestAcked, none, numAdditionalBlocks, firstAckBlockLength, ackBlocks);
   folly::io::Cursor cursor1(result1.get());
 
   EXPECT_THROW(
@@ -452,7 +448,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
       QuicTransportException);
 
   auto result2 = createAckFrame(
-      largestAcked, ackDelay, folly::none, firstAckBlockLength, ackBlocks);
+      largestAcked, ackDelay, none, firstAckBlockLength, ackBlocks);
   folly::io::Cursor cursor2(result2.get());
   EXPECT_THROW(
       decodeAckFrame(
@@ -462,7 +458,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
       QuicTransportException);
 
   auto result3 = createAckFrame(
-      largestAcked, ackDelay, folly::none, firstAckBlockLength, ackBlocks);
+      largestAcked, ackDelay, none, firstAckBlockLength, ackBlocks);
   folly::io::Cursor cursor3(result3.get());
   EXPECT_THROW(
       decodeAckFrame(
@@ -472,7 +468,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
       QuicTransportException);
 
   auto result4 = createAckFrame(
-      largestAcked, ackDelay, numAdditionalBlocks, folly::none, ackBlocks);
+      largestAcked, ackDelay, numAdditionalBlocks, none, ackBlocks);
   folly::io::Cursor cursor4(result4.get());
   EXPECT_THROW(
       decodeAckFrame(
@@ -613,8 +609,8 @@ TEST_F(DecodeTest, StreamLengthStreamIdInvalid) {
   QuicInteger streamId(std::numeric_limits<uint64_t>::max());
   auto streamType =
       StreamTypeField::Builder().setFin().setOffset().setLength().build();
-  auto streamFrame = createStreamFrame<uint8_t>(
-      streamId, folly::none, folly::none, nullptr, true);
+  auto streamFrame =
+      createStreamFrame<uint8_t>(streamId, none, none, nullptr, true);
   BufQueue queue;
   queue.append(streamFrame->clone());
   EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
@@ -625,8 +621,8 @@ TEST_F(DecodeTest, StreamOffsetNotPresent) {
   QuicInteger length(1);
   auto streamType =
       StreamTypeField::Builder().setFin().setOffset().setLength().build();
-  auto streamFrame = createStreamFrame(
-      streamId, folly::none, length, folly::IOBuf::copyBuffer("a"));
+  auto streamFrame =
+      createStreamFrame(streamId, none, length, folly::IOBuf::copyBuffer("a"));
   BufQueue queue;
   queue.append(streamFrame->clone());
   EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
@@ -726,14 +722,14 @@ TEST_F(DecodeTest, CryptoDecodeSuccess) {
 TEST_F(DecodeTest, CryptoOffsetNotPresent) {
   QuicInteger length(1);
   auto cryptoFrame =
-      createCryptoFrame(folly::none, length, folly::IOBuf::copyBuffer("a"));
+      createCryptoFrame(none, length, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(cryptoFrame.get());
   EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
 }
 
 TEST_F(DecodeTest, CryptoLengthNotPresent) {
   QuicInteger offset(0);
-  auto cryptoFrame = createCryptoFrame(offset, folly::none, nullptr);
+  auto cryptoFrame = createCryptoFrame(offset, none, nullptr);
   folly::io::Cursor cursor(cryptoFrame.get());
   EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
 }
@@ -789,7 +785,7 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
 }
 
 std::unique_ptr<folly::IOBuf> createNewTokenFrame(
-    folly::Optional<QuicInteger> tokenLength = folly::none,
+    Optional<QuicInteger> tokenLength = none,
     Buf token = nullptr) {
   std::unique_ptr<folly::IOBuf> newTokenFrame = folly::IOBuf::create(0);
   BufAppender wcursor(newTokenFrame.get(), 10);
@@ -813,8 +809,7 @@ TEST_F(DecodeTest, NewTokenDecodeSuccess) {
 }
 
 TEST_F(DecodeTest, NewTokenLengthNotPresent) {
-  auto newTokenFrame =
-      createNewTokenFrame(folly::none, folly::IOBuf::copyBuffer("a"));
+  auto newTokenFrame = createNewTokenFrame(none, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(newTokenFrame.get());
   EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
 }
@@ -922,7 +917,7 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
   QuicInteger packetTolerance(100);
   QuicInteger maxAckDelay(100000); // 100 ms
   auto ackFrequencyFrame = createAckFrequencyFrame(
-      sequenceNumber, packetTolerance, maxAckDelay, folly::none);
+      sequenceNumber, packetTolerance, maxAckDelay, none);
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
   folly::io::Cursor cursor(ackFrequencyFrame.get());

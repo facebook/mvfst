@@ -16,9 +16,9 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//folly:chrono",
-        "//folly:optional",
         "//quic:constants",
         "//quic/codec:types",
+        "//quic/common:optional",
         "//quic/common:time_util",
         "//quic/congestion_control:congestion_controller",
         "//quic/flowcontrol:flow_control",

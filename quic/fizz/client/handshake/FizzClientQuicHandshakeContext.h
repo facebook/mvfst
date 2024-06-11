@@ -38,14 +38,13 @@ class FizzClientQuicHandshakeContext
     return verifier_;
   }
 
-  folly::Optional<QuicCachedPsk> getPsk(
-      const folly::Optional<std::string>& hostname);
+  Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname);
   void putPsk(
-      const folly::Optional<std::string>& hostname,
+      const Optional<std::string>& hostname,
       QuicCachedPsk quicCachedPsk);
-  void removePsk(const folly::Optional<std::string>& hostname);
+  void removePsk(const Optional<std::string>& hostname);
 
-  folly::Optional<std::vector<fizz::ech::ECHConfig>> getECHConfigs(
+  Optional<std::vector<fizz::ech::ECHConfig>> getECHConfigs(
       const std::string& sni) const;
 
   void setECHRetryCallback(

@@ -51,8 +51,8 @@ cpp_unittest(
     ],
     deps = [
         "//fizz/server:resumption_state",
-        "//folly:optional",
         "//quic:constants",
+        "//quic/common:optional",
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/server/state:server",
     ],
@@ -66,9 +66,9 @@ cpp_unittest(
     deps = [
         "fbsource//third-party/googletest:gmock",
         "//fizz/server:resumption_state",
-        "//folly:optional",
         "//quic:constants",
         "//quic/api/test:mocks",
+        "//quic/common:optional",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/server/handshake:default_app_token_validator",

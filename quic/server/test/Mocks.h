@@ -67,7 +67,7 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
       (const folly::SocketAddress&,
        std::unique_ptr<RoutingData>&,
        std::unique_ptr<NetworkData>&,
-       folly::Optional<QuicVersion>,
+       Optional<QuicVersion>,
        bool isForwardedData));
 
   MOCK_METHOD(
@@ -76,14 +76,14 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
       (const folly::SocketAddress&,
        std::unique_ptr<RoutingData>&,
        std::unique_ptr<NetworkData>&,
-       folly::Optional<QuicVersion>,
+       Optional<QuicVersion>,
        bool isForwardedData));
 
   void routeDataToWorker(
       const folly::SocketAddress& client,
       RoutingData&& routingDataIn,
       NetworkData&& networkDataIn,
-      folly::Optional<QuicVersion> quicVersion,
+      Optional<QuicVersion> quicVersion,
       folly::EventBase*,
       bool isForwardedData = false) {
     auto routingData = std::make_unique<RoutingData>(std::move(routingDataIn));
@@ -157,8 +157,8 @@ class MockQuicServerTransport : public QuicServerTransport {
             nullptr,
             nullptr) {}
   MOCK_CONST_METHOD0(getOneRttCipherInfo, CipherInfo());
-  MOCK_CONST_METHOD0(getServerConnectionId, folly::Optional<ConnectionId>());
-  MOCK_CONST_METHOD0(getClientConnectionId, folly::Optional<ConnectionId>());
+  MOCK_CONST_METHOD0(getServerConnectionId, Optional<ConnectionId>());
+  MOCK_CONST_METHOD0(getClientConnectionId, Optional<ConnectionId>());
   MOCK_CONST_METHOD0(getPeerAddress, folly::SocketAddress&());
 };
 

@@ -468,8 +468,8 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
 
   // create next local stream, then check that limit is applied
   manager.createStream(serverStreamId2);
-  EXPECT_EQ(folly::none, manager.nextAcceptableLocalUnidirectionalStreamId());
-  EXPECT_EQ(folly::none, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptableLocalUnidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
@@ -499,8 +499,8 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
 
   // create next local stream, then check that limit is applied
   manager.createStream(serverStreamId2);
-  EXPECT_EQ(folly::none, manager.nextAcceptableLocalBidirectionalStreamId());
-  EXPECT_EQ(folly::none, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptableLocalBidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
@@ -595,8 +595,8 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
 
   // open next stream, then check that limit is applied
   manager.getStream(clientStreamId2);
-  EXPECT_EQ(folly::none, manager.nextAcceptablePeerUnidirectionalStreamId());
-  EXPECT_EQ(folly::none, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptablePeerUnidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
@@ -623,8 +623,8 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
 
   // open next stream, then check that limit is applied
   manager.getStream(clientStreamId2);
-  EXPECT_EQ(folly::none, manager.nextAcceptablePeerBidirectionalStreamId());
-  EXPECT_EQ(folly::none, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(none, manager.nextAcceptablePeerBidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, TestClearActionable) {

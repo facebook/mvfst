@@ -8,12 +8,12 @@
 #pragma once
 
 #include <folly/Expected.h>
-#include <folly/Optional.h>
 #include <folly/String.h>
 #include <folly/io/Cursor.h>
 #include <folly/lang/Bits.h>
 #include <quic/QuicException.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 
@@ -97,10 +97,10 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
 
 /**
  * Reads an integer out of the cursor and returns a pair with the integer and
- * the numbers of bytes read, or folly::none if there are not enough bytes to
+ * the numbers of bytes read, or none if there are not enough bytes to
  * read the int. It only advances the cursor in case of success.
  */
-folly::Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
+Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
     folly::io::Cursor& cursor,
     uint64_t atMost = sizeof(uint64_t));
 

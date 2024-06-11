@@ -9,15 +9,15 @@
 
 #include <quic/fizz/client/handshake/QuicPskCache.h>
 
-#include <folly/Optional.h>
 #include <folly/portability/GMock.h>
+#include <quic/common/Optional.h>
 
 #include <string>
 
 namespace quic {
 class MockQuicPskCache : public QuicPskCache {
  public:
-  MOCK_METHOD(folly::Optional<QuicCachedPsk>, getPsk, (const std::string&));
+  MOCK_METHOD(Optional<QuicCachedPsk>, getPsk, (const std::string&));
   MOCK_METHOD(void, putPsk, (const std::string&, QuicCachedPsk));
   MOCK_METHOD(void, removePsk, (const std::string&));
 };

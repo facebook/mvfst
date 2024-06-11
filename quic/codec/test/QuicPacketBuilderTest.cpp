@@ -93,7 +93,7 @@ class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {
       uint32_t pktSizeLimit,
       PacketHeader header,
       PacketNum largestAckedPacketNum,
-      folly::Optional<size_t> outputBufSize) {
+      quic::Optional<size_t> outputBufSize) {
     switch (flavor) {
       case TestFlavor::Regular:
         return std::make_unique<RegularQuicPacketBuilder>(

@@ -79,9 +79,7 @@ class Cubic : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
-  void onPacketAckOrLoss(
-      folly::Optional<AckEvent> ack,
-      folly::Optional<LossEvent> loss) {
+  void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
   void onRemoveBytesFromInflight(uint64_t) override;
@@ -145,6 +143,10 @@ class Cubic : public CongestionController {
 
   QuicConnectionStateBase& conn_;
   uint64_t cwndBytes_;
+  // the value of cwndBytes_ at last loss event
+  Optional<uint64_t> lossCwndBytes_;
+  // the value of ssthresh_ at the last loss event
+  Optional<uint64_t> lossSsthresh_;
   uint64_t ssthresh_;
 
   struct HystartState {
@@ -160,11 +162,11 @@ class Cubic : public CongestionController {
     TimePoint lastJiffy;
     // The minimal of sampled RTT in current RTT round. Hystart only samples
     // first a few RTTs in a round
-    folly::Optional<std::chrono::microseconds> currSampledRtt;
+    Optional<std::chrono::microseconds> currSampledRtt;
     // End value of currSampledRtt at the end of a RTT round:
-    folly::Optional<std::chrono::microseconds> lastSampledRtt;
+    Optional<std::chrono::microseconds> lastSampledRtt;
     // Estimated minimal delay of a path
-    folly::Optional<std::chrono::microseconds> delayMin;
+    Optional<std::chrono::microseconds> delayMin;
     // Ack sampling count
     uint8_t ackCount{0};
     // When a packet with sent time >= rttRoundEndTarget is acked, end the
@@ -176,12 +178,12 @@ class Cubic : public CongestionController {
     // time takes for cwnd to increase to lastMaxCwndBytes
     double timeToOrigin{0.0};
     // The cwnd value that timeToOrigin is calculated based on
-    folly::Optional<uint64_t> originPoint;
+    Optional<uint64_t> originPoint;
     bool tcpFriendly{true};
-    folly::Optional<TimePoint> lastReductionTime;
+    Optional<TimePoint> lastReductionTime;
     // This is Wmax, it could be different from lossCwndBytes if cwnd never
     // reaches last lastMaxCwndBytes before loss event:
-    folly::Optional<uint64_t> lastMaxCwndBytes;
+    Optional<uint64_t> lastMaxCwndBytes;
     uint64_t estRenoCwnd;
     // cache reduction/increase factors based on numEmulatedConnections_
     float reductionFactor{kDefaultCubicReductionFactor};
@@ -191,11 +193,11 @@ class Cubic : public CongestionController {
 
   struct RecoveryState {
     // The time point after which Quic will no longer be in current recovery
-    folly::Optional<TimePoint> endOfRecovery;
+    Optional<TimePoint> endOfRecovery;
   };
 
   // if quiescenceStart_ has a value, then the connection is app limited
-  folly::Optional<TimePoint> quiescenceStart_;
+  Optional<TimePoint> quiescenceStart_;
 
   HystartState hystartState_;
   SteadyState steadyState_;

@@ -8,8 +8,8 @@ mvfst_cpp_library(
         "Aead.h",
     ],
     exported_deps = [
-        "//folly:optional",
         "//folly/io:iobuf",
+        "//quic/common:optional",
     ],
 )
 

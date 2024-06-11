@@ -43,7 +43,7 @@ struct AckEventStreamDetailsMatcherBuilder {
   }
 
  private:
-  folly::Optional<uint64_t> maybeStreamId;
+  Optional<uint64_t> maybeStreamId;
   DupAckedStreamIntervals dupAckedStreamIntervals;
 };
 

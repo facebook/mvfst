@@ -54,7 +54,7 @@ class ServerTransportParameters : public testing::Test {
   }
   void TearDown() override {
     if (client_) {
-      client_->close(folly::none);
+      client_->close(none);
     }
     evb_.loop();
   }

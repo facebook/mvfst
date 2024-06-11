@@ -33,7 +33,6 @@ mvfst_cpp_library(
         ":accept_observer",
         "//common/network:mvfst_hooks",  # @manual
         "//folly:conv",
-        "//folly:optional",
         "//folly/chrono:conv",
         "//folly/experimental/io:io_uring_backend",
         "//folly/io:iobuf",
@@ -41,6 +40,7 @@ mvfst_cpp_library(
         "//folly/portability:gflags",
         "//folly/system:thread_id",
         "//quic/codec:header_codec",
+        "//quic/common:optional",
         "//quic/common:socket_util",
         "//quic/congestion_control:bbr",
         "//quic/congestion_control:copa",
@@ -94,8 +94,8 @@ mvfst_cpp_library(
         "SlidingWindowRateLimiter.h",
     ],
     exported_deps = [
-        "//folly:optional",
         "//quic:constants",
+        "//quic/common:optional",
     ],
 )
 

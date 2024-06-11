@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <folly/Range.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/Optional.h>
 #include <stdexcept>
 #include <string>
 
@@ -59,13 +59,13 @@ class QuicTransportException : public std::runtime_error {
     return errCode_;
   }
 
-  folly::Optional<FrameType> frameType() const noexcept {
+  Optional<FrameType> frameType() const noexcept {
     return frameType_;
   }
 
  private:
   TransportErrorCode errCode_;
-  folly::Optional<FrameType> frameType_;
+  Optional<FrameType> frameType_;
 };
 
 class QuicInternalException : public std::runtime_error {

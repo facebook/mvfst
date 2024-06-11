@@ -145,8 +145,8 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
  public:
   ~AcceptingTicketCipher() override = default;
 
-  folly::SemiFuture<folly::Optional<
-      std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
+  folly::SemiFuture<
+      Optional<std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
   encrypt(fizz::server::ResumptionState) const override {
     // Fake handshake, no need todo anything here.
     return std::make_pair(folly::IOBuf::create(0), 2s);
@@ -183,7 +183,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
   }
 
   folly::SemiFuture<
-      std::pair<fizz::PskType, folly::Optional<fizz::server::ResumptionState>>>
+      std::pair<fizz::PskType, Optional<fizz::server::ResumptionState>>>
   decrypt(std::unique_ptr<folly::IOBuf>) const override {
     return std::make_pair(fizz::PskType::Resumption, createResumptionState());
   }
@@ -271,10 +271,9 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     folly::IOBuf& data,
     uint8_t cipherOverhead,
     PacketNum largestAcked,
-    folly::Optional<std::pair<LongHeader::Types, QuicVersion>>
-        longHeaderOverride,
+    Optional<std::pair<LongHeader::Types, QuicVersion>> longHeaderOverride,
     bool eof,
-    folly::Optional<ProtectionType> shortHeaderOverride,
+    Optional<ProtectionType> shortHeaderOverride,
     uint64_t offset,
     uint64_t packetSizeLimit) {
   std::unique_ptr<RegularQuicPacketBuilder> builder;
@@ -305,7 +304,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
       data.computeChainDataLength(),
       data.computeChainDataLength(),
       eof,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(
       *builder,
       data.clone(),
@@ -359,7 +358,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
     PacketNum largestAcked,
     uint64_t offset,
     uint64_t packetSizeLimit) {
-  folly::Optional<PacketHeader> header;
+  Optional<PacketHeader> header;
   switch (protectionType) {
     case ProtectionType::Initial:
       header = LongHeader(
@@ -735,7 +734,7 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
       .build();
 }
 
-folly::Optional<WriteCryptoFrame>
+Optional<WriteCryptoFrame>
 writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
   BufQueue bufQueue(std::move(data));
   return writeCryptoFrame(offsetIn, bufQueue, builder);

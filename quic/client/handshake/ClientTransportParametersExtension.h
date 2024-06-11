@@ -41,7 +41,7 @@ struct ClientTransportParametersExtension {
         initialSourceCid_(initialSourceCid),
         customTransportParameters_(std::move(customTransportParameters)) {}
 
-  const folly::Optional<ServerTransportParameters>& getServerTransportParams() {
+  const Optional<ServerTransportParameters>& getServerTransportParams() {
     return serverTransportParameters_;
   }
 
@@ -101,6 +101,6 @@ struct ClientTransportParametersExtension {
   const uint64_t activeConnectionLimit_;
   const ConnectionId initialSourceCid_;
   const std::vector<TransportParameter> customTransportParameters_;
-  folly::Optional<ServerTransportParameters> serverTransportParameters_;
+  Optional<ServerTransportParameters> serverTransportParameters_;
 };
 } // namespace quic

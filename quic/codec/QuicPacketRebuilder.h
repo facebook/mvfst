@@ -27,8 +27,7 @@ class PacketRebuilder {
       PacketBuilderInterface& regularBuilder,
       QuicConnectionStateBase& conn);
 
-  folly::Optional<PacketEvent> rebuildFromPacket(
-      OutstandingPacketWrapper& packet);
+  Optional<PacketEvent> rebuildFromPacket(OutstandingPacketWrapper& packet);
 
   // TODO: Same as passing cipherOverhead into the CloningScheduler, this really
   // is a sad way to solve the writableBytes problem.

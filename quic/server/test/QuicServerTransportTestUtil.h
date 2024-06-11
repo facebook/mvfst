@@ -277,9 +277,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        folly::none /* longHeaderOverride */,
+        none /* longHeaderOverride */,
         eof,
-        folly::none,
+        none,
         offset));
     deliverData(packetData->clone());
     return packetData;
@@ -352,7 +352,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
   virtual void expectWriteNewSessionTicket() {
     server->setEarlyDataAppParamsFunctions(
-        [](const folly::Optional<std::string>&, const Buf&) { return false; },
+        [](const Optional<std::string>&, const Buf&) { return false; },
         []() -> Buf { return nullptr; });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(testing::_))
         .Times(1);
@@ -587,9 +587,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   testing::NiceMock<MockConnectionCallback> connCallback;
   testing::NiceMock<MockRoutingCallback> routingCallback;
   testing::NiceMock<MockHandshakeFinishedCallback> handshakeFinishedCallback;
-  folly::Optional<ConnectionId> clientConnectionId;
-  folly::Optional<ConnectionId> initialDestinationConnectionId;
-  folly::Optional<ConnectionId> serverConnectionId;
+  Optional<ConnectionId> clientConnectionId;
+  Optional<ConnectionId> initialDestinationConnectionId;
+  Optional<ConnectionId> serverConnectionId;
   std::unique_ptr<QuicReadCodec> clientReadCodec;
   std::vector<Buf> serverWrites;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;

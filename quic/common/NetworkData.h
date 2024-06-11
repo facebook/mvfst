@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Optional.h>
 #include <quic/common/TimePoints.h>
 
 #include <memory>
@@ -51,7 +51,7 @@ struct ReceivedUdpPacket {
     TimePoint receiveTimePoint;
 
     // Socket timestamps, when available.
-    folly::Optional<SocketTimestampExt> maybeSoftwareTs;
+    Optional<SocketTimestampExt> maybeSoftwareTs;
   };
 
   ReceivedUdpPacket() = default;

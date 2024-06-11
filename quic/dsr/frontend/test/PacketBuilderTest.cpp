@@ -103,9 +103,8 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
   const auto& writePacket = packet.packet;
   EXPECT_EQ(2, packet.sendInstructions.size());
   EXPECT_EQ(2, writePacket.frames.size());
-  WriteStreamFrame expectedFirstFrame(id, 0, 100, false, true, folly::none, 5);
-  WriteStreamFrame expectedSecondFrame(
-      id, 100, 100, true, true, folly::none, 6);
+  WriteStreamFrame expectedFirstFrame(id, 0, 100, false, true, none, 5);
+  WriteStreamFrame expectedSecondFrame(id, 100, 100, true, true, none, 6);
   EXPECT_EQ(expectedFirstFrame, *writePacket.frames[0].asWriteStreamFrame());
   EXPECT_EQ(expectedSecondFrame, *writePacket.frames[1].asWriteStreamFrame());
   EXPECT_TRUE(expectedFirstFrame == packet.sendInstructions[0]);

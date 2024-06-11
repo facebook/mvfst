@@ -21,7 +21,7 @@ void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame);
  * Update connection state and the frame on clone of the given simple frame.
  * Returns the updated simple frame.
  */
-folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
+Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame);
 

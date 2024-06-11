@@ -22,26 +22,26 @@ namespace quic {
 
 QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
 
-folly::Optional<VersionNegotiationPacket>
-QuicReadCodec::tryParsingVersionNegotiation(BufQueue& queue) {
+Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
+    BufQueue& queue) {
   folly::io::Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(uint8_t))) {
-    return folly::none;
+    return none;
   }
   uint8_t initialByte = cursor.readBE<uint8_t>();
   auto headerForm = getHeaderForm(initialByte);
   if (headerForm != HeaderForm::Long) {
-    return folly::none;
+    return none;
   }
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
   if (!longHeaderInvariant) {
     // if it is an invalid packet, it's definitely not a VN packet, so ignore
     // it.
-    return folly::none;
+    return none;
   }
   if (longHeaderInvariant->invariant.version !=
       QuicVersion::VERSION_NEGOTIATION) {
-    return folly::none;
+    return none;
   }
   return decodeVersionNegotiation(*longHeaderInvariant, cursor);
 }
@@ -182,7 +182,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   }
 
   PacketNum expectedNextPacketNum = 0;
-  folly::Optional<PacketNum> largestRecvdPacketNum;
+  Optional<PacketNum> largestRecvdPacketNum;
   switch (longHeaderTypeToProtectionType(type)) {
     case ProtectionType::Initial:
       largestRecvdPacketNum = ackStates.initialAckState->largestRecvdPacketNum;
@@ -410,7 +410,7 @@ CodecResult QuicReadCodec::parsePacket(
   }
 
   auto data = queue.move();
-  folly::Optional<StatelessResetToken> token;
+  Optional<StatelessResetToken> token;
   if (nodeType_ == QuicNodeType::Client &&
       initialByte & ShortHeader::kFixedBitMask) {
     auto dataLength = data->length();
@@ -472,8 +472,8 @@ const Aead* QuicReadCodec::getHandshakeReadCipher() const {
   return handshakeReadCipher_.get();
 }
 
-const folly::Optional<StatelessResetToken>&
-QuicReadCodec::getStatelessResetToken() const {
+const Optional<StatelessResetToken>& QuicReadCodec::getStatelessResetToken()
+    const {
   return statelessResetToken_;
 }
 
@@ -591,7 +591,7 @@ void QuicReadCodec::onHandshakeDone(TimePoint handshakeDoneTime) {
   }
 }
 
-folly::Optional<TimePoint> QuicReadCodec::getHandshakeDoneTime() {
+Optional<TimePoint> QuicReadCodec::getHandshakeDoneTime() {
   return handshakeDoneTime_;
 }
 

@@ -73,12 +73,11 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
   }
 
   // Send (consume tokens) and determine if any new debt.
-  folly::Optional<double> maybeDebtPayOffTimeDouble =
-      consumeWithBorrowNonBlocking(
-          toConsume,
-          config_.rateBytesPerSecond,
-          config_.burstSizeBytes,
-          sendTimeDouble);
+  Optional<double> maybeDebtPayOffTimeDouble = consumeWithBorrowNonBlocking(
+      toConsume,
+      config_.rateBytesPerSecond,
+      config_.burstSizeBytes,
+      sendTimeDouble);
   DCHECK(maybeDebtPayOffTimeDouble.hasValue());
   if (maybeDebtPayOffTimeDouble.value() > 0) {
     // Bucket is in debt now after consuming toConsume tokens
@@ -198,8 +197,7 @@ void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
   return config_.burstSizeBytes;
 }
 
-[[nodiscard]] folly::Optional<double> SimulatedTBF::getMaxDebtQueueSizeBytes()
-    const {
+[[nodiscard]] Optional<double> SimulatedTBF::getMaxDebtQueueSizeBytes() const {
   return config_.maybeMaxDebtQueueSizeBytes;
 }
 

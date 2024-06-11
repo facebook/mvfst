@@ -238,8 +238,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     bool isInitial,
     LongHeaderInvariant& invariant,
     size_t datagramLen) {
-  folly::Optional<std::pair<VersionNegotiationPacket, Buf>>
-      versionNegotiationPacket;
+  Optional<std::pair<VersionNegotiationPacket, Buf>> versionNegotiationPacket;
   if (isInitial && datagramLen < kMinInitialPacketSize) {
     VLOG(3) << "Dropping initial packet due to invalid size";
     QUIC_STATS(
@@ -442,12 +441,12 @@ void QuicServerWorker::handleNetworkData(
             false, /* isInitial */
             false, /* is0Rtt */
             std::move(maybeParsedShortHeader->destinationConnId),
-            folly::none);
+            none);
         return forwardNetworkData(
             client,
             std::move(routingData),
             NetworkData(std::move(udpPacket)),
-            folly::none, /* quicVersion */
+            none, /* quicVersion */
             isForwardedData);
       }
     } else if (
@@ -599,7 +598,7 @@ void QuicServerWorker::forwardNetworkData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
-    folly::Optional<QuicVersion> quicVersion,
+    Optional<QuicVersion> quicVersion,
     bool isForwardedData) {
   // if it's not Client initial or ZeroRtt, AND if the connectionId version
   // mismatches: forward if pktForwarding is enabled else dropPacket
@@ -642,7 +641,7 @@ void QuicServerWorker::setPacingTimer(
 QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     QuicVersion quicVersion,
     const folly::SocketAddress& client,
-    const folly::Optional<ConnectionId>& srcConnId,
+    const Optional<ConnectionId>& srcConnId,
     const ConnectionId& dstConnId,
     bool validNewToken) {
   // create 'accepting' transport
@@ -759,7 +758,7 @@ void QuicServerWorker::dispatchPacketData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
-    folly::Optional<QuicVersion> quicVersion,
+    Optional<QuicVersion> quicVersion,
     bool isForwardedData) noexcept {
   DCHECK(socket_);
   CHECK(transportFactory_);
@@ -997,23 +996,23 @@ void QuicServerWorker::sendResetPacket(
   QUIC_STATS(statsCallback_, onStatelessReset);
 }
 
-folly::Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(
+Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(
     folly::io::Cursor& cursor) {
   // Move cursor to the byte right after the initial byte
   if (!cursor.canAdvance(1)) {
-    return folly::none;
+    return none;
   }
   auto initialByte = cursor.readBE<uint8_t>();
 
   // We already know this is an initial packet, which uses a long header
   auto parsedLongHeader = parseLongHeader(initialByte, cursor);
   if (!parsedLongHeader || !parsedLongHeader->parsedLongHeader.has_value()) {
-    return folly::none;
+    return none;
   }
 
   auto header = parsedLongHeader->parsedLongHeader.value().header;
   if (!header.hasToken()) {
-    return folly::none;
+    return none;
   }
   return header.getToken();
 }

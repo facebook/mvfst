@@ -16,19 +16,19 @@
 
 namespace quic {
 namespace {
-folly::Optional<uint64_t> calculateNewWindowUpdate(
+Optional<uint64_t> calculateNewWindowUpdate(
     uint64_t curReadOffset,
     uint64_t curAdvertisedOffset,
     uint64_t windowSize,
     const std::chrono::microseconds& srtt,
     const TransportSettings& transportSettings,
-    const folly::Optional<TimePoint>& lastSendTime,
+    const Optional<TimePoint>& lastSendTime,
     const TimePoint& updateTime) {
   DCHECK_LE(curReadOffset, curAdvertisedOffset);
   auto nextAdvertisedOffset = curReadOffset + windowSize;
   if (nextAdvertisedOffset == curAdvertisedOffset) {
     // No change in flow control
-    return folly::none;
+    return none;
   }
   bool enoughTimeElapsed = lastSendTime && updateTime > *lastSendTime &&
       (updateTime - *lastSendTime) >
@@ -43,7 +43,7 @@ folly::Optional<uint64_t> calculateNewWindowUpdate(
   if (enoughWindowElapsed) {
     return nextAdvertisedOffset;
   }
-  return folly::none;
+  return none;
 }
 
 template <typename T>
@@ -72,7 +72,7 @@ inline uint64_t calculateMaximumData(const QuicStreamState& stream) {
 } // namespace
 
 void maybeIncreaseFlowControlWindow(
-    const folly::Optional<TimePoint>& timeOfLastFlowControlUpdate,
+    const Optional<TimePoint>& timeOfLastFlowControlUpdate,
     TimePoint updateTime,
     std::chrono::microseconds srtt,
     uint64_t& windowSize) {

@@ -14,7 +14,6 @@ mvfst_cpp_library(
         "FizzClientQuicHandshakeContext.h",
     ],
     deps = [
-        "//fizz/backend:openssl",
         "//fizz/client:early_data_rejection",
         "//fizz/client:ech_policy",
         "//fizz/protocol:exporter",
@@ -42,8 +41,8 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//fizz/client:psk_cache",
-        "//folly:optional",
         "//quic/client:cached_server_tp",
+        "//quic/common:optional",
     ],
 )
 
@@ -53,7 +52,7 @@ mvfst_cpp_library(
         "QuicTokenCache.h",
     ],
     exported_deps = [
-        "//folly:optional",
         "//folly:string",
+        "//quic/common:optional",
     ],
 )

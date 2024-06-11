@@ -50,8 +50,8 @@ mvfst_cpp_library(
         "MockQuicPskCache.h",
     ],
     exported_deps = [
-        "//folly:optional",
         "//folly/portability:gmock",
+        "//quic/common:optional",
         "//quic/fizz/client/handshake:psk_cache",
     ],
 )

@@ -9,11 +9,11 @@
 
 #include <folly/Expected.h>
 #include <folly/MaybeManagedPtr.h>
-#include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Optional.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
@@ -196,10 +196,10 @@ class QuicSocket {
     std::chrono::microseconds srtt{0us};
     std::chrono::microseconds rttvar{0us};
     std::chrono::microseconds lrtt{0us};
-    folly::Optional<std::chrono::microseconds> maybeLrtt;
-    folly::Optional<std::chrono::microseconds> maybeLrttAckDelay;
-    folly::Optional<std::chrono::microseconds> maybeMinRtt;
-    folly::Optional<std::chrono::microseconds> maybeMinRttNoAckDelay;
+    Optional<std::chrono::microseconds> maybeLrtt;
+    Optional<std::chrono::microseconds> maybeLrttAckDelay;
+    Optional<std::chrono::microseconds> maybeMinRtt;
+    Optional<std::chrono::microseconds> maybeMinRttNoAckDelay;
     uint64_t mss{kDefaultUDPSendPacketLen};
     CongestionControlType congestionControlType{CongestionControlType::None};
     uint64_t writableBytes{0};
@@ -237,11 +237,11 @@ class QuicSocket {
     uint64_t totalNewStreamBytesSent{0};
     uint32_t ptoCount{0};
     uint32_t totalPTOCount{0};
-    folly::Optional<PacketNum> largestPacketAckedByPeer;
-    folly::Optional<PacketNum> largestPacketSent;
+    Optional<PacketNum> largestPacketAckedByPeer;
+    Optional<PacketNum> largestPacketSent;
     bool usedZeroRtt{false};
     // State from congestion control module, if one is installed.
-    folly::Optional<CongestionController::State> maybeCCState;
+    Optional<CongestionController::State> maybeCCState;
   };
 
   /**
@@ -267,21 +267,21 @@ class QuicSocket {
 
     // Total number of 'new' stream bytes sent on this stream.
     // Does not include retransmissions of stream bytes.
-    folly::Optional<uint64_t> streamBytesSent{0};
+    Optional<uint64_t> streamBytesSent{0};
 
     // Total number of stream bytes received on this stream.
-    folly::Optional<uint64_t> streamBytesReceived{0};
+    Optional<uint64_t> streamBytesReceived{0};
 
     // Stream read error (if one occured)
-    folly::Optional<QuicErrorCode> streamReadError;
+    Optional<QuicErrorCode> streamReadError;
     // Stream write error (if one occured)
-    folly::Optional<QuicErrorCode> streamWriteError;
+    Optional<QuicErrorCode> streamWriteError;
   };
 
-  // Returns folly::none before the handshake is complete, otherwise is always
+  // Returns none before the handshake is complete, otherwise is always
   // non-empty.
-  virtual folly::Optional<std::vector<TransportParameter>>
-  getPeerTransportParams() const = 0;
+  virtual Optional<std::vector<TransportParameter>> getPeerTransportParams()
+      const = 0;
 
   /**
    * Sets connection setup callback. This callback must be set before using the
@@ -342,8 +342,8 @@ class QuicSocket {
    */
   virtual void setEarlyDataAppParamsFunctions(
       folly::Function<
-          bool(const folly::Optional<std::string>& alpn, const Buf& appParams)
-              const> validator,
+          bool(const Optional<std::string>& alpn, const Buf& appParams) const>
+          validator,
       folly::Function<Buf()> getter) = 0;
 
   virtual ~QuicSocket() = default;
@@ -355,17 +355,17 @@ class QuicSocket {
   /**
    * Get the QUIC Client Connection ID
    */
-  virtual folly::Optional<ConnectionId> getClientConnectionId() const = 0;
+  virtual Optional<ConnectionId> getClientConnectionId() const = 0;
 
   /**
    * Get the QUIC Server Connection ID
    */
-  virtual folly::Optional<ConnectionId> getServerConnectionId() const = 0;
+  virtual Optional<ConnectionId> getServerConnectionId() const = 0;
 
   /**
    * Get the original Quic Server Connection ID chosen by client
    */
-  FOLLY_NODISCARD virtual folly::Optional<ConnectionId>
+  FOLLY_NODISCARD virtual Optional<ConnectionId>
   getClientChosenDestConnectionId() const = 0;
 
   /**
@@ -405,9 +405,9 @@ class QuicSocket {
    * Derive exported key material (RFC5705) from the transport's TLS layer, if
    * the transport is capable.
    */
-  virtual folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  virtual Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const folly::Optional<folly::ByteRange>& context,
+      const Optional<folly::ByteRange>& context,
       uint16_t keyLength) const = 0;
 
   /**
@@ -428,7 +428,7 @@ class QuicSocket {
    * Close this socket with a drain period. If closing with an error, it may be
    * specified.
    */
-  virtual void close(folly::Optional<QuicError> errorCode) = 0;
+  virtual void close(Optional<QuicError> errorCode) = 0;
 
   /**
    * Close this socket gracefully, by waiting for all the streams to be idle
@@ -440,7 +440,7 @@ class QuicSocket {
    * Close this socket without a drain period. If closing with an error, it may
    * be specified.
    */
-  virtual void closeNow(folly::Optional<QuicError> errorCode) = 0;
+  virtual void closeNow(Optional<QuicError> errorCode) = 0;
 
   /**
    * Returns the event base associated with this socket
@@ -475,9 +475,9 @@ class QuicSocket {
 
   /**
    * Get the negotiated ALPN. If called before the transport is ready
-   * returns folly::none
+   * returns none
    */
-  virtual folly::Optional<std::string> getAppProtocol() const = 0;
+  virtual Optional<std::string> getAppProtocol() const = 0;
 
   /**
    * Sets the size of the given stream's receive window, or the connection
@@ -674,7 +674,7 @@ class QuicSocket {
    * StopSending. By default when cb is nullptr this function will cause the
    * transport to send a StopSending frame with
    * GenericApplicationErrorCode::NO_ERROR. If err is specified to be
-   * folly::none, no StopSending will be sent.
+   * none, no StopSending will be sent.
    *
    * Users should remove the callback via setReadCallback(id, nullptr) after
    * reading an error or eof to allow streams to be reaped by the transport.
@@ -682,7 +682,7 @@ class QuicSocket {
   virtual folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
       StreamId id,
       ReadCallback* cb,
-      folly::Optional<ApplicationErrorCode> err =
+      Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) = 0;
 
   /**
@@ -839,10 +839,9 @@ class QuicSocket {
    * will return an EAGAIN-like error code.
    *
    */
-  virtual folly::Expected<
-      folly::Unit,
-      std::pair<LocalErrorCode, folly::Optional<uint64_t>>>
-  consume(StreamId id, uint64_t offset, size_t amount) = 0;
+  virtual folly::
+      Expected<folly::Unit, std::pair<LocalErrorCode, Optional<uint64_t>>>
+      consume(StreamId id, uint64_t offset, size_t amount) = 0;
 
   /**
    * Equivalent of calling consume(id, stream->currentReadOffset, amount);
@@ -1135,7 +1134,7 @@ class QuicSocket {
    */
   virtual void cancelByteEventCallbacksForStream(
       const StreamId id,
-      const folly::Optional<uint64_t>& offset = folly::none) = 0;
+      const Optional<uint64_t>& offset = none) = 0;
 
   /**
    * Cancel byte event callbacks for given type and stream.
@@ -1146,7 +1145,7 @@ class QuicSocket {
   virtual void cancelByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id,
-      const folly::Optional<uint64_t>& offset = folly::none) = 0;
+      const Optional<uint64_t>& offset = none) = 0;
 
   /**
    * Cancel all byte event callbacks of all streams.
@@ -1223,7 +1222,7 @@ class QuicSocket {
   /**
    * Close the stream for writing.  Equivalent to writeChain(id, nullptr, true).
    */
-  virtual folly::Optional<LocalErrorCode> shutdownWrite(StreamId id) = 0;
+  virtual Optional<LocalErrorCode> shutdownWrite(StreamId id) = 0;
 
   /**
    * Cancel the given stream
@@ -1316,7 +1315,7 @@ class QuicSocket {
    * Applications should declare all their control streams after either calling
    * createStream() or receiving onNewBidirectionalStream()
    */
-  virtual folly::Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
+  virtual Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
 
   /**
    * Set congestion control type.

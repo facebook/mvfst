@@ -55,7 +55,7 @@ class TokenlessPacer : public Pacer {
   uint64_t maxPacingRateBytesPerSec_{std::numeric_limits<uint64_t>::max()};
   std::chrono::microseconds writeInterval_{0};
   PacingRateCalculator pacingRateCalculator_;
-  folly::Optional<TimePoint> lastWriteTime_;
+  Optional<TimePoint> lastWriteTime_;
   uint8_t rttFactorNumerator_{1};
   uint8_t rttFactorDenominator_{1};
   bool experimental_{false};

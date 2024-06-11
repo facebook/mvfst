@@ -13,7 +13,7 @@
 namespace quic {
 ParsedHeaderResult::ParsedHeaderResult(
     bool isVersionNegotiationIn,
-    folly::Optional<PacketHeader> parsedHeaderIn)
+    Optional<PacketHeader> parsedHeaderIn)
     : isVersionNegotiation(isVersionNegotiationIn),
       parsedHeader(std::move(parsedHeaderIn)) {
   CHECK(isVersionNegotiation || parsedHeader);
@@ -30,7 +30,7 @@ folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
     return parseLongHeader(initialByte, cursor)
         .then([](ParsedLongHeaderResult&& parsedLongHeaderResult) {
           if (parsedLongHeaderResult.isVersionNegotiation) {
-            return ParsedHeaderResult(true, folly::none);
+            return ParsedHeaderResult(true, none);
           }
           // We compensate for the type byte length by adding it back.
           DCHECK(parsedLongHeaderResult.parsedLongHeader);

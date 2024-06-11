@@ -75,7 +75,7 @@ void parseAckReceiveTimestamps(
     const QuicConnectionStateBase& conn,
     const quic::ReadAckFrame& frame,
     folly::F14FastMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
-    folly::Optional<PacketNum> firstPacketNum);
+    Optional<PacketNum> firstPacketNum);
 
 /**
  * Update the outgoing ECN marking count for an outstanding packet that has been

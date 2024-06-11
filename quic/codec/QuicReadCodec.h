@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/codec/Decode.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Optional.h>
 #include <quic/handshake/Aead.h>
 #include <quic/state/AckStates.h>
 #include <quic/state/QuicTransportStatsCallback.h>
@@ -108,10 +108,10 @@ class QuicReadCodec {
   /**
    * Tries to parse the packet and returns whether or not
    * it is a version negotiation packet.
-   * This returns folly::none if the packet is either not
+   * This returns none if the packet is either not
    * a VN packet or is invalid.
    */
-  folly::Optional<VersionNegotiationPacket> tryParsingVersionNegotiation(
+  Optional<VersionNegotiationPacket> tryParsingVersionNegotiation(
       BufQueue& queue);
 
   const Aead* getOneRttReadCipher() const;
@@ -125,7 +125,7 @@ class QuicReadCodec {
   const PacketNumberCipher* getHandshakeHeaderCipher() const;
   const PacketNumberCipher* getZeroRttHeaderCipher() const;
 
-  const folly::Optional<StatelessResetToken>& getStatelessResetToken() const;
+  const Optional<StatelessResetToken>& getStatelessResetToken() const;
 
   [[nodiscard]] ProtectionType getCurrentOneRttReadPhase() const;
 
@@ -180,7 +180,7 @@ class QuicReadCodec {
    */
   void onHandshakeDone(TimePoint handshakeDoneTime);
 
-  folly::Optional<TimePoint> getHandshakeDoneTime();
+  Optional<TimePoint> getHandshakeDoneTime();
 
  private:
   CodecResult tryParseShortHeaderPacket(
@@ -197,8 +197,8 @@ class QuicReadCodec {
   QuicNodeType nodeType_;
 
   CodecParameters params_;
-  folly::Optional<ConnectionId> clientConnectionId_;
-  folly::Optional<ConnectionId> serverConnectionId_;
+  Optional<ConnectionId> clientConnectionId_;
+  Optional<ConnectionId> serverConnectionId_;
 
   // Cipher used to decrypt handshake packets.
   std::unique_ptr<Aead> initialReadCipher_;
@@ -213,16 +213,16 @@ class QuicReadCodec {
   // The packet number of the first packet in the current 1-RTT phase
   // It's not set when a key update is ongoing (i.e. the write key has been
   // updated but no packets have been received with the corresponding read key)
-  folly::Optional<PacketNum> currentOneRttReadPhaseStartPacketNum_{0};
+  Optional<PacketNum> currentOneRttReadPhaseStartPacketNum_{0};
 
   std::unique_ptr<PacketNumberCipher> initialHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> zeroRttHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeHeaderCipher_;
 
-  folly::Optional<StatelessResetToken> statelessResetToken_;
+  Optional<StatelessResetToken> statelessResetToken_;
   std::function<bool(folly::ByteRange, folly::ByteRange)> cryptoEqual_;
-  folly::Optional<TimePoint> handshakeDoneTime_;
+  Optional<TimePoint> handshakeDoneTime_;
 
   QuicTransportStatsCallback* statsCallback_{nullptr};
 };

@@ -159,8 +159,7 @@ void FollyQuicAsyncUDPSocket::appendCmsgs(const folly::SocketCmsgMap& cmsgs) {
   follySocket_.appendCmsgs(cmsgs);
 }
 void FollyQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
-    folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&
-        additionalCmsgsFunc) {
+    folly::Function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc) {
   follySocket_.setAdditionalCmsgsFunc(std::move(additionalCmsgsFunc));
 }
 

@@ -24,9 +24,7 @@ class NewReno : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
-  void onPacketAckOrLoss(
-      folly::Optional<AckEvent> ack,
-      folly::Optional<LossEvent> loss) {
+  void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
 
@@ -61,6 +59,6 @@ class NewReno : public CongestionController {
   QuicConnectionStateBase& conn_;
   uint64_t ssthresh_;
   uint64_t cwndBytes_;
-  folly::Optional<TimePoint> endOfRecovery_;
+  Optional<TimePoint> endOfRecovery_;
 };
 } // namespace quic

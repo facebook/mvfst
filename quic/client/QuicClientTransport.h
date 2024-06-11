@@ -111,9 +111,9 @@ class QuicClientTransport
    * context is the context value argument for the TLS exporter.
    * keyLength is the length of the exported key.
    */
-  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const folly::Optional<folly::ByteRange>& context,
+      const Optional<folly::ByteRange>& context,
       uint16_t keyLength) const override {
     return clientConn_->clientHandshakeLayer->getExportedKeyingMaterial(
         label, context, keyLength);
@@ -203,7 +203,7 @@ class QuicClientTransport
     conn_->bufAccessor = bufAccessor_.get();
   }
 
-  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+  Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override;
 
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
@@ -243,14 +243,14 @@ class QuicClientTransport
       uint64_t readBufferSize,
       int numPackets,
       NetworkData& networkData,
-      folly::Optional<folly::SocketAddress>& server,
+      Optional<folly::SocketAddress>& server,
       size_t& totalData);
   void recvMmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,
-      folly::Optional<folly::SocketAddress>& server,
+      Optional<folly::SocketAddress>& server,
       size_t& totalData);
 
   /**
@@ -298,7 +298,7 @@ class QuicClientTransport
       const QuicWriteFrame& packetFrame,
       const ReadAckFrame&);
 
-  folly::Optional<std::string> hostname_;
+  Optional<std::string> hostname_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
  private:

@@ -178,7 +178,7 @@ class QuicStreamAsyncTransportTest : public Test {
 
   void TearDown() override {
     if (client_) {
-      client_->close(folly::none);
+      client_->close(none);
     }
     clientEvb_.loop();
     server_->shutdown();

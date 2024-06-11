@@ -36,8 +36,8 @@ ShortHeader buildTestShortHeader() {
 QuicFrame parseQuicFrame(
     BufQueue& queue,
     bool isAckReceiveTimestampsSupported = false) {
-  folly::Optional<AckReceiveTimestampsConfig> receiveTimeStampsConfig =
-      folly::none;
+  quic::Optional<AckReceiveTimestampsConfig> receiveTimeStampsConfig =
+      quic::none;
   if (isAckReceiveTimestampsSupported) {
     receiveTimeStampsConfig.assign(
         {.maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3});
@@ -317,7 +317,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   uint64_t offset = 0;
   bool fin = false;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 10, 10, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 10, 10, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 10);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 10);
@@ -363,7 +363,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
   // 1 byte for length
   // => 8 bytes of header
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 20, 20, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 20, 20, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   EXPECT_EQ(*dataLen, 20);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 20);
@@ -412,13 +412,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   bool fin1 = false;
   auto inputBuf = buildRandomInputData(30);
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder,
-      streamId1,
-      offset1,
-      30,
-      30,
-      fin1,
-      folly::none /* skipLenHint */);
+      pktBuilder, streamId1, offset1, 30, 30, fin1, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 30);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 30);
@@ -445,7 +439,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       remainingSpace,
       remainingSpace,
       fin2,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, remainingSpace - 7);
   writeStreamFrameData(pktBuilder, inputBuf2->clone(), remainingSpace - 7);
@@ -515,7 +509,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFramePartialData) {
   // 4 bytes for offset
   // => 7 bytes for header
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 50, 50, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 50, 50, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 33);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 33);
@@ -554,7 +548,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameTooSmallForStreamHeader) {
   uint64_t offset = 65535;
   bool fin = false;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 1, 1, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 1, 1, fin, none /* skipLenHint */);
   EXPECT_FALSE(dataLen);
   EXPECT_EQ(1, pktBuilder.remainingSpaceInPkt());
 }
@@ -572,7 +566,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamNoSpaceForData) {
   // 1 byte for offset
   // => 3 bytes
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 10, 10, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 10, 10, fin, none /* skipLenHint */);
   EXPECT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 3);
 }
@@ -594,13 +588,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   // 1 byte for offset
   // => 3 bytes
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder,
-      streamId,
-      offset,
-      100,
-      100,
-      fin,
-      folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 100, 100, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 1);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 1);
@@ -646,7 +634,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   uint64_t offset = 0;
   bool fin = true;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 10, 10, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 10, 10, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 10);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 10);
@@ -703,7 +691,7 @@ TEST_F(QuicWriteCodecTest, TestWriteIncompleteDataAndFin) {
       inDataSize,
       inDataSize,
       fin,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   EXPECT_LT(*dataLen, inDataSize);
 }
@@ -720,7 +708,7 @@ TEST_F(QuicWriteCodecTest, TestWriteNoDataAndFin) {
   bool fin = true;
   Buf empty;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 0, 0, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 0, 0, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   EXPECT_EQ(*dataLen, 0);
 }
@@ -734,13 +722,7 @@ TEST_F(QuicWriteCodecTest, TestWriteNoDataAndNoFin) {
   Buf empty;
   EXPECT_THROW(
       writeStreamFrameHeader(
-          pktBuilder,
-          streamId,
-          offset,
-          0,
-          0,
-          fin,
-          folly::none /* skipLenHint */),
+          pktBuilder, streamId, offset, 0, 0, fin, none /* skipLenHint */),
       QuicInternalException);
 }
 
@@ -758,7 +740,7 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeader) {
   uint64_t offset = 0;
   bool fin = true;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 20, 20, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 20, 20, fin, none /* skipLenHint */);
   EXPECT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
 }
@@ -775,7 +757,7 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeaderWithFin) {
   uint64_t offset = 0;
   bool fin = true;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 0, 0, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 0, 0, fin, none /* skipLenHint */);
   ASSERT_TRUE(dataLen.has_value());
   EXPECT_EQ(*dataLen, 0);
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
@@ -793,7 +775,7 @@ TEST_F(QuicWriteCodecTest, PacketNotEnoughSpaceForStreamHeaderWithFin) {
   uint64_t offset = 0;
   bool fin = true;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 0, 0, fin, folly::none /* skipLenHint */);
+      pktBuilder, streamId, offset, 0, 0, fin, none /* skipLenHint */);
   ASSERT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
 }
@@ -819,7 +801,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeSkipLen) {
   uint64_t offset = 10;
   bool fin = false;
   auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 1200 * 2, 1200 * 2, fin, folly::none);
+      pktBuilder, streamId, offset, 1200 * 2, 1200 * 2, fin, none);
   EXPECT_LT(*dataLen, 1200);
 }
 
@@ -843,8 +825,8 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeNotSkipLen) {
   StreamId streamId = 0;
   uint64_t offset = 10;
   bool fin = false;
-  auto dataLen = writeStreamFrameHeader(
-      pktBuilder, streamId, offset, 200, 200, fin, folly::none);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 200, 200, fin, none);
   EXPECT_EQ(*dataLen, 200);
 }
 
@@ -2363,7 +2345,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameWithGroup) {
       50,
       50,
       fin,
-      folly::none /* skipLenHint */,
+      none /* skipLenHint */,
       groupId);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 50);

@@ -34,7 +34,7 @@ class ClientHandshake : public Handshake {
    * Initiate the handshake with the supplied parameters.
    */
   void connect(
-      folly::Optional<std::string> hostname,
+      Optional<std::string> hostname,
       std::shared_ptr<ClientTransportParametersExtension> transportParams);
 
   /**
@@ -50,7 +50,7 @@ class ClientHandshake : public Handshake {
    * Provides facilities to get, put and remove a PSK from the cache in case the
    * handshake supports a PSK cache.
    */
-  virtual void removePsk(const folly::Optional<std::string>& /* hostname */) {}
+  virtual void removePsk(const Optional<std::string>& /* hostname */) {}
 
   /**
    * Returns a reference to the CryptoFactory used internally.
@@ -85,16 +85,16 @@ class ClientHandshake : public Handshake {
 
   /**
    * Edge triggered api to obtain whether or not zero rtt data was rejected.
-   * If zero rtt was never attempted, then this will return folly::none. Once
+   * If zero rtt was never attempted, then this will return none. Once
    * the result is obtained, the result is cleared out.
    */
-  folly::Optional<bool> getZeroRttRejected();
+  Optional<bool> getZeroRttRejected();
 
   /**
    * If zero-rtt is rejected, this will indicate whether zero-rtt data can be
    * resent on the connection or the connection has to be closed.
    */
-  folly::Optional<bool> getCanResendZeroRtt() const;
+  Optional<bool> getCanResendZeroRtt() const;
 
   /**
    * API used to verify that the integrity token present in the retry packet
@@ -107,8 +107,7 @@ class ClientHandshake : public Handshake {
   /**
    * Returns the negotiated transport parameters chosen by the server
    */
-  virtual const folly::Optional<ServerTransportParameters>&
-  getServerTransportParams();
+  virtual const Optional<ServerTransportParameters>& getServerTransportParams();
 
   ~ClientHandshake() override = default;
 
@@ -159,8 +158,8 @@ class ClientHandshake : public Handshake {
   Buf writeTrafficSecret_;
 
  private:
-  virtual folly::Optional<CachedServerTransportParameters> connectImpl(
-      folly::Optional<std::string> hostname) = 0;
+  virtual Optional<CachedServerTransportParameters> connectImpl(
+      Optional<std::string> hostname) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
@@ -178,8 +177,8 @@ class ClientHandshake : public Handshake {
   QuicClientConnectionState* conn_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
 
-  folly::Optional<bool> zeroRttRejected_;
-  folly::Optional<bool> canResendZeroRtt_;
+  Optional<bool> zeroRttRejected_;
+  Optional<bool> canResendZeroRtt_;
 
   bool waitForData_{false};
   bool earlyDataAttempted_{false};

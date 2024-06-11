@@ -9,8 +9,8 @@ mvfst_cpp_library(
         "IntervalSet-inl.h",
     ],
     exported_deps = [
+        ":optional",
         "//folly:likely",
-        "//folly:optional",
     ],
 )
 
@@ -26,8 +26,8 @@ mvfst_cpp_library(
         "//folly:scope_guard",
     ],
     exported_deps = [
+        ":optional",
         "//folly:function",
-        "//folly:optional",
         "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic/common/events:eventbase",
@@ -135,8 +135,8 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":buf_util",
+        ":optional",
         ":time_points",
-        "//folly:optional",
         "//quic:constants",
     ],
 )
@@ -147,7 +147,7 @@ mvfst_cpp_library(
         "TimePoints.h",
     ],
     exported_deps = [
-        "//folly:optional",
+        ":optional",
         "//quic:constants",
     ],
 )
@@ -176,9 +176,19 @@ mvfst_cpp_library(
         "//quic:constants",
     ],
     exported_deps = [
-        "//folly:optional",
+        ":optional",
     ],
     external_deps = [
         "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "optional",
+    headers = [
+        "Optional.h",
+    ],
+    exported_deps = [
+        "//folly:optional",
     ],
 )

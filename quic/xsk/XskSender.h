@@ -18,6 +18,7 @@
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+#include <quic/common/Optional.h>
 #include <quic/xsk/xsk_lib.h>
 #include <queue>
 #include <stdexcept>
@@ -111,7 +112,7 @@ class XskSender {
 
   ~XskSender();
 
-  folly::Optional<XskBuffer> getXskBuffer(bool isIpV6);
+  quic::Optional<XskBuffer> getXskBuffer(bool isIpV6);
 
   void writeXskBuffer(
       const XskBuffer& xskBuffer,
@@ -162,7 +163,7 @@ class XskSender {
 
   xdp_desc* getTxDescriptor();
 
-  folly::Optional<uint32_t> getFreeUmemIndex();
+  quic::Optional<uint32_t> getFreeUmemIndex();
 
   void getFreeUmemFrames();
 

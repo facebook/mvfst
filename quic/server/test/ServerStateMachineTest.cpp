@@ -338,7 +338,7 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
 
 struct advertisedMaxStreamGroupstestStruct {
   uint64_t peerMaxGroupsIn;
-  folly::Optional<uint64_t> expectedTransportSettingVal;
+  Optional<uint64_t> expectedTransportSettingVal;
 };
 
 class ServerStateMachineAdvertisedMaxStreamGroupsParamTest
@@ -371,7 +371,7 @@ INSTANTIATE_TEST_SUITE_P(
     ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
     ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
     ::testing::Values(
-        advertisedMaxStreamGroupstestStruct{0, folly::none},
+        advertisedMaxStreamGroupstestStruct{0, none},
         advertisedMaxStreamGroupstestStruct{16, 16}));
 
 } // namespace test

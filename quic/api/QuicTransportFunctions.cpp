@@ -39,8 +39,7 @@ bool cryptoHasWritableData(const quic::QuicConnectionStateBase& conn) {
         !conn.cryptoState->oneRttStream.lossBuffer.empty()));
 }
 
-std::string optionalToString(
-    const folly::Optional<quic::PacketNum>& packetNum) {
+std::string optionalToString(const quic::Optional<quic::PacketNum>& packetNum) {
   if (!packetNum) {
     return "-";
   }
@@ -54,12 +53,12 @@ std::string largestAckScheduledToString(
       optionalToString(
           conn.ackStates.initialAckState
               ? conn.ackStates.initialAckState->largestAckScheduled
-              : folly::none),
+              : quic::none),
       ",",
       optionalToString(
           conn.ackStates.handshakeAckState
               ? conn.ackStates.handshakeAckState->largestAckScheduled
-              : folly::none),
+              : quic::none),
       ",",
       optionalToString(conn.ackStates.appDataAckState.largestAckScheduled),
       "]");
@@ -72,12 +71,12 @@ std::string largestAckToSendToString(
       optionalToString(
           conn.ackStates.initialAckState
               ? largestAckToSend(*conn.ackStates.initialAckState)
-              : folly::none),
+              : quic::none),
       ",",
       optionalToString(
           conn.ackStates.handshakeAckState
               ? largestAckToSend(*conn.ackStates.handshakeAckState)
-              : folly::none),
+              : quic::none),
       ",",
       optionalToString(largestAckToSend(conn.ackStates.appDataAckState)),
       "]");
@@ -614,7 +613,7 @@ bool handleStreamBufMetaWritten(
 
 void updateConnection(
     QuicConnectionStateBase& conn,
-    folly::Optional<PacketEvent> packetEvent,
+    Optional<PacketEvent> packetEvent,
     RegularQuicWritePacket packet,
     TimePoint sentTime,
     uint32_t encodedSize,
@@ -1198,7 +1197,7 @@ void writeCloseCommon(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
-    folly::Optional<QuicError> closeDetails,
+    Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   // close is special, we're going to bypass all the packet sent logic for all
@@ -1303,7 +1302,7 @@ void writeLongClose(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     LongHeader::Types headerType,
-    folly::Optional<QuicError> closeDetails,
+    Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
@@ -1332,7 +1331,7 @@ void writeShortClose(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
-    folly::Optional<QuicError> closeDetails,
+    Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   auto header = ShortHeader(

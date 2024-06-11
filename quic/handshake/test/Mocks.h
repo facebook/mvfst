@@ -43,7 +43,7 @@ class MockAead : public Aead {
  public:
   MOCK_METHOD(size_t, getCipherOverhead, (), (const));
 
-  MOCK_METHOD(folly::Optional<TrafficKey>, getKey, (), (const));
+  MOCK_METHOD(Optional<TrafficKey>, getKey, (), (const));
   MOCK_METHOD(
       std::unique_ptr<folly::IOBuf>,
       _inplaceEncrypt,
@@ -73,13 +73,13 @@ class MockAead : public Aead {
   }
 
   MOCK_METHOD(
-      folly::Optional<std::unique_ptr<folly::IOBuf>>,
+      Optional<std::unique_ptr<folly::IOBuf>>,
       _tryDecrypt,
       (std::unique_ptr<folly::IOBuf> & ciphertext,
        const folly::IOBuf* associatedData,
        uint64_t seqNum),
       (const));
-  folly::Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
+  Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {

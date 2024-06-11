@@ -16,19 +16,19 @@ struct LossState {
   enum class AlarmMethod { EarlyRetransmitOrReordering, PTO };
   // Latest packet number sent
   // TODO: this also needs to be 3 numbers now...
-  folly::Optional<PacketNum> largestSent;
+  Optional<PacketNum> largestSent;
   // Timer for time reordering detection or early retransmit alarm.
-  EnumArray<PacketNumberSpace, folly::Optional<TimePoint>> lossTimes;
+  EnumArray<PacketNumberSpace, Optional<TimePoint>> lossTimes;
   // Max ack delay received from peer.
   std::chrono::microseconds maxAckDelay{0us};
   // minimum rtt. AckDelay isn't excluded from this.
   std::chrono::microseconds mrtt{kDefaultMinRtt};
   // minimum rtt measured from samples with AckDelay excluded.
-  folly::Optional<std::chrono::microseconds> maybeMrttNoAckDelay;
+  Optional<std::chrono::microseconds> maybeMrttNoAckDelay;
   // Last raw RTT value; unlike lrtt, this will always contain any ACK delay.
-  folly::Optional<std::chrono::microseconds> maybeLrtt;
+  Optional<std::chrono::microseconds> maybeLrtt;
   // Last raw ACK delay value.
-  folly::Optional<std::chrono::microseconds> maybeLrttAckDelay;
+  Optional<std::chrono::microseconds> maybeLrttAckDelay;
   // Smooth rtt.
   std::chrono::microseconds srtt{0us};
   // Latest rtt.
@@ -36,16 +36,16 @@ struct LossState {
   // Rtt var.
   std::chrono::microseconds rttvar{0us};
   // The sent time of the latest acked packet.
-  folly::Optional<TimePoint> lastAckedPacketSentTime;
+  Optional<TimePoint> lastAckedPacketSentTime;
   // The latest time a packet is acked.
-  folly::Optional<TimePoint> lastAckedTime;
+  Optional<TimePoint> lastAckedTime;
   // The latest time a packet is acked, minus ack delay.
-  folly::Optional<TimePoint> adjustedLastAckedTime;
+  Optional<TimePoint> adjustedLastAckedTime;
   // The time when last retranmittable packet is sent for every packet number.
   // space
   TimePoint lastRetransmittablePacketSentTime;
   // The time when the last packet was sent.
-  folly::Optional<TimePoint> maybeLastPacketSentTime;
+  Optional<TimePoint> maybeLastPacketSentTime;
   // Total number of bytes sent on this connection. This is after encoding.
   uint64_t totalBytesSent{0};
   // Total number of bytes received on this connection. This is before decoding.

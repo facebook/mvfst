@@ -51,12 +51,12 @@ class TransportClosingDeliveryCallback : public QuicSocket::DeliveryCallback {
   void onDeliveryAck(StreamId, uint64_t offset, std::chrono::microseconds)
       override {
     if (offset >= targetOffset_) {
-      transport_->close(folly::none);
+      transport_->close(none);
     }
   }
 
   void onCanceled(StreamId, uint64_t) override {
-    transport_->close(folly::none);
+    transport_->close(none);
   }
 
  private:
@@ -275,7 +275,7 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
       }));
   transport_->writeChain(streamId, buf->clone(), true);
   loopForWrites();
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
@@ -304,7 +304,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
   EXPECT_CALL(connCallback_, onAppRateLimited()).Times(0);
   loopForWrites();
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
@@ -327,7 +327,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
   EXPECT_CALL(connCallback_, onAppRateLimited()).Times(0);
   loopForWrites();
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
@@ -345,7 +345,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
   EXPECT_CALL(connCallback_, onAppRateLimited()).Times(0);
   loopForWrites();
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, AppLimited) {
@@ -364,7 +364,7 @@ TEST_F(QuicTransportTest, AppLimited) {
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(1);
   EXPECT_CALL(connCallback_, onAppRateLimited()).Times(1);
   loopForWrites();
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, ObserverNotAppLimitedWithNoWritableBytes) {
@@ -417,7 +417,7 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithNoWritableBytes) {
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   EXPECT_CALL(*cb3, destroy(transport_.get()));
-  transport_->close(folly::none);
+  transport_->close(none);
   transport_ = nullptr;
 }
 
@@ -466,7 +466,7 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   EXPECT_CALL(*cb3, destroy(transport_.get()));
-  transport_->close(folly::none);
+  transport_->close(none);
   transport_ = nullptr;
 }
 
@@ -517,7 +517,7 @@ TEST_F(QuicTransportTest, ObserverAppLimited) {
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   EXPECT_CALL(*cb3, destroy(transport_.get()));
-  transport_->close(folly::none);
+  transport_->close(none);
   transport_ = nullptr;
 }
 
@@ -905,7 +905,7 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
   }));
-  transport_->close(folly::none);
+  transport_->close(none);
   transport_ = nullptr;
 }
 
@@ -1120,7 +1120,7 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
   }));
-  transport_->close(folly::none);
+  transport_->close(none);
   transport_ = nullptr;
 }
 
@@ -1180,10 +1180,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
             testing::Eq(writeNum)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+            testing::Eq(Optional<uint64_t>(cwndInBytes))));
 
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
@@ -1195,10 +1195,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
             testing::Eq(writeNum)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(
+            testing::Lt(Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
@@ -1221,10 +1221,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
             testing::Eq(writeNum)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(
+            testing::Lt(Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))));
 
     invokeForEachObserverWithTestEvents(
@@ -1296,11 +1296,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
             testing::Eq(writeNum)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(
-                folly::Optional<uint64_t>(upperBoundCurrentBytesWritable))));
+            testing::Lt(Optional<uint64_t>(upperBoundCurrentBytesWritable))));
 
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
@@ -1312,10 +1311,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
             testing::Eq(writeNum)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(
+            testing::Lt(Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
@@ -1338,10 +1337,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
             testing::Eq(writeNum)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+            testing::Eq(Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Lt(folly::Optional<uint64_t>(
+            testing::Lt(Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))));
 
     invokeForEachObserverWithTestEvents(
@@ -1404,7 +1403,7 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
   invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
   }));
-  transport_->close(folly::none);
+  transport_->close(none);
   transport_ = nullptr;
 }
 
@@ -2060,11 +2059,11 @@ TEST_F(QuicTransportTest, NoWritePendingAckIfHavingData) {
     ackFound = true;
   }
   EXPECT_FALSE(ackFound);
-  EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, folly::none);
+  EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, none);
 
   auto pnSpace = packet.header.getPacketNumberSpace();
   auto ackState = getAckState(conn, pnSpace);
-  EXPECT_EQ(ackState.largestAckScheduled, folly::none);
+  EXPECT_EQ(ackState.largestAckScheduled, none);
   EXPECT_FALSE(ackState.needsToSendAckImmediately);
   EXPECT_EQ(3, ackState.numNonRxPacketsRecvd);
 }
@@ -2198,7 +2197,7 @@ TEST_F(QuicTransportTest, StopSendingReadCallbackNone) {
   auto streamId = transport_->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb;
   transport_->setReadCallback(streamId, &readCb);
-  transport_->setReadCallback(streamId, nullptr, folly::none);
+  transport_->setReadCallback(streamId, nullptr, none);
   loopForWrites();
   EXPECT_EQ(0, transport_->getConnectionState().outstandings.packets.size());
 }
@@ -2209,7 +2208,7 @@ TEST_F(QuicTransportTest, NoStopSendingReadCallback) {
   transport_->setReadCallback(streamId, &readCb);
   loopForWrites();
   EXPECT_EQ(0, transport_->getConnectionState().outstandings.packets.size());
-  transport_->setReadCallback(streamId, nullptr, folly::none);
+  transport_->setReadCallback(streamId, nullptr, none);
 }
 
 TEST_F(QuicTransportTest, SendPathChallenge) {
@@ -2311,7 +2310,7 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
   PathChallengeFrame pathChallenge2(456);
   transport_->getPathValidationTimeout().cancelTimerCallback();
   conn.pendingEvents.schedulePathValidationTimeout = false;
-  conn.outstandingPathValidation = folly::none;
+  conn.outstandingPathValidation = none;
   conn.pendingEvents.pathChallenge = pathChallenge2;
   EXPECT_EQ(conn.pendingEvents.pathChallenge, pathChallenge2);
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
@@ -2384,7 +2383,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   // Reset outstandingPathValidation
   // This could happen when an endpoint migrates to an unvalidated address, and
   // then migrates back to a validated address before timer expires
-  conn.outstandingPathValidation = folly::none;
+  conn.outstandingPathValidation = none;
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
@@ -2674,7 +2673,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   EXPECT_EQ(1, conn.outstandings.packets.size());
   EXPECT_EQ(1, conn.writeDebugState.currentEmptyLoopCount);
 
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
@@ -3085,7 +3084,7 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesClosedTransport) {
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
   transport_->writeChain(stream1, buf1->clone(), true, &dc);
   loopForWrites();
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
@@ -3350,7 +3349,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByte) {
   // unsentByteDeliveryCb::onByteEvent will never get called
   // cancel gets called instead
   EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 1)).Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
 }
 
@@ -3408,7 +3407,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
   // unsentByteDeliveryCb::onByteEvent will never get called
   // cancel gets called instead
   EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 2)).Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
 }
 
@@ -3465,7 +3464,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByteWithFin) {
   // unsentByteDeliveryCb::onByteEvent will never get called
   // cancel gets called instead
   EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 2)).Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
 }
 
@@ -3528,7 +3527,7 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByte) {
   // an error. So, onByteEventCanceled should be called only once.
   EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 1)))
       .Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
 
@@ -3613,7 +3612,7 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByteDSR) {
   // an error. So, onByteEventCanceled should be called only once.
   EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 2)))
       .Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
 
@@ -3674,7 +3673,7 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByteWithFin) {
   // cancel gets called instead
   EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 2)))
       .Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
 
@@ -3737,7 +3736,7 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytes) {
   EXPECT_CALL(
       pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, lastByte + 1)))
       .Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
 
@@ -3809,7 +3808,7 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesWriteRateLimited) {
   EXPECT_CALL(
       pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, lastByte + 1)))
       .Times(1);
-  transport_->close(folly::none);
+  transport_->close(none);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
 
@@ -4288,7 +4287,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnDuringClose) {
         } else {
           EXPECT_CALL(writeCallback_, onStreamWriteError(streamId, _));
         }
-        transport_->close(folly::none);
+        transport_->close(none);
       }));
   PacketNum num = 10;
   // Give the conn some headroom.
@@ -4324,7 +4323,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamDuringClose) {
   EXPECT_CALL(connCallback_, onFlowControlUpdate(stream->id));
   EXPECT_CALL(writeCallback_, onStreamWriteError(streamId2, _));
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _))
-      .WillOnce(Invoke([&](auto, auto) { transport_->close(folly::none); }));
+      .WillOnce(Invoke([&](auto, auto) { transport_->close(none); }));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
@@ -4427,7 +4426,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   const WriteStreamFrame* streamFrame4 = frame4.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame4);
   EXPECT_EQ(streamFrame4->streamId, s1);
-  transport_->close(folly::none);
+  transport_->close(none);
 }
 
 TEST_F(QuicTransportTest, NoStream) {
@@ -4536,7 +4535,7 @@ TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   transport_->scheduleLossTimeout(500ms);
   EXPECT_TRUE(transport_->isLossTimeoutScheduled());
 
-  transport_->closeNow(folly::none);
+  transport_->closeNow(none);
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   EXPECT_FALSE(transport_->isLossTimeoutScheduled());
 }
@@ -4550,7 +4549,7 @@ TEST_F(QuicTransportTest, DrainTimeoutExpired) {
 TEST_F(QuicTransportTest, CloseWithDrainWillKeepSocketAround) {
   EXPECT_CALL(*socket_, pauseRead()).Times(0);
   EXPECT_CALL(*socket_, close()).Times(0);
-  transport_->close(folly::none);
+  transport_->close(none);
 
   // Manual shut it, otherwise transport_'s dtor will shut the socket and mess
   // up the EXPECT_CALLs above
@@ -4872,7 +4871,7 @@ TEST_F(QuicTransportTest, PrioritySetAndGet) {
   auto nonExistStreamPri = transport_->getStreamPriority(stream + 4);
   EXPECT_TRUE(nonExistStreamPri.hasError());
   EXPECT_EQ(LocalErrorCode::STREAM_NOT_EXISTS, nonExistStreamPri.error());
-  transport_->close(folly::none);
+  transport_->close(none);
   auto closedConnStreamPri = transport_->getStreamPriority(stream);
   EXPECT_TRUE(closedConnStreamPri.hasError());
   EXPECT_EQ(LocalErrorCode::CONNECTION_CLOSED, closedConnStreamPri.error());

@@ -95,7 +95,7 @@ void appendDataToReadBufferCommon(
 
   auto bufferEndOffset = buffer.offset + buffer.data.chainLength();
 
-  folly::Optional<uint64_t> bufferEofOffset;
+  Optional<uint64_t> bufferEofOffset;
   if (buffer.eof) {
     bufferEofOffset = bufferEndOffset;
   } else if (buffer.data.chainLength() == 0) {
@@ -151,8 +151,8 @@ void appendDataToReadBufferCommon(
   // Start overlap will point to the first buffer that overlaps with the
   // current buffer and End overlap will point to the last buffer that overlaps.
   // They must always be set together.
-  folly::Optional<decltype(stream.readBuffer)::iterator> startOverlap;
-  folly::Optional<decltype(stream.readBuffer)::iterator> endOverlap;
+  Optional<decltype(stream.readBuffer)::iterator> startOverlap;
+  Optional<decltype(stream.readBuffer)::iterator> endOverlap;
 
   StreamBuffer* current = &buffer;
   bool currentAlreadyInserted = false;
@@ -430,26 +430,24 @@ uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
       stream.writeBufMeta.offset + stream.writeBufMeta.length));
 }
 
-folly::Optional<uint64_t> getLargestWriteOffsetTxed(
-    const QuicStreamState& stream) {
+Optional<uint64_t> getLargestWriteOffsetTxed(const QuicStreamState& stream) {
   // currentWriteOffset is really nextWriteOffset
   // when 0, it indicates nothing has been written yet
   if (stream.currentWriteOffset == 0 && stream.writeBufMeta.offset == 0) {
-    return folly::none;
+    return none;
   }
   uint64_t currentWriteOffset =
       std::max<uint64_t>(stream.currentWriteOffset, stream.writeBufMeta.offset);
   return currentWriteOffset - 1;
 }
 
-folly::Optional<uint64_t> getLargestDeliverableOffset(
-    const QuicStreamState& stream) {
+Optional<uint64_t> getLargestDeliverableOffset(const QuicStreamState& stream) {
   // If the acked intervals is not empty, then the furthest acked interval
   // starting at zero is the next offset. If there is no interval starting at
   // zero then we cannot deliver any offsets.
   if (stream.ackedIntervals.empty() ||
       stream.ackedIntervals.front().start != 0) {
-    return folly::none;
+    return none;
   }
   return stream.ackedIntervals.front().end;
 }

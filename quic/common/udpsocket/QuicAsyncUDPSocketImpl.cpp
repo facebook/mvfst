@@ -17,7 +17,7 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     uint64_t readBufferSize,
     uint16_t numPackets,
     NetworkData& networkData,
-    folly::Optional<folly::SocketAddress>& peerAddress,
+    Optional<folly::SocketAddress>& peerAddress,
     size_t& totalData) {
   /**
    * This is largely a copy / paste of QuicClientTransport::recvmmsg.
@@ -126,11 +126,11 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     // ts[2] -> hardware timestamp
     if (params.ts.has_value()) {
       const auto timespecToTimestamp = [](const timespec& ts)
-          -> folly::Optional<ReceivedUdpPacket::Timings::SocketTimestampExt> {
+          -> Optional<ReceivedUdpPacket::Timings::SocketTimestampExt> {
         std::chrono::nanoseconds duration = std::chrono::seconds(ts.tv_sec) +
             std::chrono::nanoseconds(ts.tv_nsec);
         if (duration == duration.zero()) {
-          return folly::none;
+          return none;
         }
 
         ReceivedUdpPacket::Timings::SocketTimestampExt sockTsExt;

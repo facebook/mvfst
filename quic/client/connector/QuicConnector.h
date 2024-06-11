@@ -46,7 +46,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
 
   void connect(
       folly::EventBase* eventBase,
-      folly::Optional<folly::SocketAddress> localAddr,
+      Optional<folly::SocketAddress> localAddr,
       const folly::SocketAddress& connectAddr,
       std::shared_ptr<const fizz::client::FizzClientContext> fizzContext,
       std::shared_ptr<const fizz::CertificateVerifier> verifier,
@@ -56,7 +56,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
       std::chrono::milliseconds connectTimeout =
           std::chrono::milliseconds(1000),
       const folly::SocketOptionMap& socketOptions = folly::emptySocketOptionMap,
-      const folly::Optional<std::string>& sni = folly::none,
+      const Optional<std::string>& sni = none,
       std::shared_ptr<quic::QLogger> qLogger = nullptr,
       std::shared_ptr<quic::LoopDetectorCallback> quicLoopDetectorCallback =
           nullptr,

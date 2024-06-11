@@ -331,7 +331,7 @@ void Cubic::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
   // TODO: current code in detectLossPackets only gives back a loss event when
-  // largestLostPacketNum isn't a folly::none. But we should probably also check
+  // largestLostPacketNum isn't a none. But we should probably also check
   // against it here anyway just in case the loss code is changed in the
   // future.
   if (lossEvent) {
@@ -453,7 +453,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       conn_.transportSettings.maxCwndInMss,
       conn_.transportSettings.minCwndInMss);
 
-  folly::Optional<Cubic::ExitReason> exitReason;
+  Optional<Cubic::ExitReason> exitReason;
   SCOPE_EXIT {
     if (hystartState_.found != Cubic::HystartFound::No &&
         cwndBytes_ >= kLowSsthreshInMss * conn_.udpSendPacketLen) {

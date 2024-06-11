@@ -194,8 +194,8 @@ class ReadAckFrameLog : public QLogFrame {
   ReadAckFrame::Vec ackBlocks;
   std::chrono::microseconds ackDelay;
   FrameType frameType;
-  folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
+  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
+  Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count;
   uint32_t ecnECT1Count;
@@ -205,9 +205,8 @@ class ReadAckFrameLog : public QLogFrame {
       const ReadAckFrame::Vec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
       FrameType frameTypeIn = FrameType::ACK,
-      folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn =
-          folly::none,
-      folly::Optional<PacketNum> maybeLatestRecvdPacketNumIn = folly::none,
+      Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn = none,
+      Optional<PacketNum> maybeLatestRecvdPacketNumIn = none,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
       uint32_t ecnECT0CountIn = 0,
       uint32_t ecnECT1CountIn = 0,
@@ -230,8 +229,8 @@ class WriteAckFrameLog : public QLogFrame {
   WriteAckFrame::AckBlockVec ackBlocks;
   std::chrono::microseconds ackDelay;
   FrameType frameType;
-  folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
+  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
+  Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count;
   uint32_t ecnECT1Count;
@@ -241,9 +240,8 @@ class WriteAckFrameLog : public QLogFrame {
       const WriteAckFrame::AckBlockVec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
       FrameType frameTypeIn = FrameType::ACK,
-      folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn =
-          folly::none,
-      folly::Optional<PacketNum> maybeLatestRecvdPacketNumIn = folly::none,
+      Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn = none,
+      Optional<PacketNum> maybeLatestRecvdPacketNumIn = none,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
       uint32_t ecnECT0CountIn = 0,
       uint32_t ecnECT1CountIn = 0,
@@ -703,13 +701,13 @@ class QLogStreamStateUpdateEvent : public QLogEvent {
   QLogStreamStateUpdateEvent(
       StreamId id,
       std::string update,
-      folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation,
+      Optional<std::chrono::milliseconds> timeSinceStreamCreation,
       VantagePoint vantagePoint,
       std::chrono::microseconds refTime);
   ~QLogStreamStateUpdateEvent() override = default;
   StreamId id;
   std::string update;
-  folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation;
+  Optional<std::chrono::milliseconds> timeSinceStreamCreation;
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 
  private:

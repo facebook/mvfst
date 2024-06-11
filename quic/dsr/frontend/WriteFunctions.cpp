@@ -84,7 +84,7 @@ uint64_t writePacketizationRequest(
     // of addSendInstruction() call.
     updateConnection(
         connection,
-        folly::none /* Packet Event */,
+        none /* Packet Event */,
         packet.packet,
         Clock::now(),
         packet.encodedSize + cipherOverhead,

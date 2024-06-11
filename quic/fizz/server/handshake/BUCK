@@ -40,7 +40,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//fizz/record:record",
-        "//folly:optional",
+        "//quic/common:optional",
         "//quic/server/handshake:app_token",
     ],
 )

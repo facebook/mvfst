@@ -66,7 +66,7 @@ bool IOBufQuicBatch::flushInternal() {
   }
 
   bool written = false;
-  folly::Optional<int> firstSocketErrno;
+  Optional<int> firstSocketErrno;
   if (!happyEyeballsState_ || happyEyeballsState_->shouldWriteToFirstSocket) {
     auto consumed = batchWriter_->write(sock_, peerAddress_);
     if (consumed < 0) {
@@ -92,7 +92,7 @@ bool IOBufQuicBatch::flushInternal() {
     happyEyeballsState_->connAttemptDelayTimeout->timeoutExpired();
   }
 
-  folly::Optional<int> secondSocketErrno;
+  Optional<int> secondSocketErrno;
   if (happyEyeballsState_ && happyEyeballsState_->shouldWriteToSecondSocket) {
     auto consumed = batchWriter_->write(
         *happyEyeballsState_->secondSocket,

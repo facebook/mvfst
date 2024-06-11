@@ -26,9 +26,7 @@ class Copa2 : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
-  void onPacketAckOrLoss(
-      folly::Optional<AckEvent> ack,
-      folly::Optional<LossEvent> loss) {
+  void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
 
@@ -56,7 +54,7 @@ class Copa2 : public CongestionController {
  private:
   void onPacketLoss(const LossEvent&);
   void onPacketAcked(const AckEvent&);
-  void manageLossyMode(folly::Optional<TimePoint> sentTime);
+  void manageLossyMode(Optional<TimePoint> sentTime);
 
   QuicConnectionStateBase& conn_;
   uint64_t cwndBytes_;
@@ -76,7 +74,7 @@ class Copa2 : public CongestionController {
       minRTTFilter_;
 
   // Updates happen in cycles.
-  folly::Optional<TimePoint> cycleStartTime_;
+  Optional<TimePoint> cycleStartTime_;
   bool appLimitedInCycle_{false};
   uint64_t bytesAckedInCycle_{0};
 

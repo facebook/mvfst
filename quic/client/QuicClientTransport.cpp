@@ -1131,7 +1131,7 @@ void QuicClientTransport::recvMsg(
     uint64_t readBufferSize,
     int numPackets,
     NetworkData& networkData,
-    folly::Optional<folly::SocketAddress>& server,
+    Optional<folly::SocketAddress>& server,
     size_t& totalData) {
   for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
@@ -1263,7 +1263,7 @@ void QuicClientTransport::recvMmsg(
     uint64_t readBufferSize,
     uint16_t numPackets,
     NetworkData& networkData,
-    folly::Optional<folly::SocketAddress>& server,
+    Optional<folly::SocketAddress>& server,
     size_t& totalData) {
   auto& msgs = recvmmsgStorage_.msgs;
   int flags = 0;
@@ -1420,7 +1420,7 @@ void QuicClientTransport::onNotifyDataAvailable(
   NetworkData networkData;
   networkData.reserve(numPackets);
   size_t totalData = 0;
-  folly::Optional<folly::SocketAddress> server;
+  Optional<folly::SocketAddress> server;
 
   if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
     const auto result = sock.recvmmsgNetworkData(
@@ -1728,7 +1728,7 @@ void QuicClientTransport::maybeSendTransportKnobs() {
   }
 }
 
-folly::Optional<std::vector<TransportParameter>>
+Optional<std::vector<TransportParameter>>
 QuicClientTransport::getPeerTransportParams() const {
   if (clientConn_ && clientConn_->clientHandshakeLayer) {
     auto maybeParams =
@@ -1737,7 +1737,7 @@ QuicClientTransport::getPeerTransportParams() const {
       return maybeParams->parameters;
     }
   }
-  return folly::none;
+  return none;
 }
 
 void QuicClientTransport::setCongestionControl(CongestionControlType type) {

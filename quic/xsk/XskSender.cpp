@@ -39,7 +39,7 @@ XskSender::~XskSender() {
   }
 }
 
-folly::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
+quic::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
   auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
                                              : std::unique_lock<std::mutex>(m_);
 
@@ -51,7 +51,7 @@ folly::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
   auto maybeFreeUmemLoc = getFreeUmemIndex();
 
   if (!maybeFreeUmemLoc.hasValue()) {
-    return folly::none;
+    return quic::none;
   }
 
   XskBuffer xskBuffer;
@@ -411,9 +411,9 @@ xdp_desc* XskSender::getTxDescriptor() {
   return result;
 }
 
-folly::Optional<uint32_t> XskSender::getFreeUmemIndex() {
+quic::Optional<uint32_t> XskSender::getFreeUmemIndex() {
   if (freeUmemIndices_.empty()) {
-    return folly::none;
+    return quic::none;
   }
   uint32_t freeLoc = freeUmemIndices_.front();
   freeUmemIndices_.pop();

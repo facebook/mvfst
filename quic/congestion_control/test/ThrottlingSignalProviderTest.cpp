@@ -25,7 +25,7 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
  public:
   explicit SimpleThrottlingSignalProvider(
       SimulatedTBF::Config config,
-      folly::Optional<uint64_t> burstRateBytesPerSecond = folly::none)
+      Optional<uint64_t> burstRateBytesPerSecond = none)
       : stbf_(std::move(config)),
         burstRateBytesPerSecond_(std::move(burstRateBytesPerSecond)) {}
   ~SimpleThrottlingSignalProvider() override = default;
@@ -34,7 +34,7 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
         packet.metadata.encodedSize, packet.metadata.time);
   }
 
-  [[nodiscard]] folly::Optional<ThrottlingSignal> getCurrentThrottlingSignal()
+  [[nodiscard]] Optional<ThrottlingSignal> getCurrentThrottlingSignal()
       override {
     auto availTokens = stbf_.getNumAvailableTokensInBytes(quic::Clock::now());
     ThrottlingSignal signal = {};
@@ -49,7 +49,7 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
 
  private:
   SimulatedTBF stbf_;
-  folly::Optional<uint64_t> burstRateBytesPerSecond_;
+  Optional<uint64_t> burstRateBytesPerSecond_;
 };
 
 TEST(ThrottlingSignalProviderTest, BasicInitSetGetTest) {
@@ -156,7 +156,7 @@ TEST(
     bbr.onPacketAckOrLoss(
         makeAck(
             pn, 2000, now + std::chrono::milliseconds{5}, packet.metadata.time),
-        folly::none);
+        none);
     auto maybeSignal = signalProvider->getCurrentThrottlingSignal();
     ASSERT_TRUE(maybeSignal.has_value());
     ASSERT_TRUE(bbr.getBandwidth().has_value());

@@ -117,13 +117,13 @@ inline fizz::Extension encodeExtension(
 
 namespace fizz {
 
-inline folly::Optional<quic::ClientTransportParameters> getClientExtension(
+inline quic::Optional<quic::ClientTransportParameters> getClientExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
   auto extensionType = getQuicTransportParametersExtention(encodingVersion);
   auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
-    return folly::none;
+    return quic::none;
   }
   quic::ClientTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
@@ -131,13 +131,13 @@ inline folly::Optional<quic::ClientTransportParameters> getClientExtension(
   return parameters;
 }
 
-inline folly::Optional<quic::ServerTransportParameters> getServerExtension(
+inline quic::Optional<quic::ServerTransportParameters> getServerExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
   auto extensionType = getQuicTransportParametersExtention(encodingVersion);
   auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
-    return folly::none;
+    return quic::none;
   }
   quic::ServerTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
@@ -145,13 +145,13 @@ inline folly::Optional<quic::ServerTransportParameters> getServerExtension(
   return parameters;
 }
 
-inline folly::Optional<quic::TicketTransportParameters> getTicketExtension(
+inline quic::Optional<quic::TicketTransportParameters> getTicketExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
   auto extensionType = getQuicTransportParametersExtention(encodingVersion);
   auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
-    return folly::none;
+    return quic::none;
   }
   quic::TicketTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());

@@ -9,9 +9,9 @@
 #include <ostream>
 
 #include <folly/Function.h>
-#include <folly/Optional.h>
 #include <folly/io/async/DelayedDestruction.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/common/events/QuicTimer.h>
 
@@ -95,7 +95,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
 
   void callbackCanceled() noexcept override;
 
-  folly::Optional<std::chrono::microseconds> getTimerTickInterval() noexcept;
+  Optional<std::chrono::microseconds> getTimerTickInterval() noexcept;
 
   /*
    * Controls whether to fire a loop early when the pacing timer has been

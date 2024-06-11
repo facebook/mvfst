@@ -129,17 +129,14 @@ class BbrCongestionController : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
-  void onPacketAckOrLoss(
-      folly::Optional<AckEvent> ack,
-      folly::Optional<LossEvent> loss) {
+  void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
   uint64_t getWritableBytes() const noexcept override;
 
   uint64_t getCongestionWindow() const noexcept override;
 
-  [[nodiscard]] folly::Optional<Bandwidth> getBandwidth()
-      const noexcept override;
+  [[nodiscard]] Optional<Bandwidth> getBandwidth() const noexcept override;
 
   CongestionControlType type() const noexcept override;
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
@@ -258,7 +255,7 @@ class BbrCongestionController : public CongestionController {
   TimePoint endOfRoundTrip_;
   // When a packet with send time later than endOfRecovery_ is acked, the
   // connection is no longer in recovery
-  folly::Optional<TimePoint> endOfRecovery_;
+  Optional<TimePoint> endOfRecovery_;
   // Cwnd in bytes
   uint64_t cwnd_;
   // Initial cwnd in bytes
@@ -290,10 +287,10 @@ class BbrCongestionController : public CongestionController {
   // Once in ProbeRtt state, we cannot exit ProbeRtt before at least we spend
   // some duration with low inflight bytes. earliestTimeToExitProbeRtt_ is that
   // time point.
-  folly::Optional<TimePoint> earliestTimeToExitProbeRtt_;
+  Optional<TimePoint> earliestTimeToExitProbeRtt_;
   // We also cannot exit ProbeRtt if are not at least at the low inflight bytes
   // mode for one RTT round. probeRttRound_ tracks that.
-  folly::Optional<uint64_t> probeRttRound_;
+  Optional<uint64_t> probeRttRound_;
 
   WindowedFilter<
       uint64_t /* ack bytes count */,
@@ -301,7 +298,7 @@ class BbrCongestionController : public CongestionController {
       uint64_t /* roundtrip count */,
       uint64_t /* roundtrip count */>
       maxAckHeightFilter_;
-  folly::Optional<TimePoint> ackAggregationStartTime_;
+  Optional<TimePoint> ackAggregationStartTime_;
   uint64_t aggregatedAckBytes_{0};
 
   bool appLimitedSinceProbeRtt_{false};
@@ -310,8 +307,8 @@ class BbrCongestionController : public CongestionController {
 
   // The last max ACK delay requested, so we don't end up sending
   // them too frequently.
-  folly::Optional<std::chrono::milliseconds> lastMaxAckDelay_;
-  folly::Optional<uint32_t> lastAckThreshold_;
+  Optional<std::chrono::milliseconds> lastMaxAckDelay_;
+  Optional<uint32_t> lastAckThreshold_;
 
   friend std::ostream& operator<<(
       std::ostream& os,

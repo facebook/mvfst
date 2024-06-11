@@ -17,7 +17,7 @@
 #include <fizz/server/ResumptionState.h>
 #include <folly/Function.h>
 #include <folly/IPAddress.h>
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 
 #include <glog/logging.h>
 

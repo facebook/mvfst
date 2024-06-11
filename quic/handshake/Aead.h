@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 
@@ -24,7 +24,7 @@ class Aead {
  public:
   virtual ~Aead() = default;
 
-  virtual folly::Optional<TrafficKey> getKey() const = 0;
+  virtual Optional<TrafficKey> getKey() const = 0;
 
   /**
    * Encrypts plaintext inplace. Will throw on error.
@@ -53,7 +53,7 @@ class Aead {
    * Decrypt ciphertext. Will return none if the ciphertext does not decrypt
    * successfully. May still throw from errors unrelated to ciphertext.
    */
-  virtual folly::Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
+  virtual Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const = 0;

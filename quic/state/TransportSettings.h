@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/Optional.h>
 #include <quic/state/QuicPriorityQueue.h>
 #include <chrono>
 #include <cstdint>
@@ -66,7 +66,7 @@ struct CongestionControlConfig {
   };
 
   // Used by: BBR1
-  folly::Optional<AckFrequencyConfig> ackFrequencyConfig;
+  Optional<AckFrequencyConfig> ackFrequencyConfig;
 
   // Used by: BBR2
   // Whether BBR2 should not use inflightHi when settings its cwnd.
@@ -148,7 +148,7 @@ struct TransportSettings {
       CongestionControlType::Cubic};
   // Param to determine sensitivity of CongestionController to latency. Only
   // used by Copa.
-  folly::Optional<double> copaDeltaParam;
+  Optional<double> copaDeltaParam;
   // Whether to use Copa's RTT standing feature. Only used by Copa.
   bool copaUseRttStanding{false};
   // The max UDP packet size we are willing to receive.
@@ -225,7 +225,7 @@ struct TransportSettings {
   // The minimum amount of time in microseconds by which an ack can be delayed
   // Setting a value here also indicates to the peer that it can send
   // ACK_FREQUENCY and IMMEDIATE_ACK frames
-  folly::Optional<std::chrono::microseconds> minAckDelay;
+  Optional<std::chrono::microseconds> minAckDelay;
   // Limits the amount of data that should be buffered in a QuicSocket.
   // If the amount of data in the buffer equals or exceeds this amount, then
   // the callback registered through notifyPendingWriteOnConnection() will
@@ -236,11 +236,10 @@ struct TransportSettings {
   // Whether or not the socket should gracefully drain on close
   bool shouldDrain{true};
   // default stateless reset secret for stateless reset token
-  folly::Optional<std::array<uint8_t, kStatelessResetTokenSecretLength>>
+  Optional<std::array<uint8_t, kStatelessResetTokenSecretLength>>
       statelessResetTokenSecret;
   // retry token secret used for encryption/decryption
-  folly::Optional<std::array<uint8_t, kRetryTokenSecretLength>>
-      retryTokenSecret;
+  Optional<std::array<uint8_t, kRetryTokenSecretLength>> retryTokenSecret;
   // Default initial RTT
   std::chrono::microseconds initialRtt{kDefaultInitialRtt};
   // The active_connection_id_limit that is sent to the peer.
@@ -341,7 +340,7 @@ struct TransportSettings {
   // If structure is not initialized, ACK receive timestamps are
   // not requested from peer regardless of whether the peer
   // supports them.
-  folly::Optional<AckReceiveTimestampsConfig>
+  Optional<AckReceiveTimestampsConfig>
       maybeAckReceiveTimestampsConfigSentToPeer;
 
   // Maximum number of received packet timestamps stored per ACK. This will be
@@ -362,9 +361,8 @@ struct TransportSettings {
   // Whether to initiate key updates
   bool initiateKeyUpdate{false};
   // How many packets to send before initiating the first key update.
-  // This is reset to folly::none after the first key update is initiated.
-  folly::Optional<uint64_t> firstKeyUpdatePacketCount{
-      kFirstKeyUpdatePacketCount};
+  // This is reset to none after the first key update is initiated.
+  Optional<uint64_t> firstKeyUpdatePacketCount{kFirstKeyUpdatePacketCount};
   // How many packets to send before initiating periodic key updates
   uint64_t keyUpdatePacketCountInterval{kDefaultKeyUpdatePacketCountInterval};
 

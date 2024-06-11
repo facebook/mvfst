@@ -16,14 +16,14 @@ void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame) {
   conn.pendingEvents.frames.emplace_back(std::move(frame));
 }
 
-folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
+Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame:
       if (!conn.streamManager->streamExists(
               frame.asStopSendingFrame()->streamId)) {
-        return folly::none;
+        return none;
       }
       return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathChallengeFrame:
@@ -31,7 +31,7 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       // or a different path validation was scheduled
       if (!conn.outstandingPathValidation ||
           *frame.asPathChallengeFrame() != *conn.outstandingPathValidation) {
-        return folly::none;
+        return none;
       }
       return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathResponseFrame:

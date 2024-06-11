@@ -25,13 +25,13 @@ EncryptionLevel getEncryptionLevelFromFizz(
   folly::assume_unreachable();
 }
 
-folly::Optional<TrafficKey> FizzAead::getKey() const {
+Optional<TrafficKey> FizzAead::getKey() const {
   if (!fizzAead) {
-    return folly::none;
+    return none;
   }
   auto fizzKey = fizzAead->getKey();
   if (!fizzKey) {
-    return folly::none;
+    return none;
   }
   TrafficKey quicKey;
   quicKey.key = std::move(fizzKey->key);

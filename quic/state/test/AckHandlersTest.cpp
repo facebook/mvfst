@@ -2399,8 +2399,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth())
-      .WillOnce(Return(folly::none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled
@@ -2528,8 +2527,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth())
-      .WillOnce(Return(folly::none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled
@@ -3362,15 +3360,14 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
                 ackTime - getSentTime(9)),
             ack->rttSample);
         EXPECT_EQ(
-            folly::none, // ack delay > RTT, so not set
+            none, // ack delay > RTT, so not set
             ack->rttSampleNoAckDelay);
       }));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth())
-      .WillOnce(Return(folly::none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
@@ -3470,8 +3467,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth())
-      .WillOnce(Return(folly::none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
@@ -3598,7 +3594,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(folly::none));
+        .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -3641,8 +3637,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
               Pointee(
                   getAckPacketMatcher(4, getWriteCount(4), getSentTime(4))));
 
-          EXPECT_EQ(folly::none, ack->rttSample); // no RTT sample
-          EXPECT_EQ(folly::none, ack->rttSampleNoAckDelay); // no RTT sample
+          EXPECT_EQ(none, ack->rttSample); // no RTT sample
+          EXPECT_EQ(none, ack->rttSampleNoAckDelay); // no RTT sample
           EXPECT_THAT(ack->ackedPackets, SizeIs(1));
           EXPECT_THAT(
               ack->ackedPackets,
@@ -3654,7 +3650,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(folly::none));
+        .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -3696,8 +3692,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
               Pointee(
                   getAckPacketMatcher(6, getWriteCount(6), getSentTime(6))));
 
-          EXPECT_EQ(folly::none, ack->rttSample); // no RTT sample
-          EXPECT_EQ(folly::none, ack->rttSampleNoAckDelay); // no RTT sample
+          EXPECT_EQ(none, ack->rttSample); // no RTT sample
+          EXPECT_EQ(none, ack->rttSampleNoAckDelay); // no RTT sample
           EXPECT_THAT(ack->ackedPackets, SizeIs(2));
           EXPECT_THAT(
               ack->ackedPackets,
@@ -3710,7 +3706,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(folly::none));
+        .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -3829,7 +3825,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(folly::none));
+        .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
@@ -3953,8 +3949,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth())
-      .WillOnce(Return(folly::none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
@@ -4368,7 +4363,7 @@ class AckEventForAppDataTest : public Test {
   auto buildEmptyPacket(
       const PacketNumberSpace pnSpace,
       const bool shortHeader = false) {
-    folly::Optional<PacketHeader> header;
+    Optional<PacketHeader> header;
     if (shortHeader) {
       header = ShortHeader(
           ProtectionType::KeyPhaseZero,
@@ -4433,7 +4428,7 @@ class AckEventForAppDataTest : public Test {
       const TimePoint timepoint = Clock::now()) {
     updateConnection(
         *conn_,
-        folly::none,
+        none,
         packet.packet,
         timepoint,
         getEncodedSize(packet),

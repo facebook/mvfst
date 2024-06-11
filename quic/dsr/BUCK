@@ -12,8 +12,8 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//folly:network_address",
-        "//folly:optional",
         "//quic/codec:types",
+        "//quic/common:optional",
         "//quic/server/state:server",
         "//quic/state:quic_state_machine",
     ],

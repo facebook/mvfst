@@ -8,9 +8,9 @@
 #pragma once
 
 #include <folly/Chrono.h>
-#include <folly/Optional.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Optional.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/flowcontrol/QuicFlowController.h>
@@ -37,7 +37,7 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn);
  *
  */
 bool isPersistentCongestion(
-    folly::Optional<std::chrono::microseconds> pto,
+    Optional<std::chrono::microseconds> pto,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd,
     const CongestionController::AckEvent& ack) noexcept;
@@ -60,7 +60,7 @@ template <class ClockType = Clock>
 std::pair<std::chrono::milliseconds, LossState::AlarmMethod>
 calculateAlarmDuration(const QuicConnectionStateBase& conn) {
   std::chrono::microseconds alarmDuration;
-  folly::Optional<LossState::AlarmMethod> alarmMethod;
+  Optional<LossState::AlarmMethod> alarmMethod;
   TimePoint lastSentPacketTime =
       conn.lossState.lastRetransmittablePacketSentTime;
   auto lossTimeAndSpace = earliestLossTimer(conn);
@@ -191,19 +191,19 @@ bool processOutstandingsForLoss(
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
     const InlineMap<StreamId, PacketNum, 20>& largestDsrAckedSequenceNumber,
-    const folly::Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
+    const Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
     const TimePoint& lossTime,
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
     std::chrono::microseconds& delayUntilLost,
     CongestionController::LossEvent& lossEvent,
-    folly::Optional<SocketObserverInterface::LossEvent>& observerLossEvent);
+    Optional<SocketObserverInterface::LossEvent>& observerLossEvent);
 
 /*
  * This function should be invoked after some event that is possible to
  * trigger loss detection, for example: packets are acked
  */
-folly::Optional<CongestionController::LossEvent> detectLossPackets(
+Optional<CongestionController::LossEvent> detectLossPackets(
     QuicConnectionStateBase& conn,
     const AckState& ackState,
     const LossVisitor& lossVisitor,
@@ -265,7 +265,7 @@ void markPacketLoss(
     RegularQuicWritePacket& packet,
     bool processed);
 
-folly::Optional<CongestionController::LossEvent> handleAckForLoss(
+Optional<CongestionController::LossEvent> handleAckForLoss(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor,
     CongestionController::AckEvent& ack,

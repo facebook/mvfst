@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/Optional.h>
 
 /**
  * Namespace for mvfst chrono types.
@@ -36,7 +36,7 @@ struct SystemClockTimePointExt {
   //
   // We keep both the raw TimePoint and the transformed TimePoint to enable us
   // to measure the impact of said correction and for debugging purposes.
-  folly::Optional<SystemClock::TimePoint> maybeMonotonic;
+  Optional<SystemClock::TimePoint> maybeMonotonic;
 };
 
 /**

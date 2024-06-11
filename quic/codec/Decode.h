@@ -23,16 +23,14 @@ struct CodecParameters {
   // This must not be set to zero.
   uint8_t peerAckDelayExponent{kDefaultAckDelayExponent};
   QuicVersion version{QuicVersion::MVFST};
-  folly::Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig =
-      folly::none;
+  Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig = none;
 
   CodecParameters() = default;
 
   CodecParameters(
       uint8_t peerAckDelayExponentIn,
       QuicVersion versionIn,
-      folly::Optional<AckReceiveTimestampsConfig>
-          maybeAckReceiveTimestampsConfigIn)
+      Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfigIn)
       : peerAckDelayExponent(peerAckDelayExponentIn),
         version(versionIn),
         maybeAckReceiveTimestampsConfig(maybeAckReceiveTimestampsConfigIn) {}
@@ -52,10 +50,10 @@ struct ParsedLongHeaderInvariant {
 };
 
 /**
- * Decodes a version negotiation packet. Returns a folly::none, if it cannot
+ * Decodes a version negotiation packet. Returns a none, if it cannot
  * decode the packet.
  */
-folly::Optional<VersionNegotiationPacket> decodeVersionNegotiation(
+Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     const ParsedLongHeaderInvariant& longHeaderInvariant,
     folly::io::Cursor& cursor);
 
@@ -188,11 +186,11 @@ struct ParsedLongHeader {
 
 struct ParsedLongHeaderResult {
   bool isVersionNegotiation;
-  folly::Optional<ParsedLongHeader> parsedLongHeader;
+  Optional<ParsedLongHeader> parsedLongHeader;
 
   ParsedLongHeaderResult(
       bool isVersionNegotiationIn,
-      folly::Optional<ParsedLongHeader> parsedLongHeaderIn);
+      Optional<ParsedLongHeader> parsedLongHeaderIn);
 };
 
 // Functions that operate on the initial byte

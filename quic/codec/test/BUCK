@@ -22,10 +22,10 @@ cpp_unittest(
         "QuicHeaderCodecTest.cpp",
     ],
     deps = [
-        "//folly:optional",
         "//folly/portability:gtest",
         "//quic:exception",
         "//quic/codec:header_codec",
+        "//quic/common:optional",
         "//quic/common/test:test_utils",
     ],
 )
@@ -191,12 +191,12 @@ cpp_unittest(
     supports_static_listing = False,
     deps = [
         "//folly:expected",
-        "//folly:optional",
         "//folly:string",
         "//folly/io:iobuf",
         "//folly/portability:gtest",
         "//quic:exception",
         "//quic/codec:types",
+        "//quic/common:optional",
     ],
 )
 

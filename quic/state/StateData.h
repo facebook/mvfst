@@ -33,9 +33,9 @@
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 
-#include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/DelayedDestruction.h>
+#include <quic/common/Optional.h>
 
 #include <chrono>
 #include <list>
@@ -333,7 +333,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // When server receives early data attempt without valid source address token,
   // server will limit bytes in flight to avoid amplification attack.
   // This limit should be cleared and set back to max after CFIN is received.
-  folly::Optional<uint64_t> writableBytesLimit;
+  Optional<uint64_t> writableBytesLimit;
 
   std::unique_ptr<PendingPathRateLimiter> pathValidationLimiter;
 
@@ -365,7 +365,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // current (updated) phase. The peer must acknowledge this packet in the same
   // phase, responding in a different phase is a protocol violation. Once the
   // packet is acked, this value will be cleared.
-  folly::Optional<PacketNum> oneRttWritePendingVerificationPacketNumber;
+  Optional<PacketNum> oneRttWritePendingVerificationPacketNumber;
 
   // Write cipher for packets with initial keys.
   std::unique_ptr<Aead> initialWriteCipher;
@@ -381,13 +381,13 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   uint64_t peerActiveConnectionIdLimit{0};
 
   // The destination connection id used in client's initial packet.
-  folly::Optional<ConnectionId> clientChosenDestConnectionId;
+  Optional<ConnectionId> clientChosenDestConnectionId;
 
   // The source connection id used in client's initial packet.
-  folly::Optional<ConnectionId> clientConnectionId;
+  Optional<ConnectionId> clientConnectionId;
 
   // The current server chosen connection id.
-  folly::Optional<ConnectionId> serverConnectionId;
+  Optional<ConnectionId> serverConnectionId;
 
   // Connection ids issued by self.
   std::vector<ConnectionIdData> selfConnectionIds;
@@ -396,18 +396,18 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   std::vector<ConnectionIdData> peerConnectionIds;
 
   // Connection ids to be unbinded soon (server only)
-  folly::Optional<SmallVec<ConnectionId, 5>> connIdsRetiringSoon;
+  Optional<SmallVec<ConnectionId, 5>> connIdsRetiringSoon;
 
   // ConnectionIdAlgo implementation to encode and decode ConnectionId with
   // various info, such as routing related info.
   ConnectionIdAlgo* connIdAlgo{nullptr};
 
   // Negotiated version.
-  folly::Optional<QuicVersion> version;
+  Optional<QuicVersion> version;
 
   // Original advertised version. Only meaningful to clients.
   // TODO: move to client only conn state.
-  folly::Optional<QuicVersion> originalVersion;
+  Optional<QuicVersion> originalVersion;
 
   // Original address used by the peer when first establishing the connection.
   folly::SocketAddress originalPeerAddress;
@@ -416,13 +416,13 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   folly::SocketAddress peerAddress;
 
   // Local address. INADDR_ANY if not set.
-  folly::Optional<folly::SocketAddress> localAddress;
+  Optional<folly::SocketAddress> localAddress;
 
   // Local error on the connection.
-  folly::Optional<QuicError> localConnectionError;
+  Optional<QuicError> localConnectionError;
 
   // Error sent on the connection by the peer.
-  folly::Optional<QuicError> peerConnectionError;
+  Optional<QuicError> peerConnectionError;
 
   // Supported versions in order of preference. Only meaningful to clients.
   // TODO: move to client only conn state.
@@ -431,15 +431,15 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // The endpoint attempts to create a new self connection id with sequence
   // number and stateless reset token for itself, and if successful, returns it
   // and updates the connection's state to ensure its peer can use it.
-  virtual folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() {
-    return folly::none;
+  virtual Optional<ConnectionIdData> createAndAddNewSelfConnId() {
+    return none;
   }
 
   uint64_t nextSelfConnectionIdSequence{0};
 
   struct PendingEvents {
     Resets resets;
-    folly::Optional<PathChallengeFrame> pathChallenge;
+    Optional<PathChallengeFrame> pathChallenge;
 
     FrameList frames;
 
@@ -511,7 +511,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // The sum of length of data in all the stream buffers.
     uint64_t sumCurStreamBufferLen{0};
     // The packet number in which we got the last largest max data.
-    folly::Optional<PacketNum> largestMaxOffsetReceived;
+    Optional<PacketNum> largestMaxOffsetReceived;
     // The following are advertised by the peer, and are set to zero initially
     // so that we cannot send any data until we know the peer values.
     // The initial max stream offset for peer-initiated bidirectional streams.
@@ -521,7 +521,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // The initial max stream offset for unidirectional streams.
     uint64_t peerAdvertisedInitialMaxStreamOffsetUni{0};
     // Time at which the last flow control update was sent by the transport.
-    folly::Optional<TimePoint> timeOfLastFlowControlUpdate;
+    Optional<TimePoint> timeOfLastFlowControlUpdate;
   };
 
   // Current state of flow control.
@@ -537,7 +537,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   PendingWriteBatch pendingWriteBatch_;
 
   // The outstanding path challenge
-  folly::Optional<PathChallengeFrame> outstandingPathValidation;
+  Optional<PathChallengeFrame> outstandingPathValidation;
 
   // Settings for transports.
   TransportSettings transportSettings;
@@ -547,7 +547,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // The value of the peer's min_ack_delay, for creating ACK_FREQUENCY and
   // IMMEDIATE_ACK frames.
-  folly::Optional<std::chrono::microseconds> peerMinAckDelay;
+  Optional<std::chrono::microseconds> peerMinAckDelay;
 
   // Idle timeout advertised by the peer. Initially sets it to the maximum value
   // until the handshake sets the timeout.
@@ -600,7 +600,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   /**
    * Eerie data app params functions.
    */
-  folly::Function<bool(const folly::Optional<std::string>&, const Buf&) const>
+  folly::Function<bool(const Optional<std::string>&, const Buf&) const>
       earlyDataAppParamsValidator;
   folly::Function<Buf()> earlyDataAppParamsGetter;
 
@@ -677,16 +677,15 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   DatagramState datagramState;
 
   // Peer max stream groups advertised.
-  folly::Optional<uint64_t> peerAdvertisedMaxStreamGroups;
+  Optional<uint64_t> peerAdvertisedMaxStreamGroups;
 
   // Sequence number to use for the next ACK_FREQUENCY frame
   uint64_t nextAckFrequencyFrameSequenceNumber{0};
 
   // GSO supported on conn.
-  folly::Optional<bool> gsoSupported;
+  Optional<bool> gsoSupported;
 
-  folly::Optional<AckReceiveTimestampsConfig>
-      maybePeerAckReceiveTimestampsConfig;
+  Optional<AckReceiveTimestampsConfig> maybePeerAckReceiveTimestampsConfig;
 
   bool peerAdvertisedKnobFrameSupport{false};
   // Retransmission policies map.
@@ -694,7 +693,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
       retransmissionPolicies;
 
   struct SocketCmsgsState {
-    folly::Optional<folly::SocketCmsgMap> additionalCmsgs;
+    Optional<folly::SocketCmsgMap> additionalCmsgs;
     // The write count which this SocketCmsgs state is intended for.
     // This is used to make sure this cmsgs list does not end up used
     // for multiple writes.

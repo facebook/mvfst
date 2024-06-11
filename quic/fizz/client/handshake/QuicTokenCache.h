@@ -10,8 +10,8 @@
 #include <string>
 #include <unordered_map>
 
-#include <folly/Optional.h>
 #include <folly/String.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 
@@ -19,7 +19,7 @@ class QuicTokenCache {
  public:
   virtual ~QuicTokenCache() = default;
 
-  [[nodiscard]] virtual folly::Optional<std::string> getToken(
+  [[nodiscard]] virtual Optional<std::string> getToken(
       const std::string& hostname) = 0;
 
   virtual void putToken(const std::string& hostname, std::string token) = 0;
@@ -31,12 +31,12 @@ class BasicQuicTokenCache : public QuicTokenCache {
  public:
   ~BasicQuicTokenCache() override = default;
 
-  folly::Optional<std::string> getToken(const std::string& hostname) override {
+  Optional<std::string> getToken(const std::string& hostname) override {
     auto res = cache_.find(hostname);
     if (res != cache_.end()) {
       return res->second;
     }
-    return folly::none;
+    return none;
   }
 
   void putToken(const std::string& hostname, std::string token) override {

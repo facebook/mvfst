@@ -43,14 +43,14 @@ uint8_t decodeQuicIntegerLength(uint8_t firstByte) {
   return (1 << ((firstByte >> 6) & 0x03));
 }
 
-folly::Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
+Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
     folly::io::Cursor& cursor,
     uint64_t atMost) {
   // checks
   if (atMost == 0 || !cursor.canAdvance(1)) {
     VLOG(10) << "Not enough bytes to decode integer, cursor len="
              << cursor.totalLength();
-    return folly::none;
+    return none;
   }
 
   // get 2 msb of first byte that determines variable-length size expected
@@ -67,7 +67,7 @@ folly::Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
   // not enough bytes to decode, undo cursor
   if (!cursor.canAdvance(bytesExpected) || atMost < bytesExpected) {
     VLOG(10) << "Could not decode integer numBytes=" << bytesExpected;
-    return folly::none;
+    return none;
   }
   // result storage
   uint64_t result{0};

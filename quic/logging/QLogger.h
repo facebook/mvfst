@@ -27,8 +27,8 @@ class QLogger {
   explicit QLogger(VantagePoint vantagePointIn, std::string protocolTypeIn)
       : vantagePoint(vantagePointIn), protocolType(std::move(protocolTypeIn)) {}
 
-  folly::Optional<ConnectionId> dcid;
-  folly::Optional<ConnectionId> scid;
+  Optional<ConnectionId> dcid;
+  Optional<ConnectionId> scid;
   VantagePoint vantagePoint;
   std::string protocolType;
   QLogger() = delete;
@@ -115,7 +115,7 @@ class QLogger {
   virtual void addStreamStateUpdate(
       quic::StreamId streamId,
       std::string update,
-      folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) = 0;
+      Optional<std::chrono::milliseconds> timeSinceStreamCreation) = 0;
   virtual void addConnectionMigrationUpdate(bool intentionalMigration) = 0;
   virtual void addPathValidationEvent(bool success) = 0;
   virtual void addPriorityUpdate(
@@ -125,8 +125,8 @@ class QLogger {
   virtual void
   addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe) = 0;
 
-  virtual void setDcid(folly::Optional<ConnectionId> connID) = 0;
-  virtual void setScid(folly::Optional<ConnectionId> connID) = 0;
+  virtual void setDcid(Optional<ConnectionId> connID) = 0;
+  virtual void setScid(Optional<ConnectionId> connID) = 0;
 };
 
 std::string getFlowControlEvent(int offset);

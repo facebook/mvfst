@@ -27,7 +27,7 @@ class BbrRttSampler : public BbrCongestionController::MinRttSampler {
  private:
   std::chrono::seconds expiration_;
   std::chrono::microseconds minRtt_{kDefaultMinRtt};
-  folly::Optional<TimePoint> minRttTimestamp_;
+  Optional<TimePoint> minRttTimestamp_;
   bool rttSampleExpired_;
 };
 } // namespace quic

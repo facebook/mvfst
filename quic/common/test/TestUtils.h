@@ -81,10 +81,10 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     folly::IOBuf& data,
     uint8_t cipherOverhead,
     PacketNum largestAcked,
-    folly::Optional<std::pair<LongHeader::Types, QuicVersion>>
-        longHeaderOverride = folly::none,
+    Optional<std::pair<LongHeader::Types, QuicVersion>> longHeaderOverride =
+        none,
     bool eof = true,
-    folly::Optional<ProtectionType> shortHeaderOverride = folly::none,
+    Optional<ProtectionType> shortHeaderOverride = none,
     uint64_t offset = 0,
     uint64_t packetSizeLimit = kDefaultUDPSendPacketLen);
 
@@ -315,7 +315,7 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacketWrapper outstandingPacket);
 
 // A Buf based overload of writeCryptoFrame for test only
-folly::Optional<WriteCryptoFrame>
+Optional<WriteCryptoFrame>
 writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder);
 
 void overridePacketWithToken(
@@ -400,7 +400,7 @@ class FakeServerHandshake : public FizzServerHandshake {
       std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext,
       bool chloSync = false,
       bool cfinSync = false,
-      folly::Optional<uint64_t> clientActiveConnectionIdLimit = folly::none)
+      Optional<uint64_t> clientActiveConnectionIdLimit = none)
       : FizzServerHandshake(
             &conn,
             std::move(fizzContext),
@@ -479,8 +479,7 @@ class FakeServerHandshake : public FizzServerHandshake {
     }
   }
 
-  folly::Optional<ClientTransportParameters> getClientTransportParams()
-      override {
+  Optional<ClientTransportParameters> getClientTransportParams() override {
     std::vector<TransportParameter> transportParams;
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
@@ -578,7 +577,7 @@ class FakeServerHandshake : public FizzServerHandshake {
   uint64_t maxRecvPacketSize{kDefaultMaxUDPPayload};
   bool allowZeroRttKeys_{false};
   std::vector<folly::IPAddress> sourceAddrs_;
-  folly::Optional<uint64_t> clientActiveConnectionIdLimit_;
+  Optional<uint64_t> clientActiveConnectionIdLimit_;
 };
 
 } // namespace test

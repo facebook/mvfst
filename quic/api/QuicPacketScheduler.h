@@ -23,13 +23,13 @@
 namespace quic {
 
 struct SchedulingResult {
-  folly::Optional<PacketEvent> packetEvent;
-  folly::Optional<PacketBuilderInterface::Packet> packet;
+  Optional<PacketEvent> packetEvent;
+  Optional<PacketBuilderInterface::Packet> packet;
   size_t shortHeaderPadding;
 
   explicit SchedulingResult(
-      folly::Optional<PacketEvent> packetEventIn,
-      folly::Optional<PacketBuilderInterface::Packet> packetIn,
+      Optional<PacketEvent> packetEventIn,
+      Optional<PacketBuilderInterface::Packet> packetIn,
       size_t shortHeaderPaddingIn = 0)
       : packetEvent(std::move(packetEventIn)),
         packet(std::move(packetIn)),
@@ -129,7 +129,7 @@ class AckScheduler {
  public:
   AckScheduler(const QuicConnectionStateBase& conn, const AckState& ackState);
 
-  folly::Optional<PacketNum> writeNextAcks(PacketBuilderInterface& builder);
+  Optional<PacketNum> writeNextAcks(PacketBuilderInterface& builder);
 
   bool hasPendingAcks() const;
 
@@ -147,7 +147,7 @@ bool hasAcksToSchedule(const AckState& ackState);
 /**
  * Returns the largest packet received which needs to be acked.
  */
-folly::Optional<PacketNum> largestAckToSend(const AckState& ackState);
+Optional<PacketNum> largestAckToSend(const AckState& ackState);
 
 class RstStreamScheduler {
  public:
@@ -323,16 +323,16 @@ class FrameScheduler : public QuicPacketScheduler {
   void writeNextAcks(PacketBuilderInterface& builder);
 
  private:
-  folly::Optional<StreamFrameScheduler> streamFrameScheduler_;
-  folly::Optional<AckScheduler> ackScheduler_;
-  folly::Optional<RstStreamScheduler> rstScheduler_;
-  folly::Optional<WindowUpdateScheduler> windowUpdateScheduler_;
-  folly::Optional<BlockedScheduler> blockedScheduler_;
-  folly::Optional<CryptoStreamScheduler> cryptoStreamScheduler_;
-  folly::Optional<SimpleFrameScheduler> simpleFrameScheduler_;
-  folly::Optional<PingFrameScheduler> pingFrameScheduler_;
-  folly::Optional<DatagramFrameScheduler> datagramFrameScheduler_;
-  folly::Optional<ImmediateAckFrameScheduler> immediateAckFrameScheduler_;
+  Optional<StreamFrameScheduler> streamFrameScheduler_;
+  Optional<AckScheduler> ackScheduler_;
+  Optional<RstStreamScheduler> rstScheduler_;
+  Optional<WindowUpdateScheduler> windowUpdateScheduler_;
+  Optional<BlockedScheduler> blockedScheduler_;
+  Optional<CryptoStreamScheduler> cryptoStreamScheduler_;
+  Optional<SimpleFrameScheduler> simpleFrameScheduler_;
+  Optional<PingFrameScheduler> pingFrameScheduler_;
+  Optional<DatagramFrameScheduler> datagramFrameScheduler_;
+  Optional<ImmediateAckFrameScheduler> immediateAckFrameScheduler_;
   folly::StringPiece name_;
   QuicConnectionStateBase& conn_;
 };

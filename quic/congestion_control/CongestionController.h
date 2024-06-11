@@ -50,22 +50,22 @@ struct CongestionController {
   struct State {
     uint64_t writableBytes{0};
     uint64_t congestionWindowBytes{0};
-    folly::Optional<uint64_t> maybeBandwidthBitsPerSec{folly::none};
+    Optional<uint64_t> maybeBandwidthBitsPerSec{none};
   };
 
   // Helper struct to group multiple lost packets into one event
   struct LossEvent {
-    folly::Optional<PacketNum> largestLostPacketNum;
+    Optional<PacketNum> largestLostPacketNum;
     std::vector<PacketNum> lostPacketNumbers;
     uint64_t lostBytes{0};
     uint32_t lostPackets{0};
     const TimePoint lossTime;
     // The packet sent time of the lost packet with largest packet sent time in
     // this LossEvent
-    folly::Optional<TimePoint> largestLostSentTime;
+    Optional<TimePoint> largestLostSentTime;
     // The packet sent time of the lost packet with smallest packet sent time in
     // the LossEvent
-    folly::Optional<TimePoint> smallestLostSentTime;
+    Optional<TimePoint> smallestLostSentTime;
     // Whether this LossEvent also indicates persistent congestion
     bool persistentCongestion{false};
 
@@ -121,8 +121,8 @@ struct CongestionController {
    *
    * Unit is bits-per-second (bps).
    */
-  FOLLY_NODISCARD virtual folly::Optional<Bandwidth> getBandwidth() const {
-    return folly::none;
+  FOLLY_NODISCARD virtual Optional<Bandwidth> getBandwidth() const {
+    return none;
   }
 
   /**

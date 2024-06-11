@@ -12,7 +12,7 @@
 namespace quic {
 
 void maybeIncreaseFlowControlWindow(
-    const folly::Optional<TimePoint>& timeOfLastFlowControlUpdate,
+    const Optional<TimePoint>& timeOfLastFlowControlUpdate,
     TimePoint updateTime,
     std::chrono::microseconds srtt,
     uint64_t& windowSize);

@@ -23,8 +23,7 @@ class Handshake {
  public:
   virtual ~Handshake() = default;
 
-  virtual const folly::Optional<std::string>& getApplicationProtocol()
-      const = 0;
+  virtual const Optional<std::string>& getApplicationProtocol() const = 0;
 
   /**
    * An API to get oneRttReadCiphers on key rotation. Each call will return a
@@ -46,9 +45,9 @@ class Handshake {
    * context is the context value argument for the TLS exporter.
    * keyLength is the length of the exported key.
    */
-  virtual folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  virtual Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const folly::Optional<folly::ByteRange>& context,
+      const Optional<folly::ByteRange>& context,
       uint16_t keyLength) = 0;
 
   virtual void handshakeConfirmed() {

@@ -76,7 +76,7 @@ void Copa2::onPacketAckOrLoss(
 }
 
 // Switch to and from lossy mode
-void Copa2::manageLossyMode(folly::Optional<TimePoint> sentTime) {
+void Copa2::manageLossyMode(Optional<TimePoint> sentTime) {
   if (!sentTime) {
     // Loss happened and we don't know when. Be safe
     lossyMode_ = true;

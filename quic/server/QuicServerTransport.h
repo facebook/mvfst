@@ -169,9 +169,9 @@ class QuicServerTransport
    * context is the context value argument for the TLS exporter.
    * keyLength is the length of the exported key.
    */
-  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const folly::Optional<folly::ByteRange>& context,
+      const Optional<folly::ByteRange>& context,
       uint16_t keyLength) const override {
     return serverConn_->serverHandshakeLayer->getExportedKeyingMaterial(
         label, context, keyLength);
@@ -182,7 +182,7 @@ class QuicServerTransport
    */
   void logTimeBasedStats() const;
 
-  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+  Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override;
 
   void setCongestionControl(CongestionControlType type) override;
@@ -250,8 +250,8 @@ class QuicServerTransport
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   bool notifiedRouting_{false};
   bool notifiedConnIdBound_{false};
-  folly::Optional<TimePoint> newSessionTicketWrittenTimestamp_;
-  folly::Optional<uint64_t> newSessionTicketWrittenCwndHint_;
+  Optional<TimePoint> newSessionTicketWrittenTimestamp_;
+  Optional<uint64_t> newSessionTicketWrittenCwndHint_;
   QuicServerConnectionState* serverConn_;
   std::unordered_map<
       uint64_t,

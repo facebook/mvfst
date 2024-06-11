@@ -9,7 +9,6 @@
 
 #include <folly/Conv.h>
 #include <folly/IPAddress.h>
-#include <folly/Optional.h>
 #include <folly/io/Cursor.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
@@ -20,6 +19,7 @@
 #include <quic/common/CircularDeque.h>
 #include <quic/common/IntervalSet.h>
 #include <quic/common/NetworkData.h>
+#include <quic/common/Optional.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/common/Variant.h>
 
@@ -187,8 +187,8 @@ struct ReadAckFrame {
   using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame>;
   Vec ackBlocks;
   FrameType frameType = FrameType::ACK;
-  folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
+  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
+  Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count{0};
   uint32_t ecnECT1Count{0};
@@ -208,8 +208,8 @@ struct WriteAckFrame {
   // Delay in sending ack from time that packet was received.
   std::chrono::microseconds ackDelay{0us};
   FrameType frameType = FrameType::ACK;
-  folly::Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  folly::Optional<PacketNum> maybeLatestRecvdPacketNum;
+  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
+  Optional<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count{0};
   uint32_t ecnECT1Count{0};
@@ -236,7 +236,7 @@ struct WriteAckFrameState {
   // Updated whenever we receive a packet with a larger packet number
   // than all previously received packets in the packet number space
   // tracked by this AckState.
-  folly::Optional<ReceivedPacket> largestRecvdPacketInfo;
+  Optional<ReceivedPacket> largestRecvdPacketInfo;
 
   // Receive timestamp and packet number for the last received packet.
   //
@@ -244,7 +244,7 @@ struct WriteAckFrameState {
   // if the last packet was received out of order and thus had a packet
   // number less than that of a previously received packet in the packet
   // number space tracked by this AckState.
-  folly::Optional<ReceivedPacket> lastRecvdPacketInfo;
+  Optional<ReceivedPacket> lastRecvdPacketInfo;
 
   // Packet number and timestamp of recently received packets.
   //
@@ -438,7 +438,7 @@ struct ReadNewTokenFrame {
 */
 struct WriteStreamFrame {
   StreamId streamId;
-  folly::Optional<StreamGroupId> streamGroupId;
+  Optional<StreamGroupId> streamGroupId;
   uint64_t offset;
   uint64_t len;
   bool fin;
@@ -455,7 +455,7 @@ struct WriteStreamFrame {
       uint64_t lenIn,
       bool finIn,
       bool fromBufMetaIn = false,
-      folly::Optional<StreamGroupId> streamGroupIdIn = folly::none,
+      Optional<StreamGroupId> streamGroupIdIn = none,
       uint64_t streamPacketIdxIn = 0)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
@@ -478,7 +478,7 @@ struct WriteStreamFrame {
  */
 struct ReadStreamFrame {
   StreamId streamId;
-  folly::Optional<StreamGroupId> streamGroupId;
+  Optional<StreamGroupId> streamGroupId;
   uint64_t offset;
   Buf data;
   bool fin;
@@ -488,7 +488,7 @@ struct ReadStreamFrame {
       uint64_t offsetIn,
       Buf dataIn,
       bool finIn,
-      folly::Optional<StreamGroupId> streamGroupIdIn = folly::none)
+      Optional<StreamGroupId> streamGroupIdIn = none)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
         offset(offsetIn),
@@ -499,7 +499,7 @@ struct ReadStreamFrame {
       StreamId streamIdIn,
       uint64_t offsetIn,
       bool finIn,
-      folly::Optional<StreamGroupId> streamGroupIdIn = folly::none)
+      Optional<StreamGroupId> streamGroupIdIn = none)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
         offset(offsetIn),

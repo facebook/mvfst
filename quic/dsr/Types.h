@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <folly/SocketAddress.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Optional.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/StateData.h>
 
@@ -90,7 +90,7 @@ struct SendInstruction {
   std::chrono::microseconds writeOffset{0us};
 
   // QUIC Stream info
-  folly::Optional<uint64_t> largestAckedStreamOffset;
+  Optional<uint64_t> largestAckedStreamOffset;
   StreamId streamId;
   uint64_t streamOffset;
   uint64_t len;
@@ -166,13 +166,13 @@ struct SendInstruction {
     const folly::SocketAddress& clientAddr;
     PacketNum packetNum{0};
     PacketNum largestAckedPacketNum{0};
-    folly::Optional<uint64_t> largestAckedStreamOffset;
+    Optional<uint64_t> largestAckedStreamOffset;
     std::chrono::microseconds writeOffset{0us};
     StreamId streamId;
-    folly::Optional<uint64_t> streamOffset;
-    folly::Optional<uint64_t> len;
+    Optional<uint64_t> streamOffset;
+    Optional<uint64_t> len;
     bool fin{false};
-    folly::Optional<uint64_t> bufMetaStartingOffset;
+    Optional<uint64_t> bufMetaStartingOffset;
   };
 
  private:
@@ -183,7 +183,7 @@ struct SendInstruction {
       PacketNum packetNumIn,
       PacketNum largestAckedPacketNumIn,
       std::chrono::microseconds writeOffsetIn,
-      folly::Optional<uint64_t> largestAckedStreamOffsetIn,
+      Optional<uint64_t> largestAckedStreamOffsetIn,
       StreamId idIn,
       uint64_t streamOffsetIn,
       uint64_t lenIn,

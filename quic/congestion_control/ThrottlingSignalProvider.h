@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 
@@ -25,17 +25,17 @@ class ThrottlingSignalProvider {
     // stores the amount of tokens currently available at throttler's bucket
     // and if the bucket is in debt, it stores zero.
     // Note that this value changes over time and may become stale quickly.
-    folly::Optional<uint64_t> maybeBytesToSend;
+    Optional<uint64_t> maybeBytesToSend;
 
     // The rate for which CCA can send bytes when the connection is being
     // throttled (ie when the bucket has no tokens).
     // Note that this value changes over time and may become stale quickly.
-    folly::Optional<uint64_t> maybeThrottledRateBytesPerSecond;
+    Optional<uint64_t> maybeThrottledRateBytesPerSecond;
 
     // The rate for which CCA can send bytes when the connection is not being
     // throttled (eg during burst or generally when the bucket has tokens).
     // Note that this value changes over time and may become stale quickly.
-    folly::Optional<uint64_t> maybeBurstRateBytesPerSecond;
+    Optional<uint64_t> maybeBurstRateBytesPerSecond;
   };
 
   virtual ~ThrottlingSignalProvider() = default;
@@ -44,7 +44,7 @@ class ThrottlingSignalProvider {
    * Returns the current value of throttling signal, if exists.
    * Its return value changes over time and may become stale quickly.
    */
-  virtual folly::Optional<ThrottlingSignal> getCurrentThrottlingSignal() = 0;
+  virtual Optional<ThrottlingSignal> getCurrentThrottlingSignal() = 0;
 };
 
 } // namespace quic

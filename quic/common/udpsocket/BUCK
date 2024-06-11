@@ -18,6 +18,7 @@ mvfst_cpp_library(
         "//folly/io/async:async_socket_exception",
         "//folly/portability:sockets",
         "//quic/common:network_data",
+        "//quic/common:optional",
         "//quic/common/events:eventbase",
     ],
 )
@@ -59,6 +60,9 @@ mvfst_cpp_library(
     ],
     headers = [
         "LibevQuicAsyncUDPSocket.h",
+    ],
+    deps = [
+        "//quic/common:optional",
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",

@@ -170,8 +170,8 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":congestion_controller",
-        "//folly:optional",
         "//quic:exception",
+        "//quic/common:optional",
         "//quic/congestion_control/third_party:chromium_windowed_filter",
         "//quic/state:ack_event",
         "//quic/state:quic_state_machine",
@@ -344,7 +344,7 @@ mvfst_cpp_library(
         "ThrottlingSignalProvider.h",
     ],
     exported_deps = [
-        "//folly:optional",
+        "//quic/common:optional",
     ],
 )
 

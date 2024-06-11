@@ -10,7 +10,7 @@
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 
 #include <fizz/client/PskCache.h>
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 
 #include <string>
 
@@ -26,7 +26,7 @@ class QuicPskCache {
  public:
   virtual ~QuicPskCache() = default;
 
-  virtual folly::Optional<QuicCachedPsk> getPsk(const std::string&) = 0;
+  virtual Optional<QuicCachedPsk> getPsk(const std::string&) = 0;
   virtual void putPsk(const std::string&, QuicCachedPsk) = 0;
   virtual void removePsk(const std::string&) = 0;
 };
@@ -39,12 +39,12 @@ class BasicQuicPskCache : public QuicPskCache {
  public:
   ~BasicQuicPskCache() override = default;
 
-  folly::Optional<QuicCachedPsk> getPsk(const std::string& identity) override {
+  Optional<QuicCachedPsk> getPsk(const std::string& identity) override {
     auto result = cache_.find(identity);
     if (result != cache_.end()) {
       return result->second;
     }
-    return folly::none;
+    return none;
   }
 
   void putPsk(const std::string& identity, QuicCachedPsk psk) override {

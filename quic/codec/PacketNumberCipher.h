@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <folly/io/Cursor.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Optional.h>
 
 namespace quic {
 

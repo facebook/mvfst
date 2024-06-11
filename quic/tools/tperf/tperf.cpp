@@ -559,7 +559,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void timeoutExpired() noexcept override {
-    quicClient_->closeNow(folly::none);
+    quicClient_->closeNow(none);
     constexpr double bytesPerMegabit = 131072;
     LOG(INFO) << "Received " << receivedBytes_ << " bytes in "
               << duration_.count() << " seconds.";

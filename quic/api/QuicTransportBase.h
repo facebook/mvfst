@@ -55,12 +55,11 @@ class QuicTransportBase : public QuicSocket,
 
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
 
-  folly::Optional<ConnectionId> getClientConnectionId() const override;
+  Optional<ConnectionId> getClientConnectionId() const override;
 
-  folly::Optional<ConnectionId> getServerConnectionId() const override;
+  Optional<ConnectionId> getServerConnectionId() const override;
 
-  folly::Optional<ConnectionId> getClientChosenDestConnectionId()
-      const override;
+  Optional<ConnectionId> getClientChosenDestConnectionId() const override;
 
   const folly::SocketAddress& getPeerAddress() const override;
 
@@ -77,11 +76,11 @@ class QuicTransportBase : public QuicSocket,
 
   bool error() const override;
 
-  void close(folly::Optional<QuicError> error) override;
+  void close(Optional<QuicError> error) override;
 
   void closeGracefully() override;
 
-  void closeNow(folly::Optional<QuicError> error) override;
+  void closeNow(Optional<QuicError> error) override;
 
   folly::Expected<size_t, LocalErrorCode> getStreamReadOffset(
       StreamId id) const override;
@@ -95,7 +94,7 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
       StreamId id) const override;
 
-  folly::Optional<std::string> getAppProtocol() const override;
+  Optional<std::string> getAppProtocol() const override;
 
   void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 
@@ -127,7 +126,7 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
       StreamId id,
       ReadCallback* cb,
-      folly::Optional<ApplicationErrorCode> err =
+      Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) override;
   void unsetAllReadCallbacks() override;
   void unsetAllPeekCallbacks() override;
@@ -158,9 +157,7 @@ class QuicTransportBase : public QuicSocket,
       StreamId id,
       size_t amount) override;
 
-  folly::Expected<
-      folly::Unit,
-      std::pair<LocalErrorCode, folly::Optional<uint64_t>>>
+  folly::Expected<folly::Unit, std::pair<LocalErrorCode, Optional<uint64_t>>>
   consume(StreamId id, uint64_t offset, size_t amount) override;
 
   folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
@@ -218,7 +215,7 @@ class QuicTransportBase : public QuicSocket,
       uint64_t offset,
       ByteEventCallback* cb) override;
 
-  folly::Optional<LocalErrorCode> shutdownWrite(StreamId id) override;
+  Optional<LocalErrorCode> shutdownWrite(StreamId id) override;
 
   folly::Expected<folly::Unit, LocalErrorCode> resetStream(
       StreamId id,
@@ -254,8 +251,8 @@ class QuicTransportBase : public QuicSocket,
       folly::MaybeManagedPtr<ConnectionCallback> callback) final;
 
   void setEarlyDataAppParamsFunctions(
-      folly::Function<bool(const folly::Optional<std::string>&, const Buf&)
-                          const> validator,
+      folly::Function<bool(const Optional<std::string>&, const Buf&) const>
+          validator,
       folly::Function<Buf()> getter) final;
 
   bool isDetachable() override;
@@ -264,7 +261,7 @@ class QuicTransportBase : public QuicSocket,
 
   void attachEventBase(std::shared_ptr<QuicEventBase> evb) override;
 
-  folly::Optional<LocalErrorCode> setControlStream(StreamId id) override;
+  Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
   /**
    * Set the initial flow control window for the connection.
@@ -399,7 +396,7 @@ class QuicTransportBase : public QuicSocket,
    */
   void cancelByteEventCallbacksForStream(
       const StreamId id,
-      const folly::Optional<uint64_t>& offset = folly::none) override;
+      const Optional<uint64_t>& offset = none) override;
 
   /**
    * Cancel byte event callbacks for given type and stream.
@@ -410,7 +407,7 @@ class QuicTransportBase : public QuicSocket,
   void cancelByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id,
-      const folly::Optional<uint64_t>& offset = folly::none) override;
+      const Optional<uint64_t>& offset = none) override;
 
   /**
    * Cancel all byte event callbacks of all streams.
@@ -746,7 +743,7 @@ class QuicTransportBase : public QuicSocket,
       folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);
 
   void closeImpl(
-      folly::Optional<QuicError> error,
+      Optional<QuicError> error,
       bool drainConnection = true,
       bool sendCloseImmediately = true);
   void closeUdpSocket();
@@ -760,13 +757,13 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
       ReadCallback* cb,
-      folly::Optional<ApplicationErrorCode> err) noexcept;
+      Optional<ApplicationErrorCode> err) noexcept;
   folly::Expected<folly::Unit, LocalErrorCode> setPeekCallbackInternal(
       StreamId id,
       PeekCallback* cb) noexcept;
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
       bool bidirectional,
-      const folly::Optional<StreamGroupId>& streamGroupId = folly::none);
+      const Optional<StreamGroupId>& streamGroupId = none);
 
   /**
    * write data to socket
@@ -875,7 +872,7 @@ class QuicTransportBase : public QuicSocket,
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
    * required by this QuicSocket's packet processors.
    */
-  folly::Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
+  Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
@@ -934,7 +931,7 @@ class QuicTransportBase : public QuicSocket,
   // Uninitialied local address as a fallback answer when socket isn't bound.
   folly::SocketAddress localFallbackAddress;
 
-  folly::Optional<std::string> exceptionCloseWhat_;
+  Optional<std::string> exceptionCloseWhat_;
 
   uint64_t qlogRefcnt_{0};
 
@@ -942,8 +939,8 @@ class QuicTransportBase : public QuicSocket,
   // If all streams have equal or lower priority to the threshold
   // (value >= threshold), the connection is considered to be in background
   // mode.
-  folly::Optional<PriorityLevel> backgroundPriorityThreshold_;
-  folly::Optional<float> backgroundUtilizationFactor_;
+  Optional<PriorityLevel> backgroundPriorityThreshold_;
+  Optional<float> backgroundUtilizationFactor_;
 
   /**
    * Container for use in QuicTransportBase implementations.

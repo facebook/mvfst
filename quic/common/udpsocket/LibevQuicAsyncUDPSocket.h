@@ -117,8 +117,8 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   void setCmsgs(const folly::SocketCmsgMap& cmsgs) override;
   void appendCmsgs(const folly::SocketCmsgMap& cmsgs) override;
   void setAdditionalCmsgsFunc(
-      folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&
-          additionalCmsgsFunc) override;
+      folly::Function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc)
+      override;
 
   /*
    * Packet timestamping is currently not supported.

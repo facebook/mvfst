@@ -6,7 +6,7 @@
  */
 
 #pragma once
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -31,7 +31,7 @@ constexpr uint64_t kPriorityThresholdKnobMultiplier = 1000;
 
 using TransportKnobParams = std::vector<TransportKnobParam>;
 
-folly::Optional<TransportKnobParams> parseTransportKnobs(
+Optional<TransportKnobParams> parseTransportKnobs(
     const std::string& serializedParams);
 
 } // namespace quic

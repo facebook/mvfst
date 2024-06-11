@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 
 #include <folly/String.h>
 #include <folly/hash/Hash.h>
@@ -94,7 +94,7 @@ struct ConnectionIdData {
 
   ConnectionId connId;
   uint64_t sequenceNumber;
-  folly::Optional<StatelessResetToken> token;
+  Optional<StatelessResetToken> token;
 };
 
 /**

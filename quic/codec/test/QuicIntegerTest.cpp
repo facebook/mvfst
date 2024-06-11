@@ -6,10 +6,10 @@
  */
 
 #include <folly/Expected.h>
-#include <folly/Optional.h>
 #include <folly/String.h>
 #include <folly/io/IOBuf.h>
 #include <folly/portability/GTest.h>
+#include <quic/common/Optional.h>
 
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>

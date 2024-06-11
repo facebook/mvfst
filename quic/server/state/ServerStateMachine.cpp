@@ -538,7 +538,7 @@ void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn) {
 
 void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
-    const folly::Optional<Buf>& tokenBuf) {
+    const Optional<Buf>& tokenBuf) {
   if (!tokenBuf) {
     return;
   }
@@ -1544,7 +1544,7 @@ void onServerCloseOpenState(QuicServerConnectionState& conn) {
   conn.state = ServerState::Closed;
 }
 
-folly::Optional<ConnectionIdData>
+Optional<ConnectionIdData>
 QuicServerConnectionState::createAndAddNewSelfConnId() {
   // Should be set right after server transport construction.
   CHECK(connIdAlgo);
@@ -1568,7 +1568,7 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   LOG_IF(ERROR, encodedTimes == kConnIdEncodingRetryLimit)
       << "Quic CIDRejector rejected all conneectionIDs";
   if (encodedCid.hasError()) {
-    return folly::none;
+    return none;
   }
   QUIC_STATS(statsCallback, onConnectionIdCreated, encodedTimes);
   auto newConnIdData =

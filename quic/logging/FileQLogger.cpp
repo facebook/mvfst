@@ -13,7 +13,7 @@
 
 namespace quic {
 
-void FileQLogger::setDcid(folly::Optional<ConnectionId> connID) {
+void FileQLogger::setDcid(Optional<ConnectionId> connID) {
   if (connID.hasValue()) {
     dcid = connID.value();
     if (streaming_) {
@@ -21,7 +21,7 @@ void FileQLogger::setDcid(folly::Optional<ConnectionId> connID) {
     }
   }
 }
-void FileQLogger::setScid(folly::Optional<ConnectionId> connID) {
+void FileQLogger::setScid(Optional<ConnectionId> connID) {
   if (connID.hasValue()) {
     scid = connID.value();
   }
@@ -463,7 +463,7 @@ folly::dynamic FileQLogger::generateSummary(
 void FileQLogger::addStreamStateUpdate(
     quic::StreamId id,
     std::string update,
-    folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) {
+    Optional<std::chrono::milliseconds> timeSinceStreamCreation) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 

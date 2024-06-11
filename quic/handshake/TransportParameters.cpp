@@ -12,12 +12,12 @@
 
 namespace quic {
 
-folly::Optional<uint64_t> getIntegerParameter(
+Optional<uint64_t> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
-    return folly::none;
+    return none;
   }
   auto parameterCursor = folly::io::Cursor(it->value.get());
   auto parameter = decodeQuicInteger(parameterCursor);
@@ -30,12 +30,12 @@ folly::Optional<uint64_t> getIntegerParameter(
   return parameter->first;
 }
 
-folly::Optional<ConnectionId> getConnIdParameter(
+Optional<ConnectionId> getConnIdParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
-    return folly::none;
+    return none;
   }
 
   auto value = it->value->clone();
@@ -45,12 +45,12 @@ folly::Optional<ConnectionId> getConnIdParameter(
   return ConnectionId(cursor, value->length());
 }
 
-folly::Optional<StatelessResetToken> getStatelessResetTokenParameter(
+Optional<StatelessResetToken> getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters) {
   auto it =
       findParameter(parameters, TransportParameterId::stateless_reset_token);
   if (it == parameters.end()) {
-    return folly::none;
+    return none;
   }
 
   auto value = it->value->clone();

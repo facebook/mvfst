@@ -158,12 +158,12 @@ void FunctionLooper::callbackCanceled() noexcept {
   return;
 }
 
-folly::Optional<std::chrono::microseconds>
+Optional<std::chrono::microseconds>
 FunctionLooper::getTimerTickInterval() noexcept {
   if (pacingTimer_) {
     return pacingTimer_->getTickInterval();
   }
-  return folly::none;
+  return none;
 }
 
 std::ostream& operator<<(std::ostream& out, const LooperType& rhs) {

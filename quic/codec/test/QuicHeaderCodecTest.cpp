@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/Optional.h>
 #include <folly/portability/GTest.h>
+#include <quic/common/Optional.h>
 
 #include <quic/QuicException.h>
 #include <quic/codec/QuicHeaderCodec.h>

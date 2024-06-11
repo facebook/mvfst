@@ -162,9 +162,9 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   auto& packet2 = conn_.outstandings.packets.back().packet;
   EXPECT_EQ(1, packet1.frames.size());
   WriteStreamFrame expectedFirstFrame(
-      streamId, bufMetaStartingOffset, 500, false, true, folly::none, 0);
+      streamId, bufMetaStartingOffset, 500, false, true, none, 0);
   WriteStreamFrame expectedSecondFrame(
-      streamId, 500 + bufMetaStartingOffset, 500, true, true, folly::none, 1);
+      streamId, 500 + bufMetaStartingOffset, 500, true, true, none, 1);
   EXPECT_EQ(expectedFirstFrame, *packet1.frames[0].asWriteStreamFrame());
   EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 

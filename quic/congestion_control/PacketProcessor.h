@@ -17,7 +17,7 @@ namespace quic {
 class PacketProcessor {
  public:
   struct PrewriteRequest {
-    folly::Optional<folly::SocketCmsgMap> cmsgs;
+    Optional<folly::SocketCmsgMap> cmsgs;
   };
 
   virtual ~PacketProcessor() = default;
@@ -26,8 +26,8 @@ class PacketProcessor {
    * Called before a write loop start. The returned PrewriteRequest
    * will apply to that write loop only.
    */
-  virtual folly::Optional<PrewriteRequest> prewrite() {
-    return folly::none;
+  virtual Optional<PrewriteRequest> prewrite() {
+    return none;
   }
 
   /**

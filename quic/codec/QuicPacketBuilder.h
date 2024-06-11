@@ -176,7 +176,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   PacketNum largestAckedPacketNum_;
   RegularQuicWritePacket packet_;
   uint32_t cipherOverhead_{0};
-  folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
+  Optional<PacketNumEncodingResult> packetNumberEncoding_;
   // The offset in the IOBuf writable area to write Packet Length.
   size_t packetLenOffset_{0};
   // The offset in the IOBuf writable area to write Packet Number.
@@ -263,7 +263,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   BufAppender bodyAppender_;
 
   uint32_t cipherOverhead_{0};
-  folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
+  Optional<PacketNumEncodingResult> packetNumberEncoding_;
 };
 
 /**

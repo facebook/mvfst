@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Optional.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/state/OutstandingPacket.h>
@@ -117,7 +117,7 @@ struct AckEvent {
   // the reason that this is an optional type is that we construct an
   // AckEvent first, then go through the acked packets that are still
   // outstanding and figure out the largest newly acked packet along the way.
-  folly::Optional<PacketNum> largestNewlyAckedPacket;
+  Optional<PacketNum> largestNewlyAckedPacket;
 
   // when largestNewlyAckedPacket was sent
   TimePoint largestNewlyAckedPacketSentTime;
@@ -125,17 +125,17 @@ struct AckEvent {
   // RTT sample with ack delay included.
   //
   // not available if largestAckedPacket already acked or declared lost
-  folly::Optional<std::chrono::microseconds> rttSample;
+  Optional<std::chrono::microseconds> rttSample;
 
   // RTT sample with ack delay removed.
   //
   // not available if largestAckedPacket already acked or declared lost
-  folly::Optional<std::chrono::microseconds> rttSampleNoAckDelay;
+  Optional<std::chrono::microseconds> rttSampleNoAckDelay;
 
   // Congestion controller state after processing of AckEvent.
   //
   // Optional to handle cases where congestion controller not used.
-  folly::Optional<CongestionController::State> ccState;
+  Optional<CongestionController::State> ccState;
 
   /**
    * Booleans grouped together to avoid padding.
@@ -159,7 +159,7 @@ struct AckEvent {
     OutstandingPacketMetadata outstandingPacketMetadata;
 
     struct StreamDetails {
-      folly::Optional<uint64_t> streamPacketIdx;
+      Optional<uint64_t> streamPacketIdx;
 
       // definition for DupAckedStreamIntervalSet
       // we expect this to be rare, any thus only allocate a single position
@@ -244,11 +244,10 @@ struct AckEvent {
 
     // LastAckedPacketInfo from this acked packet'r original sent
     // OutstandingPacketWrapper structure.
-    folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
-        lastAckedPacketInfo;
+    Optional<OutstandingPacketWrapper::LastAckedPacketInfo> lastAckedPacketInfo;
     // Delta RX Timestamp of the current packet relative to the previous packet
     // (or connection start time).
-    folly::Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
+    Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
 
     // Whether this packet was sent when CongestionController is in
     // app-limited state.
@@ -265,19 +264,18 @@ struct AckEvent {
           OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfoIn);
       Builder&& setAppLimited(bool appLimitedIn);
       Builder&& setReceiveDeltaTimeStamp(
-          folly::Optional<std::chrono::microseconds>&&
-              receiveRelativeTimeStampUsec);
+          Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec);
       AckPacket build() &&;
       explicit Builder() = default;
 
      private:
-      folly::Optional<quic::PacketNum> packetNum;
-      folly::Optional<uint64_t> nonDsrPacketSequenceNumber;
+      Optional<quic::PacketNum> packetNum;
+      Optional<uint64_t> nonDsrPacketSequenceNumber;
       OutstandingPacketMetadata* outstandingPacketMetadata{nullptr};
-      folly::Optional<DetailsPerStream> detailsPerStream;
+      Optional<DetailsPerStream> detailsPerStream;
       OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfo{
           nullptr};
-      folly::Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
+      Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
       bool isAppLimited{false};
     };
 
@@ -287,22 +285,21 @@ struct AckEvent {
         uint64_t nonDsrPacketSequenceNumberIn,
         const OutstandingPacketMetadata& outstandingPacketMetadataIn, // NOLINT
         const DetailsPerStream& detailsPerStreamIn, // NOLINT
-        folly::Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
+        Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
             lastAckedPacketInfoIn,
         bool isAppLimitedIn,
-        folly::Optional<std::chrono::microseconds>&&
-            receiveRelativeTimeStampUsec);
+        Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec);
   };
 
   // Information about each packet ACKed during this event
   std::vector<AckPacket> ackedPackets;
 
   struct BuilderFields {
-    folly::Optional<TimePoint> maybeAckTime;
-    folly::Optional<TimePoint> maybeAdjustedAckTime;
-    folly::Optional<std::chrono::microseconds> maybeAckDelay;
-    folly::Optional<PacketNumberSpace> maybePacketNumberSpace;
-    folly::Optional<PacketNum> maybeLargestAckedPacket;
+    Optional<TimePoint> maybeAckTime;
+    Optional<TimePoint> maybeAdjustedAckTime;
+    Optional<std::chrono::microseconds> maybeAckDelay;
+    Optional<PacketNumberSpace> maybePacketNumberSpace;
+    Optional<PacketNum> maybeLargestAckedPacket;
     bool isImplicitAck{false};
     uint32_t ecnECT0Count{0};
     uint32_t ecnECT1Count{0};

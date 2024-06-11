@@ -22,7 +22,7 @@ class TokenGenerator {
  public:
   explicit TokenGenerator(TokenSecret secret);
 
-  folly::Optional<Buf> encryptToken(const QuicAddrValidationToken& token);
+  Optional<Buf> encryptToken(const QuicAddrValidationToken& token);
 
   uint64_t decryptToken(Buf encryptedToken, Buf aeadAssocData);
 

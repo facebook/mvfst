@@ -18,7 +18,7 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamDataUni,
     uint64_t initialMaxStreamsBidi,
     uint64_t initialMaxStreamsUni,
-    folly::Optional<uint64_t> cwndHintBytes) {
+    Optional<uint64_t> cwndHintBytes) {
   TicketTransportParameters params;
   params.parameters.push_back(
       encodeIntegerParameter(TransportParameterId::idle_timeout, idleTimeout));

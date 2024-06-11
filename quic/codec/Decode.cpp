@@ -473,7 +473,7 @@ ReadStreamFrame decodeStreamFrame(
         frameType);
   }
 
-  folly::Optional<StreamGroupId> groupId;
+  Optional<StreamGroupId> groupId;
   if (isGroupFrame) {
     auto gId = decodeQuicInteger(cursor);
     if (!gId) {
@@ -497,7 +497,7 @@ ReadStreamFrame decodeStreamFrame(
     offset = optionalOffset->first;
   }
   auto fin = frameTypeField.hasFin();
-  folly::Optional<std::pair<uint64_t, size_t>> dataLength;
+  Optional<std::pair<uint64_t, size_t>> dataLength;
   if (frameTypeField.hasDataLength()) {
     dataLength = decodeQuicInteger(cursor);
     if (!dataLength) {
@@ -982,7 +982,7 @@ RegularQuicPacket decodeRegularPacket(
   return packet;
 }
 
-folly::Optional<VersionNegotiationPacket> decodeVersionNegotiation(
+Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     const ParsedLongHeaderInvariant& longHeaderInvariant,
     folly::io::Cursor& cursor) {
   auto cursorLength = cursor.totalLength();
@@ -990,7 +990,7 @@ folly::Optional<VersionNegotiationPacket> decodeVersionNegotiation(
   if (cursorLength < sizeof(QuicVersionType) ||
       cursorLength % sizeof(QuicVersionType)) {
     VLOG(4) << "Version negotiation packet invalid";
-    return folly::none;
+    return none;
   }
 
   VersionNegotiationPacket packet(
@@ -1008,7 +1008,7 @@ folly::Optional<VersionNegotiationPacket> decodeVersionNegotiation(
 
 ParsedLongHeaderResult::ParsedLongHeaderResult(
     bool isVersionNegotiationIn,
-    folly::Optional<ParsedLongHeader> parsedLongHeaderIn)
+    Optional<ParsedLongHeader> parsedLongHeaderIn)
     : isVersionNegotiation(isVersionNegotiationIn),
       parsedLongHeader(std::move(parsedLongHeaderIn)) {
   CHECK(isVersionNegotiation || parsedLongHeader);
@@ -1126,7 +1126,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
 
   auto version = parsedLongHeaderInvariant->invariant.version;
   if (version == QuicVersion::VERSION_NEGOTIATION) {
-    return ParsedLongHeaderResult(true, folly::none);
+    return ParsedLongHeaderResult(true, none);
   }
   auto parsedHeader = parseLongHeaderVariants(
       type, std::move(*parsedLongHeaderInvariant), cursor);

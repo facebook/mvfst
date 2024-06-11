@@ -113,7 +113,7 @@ class MiddleStartingIterationWrapper {
 namespace quic {
 
 bool hasAcksToSchedule(const AckState& ackState) {
-  folly::Optional<PacketNum> largestAckSend = largestAckToSend(ackState);
+  Optional<PacketNum> largestAckSend = largestAckToSend(ackState);
   if (!largestAckSend) {
     return false;
   }
@@ -124,9 +124,9 @@ bool hasAcksToSchedule(const AckState& ackState) {
   return *largestAckSend > *(ackState.largestAckScheduled);
 }
 
-folly::Optional<PacketNum> largestAckToSend(const AckState& ackState) {
+Optional<PacketNum> largestAckToSend(const AckState& ackState) {
   if (ackState.acks.empty()) {
-    return folly::none;
+    return none;
   }
   return ackState.acks.back().end;
 }
@@ -329,7 +329,7 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   }
 
   return SchedulingResult(
-      folly::none, std::move(builder).buildPacket(), shortHeaderPadding);
+      none, std::move(builder).buildPacket(), shortHeaderPadding);
 }
 
 void FrameScheduler::writeNextAcks(PacketBuilderInterface& builder) {
@@ -379,7 +379,7 @@ bool StreamFrameScheduler::writeStreamLossBuffers(
         bufferLen, // writeBufferLen -- only the len of the single buffer.
         bufferLen, // flowControlLen -- not relevant, already flow controlled.
         buffer->eof,
-        folly::none /* skipLenHint */,
+        none /* skipLenHint */,
         stream.groupId);
     if (dataLen) {
       wroteStreamFrame = true;
@@ -549,7 +549,7 @@ bool StreamFrameScheduler::writeStreamFrame(
       bufferLen,
       flowControlLen,
       canWriteFin,
-      folly::none /* skipLenHint */,
+      none /* skipLenHint */,
       stream.groupId);
   if (!dataLen) {
     return false;
@@ -569,7 +569,7 @@ AckScheduler::AckScheduler(
     const AckState& ackState)
     : conn_(conn), ackState_(ackState) {}
 
-folly::Optional<PacketNum> AckScheduler::writeNextAcks(
+Optional<PacketNum> AckScheduler::writeNextAcks(
     PacketBuilderInterface& builder) {
   // Use default ack delay for long headers. Usually long headers are sent
   // before crypto negotiation, so the peer might not know about the ack delay
@@ -597,7 +597,7 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
       conn_.connectionTime, /* connect timestamp */
   };
 
-  folly::Optional<WriteAckFrameResult> ackWriteResult;
+  Optional<WriteAckFrameResult> ackWriteResult;
 
   bool isAckReceiveTimestampsSupported =
       conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
@@ -630,7 +630,7 @@ folly::Optional<PacketNum> AckScheduler::writeNextAcks(
     ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK);
   }
   if (!ackWriteResult) {
-    return folly::none;
+    return none;
   }
   return largestAckedPacketNum;
 }
@@ -973,7 +973,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
       buf->trimEnd(buf->length() - prevSize);
     }
   }
-  return SchedulingResult(folly::none, folly::none, 0);
+  return SchedulingResult(none, none, 0);
 }
 
 folly::StringPiece CloningScheduler::name() const {

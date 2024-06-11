@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
 #include <quic/QuicException.h>
+#include <quic/common/Optional.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/third_party/windowed_filter.h>
 #include <quic/state/AckEvent.h>
@@ -35,9 +35,7 @@ class Copa : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
-  void onPacketAckOrLoss(
-      folly::Optional<AckEvent> ack,
-      folly::Optional<LossEvent> loss) {
+  void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
 
@@ -78,7 +76,7 @@ class Copa : public CongestionController {
     uint64_t numTimesDirectionSame{0};
     // updated every srtt
     uint64_t lastRecordedCwndBytes;
-    folly::Optional<TimePoint> lastCwndRecordTime{folly::none};
+    Optional<TimePoint> lastCwndRecordTime{none};
   };
   void checkAndUpdateDirection(const TimePoint ackTime);
   void changeDirection(
@@ -89,7 +87,7 @@ class Copa : public CongestionController {
 
   bool isSlowStart_;
   // time at which cwnd was last doubled during slow start
-  folly::Optional<TimePoint> lastCwndDoubleTime_{folly::none};
+  Optional<TimePoint> lastCwndDoubleTime_{none};
 
   WindowedFilter<
       std::chrono::microseconds,

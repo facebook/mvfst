@@ -58,8 +58,8 @@ class FizzCryptoFactoryTest : public Test {
     return mockPacketNumberCipher;
   }
 
-  folly::Optional<fizz::TrafficKey> trafficKey_;
-  folly::Optional<std::unique_ptr<folly::IOBuf>> packetCipherKey_;
+  Optional<fizz::TrafficKey> trafficKey_;
+  Optional<std::unique_ptr<folly::IOBuf>> packetCipherKey_;
 };
 
 TEST_F(FizzCryptoFactoryTest, TestV1ClearTextCipher) {

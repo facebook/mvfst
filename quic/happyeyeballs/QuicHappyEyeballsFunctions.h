@@ -45,7 +45,7 @@ void startHappyEyeballs(
 
 void happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket& socket,
-    folly::Optional<folly::SocketAddress> localAddress,
+    Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
     const uint8_t socketTos,

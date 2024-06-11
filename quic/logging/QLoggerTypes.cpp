@@ -845,7 +845,7 @@ folly::dynamic QLogMetricUpdateEvent::toDynamic() const {
 QLogStreamStateUpdateEvent::QLogStreamStateUpdateEvent(
     StreamId idIn,
     std::string updateIn,
-    folly::Optional<std::chrono::milliseconds> timeSinceStreamCreationIn,
+    Optional<std::chrono::milliseconds> timeSinceStreamCreationIn,
     VantagePoint vantagePoint,
     std::chrono::microseconds refTimeIn)
     : id{idIn},

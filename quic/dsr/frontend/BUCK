@@ -11,7 +11,7 @@ mvfst_cpp_library(
         "WriteCodec.h",
     ],
     deps = [
-        "//folly:optional",
+        "//quic/common:optional",
     ],
     exported_deps = [
         ":packet_builder",

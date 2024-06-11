@@ -28,18 +28,18 @@ bool packetSpaceCheck(uint64_t limit, size_t require) {
 
 namespace quic {
 
-folly::Optional<uint64_t> writeStreamFrameHeader(
+Optional<uint64_t> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
     uint64_t offset,
     uint64_t writeBufferLen,
     uint64_t flowControlLen,
     bool fin,
-    folly::Optional<bool> skipLenHint,
-    folly::Optional<StreamGroupId> streamGroupId,
+    Optional<bool> skipLenHint,
+    Optional<StreamGroupId> streamGroupId,
     bool appendFrame) {
   if (builder.remainingSpaceInPkt() == 0) {
-    return folly::none;
+    return none;
   }
   if (writeBufferLen == 0 && !fin) {
     throw QuicInternalException(
@@ -51,7 +51,7 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
     streamTypeBuilder.switchToStreamGroups();
   }
   QuicInteger idInt(id);
-  folly::Optional<QuicInteger> groupIdInt;
+  Optional<QuicInteger> groupIdInt;
   if (streamGroupId) {
     groupIdInt = QuicInteger(*streamGroupId);
   }
@@ -65,7 +65,7 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
-    return folly::none;
+    return none;
   }
   QuicInteger offsetInt(offset);
   if (offset != 0) {
@@ -115,7 +115,7 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
         headerSize + dataLenLen >= builder.remainingSpaceInPkt()) {
       VLOG(4) << "No space in packet for stream header. stream=" << id
               << " remaining=" << builder.remainingSpaceInPkt();
-      return folly::none;
+      return none;
     }
     // We have to encode the actual data length in the header.
     headerSize += dataLenLen;
@@ -126,12 +126,12 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   bool shouldSetFin = fin && dataLen == writeBufferLen;
   if (dataLen == 0 && !shouldSetFin) {
     // This would be an empty non-fin stream frame.
-    return folly::none;
+    return none;
   }
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
-    return folly::none;
+    return none;
   }
 
   // Done with the accounting, set the bits and write the actual frame header.
@@ -185,7 +185,7 @@ void writeStreamFrameData(
   }
 }
 
-folly::Optional<WriteCryptoFrame> writeCryptoFrame(
+Optional<WriteCryptoFrame> writeCryptoFrame(
     uint64_t offsetIn,
     const BufQueue& data,
     PacketBuilderInterface& builder) {
@@ -200,7 +200,7 @@ folly::Optional<WriteCryptoFrame> writeCryptoFrame(
   if (spaceLeftInPkt <= cryptoFrameHeaderSize) {
     VLOG(3) << "No space left in packet to write cryptoFrame header of size: "
             << cryptoFrameHeaderSize << ", space left=" << spaceLeftInPkt;
-    return folly::none;
+    return none;
   }
   size_t spaceRemaining = spaceLeftInPkt - cryptoFrameHeaderSize;
   size_t dataLength = data.chainLength();
@@ -378,12 +378,12 @@ static size_t fillPacketReceiveTimestamps(
   return ackFrame.recvdPacketsTimestampRanges.size();
 }
 
-folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
+Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType) {
   if (ackFrameMetaData.ackState.acks.empty()) {
-    return folly::none;
+    return none;
   }
   const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
   // The last block must be the largest block.
@@ -455,7 +455,7 @@ folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
         getQuicIntegerSize(maybeLastPktTsDelta.count()).value_or(0);
   }
   if (spaceLeft < (headerSize + minAdditionalAckReceiveTimestampsFieldsSize)) {
-    return folly::none;
+    return none;
   }
   spaceLeft -= (headerSize + minAdditionalAckReceiveTimestampsFieldsSize);
 
@@ -492,7 +492,7 @@ folly::Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
   return ackFrame;
 }
 
-folly::Optional<WriteAckFrameResult> writeAckFrame(
+Optional<WriteAckFrameResult> writeAckFrame(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType) {
@@ -507,11 +507,11 @@ folly::Optional<WriteAckFrameResult> writeAckFrame(
         maybeWriteAckFrame.value(),
         maybeWriteAckFrame.value().ackBlocks.size());
   } else {
-    return folly::none;
+    return none;
   }
 }
 
-folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
+Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     const AckReceiveTimestampsConfig& recvTimestampsConfig,
@@ -520,7 +520,7 @@ folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
   auto maybeAckFrame = writeAckFrameToPacketBuilder(
       ackFrameMetaData, builder, FrameType::ACK_RECEIVE_TIMESTAMPS);
   if (!maybeAckFrame.has_value()) {
-    return folly::none;
+    return none;
   }
   auto ackFrame = maybeAckFrame.value();
   const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
@@ -919,7 +919,7 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
                                : FrameType::CONNECTION_CLOSE_APP_ERR));
 
       QuicInteger reasonLength(connectionCloseFrame.reasonPhrase.size());
-      folly::Optional<QuicInteger> closingFrameType;
+      Optional<QuicInteger> closingFrameType;
       if (isTransportErrorCode) {
         closingFrameType = QuicInteger(
             static_cast<FrameTypeType>(connectionCloseFrame.closingFrameType));

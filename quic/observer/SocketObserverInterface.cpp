@@ -34,21 +34,21 @@ SocketObserverInterface::WriteEvent::Builder::setLastPacketSentTime(
 
 SocketObserverInterface::WriteEvent::Builder&&
 SocketObserverInterface::WriteEvent::Builder::setLastPacketSentTime(
-    const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
+    const Optional<TimePoint>& maybeLastPacketSentTimeIn) {
   maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
   return std::move(*this);
 }
 
 SocketObserverInterface::WriteEvent::Builder&&
 SocketObserverInterface::WriteEvent::Builder::setCwndInBytes(
-    const folly::Optional<uint64_t>& maybeCwndInBytesIn) {
+    const Optional<uint64_t>& maybeCwndInBytesIn) {
   maybeCwndInBytes = maybeCwndInBytesIn;
   return std::move(*this);
 }
 
 SocketObserverInterface::WriteEvent::Builder&&
 SocketObserverInterface::WriteEvent::Builder::setWritableBytes(
-    const folly::Optional<uint64_t>& maybeWritableBytesIn) {
+    const Optional<uint64_t>& maybeWritableBytesIn) {
   maybeWritableBytes = maybeWritableBytesIn;
   return std::move(*this);
 }
@@ -90,21 +90,21 @@ SocketObserverInterface::AppLimitedEvent::Builder::setLastPacketSentTime(
 
 SocketObserverInterface::AppLimitedEvent::Builder&&
 SocketObserverInterface::AppLimitedEvent::Builder::setLastPacketSentTime(
-    const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
+    const Optional<TimePoint>& maybeLastPacketSentTimeIn) {
   maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
   return std::move(*this);
 }
 
 SocketObserverInterface::AppLimitedEvent::Builder&&
 SocketObserverInterface::AppLimitedEvent::Builder::setCwndInBytes(
-    const folly::Optional<uint64_t>& maybeCwndInBytesIn) {
+    const Optional<uint64_t>& maybeCwndInBytesIn) {
   maybeCwndInBytes = maybeCwndInBytesIn;
   return std::move(*this);
 }
 
 SocketObserverInterface::AppLimitedEvent::Builder&&
 SocketObserverInterface::AppLimitedEvent::Builder::setWritableBytes(
-    const folly::Optional<uint64_t>& maybeWritableBytesIn) {
+    const Optional<uint64_t>& maybeWritableBytesIn) {
   maybeWritableBytes = maybeWritableBytesIn;
   return std::move(*this);
 }
@@ -156,7 +156,7 @@ void SocketObserverInterface::PacketsWrittenEvent::
     const auto startIt = outstandingPackets.end() -
         static_cast<int64_t>(numAckElicitingPacketsWritten);
     bool needFullWalk = false;
-    folly::Optional<uint64_t> maybePrevNumAckElicitingPacketsSent;
+    Optional<uint64_t> maybePrevNumAckElicitingPacketsSent;
 
     for (auto it = startIt; it != outstandingPackets.end(); it++) {
       if (writeCount != it->metadata.writeCount) {
@@ -245,21 +245,21 @@ SocketObserverInterface::PacketsWrittenEvent::Builder::setLastPacketSentTime(
 
 SocketObserverInterface::PacketsWrittenEvent::Builder&&
 SocketObserverInterface::PacketsWrittenEvent::Builder::setLastPacketSentTime(
-    const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
+    const Optional<TimePoint>& maybeLastPacketSentTimeIn) {
   maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
   return std::move(*this);
 }
 
 SocketObserverInterface::PacketsWrittenEvent::Builder&&
 SocketObserverInterface::PacketsWrittenEvent::Builder::setCwndInBytes(
-    const folly::Optional<uint64_t>& maybeCwndInBytesIn) {
+    const Optional<uint64_t>& maybeCwndInBytesIn) {
   maybeCwndInBytes = maybeCwndInBytesIn;
   return std::move(*this);
 }
 
 SocketObserverInterface::PacketsWrittenEvent::Builder&&
 SocketObserverInterface::PacketsWrittenEvent::Builder::setWritableBytes(
-    const folly::Optional<uint64_t>& maybeWritableBytesIn) {
+    const Optional<uint64_t>& maybeWritableBytesIn) {
   maybeWritableBytes = maybeWritableBytesIn;
   return std::move(*this);
 }

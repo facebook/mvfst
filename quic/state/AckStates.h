@@ -17,26 +17,26 @@ namespace quic {
 // Ack and PacketNumber states. This is per-packet number space.
 struct AckState : WriteAckFrameState {
   // Largest ack that has been written to a packet
-  folly::Optional<PacketNum> largestAckScheduled;
+  Optional<PacketNum> largestAckScheduled;
   // Count of outstanding packets received with only non-retransmittable data.
   uint64_t numNonRxPacketsRecvd{0};
   // The receive time of the largest ack packet
-  folly::Optional<TimePoint> largestRecvdPacketTime;
+  Optional<TimePoint> largestRecvdPacketTime;
   // Largest received packet numbers on the connection.
-  folly::Optional<PacketNum> largestRecvdPacketNum;
+  Optional<PacketNum> largestRecvdPacketNum;
   // Latest packet number acked by peer
-  folly::Optional<PacketNum> largestAckedByPeer;
+  Optional<PacketNum> largestAckedByPeer;
   // Largest received packet number at the time we sent our last close message.
-  folly::Optional<PacketNum> largestReceivedAtLastCloseSent;
+  Optional<PacketNum> largestReceivedAtLastCloseSent;
   // Packet sequence number for largest non-dsr packet acked by peer.
-  folly::Optional<uint64_t> largestNonDsrSequenceNumberAckedByPeer;
+  Optional<uint64_t> largestNonDsrSequenceNumberAckedByPeer;
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
   // Incremented for each non-DSR packet.
   uint64_t nonDsrPacketSequenceNumber{0};
   uint64_t reorderThreshold{0};
-  folly::Optional<uint64_t> tolerance;
-  folly::Optional<uint64_t> ackFrequencySequenceNumber;
+  Optional<uint64_t> tolerance;
+  Optional<uint64_t> ackFrequencySequenceNumber;
   // Flag indicating that if we need to send ack immediately. This will be set
   // to true in either of the following cases:
   // - we got packets with retransmittable data and haven't sent the

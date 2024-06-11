@@ -32,7 +32,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
                    public std::enable_shared_from_this<QuicServer> {
  public:
   using TransportSettingsOverrideFn =
-      std::function<folly::Optional<quic::TransportSettings>(
+      std::function<Optional<quic::TransportSettings>(
           const quic::TransportSettings&,
           const folly::IPAddress&)>;
 
@@ -360,7 +360,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       const folly::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
-      folly::Optional<QuicVersion> quicVersion,
+      Optional<QuicVersion> quicVersion,
       folly::EventBase* workerEvb,
       bool isForwardedData = false) override;
 
@@ -431,7 +431,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // factory used to create specific instance of Congestion control algorithm
   std::shared_ptr<CongestionControllerFactory> ccFactory_;
 
-  folly::Optional<std::string> healthCheckToken_;
+  Optional<std::string> healthCheckToken_;
   // vector of all the listening fds on each quic server worker
   std::vector<int> listeningFDs_;
   ProcessId processId_{ProcessId::ZERO};
@@ -458,7 +458,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
     std::function<uint64_t()> count;
     std::chrono::seconds window;
   };
-  folly::Optional<RateLimit> rateLimit_;
+  Optional<RateLimit> rateLimit_;
 
   std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1048576; }};
 

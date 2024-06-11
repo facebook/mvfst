@@ -28,7 +28,7 @@ bool compareTransportKnobParam(
 
 } // namespace
 
-folly::Optional<TransportKnobParams> parseTransportKnobs(
+Optional<TransportKnobParams> parseTransportKnobs(
     const std::string& serializedParams) {
   TransportKnobParams knobParams;
   try {
@@ -66,7 +66,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
                 knobParams.push_back({paramId, expectAsInt.value()});
                 continue; // triggers next loop iteration
               }
-              return folly::none; // error parsing integer parameter
+              return none; // error parsing integer parameter
           }
 
           /*
@@ -82,7 +82,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
                   {paramId, folly::to<uint64_t>(cctype.value())});
             } else {
               LOG(ERROR) << "unknown cc type " << val;
-              return folly::none;
+              return none;
             }
             /*
              * set rtt factor used in cc algs like bbr or copa
@@ -104,7 +104,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             if (pos == std::string::npos) {
               LOG(ERROR)
                   << "rtt factor knob expected format {numerator}/{denominator}";
-              return folly::none;
+              return none;
             }
             uint64_t numerator =
                 folly::tryTo<int>(s.substr(0, pos)).value_or(kKnobFractionMax);
@@ -117,7 +117,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
               LOG(ERROR)
                   << "rtt factor knob numerator and denominator must be ints in range (0,"
                   << kKnobFractionMax << "]";
-              return folly::none;
+              return none;
             }
             // transport knobs must be a single int, so we pack numerator and
             // denominator into a single int here and unpack in the handler
@@ -135,7 +135,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             LOG(ERROR)
                 << "string param type is not valid for this knob with id= "
                 << TransportKnobParamId::_from_integral(paramId);
-            return folly::none;
+            return none;
           }
           continue;
         }
@@ -143,12 +143,12 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
           // Quic transport knob param values cannot be of type ARRAY, NULLT or
           // OBJECT
           LOG(ERROR) << "Invalid transport knob param value type" << val.type();
-          return folly::none;
+          return none;
       }
     }
   } catch (const std::exception& e) {
     LOG(ERROR) << "fail to parse knobs: " << e.what();
-    return folly::none;
+    return none;
   }
 
   std::sort(knobParams.begin(), knobParams.end(), compareTransportKnobParam);

@@ -29,7 +29,7 @@ using ByteEvent = QuicTransportBase::ByteEvent;
 auto constexpr kTestMaxPacingRate = std::numeric_limits<uint64_t>::max();
 } // namespace
 
-folly::Optional<QuicFrame> getFrameIfPresent(
+Optional<QuicFrame> getFrameIfPresent(
     std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
     QuicReadCodec& readCodec,
     QuicFrame::Type frameType) {
@@ -48,7 +48,7 @@ folly::Optional<QuicFrame> getFrameIfPresent(
       return frame;
     }
   }
-  return folly::none;
+  return none;
 }
 
 bool verifyFramePresent(
@@ -59,7 +59,7 @@ bool verifyFramePresent(
 }
 
 struct MigrationParam {
-  folly::Optional<uint64_t> clientSentActiveConnIdTransportParam;
+  Optional<uint64_t> clientSentActiveConnIdTransportParam;
 };
 
 class QuicServerTransportTest : public QuicServerTransportAfterStartTestBase {
@@ -92,7 +92,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
   writeStreamFrameData(builder, buf1->clone(), buf1->computeChainDataLength());
@@ -104,7 +104,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
   writeStreamFrameData(builder, buf2->clone(), buf2->computeChainDataLength());
@@ -114,13 +114,13 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   // Clear out the existing acks to make sure that we are the cause of the acks.
   server->getNonConstConn().ackStates.initialAckState->acks.clear();
   server->getNonConstConn().ackStates.initialAckState->largestRecvdPacketTime =
-      folly::none;
+      none;
   server->getNonConstConn().ackStates.handshakeAckState->acks.clear();
   server->getNonConstConn()
-      .ackStates.handshakeAckState->largestRecvdPacketTime = folly::none;
+      .ackStates.handshakeAckState->largestRecvdPacketTime = none;
   server->getNonConstConn().ackStates.appDataAckState.acks.clear();
   server->getNonConstConn().ackStates.appDataAckState.largestRecvdPacketTime =
-      folly::none;
+      none;
 
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2); // for x08, x0C
   deliverData(packetToBuf(packet));
@@ -556,7 +556,7 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(builder, buf->clone(), buf->computeChainDataLength());
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(
@@ -768,7 +768,7 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       false,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));
@@ -1032,7 +1032,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       0,
       10,
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   ASSERT_TRUE(dataLen.has_value());
   ASSERT_EQ(*dataLen, 0);
   writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
@@ -1126,7 +1126,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   EXPECT_CALL(
       connCallback, onStopSending(_, GenericApplicationErrorCode::UNKNOWN))
       .WillOnce(Invoke([&](StreamId /*sid*/, ApplicationErrorCode /*e*/) {
-        server->close(folly::none);
+        server->close(none);
       }));
   EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
 }
@@ -1796,7 +1796,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicServerTransportMigrationTests,
     QuicServerTransportAllowMigrationTest,
     Values(
-        MigrationParam{folly::none},
+        MigrationParam{none},
         MigrationParam{2},
         MigrationParam{4},
         MigrationParam{9},
@@ -3509,7 +3509,7 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       /*fin=*/true,
-      /*skipLenHint=*/folly::none);
+      /*skipLenHint=*/none);
   writeStreamFrameData(
       builder,
       data->clone(),
@@ -3550,7 +3550,7 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       /*eof=*/true,
-      /*skipLenHint=*/folly::none);
+      /*skipLenHint=*/none);
   writeStreamFrameData(
       builder,
       data->clone(),
@@ -3591,7 +3591,7 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       /*eof=*/true,
-      /*skipLenHint=*/folly::none);
+      /*skipLenHint=*/none);
   writeStreamFrameData(
       builder,
       data->clone(),
@@ -4064,7 +4064,7 @@ TEST_F(
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   recvClientFinished();
   loopForWrites();
-  EXPECT_EQ(server->getConn().writableBytesLimit, folly::none);
+  EXPECT_EQ(server->getConn().writableBytesLimit, none);
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
@@ -4447,7 +4447,7 @@ TEST_P(
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none,
+      none,
       false));
   deliverData(std::move(packetData));
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
@@ -4551,7 +4551,7 @@ class QuicServerTransportHandshakeTest
   void expectWriteNewSessionTicket() override {
     std::string appParams("APP params");
     server->setEarlyDataAppParamsFunctions(
-        [](const folly::Optional<std::string>&, const Buf&) { return false; },
+        [](const Optional<std::string>&, const Buf&) { return false; },
         [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams); });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
         .WillOnce(Invoke([=](const AppToken& appToken) {

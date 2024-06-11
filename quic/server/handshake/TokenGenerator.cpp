@@ -25,7 +25,7 @@ TokenGenerator::TokenGenerator(TokenSecret secret) : cipher_(kCipherContexts) {
   cipher_.setSecrets(secrets);
 }
 
-folly::Optional<Buf> TokenGenerator::encryptToken(
+Optional<Buf> TokenGenerator::encryptToken(
     const QuicAddrValidationToken& token) {
   // Generate the retry token in plaintext
   auto plainTextToken = token.getPlaintextToken();

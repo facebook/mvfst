@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/Optional.h>
+#include <quic/common/Optional.h>
 #include <quic/server/RateLimiter.h>
 #include <functional>
 
@@ -37,7 +37,7 @@ class SlidingWindowRateLimiter : public RateLimiter {
  private:
   const std::function<uint64_t()> count_;
   const std::chrono::microseconds window_;
-  folly::Optional<TimePoint> currentWindowStartPoint_{folly::none};
+  Optional<TimePoint> currentWindowStartPoint_{none};
   uint64_t countInPrevWindow_{0};
   uint64_t countInCurWindow_{0};
 };

@@ -38,7 +38,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   std::unique_ptr<Aead> zeroRttWriteCipher;
 
   // The stateless reset token sent by the server.
-  folly::Optional<StatelessResetToken> statelessResetToken;
+  Optional<StatelessResetToken> statelessResetToken;
 
   // The retry token sent by the server.
   std::string retryToken;
@@ -49,18 +49,18 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 
   // This is the destination connection id that will be sent in the outgoing
   // client initial packet. It is modified in the event of a retry.
-  folly::Optional<ConnectionId> initialDestinationConnectionId;
+  Optional<ConnectionId> initialDestinationConnectionId;
 
   // This is the original destination connection id. It is the same as the
   // initialDestinationConnectionId when there is no retry involved. When
   // there is retry involved, this is the value of the destination connection
   // id sent in the very first initial packet.
-  folly::Optional<ConnectionId> originalDestinationConnectionId;
+  Optional<ConnectionId> originalDestinationConnectionId;
 
   std::shared_ptr<ClientHandshakeFactory> handshakeFactory;
   ClientHandshake* clientHandshakeLayer;
 
-  folly::Optional<TimePoint> lastCloseSentTime;
+  Optional<TimePoint> lastCloseSentTime;
 
   // Save the server transport params here so that client can access the value
   // when it wants to write the values to psk cache
@@ -110,7 +110,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 
   // Whether 0-rtt has been rejected in this connection.
   // The value should be set after the handshake if 0-rtt was attempted
-  folly::Optional<bool> zeroRttRejected;
+  Optional<bool> zeroRttRejected;
 
   explicit QuicClientConnectionState(
       std::shared_ptr<ClientHandshakeFactory> handshakeFactoryIn)

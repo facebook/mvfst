@@ -54,9 +54,7 @@ class MockQLogger : public QLogger {
   MOCK_METHOD(
       void,
       addStreamStateUpdate,
-      (quic::StreamId,
-       std::string,
-       folly::Optional<std::chrono::milliseconds>));
+      (quic::StreamId, std::string, Optional<std::chrono::milliseconds>));
   MOCK_METHOD(
       void,
       addBandwidthEstUpdate,
@@ -65,8 +63,8 @@ class MockQLogger : public QLogger {
   MOCK_METHOD(void, addAppUnlimitedUpdate, ());
   MOCK_METHOD(void, addConnectionMigrationUpdate, (bool));
   MOCK_METHOD(void, addPathValidationEvent, (bool));
-  MOCK_METHOD(void, setDcid, (folly::Optional<ConnectionId>));
-  MOCK_METHOD(void, setScid, (folly::Optional<ConnectionId>));
+  MOCK_METHOD(void, setDcid, (Optional<ConnectionId>));
+  MOCK_METHOD(void, setScid, (Optional<ConnectionId>));
   MOCK_METHOD(void, addPriorityUpdate, (quic::StreamId, uint8_t, bool));
   MOCK_METHOD(
       void,

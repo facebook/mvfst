@@ -10,8 +10,8 @@
 #include <fizz/server/State.h>
 
 #include <folly/Function.h>
-#include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
+#include <quic/common/Optional.h>
 
 #include <memory>
 #include <string>

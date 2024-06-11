@@ -126,15 +126,15 @@ inline auto findParameter(
   });
 }
 
-folly::Optional<uint64_t> getIntegerParameter(
+Optional<uint64_t> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
-folly::Optional<ConnectionId> getConnIdParameter(
+Optional<ConnectionId> getConnIdParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
-folly::Optional<StatelessResetToken> getStatelessResetTokenParameter(
+Optional<StatelessResetToken> getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters);
 
 TransportParameter encodeIntegerParameter(

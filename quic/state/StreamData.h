@@ -153,7 +153,7 @@ struct QuicStreamLike {
   // either from FIN or RST. Right now we use one value to represent both FIN
   // and RST. We may split write EOF into two values in the future.
   // Read side eof offset.
-  folly::Optional<uint64_t> finalReadOffset;
+  Optional<uint64_t> finalReadOffset;
 
   // Current cumulative number of packets sent for this stream. It only counts
   // egress packets that contains a *new* STREAM frame for this stream.
@@ -284,7 +284,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   QuicStreamState(
       StreamId idIn,
-      const folly::Optional<StreamGroupId>& groupIdIn,
+      const Optional<StreamGroupId>& groupIdIn,
       QuicConnectionStateBase& connIn);
 
   QuicStreamState(QuicStreamState&&) = default;
@@ -324,17 +324,17 @@ struct QuicStreamState : public QuicStreamLike {
   StreamId id;
 
   // ID of the group the stream belongs to.
-  folly::Optional<StreamGroupId> groupId;
+  Optional<StreamGroupId> groupId;
 
   // Write side eof offset. This represents only the final FIN offset.
-  folly::Optional<uint64_t> finalWriteOffset;
+  Optional<uint64_t> finalWriteOffset;
 
   struct StreamFlowControlState {
     uint64_t windowSize{0};
     uint64_t advertisedMaxOffset{0};
     uint64_t peerAdvertisedMaxOffset{0};
     // Time at which the last flow control update was sent by the transport.
-    folly::Optional<TimePoint> timeOfLastFlowControlUpdate;
+    Optional<TimePoint> timeOfLastFlowControlUpdate;
     // A flag indicating if the stream has a pending blocked frame to the peer
     // (blocked frame sent, but a stream flow control update has not been
     // received yet). Set when we write a blocked data frame on the stream;
@@ -345,9 +345,9 @@ struct QuicStreamState : public QuicStreamLike {
   StreamFlowControlState flowControlState;
 
   // Stream level read error occurred.
-  folly::Optional<QuicErrorCode> streamReadError;
+  Optional<QuicErrorCode> streamReadError;
   // Stream level write error occurred.
-  folly::Optional<QuicErrorCode> streamWriteError;
+  Optional<QuicErrorCode> streamWriteError;
 
   // State machine data
   StreamSendState sendState{StreamSendState::Open};
@@ -362,7 +362,7 @@ struct QuicStreamState : public QuicStreamLike {
   bool isControl{false};
 
   // The last time we detected we were head of line blocked on the stream.
-  folly::Optional<Clock::time_point> lastHolbTime;
+  Optional<Clock::time_point> lastHolbTime;
 
   // The total amount of time we are head line blocked on the stream.
   std::chrono::microseconds totalHolbTime{0us};

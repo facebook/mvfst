@@ -143,7 +143,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeFrame(maxDataFrame, regularBuilder1);
@@ -273,7 +273,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
@@ -305,7 +305,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
 
   // Write them with a regular builder
   writeStreamFrameHeader(
-      regularBuilder1, streamId, 0, 0, 0, true, folly::none /* skipLenHint */);
+      regularBuilder1, streamId, 0, 0, 0, true, none /* skipLenHint */);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
@@ -360,7 +360,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
@@ -469,7 +469,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
@@ -537,7 +537,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0);
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
-  EXPECT_EQ(folly::none, rebuilder.rebuildFromPacket(outstandingPacket));
+  EXPECT_EQ(none, rebuilder.rebuildFromPacket(outstandingPacket));
   EXPECT_FALSE(outstandingPacket.associatedEvent.has_value());
   EXPECT_EQ(0, conn.outstandings.numClonedPackets());
 }
@@ -564,7 +564,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       false,
-      folly::none);
+      none);
   writeStreamFrameData(
       regularBuilder, buf1->clone(), buf1->computeChainDataLength());
   writeStreamFrameHeader(
@@ -574,7 +574,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       buf2->computeChainDataLength(),
       buf2->computeChainDataLength(),
       true,
-      folly::none);
+      none);
   writeStreamFrameData(
       regularBuilder, buf2->clone(), buf2->computeChainDataLength());
   auto packet = std::move(regularBuilder).buildPacket();
@@ -638,7 +638,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       false,
-      folly::none);
+      none);
   writeStreamFrameData(
       regularBuilder, buf1->clone(), buf1->computeChainDataLength());
   writeStreamFrameHeader(
@@ -648,7 +648,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       0,
       0,
       true,
-      folly::none);
+      none);
   writeStreamFrameData(regularBuilder, nullptr, 0);
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1200);

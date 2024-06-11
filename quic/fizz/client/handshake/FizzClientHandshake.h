@@ -27,11 +27,11 @@ class FizzClientHandshake : public ClientHandshake {
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext,
       std::unique_ptr<FizzCryptoFactory> cryptoFactory);
 
-  void removePsk(const folly::Optional<std::string>& hostname) override;
+  void removePsk(const Optional<std::string>& hostname) override;
 
   const CryptoFactory& getCryptoFactory() const override;
 
-  const folly::Optional<std::string>& getApplicationProtocol() const override;
+  const Optional<std::string>& getApplicationProtocol() const override;
 
   bool verifyRetryIntegrityTag(
       const ConnectionId& originalDstConnId,
@@ -39,9 +39,9 @@ class FizzClientHandshake : public ClientHandshake {
 
   bool isTLSResumed() const override;
 
-  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const folly::Optional<folly::ByteRange>& context,
+      const Optional<folly::ByteRange>& context,
       uint16_t keyLength) override;
 
   const fizz::client::State& getState() const {
@@ -53,16 +53,15 @@ class FizzClientHandshake : public ClientHandshake {
   }
 
  protected:
-  folly::Optional<QuicCachedPsk> getPsk(
-      const folly::Optional<std::string>& hostname) const;
+  Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname) const;
 
   void onNewCachedPsk(fizz::client::NewCachedPsk& newCachedPsk) noexcept;
 
   void echRetryAvailable(fizz::client::ECHRetryAvailable& retry);
 
  private:
-  folly::Optional<CachedServerTransportParameters> connectImpl(
-      folly::Optional<std::string> hostname) override;
+  Optional<CachedServerTransportParameters> connectImpl(
+      Optional<std::string> hostname) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;

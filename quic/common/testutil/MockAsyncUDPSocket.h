@@ -56,14 +56,14 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
       (uint64_t readBufferSize,
        uint16_t numPackets,
        NetworkData& networkData,
-       folly::Optional<folly::SocketAddress>& peerAddress,
+       Optional<folly::SocketAddress>& peerAddress,
        size_t& totalData));
   MOCK_METHOD(int, getGRO, ());
   MOCK_METHOD(bool, setGRO, (bool));
   MOCK_METHOD(
       void,
       setAdditionalCmsgsFunc,
-      (folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&));
+      (folly::Function<Optional<folly::SocketCmsgMap>()>&&));
   MOCK_METHOD(void, setRcvBuf, (int));
   MOCK_METHOD(void, setSndBuf, (int));
   MOCK_METHOD(int, getTimestamping, ());

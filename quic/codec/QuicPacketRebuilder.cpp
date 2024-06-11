@@ -43,7 +43,7 @@ PacketEvent PacketRebuilder::cloneOutstandingPacket(
   return *packet.associatedEvent;
 }
 
-folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
+Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     OutstandingPacketWrapper& packet) {
   // TODO: if PMTU changes between the transmission of the original packet and
   // now, then we cannot clone everything in the packet.
@@ -193,7 +193,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
       case QuicWriteFrame::Type::DatagramFrame:
         // Do not clone Datagram frames. If datagram frame is the only frame in
         // the packet, notPureAck will be false, and the function will return
-        // folly::none correctly.
+        // none correctly.
         writeSuccess = true;
         break;
       default: {
@@ -204,7 +204,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
       }
     }
     if (!writeSuccess) {
-      return folly::none;
+      return none;
     }
   }
   // If this packet had a WriteAckFrame, build a new one it with
@@ -237,7 +237,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         conn_.connectionTime, /* connect timestamp */
     };
 
-    folly::Optional<WriteAckFrameResult> ackWriteResult;
+    Optional<WriteAckFrameResult> ackWriteResult;
 
     uint64_t peerRequestedTimestampsCount =
         conn_.maybePeerAckReceiveTimestampsConfig.has_value()
@@ -266,7 +266,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   // (2) we should write window update, but didn't, and wrote nothing else.
   if (!notPureAck ||
       (shouldWriteWindowUpdate && !windowUpdateWritten && !writeSuccess)) {
-    return folly::none;
+    return none;
   }
 
   if (encryptionLevel == EncryptionLevel::Initial) {

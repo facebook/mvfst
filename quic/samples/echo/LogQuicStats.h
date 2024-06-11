@@ -110,8 +110,7 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
-  void onConnectionClose(
-      folly::Optional<QuicErrorCode> code = folly::none) override {
+  void onConnectionClose(Optional<QuicErrorCode> code = none) override {
     VLOG(2) << prefix_ << __func__ << " reason="
             << quic::toString(code.value_or(LocalErrorCode::NO_ERROR));
   }

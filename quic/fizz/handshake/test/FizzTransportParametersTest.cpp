@@ -73,7 +73,7 @@ TEST_F(QuicExtensionsTest, TestClientParamsV1) {
   // Confirm D29 parameters are not parsed for V1.
   auto d29Exts = getExtensions(clientParamsD29);
   auto d2Ext = getClientExtension(exts, kQuicDraft);
-  EXPECT_EQ(d2Ext, folly::none);
+  EXPECT_EQ(d2Ext, none);
 }
 
 TEST_F(QuicExtensionsTest, TestClientParamsD29) {
@@ -114,7 +114,7 @@ TEST_F(QuicExtensionsTest, TestServerParamsV1) {
   // Confirm D29 parameters are not parsed for V1.
   auto d29Exts = getExtensions(serverParamsD29);
   auto d2Ext = getServerExtension(exts, kQuicDraft);
-  EXPECT_EQ(d2Ext, folly::none);
+  EXPECT_EQ(d2Ext, none);
 }
 
 TEST_F(QuicExtensionsTest, TestServerParamsD29) {
@@ -156,7 +156,7 @@ TEST_F(QuicExtensionsTest, TestTicketParamsV1) {
   // Confirm D29 parameters are not parsed for V1.
   auto d29Exts = getExtensions(ticketParamsD29);
   auto d2Ext = getTicketExtension(exts, kQuicDraft);
-  EXPECT_EQ(d2Ext, folly::none);
+  EXPECT_EQ(d2Ext, none);
 }
 
 TEST_F(QuicExtensionsTest, TestTicketParamsD29) {

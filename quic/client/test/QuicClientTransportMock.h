@@ -46,7 +46,7 @@ class QuicClientTransportMock : public QuicClientTransport {
       setReadCallback,
       (StreamId,
        quic::QuicSocket::ReadCallback*,
-       folly::Optional<ApplicationErrorCode>));
+       Optional<ApplicationErrorCode>));
   MOCK_METHOD(
       (folly::Expected<StreamTransportInfo, LocalErrorCode>),
       getStreamTransportInfo,
@@ -54,8 +54,8 @@ class QuicClientTransportMock : public QuicClientTransport {
       (const));
   MOCK_METHOD((bool), isTLSResumed, (), (const));
   MOCK_METHOD((ZeroRttAttemptState), getZeroRttState, ());
-  MOCK_METHOD((void), closeImpl, (folly::Optional<QuicError>, bool, bool));
-  MOCK_METHOD((void), close, (folly::Optional<QuicError>));
+  MOCK_METHOD((void), closeImpl, (Optional<QuicError>, bool, bool));
+  MOCK_METHOD((void), close, (Optional<QuicError>));
   MOCK_METHOD((void), writeData, ());
   MOCK_METHOD((void), closeSecondSocket, ());
   MOCK_METHOD((void), setHappyEyeballsEnabled, (bool));

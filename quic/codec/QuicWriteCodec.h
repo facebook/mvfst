@@ -49,15 +49,15 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder);
  *   to decide it. When skipLenHint is true, the field is skipped. When it's
  *   false, it will be encoded into the header.
  */
-folly::Optional<uint64_t> writeStreamFrameHeader(
+Optional<uint64_t> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
     uint64_t offset,
     uint64_t writeBufferLen,
     uint64_t flowControlLen,
     bool fin,
-    folly::Optional<bool> skipLenHint,
-    folly::Optional<StreamGroupId> streamGroupId = folly::none,
+    Optional<bool> skipLenHint,
+    Optional<StreamGroupId> streamGroupId = none,
     bool appendFrame = true);
 
 /**
@@ -93,7 +93,7 @@ void writeStreamFrameData(
  * written. The caller should check the structure to confirm how many bytes were
  * written.
  */
-folly::Optional<WriteCryptoFrame> writeCryptoFrame(
+Optional<WriteCryptoFrame> writeCryptoFrame(
     uint64_t offsetIn,
     const BufQueue& data,
     PacketBuilderInterface& builder);
@@ -114,7 +114,7 @@ folly::Optional<WriteCryptoFrame> writeCryptoFrame(
  * written to the appender. Returns an empty optional if an ack block could not
  * be written.
  */
-folly::Optional<WriteAckFrameResult> writeAckFrame(
+Optional<WriteAckFrameResult> writeAckFrame(
     const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType = FrameType::ACK);
@@ -124,13 +124,13 @@ folly::Optional<WriteAckFrameResult> writeAckFrame(
  */
 size_t computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 
-folly::Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
+Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
     const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     const AckReceiveTimestampsConfig& recvTimestampsConfig,
     uint64_t maxRecvTimestampsToSend);
 
-folly::Optional<quic::WriteAckFrame> writeAckFrameToPacketBuilder(
+Optional<quic::WriteAckFrame> writeAckFrameToPacketBuilder(
     const WriteAckFrameMetaData& ackFrameMetaData,
     quic::PacketBuilderInterface& builder,
     quic::FrameType frameType);

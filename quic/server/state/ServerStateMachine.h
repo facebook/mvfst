@@ -77,7 +77,7 @@ struct ConnectionMigrationState {
   std::vector<folly::SocketAddress> previousPeerAddresses;
 
   // Congestion state and rtt stats of last validated peer
-  folly::Optional<CongestionAndRttState> lastCongestionAndRtt;
+  Optional<CongestionAndRttState> lastCongestionAndRtt;
 };
 
 /**
@@ -105,7 +105,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   ConnectionMigrationState migrationState;
 
   // Parameters to generate server chosen connection id
-  folly::Optional<ServerConnectionIdParams> serverConnIdParams;
+  Optional<ServerConnectionIdParams> serverConnIdParams;
 
   // ConnectionIdAlgo implementation to encode and decode ConnectionId with
   // various info, such as routing related info.
@@ -122,14 +122,14 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 
   // Whether transport parameters from psk match current server parameters.
   // A false value indicates 0-rtt is rejected.
-  folly::Optional<bool> transportParamsMatching;
+  Optional<bool> transportParamsMatching;
 
-  folly::Optional<uint64_t> maybeCwndHintBytes;
+  Optional<uint64_t> maybeCwndHintBytes;
 
   // Whether source address token matches client ip.
   // A false value indicates either 0-rtt is rejected or inflight bytes are
   // limited until CFIN depending on matching policy.
-  folly::Optional<bool> sourceTokenMatching;
+  Optional<bool> sourceTokenMatching;
 
   // Server address of VIP. Currently used as input for stateless reset token.
   folly::SocketAddress serverAddr;
@@ -152,9 +152,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   MaxPacingRateKnobState maxPacingRateKnobState{};
 
   // Sequence number of the last received MAX_PACING_RATE_KNOB_SEQUENCED.
-  folly::Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{folly::none};
+  Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{none};
 
-  folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
+  Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 
   QuicServerConnectionState(
       std::shared_ptr<ServerHandshakeFactory> handshakeFactory)
@@ -224,7 +224,7 @@ void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn);
 
 void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
-    const folly::Optional<Buf>& appToken);
+    const Optional<Buf>& appToken);
 
 void onConnectionMigration(
     QuicServerConnectionState& conn,

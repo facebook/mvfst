@@ -47,7 +47,7 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   struct Config {
     double rateBytesPerSecond{0};
     double burstSizeBytes{0};
-    folly::Optional<double> maybeMaxDebtQueueSizeBytes;
+    Optional<double> maybeMaxDebtQueueSizeBytes;
 
     // Whether the SimulatedTBF will keep track of when TBF was empty.
     bool trackEmptyIntervals{true};
@@ -138,7 +138,7 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
 
   [[nodiscard]] double getBurstSizeBytes() const;
 
-  [[nodiscard]] folly::Optional<double> getMaxDebtQueueSizeBytes() const;
+  [[nodiscard]] Optional<double> getMaxDebtQueueSizeBytes() const;
 
  private:
   static double timePointToDouble(TimePoint timePoint) {
@@ -146,8 +146,8 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   }
   struct EmptyIntervalState {
     std::shared_ptr<std::deque<TimeInterval>> emptyBucketTimeIntervals_;
-    folly::Optional<TimePoint> maybeLastSendTimeBucketNotEmpty_;
-    folly::Optional<TimePoint> maybeLastForgetEmptyIntervalTime_;
+    Optional<TimePoint> maybeLastSendTimeBucketNotEmpty_;
+    Optional<TimePoint> maybeLastForgetEmptyIntervalTime_;
   };
 
   EmptyIntervalState& getEmptyIntervalState();
@@ -155,6 +155,6 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
 
   Config config_;
   double zeroTime_{0};
-  folly::Optional<EmptyIntervalState> maybeEmptyIntervalState_;
+  Optional<EmptyIntervalState> maybeEmptyIntervalState_;
 };
 } // namespace quic

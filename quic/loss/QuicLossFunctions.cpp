@@ -20,7 +20,7 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn) {
 }
 
 bool isPersistentCongestion(
-    folly::Optional<std::chrono::microseconds> pto,
+    Optional<std::chrono::microseconds> pto,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd,
     const CongestionController::AckEvent& ack) noexcept {
@@ -273,13 +273,13 @@ bool processOutstandingsForLoss(
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
     const InlineMap<StreamId, PacketNum, 20>& largestDsrAckedSequenceNumber,
-    const folly::Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
+    const Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
     const TimePoint& lossTime,
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
     std::chrono::microseconds& delayUntilLost,
     CongestionController::LossEvent& lossEvent,
-    folly::Optional<SocketObserverInterface::LossEvent>& observerLossEvent) {
+    Optional<SocketObserverInterface::LossEvent>& observerLossEvent) {
   bool shouldSetTimer = false;
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   while (iter != conn.outstandings.packets.end()) {
@@ -290,7 +290,7 @@ bool processOutstandingsForLoss(
 
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
-    folly::Optional<uint64_t> maybeCurrentStreamPacketIdx;
+    Optional<uint64_t> maybeCurrentStreamPacketIdx;
     if (currentPacketNum >= largestAcked) {
       break;
     }
@@ -404,7 +404,7 @@ bool processOutstandingsForLoss(
  * This function should be invoked after some event that is possible to
  * trigger loss detection, for example: packets are acked
  */
-folly::Optional<CongestionController::LossEvent> detectLossPackets(
+Optional<CongestionController::LossEvent> detectLossPackets(
     QuicConnectionStateBase& conn,
     const AckState& ackState,
     const LossVisitor& lossVisitor,
@@ -422,7 +422,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
            << " delayUntilLost=" << delayUntilLost.count() << "us" << " "
            << conn;
   CongestionController::LossEvent lossEvent(lossTime);
-  folly::Optional<SocketObserverInterface::LossEvent> observerLossEvent;
+  Optional<SocketObserverInterface::LossEvent> observerLossEvent;
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
     if (socketObserverContainer &&
@@ -441,7 +441,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   // These two variables hold DSR and non-DSR sequence numbers not actual packet
   // numbers
   InlineMap<StreamId, PacketNum, 20> largestDsrAckedSeqNo;
-  folly::Optional<PacketNum> largestNonDsrAckedSeqNo;
+  Optional<PacketNum> largestNonDsrAckedSeqNo;
   if (ackEvent) {
     for (const auto& ackPacket : ackEvent->ackedPackets) {
       for (auto& [stream, details] : ackPacket.detailsPerStream) {
@@ -535,10 +535,10 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       return lossEvent;
     }
   }
-  return folly::none;
+  return none;
 }
 
-folly::Optional<CongestionController::LossEvent> handleAckForLoss(
+Optional<CongestionController::LossEvent> handleAckForLoss(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor,
     CongestionController::AckEvent& ack,

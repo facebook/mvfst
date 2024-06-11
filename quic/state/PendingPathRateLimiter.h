@@ -6,8 +6,8 @@
  */
 
 #pragma once
-#include <folly/Optional.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/Optional.h>
 #include <chrono>
 
 namespace quic {
@@ -35,7 +35,7 @@ class PendingPathRateLimiter {
  private:
   const uint64_t maxCredit_;
   uint64_t credit_;
-  folly::Optional<TimePoint> lastChecked_;
+  Optional<TimePoint> lastChecked_;
 };
 
 } // namespace quic

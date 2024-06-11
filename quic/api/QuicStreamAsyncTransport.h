@@ -159,13 +159,13 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
   enum class CloseState { OPEN, CLOSING, CLOSED };
   CloseState state_{CloseState::OPEN};
   std::shared_ptr<quic::QuicSocket> sock_;
-  folly::Optional<quic::StreamId> id_;
+  Optional<quic::StreamId> id_;
   enum class EOFState { NOT_SEEN, QUEUED, DELIVERED };
   EOFState readEOF_{EOFState::NOT_SEEN};
   EOFState writeEOF_{EOFState::NOT_SEEN};
   AsyncTransport::ReadCallback* readCb_{nullptr};
   folly::IOBufQueue writeBuf_{folly::IOBufQueue::cacheChainLength()};
   std::deque<std::pair<size_t, AsyncTransport::WriteCallback*>> writeCallbacks_;
-  folly::Optional<folly::AsyncSocketException> ex_;
+  Optional<folly::AsyncSocketException> ex_;
 };
 } // namespace quic

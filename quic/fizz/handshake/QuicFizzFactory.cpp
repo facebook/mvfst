@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/Optional.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
 
 namespace {
@@ -17,7 +18,7 @@ class QuicPlaintextReadRecordLayer : public fizz::PlaintextReadRecordLayer {
       folly::IOBufQueue& buf,
       fizz::Aead::AeadOptions) override {
     if (buf.empty()) {
-      return folly::none;
+      return quic::none;
     }
     fizz::TLSMessage msg;
     msg.type = fizz::ContentType::handshake;
@@ -37,7 +38,7 @@ class QuicEncryptedReadRecordLayer : public fizz::EncryptedReadRecordLayer {
       folly::IOBufQueue& buf,
       fizz::Aead::AeadOptions) override {
     if (buf.empty()) {
-      return folly::none;
+      return quic::none;
     }
     fizz::TLSMessage msg;
     msg.type = fizz::ContentType::handshake;

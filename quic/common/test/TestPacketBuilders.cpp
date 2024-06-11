@@ -71,11 +71,11 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
                  CHECK_NOTNULL(dstConn)->clientConnectionId.get_pointer())
            : *CHECK_NOTNULL(
                  CHECK_NOTNULL(dstConn)->serverConnectionId.get_pointer()));
-  folly::Optional<PacketHeader> header;
+  Optional<PacketHeader> header;
 
   const auto ackPnSpace = *CHECK_NOTNULL(maybePnSpace.get_pointer());
   const auto ackPacketNum = [this, &ackPnSpace]() {
-    folly::Optional<quic::PacketNum> maybeAckPacketNum;
+    Optional<quic::PacketNum> maybeAckPacketNum;
     if (this->ackPacketNumStore) {
       CHECK(!maybeAckPacketNum.has_value());
       auto& ackPacketNumStore = *this->ackPacketNumStore;

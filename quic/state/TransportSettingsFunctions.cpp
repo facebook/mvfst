@@ -104,15 +104,15 @@ quic::CongestionControlConfig parseCongestionControlConfig(
   return ccaConfig;
 }
 
-// Same as parse function but returns folly::none on error instead of throwing.
-folly::Optional<quic::CongestionControlConfig> tryParseCongestionControlConfig(
+// Same as parse function but returns none on error instead of throwing.
+Optional<quic::CongestionControlConfig> tryParseCongestionControlConfig(
     const std::string& ccaConfigJson) {
   try {
     quic::CongestionControlConfig ccaConfig;
     ccaConfig = parseCongestionControlConfig(ccaConfigJson);
     return ccaConfig;
   } catch (const std::exception&) {
-    return folly::none;
+    return none;
   }
   folly::assume_unreachable();
 }

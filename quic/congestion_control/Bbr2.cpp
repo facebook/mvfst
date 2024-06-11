@@ -215,7 +215,7 @@ bool Bbr2CongestionController::isInBackgroundMode() const {
   return false;
 }
 
-folly::Optional<Bandwidth> Bbr2CongestionController::getBandwidth() const {
+Optional<Bandwidth> Bbr2CongestionController::getBandwidth() const {
   return bandwidth_;
 }
 

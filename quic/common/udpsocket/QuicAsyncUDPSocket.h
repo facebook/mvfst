@@ -17,6 +17,7 @@
 #include <folly/portability/Sockets.h>
 
 #include <quic/common/NetworkData.h>
+#include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
 
 namespace quic {
@@ -222,14 +223,14 @@ class QuicAsyncUDPSocket {
     explicit RecvResult(NoReadReason noReadReason)
         : maybeNoReadReason(noReadReason) {}
 
-    folly::Optional<NoReadReason> maybeNoReadReason;
+    Optional<NoReadReason> maybeNoReadReason;
   };
 
   virtual RecvResult recvmmsgNetworkData(
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,
-      folly::Optional<folly::SocketAddress>& peerAddress,
+      Optional<folly::SocketAddress>& peerAddress,
       size_t& totalData) = 0;
 
   // generic segmentation offload get/set
@@ -267,7 +268,7 @@ class QuicAsyncUDPSocket {
   virtual void setCmsgs(const folly::SocketCmsgMap& /* cmsgs */) = 0;
   virtual void appendCmsgs(const folly::SocketCmsgMap& /* cmsgs */) = 0;
   virtual void setAdditionalCmsgsFunc(
-      folly::Function<folly::Optional<folly::SocketCmsgMap>()>&&
+      folly::Function<Optional<folly::SocketCmsgMap>()>&&
       /* additionalCmsgsFunc */) = 0;
 
   /*

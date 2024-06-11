@@ -96,7 +96,7 @@ TEST_F(Copa2Test, PersistentCongestion) {
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
-  copa2.onPacketAckOrLoss(folly::none, loss);
+  copa2.onPacketAckOrLoss(none, loss);
   EXPECT_EQ(
       copa2.getCongestionWindow(),
       conn.transportSettings.minCwndInMss * conn.udpSendPacketLen);
@@ -172,7 +172,7 @@ TEST_F(Copa2Test, TestBwEstimate) {
   // You get the ack for the first 5 packets after 100ms all at once
   conn.lossState.lrtt = 100ms;
   now += 100ms;
-  copa2.onPacketAckOrLoss(createAckEvent(5, 5 * packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(5, 5 * packetSize, now), none);
   numPacketsInFlight -= 5;
   EXPECT_EQ(copa2.getBytesInFlight(), numPacketsInFlight * packetSize);
   // Not enough time has passed for cwnd to increase
@@ -184,7 +184,7 @@ TEST_F(Copa2Test, TestBwEstimate) {
   now += 210ms;
   conn.lossState.lrtt = 500ms; // Large value should be ignored since
                                // only the min rtt should matter.
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_EQ(
       copa2.getCongestionWindow(), (6 + alphaParam) * conn.udpSendPacketLen);
   EXPECT_FALSE(copa2.inLossyMode());
@@ -224,10 +224,10 @@ TEST_F(Copa2Test, PacketLossInvokesPacer) {
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
-  copa2.onPacketAckOrLoss(folly::none, lossEvent);
+  copa2.onPacketAckOrLoss(none, lossEvent);
   // Ack one packet to test how we set pacing rate
   copa2.onPacketSent(createPacket(1, 1000, 2000));
-  copa2.onPacketAckOrLoss(createAckEvent(1, 1000, Clock::now()), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, 1000, Clock::now()), none);
 }
 
 TEST_F(Copa2Test, ProbeRttHappens) {
@@ -248,28 +248,28 @@ TEST_F(Copa2Test, ProbeRttHappens) {
   now += 10ms;
   // Set the min rtt
   conn.lossState.lrtt = 100ms;
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_FALSE(copa2.inProbeRtt());
 
   now += kCopa2ProbeRttInterval / 2;
   conn.lossState.lrtt = 250ms;
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_FALSE(copa2.inProbeRtt());
 
   now += kCopa2ProbeRttInterval / 2;
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_TRUE(copa2.inProbeRtt());
 
   conn.lossState.lrtt = 150ms;
   now += kCopa2ProbeRttInterval / 2 - 50ms;
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_FALSE(copa2.inProbeRtt());
 
   // If delay is small enough, it will enter probe rtt after half the usual
   // period
   conn.lossState.lrtt = 150ms;
   now += 100ms;
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_TRUE(copa2.inProbeRtt());
 }
 
@@ -302,7 +302,7 @@ TEST_F(Copa2Test, LossModeHappens) {
   loss.lostPackets = 1;
   loss.largestLostSentTime = now;
   // Start the cycle
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   now += 21ms;
   // End it
   copa2.onPacketAckOrLoss(createAckEvent(8, 7 * packetSize, now), loss);
@@ -312,7 +312,7 @@ TEST_F(Copa2Test, LossModeHappens) {
 
   // Should shift to loss mode now
   loss.largestLostPacketNum = 10;
-  copa2.onPacketAckOrLoss(folly::none, loss);
+  copa2.onPacketAckOrLoss(none, loss);
   EXPECT_TRUE(copa2.inLossyMode());
 
   // Send the next cycle and ensure that we are sending fewer packets
@@ -322,7 +322,7 @@ TEST_F(Copa2Test, LossModeHappens) {
 
   // Ack it at 10ms + 10ms * 2 * lossToleranceParam + 1ms
   now += 12ms;
-  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), folly::none);
+  copa2.onPacketAckOrLoss(createAckEvent(1, packetSize, now), none);
   EXPECT_EQ(
       copa2.getCongestionWindow(),
       packetSize + alphaParam * conn.udpSendPacketLen);

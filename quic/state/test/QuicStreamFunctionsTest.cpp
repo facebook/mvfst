@@ -2125,7 +2125,7 @@ TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedNothingTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 0;
   stream.writeBufMeta.offset = 0;
-  EXPECT_EQ(folly::none, getLargestWriteOffsetTxed(stream));
+  EXPECT_EQ(none, getLargestWriteOffsetTxed(stream));
 }
 
 TEST_F(
@@ -2197,7 +2197,7 @@ TEST_F(
 TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverNothingAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
-  EXPECT_EQ(folly::none, getLargestDeliverableOffset(stream));
+  EXPECT_EQ(none, getLargestDeliverableOffset(stream));
 }
 
 TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverAllAcked) {

@@ -34,7 +34,7 @@ class MockCongestionController : public CongestionController {
       (const AckEvent* FOLLY_NULLABLE, const LossEvent* FOLLY_NULLABLE));
   MOCK_METHOD(uint64_t, getWritableBytes, (), (const));
   MOCK_METHOD(uint64_t, getCongestionWindow, (), (const));
-  MOCK_METHOD(folly::Optional<Bandwidth>, getBandwidth, (), (const));
+  MOCK_METHOD(Optional<Bandwidth>, getBandwidth, (), (const));
   MOCK_METHOD(void, onSpuriousLoss, ());
   MOCK_METHOD(CongestionControlType, type, (), (const));
   MOCK_METHOD(void, setAppIdle, (bool, TimePoint));
@@ -60,14 +60,14 @@ class MockPacketProcessor : public PacketProcessor {
       onPacketDestroyed,
       (const OutstandingPacketWrapper&),
       (override));
-  MOCK_METHOD(folly::Optional<PrewriteRequest>, prewrite, (), (override));
+  MOCK_METHOD(Optional<PrewriteRequest>, prewrite, (), (override));
 };
 
 class MockThrottlingSignalProvider : public ThrottlingSignalProvider {
  public:
   ~MockThrottlingSignalProvider() override = default;
   MOCK_METHOD(
-      folly::Optional<ThrottlingSignalProvider::ThrottlingSignal>,
+      Optional<ThrottlingSignalProvider::ThrottlingSignal>,
       getCurrentThrottlingSignal,
       (),
       (override));

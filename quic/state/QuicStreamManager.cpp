@@ -281,7 +281,7 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
 
 QuicStreamState* QuicStreamManager::getStream(
     StreamId streamId,
-    folly::Optional<StreamGroupId> streamGroupId) {
+    Optional<StreamGroupId> streamGroupId) {
   if (isRemoteStream(nodeType_, streamId)) {
     auto stream = getOrCreatePeerStream(streamId, std::move(streamGroupId));
     updateAppIdleState();
@@ -306,7 +306,7 @@ QuicStreamState* QuicStreamManager::getStream(
 
 folly::Expected<QuicStreamState*, LocalErrorCode>
 QuicStreamManager::createNextBidirectionalStream(
-    folly::Optional<StreamGroupId> streamGroupId) {
+    Optional<StreamGroupId> streamGroupId) {
   auto stream =
       createStream(nextBidirectionalStreamId_, std::move(streamGroupId));
   if (stream.hasValue()) {
@@ -323,7 +323,7 @@ QuicStreamManager::createNextBidirectionalStreamGroup() {
 
 folly::Expected<QuicStreamState*, LocalErrorCode>
 QuicStreamManager::createNextUnidirectionalStream(
-    folly::Optional<StreamGroupId> streamGroupId) {
+    Optional<StreamGroupId> streamGroupId) {
   auto stream =
       createStream(nextUnidirectionalStreamId_, std::move(streamGroupId));
   if (stream.hasValue()) {
@@ -334,7 +334,7 @@ QuicStreamManager::createNextUnidirectionalStream(
 
 QuicStreamState* FOLLY_NULLABLE QuicStreamManager::instantiatePeerStream(
     StreamId streamId,
-    folly::Optional<StreamGroupId> groupId) {
+    Optional<StreamGroupId> groupId) {
   if (groupId) {
     auto& seenSet = isUnidirectionalStream(streamId)
         ? peerUnidirectionalStreamGroupsSeen_
@@ -388,7 +388,7 @@ QuicStreamManager::createNextStreamGroup(
 
 QuicStreamState* FOLLY_NULLABLE QuicStreamManager::getOrCreatePeerStream(
     StreamId streamId,
-    folly::Optional<StreamGroupId> streamGroupId) {
+    Optional<StreamGroupId> streamGroupId) {
   // This function maintains 3 invariants:
   // 1. Streams below nextAcceptableStreamId are streams that have been
   //    seen before. Everything above can be opened.
@@ -485,7 +485,7 @@ QuicStreamState* FOLLY_NULLABLE QuicStreamManager::getOrCreatePeerStream(
 folly::Expected<QuicStreamState*, LocalErrorCode>
 QuicStreamManager::createStream(
     StreamId streamId,
-    folly::Optional<StreamGroupId> streamGroupId) {
+    Optional<StreamGroupId> streamGroupId) {
   if (nodeType_ == QuicNodeType::Client && !isClientStream(streamId)) {
     throw QuicTransportException(
         "Attempted creating non-client stream on client",

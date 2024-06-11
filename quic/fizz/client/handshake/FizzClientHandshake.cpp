@@ -31,13 +31,13 @@ FizzClientHandshake::FizzClientHandshake(
   CHECK(cryptoFactory_->getFizzFactory());
 }
 
-folly::Optional<CachedServerTransportParameters>
-FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
+Optional<CachedServerTransportParameters> FizzClientHandshake::connectImpl(
+    Optional<std::string> hostname) {
   // Look up psk
-  folly::Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
+  Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
 
-  folly::Optional<fizz::client::CachedPsk> cachedPsk;
-  folly::Optional<CachedServerTransportParameters> transportParams;
+  Optional<fizz::client::CachedPsk> cachedPsk;
+  Optional<CachedServerTransportParameters> transportParams;
   if (quicCachedPsk) {
     cachedPsk = std::move(quicCachedPsk->cachedPsk);
     transportParams = std::move(quicCachedPsk->transportParams);
@@ -52,7 +52,7 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
   // Since Draft-17, EOED should not be sent
   context->setOmitEarlyRecordLayer(true);
 
-  folly::Optional<std::vector<fizz::ech::ECHConfig>> echConfigs;
+  Optional<std::vector<fizz::ech::ECHConfig>> echConfigs;
   if (hostname.hasValue()) {
     echConfigs = fizzContext_->getECHConfigs(*hostname);
   }
@@ -69,11 +69,11 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
   return transportParams;
 }
 
-folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
-    const folly::Optional<std::string>& hostname) const {
+Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
+    const Optional<std::string>& hostname) const {
   auto quicCachedPsk = fizzContext_->getPsk(hostname);
   if (!quicCachedPsk) {
-    return folly::none;
+    return none;
   }
 
   // TODO T32658838 better API to disable early data for current connection
@@ -92,8 +92,7 @@ folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
   return quicCachedPsk;
 }
 
-void FizzClientHandshake::removePsk(
-    const folly::Optional<std::string>& hostname) {
+void FizzClientHandshake::removePsk(const Optional<std::string>& hostname) {
   fizzContext_->removePsk(hostname);
 }
 
@@ -101,8 +100,8 @@ const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
   return *cryptoFactory_;
 }
 
-const folly::Optional<std::string>&
-FizzClientHandshake::getApplicationProtocol() const {
+const Optional<std::string>& FizzClientHandshake::getApplicationProtocol()
+    const {
   auto& earlyDataParams = state_.earlyDataParams();
   if (earlyDataParams) {
     return earlyDataParams->alpn;
@@ -138,15 +137,14 @@ bool FizzClientHandshake::isTLSResumed() const {
   return pskType && *pskType == fizz::PskType::Resumption;
 }
 
-folly::Optional<std::vector<uint8_t>>
-FizzClientHandshake::getExportedKeyingMaterial(
+Optional<std::vector<uint8_t>> FizzClientHandshake::getExportedKeyingMaterial(
     const std::string& label,
-    const folly::Optional<folly::ByteRange>& context,
+    const Optional<folly::ByteRange>& context,
     uint16_t keyLength) {
   const auto& ems = state_.exporterMasterSecret();
   const auto cipherSuite = state_.cipher();
   if (!ems.hasValue() || !cipherSuite.hasValue()) {
-    return folly::none;
+    return none;
   }
 
   auto ekm = fizz::Exporter::getExportedKeyingMaterial(
@@ -154,7 +152,7 @@ FizzClientHandshake::getExportedKeyingMaterial(
       cipherSuite.value(),
       ems.value()->coalesce(),
       label,
-      context == folly::none ? nullptr : folly::IOBuf::wrapBuffer(*context),
+      context == none ? nullptr : folly::IOBuf::wrapBuffer(*context),
       keyLength);
 
   std::vector<uint8_t> result(ekm->coalesce());

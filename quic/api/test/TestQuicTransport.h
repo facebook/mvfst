@@ -50,9 +50,9 @@ class TestQuicTransport
     closeUdpSocket();
   }
 
-  folly::Optional<std::vector<TransportParameter>> getPeerTransportParams()
+  Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override {
-    return folly::none;
+    return none;
   }
 
   QuicVersion getVersion() {
@@ -179,11 +179,11 @@ class TestQuicTransport
     return observerContainer_.get();
   }
 
-  folly::Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string&,
-      const folly::Optional<folly::ByteRange>&,
+      const Optional<folly::ByteRange>&,
       uint16_t) const override {
-    return folly::none;
+    return none;
   }
 
   void validateECN() {

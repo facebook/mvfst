@@ -12,6 +12,7 @@
 #include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/common/Optional.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/congestion_control/Pacer.h>
@@ -34,7 +35,7 @@ namespace {
  */
 constexpr auto APP_NO_ERROR = quic::GenericApplicationErrorCode::NO_ERROR;
 quic::QuicError maybeSetGenericAppError(
-    folly::Optional<quic::QuicError>&& error) {
+    quic::Optional<quic::QuicError>&& error) {
   return std::move(error).value_or(
       quic::QuicError{APP_NO_ERROR, quic::toString(APP_NO_ERROR)});
 }
@@ -76,7 +77,7 @@ QuicTransportBase::QuicTransportBase(
     return 0us;
   });
   if (socket_) {
-    folly::Function<folly::Optional<folly::SocketCmsgMap>()> func = [&]() {
+    folly::Function<Optional<folly::SocketCmsgMap>()> func = [&]() {
       return getAdditionalCmsgsForAsyncUDPSocket();
     };
     socket_->setAdditionalCmsgsFunc(std::move(func));
@@ -152,16 +153,16 @@ void QuicTransportBase::setQLogger(std::shared_ptr<QLogger> qLogger) {
   }
 }
 
-folly::Optional<ConnectionId> QuicTransportBase::getClientConnectionId() const {
+Optional<ConnectionId> QuicTransportBase::getClientConnectionId() const {
   return conn_->clientConnectionId;
 }
 
-folly::Optional<ConnectionId> QuicTransportBase::getServerConnectionId() const {
+Optional<ConnectionId> QuicTransportBase::getServerConnectionId() const {
   return conn_->serverConnectionId;
 }
 
-folly::Optional<ConnectionId>
-QuicTransportBase::getClientChosenDestConnectionId() const {
+Optional<ConnectionId> QuicTransportBase::getClientChosenDestConnectionId()
+    const {
   return conn_->clientChosenDestConnectionId;
 }
 
@@ -201,7 +202,7 @@ bool QuicTransportBase::error() const {
   return conn_->localConnectionError.has_value();
 }
 
-void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
+void QuicTransportBase::close(Optional<QuicError> errorCode) {
   [[maybe_unused]] auto self = sharedGuard();
   // The caller probably doesn't need a conn callback any more because they
   // explicitly called close.
@@ -213,7 +214,7 @@ void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
   closeImpl(std::move(errorCode), true);
 }
 
-void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
+void QuicTransportBase::closeNow(Optional<QuicError> errorCode) {
   DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   [[maybe_unused]] auto self = sharedGuard();
   VLOG(4) << __func__ << " " << *this;
@@ -249,14 +250,14 @@ void QuicTransportBase::closeGracefully() {
       QuicError(QuicErrorCode(LocalErrorCode::NO_ERROR), "Graceful Close"));
   // All streams are closed, close the transport for realz.
   if (conn_->streamManager->streamCount() == 0) {
-    closeImpl(folly::none);
+    closeImpl(none);
   }
 }
 
 // TODO: t64691045 change the closeImpl API to include both the sanitized and
 // unsanited error message, remove exceptionCloseWhat_.
 void QuicTransportBase::closeImpl(
-    folly::Optional<QuicError> errorCode,
+    Optional<QuicError> errorCode,
     bool drainConnection,
     bool sendCloseImmediately) {
   if (closeState_ == CloseState::CLOSED) {
@@ -582,7 +583,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   CongestionControlType congestionControlType = CongestionControlType::None;
   uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
   uint64_t congestionWindow = std::numeric_limits<uint64_t>::max();
-  folly::Optional<CongestionController::State> maybeCCState;
+  Optional<CongestionController::State> maybeCCState;
   uint64_t burstSize = 0;
   std::chrono::microseconds pacingInterval = 0ms;
   if (conn_->congestionController) {
@@ -647,7 +648,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   return transportInfo;
 }
 
-folly::Optional<std::string> QuicTransportBase::getAppProtocol() const {
+Optional<std::string> QuicTransportBase::getAppProtocol() const {
   return conn_->handshakeLayer->getApplicationProtocol();
 }
 
@@ -730,7 +731,7 @@ QuicTransportBase::setStreamFlowControlWindow(
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setReadCallback(
     StreamId id,
     ReadCallback* cb,
-    folly::Optional<ApplicationErrorCode> err) {
+    Optional<ApplicationErrorCode> err) {
   if (isSendingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
@@ -766,7 +767,7 @@ folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setReadCallbackInternal(
     StreamId id,
     ReadCallback* cb,
-    folly::Optional<ApplicationErrorCode> err) noexcept {
+    Optional<ApplicationErrorCode> err) noexcept {
   VLOG(4) << "Setting setReadCallback for stream=" << id << " cb=" << cb << " "
           << *this;
   auto readCbIt = readCallbacks_.find(id);
@@ -1164,7 +1165,7 @@ void QuicTransportBase::cancelDeliveryCallbacksForStream(
 
 void QuicTransportBase::cancelByteEventCallbacksForStream(
     const StreamId id,
-    const folly::Optional<uint64_t>& offset) {
+    const Optional<uint64_t>& offset) {
   invokeForEachByteEventType(([this, id, &offset](const ByteEvent::Type type) {
     cancelByteEventCallbacksForStream(type, id, offset);
   }));
@@ -1173,7 +1174,7 @@ void QuicTransportBase::cancelByteEventCallbacksForStream(
 void QuicTransportBase::cancelByteEventCallbacksForStream(
     const ByteEvent::Type type,
     const StreamId id,
-    const folly::Optional<uint64_t>& offset) {
+    const Optional<uint64_t>& offset) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return;
   }
@@ -1367,13 +1368,12 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::consume(
   return folly::makeExpected<LocalErrorCode>(result.value());
 }
 
-folly::
-    Expected<folly::Unit, std::pair<LocalErrorCode, folly::Optional<uint64_t>>>
-    QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
-  using ConsumeError = std::pair<LocalErrorCode, folly::Optional<uint64_t>>;
+folly::Expected<folly::Unit, std::pair<LocalErrorCode, Optional<uint64_t>>>
+QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
+  using ConsumeError = std::pair<LocalErrorCode, Optional<uint64_t>>;
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(
-        ConsumeError{LocalErrorCode::CONNECTION_CLOSED, folly::none});
+        ConsumeError{LocalErrorCode::CONNECTION_CLOSED, none});
   }
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
@@ -1381,7 +1381,7 @@ folly::
     updateReadLooper(); // consume may affect "read" API
     updateWriteLooper(true);
   };
-  folly::Optional<uint64_t> readOffset;
+  Optional<uint64_t> readOffset;
   try {
     // Need to check that the stream exists first so that we don't
     // accidentally let the API create a peer stream that was not
@@ -1400,11 +1400,11 @@ folly::
     if (stream->streamReadError) {
       switch (stream->streamReadError->type()) {
         case QuicErrorCode::Type::LocalErrorCode:
-          return folly::makeUnexpected(ConsumeError{
-              *stream->streamReadError->asLocalErrorCode(), folly::none});
+          return folly::makeUnexpected(
+              ConsumeError{*stream->streamReadError->asLocalErrorCode(), none});
         default:
           return folly::makeUnexpected(
-              ConsumeError{LocalErrorCode::INTERNAL_ERROR, folly::none});
+              ConsumeError{LocalErrorCode::INTERNAL_ERROR, none});
       }
     }
 
@@ -1473,16 +1473,16 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
     // lambda to help get the next callback to call for this stream
     auto getNextTxCallbackForStreamAndCleanup =
         [this, &largestOffsetTxed](
-            const auto& streamId) -> folly::Optional<ByteEventDetail> {
+            const auto& streamId) -> Optional<ByteEventDetail> {
       auto txCallbacksForStreamIt = txCallbacks_.find(streamId);
       if (txCallbacksForStreamIt == txCallbacks_.end() ||
           txCallbacksForStreamIt->second.empty()) {
-        return folly::none;
+        return none;
       }
 
       auto& txCallbacksForStream = txCallbacksForStreamIt->second;
       if (txCallbacksForStream.front().offset > *largestOffsetTxed) {
-        return folly::none;
+        return none;
       }
 
       // extract the callback, pop from the queue, then check for cleanup
@@ -1494,7 +1494,7 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
       return result;
     };
 
-    folly::Optional<ByteEventDetail> nextOffsetAndCallback;
+    Optional<ByteEventDetail> nextOffsetAndCallback;
     while (
         (nextOffsetAndCallback =
              getNextTxCallbackForStreamAndCleanup(streamId))) {
@@ -1995,7 +1995,7 @@ uint64_t QuicTransportBase::getNumOpenableUnidirectionalStreams() const {
 folly::Expected<StreamId, LocalErrorCode>
 QuicTransportBase::createStreamInternal(
     bool bidirectional,
-    const folly::Optional<StreamGroupId>& streamGroupId) {
+    const Optional<StreamGroupId>& streamGroupId) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
@@ -2435,7 +2435,7 @@ QuicTransportBase::registerByteEventCallback(
 
   // if the callback is already ready, we still insert, but schedule to
   // process
-  folly::Optional<uint64_t> maxOffsetReady;
+  Optional<uint64_t> maxOffsetReady;
   switch (type) {
     case ByteEvent::Type::ACK:
       maxOffsetReady = getLargestDeliverableOffset(*stream);
@@ -2481,11 +2481,11 @@ QuicTransportBase::registerByteEventCallback(
   return folly::unit;
 }
 
-folly::Optional<LocalErrorCode> QuicTransportBase::shutdownWrite(StreamId id) {
+Optional<LocalErrorCode> QuicTransportBase::shutdownWrite(StreamId id) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return LocalErrorCode::INVALID_OPERATION;
   }
-  return folly::none;
+  return none;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
@@ -2624,7 +2624,7 @@ void QuicTransportBase::checkForClosedStream() {
 
   if (closeState_ == CloseState::GRACEFUL_CLOSING &&
       conn_->streamManager->streamCount() == 0) {
-    closeImpl(folly::none);
+    closeImpl(none);
   }
 }
 
@@ -2858,7 +2858,7 @@ void QuicTransportBase::setConnectionCallback(
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(
-    folly::Function<bool(const folly::Optional<std::string>&, const Buf&) const>
+    folly::Function<bool(const Optional<std::string>&, const Buf&) const>
         validator,
     folly::Function<Buf()> getter) {
   conn_->earlyDataAppParamsValidator = std::move(validator);
@@ -3546,14 +3546,13 @@ void QuicTransportBase::detachEventBase() {
   evb_ = nullptr;
 }
 
-folly::Optional<LocalErrorCode> QuicTransportBase::setControlStream(
-    StreamId id) {
+Optional<LocalErrorCode> QuicTransportBase::setControlStream(StreamId id) {
   if (!conn_->streamManager->streamExists(id)) {
     return LocalErrorCode::STREAM_NOT_EXISTS;
   }
   auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
   conn_->streamManager->setStreamAsControl(*stream);
-  return folly::none;
+  return none;
 }
 
 void QuicTransportBase::runOnEvbAsync(
@@ -3816,24 +3815,23 @@ void QuicTransportBase::notifyStartWritingFromAppRateLimited() {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::appRateLimitedEvents>(
-            [event = SocketObserverInterface::AppLimitedEvent::Builder()
-                         .setOutstandingPackets(conn_->outstandings.packets)
-                         .setWriteCount(conn_->writeCount)
-                         .setLastPacketSentTime(
-                             conn_->lossState.maybeLastPacketSentTime)
-                         .setCwndInBytes(
-                             conn_->congestionController
-                                 ? folly::Optional<uint64_t>(
-                                       conn_->congestionController
-                                           ->getCongestionWindow())
-                                 : folly::none)
-                         .setWritableBytes(
-                             conn_->congestionController
-                                 ? folly::Optional<uint64_t>(
-                                       conn_->congestionController
-                                           ->getWritableBytes())
-                                 : folly::none)
-                         .build()](auto observer, auto observed) {
+            [event =
+                 SocketObserverInterface::AppLimitedEvent::Builder()
+                     .setOutstandingPackets(conn_->outstandings.packets)
+                     .setWriteCount(conn_->writeCount)
+                     .setLastPacketSentTime(
+                         conn_->lossState.maybeLastPacketSentTime)
+                     .setCwndInBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getCongestionWindow())
+                             : none)
+                     .setWritableBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getWritableBytes())
+                             : none)
+                     .build()](auto observer, auto observed) {
               observer->startWritingFromAppLimited(observed, event);
             });
   }
@@ -3850,28 +3848,27 @@ void QuicTransportBase::notifyPacketsWritten(
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::packetsWrittenEvents>(
-            [event = SocketObserverInterface::PacketsWrittenEvent::Builder()
-                         .setOutstandingPackets(conn_->outstandings.packets)
-                         .setWriteCount(conn_->writeCount)
-                         .setLastPacketSentTime(
-                             conn_->lossState.maybeLastPacketSentTime)
-                         .setCwndInBytes(
-                             conn_->congestionController
-                                 ? folly::Optional<uint64_t>(
-                                       conn_->congestionController
-                                           ->getCongestionWindow())
-                                 : folly::none)
-                         .setWritableBytes(
-                             conn_->congestionController
-                                 ? folly::Optional<uint64_t>(
-                                       conn_->congestionController
-                                           ->getWritableBytes())
-                                 : folly::none)
-                         .setNumPacketsWritten(numPacketsWritten)
-                         .setNumAckElicitingPacketsWritten(
-                             numAckElicitingPacketsWritten)
-                         .setNumBytesWritten(numBytesWritten)
-                         .build()](auto observer, auto observed) {
+            [event =
+                 SocketObserverInterface::PacketsWrittenEvent::Builder()
+                     .setOutstandingPackets(conn_->outstandings.packets)
+                     .setWriteCount(conn_->writeCount)
+                     .setLastPacketSentTime(
+                         conn_->lossState.maybeLastPacketSentTime)
+                     .setCwndInBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getCongestionWindow())
+                             : none)
+                     .setWritableBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getWritableBytes())
+                             : none)
+                     .setNumPacketsWritten(numPacketsWritten)
+                     .setNumAckElicitingPacketsWritten(
+                         numAckElicitingPacketsWritten)
+                     .setNumBytesWritten(numBytesWritten)
+                     .build()](auto observer, auto observed) {
               observer->packetsWritten(observed, event);
             });
   }
@@ -3885,24 +3882,23 @@ void QuicTransportBase::notifyAppRateLimited() {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::appRateLimitedEvents>(
-            [event = SocketObserverInterface::AppLimitedEvent::Builder()
-                         .setOutstandingPackets(conn_->outstandings.packets)
-                         .setWriteCount(conn_->writeCount)
-                         .setLastPacketSentTime(
-                             conn_->lossState.maybeLastPacketSentTime)
-                         .setCwndInBytes(
-                             conn_->congestionController
-                                 ? folly::Optional<uint64_t>(
-                                       conn_->congestionController
-                                           ->getCongestionWindow())
-                                 : folly::none)
-                         .setWritableBytes(
-                             conn_->congestionController
-                                 ? folly::Optional<uint64_t>(
-                                       conn_->congestionController
-                                           ->getWritableBytes())
-                                 : folly::none)
-                         .build()](auto observer, auto observed) {
+            [event =
+                 SocketObserverInterface::AppLimitedEvent::Builder()
+                     .setOutstandingPackets(conn_->outstandings.packets)
+                     .setWriteCount(conn_->writeCount)
+                     .setLastPacketSentTime(
+                         conn_->lossState.maybeLastPacketSentTime)
+                     .setCwndInBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getCongestionWindow())
+                             : none)
+                     .setWritableBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getWritableBytes())
+                             : none)
+                     .build()](auto observer, auto observed) {
               observer->appRateLimited(observed, event);
             });
   }
@@ -4088,14 +4084,14 @@ void QuicTransportBase::validateECNState() {
   }
 }
 
-folly::Optional<folly::SocketCmsgMap>
+Optional<folly::SocketCmsgMap>
 QuicTransportBase::getAdditionalCmsgsForAsyncUDPSocket() {
   if (conn_->socketCmsgsState.additionalCmsgs) {
     // This callback should be happening for the target write
     DCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
     return conn_->socketCmsgsState.additionalCmsgs;
   }
-  return folly::none;
+  return none;
 }
 
 WriteQuicDataResult QuicTransportBase::handleInitialWriteDataCommon(

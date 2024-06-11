@@ -31,8 +31,7 @@ TEST_F(StateDataTest, CongestionControllerState) {
       .WillOnce(Return(1000));
   EXPECT_CALL(*mockCongestionController, getWritableBytes())
       .WillOnce(Return(2000));
-  EXPECT_CALL(*mockCongestionController, getBandwidth())
-      .WillOnce(Return(folly::none));
+  EXPECT_CALL(*mockCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_THAT(
       mockCongestionController->getState(),
       testing::AllOf(
@@ -40,8 +39,7 @@ TEST_F(StateDataTest, CongestionControllerState) {
               &CongestionController::State::congestionWindowBytes, 1000),
           testing::Field(&CongestionController::State::writableBytes, 2000),
           testing::Field(
-              &CongestionController::State::maybeBandwidthBitsPerSec,
-              folly::none)));
+              &CongestionController::State::maybeBandwidthBitsPerSec, none)));
   {
     Bandwidth testBandwidth(
         300 /* bytes delivered */, 20us /* time interval */);
@@ -84,8 +82,7 @@ TEST_F(StateDataTest, CongestionControllerState) {
                 &CongestionController::State::congestionWindowBytes, 3000),
             testing::Field(&CongestionController::State::writableBytes, 4000),
             testing::Field(
-                &CongestionController::State::maybeBandwidthBitsPerSec,
-                folly::none)));
+                &CongestionController::State::maybeBandwidthBitsPerSec, none)));
   }
 }
 

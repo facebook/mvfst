@@ -24,12 +24,12 @@ struct PacketNumStore {
 
 struct AckPacketBuilderFields {
   QuicConnectionStateBase* dstConn{nullptr};
-  folly::Optional<quic::PacketNumberSpace> maybePnSpace;
-  folly::Optional<quic::PacketNum> maybeAckPacketNum;
+  Optional<quic::PacketNumberSpace> maybePnSpace;
+  Optional<quic::PacketNum> maybeAckPacketNum;
   PacketNumStore* ackPacketNumStore{nullptr};
-  folly::Optional<quic::AckBlocks> maybeAckBlocks;
-  folly::Optional<std::chrono::microseconds> maybeAckDelay;
-  folly::Optional<const Aead*> maybeAead; // not required
+  Optional<quic::AckBlocks> maybeAckBlocks;
+  Optional<std::chrono::microseconds> maybeAckDelay;
+  Optional<const Aead*> maybeAead; // not required
   ProtectionType shortHeaderProtectionType{ProtectionType::KeyPhaseZero};
   explicit AckPacketBuilderFields() = default;
 };
@@ -50,19 +50,19 @@ struct AckPacketBuilder : public AckPacketBuilderFields {
 };
 
 struct OutstandingPacketBuilderFields {
-  folly::Optional<RegularQuicWritePacket> maybePacket;
-  folly::Optional<TimePoint> maybeTime;
-  folly::Optional<uint16_t> maybeEncodedSize;
-  folly::Optional<uint16_t> maybeEncodedBodySize;
-  folly::Optional<uint64_t> maybeTotalBytesSent;
-  folly::Optional<uint64_t> maybeTotalBodyBytesSent;
-  folly::Optional<uint32_t> maybeInflightBytes;
-  folly::Optional<uint64_t> maybePacketsInflight;
-  folly::Optional<std::reference_wrapper<const LossState>> maybeLossState;
-  folly::Optional<uint64_t> maybeWriteCount;
-  folly::Optional<OutstandingPacketWrapper::Metadata::DetailsPerStream>
+  Optional<RegularQuicWritePacket> maybePacket;
+  Optional<TimePoint> maybeTime;
+  Optional<uint16_t> maybeEncodedSize;
+  Optional<uint16_t> maybeEncodedBodySize;
+  Optional<uint64_t> maybeTotalBytesSent;
+  Optional<uint64_t> maybeTotalBodyBytesSent;
+  Optional<uint32_t> maybeInflightBytes;
+  Optional<uint64_t> maybePacketsInflight;
+  Optional<std::reference_wrapper<const LossState>> maybeLossState;
+  Optional<uint64_t> maybeWriteCount;
+  Optional<OutstandingPacketWrapper::Metadata::DetailsPerStream>
       maybeDetailsPerStream;
-  folly::Optional<std::chrono::microseconds> maybeTotalAppLimitedTimeUsecs;
+  Optional<std::chrono::microseconds> maybeTotalAppLimitedTimeUsecs;
   explicit OutstandingPacketBuilderFields() = default;
 };
 

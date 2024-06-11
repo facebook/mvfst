@@ -40,7 +40,7 @@ void QuicConnector::onReplaySafe() noexcept {
 
 void QuicConnector::connect(
     folly::EventBase* eventBase,
-    folly::Optional<folly::SocketAddress> localAddr,
+    Optional<folly::SocketAddress> localAddr,
     const folly::SocketAddress& connectAddr,
     std::shared_ptr<const fizz::client::FizzClientContext> fizzContext,
     std::shared_ptr<const fizz::CertificateVerifier> verifier,
@@ -49,7 +49,7 @@ void QuicConnector::connect(
     const std::vector<QuicVersion>& supportedQuicVersions,
     std::chrono::milliseconds connectTimeout,
     const folly::SocketOptionMap& socketOptions,
-    const folly::Optional<std::string>& sni,
+    const Optional<std::string>& sni,
     std::shared_ptr<quic::QLogger> qLogger,
     std::shared_ptr<quic::LoopDetectorCallback> quicLoopDetectorCallback,
     std::shared_ptr<quic::QuicTransportStatsCallback>

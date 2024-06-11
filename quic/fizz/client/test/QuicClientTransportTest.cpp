@@ -380,10 +380,10 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
 TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
-    client->close(folly::none);
+    client->close(none);
     eventbase_.terminateLoopSoon();
   }));
-  ASSERT_EQ(client->getAppProtocol(), folly::none);
+  ASSERT_EQ(client->getAppProtocol(), none);
   client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 }
@@ -400,13 +400,13 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
         const TransportErrorCode* transportError =
             errorCode.code.asTransportErrorCode();
         EXPECT_NE(transportError, nullptr);
-        client->close(folly::none);
+        client->close(none);
         this->checkTransportSummaryEvent(qLogger);
 
         eventbase_.terminateLoopSoon();
       }));
 
-  ASSERT_EQ(client->getAppProtocol(), folly::none);
+  ASSERT_EQ(client->getAppProtocol(), none);
 
   client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
@@ -484,10 +484,10 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
-  folly::Optional<std::string> alpn = std::string("h3");
+  Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>& alpnToValidate, const Buf&) {
+      [&](const Optional<std::string>& alpnToValidate, const Buf&) {
         performedValidation = true;
         EXPECT_EQ(alpnToValidate, alpn);
         return true;
@@ -562,10 +562,10 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
       std::make_shared<DefaultCongestionControllerFactory>());
   client->setCongestionControl(CongestionControlType::NewReno);
 
-  folly::Optional<std::string> alpn = std::string("h3");
+  Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>& alpnToValidate, const Buf&) {
+      [&](const Optional<std::string>& alpnToValidate, const Buf&) {
         performedValidation = true;
         EXPECT_EQ(alpnToValidate, alpn);
         return true;
@@ -706,7 +706,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   server_->setFizzContext(serverCtx);
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return true;
       },
@@ -773,7 +773,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   server_->setFizzContext(serverCtx);
   client->getNonConstConn().transportSettings.attemptEarlyData = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         EXPECT_TRUE(false);
         return true;
       },
@@ -815,7 +815,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   server_->setFizzContext(serverCtx);
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return false;
       },
@@ -932,7 +932,7 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
-  folly::Optional<StatelessResetToken> token1, token2;
+  Optional<StatelessResetToken> token1, token2;
 
   expectTransportCallbacks();
   auto server2 = createServer(ProcessId::ONE);
@@ -1053,7 +1053,7 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   deliverData(serverAddr, oneMoreAckPacket->coalesce());
   EXPECT_FALSE(client->hasWriteCipher());
 
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
@@ -1078,7 +1078,7 @@ TEST_F(QuicClientTransportTest, AddNewPeerAddressSetsPacketSize) {
   client->addNewPeerAddress(v6Address);
   EXPECT_EQ(kDefaultV6UDPSendPacketLen, client->getConn().udpSendPacketLen);
 
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
@@ -1088,7 +1088,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
 
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
   client->onNetworkSwitch(nullptr);
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
@@ -1111,7 +1111,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true));
   client->onNetworkSwitch(std::move(newSocket));
 
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
@@ -1122,7 +1122,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
   EXPECT_CALL(*newSocketPtr, bind(_)).Times(0);
   client->onNetworkSwitch(std::move(newSocket));
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
@@ -1135,7 +1135,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
         : socket_(std::move(socket)) {}
 
     void onTransportReady() noexcept override {
-      socket_->close(folly::none);
+      socket_->close(none);
       socket_.reset();
       onTransportReadyMock();
     }
@@ -1242,7 +1242,7 @@ TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
   EXPECT_CALL(
       *mockQLogger, setDcid(client->getConn().clientChosenDestConnectionId));
   client->setQLogger(mockQLogger);
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
@@ -1274,7 +1274,7 @@ TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
   client->setQLogger(nullptr);
   CHECK(client->getQLogger() == nullptr);
 
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
@@ -1287,7 +1287,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
   EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
   EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
@@ -1312,7 +1312,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
   auto replacedCid = conn.serverConnectionId;
   EXPECT_NE(originalCid.connId, *replacedCid);
   EXPECT_EQ(secondCid.connId, *replacedCid);
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
@@ -1341,7 +1341,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
   auto replacedCid = conn.serverConnectionId;
   EXPECT_NE(originalCid.connId, *replacedCid);
   EXPECT_EQ(secondCid.connId, *replacedCid);
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 enum class ServerFirstPacketType : uint8_t { ServerHello, Retry };
@@ -2316,7 +2316,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, CleanupReadLoopCounting) {
@@ -2487,7 +2487,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none /* longHeaderOverride */,
+      none /* longHeaderOverride */,
       false /* eof */));
   auto packet2 = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -2497,9 +2497,9 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none /* longHeaderOverride */,
+      none /* longHeaderOverride */,
       true /* eof */,
-      folly::none /* shortHeaderOverride */,
+      none /* shortHeaderOverride */,
       data->length() /* offset */));
 
   socketReads.emplace_back(TestReadData(packet1->coalesce(), serverAddr));
@@ -2508,7 +2508,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithRetriableError) {
@@ -2518,7 +2518,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithRetriableError) {
   EXPECT_CALL(readCb, readError(_, _)).Times(0);
   deliverNetworkError(EAGAIN);
   client->setReadCallback(streamId, nullptr);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithNonRetriableError) {
@@ -2529,7 +2529,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithNonRetriableError) {
   EXPECT_CALL(readCb, readError(_, _)).Times(0);
   deliverNetworkError(EBADF);
   client->setReadCallback(streamId, nullptr);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(
@@ -2564,7 +2564,7 @@ TEST_F(
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(
@@ -2839,7 +2839,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(folly::none);
+  client->close(none);
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
   EXPECT_EQ(indices.size(), 1);
@@ -2889,7 +2889,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   auto data = packets.move();
   deliverData(data->coalesce());
   eventbase_->loopOnce();
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeNoAvailablePeerIds) {
@@ -3012,7 +3012,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none,
+      none,
       true));
   socketWrites.clear();
   deliverData(packet->coalesce());
@@ -3081,12 +3081,12 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none,
+      none,
       true));
   socketWrites.clear();
   deliverData(packet->coalesce());
   EXPECT_CALL(readCb, readError(streamId, _));
-  client->close(folly::none);
+  client->close(none);
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
       *makeEncryptedCodec(),
@@ -3136,7 +3136,7 @@ TEST_P(
     EXPECT_TRUE(event->sendCloseImmediately);
 
   } else {
-    client->close(folly::none);
+    client->close(none);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
@@ -3278,7 +3278,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none,
+      none,
       true));
   deliverData(packet->coalesce());
   socketWrites.clear();
@@ -3291,7 +3291,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
         *makeHandshakeCodec(),
         QuicFrame::Type::ConnectionCloseFrame));
   } else {
-    client->close(folly::none);
+    client->close(none);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
@@ -3327,7 +3327,7 @@ TEST_P(
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      folly::none,
+      none,
       true));
   deliverData(packet->coalesce());
   EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
@@ -3401,7 +3401,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
@@ -3425,7 +3425,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("how about no")));
   } else {
-    client->close(folly::none);
+    client->close(none);
   }
   client->idleTimeout().cancelTimerCallback();
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
@@ -3457,7 +3457,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
-  client->closeNow(folly::none);
+  client->closeNow(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
@@ -3633,7 +3633,7 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       false,
-      folly::none /* skipLenHint */);
+      none /* skipLenHint */);
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));
@@ -3683,7 +3683,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   deliverData(packet2->coalesce());
 
   EXPECT_TRUE(client->getReadCallbacks().empty());
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(
@@ -3729,7 +3729,7 @@ TEST_F(
 
   ASSERT_EQ(
       client->getNonConstConn().streamManager->getStream(streamId), nullptr);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
@@ -3766,7 +3766,7 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
 
   ASSERT_EQ(
       client->getNonConstConn().streamManager->getStream(streamId), nullptr);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
@@ -3790,7 +3790,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 0, _)).Times(1);
   deliverData(packet->coalesce());
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
@@ -3813,7 +3813,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, _, _)).Times(1);
   deliverData(packet->coalesce());
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackRange) {
@@ -3846,7 +3846,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackRange) {
       PacketNumberSpace::AppData));
 
   deliverData(packet->coalesce());
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(
@@ -3876,7 +3876,7 @@ TEST_F(
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 0, _)).Times(1);
   client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
   eventbase_->loopOnce();
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
@@ -3902,7 +3902,7 @@ TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
   // DeliveryCallback is called, and offset delivered is 10:
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 10, _)).Times(1);
   deliverData(packet->coalesce());
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
@@ -3910,7 +3910,7 @@ TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
   EXPECT_CALL(writeCallback, onConnectionWriteReady(_));
   client->notifyPendingWriteOnConnection(&writeCallback);
   loopForWrites();
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
@@ -3922,7 +3922,7 @@ TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
   client->detachEventBase();
   client->attachEventBase(qEvb2);
   loopForWrites();
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
@@ -3933,7 +3933,7 @@ TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
 
   // Make the decrypt fail
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return folly::none; }));
+      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return none; }));
 
   auto token = *client->getConn().statelessResetToken;
   StatelessResetPacketBuilder builder(kDefaultUDPSendPacketLen, token);
@@ -3951,7 +3951,7 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
   ASSERT_TRUE(aead);
   // Make the decrypt fail
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return folly::none; }));
+      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return none; }));
   // Alter the expected token so it definitely won't match the one in conn
   auto token = *client->getConn().statelessResetToken;
   token[0] = ~token[0];
@@ -4026,7 +4026,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   EXPECT_EQ(header.getDestinationConnId(), serverCid);
 
   eventbase_->loopOnce();
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(
@@ -4053,7 +4053,7 @@ TEST_F(
   EXPECT_EQ(client->getConn().oneRttWriteCipher.get(), nullptr);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).Times(0);
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(
@@ -4073,7 +4073,7 @@ TEST_F(
                     {QuicVersion::MVFST})
                     .buildPacket();
   EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedStreamData) {
@@ -4217,7 +4217,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
   deliverData(packet->coalesce());
   // Stream is not yet closed because ingress state machine is open
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  client->close(folly::none);
+  client->close(none);
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4247,7 +4247,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   SCOPE_EXIT {
-    client->close(folly::none);
+    client->close(none);
   };
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
@@ -4266,7 +4266,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   SCOPE_EXIT {
-    client->close(folly::none);
+    client->close(none);
   };
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
@@ -4309,7 +4309,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   deliverData(packet->coalesce());
   // Stream still exists since ingress state machine is still open
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  client->close(folly::none);
+  client->close(none);
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4360,7 +4360,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
   EXPECT_EQ(1, readCbs.count(streamId));
   EXPECT_EQ(0, conn.streamManager->readableStreams().count(streamId));
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  client->close(folly::none);
+  client->close(none);
   EXPECT_EQ(0, readCbs.count(streamId));
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(client->isClosed());
@@ -4415,7 +4415,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
   deliverData(packet->coalesce());
   // Stream should be closed after it received the ack for rst
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
-  client->close(folly::none);
+  client->close(none);
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4468,7 +4468,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   EXPECT_FALSE(conn.streamManager->hasDeliverable());
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
   EXPECT_EQ(readCbs.count(streamId), 1);
-  client->close(folly::none);
+  client->close(none);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_EQ(readCbs.count(streamId), 0);
   EXPECT_TRUE(client->isClosed());
@@ -4598,7 +4598,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyWhileDraining) {
 
   EXPECT_CALL(deliveryCallback, onCanceled(_, _));
   EXPECT_CALL(readCb, readError(_, _));
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
@@ -4907,7 +4907,7 @@ TEST_F(QuicClientTransportAfterStartTest, RetryPacketAfterRxInitial) {
   loopForWrites();
   // validate we dropped the retry packet via retryToken str
   EXPECT_TRUE(client->getConn().retryToken.empty());
-  client->close(folly::none);
+  client->close(none);
 }
 
 TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
@@ -4933,7 +4933,7 @@ class QuicClientTransportPskCacheTest
 TEST_F(QuicClientTransportPskCacheTest, TestOnNewCachedPsk) {
   std::string appParams = "APP params";
   client->setEarlyDataAppParamsFunctions(
-      [](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [](const Optional<std::string>&, const Buf&) { return true; },
       [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams); });
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
@@ -4945,7 +4945,7 @@ TEST_F(QuicClientTransportPskCacheTest, TestOnNewCachedPsk) {
 TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
   std::string appParams1 = "APP params1";
   client->setEarlyDataAppParamsFunctions(
-      [](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [](const Optional<std::string>&, const Buf&) { return true; },
       [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams1); });
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
@@ -4973,7 +4973,7 @@ TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
 
   std::string appParams2 = "APP params2";
   client->setEarlyDataAppParamsFunctions(
-      [](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [](const Optional<std::string>&, const Buf&) { return true; },
       [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams2); });
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
@@ -5083,7 +5083,7 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
       }));
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return true;
       },
@@ -5161,7 +5161,7 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   client->setTransportSettings(tp);
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return true;
       },
@@ -5241,7 +5241,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
       }));
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return true;
       },
@@ -5293,7 +5293,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
       }));
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return true;
       },
@@ -5336,7 +5336,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionCannotResendZeroRttData) {
       }));
   bool performedValidation = false;
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
+      [&](const Optional<std::string>&, const Buf&) {
         performedValidation = true;
         return true;
       },
@@ -5415,7 +5415,7 @@ TEST_F(
         return quicCachedPsk;
       }));
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [&](const Optional<std::string>&, const Buf&) { return true; },
       []() -> Buf { return nullptr; });
 
   EXPECT_CALL(*sock, write(firstAddress, _))
@@ -5506,7 +5506,7 @@ TEST_F(
         return quicCachedPsk;
       }));
   client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [&](const Optional<std::string>&, const Buf&) { return true; },
       []() -> Buf { return nullptr; });
 
   EXPECT_CALL(*sock, write(firstAddress, _))
@@ -5894,7 +5894,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   EmptyReadCallback readCallback;
   happyEyeballsSetUpSocket(
       socket,
-      folly::none,
+      none,
       folly::SocketAddress("127.0.0.1", 12345),
       transportSettings,
       0, // tosValue

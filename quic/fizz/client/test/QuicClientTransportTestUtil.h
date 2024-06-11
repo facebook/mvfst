@@ -163,12 +163,12 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
             std::move(fizzContext),
             std::make_unique<FizzCryptoFactory>()) {}
 
-  folly::Optional<CachedServerTransportParameters> connectImpl(
-      folly::Optional<std::string> hostname) override {
+  Optional<CachedServerTransportParameters> connectImpl(
+      Optional<std::string> hostname) override {
     // Look up psk
-    folly::Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
+    Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
 
-    folly::Optional<CachedServerTransportParameters> transportParams;
+    Optional<CachedServerTransportParameters> transportParams;
     if (quicCachedPsk) {
       transportParams = quicCachedPsk->transportParams;
     }
@@ -316,7 +316,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return connected_;
   }
 
-  const folly::Optional<ServerTransportParameters>& getServerTransportParams()
+  const Optional<ServerTransportParameters>& getServerTransportParams()
       override {
     return params_;
   }
@@ -339,7 +339,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   uint64_t connWindowSize{kDefaultConnectionFlowControlWindow};
   uint64_t maxInitialStreamsBidi{std::numeric_limits<uint32_t>::max()};
   uint64_t maxInitialStreamsUni{std::numeric_limits<uint32_t>::max()};
-  folly::Optional<ServerTransportParameters> params_;
+  Optional<ServerTransportParameters> params_;
   EnumArray<EncryptionLevel, BufQueue> readBuffers{};
 
   std::unique_ptr<Aead> oneRttWriteCipher_;
@@ -358,7 +358,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     throw std::runtime_error(
         "getReadRecordLayerEncryptionLevel not implemented");
   }
-  const folly::Optional<std::string>& getApplicationProtocol() const override {
+  const Optional<std::string>& getApplicationProtocol() const override {
     throw std::runtime_error("getApplicationProtocol not implemented");
   }
   void processSocketData(folly::IOBufQueue&) override {
@@ -387,7 +387,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   struct TestReadData {
     ReceivedUdpPacket udpPacket;
     folly::SocketAddress addr;
-    folly::Optional<int> err;
+    Optional<int> err;
 
     TestReadData(folly::ByteRange dataIn, folly::SocketAddress addrIn)
         : udpPacket(folly::IOBuf::copyBuffer(dataIn)),
@@ -651,7 +651,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     recvServerHello(serverAddr);
   }
 
-  void recvTicket(folly::Optional<uint64_t> offsetOverride = folly::none) {
+  void recvTicket(Optional<uint64_t> offsetOverride = none) {
     auto negotiatedVersion = *client->getConn().version;
     auto ticket = folly::IOBuf::copyBuffer("NST");
     auto packet = packetToBuf(createCryptoPacket(
@@ -835,9 +835,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     eventbase_->loopOnce(EVLOOP_NONBLOCK);
   }
 
-  void assertWritten(
-      bool shortHeader,
-      folly::Optional<LongHeader::Types> longHeader) {
+  void assertWritten(bool shortHeader, Optional<LongHeader::Types> longHeader) {
     size_t numShort = 0;
     size_t numLong = 0;
     size_t numOthers = 0;
@@ -979,8 +977,8 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   std::shared_ptr<TestingQuicClientTransport> client;
   PacketNum initialPacketNum{0}, handshakePacketNum{0}, appDataPacketNum{0};
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
-  folly::Optional<ConnectionId> originalConnId;
-  folly::Optional<ConnectionId> serverChosenConnId;
+  Optional<ConnectionId> originalConnId;
+  Optional<ConnectionId> serverChosenConnId;
   QuicVersion version{QuicVersion::QUIC_V1};
   std::shared_ptr<testing::NiceMock<MockQuicStats>> quicStats_;
   std::string hostname_{"TestHost"};

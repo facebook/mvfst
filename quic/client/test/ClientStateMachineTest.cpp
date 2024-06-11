@@ -220,7 +220,7 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
 
 struct maxStreamGroupsAdvertizedtestStruct {
   uint64_t peerMaxGroupsIn;
-  folly::Optional<uint64_t> expectedTransportSettingVal;
+  Optional<uint64_t> expectedTransportSettingVal;
 };
 class ClientStateMachineMaxStreamGroupsAdvertizedParamTest
     : public ClientStateMachineTest,
@@ -252,7 +252,7 @@ INSTANTIATE_TEST_SUITE_P(
     ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
     ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
     ::testing::Values(
-        maxStreamGroupsAdvertizedtestStruct{0, folly::none},
+        maxStreamGroupsAdvertizedtestStruct{0, none},
         maxStreamGroupsAdvertizedtestStruct{16, 16}));
 
 } // namespace quic::test
