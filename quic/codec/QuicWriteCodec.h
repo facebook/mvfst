@@ -57,7 +57,7 @@ Optional<uint64_t> writeStreamFrameHeader(
     uint64_t flowControlLen,
     bool fin,
     Optional<bool> skipLenHint,
-    Optional<StreamGroupId> streamGroupId = none,
+    OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt,
     bool appendFrame = true);
 
 /**

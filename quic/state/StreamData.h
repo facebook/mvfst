@@ -284,7 +284,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   QuicStreamState(
       StreamId idIn,
-      const Optional<StreamGroupId>& groupIdIn,
+      const OptionalIntegral<StreamGroupId>& groupIdIn,
       QuicConnectionStateBase& connIn);
 
   QuicStreamState(QuicStreamState&&) = default;
@@ -324,7 +324,7 @@ struct QuicStreamState : public QuicStreamLike {
   StreamId id;
 
   // ID of the group the stream belongs to.
-  Optional<StreamGroupId> groupId;
+  OptionalIntegral<StreamGroupId> groupId;
 
   // Write side eof offset. This represents only the final FIN offset.
   Optional<uint64_t> finalWriteOffset;

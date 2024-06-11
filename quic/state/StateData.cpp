@@ -45,7 +45,7 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
 
 QuicStreamState::QuicStreamState(
     StreamId idIn,
-    const Optional<StreamGroupId>& groupIdIn,
+    const OptionalIntegral<StreamGroupId>& groupIdIn,
     QuicConnectionStateBase& connIn)
     : QuicStreamState(idIn, connIn) {
   groupId = groupIdIn;

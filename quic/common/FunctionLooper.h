@@ -95,7 +95,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
 
   void callbackCanceled() noexcept override;
 
-  Optional<std::chrono::microseconds> getTimerTickInterval() noexcept;
+  OptionalMicros getTimerTickInterval() noexcept;
 
   /*
    * Controls whether to fire a loop early when the pacing timer has been

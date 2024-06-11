@@ -50,7 +50,7 @@ bool PacketGroupWriter::writeSingleQuicPacket(
       length /* flow control len*/,
       eof,
       true /* skip length field in stream header */,
-      none, /* stream group id */
+      std::nullopt, /* stream group id */
       false /* don't append frame to builder */);
   BufQueue bufQueue(std::move(buf));
   writeStreamFrameData(builder, bufQueue, *dataLen);

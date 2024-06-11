@@ -225,7 +225,7 @@ struct TransportSettings {
   // The minimum amount of time in microseconds by which an ack can be delayed
   // Setting a value here also indicates to the peer that it can send
   // ACK_FREQUENCY and IMMEDIATE_ACK frames
-  Optional<std::chrono::microseconds> minAckDelay;
+  OptionalMicros minAckDelay;
   // Limits the amount of data that should be buffered in a QuicSocket.
   // If the amount of data in the buffer equals or exceeds this amount, then
   // the callback registered through notifyPendingWriteOnConnection() will
@@ -362,7 +362,8 @@ struct TransportSettings {
   bool initiateKeyUpdate{false};
   // How many packets to send before initiating the first key update.
   // This is reset to none after the first key update is initiated.
-  Optional<uint64_t> firstKeyUpdatePacketCount{kFirstKeyUpdatePacketCount};
+  OptionalIntegral<uint64_t> firstKeyUpdatePacketCount{
+      kFirstKeyUpdatePacketCount};
   // How many packets to send before initiating periodic key updates
   uint64_t keyUpdatePacketCountInterval{kDefaultKeyUpdatePacketCountInterval};
 

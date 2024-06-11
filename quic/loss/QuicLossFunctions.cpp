@@ -20,7 +20,7 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn) {
 }
 
 bool isPersistentCongestion(
-    Optional<std::chrono::microseconds> pto,
+    OptionalMicros pto,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd,
     const CongestionController::AckEvent& ack) noexcept {

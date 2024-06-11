@@ -333,7 +333,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // When server receives early data attempt without valid source address token,
   // server will limit bytes in flight to avoid amplification attack.
   // This limit should be cleared and set back to max after CFIN is received.
-  Optional<uint64_t> writableBytesLimit;
+  OptionalIntegral<uint64_t> writableBytesLimit;
 
   std::unique_ptr<PendingPathRateLimiter> pathValidationLimiter;
 
@@ -365,7 +365,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // current (updated) phase. The peer must acknowledge this packet in the same
   // phase, responding in a different phase is a protocol violation. Once the
   // packet is acked, this value will be cleared.
-  Optional<PacketNum> oneRttWritePendingVerificationPacketNumber;
+  OptionalIntegral<PacketNum> oneRttWritePendingVerificationPacketNumber;
 
   // Write cipher for packets with initial keys.
   std::unique_ptr<Aead> initialWriteCipher;
@@ -511,7 +511,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // The sum of length of data in all the stream buffers.
     uint64_t sumCurStreamBufferLen{0};
     // The packet number in which we got the last largest max data.
-    Optional<PacketNum> largestMaxOffsetReceived;
+    OptionalIntegral<PacketNum> largestMaxOffsetReceived;
     // The following are advertised by the peer, and are set to zero initially
     // so that we cannot send any data until we know the peer values.
     // The initial max stream offset for peer-initiated bidirectional streams.
@@ -547,7 +547,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // The value of the peer's min_ack_delay, for creating ACK_FREQUENCY and
   // IMMEDIATE_ACK frames.
-  Optional<std::chrono::microseconds> peerMinAckDelay;
+  OptionalMicros peerMinAckDelay;
 
   // Idle timeout advertised by the peer. Initially sets it to the maximum value
   // until the handshake sets the timeout.
@@ -677,7 +677,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   DatagramState datagramState;
 
   // Peer max stream groups advertised.
-  Optional<uint64_t> peerAdvertisedMaxStreamGroups;
+  OptionalIntegral<uint64_t> peerAdvertisedMaxStreamGroups;
 
   // Sequence number to use for the next ACK_FREQUENCY frame
   uint64_t nextAckFrequencyFrameSequenceNumber{0};

@@ -307,9 +307,9 @@ TEST_F(WriteFunctionsTest, LossAndFreshTwoInstructionsInTwoPackets) {
   EXPECT_EQ(1, packet1.frames.size());
   EXPECT_EQ(1, packet2.frames.size());
   WriteStreamFrame expectedFirstFrame(
-      streamId, bufMetaStartingOffset, 500, false, true, none, 0);
+      streamId, bufMetaStartingOffset, 500, false, true, std::nullopt, 0);
   WriteStreamFrame expectedSecondFrame(
-      streamId, 500 + bufMetaStartingOffset, 500, true, true, none, 1);
+      streamId, 500 + bufMetaStartingOffset, 500, true, true, std::nullopt, 1);
   EXPECT_EQ(expectedFirstFrame, *packet1.frames[0].asWriteStreamFrame());
   EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 }

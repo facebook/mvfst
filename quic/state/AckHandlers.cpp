@@ -232,7 +232,7 @@ AckEvent processAckFrame(
         CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.lossState.totalPacketsSpuriouslyMarkedLost++;
         if (conn.transportSettings.useAdaptiveLossReorderingThresholds) {
-          if (rPacketIt->metadata.lossReorderDistance.hasValue() &&
+          if (rPacketIt->metadata.lossReorderDistance.has_value() &&
               rPacketIt->metadata.lossReorderDistance.value() >
                   conn.lossState.reorderingThreshold) {
             conn.lossState.reorderingThreshold =
@@ -240,7 +240,7 @@ AckEvent processAckFrame(
           }
         }
         if (conn.transportSettings.useAdaptiveLossTimeThresholds) {
-          if (rPacketIt->metadata.lossTimeoutDividend.hasValue() &&
+          if (rPacketIt->metadata.lossTimeoutDividend.has_value() &&
               rPacketIt->metadata.lossTimeoutDividend.value() >
                   conn.transportSettings.timeReorderingThreshDividend) {
             conn.transportSettings.timeReorderingThreshDividend =
@@ -335,10 +335,9 @@ AckEvent processAckFrame(
           CHECK(!ack.rttSampleNoAckDelay.has_value());
           ack.rttSample = rttSample;
           ack.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
-              ? folly::make_optional(
-                    std::chrono::ceil<std::chrono::microseconds>(
-                        rttSample - frame.ackDelay))
-              : none;
+              ? OptionalMicros(std::chrono::ceil<std::chrono::microseconds>(
+                    rttSample - frame.ackDelay))
+              : std::nullopt;
 
           // update transport RTT
           updateRtt(conn, rttSample, frame.ackDelay);
@@ -508,9 +507,9 @@ AckEvent processAckFrame(
             .setAppLimited(outstandingPacket->isAppLimited)
             .setReceiveDeltaTimeStamp(
                 maybeRxTimestamp != packetReceiveTimeStamps.end()
-                    ? folly::make_optional(
+                    ? OptionalMicros(
                           std::chrono::microseconds(maybeRxTimestamp->second))
-                    : none)
+                    : std::nullopt)
             .build());
   }
   if (lastAckedPacketSentTime) {
@@ -550,9 +549,8 @@ AckEvent processAckFrame(
       // congestion period. Alternatively we could consider every lost block
       // and check if any of them constitute persistent congestion.
       lossEvent->persistentCongestion = isPersistentCongestion(
-          conn.lossState.srtt == 0s
-              ? none
-              : Optional<std::chrono::microseconds>(calculatePTO(conn)),
+          conn.lossState.srtt == 0s ? std::nullopt
+                                    : OptionalMicros(calculatePTO(conn)),
           *lossEvent->smallestLostSentTime,
           *lossEvent->largestLostSentTime,
           ack);

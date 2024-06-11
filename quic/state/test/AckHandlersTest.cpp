@@ -3360,7 +3360,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
                 ackTime - getSentTime(9)),
             ack->rttSample);
         EXPECT_EQ(
-            none, // ack delay > RTT, so not set
+            std::nullopt, // ack delay > RTT, so not set
             ack->rttSampleNoAckDelay);
       }));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -3637,8 +3637,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
               Pointee(
                   getAckPacketMatcher(4, getWriteCount(4), getSentTime(4))));
 
-          EXPECT_EQ(none, ack->rttSample); // no RTT sample
-          EXPECT_EQ(none, ack->rttSampleNoAckDelay); // no RTT sample
+          EXPECT_EQ(std::nullopt, ack->rttSample); // no RTT sample
+          EXPECT_EQ(std::nullopt, ack->rttSampleNoAckDelay); // no RTT sample
           EXPECT_THAT(ack->ackedPackets, SizeIs(1));
           EXPECT_THAT(
               ack->ackedPackets,
@@ -3692,8 +3692,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
               Pointee(
                   getAckPacketMatcher(6, getWriteCount(6), getSentTime(6))));
 
-          EXPECT_EQ(none, ack->rttSample); // no RTT sample
-          EXPECT_EQ(none, ack->rttSampleNoAckDelay); // no RTT sample
+          EXPECT_EQ(std::nullopt, ack->rttSample); // no RTT sample
+          EXPECT_EQ(std::nullopt, ack->rttSampleNoAckDelay); // no RTT sample
           EXPECT_THAT(ack->ackedPackets, SizeIs(2));
           EXPECT_THAT(
               ack->ackedPackets,

@@ -141,7 +141,7 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   ackState.acks = *CHECK_NOTNULL(maybeAckBlocks.get_pointer());
   WriteAckFrameMetaData ackData = {
       ackState,
-      *CHECK_NOTNULL(maybeAckDelay.get_pointer()),
+      maybeAckDelay.value(),
       static_cast<uint8_t>(
           CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent),
       TimePoint()};
@@ -235,7 +235,7 @@ OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
       *CHECK_NOTNULL(maybeWriteCount.get_pointer()),
       OutstandingPacketWrapper::Metadata::DetailsPerStream(
           *CHECK_NOTNULL(maybeDetailsPerStream.get_pointer())),
-      *CHECK_NOTNULL(maybeTotalAppLimitedTimeUsecs.get_pointer())};
+      maybeTotalAppLimitedTimeUsecs.value()};
 }
 
 } // namespace quic::test

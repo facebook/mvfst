@@ -1750,7 +1750,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
           testing::Field(&PacketStreamDetails::newStreamBytesSent, frameLen),
           testing::Field(
               &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-              Optional<uint64_t>(frameOffset)),
+              OptionalIntegral<uint64_t>(frameOffset)),
           testing::Field(
               &PacketStreamDetails::streamIntervals,
               testing::ElementsAre(Interval<uint64_t>(
@@ -1792,7 +1792,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
           testing::Field(&PacketStreamDetails::newStreamBytesSent, 15),
           testing::Field(
               &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-              Optional<uint64_t>(0)),
+              OptionalIntegral<uint64_t>(0)),
           testing::Field(
               &PacketStreamDetails::streamIntervals,
               testing::ElementsAre(Interval<uint64_t>(0, 14)))));
@@ -1836,7 +1836,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, frame1Len),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(frame1Offset)),
+                OptionalIntegral<uint64_t>(frame1Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -1873,7 +1873,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -1917,7 +1917,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, frame2Len),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(frame2Offset)),
+                OptionalIntegral<uint64_t>(frame2Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -1956,7 +1956,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -2019,7 +2019,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                   &PacketStreamDetails::newStreamBytesSent, frameLen),
               testing::Field(
                   &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                  Optional<uint64_t>(frameOffset)),
+                  OptionalIntegral<uint64_t>(frameOffset)),
               testing::Field(
                   &PacketStreamDetails::streamIntervals,
                   testing::ElementsAre(Interval<uint64_t>(
@@ -2069,7 +2069,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 // contains frame1 and frame2
@@ -2151,7 +2151,7 @@ TEST_F(
                   &PacketStreamDetails::newStreamBytesSent, frameLen),
               testing::Field(
                   &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                  Optional<uint64_t>(frameOffset)),
+                  OptionalIntegral<uint64_t>(frameOffset)),
               testing::Field(
                   &PacketStreamDetails::streamIntervals,
                   testing::ElementsAre(Interval<uint64_t>(
@@ -2208,7 +2208,7 @@ TEST_F(
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 // contains frame1 and frame 3
@@ -2295,7 +2295,7 @@ TEST_F(
                   &PacketStreamDetails::newStreamBytesSent, frameLen),
               testing::Field(
                   &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                  Optional<uint64_t>(frameOffset)),
+                  OptionalIntegral<uint64_t>(frameOffset)),
               testing::Field(
                   &PacketStreamDetails::streamIntervals,
                   testing::ElementsAre(Interval<uint64_t>(
@@ -2352,7 +2352,7 @@ TEST_F(
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 // contains frame1 and frame 3
@@ -2429,7 +2429,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 &PacketStreamDetails::newStreamBytesSent, stream1Len),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(stream1Offset)),
+                OptionalIntegral<uint64_t>(stream1Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -2443,7 +2443,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 &PacketStreamDetails::newStreamBytesSent, stream2Len),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(stream2Offset)),
+                OptionalIntegral<uint64_t>(stream2Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -2456,7 +2456,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 &PacketStreamDetails::newStreamBytesSent, stream3Len),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(stream3Offset)),
+                OptionalIntegral<uint64_t>(stream3Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -2499,7 +2499,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -2511,7 +2511,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(
@@ -2523,7 +2523,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
             testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
             testing::Field(
                 &PacketStreamDetails::maybeFirstNewStreamByteOffset,
-                Optional<uint64_t>(/* empty */)),
+                OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 testing::ElementsAre(Interval<uint64_t>(

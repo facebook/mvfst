@@ -627,7 +627,7 @@ void QuicClientTransport::processUdpPacketData(
         break;
       }
       case QuicFrame::Type::ImmediateAckFrame: {
-        if (!conn_->transportSettings.minAckDelay.hasValue()) {
+        if (!conn_->transportSettings.minAckDelay.has_value()) {
           // We do not accept IMMEDIATE_ACK frames. This is a protocol
           // violation.
           throw QuicTransportException(

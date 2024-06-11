@@ -1470,7 +1470,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
            << " writing data using scheduler=" << scheduler.name() << " "
            << connection;
 
-  if (!connection.gsoSupported.hasValue()) {
+  if (!connection.gsoSupported.has_value()) {
     connection.gsoSupported = sock.getGSO() >= 0;
     if (!*connection.gsoSupported) {
       if (!useSinglePacketInplaceBatchWriter(
@@ -1988,7 +1988,7 @@ void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
         conn.readCodec->canInitiateKeyUpdate()) {
       QUIC_STATS(conn.statsCallback, onKeyUpdateAttemptInitiated);
       conn.readCodec->advanceOneRttReadPhase();
-      conn.transportSettings.firstKeyUpdatePacketCount.clear();
+      conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
       updateOneRttWriteCipher(
           conn,
@@ -1998,7 +1998,7 @@ void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
           conn.handshakeLayer->getNextOneRttReadCipher());
       // Signal the transport that a key update has been initiated.
       conn.oneRttWritePendingVerification = true;
-      conn.oneRttWritePendingVerificationPacketNumber.clear();
+      conn.oneRttWritePendingVerificationPacketNumber.reset();
     }
   }
 }
@@ -2021,7 +2021,7 @@ void maybeVerifyPendingKeyUpdate(
     // the current phase.
     if (ackPacket.header.getProtectionType() == conn.oneRttWritePhase) {
       // Key update is verified.
-      conn.oneRttWritePendingVerificationPacketNumber.clear();
+      conn.oneRttWritePendingVerificationPacketNumber.reset();
       conn.oneRttWritePendingVerification = false;
     } else {
       throw QuicTransportException(

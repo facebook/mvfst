@@ -126,9 +126,10 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TransportInfoRttSignals) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(std::nullopt, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      std::nullopt,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -326,9 +327,10 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayEqual) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(std::nullopt, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      std::nullopt,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -386,9 +388,10 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(std::nullopt, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      std::nullopt,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -411,7 +414,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
       EXPECT_EQ(rtt, tInfo.maybeLrtt);
       EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
       EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
-      EXPECT_EQ(none, tInfo.maybeMinRttNoAckDelay); // unavailable
+      EXPECT_EQ(std::nullopt, tInfo.maybeMinRttNoAckDelay); // unavailable
     } else {
       FAIL(); // unhandled typed test
     }
@@ -448,9 +451,10 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleZeroTime) {
   };
 
   // minRTT should not be available in any form
-  EXPECT_EQ(none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(std::nullopt, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      none, this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+      std::nullopt,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
@@ -1557,13 +1561,12 @@ struct AckEventMatcherBuilder {
     maybeLargestNewlyAckedPacket = largestNewlyAckedPacketIn;
     return std::move(*this);
   }
-  Builder&& setRtt(const Optional<std::chrono::microseconds>& rttIn) {
+  Builder&& setRtt(const OptionalMicros& rttIn) {
     maybeRtt = rttIn;
     CHECK(!noRtt);
     return std::move(*this);
   }
-  Builder&& setRttNoAckDelay(
-      const Optional<std::chrono::microseconds>& rttNoAckDelayIn) {
+  Builder&& setRttNoAckDelay(const OptionalMicros& rttNoAckDelayIn) {
     maybeRttNoAckDelay = rttNoAckDelayIn;
     CHECK(!noRtt);
     CHECK(!noRttWithNoAckDelay);
@@ -1677,13 +1680,13 @@ struct AckEventMatcherBuilder {
   Optional<std::vector<
       typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
       maybeExpectedAckedIntervals;
-  Optional<uint64_t> maybeExpectedNumAckedPackets;
+  OptionalIntegral<uint64_t> maybeExpectedNumAckedPackets;
   Optional<TimePoint> maybeAckTime;
-  Optional<std::chrono::microseconds> maybeAckDelay;
-  Optional<quic::PacketNum> maybeLargestAckedPacket;
-  Optional<quic::PacketNum> maybeLargestNewlyAckedPacket;
-  Optional<std::chrono::microseconds> maybeRtt;
-  Optional<std::chrono::microseconds> maybeRttNoAckDelay;
+  OptionalMicros maybeAckDelay;
+  OptionalIntegral<quic::PacketNum> maybeLargestAckedPacket;
+  OptionalIntegral<quic::PacketNum> maybeLargestNewlyAckedPacket;
+  OptionalMicros maybeRtt;
+  OptionalMicros maybeRttNoAckDelay;
   bool noRtt{false};
   bool noRttWithNoAckDelay{false};
 };
@@ -1747,7 +1750,7 @@ struct ReceivedUdpPacketMatcherBuilder {
   explicit ReceivedUdpPacketMatcherBuilder() = default;
 
   Optional<TimePoint> maybeExpectedPacketReceiveTime;
-  Optional<uint64_t> maybeExpectedPacketNumBytes;
+  OptionalIntegral<uint64_t> maybeExpectedPacketNumBytes;
   Optional<uint8_t> maybeExpectedTosValue;
 };
 
@@ -4094,7 +4097,7 @@ TYPED_TEST(
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::AnyOf(
-                          testing::Eq(0ms), testing::Eq(none)))))))));
+                          testing::Eq(0ms), testing::Eq(std::nullopt)))))))));
   EXPECT_CALL(
       *observerWithAcks2,
       acksProcessed(
@@ -4107,7 +4110,7 @@ TYPED_TEST(
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::AnyOf(
-                          testing::Eq(0ms), testing::Eq(none)))))))));
+                          testing::Eq(0ms), testing::Eq(std::nullopt)))))))));
 
   const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
   auto buf = quic::test::packetToBuf(
@@ -4190,7 +4193,7 @@ TYPED_TEST(
                       getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::Eq(none))))))));
+                      testing::Eq(std::nullopt))))))));
   EXPECT_CALL(
       *observerWithAcks2,
       acksProcessed(
@@ -4202,7 +4205,7 @@ TYPED_TEST(
                       getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::Eq(none))))))));
+                      testing::Eq(std::nullopt))))))));
 
   const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
   auto buf = quic::test::packetToBuf(

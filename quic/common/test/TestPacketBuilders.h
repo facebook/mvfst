@@ -28,7 +28,7 @@ struct AckPacketBuilderFields {
   Optional<quic::PacketNum> maybeAckPacketNum;
   PacketNumStore* ackPacketNumStore{nullptr};
   Optional<quic::AckBlocks> maybeAckBlocks;
-  Optional<std::chrono::microseconds> maybeAckDelay;
+  OptionalMicros maybeAckDelay;
   Optional<const Aead*> maybeAead; // not required
   ProtectionType shortHeaderProtectionType{ProtectionType::KeyPhaseZero};
   explicit AckPacketBuilderFields() = default;
@@ -62,7 +62,7 @@ struct OutstandingPacketBuilderFields {
   Optional<uint64_t> maybeWriteCount;
   Optional<OutstandingPacketWrapper::Metadata::DetailsPerStream>
       maybeDetailsPerStream;
-  Optional<std::chrono::microseconds> maybeTotalAppLimitedTimeUsecs;
+  OptionalMicros maybeTotalAppLimitedTimeUsecs;
   explicit OutstandingPacketBuilderFields() = default;
 };
 

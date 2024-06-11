@@ -763,7 +763,7 @@ class QuicTransportBase : public QuicSocket,
       PeekCallback* cb) noexcept;
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
       bool bidirectional,
-      const Optional<StreamGroupId>& streamGroupId = none);
+      const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
   /**
    * write data to socket

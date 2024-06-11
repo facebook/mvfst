@@ -36,7 +36,7 @@ Optional<uint64_t> writeStreamFrameHeader(
     uint64_t flowControlLen,
     bool fin,
     Optional<bool> skipLenHint,
-    Optional<StreamGroupId> streamGroupId,
+    OptionalIntegral<StreamGroupId> streamGroupId,
     bool appendFrame) {
   if (builder.remainingSpaceInPkt() == 0) {
     return none;

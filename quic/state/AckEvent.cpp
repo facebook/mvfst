@@ -53,7 +53,7 @@ AckEvent::AckPacket::AckPacket(
     Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
         lastAckedPacketInfoIn,
     bool isAppLimitedIn,
-    Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec)
+    OptionalMicros&& receiveRelativeTimeStampUsec)
     : packetNum(packetNumIn),
       nonDsrPacketSequenceNumber(nonDsrPacketSequenceNumberIn),
       outstandingPacketMetadata(outstandingPacketMetadataIn), // NOLINT
@@ -104,7 +104,7 @@ AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setAppLimited(
 
 AckEvent::AckPacket::Builder&&
 AckEvent::AckPacket::Builder::setReceiveDeltaTimeStamp(
-    Optional<std::chrono::microseconds>&& receiveTimeStampIn) {
+    OptionalMicros&& receiveTimeStampIn) {
   receiveRelativeTimeStampUsec = receiveTimeStampIn;
   return std::move(*this);
 }
@@ -177,7 +177,7 @@ AckEvent::AckEvent(AckEvent::BuilderFields&& builderFields)
     : ackTime(*CHECK_NOTNULL(builderFields.maybeAckTime.get_pointer())),
       adjustedAckTime(
           *CHECK_NOTNULL(builderFields.maybeAdjustedAckTime.get_pointer())),
-      ackDelay(*CHECK_NOTNULL(builderFields.maybeAckDelay.get_pointer())),
+      ackDelay(builderFields.maybeAckDelay.value()),
       packetNumberSpace(
           *CHECK_NOTNULL(builderFields.maybePacketNumberSpace.get_pointer())),
       largestAckedPacket(

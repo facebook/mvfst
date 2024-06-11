@@ -196,10 +196,10 @@ class QuicSocket {
     std::chrono::microseconds srtt{0us};
     std::chrono::microseconds rttvar{0us};
     std::chrono::microseconds lrtt{0us};
-    Optional<std::chrono::microseconds> maybeLrtt;
-    Optional<std::chrono::microseconds> maybeLrttAckDelay;
-    Optional<std::chrono::microseconds> maybeMinRtt;
-    Optional<std::chrono::microseconds> maybeMinRttNoAckDelay;
+    OptionalMicros maybeLrtt;
+    OptionalMicros maybeLrttAckDelay;
+    OptionalMicros maybeMinRtt;
+    OptionalMicros maybeMinRttNoAckDelay;
     uint64_t mss{kDefaultUDPSendPacketLen};
     CongestionControlType congestionControlType{CongestionControlType::None};
     uint64_t writableBytes{0};

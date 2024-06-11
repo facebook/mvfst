@@ -1388,7 +1388,7 @@ namespace impl
 
   // Actual implementation of optional.
   template <class StoredTypeDecomposition, class FlagManipulator>
-  class TinyOptionalImpl : private CopyAssignmentBase<StoredTypeDecomposition, FlagManipulator>
+  class TinyOptionalImpl : public CopyAssignmentBase<StoredTypeDecomposition, FlagManipulator>
   {
   private:
     using Base = CopyAssignmentBase<StoredTypeDecomposition, FlagManipulator>;

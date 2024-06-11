@@ -45,14 +45,14 @@ auto getOutstandingPacketMatcher(
           testing::Field(
               &quic::OutstandingPacketMetadata::lossReorderDistance,
               testing::Property(
-                  &quic::Optional<uint16_t>::hasValue,
+                  &quic::OptionalIntegral<uint16_t>::has_value,
                   testing::Eq(lostByReorder)))),
       testing::Field(
           &quic::OutstandingPacketWrapper::metadata,
           testing::Field(
               &quic::OutstandingPacketMetadata::lossTimeoutDividend,
               testing::Property(
-                  &quic::Optional<quic::DurationRep>::hasValue,
+                  &quic::OptionalIntegral<quic::DurationRep>::has_value,
                   testing::Eq(lostByTimeout)))),
       testing::Field(
           &quic::OutstandingPacketWrapper::packet,
@@ -1918,8 +1918,8 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
-  EXPECT_FALSE(
-      isPersistentCongestion(none, currentTime + 1s, currentTime + 8s, ack));
+  EXPECT_FALSE(isPersistentCongestion(
+      std::nullopt, currentTime + 1s, currentTime + 8s, ack));
 }
 
 TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
@@ -2532,7 +2532,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
         100,
         false,
         true,
-        none,
+        std::nullopt,
         op.packet.header.getPacketSequenceNum()});
     op.isDSRPacket = true;
     conn->outstandings.dsrCount++;
@@ -2560,7 +2560,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
                  .build();
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{0, 10, 100, false, true, none, 9});
+      WriteStreamFrame{0, 10, 100, false, true, std::nullopt, 9});
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(9)
@@ -2702,7 +2702,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
         100,
         false,
         true,
-        none,
+        std::nullopt,
         op.packet.header.getPacketSequenceNum()});
     op.isDSRPacket = true;
     conn->outstandings.dsrCount++;
@@ -2960,7 +2960,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
                  .build();
   for (auto& op : conn->outstandings.packets) {
     WriteStreamFrame f{
-        0, 10, 100, false, true, none, op.packet.header.getPacketSequenceNum()};
+        0,
+        10,
+        100,
+        false,
+        true,
+        std::nullopt,
+        op.packet.header.getPacketSequenceNum()};
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     if (op.packet.header.getPacketSequenceNum() != 4) {
       detailsPerStream.recordFrameDelivered(f);
@@ -2992,7 +2998,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
   // Add one more DSR packet from the same stream, ACKed
   sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  WriteStreamFrame f{0, 10, 100, false, true, none, 5};
+  WriteStreamFrame f{0, 10, 100, false, true, std::nullopt, 5};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   detailsPerStream.recordFrameDelivered(f);
   op.packet.frames.emplace_back(f);
@@ -3064,7 +3070,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
                  .setAckDelay(0us)
                  .build();
   for (auto& op : conn->outstandings.packets) {
-    WriteStreamFrame f{0, 10, 100, false, false, none, 0};
+    WriteStreamFrame f{0, 10, 100, false, false, std::nullopt, 0};
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     if (op.packet.header.getPacketSequenceNum() != 4) {
       detailsPerStream.recordFrameDelivered(f);
@@ -3084,7 +3090,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
     sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
     auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
     WriteStreamFrame f{
-        4, 10, 100, false, true, none, conn->outstandings.dsrCount++};
+        4, 10, 100, false, true, std::nullopt, conn->outstandings.dsrCount++};
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     detailsPerStream.recordFrameDelivered(f);
     ack.ackedPackets.emplace_back(
@@ -3100,7 +3106,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
   // Add one more non-DSR packet from the same stream, ACKed
   sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  WriteStreamFrame f{0, 10, 100, false, false, none, 0};
+  WriteStreamFrame f{0, 10, 100, false, false, std::nullopt, 0};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
   detailsPerStream.recordFrameDelivered(f);
   op.packet.frames.emplace_back(f);

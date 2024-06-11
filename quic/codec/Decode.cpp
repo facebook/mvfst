@@ -473,7 +473,7 @@ ReadStreamFrame decodeStreamFrame(
         frameType);
   }
 
-  Optional<StreamGroupId> groupId;
+  OptionalIntegral<StreamGroupId> groupId;
   if (isGroupFrame) {
     auto gId = decodeQuicInteger(cursor);
     if (!gId) {

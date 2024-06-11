@@ -3041,7 +3041,7 @@ TEST_F(QuicServerTransportTest, ImmediateAckProtocolViolation) {
   // packet number spaces to generate ACKs immediately.
   ImmediateAckFrame immediateAckFrame;
   // We do not support IMMEDIATE_ACK frames
-  server->getNonConstConn().transportSettings.minAckDelay.clear();
+  server->getNonConstConn().transportSettings.minAckDelay.reset();
 
   auto packetNum = clientNextAppDataPacketNum++;
   ShortHeader header(
@@ -4064,7 +4064,7 @@ TEST_F(
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   recvClientFinished();
   loopForWrites();
-  EXPECT_EQ(server->getConn().writableBytesLimit, none);
+  EXPECT_EQ(server->getConn().writableBytesLimit, std::nullopt);
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);

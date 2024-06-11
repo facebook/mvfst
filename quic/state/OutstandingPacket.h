@@ -36,7 +36,7 @@ struct OutstandingPacketMetadata {
 
   // Has value if the packet is lost by timeout. The value is the loss timeout
   // dividend that was used to declare this packet.
-  Optional<DurationRep> lossTimeoutDividend;
+  OptionalIntegral<DurationRep> lossTimeoutDividend;
 
   // Has value if the packet is lost by reorder. The value is the distance
   // between this packet and the acknowleded packet when it was declared lost
@@ -49,7 +49,7 @@ struct OutstandingPacketMetadata {
 
     uint64_t streamBytesSent{0};
     uint64_t newStreamBytesSent{0};
-    Optional<uint64_t> maybeFirstNewStreamByteOffset;
+    OptionalIntegral<uint64_t> maybeFirstNewStreamByteOffset;
   };
 
   using MapType = InlineMap<StreamId, StreamDetails, 1>;
@@ -102,7 +102,7 @@ struct OutstandingPacketMetadata {
   // was sent.
   std::chrono::microseconds totalAppLimitedTimeUsecs{0};
 
-  Optional<uint16_t> lossReorderDistance;
+  OptionalIntegral<uint16_t> lossReorderDistance;
 
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
@@ -178,7 +178,7 @@ struct OutstandingPacket {
   // none if the packet isn't a clone and hasn't been cloned.
   Optional<PacketEvent> associatedEvent;
 
-  Optional<uint64_t> nonDsrPacketSequenceNumber;
+  OptionalIntegral<uint64_t> nonDsrPacketSequenceNumber;
 
   // Whether this is a DSR packet. A DSR packet's stream data isn't written
   // by transport directly.

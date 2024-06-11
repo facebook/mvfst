@@ -162,11 +162,11 @@ class Cubic : public CongestionController {
     TimePoint lastJiffy;
     // The minimal of sampled RTT in current RTT round. Hystart only samples
     // first a few RTTs in a round
-    Optional<std::chrono::microseconds> currSampledRtt;
+    OptionalMicros currSampledRtt;
     // End value of currSampledRtt at the end of a RTT round:
-    Optional<std::chrono::microseconds> lastSampledRtt;
+    OptionalMicros lastSampledRtt;
     // Estimated minimal delay of a path
-    Optional<std::chrono::microseconds> delayMin;
+    OptionalMicros delayMin;
     // Ack sampling count
     uint8_t ackCount{0};
     // When a packet with sent time >= rttRoundEndTarget is acked, end the

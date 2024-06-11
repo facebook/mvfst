@@ -52,7 +52,7 @@ enum class TestFrameType : uint8_t {
 Buf encodeStreamBuffer(
     StreamId id,
     StreamBuffer data,
-    Optional<StreamGroupId> groupId = none) {
+    OptionalIntegral<StreamGroupId> groupId = std::nullopt) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
   if (!groupId) {
@@ -406,7 +406,7 @@ class TestQuicTransport
   void addDataToStream(
       StreamId id,
       StreamBuffer data,
-      Optional<StreamGroupId> groupId = none) {
+      OptionalIntegral<StreamGroupId> groupId = std::nullopt) {
     auto buf = encodeStreamBuffer(id, std::move(data), std::move(groupId));
     SocketAddress addr("127.0.0.1", 1000);
     onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0));

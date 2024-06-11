@@ -24,11 +24,11 @@ struct LossState {
   // minimum rtt. AckDelay isn't excluded from this.
   std::chrono::microseconds mrtt{kDefaultMinRtt};
   // minimum rtt measured from samples with AckDelay excluded.
-  Optional<std::chrono::microseconds> maybeMrttNoAckDelay;
+  OptionalMicros maybeMrttNoAckDelay;
   // Last raw RTT value; unlike lrtt, this will always contain any ACK delay.
-  Optional<std::chrono::microseconds> maybeLrtt;
+  OptionalMicros maybeLrtt;
   // Last raw ACK delay value.
-  Optional<std::chrono::microseconds> maybeLrttAckDelay;
+  OptionalMicros maybeLrttAckDelay;
   // Smooth rtt.
   std::chrono::microseconds srtt{0us};
   // Latest rtt.

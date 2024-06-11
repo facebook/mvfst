@@ -125,12 +125,12 @@ struct AckEvent {
   // RTT sample with ack delay included.
   //
   // not available if largestAckedPacket already acked or declared lost
-  Optional<std::chrono::microseconds> rttSample;
+  OptionalMicros rttSample;
 
   // RTT sample with ack delay removed.
   //
   // not available if largestAckedPacket already acked or declared lost
-  Optional<std::chrono::microseconds> rttSampleNoAckDelay;
+  OptionalMicros rttSampleNoAckDelay;
 
   // Congestion controller state after processing of AckEvent.
   //
@@ -247,7 +247,7 @@ struct AckEvent {
     Optional<OutstandingPacketWrapper::LastAckedPacketInfo> lastAckedPacketInfo;
     // Delta RX Timestamp of the current packet relative to the previous packet
     // (or connection start time).
-    Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
+    OptionalMicros receiveRelativeTimeStampUsec;
 
     // Whether this packet was sent when CongestionController is in
     // app-limited state.
@@ -264,7 +264,7 @@ struct AckEvent {
           OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfoIn);
       Builder&& setAppLimited(bool appLimitedIn);
       Builder&& setReceiveDeltaTimeStamp(
-          Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec);
+          OptionalMicros&& receiveRelativeTimeStampUsec);
       AckPacket build() &&;
       explicit Builder() = default;
 
@@ -275,7 +275,7 @@ struct AckEvent {
       Optional<DetailsPerStream> detailsPerStream;
       OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfo{
           nullptr};
-      Optional<std::chrono::microseconds> receiveRelativeTimeStampUsec;
+      OptionalMicros receiveRelativeTimeStampUsec;
       bool isAppLimited{false};
     };
 
@@ -288,7 +288,7 @@ struct AckEvent {
         Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
             lastAckedPacketInfoIn,
         bool isAppLimitedIn,
-        Optional<std::chrono::microseconds>&& receiveRelativeTimeStampUsec);
+        OptionalMicros&& receiveRelativeTimeStampUsec);
   };
 
   // Information about each packet ACKed during this event
@@ -297,7 +297,7 @@ struct AckEvent {
   struct BuilderFields {
     Optional<TimePoint> maybeAckTime;
     Optional<TimePoint> maybeAdjustedAckTime;
-    Optional<std::chrono::microseconds> maybeAckDelay;
+    OptionalMicros maybeAckDelay;
     Optional<PacketNumberSpace> maybePacketNumberSpace;
     Optional<PacketNum> maybeLargestAckedPacket;
     bool isImplicitAck{false};

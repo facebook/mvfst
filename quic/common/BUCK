@@ -190,5 +190,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//folly:optional",
+        "//quic/common/third-party:tiny_optional",
     ],
 )

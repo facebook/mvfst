@@ -1995,7 +1995,7 @@ uint64_t QuicTransportBase::getNumOpenableUnidirectionalStreams() const {
 folly::Expected<StreamId, LocalErrorCode>
 QuicTransportBase::createStreamInternal(
     bool bidirectional,
-    const Optional<StreamGroupId>& streamGroupId) {
+    const OptionalIntegral<StreamGroupId>& streamGroupId) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }

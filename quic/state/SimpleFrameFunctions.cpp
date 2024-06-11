@@ -282,7 +282,7 @@ bool updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::AckFrequencyFrame: {
-      if (!conn.transportSettings.minAckDelay.hasValue()) {
+      if (!conn.transportSettings.minAckDelay.has_value()) {
         // We do not accept ACK_FREQUENCY frames. This is a protocol
         // violation.
         throw QuicTransportException(

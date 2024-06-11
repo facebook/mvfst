@@ -194,8 +194,8 @@ class ReadAckFrameLog : public QLogFrame {
   ReadAckFrame::Vec ackBlocks;
   std::chrono::microseconds ackDelay;
   FrameType frameType;
-  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  Optional<PacketNum> maybeLatestRecvdPacketNum;
+  OptionalMicros maybeLatestRecvdPacketTime;
+  OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count;
   uint32_t ecnECT1Count;
@@ -205,8 +205,8 @@ class ReadAckFrameLog : public QLogFrame {
       const ReadAckFrame::Vec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
       FrameType frameTypeIn = FrameType::ACK,
-      Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn = none,
-      Optional<PacketNum> maybeLatestRecvdPacketNumIn = none,
+      OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
+      OptionalIntegral<PacketNum> maybeLatestRecvdPacketNumIn = std::nullopt,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
       uint32_t ecnECT0CountIn = 0,
       uint32_t ecnECT1CountIn = 0,
@@ -229,8 +229,8 @@ class WriteAckFrameLog : public QLogFrame {
   WriteAckFrame::AckBlockVec ackBlocks;
   std::chrono::microseconds ackDelay;
   FrameType frameType;
-  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  Optional<PacketNum> maybeLatestRecvdPacketNum;
+  OptionalMicros maybeLatestRecvdPacketTime;
+  OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count;
   uint32_t ecnECT1Count;
@@ -240,8 +240,8 @@ class WriteAckFrameLog : public QLogFrame {
       const WriteAckFrame::AckBlockVec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
       FrameType frameTypeIn = FrameType::ACK,
-      Optional<std::chrono::microseconds> maybeLatestRecvdPacketTimeIn = none,
-      Optional<PacketNum> maybeLatestRecvdPacketNumIn = none,
+      OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
+      OptionalIntegral<PacketNum> maybeLatestRecvdPacketNumIn = std::nullopt,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
       uint32_t ecnECT0CountIn = 0,
       uint32_t ecnECT1CountIn = 0,

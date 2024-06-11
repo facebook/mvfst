@@ -236,7 +236,7 @@ class QuicStreamManager {
    */
   folly::Expected<QuicStreamState*, LocalErrorCode> createStream(
       StreamId streamId,
-      Optional<StreamGroupId> streamGroupId = none);
+      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Create a new bidirectional stream group.
@@ -248,7 +248,8 @@ class QuicStreamManager {
    * Create and return the state for the next available bidirectional stream.
    */
   folly::Expected<QuicStreamState*, LocalErrorCode>
-  createNextBidirectionalStream(Optional<StreamGroupId> streamGroupId = none);
+  createNextBidirectionalStream(
+      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Create a new unidirectional stream group.
@@ -260,14 +261,16 @@ class QuicStreamManager {
    * Create and return the state for the next available unidirectional stream.
    */
   folly::Expected<QuicStreamState*, LocalErrorCode>
-  createNextUnidirectionalStream(Optional<StreamGroupId> streamGroupId = none);
+  createNextUnidirectionalStream(
+      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Return the stream state or create it if the state has not yet been created.
    * Note that this is only valid for streams that are currently open.
    */
-  QuicStreamState* FOLLY_NULLABLE
-  getStream(StreamId streamId, Optional<StreamGroupId> streamGroupId = none);
+  QuicStreamState* FOLLY_NULLABLE getStream(
+      StreamId streamId,
+      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Remove all the state for a stream that is being closed.
@@ -1058,7 +1061,7 @@ class QuicStreamManager {
 
   QuicStreamState* FOLLY_NULLABLE getOrCreatePeerStream(
       StreamId streamId,
-      Optional<StreamGroupId> streamGroupId = none);
+      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   void setMaxRemoteBidirectionalStreamsInternal(
       uint64_t maxStreams,
@@ -1071,8 +1074,9 @@ class QuicStreamManager {
   void notifyStreamPriorityChanges();
 
   // helper to create a new peer stream.
-  QuicStreamState* FOLLY_NULLABLE
-  instantiatePeerStream(StreamId streamId, Optional<StreamGroupId> groupId);
+  QuicStreamState* FOLLY_NULLABLE instantiatePeerStream(
+      StreamId streamId,
+      OptionalIntegral<StreamGroupId> groupId);
 
   folly::Expected<StreamGroupId, LocalErrorCode> createNextStreamGroup(
       StreamGroupId& groupId,

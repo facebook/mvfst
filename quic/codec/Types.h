@@ -187,8 +187,8 @@ struct ReadAckFrame {
   using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame>;
   Vec ackBlocks;
   FrameType frameType = FrameType::ACK;
-  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  Optional<PacketNum> maybeLatestRecvdPacketNum;
+  OptionalMicros maybeLatestRecvdPacketTime;
+  OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count{0};
   uint32_t ecnECT1Count{0};
@@ -202,14 +202,13 @@ struct ReadAckFrame {
 struct WriteAckFrame {
   // Since we don't need this to be an IntervalSet, they are stored directly
   // in a vector, in reverse order.
-  // TODO should this be a small_vector?
   using AckBlockVec = std::vector<Interval<PacketNum>>;
   AckBlockVec ackBlocks;
   // Delay in sending ack from time that packet was received.
   std::chrono::microseconds ackDelay{0us};
   FrameType frameType = FrameType::ACK;
-  Optional<std::chrono::microseconds> maybeLatestRecvdPacketTime;
-  Optional<PacketNum> maybeLatestRecvdPacketNum;
+  OptionalMicros maybeLatestRecvdPacketTime;
+  OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
   uint32_t ecnECT0Count{0};
   uint32_t ecnECT1Count{0};
@@ -438,7 +437,7 @@ struct ReadNewTokenFrame {
 */
 struct WriteStreamFrame {
   StreamId streamId;
-  Optional<StreamGroupId> streamGroupId;
+  OptionalIntegral<StreamGroupId> streamGroupId;
   uint64_t offset;
   uint64_t len;
   bool fin;
@@ -455,7 +454,7 @@ struct WriteStreamFrame {
       uint64_t lenIn,
       bool finIn,
       bool fromBufMetaIn = false,
-      Optional<StreamGroupId> streamGroupIdIn = none,
+      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt,
       uint64_t streamPacketIdxIn = 0)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
@@ -478,7 +477,7 @@ struct WriteStreamFrame {
  */
 struct ReadStreamFrame {
   StreamId streamId;
-  Optional<StreamGroupId> streamGroupId;
+  OptionalIntegral<StreamGroupId> streamGroupId;
   uint64_t offset;
   Buf data;
   bool fin;
@@ -488,7 +487,7 @@ struct ReadStreamFrame {
       uint64_t offsetIn,
       Buf dataIn,
       bool finIn,
-      Optional<StreamGroupId> streamGroupIdIn = none)
+      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
         offset(offsetIn),
@@ -499,7 +498,7 @@ struct ReadStreamFrame {
       StreamId streamIdIn,
       uint64_t offsetIn,
       bool finIn,
-      Optional<StreamGroupId> streamGroupIdIn = none)
+      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
         offset(offsetIn),

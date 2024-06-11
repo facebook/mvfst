@@ -1269,7 +1269,7 @@ void onServerReadDataFromOpen(
           break;
         }
         case QuicFrame::Type::ImmediateAckFrame: {
-          if (!conn.transportSettings.minAckDelay.hasValue()) {
+          if (!conn.transportSettings.minAckDelay.has_value()) {
             // We do not accept IMMEDIATE_ACK frames. This is a protocol
             // violation.
             throw QuicTransportException(
