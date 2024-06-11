@@ -31,8 +31,8 @@ namespace quic {
  * just be an alias to this type.
  */
 struct PacketEvent {
-  PacketNumberSpace packetNumberSpace;
-  PacketNum packetNumber;
+  PacketNum packetNumber : 62;
+  PacketNumberSpace packetNumberSpace : 2;
 
   PacketEvent() = delete;
   PacketEvent(PacketNumberSpace packetNumberSpaceIn, PacketNum packetNumberIn);

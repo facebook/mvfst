@@ -15,7 +15,7 @@ namespace quic {
 PacketEvent::PacketEvent(
     PacketNumberSpace packetNumberSpaceIn,
     PacketNum packetNumberIn)
-    : packetNumberSpace(packetNumberSpaceIn), packetNumber(packetNumberIn) {}
+    : packetNumber(packetNumberIn), packetNumberSpace(packetNumberSpaceIn) {}
 
 bool operator==(const PacketEvent& lhs, const PacketEvent& rhs) {
   return static_cast<std::underlying_type_t<PacketNumberSpace>>(
