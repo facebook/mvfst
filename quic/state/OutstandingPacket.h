@@ -43,7 +43,7 @@ struct OutstandingPacketMetadata {
   // due to reordering
   struct StreamDetails {
     template <class T>
-    using IntervalSetVec = SmallVec<T, 4 /* stack size */>;
+    using IntervalSetVec = SmallVec<T, 1 /* stack size */>;
     using StreamIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
     StreamIntervals streamIntervals;
 
@@ -52,7 +52,7 @@ struct OutstandingPacketMetadata {
     folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
   };
 
-  using MapType = InlineMap<StreamId, StreamDetails, 5>;
+  using MapType = InlineMap<StreamId, StreamDetails, 1>;
   class DetailsPerStream : private MapType {
    public:
     void addFrame(const WriteStreamFrame& frame, const bool newData) {
