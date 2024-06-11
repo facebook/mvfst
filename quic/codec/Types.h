@@ -958,24 +958,23 @@ struct LongHeader {
       const ConnectionId& dstConnId,
       PacketNum packetNum,
       QuicVersion version,
-      std::string token = std::string());
+      std::string token = "");
 
-  LongHeader(
-      Types type,
-      LongHeaderInvariant invariant,
-      std::string token = std::string());
+  LongHeader(Types type, LongHeaderInvariant invariant, std::string token = "");
 
   LongHeader(const LongHeader& other)
       : packetSequenceNum_(other.packetSequenceNum_),
         longHeaderType_(other.longHeaderType_),
         invariant_(std::make_unique<LongHeaderInvariant>(*other.invariant_)),
-        token_(other.token_) {}
+        token_(
+            other.token_ ? std::make_unique<std::string>(*other.token_)
+                         : nullptr) {}
   LongHeader(LongHeader&& other) = default;
   LongHeader& operator=(const LongHeader& other) {
     packetSequenceNum_ = other.packetSequenceNum_;
     longHeaderType_ = other.longHeaderType_;
     invariant_ = std::make_unique<LongHeaderInvariant>(*other.invariant_);
-    token_ = other.token_;
+    token_ = std::make_unique<std::string>(*other.token_);
     return *this;
   }
   LongHeader& operator=(LongHeader&& other) = default;
@@ -1002,7 +1001,7 @@ struct LongHeader {
   PacketNum packetSequenceNum_{0};
   Types longHeaderType_;
   std::unique_ptr<LongHeaderInvariant> invariant_;
-  std::string token_;
+  std::unique_ptr<std::string> token_;
 };
 
 struct ShortHeaderInvariant {

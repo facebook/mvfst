@@ -165,7 +165,9 @@ LongHeader::LongHeader(
     std::string token)
     : longHeaderType_(type),
       invariant_(std::make_unique<LongHeaderInvariant>(std::move(invariant))),
-      token_(std::move(token)) {}
+      token_(
+          token.empty() ? nullptr
+                        : std::make_unique<std::string>(std::move(token))) {}
 
 LongHeader::LongHeader(
     Types type,
@@ -177,7 +179,9 @@ LongHeader::LongHeader(
     : longHeaderType_(type),
       invariant_(
           std::make_unique<LongHeaderInvariant>(version, srcConnId, dstConnId)),
-      token_(std::move(token)) {
+      token_(
+          token.empty() ? nullptr
+                        : std::make_unique<std::string>(std::move(token))) {
   setPacketNumber(packetNum);
 }
 
@@ -198,11 +202,12 @@ QuicVersion LongHeader::getVersion() const {
 }
 
 bool LongHeader::hasToken() const {
-  return !token_.empty();
+  return token_ != nullptr;
 }
 
 const std::string& LongHeader::getToken() const {
-  return token_;
+  static const std::string kEmptyToken;
+  return token_ ? *token_ : kEmptyToken;
 }
 
 void LongHeader::setPacketNumber(PacketNum packetNum) {
