@@ -52,11 +52,11 @@ struct AckPacketBuilder : public AckPacketBuilderFields {
 struct OutstandingPacketBuilderFields {
   folly::Optional<RegularQuicWritePacket> maybePacket;
   folly::Optional<TimePoint> maybeTime;
-  folly::Optional<uint32_t> maybeEncodedSize;
-  folly::Optional<uint32_t> maybeEncodedBodySize;
+  folly::Optional<uint16_t> maybeEncodedSize;
+  folly::Optional<uint16_t> maybeEncodedBodySize;
   folly::Optional<uint64_t> maybeTotalBytesSent;
   folly::Optional<uint64_t> maybeTotalBodyBytesSent;
-  folly::Optional<uint64_t> maybeInflightBytes;
+  folly::Optional<uint32_t> maybeInflightBytes;
   folly::Optional<uint64_t> maybePacketsInflight;
   folly::Optional<std::reference_wrapper<const LossState>> maybeLossState;
   folly::Optional<uint64_t> maybeWriteCount;

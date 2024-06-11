@@ -45,7 +45,7 @@ auto getOutstandingPacketMatcher(
           testing::Field(
               &quic::OutstandingPacketMetadata::lossReorderDistance,
               testing::Property(
-                  &folly::Optional<uint32_t>::hasValue,
+                  &folly::Optional<uint16_t>::hasValue,
                   testing::Eq(lostByReorder)))),
       testing::Field(
           &quic::OutstandingPacketWrapper::metadata,

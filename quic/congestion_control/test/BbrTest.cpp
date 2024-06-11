@@ -62,7 +62,7 @@ TEST_F(BbrTest, Recovery) {
   conn.transportSettings.initCwndInMss = 500; // Make a really large initCwnd
   BbrCongestionController bbr(conn);
   // Make a huge inflight so we don't underflow anything
-  auto inflightBytes = 100 * 1000;
+  auto inflightBytes = std::numeric_limits<uint16_t>::max();
   bbr.onPacketSent(makeTestingWritePacket(9, inflightBytes, inflightBytes));
 
   // This also makes sure recoveryWindow_ is larger than inflightBytes
