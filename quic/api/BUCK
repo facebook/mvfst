@@ -44,6 +44,7 @@ mvfst_cpp_library(
         ":loop_detector_callback",
         "//folly:chrono",
         "//folly:scope_guard",
+        "//folly/tracing:static_tracepoint",
         "//quic/common:socket_util",
         "//quic/common:time_util",
         "//quic/congestion_control:ecn_l4s_tracker",

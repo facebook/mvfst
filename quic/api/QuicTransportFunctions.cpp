@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/tracing/StaticTracepoint.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicBatchWriterFactory.h>
@@ -636,6 +637,7 @@ void updateConnection(
   if (conn.qLogger) {
     conn.qLogger->addPacket(packet, encodedSize);
   }
+  FOLLY_SDT(quic, update_connection_num_frames, packet.frames.size());
   for (const auto& frame : packet.frames) {
     switch (frame.type()) {
       case QuicWriteFrame::Type::WriteStreamFrame: {
