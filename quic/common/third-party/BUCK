@@ -8,3 +8,11 @@ mvfst_cpp_library(
         "enum.h",
     ],
 )
+
+mvfst_cpp_library(
+    name = "tiny_optional",
+    headers = [
+        "optional.h",
+        "optional_flag_manipulator_fwd.h",
+    ],
+)
