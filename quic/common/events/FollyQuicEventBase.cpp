@@ -49,6 +49,11 @@ void FollyQuicEventBase::runImmediatelyOrRunInEventBaseThreadAndWait(
       std::move(fn));
 }
 
+void FollyQuicEventBase::runImmediatelyOrRunInEventBaseThread(
+    folly::Function<void()> fn) noexcept {
+  return backingEvb_->runImmediatelyOrRunInEventBaseThread(std::move(fn));
+}
+
 void FollyQuicEventBase::runInEventBaseThread(
     folly::Function<void()> fn) noexcept {
   return backingEvb_->runInEventBaseThread(std::move(fn));

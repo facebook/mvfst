@@ -121,6 +121,9 @@ class QuicEventBase {
 
   virtual void runInEventBaseThread(folly::Function<void()> fn) noexcept = 0;
 
+  virtual void runImmediatelyOrRunInEventBaseThread(
+      folly::Function<void()> fn) noexcept = 0;
+
   [[nodiscard]] virtual bool isInEventBaseThread() const = 0;
 
   virtual void scheduleTimeout(

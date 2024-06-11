@@ -45,6 +45,9 @@ class FollyQuicEventBase : public QuicEventBase {
 
   void runInEventBaseThread(folly::Function<void()> fn) noexcept override;
 
+  void runImmediatelyOrRunInEventBaseThread(
+      folly::Function<void()> fn) noexcept override;
+
   [[nodiscard]] bool isInEventBaseThread() const override;
 
   bool scheduleTimeoutHighRes(
