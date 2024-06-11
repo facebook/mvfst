@@ -965,14 +965,8 @@ TYPED_TEST(
   this->loopForWrites();
   ASSERT_FALSE(this->getConn().outstandings.packets.empty());
 
-  folly::SocketCmsgMap expectedCmsgs;
-  expectedCmsgs[{IPPROTO_IPV6, IPV6_HOPLIMIT}] = 255;
-  expectedCmsgs[{IPPROTO_IPV6, IPV6_DONTFRAG}] = 1;
   auto pkt = this->getConn().outstandings.packets.rbegin();
-  ASSERT_TRUE(pkt->metadata.cmsgs);
-  EXPECT_THAT(
-      pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
-
+  EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::TTLD);
   this->destroyTransport();
 }
 
@@ -1009,15 +1003,10 @@ TYPED_TEST(
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
 
     // Verify both packets are marked
-    folly::SocketCmsgMap expectedCmsgs;
-    expectedCmsgs[{IPPROTO_IPV6, IPV6_HOPLIMIT}] = 255;
     auto pkt = this->getConn().outstandings.packets.rbegin();
-    ASSERT_TRUE(pkt->metadata.cmsgs);
-    EXPECT_THAT(
-        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
-    ASSERT_TRUE((++pkt)->metadata.cmsgs);
-    EXPECT_THAT(
-        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+    EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::TTLD);
+    pkt++;
+    EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::TTLD);
   }
 
   {
@@ -1035,15 +1024,16 @@ TYPED_TEST(
 
     // Verify the last two packets have no marks
     auto pkt = this->getConn().outstandings.packets.rbegin();
-    EXPECT_FALSE(pkt->metadata.cmsgs);
-    EXPECT_FALSE((++pkt)->metadata.cmsgs);
+    EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::NONE);
+    pkt++;
+    EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::NONE);
   }
 
   {
     // Send two packets with the same marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
       PacketProcessor::PrewriteRequest req;
-      req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_DONTFRAG}, 1}});
+      req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}});
       return req;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -1055,15 +1045,10 @@ TYPED_TEST(
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
 
     // Verify the last two packets are marked
-    folly::SocketCmsgMap expectedCmsgs;
-    expectedCmsgs[{IPPROTO_IPV6, IPV6_DONTFRAG}] = 1;
     auto pkt = this->getConn().outstandings.packets.rbegin();
-    ASSERT_TRUE(pkt->metadata.cmsgs);
-    EXPECT_THAT(
-        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
-    ASSERT_TRUE((++pkt)->metadata.cmsgs);
-    EXPECT_THAT(
-        pkt->metadata.cmsgs.value(), UnorderedElementsAreArray(expectedCmsgs));
+    EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::TTLD);
+    pkt++;
+    EXPECT_EQ(pkt->metadata.mark, OutstandingPacketMark::TTLD);
   }
 
   this->destroyTransport();

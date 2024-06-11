@@ -884,7 +884,7 @@ void updateConnection(
       conn.appLimitedTracker.getTotalAppLimitedTime(),
       std::move(packetDestroyFn));
 
-  pkt.metadata.cmsgs = conn.socketCmsgsState.additionalCmsgs;
+  maybeAddPacketMark(conn, pkt);
 
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
@@ -2029,6 +2029,36 @@ void maybeVerifyPendingKeyUpdate(
           "Packet with key update was acked in the wrong phase",
           TransportErrorCode::CRYPTO_ERROR);
     }
+  }
+}
+
+// Unfortunate, we should make this more portable.
+#if !defined IPV6_HOPLIMIT
+#define IPV6_HOPLIMIT -1
+#endif
+#if !defined IP_TTL
+#define IP_TTL -1
+#endif
+// Add a packet mark to the outstanding packet. Currently only supports
+// TTLD marking.
+void maybeAddPacketMark(
+    QuicConnectionStateBase& conn,
+    OutstandingPacketWrapper& op) {
+  static constexpr folly::SocketOptionKey kHopLimitOptionKey = {
+      IPPROTO_IPV6, IPV6_HOPLIMIT};
+  static constexpr folly::SocketOptionKey kTTLOptionKey = {IPPROTO_IP, IP_TTL};
+  if (!conn.socketCmsgsState.additionalCmsgs.has_value()) {
+    return;
+  }
+  const auto& cmsgs = conn.socketCmsgsState.additionalCmsgs;
+  auto it = cmsgs->find(kHopLimitOptionKey);
+  if (it != cmsgs->end() && it->second == 255) {
+    op.metadata.mark = OutstandingPacketMark::TTLD;
+    return;
+  }
+  it = cmsgs->find(kTTLOptionKey);
+  if (it != cmsgs->end() && it->second == 255) {
+    op.metadata.mark = OutstandingPacketMark::TTLD;
   }
 }
 

@@ -15,6 +15,13 @@
 
 namespace quic {
 
+// Currently only used for TTLD marking, which is a mark indicating
+// retransmitted data.
+enum class OutstandingPacketMark : uint8_t {
+  NONE = 0, // No marking.
+  TTLD = 1, // Marked for TTL-D retransmission.
+};
+
 struct OutstandingPacketMetadata {
   // Time that the packet was sent.
   TimePoint time;
@@ -26,8 +33,6 @@ struct OutstandingPacketMetadata {
   // Write Count is the value of the monotonically increasing counter which
   // tracks the number of writes on this socket.
   uint64_t writeCount{0};
-  // Cmsgs added by the QuicSocket when this packet was written
-  folly::Optional<folly::SocketCmsgMap> cmsgs;
 
   // Has value if the packet is lost by timeout. The value is the loss timeout
   // dividend that was used to declare this packet.
@@ -107,7 +112,9 @@ struct OutstandingPacketMetadata {
   // Size of only the body within the packet sent on the wire.
   uint16_t encodedBodySize;
 
-  bool scheduledForDestruction{false};
+  bool scheduledForDestruction : 1;
+
+  OutstandingPacketMark mark : 7;
 
   OutstandingPacketMetadata(
       TimePoint timeIn,
@@ -127,7 +134,9 @@ struct OutstandingPacketMetadata {
         totalAppLimitedTimeUsecs(totalAppLimitedTimeUsecsIn),
         inflightBytes(inflightBytesIn),
         encodedSize(encodedSizeIn),
-        encodedBodySize(encodedBodySizeIn) {}
+        encodedBodySize(encodedBodySizeIn),
+        scheduledForDestruction(false),
+        mark(OutstandingPacketMark::NONE) {}
 };
 
 // Data structure to represent outstanding retransmittable packets

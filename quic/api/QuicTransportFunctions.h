@@ -340,5 +340,8 @@ void maybeVerifyPendingKeyUpdate(
     QuicConnectionStateBase& conn,
     const OutstandingPacketWrapper& outstandingPacket,
     const RegularQuicPacket& ackPacket);
+void maybeAddPacketMark(
+    QuicConnectionStateBase& conn,
+    OutstandingPacketWrapper& op);
 
 } // namespace quic
