@@ -965,9 +965,19 @@ struct LongHeader {
       LongHeaderInvariant invariant,
       std::string token = std::string());
 
-  LongHeader(const LongHeader& other) = default;
+  LongHeader(const LongHeader& other)
+      : packetSequenceNum_(other.packetSequenceNum_),
+        longHeaderType_(other.longHeaderType_),
+        invariant_(std::make_unique<LongHeaderInvariant>(*other.invariant_)),
+        token_(other.token_) {}
   LongHeader(LongHeader&& other) = default;
-  LongHeader& operator=(const LongHeader& other) = default;
+  LongHeader& operator=(const LongHeader& other) {
+    packetSequenceNum_ = other.packetSequenceNum_;
+    longHeaderType_ = other.longHeaderType_;
+    invariant_ = std::make_unique<LongHeaderInvariant>(*other.invariant_);
+    token_ = other.token_;
+    return *this;
+  }
   LongHeader& operator=(LongHeader&& other) = default;
 
   Types getHeaderType() const noexcept;
@@ -991,7 +1001,7 @@ struct LongHeader {
  private:
   PacketNum packetSequenceNum_{0};
   Types longHeaderType_;
-  LongHeaderInvariant invariant_;
+  std::unique_ptr<LongHeaderInvariant> invariant_;
   std::string token_;
 };
 
