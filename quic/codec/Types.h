@@ -1206,7 +1206,7 @@ struct RegularQuicPacket : public RegularPacket {
  * A representation of a regular packet that is written to the network.
  */
 struct RegularQuicWritePacket : public RegularPacket {
-  using Vec = std::vector<QuicWriteFrame>;
+  using Vec = SmallVec<QuicWriteFrame, 1>;
   Vec frames;
   bool empty{true};
 
