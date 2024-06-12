@@ -2063,4 +2063,16 @@ void maybeAddPacketMark(
   }
 }
 
+void maybeScheduleAckForCongestionFeedback(
+    const ReceivedUdpPacket& receivedPacket,
+    AckState& ackState) {
+  // If the packet was marked as having encountered congestion, send an ACK
+  // immediately to ensure timely response from the peer.
+  // Note that the tosValue will be populated only if the enableEcnOnEgress
+  // transport setting is enabled.
+  if ((receivedPacket.tosValue & 0b11) == 0b11) {
+    ackState.needsToSendAckImmediately = true;
+  }
+}
+
 } // namespace quic

@@ -1297,6 +1297,7 @@ void onServerReadDataFromOpen(
       handshakeConfirmed(conn);
     }
 
+    maybeScheduleAckForCongestionFeedback(readData.udpPacket, ackState);
     maybeHandleIncomingKeyUpdate(conn);
 
     // Update writable limit before processing the handshake data. This is so

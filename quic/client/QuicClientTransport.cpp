@@ -655,6 +655,7 @@ void QuicClientTransport::processUdpPacketData(
     handshakeConfirmed(*conn_);
   }
 
+  maybeScheduleAckForCongestionFeedback(udpPacket, ackState);
   maybeHandleIncomingKeyUpdate(*conn_);
 
   // Try reading bytes off of crypto, and performing a handshake.
