@@ -44,14 +44,16 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       uint64_t activeConnIdLimit,
       bool enableMigration,
       bool enableStreamGroups,
-      std::vector<std::string> alpns)
+      std::vector<std::string> alpns,
+      bool connectOnly)
       : host_(host),
         port_(port),
         useDatagrams_(useDatagrams),
         activeConnIdLimit_(activeConnIdLimit),
         enableMigration_(enableMigration),
         enableStreamGroups_(enableStreamGroups),
-        alpns_(std::move(alpns)) {}
+        alpns_(std::move(alpns)),
+        connectOnly_(connectOnly) {}
 
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
@@ -161,7 +163,16 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onTransportReady() noexcept override {
-    startDone_.post();
+    if (!connectOnly_) {
+      startDone_.post();
+    }
+  }
+
+  void onReplaySafe() noexcept override {
+    if (connectOnly_) {
+      VLOG(3) << "Connected successfully";
+      startDone_.post();
+    }
   }
 
   void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
@@ -236,6 +247,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     });
 
     startDone_.wait();
+
+    if (connectOnly_) {
+      evb->runInEventBaseThreadAndWait(
+          [this] { quicClient_->closeNow(folly::none); });
+
+      return;
+    }
 
     std::string message;
     bool closed = false;
@@ -328,6 +346,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   std::array<StreamGroupId, kNumTestStreamGroups> streamGroups_;
   size_t curGroupIdIdx_{0};
   std::vector<std::string> alpns_;
+  bool connectOnly_{false};
 };
 } // namespace samples
 } // namespace quic

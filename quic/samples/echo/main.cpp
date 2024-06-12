@@ -37,6 +37,10 @@ DEFINE_bool(
     false,
     "Enable/disable retransmission for stream groups");
 DEFINE_string(alpns, "echo", "Comma separated ALPN list");
+DEFINE_bool(
+    connect_only,
+    false,
+    "Client specific; connect and exit when set to true");
 
 using namespace quic::samples;
 
@@ -54,6 +58,10 @@ int main(int argc, char* argv[]) {
   folly::split(",", FLAGS_alpns, alpns);
 
   if (FLAGS_mode == "server") {
+    if (FLAGS_connect_only) {
+      LOG(ERROR) << "connect_only is not supported in server mode";
+      return -1;
+    }
     EchoServer server(
         std::move(alpns),
         FLAGS_host,
@@ -79,7 +87,8 @@ int main(int argc, char* argv[]) {
         FLAGS_active_conn_id_limit,
         FLAGS_enable_migration,
         FLAGS_use_stream_groups,
-        std::move(alpns));
+        std::move(alpns),
+        FLAGS_connect_only);
     client.start(FLAGS_token);
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
