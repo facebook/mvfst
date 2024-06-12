@@ -134,22 +134,20 @@ TEST_F(QuicStreamFunctionsTest, TestReadDataWrittenInOrder) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 
   auto readData1 = readDataFromQuicStream(*stream, 10);
-  EXPECT_EQ("I just met", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just met", readData1.first->to<std::string>());
   EXPECT_FALSE(readData1.second);
 
   auto readData2 = readDataFromQuicStream(*stream, 30);
   EXPECT_EQ(
-      " you and this is crazy. Here's",
-      readData2.first->moveToFbString().toStdString());
+      " you and this is crazy. Here's", readData2.first->to<std::string>());
   EXPECT_FALSE(readData2.second);
 
   auto readData3 = readDataFromQuicStream(*stream, 21);
-  EXPECT_EQ(
-      " my number so call me", readData3.first->moveToFbString().toStdString());
+  EXPECT_EQ(" my number so call me", readData3.first->to<std::string>());
   EXPECT_FALSE(readData3.second);
 
   auto readData4 = readDataFromQuicStream(*stream, 20);
-  EXPECT_EQ(" maybe", readData4.first->moveToFbString().toStdString());
+  EXPECT_EQ(" maybe", readData4.first->to<std::string>());
   EXPECT_TRUE(readData4.second);
 }
 
@@ -181,7 +179,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeContiguousData) {
       auto bufClone = streamBuf.data.front()->clone();
       EXPECT_EQ(
           "I just met you and this is crazy. Here's my number so call me maybe",
-          bufClone->moveToFbString().toStdString());
+          bufClone->to<std::string>());
     }
   };
 
@@ -228,13 +226,10 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeNonContiguousData) {
 
         auto bufClone = range[0].data.front()->clone();
         EXPECT_EQ(
-            "I just met you and this is crazy. ",
-            bufClone->moveToFbString().toStdString());
+            "I just met you and this is crazy. ", bufClone->to<std::string>());
 
         bufClone = range[1].data.front()->clone();
-        EXPECT_EQ(
-            "'s my number so call me maybe",
-            bufClone->moveToFbString().toStdString());
+        EXPECT_EQ("'s my number so call me maybe", bufClone->to<std::string>());
       });
   EXPECT_TRUE(cbCalled);
 
@@ -248,9 +243,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeNonContiguousData) {
     EXPECT_EQ(range.size(), 1);
 
     auto bufClone = range[0].data.front()->clone();
-    EXPECT_EQ(
-        "'s my number so call me maybe",
-        bufClone->moveToFbString().toStdString());
+    EXPECT_EQ("'s my number so call me maybe", bufClone->to<std::string>());
   };
   peekDataFromQuicStream(*stream, peekCallback2);
   EXPECT_TRUE(cbCalled);
@@ -277,8 +270,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeNonContiguousData) {
 
         auto bufClone = range[0].data.front()->clone();
         EXPECT_EQ(
-            "Here's my number so call me maybe",
-            bufClone->moveToFbString().toStdString());
+            "Here's my number so call me maybe", bufClone->to<std::string>());
       });
   EXPECT_TRUE(cbCalled);
 
@@ -361,7 +353,7 @@ TEST_F(QuicStreamFunctionsTest, TestReadDataFromMultipleBufs) {
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number so call me maybe",
-      readData1.first->moveToFbString().toStdString());
+      readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.first);
 
   auto readData2 = readDataFromQuicStream(*stream, 30);
@@ -392,19 +384,16 @@ TEST_F(QuicStreamFunctionsTest, TestReadDataOutOfOrder) {
   appendDataToReadBuffer(
       *stream, StreamBuffer(IOBuf::copyBuffer("I just met"), 0));
   auto readData2 = readDataFromQuicStream(*stream, 19);
-  EXPECT_EQ(
-      "I just met you and ", readData2.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just met you and ", readData2.first->to<std::string>());
   EXPECT_FALSE(readData2.second);
 
   auto readData3 = readDataFromQuicStream(*stream, 31);
   EXPECT_EQ(
-      "this is crazy. Here's my number",
-      readData3.first->moveToFbString().toStdString());
+      "this is crazy. Here's my number", readData3.first->to<std::string>());
   EXPECT_FALSE(readData3.second);
 
   auto readData4 = readDataFromQuicStream(*stream);
-  EXPECT_EQ(
-      " so call me maybe", readData4.first->moveToFbString().toStdString());
+  EXPECT_EQ(" so call me maybe", readData4.first->to<std::string>());
   EXPECT_TRUE(readData4.second);
 }
 
@@ -429,7 +418,7 @@ TEST_F(QuicStreamFunctionsTest, TestReadOverlappingData) {
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  auto str = readData1.first->moveToFbString().toStdString();
+  auto str = readData1.first->to<std::string>();
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number, so call me maybe.",
       str);
@@ -454,8 +443,7 @@ TEST_F(QuicStreamFunctionsTest, TestCompleteOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy",
-      readData1.first->moveToFbString().toStdString());
+      "I just met you and this is crazy", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -475,7 +463,7 @@ TEST_F(QuicStreamFunctionsTest, TestTotalOverlap) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("met you ", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("met you ", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -497,7 +485,7 @@ TEST_F(QuicStreamFunctionsTest, TestSubsetOverlap) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("met you ", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("met you ", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -517,7 +505,7 @@ TEST_F(QuicStreamFunctionsTest, TestLeftOverlap) {
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just met you ", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just met you ", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -540,7 +528,7 @@ TEST_F(QuicStreamFunctionsTest, TestLeftNoOverlap) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 2);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just", readData1.first->to<std::string>());
   EXPECT_FALSE(readData1.second);
   EXPECT_EQ(stream->readBuffer.size(), 1);
 }
@@ -563,8 +551,7 @@ TEST_F(QuicStreamFunctionsTest, TestRightOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy",
-      readData1.first->moveToFbString().toStdString());
+      "I just met you and this is crazy", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 } // namespace test
@@ -584,7 +571,7 @@ TEST_F(QuicStreamFunctionsTest, TestRightNoOverlap) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 2);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just", readData1.first->to<std::string>());
   EXPECT_FALSE(readData1.second);
   EXPECT_EQ(stream->readBuffer.size(), 1);
 }
@@ -606,8 +593,7 @@ TEST_F(QuicStreamFunctionsTest, TestRightLeftOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy",
-      readData1.first->moveToFbString().toStdString());
+      "I just met you and this is crazy", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -644,7 +630,7 @@ TEST_F(QuicStreamFunctionsTest, TestInsertVariations) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  auto str = readData1.first->moveToFbString().toStdString();
+  auto str = readData1.first->to<std::string>();
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number so call me maybe",
       str);
@@ -669,8 +655,7 @@ TEST_F(QuicStreamFunctionsTest, TestAppendAlreadyReadData) {
   appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy",
-      readData1.first->moveToFbString().toStdString());
+      "I just met you and this is crazy", readData1.first->to<std::string>());
   EXPECT_FALSE(readData1.second);
 
   appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
@@ -687,16 +672,14 @@ TEST_F(QuicStreamFunctionsTest, TestAppendAlreadyReadData) {
 
   appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 0));
   auto readData4 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(
-      ". Here's my number", readData4.first->moveToFbString().toStdString());
+  EXPECT_EQ(". Here's my number", readData4.first->to<std::string>());
   EXPECT_FALSE(readData4.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
   appendDataToReadBuffer(*stream, StreamBuffer(buf5->clone(), 0));
   appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 0));
   auto readData5 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(
-      " so call me maybe", readData5.first->moveToFbString().toStdString());
+  EXPECT_EQ(" so call me maybe", readData5.first->to<std::string>());
   EXPECT_FALSE(readData5.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
@@ -719,14 +702,14 @@ TEST_F(QuicStreamFunctionsTest, TestEmptyEOF) {
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just", readData1.first->to<std::string>());
   EXPECT_FALSE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
   auto buf3 = IOBuf::copyBuffer("m");
   appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 6));
   auto readData2 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("m", readData2.first->moveToFbString().toStdString());
+  EXPECT_EQ("m", readData2.first->to<std::string>());
   EXPECT_TRUE(readData2.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -741,7 +724,7 @@ TEST_F(QuicStreamFunctionsTest, TestEmptyEOFOverlap) {
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
@@ -757,7 +740,7 @@ TEST_F(QuicStreamFunctionsTest, TestOverlapEOF) {
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->moveToFbString().toStdString());
+  EXPECT_EQ("I just", readData1.first->to<std::string>());
   EXPECT_TRUE(readData1.second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }

@@ -17,7 +17,7 @@ void prepareDeque(T& d, size_t count) {
   size_t counter = 0;
   auto buffer = quic::test::buildRandomInputData(kLen);
   while (counter++ < count) {
-    d.emplace_back(buffer->clone()->moveToFbString().toStdString());
+    d.emplace_back(buffer->clone()->to<std::string>());
   }
 }
 } // namespace
@@ -29,7 +29,7 @@ BENCHMARK(deque_push_front, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_front(buffer->clone()->moveToFbString().toStdString());
+    d.push_front(buffer->clone()->to<std::string>());
   }
 }
 
@@ -40,7 +40,7 @@ BENCHMARK(circular_deque_push_front, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_front(buffer->clone()->moveToFbString().toStdString());
+    d.push_front(buffer->clone()->to<std::string>());
   }
 }
 
@@ -51,7 +51,7 @@ BENCHMARK(deque_push_back, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_back(buffer->clone()->moveToFbString().toStdString());
+    d.push_back(buffer->clone()->to<std::string>());
   }
 }
 
@@ -62,7 +62,7 @@ BENCHMARK(circular_deque_push_back, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_back(buffer->clone()->moveToFbString().toStdString());
+    d.push_back(buffer->clone()->to<std::string>());
   }
 }
 

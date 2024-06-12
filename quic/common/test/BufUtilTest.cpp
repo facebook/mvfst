@@ -241,7 +241,7 @@ TEST(BufAppender, TestPushAlreadyFits) {
   appender.push((uint8_t*)str.data(), str.size());
   EXPECT_EQ(data->computeChainDataLength(), str.size());
   EXPECT_EQ(data->countChainElements(), 1);
-  EXPECT_EQ(data->moveToFbString().toStdString(), str);
+  EXPECT_EQ(data->to<std::string>(), str);
 }
 
 TEST(BufAppender, TestPushLargerThanAppendLen) {
@@ -250,7 +250,7 @@ TEST(BufAppender, TestPushLargerThanAppendLen) {
   std::string str = "12456134134134134134134";
   appender.push((uint8_t*)str.data(), str.size());
   EXPECT_EQ(data->computeChainDataLength(), str.size());
-  EXPECT_EQ(data->moveToFbString().toStdString(), str);
+  EXPECT_EQ(data->to<std::string>(), str);
 }
 
 TEST(BufAppender, TestPushExpands) {
@@ -267,7 +267,7 @@ TEST(BufAppender, TestPushExpands) {
   EXPECT_EQ(data->computeChainDataLength(), str.size() * 5);
 
   std::string expected = str + str + str + str + str;
-  EXPECT_EQ(data->moveToFbString().toStdString(), expected);
+  EXPECT_EQ(data->to<std::string>(), expected);
 }
 
 TEST(BufAppender, TestInsertIOBuf) {
@@ -287,11 +287,11 @@ TEST(BufAppender, TestInsertIOBuf) {
   EXPECT_EQ(
       data->computeChainDataLength(), str.size() * 3 + hello->length() * 2);
 
-  auto helloStr = hello->clone()->moveToFbString().toStdString();
+  auto helloStr = hello->clone()->to<std::string>();
   std::string expected = str + str + helloStr + str + helloStr;
-  EXPECT_EQ(data->moveToFbString().toStdString(), expected);
+  EXPECT_EQ(data->to<std::string>(), expected);
   hello->append(4);
-  EXPECT_EQ(hello->moveToFbString().toStdString(), "helloworld");
+  EXPECT_EQ(hello->to<std::string>(), "helloworld");
 }
 
 TEST(BufAppender, TestInsertIOBufMoved) {
@@ -315,9 +315,9 @@ TEST(BufAppender, TestInsertIOBufMoved) {
 
   // test that the bufAppender uses the tailroom that is available in the hello
   // buffer.
-  auto helloStr = helloPtr->cloneOne()->moveToFbString().toStdString();
+  auto helloStr = helloPtr->cloneOne()->to<std::string>();
   std::string expected = str + str + "hello" + str;
-  EXPECT_EQ(data->moveToFbString().toStdString(), expected);
+  EXPECT_EQ(data->to<std::string>(), expected);
   EXPECT_EQ(helloStr, "hello12456");
 }
 

@@ -82,7 +82,7 @@ TEST_P(QuicIntegerEncodeTest, Encode) {
     return;
   }
   auto written = encodeQuicInteger(GetParam().decoded, appendOp);
-  auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
+  auto encodedValue = folly::hexlify(queue->to<std::string>());
   LOG(INFO) << "encoded=" << encodedValue;
   LOG(INFO) << "expected=" << GetParam().hexEncoded;
 
@@ -105,7 +105,7 @@ TEST_F(QuicIntegerEncodeTest, ForceFourBytes) {
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
   EXPECT_EQ(4, *encodeQuicInteger(37, appendOp, 4));
-  auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
+  auto encodedValue = folly::hexlify(queue->to<std::string>());
   EXPECT_EQ("80000025", encodedValue);
 }
 
@@ -114,7 +114,7 @@ TEST_F(QuicIntegerEncodeTest, ForceEightBytes) {
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
   EXPECT_EQ(8, *encodeQuicInteger(37, appendOp, 8));
-  auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
+  auto encodedValue = folly::hexlify(queue->to<std::string>());
   EXPECT_EQ("c000000000000025", encodedValue);
 }
 

@@ -3544,7 +3544,7 @@ TEST_P(QuicTransportImplTestBase, PeekData) {
     EXPECT_EQ(id, stream1);
     EXPECT_EQ(range.size(), 1);
     auto bufClone = range[0].data.front()->clone();
-    EXPECT_EQ("actual stream data", bufClone->moveToFbString().toStdString());
+    EXPECT_EQ("actual stream data", bufClone->to<std::string>());
   };
 
   transport->peek(stream1, peekCallback);
@@ -3641,7 +3641,7 @@ TEST_P(QuicTransportImplTestBase, PeekConsumeReadTest) {
 
   // Read 10 bytes.
   transport->read(stream1, 10).thenOrThrow([&](std::pair<Buf, bool> data) {
-    EXPECT_EQ("l stream d", data.first->moveToFbString().toStdString());
+    EXPECT_EQ("l stream d", data.first->to<std::string>());
   });
 
   // Both peek and read should be called.
@@ -3699,8 +3699,7 @@ TEST_P(QuicTransportImplTestBase, PeekConsumeReadTest) {
   // Read the rest of the buffer.
   transport->read(stream1, 0).thenOrThrow([&](std::pair<Buf, bool> data) {
     EXPECT_EQ(
-        " Here is my number, so call me maybe.",
-        data.first->moveToFbString().toStdString());
+        " Here is my number, so call me maybe.", data.first->to<std::string>());
   });
 
   // Neither read nor peek should be called.

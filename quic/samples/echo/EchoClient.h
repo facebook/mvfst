@@ -63,7 +63,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     } else {
       recvOffsets_[streamId] += copy->length();
     }
-    LOG(INFO) << "Client received data=" << copy->moveToFbString().toStdString()
+    LOG(INFO) << "Client received data=" << copy->to<std::string>()
               << " on stream=" << streamId;
   }
 
@@ -82,7 +82,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     } else {
       recvOffsets_[streamId] += copy->length();
     }
-    LOG(INFO) << "Client received data=" << copy->moveToFbString().toStdString()
+    LOG(INFO) << "Client received data=" << copy->to<std::string>()
               << " on stream=" << streamId << ", groupId=" << groupId;
   }
 
@@ -183,12 +183,9 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       return;
     }
     for (const auto& datagram : *res) {
-      LOG(INFO) << "Client received datagram ="
-                << datagram.bufQueue()
-                       .front()
-                       ->cloneCoalesced()
-                       ->moveToFbString()
-                       .toStdString();
+      LOG(INFO)
+          << "Client received datagram ="
+          << datagram.bufQueue().front()->cloneCoalesced()->to<std::string>();
     }
   }
 
@@ -305,7 +302,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     if (res.hasError()) {
       LOG(ERROR) << "EchoClient writeChain error=" << uint32_t(res.error());
     } else {
-      auto str = message->moveToFbString().toStdString();
+      auto str = message->to<std::string>();
       LOG(INFO) << "EchoClient wrote \"" << str << "\""
                 << ", len=" << str.size() << " on stream=" << id;
       // sent whole message

@@ -1157,7 +1157,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
         LongHeader(
             type,
             std::move(parsedLongHeaderInvariant.invariant),
-            token ? token->moveToFbString().toStdString() : std::string()),
+            token ? token->to<std::string>() : std::string()),
         PacketLength(0, 0));
   }
 
@@ -1211,7 +1211,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
       LongHeader(
           type,
           std::move(parsedLongHeaderInvariant.invariant),
-          token ? token->moveToFbString().toStdString() : std::string()),
+          token ? token->to<std::string>() : std::string()),
       PacketLength(pktLen->first, pktLen->second));
 }
 

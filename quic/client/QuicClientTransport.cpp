@@ -517,8 +517,7 @@ void QuicClientTransport::processUdpPacketData(
       }
       case QuicFrame::Type::ReadNewTokenFrame: {
         ReadNewTokenFrame& newTokenFrame = *quicFrame.asReadNewTokenFrame();
-        std::string tokenStr =
-            newTokenFrame.token->moveToFbString().toStdString();
+        std::string tokenStr = newTokenFrame.token->to<std::string>();
         VLOG(10) << "client received new token token="
                  << folly::hexlify(tokenStr);
         if (newTokenCallback_) {

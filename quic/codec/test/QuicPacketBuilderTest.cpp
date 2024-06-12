@@ -703,8 +703,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   Buf retryTokenObtained;
   cursor.clone(
       retryTokenObtained, cursor.totalLength() - kRetryIntegrityTagLen);
-  std::string retryTokenObtainedString =
-      retryTokenObtained->moveToFbString().toStdString();
+  std::string retryTokenObtainedString = retryTokenObtained->to<std::string>();
   EXPECT_EQ(retryTokenObtainedString, retryToken);
 
   // integrity tag

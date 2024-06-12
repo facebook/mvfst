@@ -221,7 +221,7 @@ void FizzClientHandshake::onNewCachedPsk(
   if (conn->earlyDataAppParamsGetter) {
     auto appParams = conn->earlyDataAppParamsGetter();
     if (appParams) {
-      quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
+      quicCachedPsk.appParams = appParams->to<std::string>();
     }
   }
 
