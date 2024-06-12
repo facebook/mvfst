@@ -43,13 +43,15 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       bool useDatagrams,
       uint64_t activeConnIdLimit,
       bool enableMigration,
-      bool enableStreamGroups)
+      bool enableStreamGroups,
+      std::vector<std::string> alpns)
       : host_(host),
         port_(port),
         useDatagrams_(useDatagrams),
         activeConnIdLimit_(activeConnIdLimit),
         enableMigration_(enableMigration),
-        enableStreamGroups_(enableStreamGroups) {}
+        enableStreamGroups_(enableStreamGroups),
+        alpns_(std::move(alpns)) {}
 
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
@@ -197,9 +199,12 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     evb->runInEventBaseThreadAndWait([&] {
       auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);
+      auto fizzCLientCtx = std::make_shared<fizz::client::FizzClientContext>();
+      fizzCLientCtx->setSupportedAlpns(std::move(alpns_));
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())
+              .setFizzClientContext(std::move(fizzCLientCtx))
               .build();
       quicClient_ = std::make_shared<quic::QuicClientTransport>(
           qEvb, std::move(sock), std::move(fizzClientContext));
@@ -322,6 +327,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   folly::fibers::Baton startDone_;
   std::array<StreamGroupId, kNumTestStreamGroups> streamGroups_;
   size_t curGroupIdIdx_{0};
+  std::vector<std::string> alpns_;
 };
 } // namespace samples
 } // namespace quic

@@ -75,6 +75,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
 class EchoServer {
  public:
   explicit EchoServer(
+      std::vector<std::string> alpns,
       const std::string& host = "::1",
       uint16_t port = 6666,
       bool useDatagrams = false,
@@ -82,13 +83,17 @@ class EchoServer {
       bool enableMigration = true,
       bool enableStreamGroups = false,
       bool disableRtx = false)
-      : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
+      : host_(host),
+        port_(port),
+        server_(QuicServer::createQuicServer()),
+        alpns_(std::move(alpns)) {
     server_->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>(useDatagrams, disableRtx));
     server_->setTransportStatsCallbackFactory(
         std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
+    serverCtx->setSupportedAlpns(std::move(alpns_));
     server_->setFizzContext(serverCtx);
 
     auto settingsCopy = server_->getTransportSettings();
@@ -125,6 +130,7 @@ class EchoServer {
   uint16_t port_;
   folly::EventBase eventbase_;
   std::shared_ptr<quic::QuicServer> server_;
+  std::vector<std::string> alpns_;
 };
 } // namespace samples
 } // namespace quic

@@ -36,6 +36,7 @@ DEFINE_bool(
     disable_rtx,
     false,
     "Enable/disable retransmission for stream groups");
+DEFINE_string(alpns, "echo", "Comma separated ALPN list");
 
 using namespace quic::samples;
 
@@ -49,8 +50,12 @@ int main(int argc, char* argv[]) {
   folly::Init init(&argc, &argv);
   fizz::CryptoUtils::init();
 
+  std::vector<std::string> alpns;
+  folly::split(",", FLAGS_alpns, alpns);
+
   if (FLAGS_mode == "server") {
     EchoServer server(
+        std::move(alpns),
         FLAGS_host,
         FLAGS_port,
         FLAGS_use_datagrams,
@@ -73,7 +78,8 @@ int main(int argc, char* argv[]) {
         FLAGS_use_datagrams,
         FLAGS_active_conn_id_limit,
         FLAGS_enable_migration,
-        FLAGS_use_stream_groups);
+        FLAGS_use_stream_groups,
+        std::move(alpns));
     client.start(FLAGS_token);
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
