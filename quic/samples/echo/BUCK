@@ -13,6 +13,9 @@ mvfst_cpp_library(
         "LogQuicStats.h",
     ],
     exported_deps = [
+        "//fizz/compression:zlib_certificate_decompressor",
+        "//fizz/compression:zstd_certificate_decompressor",
+        "//folly:file_util",
         "//folly:synchronized",
         "//folly/fibers:core",
         "//folly/io/async:scoped_event_base_thread",

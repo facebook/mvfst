@@ -13,8 +13,12 @@
 
 #include <glog/logging.h>
 
+#include <folly/FileUtil.h>
 #include <folly/fibers/Baton.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
+
+#include <fizz/compression/ZlibCertificateDecompressor.h>
+#include <fizz/compression/ZstdCertificateDecompressor.h>
 
 #include <quic/api/QuicSocket.h>
 #include <quic/client/QuicClientTransport.h>
@@ -45,7 +49,9 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       bool enableMigration,
       bool enableStreamGroups,
       std::vector<std::string> alpns,
-      bool connectOnly)
+      bool connectOnly,
+      const std::string& clientCertPath,
+      const std::string& clientKeyPath)
       : host_(host),
         port_(port),
         useDatagrams_(useDatagrams),
@@ -53,7 +59,9 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
         enableMigration_(enableMigration),
         enableStreamGroups_(enableStreamGroups),
         alpns_(std::move(alpns)),
-        connectOnly_(connectOnly) {}
+        connectOnly_(connectOnly),
+        clientCertPath_(clientCertPath),
+        clientKeyPath_(clientKeyPath) {}
 
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
@@ -210,8 +218,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     evb->runInEventBaseThreadAndWait([&] {
       auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);
-      auto fizzCLientCtx = std::make_shared<fizz::client::FizzClientContext>();
-      fizzCLientCtx->setSupportedAlpns(std::move(alpns_));
+      auto fizzCLientCtx = createFizzClientContext();
       auto fizzClientContext =
           FizzClientQuicHandshakeContext::Builder()
               .setCertificateVerifier(test::createTestCertificateVerifier())
@@ -333,6 +340,35 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     }
   }
 
+  std::shared_ptr<fizz::client::FizzClientContext> createFizzClientContext() {
+    auto fizzCLientCtx = std::make_shared<fizz::client::FizzClientContext>();
+
+    // ALPNs.
+    fizzCLientCtx->setSupportedAlpns(std::move(alpns_));
+
+    if (!clientCertPath_.empty() && !clientKeyPath_.empty()) {
+      // Client cert.
+      std::string certData;
+      folly::readFile(clientCertPath_.c_str(), certData);
+      std::string keyData;
+      folly::readFile(clientKeyPath_.c_str(), keyData);
+      auto cert = fizz::openssl::CertUtils::makeSelfCert(certData, keyData);
+
+      auto certManager = std::make_shared<fizz::client::CertManager>();
+      certManager->addCert(std::move(cert));
+      fizzCLientCtx->setClientCertManager(std::move(certManager));
+    }
+
+    // Compression settings.
+    auto mgr = std::make_shared<fizz::CertDecompressionManager>();
+    mgr->setDecompressors(
+        {std::make_shared<fizz::ZstdCertificateDecompressor>(),
+         std::make_shared<fizz::ZlibCertificateDecompressor>()});
+    fizzCLientCtx->setCertDecompressionManager(std::move(mgr));
+
+    return fizzCLientCtx;
+  }
+
   std::string host_;
   uint16_t port_;
   bool useDatagrams_;
@@ -347,6 +383,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   size_t curGroupIdIdx_{0};
   std::vector<std::string> alpns_;
   bool connectOnly_{false};
+  std::string clientCertPath_;
+  std::string clientKeyPath_;
 };
 } // namespace samples
 } // namespace quic

@@ -41,6 +41,8 @@ DEFINE_bool(
     connect_only,
     false,
     "Client specific; connect and exit when set to true");
+DEFINE_string(client_cert_path, "", "Client certificate file path");
+DEFINE_string(client_key_path, "", "Client private key file path");
 
 using namespace quic::samples;
 
@@ -88,7 +90,9 @@ int main(int argc, char* argv[]) {
         FLAGS_enable_migration,
         FLAGS_use_stream_groups,
         std::move(alpns),
-        FLAGS_connect_only);
+        FLAGS_connect_only,
+        FLAGS_client_cert_path,
+        FLAGS_client_key_path);
     client.start(FLAGS_token);
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
