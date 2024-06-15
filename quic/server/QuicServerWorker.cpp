@@ -666,9 +666,12 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->setCongestionControllerFactory(ccFactory_);
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
     if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL3) {
-      // Use twice the default pacing gain to make BBRv2's startup behavior
-      // similar to BBRv1's.
-      transportSettings_.ccaConfig.overrideStartupPacingGain = 2 * 2.89;
+      // Override BBRv1 with BBRv2 for the experimental version.
+      if (transportSettings_.defaultCongestionController ==
+          CongestionControlType::BBR) {
+        transportSettings_.defaultCongestionController =
+            CongestionControlType::BBR2;
+      }
     }
 
     auto transportSettings = transportSettingsOverrideFn_

@@ -354,7 +354,7 @@ enum class QuicVersion : uint32_t {
   MVFST_ALIAS = 0xfaceb010,
   MVFST_INVALID = 0xfaceb00f,
   MVFST_EXPERIMENTAL2 = 0xfaceb011, // Experimental alias for MVFST
-  // MVFST_EXPERIMENTAL3 is used to apply a 2x pace scaling for BBRv2
+  // MVFST_EXPERIMENTAL3 is used to default to BBRv2 instead of BBRv1.
   MVFST_EXPERIMENTAL3 = 0xfaceb013, // Experimental alias for MVFST
 };
 
