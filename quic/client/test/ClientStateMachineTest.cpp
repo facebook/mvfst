@@ -45,10 +45,10 @@ const CachedServerTransportParameters kParams{
     initialMaxStreamDataUni,
     initialMaxStreamsBidi,
     initialMaxStreamsUni,
-    knobFrameSupport,
-    ackReceiveTimestampsEnabled,
     maxReceiveTimestampsPerAck,
-    ackReceiveTimestampsExponent};
+    ackReceiveTimestampsExponent,
+    knobFrameSupport,
+    ackReceiveTimestampsEnabled};
 } // namespace
 
 class ClientStateMachineTest : public Test {
