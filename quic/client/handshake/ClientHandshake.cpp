@@ -42,7 +42,10 @@ void ClientHandshake::connect(
         cachedServerTransportParams->initialMaxStreamDataUni,
         cachedServerTransportParams->initialMaxStreamsBidi,
         cachedServerTransportParams->initialMaxStreamsUni,
-        cachedServerTransportParams->knobFrameSupport);
+        cachedServerTransportParams->knobFrameSupport,
+        cachedServerTransportParams->ackReceiveTimestampsEnabled,
+        cachedServerTransportParams->maxReceiveTimestampsPerAck,
+        cachedServerTransportParams->receiveTimestampsExponent);
     updateTransportParamsFromCachedEarlyParams(
         *conn_, *cachedServerTransportParams);
   }

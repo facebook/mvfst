@@ -738,7 +738,16 @@ void QuicClientTransport::processUdpPacketData(
             conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
             maxStreamsBidi.value_or(0),
             maxStreamsUni.value_or(0),
-            conn_->peerAdvertisedKnobFrameSupport);
+            conn_->peerAdvertisedKnobFrameSupport,
+            conn_->maybePeerAckReceiveTimestampsConfig.has_value(),
+            conn_->maybePeerAckReceiveTimestampsConfig
+                ? conn_->maybePeerAckReceiveTimestampsConfig
+                      ->maxReceiveTimestampsPerAck
+                : 0,
+            conn_->maybePeerAckReceiveTimestampsConfig
+                ? conn_->maybePeerAckReceiveTimestampsConfig
+                      ->receiveTimestampsExponent
+                : 3);
 
         if (clientConn_->zeroRttRejected.has_value() &&
             *clientConn_->zeroRttRejected) {

@@ -154,7 +154,10 @@ void cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxStreamDataUni,
     uint64_t peerAdvertisedInitialMaxStreamsBidi,
     uint64_t peerAdvertisedInitialMaxStreamUni,
-    bool peerAdvertisedKnobFrameSupport);
+    bool peerAdvertisedKnobFrameSupport,
+    bool peerAdvertisedAckReceiveTimestampsEnabled,
+    uint64_t peerAdvertisedMaxRecvTimestampsPerAck,
+    uint64_t peerAdvertisedReceiveTimestampsExponent);
 
 CachedServerTransportParameters getServerCachedTransportParameters(
     const QuicClientConnectionState& conn);

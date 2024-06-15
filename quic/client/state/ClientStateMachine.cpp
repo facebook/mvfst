@@ -281,7 +281,10 @@ void cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxStreamDataUni,
     uint64_t peerAdvertisedInitialMaxStreamsBidi,
     uint64_t peerAdvertisedInitialMaxStreamUni,
-    bool peerAdvertisedKnobFrameSupport) {
+    bool peerAdvertisedKnobFrameSupport,
+    bool peerAdvertisedAckReceiveTimestampsEnabled,
+    uint64_t peerAdvertisedMaxReceiveTimestampsPerAck,
+    uint64_t peerAdvertisedReceiveTimestampsExponent) {
   conn.serverInitialParamsSet_ = true;
   conn.peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
   conn.peerAdvertisedInitialMaxStreamDataBidiLocal =
@@ -294,6 +297,19 @@ void cacheServerInitialParams(
       peerAdvertisedInitialMaxStreamsBidi;
   conn.peerAdvertisedInitialMaxStreamsUni = peerAdvertisedInitialMaxStreamUni;
   conn.peerAdvertisedKnobFrameSupport = peerAdvertisedKnobFrameSupport;
+
+  if (peerAdvertisedAckReceiveTimestampsEnabled) {
+    conn.maybePeerAckReceiveTimestampsConfig.assign(
+        {std::min(
+             static_cast<uint8_t>(peerAdvertisedMaxReceiveTimestampsPerAck),
+             static_cast<uint8_t>(
+                 conn.transportSettings.maxReceiveTimestampsPerAckStored)),
+         std::max(
+             static_cast<uint8_t>(peerAdvertisedReceiveTimestampsExponent),
+             static_cast<uint8_t>(0))});
+  } else {
+    conn.maybePeerAckReceiveTimestampsConfig.clear();
+  }
 }
 
 CachedServerTransportParameters getServerCachedTransportParameters(
@@ -316,6 +332,14 @@ CachedServerTransportParameters getServerCachedTransportParameters(
   transportParams.initialMaxStreamsUni =
       conn.peerAdvertisedInitialMaxStreamsUni;
   transportParams.knobFrameSupport = conn.peerAdvertisedKnobFrameSupport;
+  transportParams.ackReceiveTimestampsEnabled =
+      conn.maybePeerAckReceiveTimestampsConfig.has_value();
+  if (conn.maybePeerAckReceiveTimestampsConfig) {
+    transportParams.maxReceiveTimestampsPerAck =
+        conn.maybePeerAckReceiveTimestampsConfig->maxReceiveTimestampsPerAck;
+    transportParams.receiveTimestampsExponent =
+        conn.maybePeerAckReceiveTimestampsConfig->receiveTimestampsExponent;
+  }
 
   return transportParams;
 }
@@ -337,5 +361,17 @@ void updateTransportParamsFromCachedEarlyParams(
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       transportParams.initialMaxStreamsUni);
   conn.peerAdvertisedKnobFrameSupport = transportParams.knobFrameSupport;
+  if (transportParams.ackReceiveTimestampsEnabled) {
+    conn.maybePeerAckReceiveTimestampsConfig.assign(
+        {std::min(
+             static_cast<uint8_t>(transportParams.maxReceiveTimestampsPerAck),
+             static_cast<uint8_t>(
+                 conn.transportSettings.maxReceiveTimestampsPerAckStored)),
+         std::max(
+             static_cast<uint8_t>(transportParams.receiveTimestampsExponent),
+             static_cast<uint8_t>(0))});
+  } else {
+    conn.maybePeerAckReceiveTimestampsConfig.clear();
+  }
 }
 } // namespace quic
