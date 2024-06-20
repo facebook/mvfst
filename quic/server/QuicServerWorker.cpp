@@ -1563,17 +1563,20 @@ size_t QuicServerWorker::SourceIdentityHash::operator()(
   // Zero initialization is intentional here.
   std::array<unsigned char, kKeySize> key{};
 
-  struct sockaddr_storage* storage =
-      reinterpret_cast<struct sockaddr_storage*>(key.data());
+  struct sockaddr_storage storage {};
   const auto& sockaddr = sid.first;
-  sockaddr.getAddress(storage);
+  sockaddr.getAddress(&storage);
+  memcpy(key.data(), &storage, sizeof(struct sockaddr_storage));
 
   unsigned char* connid = key.data() + sizeof(struct sockaddr_storage);
   memcpy(connid, sid.second.data(), sid.second.size());
 
-  uint16_t* port = reinterpret_cast<uint16_t*>(
-      key.data() + sizeof(struct sockaddr_storage) + kMaxConnectionIdSize);
-  *port = sid.first.getPort();
+  uint16_t port;
+  port = sid.first.getPort();
+  memcpy(
+      key.data() + sizeof(struct sockaddr_storage) + kMaxConnectionIdSize,
+      &port,
+      sizeof(uint16_t));
 
   return siphash::siphash24(key.data(), key.size(), &hashKey);
 }
