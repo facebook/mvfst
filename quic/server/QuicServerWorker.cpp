@@ -665,14 +665,6 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     }
     trans->setCongestionControllerFactory(ccFactory_);
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
-    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL3) {
-      // Override BBRv1 with BBRv2 for the experimental version.
-      if (transportSettings_.defaultCongestionController ==
-          CongestionControlType::BBR) {
-        transportSettings_.defaultCongestionController =
-            CongestionControlType::BBR2;
-      }
-    }
 
     auto transportSettings = transportSettingsOverrideFn_
         ? transportSettingsOverrideFn_(
