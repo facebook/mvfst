@@ -365,11 +365,14 @@ void QuicServerTransport::unbindConnection() {
     routingCb_ = nullptr;
     CHECK(conn_->clientChosenDestConnectionId);
     if (conn_->serverConnectionId) {
+      auto connectionIds =
+          conn_->selfConnectionIds; // We pass a copy as this transport might be
+                                    // deleted.
       routingCb->onConnectionUnbound(
           this,
           std::make_pair(
               getOriginalPeerAddress(), *conn_->clientChosenDestConnectionId),
-          conn_->selfConnectionIds);
+          connectionIds);
     }
   }
 }

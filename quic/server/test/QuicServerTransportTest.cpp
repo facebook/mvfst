@@ -1540,6 +1540,35 @@ TEST_F(QuicServerTransportTest, UnboundConnection) {
   server->setRoutingCallback(nullptr);
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    CallbackParametersAccessibleAfterTransportDestruction) {
+  // Ensures callbacks cannot access destructed objects in case the underlying
+  // transport is destroyed.
+  auto* serverPtr = server.get();
+  std::set<std::string> possibleLocalhostQual{"127.0.0.1", "::1"};
+  auto onConnectionUnboundCallback =
+      [serverOwner = std::move(server), &possibleLocalhostQual](
+          QuicServerTransport* /*transport*/,
+          const QuicServerTransport::SourceIdentity& source,
+          const std::vector<ConnectionIdData>&
+              connectionIdData) mutable noexcept {
+        serverOwner.reset(); // Destroy the transport.
+        EXPECT_EQ(connectionIdData.size(), 1);
+        EXPECT_TRUE(
+            possibleLocalhostQual.find(source.first.getFullyQualified()) !=
+            possibleLocalhostQual.end());
+      };
+  server = nullptr;
+
+  {
+    EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _))
+        .Times(1)
+        .WillOnce(onConnectionUnboundCallback);
+    serverPtr->unbindConnection();
+  }
+}
+
 TEST_F(QuicServerTransportTest, DestroyWithoutClosing) {
   StreamId streamId = server->createBidirectionalStream().value();
 
