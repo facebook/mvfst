@@ -51,8 +51,8 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":quic_timer",
-        "//folly/experimental:timerfd",
         "//folly/io/async:async_base",
+        "//folly/io/async:timerfd",
     ],
 )
 

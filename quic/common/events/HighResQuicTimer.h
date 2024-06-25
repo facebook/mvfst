@@ -14,7 +14,7 @@
 
 #if !FOLLY_MOBILE
 #define QUIC_USE_TIMERFD_TIMEOUT_MGR
-#include <folly/experimental/STTimerFDTimeoutManager.h>
+#include <folly/io/async/STTimerFDTimeoutManager.h>
 #endif
 
 namespace quic {
