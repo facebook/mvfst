@@ -710,18 +710,24 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
 
 void Cubic::onEcnCongestionEvent(const AckEvent& ack) {
   if (conn_.ecnState == ECNState::ValidatedL4S && conn_.ecnL4sTracker &&
-      conn_.ecnL4sTracker->getNormalizedL4sWeight() >
+      conn_.ecnL4sTracker->getL4sWeight() >
           conn_.transportSettings.ccaConfig.l4sCETarget) {
     if (ack.largestNewlyAckedPacketSentTime > l4sCwndReducedTimestamp_) {
       CHECK(conn_.ecnL4sTracker);
       auto distanceToTarget = conn_.ecnL4sTracker->getNormalizedL4sWeight() -
           conn_.transportSettings.ccaConfig.l4sCETarget;
       ssthresh_ = (1.0 - distanceToTarget / 2) * cwndBytes_;
-      cubicReduction(ack.ackTime);
+
+      steadyState_.lastReductionTime = ack.ackTime;
+      steadyState_.timeToOrigin = 0.0;
+      steadyState_.lastMaxCwndBytes = ssthresh_;
+      steadyState_.originPoint = ssthresh_;
+      steadyState_.estRenoCwnd = ssthresh_;
+      cwndBytes_ = ssthresh_;
       l4sCwndReducedTimestamp_ = ack.ackTime;
     }
-    lastCECount_ = ack.ecnCECount;
   }
+  lastCECount_ = ack.ecnCECount;
 }
 
 void Cubic::getStats(CongestionControllerStats& stats) const {

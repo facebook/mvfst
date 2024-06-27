@@ -99,7 +99,7 @@ struct CongestionControlConfig {
   // The target fraction of packets to be marked with CE per-RTT when l4s is
   // used This helps accommodate minor packet bursts that can be caused by pacer
   // bursts
-  float l4sCETarget{0.02f};
+  float l4sCETarget{0.0f};
 };
 
 struct DatagramConfig {
