@@ -249,7 +249,7 @@ TEST(ServerStateMachineTest, TestProcessMinAckDelayNotSet) {
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
   processClientInitialParams(serverConn, clientTransportParams);
-  EXPECT_FALSE(serverConn.peerAdvertisedKnobFrameSupport);
+  EXPECT_FALSE(serverConn.peerMinAckDelay.has_value());
 }
 
 TEST(ServerStateMachineTest, TestProcessMinAckDelaySet) {
@@ -334,6 +334,35 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
       Not(Contains(testing::Field(
           &TransportParameter::parameter,
           testing::Eq(TransportParameterId::knob_frames_supported)))));
+}
+
+TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitNotSet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  // Check that the value is the default specified in RFC9000 when the transport
+  // parameter is absent
+  // https://datatracker.ietf.org/doc/html/rfc9000#section-18.2-6.2.1
+  EXPECT_EQ(serverConn.peerActiveConnectionIdLimit, 2);
+}
+
+TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitSet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(encodeIntegerParameter(
+      TransportParameterId::active_connection_id_limit,
+      kMaxActiveConnectionIdLimit + 1));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  // This tests for max + 1. The maximum value will be enforced on sending the
+  // new connection id frames, not in parsing the parameters.
+  EXPECT_EQ(
+      serverConn.peerActiveConnectionIdLimit, kMaxActiveConnectionIdLimit + 1);
 }
 
 struct advertisedMaxStreamGroupstestStruct {
