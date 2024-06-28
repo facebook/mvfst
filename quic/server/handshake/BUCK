@@ -93,6 +93,7 @@ mvfst_cpp_library(
         "StatelessResetGenerator.h",
     ],
     deps = [
+        "//fizz/backend:openssl",
         "//folly:range",
     ],
     exported_deps = [

@@ -7,6 +7,7 @@
 
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
+#include <fizz/backend/openssl/OpenSSL.h>
 #include <folly/Range.h>
 
 namespace {
@@ -19,7 +20,7 @@ StatelessResetGenerator::StatelessResetGenerator(
     StatelessResetSecret secret,
     const std::string& addressStr)
     : addressStr_(std::move(addressStr)),
-      hkdf_(fizz::HkdfImpl::create<fizz::Sha256>()) {
+      hkdf_(fizz::openssl::createHkdf<fizz::Sha256>()) {
   extractedSecret_ = hkdf_.extract(kSalt, folly::range(secret));
 }
 
