@@ -12,5 +12,7 @@ clang-analyzer-*,
 modernize-*,
 performance-*,
 -modernize-use-trailing-return-type,
+cppcoreguidelines-pro-type-member-init,
+cppcoreguidelines-init-variables,
 '
 ...
