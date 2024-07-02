@@ -19,17 +19,7 @@ namespace quic {
 class BatchWriter {
  public:
   BatchWriter() = default;
-  virtual ~BatchWriter() {
-    if (fd_ >= 0) {
-      ::close(fd_);
-    }
-  }
-
-  void setSock(QuicAsyncUDPSocket* sock);
-
-  FOLLY_NODISCARD QuicEventBase* evb();
-
-  int getAndResetFd();
+  virtual ~BatchWriter() = default;
 
   // returns true if the batch does not contain any buffers
   virtual bool empty() const = 0;
@@ -59,10 +49,6 @@ class BatchWriter {
   virtual ssize_t write(
       QuicAsyncUDPSocket& sock,
       const folly::SocketAddress& address) = 0;
-
- protected:
-  QuicEventBase* evb_{nullptr};
-  int fd_{-1};
 };
 
 class IOBufBatchWriter : public BatchWriter {

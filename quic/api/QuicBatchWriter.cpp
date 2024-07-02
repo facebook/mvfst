@@ -13,24 +13,6 @@ bool BatchWriter::needsFlush(size_t /*unused*/) {
   return false;
 }
 
-void BatchWriter::setSock(QuicAsyncUDPSocket* sock) {
-  if (sock && !evb_) {
-    fd_ = ::dup(sock->getFD());
-    evb_ = sock->getEventBase().get();
-  }
-}
-
-QuicEventBase* BatchWriter::evb() {
-  return evb_;
-}
-
-int BatchWriter::getAndResetFd() {
-  auto ret = fd_;
-  fd_ = -1;
-
-  return ret;
-}
-
 // SinglePacketBatchWriter
 void SinglePacketBatchWriter::reset() {
   buf_.reset();

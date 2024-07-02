@@ -235,8 +235,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t size,
     const folly::SocketAddress& addr,
-    QuicAsyncUDPSocket* sock) {
-  setSock(sock);
+    QuicAsyncUDPSocket* /*unused*/) {
   currSize_ += size;
 
   // insert the entry if not present
