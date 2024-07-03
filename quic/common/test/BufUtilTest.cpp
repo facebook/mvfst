@@ -561,3 +561,61 @@ TEST(BufWriterTest, TwoWriters) {
   EXPECT_EQ(15, outputBuffer->length());
   EXPECT_EQ("Destroyer Saint", reader.readFixedString(outputBuffer->length()));
 }
+
+TEST(BufWriterTest, InsertSingleByteChainedRange) {
+  auto testBuffer = folly::IOBuf::create(100);
+  BufWriter writer(*testBuffer, 100);
+  auto inputBuffer =
+      folly::IOBuf::copyBuffer("Steady on dreaming, I sleepwalk");
+  auto len = inputBuffer->computeChainDataLength();
+  ChainedByteRangeHead cbrh(inputBuffer);
+  writer.insert(&cbrh);
+  folly::io::Cursor reader(testBuffer.get());
+  EXPECT_EQ(
+      inputBuffer->computeChainDataLength(),
+      testBuffer->computeChainDataLength());
+  EXPECT_EQ(inputBuffer->to<string>(), reader.readFixedString(len));
+}
+
+TEST(BufWriterTest, InsertZeroLen) {
+  auto testBuffer = folly::IOBuf::create(100);
+  BufWriter writer(*testBuffer, 100);
+  auto inputBuffer = folly::IOBuf::copyBuffer("");
+  ChainedByteRangeHead cbrh(inputBuffer);
+  writer.insert(&cbrh);
+  folly::io::Cursor reader(testBuffer.get());
+  EXPECT_EQ(testBuffer->computeChainDataLength(), 0);
+}
+
+TEST(BufWriterTest, InsertSingleByteChainedRangeWithLimit) {
+  auto testBuffer = folly::IOBuf::create(100);
+  BufWriter writer(*testBuffer, 100);
+  auto inputBuffer =
+      folly::IOBuf::copyBuffer("Steady on dreaming, I sleepwalk");
+  ChainedByteRangeHead cbrh(inputBuffer);
+  writer.insert(&cbrh, 10);
+  folly::io::Cursor reader(testBuffer.get());
+  EXPECT_EQ(testBuffer->computeChainDataLength(), 10);
+  EXPECT_EQ("Steady on ", reader.readFixedString(10));
+}
+
+TEST(BufWriterTest, InsertChainByteChainedRange) {
+  auto testBuffer = folly::IOBuf::create(1000);
+  BufWriter writer(*testBuffer, 1000);
+  auto inputBuffer =
+      folly::IOBuf::copyBuffer("Cause I lost you and now what am i to do?");
+  inputBuffer->prependChain(
+      folly::IOBuf::copyBuffer(" Can't believe that we are through."));
+  inputBuffer->prependChain(
+      folly::IOBuf::copyBuffer(" While the memory of you linger like a song."));
+  auto len = inputBuffer->computeChainDataLength();
+  ChainedByteRangeHead cbrh(inputBuffer);
+  writer.insert(&cbrh);
+  folly::io::Cursor reader(testBuffer.get());
+  EXPECT_EQ(testBuffer->computeChainDataLength(), len);
+  EXPECT_EQ(
+      "Cause I lost you and now what am i to do?"
+      " Can't believe that we are through."
+      " While the memory of you linger like a song.",
+      reader.readFixedString(len));
+}

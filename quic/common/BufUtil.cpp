@@ -170,6 +170,14 @@ void BufWriter::insert(const folly::IOBuf* data, size_t limit) {
   copy(data, limit);
 }
 
+void BufWriter::insert(const ChainedByteRangeHead* data) {
+  insert(data, data->chainLength());
+}
+
+void BufWriter::insert(const ChainedByteRangeHead* data, size_t limit) {
+  copy(&data->head, limit);
+}
+
 void BufWriter::append(size_t len) {
   iobuf_.append(len);
   written_ += len;
@@ -193,6 +201,27 @@ void BufWriter::copy(const folly::IOBuf* data, size_t limit) {
       break;
     }
     curBuf = curBuf->next();
+  } while (remaining && curBuf != data);
+  CHECK_GE(limit, totalInserted);
+}
+
+void BufWriter::copy(const ChainedByteRange* data, size_t limit) {
+  if (!limit) {
+    return;
+  }
+  sizeCheck(limit);
+  size_t totalInserted = 0;
+  const ChainedByteRange* curBuf = data;
+  auto remaining = limit;
+  do {
+    auto lenToCopy = std::min(curBuf->length(), remaining);
+    push(curBuf->getRange().begin(), lenToCopy);
+    totalInserted += lenToCopy;
+    remaining -= lenToCopy;
+    if (lenToCopy < curBuf->length()) {
+      break;
+    }
+    curBuf = curBuf->getNext();
   } while (remaining && curBuf != data);
   CHECK_GE(limit, totalInserted);
 }
