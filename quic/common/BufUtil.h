@@ -6,10 +6,8 @@
  */
 
 #pragma once
-#include <folly/Range.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
-#include <quic/common/ChainedByteRange.h>
 
 namespace quic {
 
@@ -123,9 +121,6 @@ class BufWriter {
   void insert(const folly::IOBuf* data);
   void insert(const folly::IOBuf* data, size_t limit);
 
-  void insert(const ChainedByteRangeHead* data);
-  void insert(const ChainedByteRangeHead* data, size_t limit);
-
   void append(size_t len);
 
  private:
@@ -140,7 +135,6 @@ class BufWriter {
   }
 
   void copy(const folly::IOBuf* data, size_t limit);
-  void copy(const ChainedByteRange* data, size_t limit);
 
  private:
   folly::IOBuf& iobuf_;
