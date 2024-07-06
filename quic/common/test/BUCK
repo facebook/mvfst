@@ -59,18 +59,6 @@ cpp_unittest(
     ],
 )
 
-cpp_unittest(
-    name = "ChainedByteRangeTest",
-    srcs = [
-        "ChainedByteRangeTest.cpp",
-    ],
-    deps = [
-        "//folly:string",
-        "//folly/io:iobuf",
-        "//quic/common:chained_byte_range",
-    ],
-)
-
 mvfst_cpp_library(
     name = "test_client_utils",
     headers = [
