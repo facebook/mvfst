@@ -55,6 +55,7 @@ target_link_libraries(
 add_library(
   mvfst_bufutil
   BufUtil.cpp
+  ChainedByteRange.cpp
 )
 
 set_property(TARGET mvfst_bufutil PROPERTY VERSION ${PACKAGE_VERSION})
