@@ -65,11 +65,14 @@ mvfst_cpp_library(
     name = "buf_util",
     srcs = [
         "BufUtil.cpp",
+        "ChainedByteRange.cpp",
     ],
     headers = [
         "BufUtil.h",
+        "ChainedByteRange.h",
     ],
     exported_deps = [
+        "//folly:range",
         "//folly/io:iobuf",
         "//quic:constants",
     ],
