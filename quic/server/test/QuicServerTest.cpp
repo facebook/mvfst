@@ -139,21 +139,26 @@ class QuicServerWorkerTest : public Test {
   }
 
   void SetUp() override {
+    TransportSettings settings;
+    settings.statelessResetTokenSecret = getRandSecret();
+    tokenSecret_ = getRandSecret();
+    settings.retryTokenSecret = tokenSecret_;
+
+    initializeWorker(settings);
+  }
+
+  void initializeWorker(const TransportSettings& settings) {
     fakeAddress_ = folly::SocketAddress("111.111.111.111", 44444);
     auto sock =
         std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
     DCHECK(sock->getEventBase());
     socketPtr_ = sock.get();
     workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-    worker_ = std::make_unique<QuicServerWorker>(workerCb_);
-    auto quicStats = std::make_unique<NiceMock<MockQuicStats>>();
-    TransportSettings settings;
-    settings.statelessResetTokenSecret = getRandSecret();
-    tokenSecret_ = getRandSecret();
-    settings.retryTokenSecret = tokenSecret_;
+
+    worker_ = std::make_unique<QuicServerWorker>(workerCb_, settings);
     worker_->setSupportedVersions({QuicVersion::MVFST});
+    auto quicStats = std::make_unique<NiceMock<MockQuicStats>>();
     worker_->setTransportStatsCallback(std::move(quicStats));
-    worker_->setTransportSettings(settings);
     worker_->setSocket(std::move(sock));
     worker_->setWorkerId(42);
     worker_->setProcessId(ProcessId::ONE);
@@ -1228,12 +1233,14 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
 }
 
 TEST_F(QuicServerWorkerTest, AssignBufAccessor) {
-  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
-  auto connId = getTestConnectionId(hostId_);
   TransportSettings transportSettings;
   transportSettings.dataPathType = DataPathType::ContinuousMemory;
   transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
-  worker_->setTransportSettings(transportSettings);
+  initializeWorker(transportSettings);
+
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto connId = getTestConnectionId(hostId_);
+
   EXPECT_CALL(*transport_, setBufAccessor(_))
       .Times(1)
       .WillOnce(Invoke(
@@ -2038,11 +2045,7 @@ class QuicServerTest : public Test {
   void SetUp() override {
     auto factory = std::make_unique<MockQuicServerTransportFactory>();
     factory_ = factory.get();
-    server_ = QuicServer::createQuicServer();
-    server_->setQuicServerTransportFactory(std::move(factory));
-    server_->setFizzContext(quic::test::createServerCtx());
-    server_->setHostId(serverHostId_);
-    server_->setConnectionIdVersion(quic::ConnectionIdVersion::V2);
+
     transportSettings_.advertisedInitialConnectionFlowControlWindow =
         kDefaultConnectionFlowControlWindow * 2;
     transportSettings_.advertisedInitialBidiLocalStreamFlowControlWindow =
@@ -2052,7 +2055,12 @@ class QuicServerTest : public Test {
     transportSettings_.advertisedInitialUniStreamFlowControlWindow =
         kDefaultStreamFlowControlWindow * 2;
     transportSettings_.statelessResetTokenSecret = getRandSecret();
-    server_->setTransportSettings(transportSettings_);
+
+    server_ = QuicServer::createQuicServer(transportSettings_);
+    server_->setQuicServerTransportFactory(std::move(factory));
+    server_->setFizzContext(quic::test::createServerCtx());
+    server_->setHostId(serverHostId_);
+    server_->setConnectionIdVersion(quic::ConnectionIdVersion::V2);
     server_->setConnectionIdAlgoFactory(
         std::make_unique<DefaultConnectionIdAlgoFactory>());
   }
@@ -2406,10 +2414,9 @@ class QuicServerTakeoverTest : public Test {
     } else {
       newFactory_ = factory.get();
     }
-    server = QuicServer::createQuicServer();
+    server = QuicServer::createQuicServer(transportSettings_);
     server->setQuicServerTransportFactory(std::move(factory));
     server->setFizzContext(quic::test::createServerCtx());
-    server->setTransportSettings(transportSettings_);
     server->setProcessId(id);
   }
 

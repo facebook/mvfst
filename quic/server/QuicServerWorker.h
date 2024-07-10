@@ -45,6 +45,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   static int getUnfinishedHandshakeCount();
 
  private:
+  static TransportSettings validateTransportSettings(
+      TransportSettings transportSettings);
+
   struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
     static auto constexpr kBuffSize = 1024;
 
@@ -175,6 +178,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   explicit QuicServerWorker(
       std::shared_ptr<WorkerCallback> callback,
+      TransportSettings transportSettings = TransportSettings(),
       SetEventCallback ec = SetEventCallback::NONE);
 
   ~QuicServerWorker() override;
@@ -315,8 +319,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   void setFizzContext(
       std::shared_ptr<const fizz::server::FizzServerContext> ctx);
-
-  void setTransportSettings(TransportSettings transportSettings);
 
   /**
    * If true, start to reject any new connection during handshake
@@ -648,7 +650,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   bool shutdown_{false};
   std::vector<QuicVersion> supportedVersions_;
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
-  TransportSettings transportSettings_;
+  const TransportSettings transportSettings_;
   // Same value as transportSettings_.numGROBuffers_ if the kernel
   // supports GRO. otherwise 1
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};

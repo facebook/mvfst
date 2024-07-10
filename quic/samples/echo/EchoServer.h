@@ -83,10 +83,22 @@ class EchoServer {
       bool enableMigration = true,
       bool enableStreamGroups = false,
       bool disableRtx = false)
-      : host_(host),
-        port_(port),
-        server_(QuicServer::createQuicServer()),
-        alpns_(std::move(alpns)) {
+      : host_(host), port_(port), alpns_(std::move(alpns)) {
+    TransportSettings settings;
+    settings.datagramConfig.enabled = useDatagrams;
+    settings.selfActiveConnectionIdLimit = activeConnIdLimit;
+    settings.disableMigration = !enableMigration;
+    if (enableStreamGroups) {
+      settings.notifyOnNewStreamsExplicitly = true;
+      settings.advertisedMaxStreamGroups = 1024;
+    }
+    if (disableRtx) {
+      if (!enableStreamGroups) {
+        LOG(FATAL) << "disable_rtx requires use_stream_groups to be enabled";
+      }
+    }
+    server_ = QuicServer::createQuicServer(std::move(settings));
+
     server_->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>(useDatagrams, disableRtx));
     server_->setTransportStatsCallbackFactory(
@@ -95,21 +107,6 @@ class EchoServer {
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     serverCtx->setSupportedAlpns(std::move(alpns_));
     server_->setFizzContext(serverCtx);
-
-    auto settingsCopy = server_->getTransportSettings();
-    settingsCopy.datagramConfig.enabled = useDatagrams;
-    settingsCopy.selfActiveConnectionIdLimit = activeConnIdLimit;
-    settingsCopy.disableMigration = !enableMigration;
-    if (enableStreamGroups) {
-      settingsCopy.notifyOnNewStreamsExplicitly = true;
-      settingsCopy.advertisedMaxStreamGroups = 1024;
-    }
-    if (disableRtx) {
-      if (!enableStreamGroups) {
-        LOG(FATAL) << "disable_rtx requires use_stream_groups to be enabled";
-      }
-    }
-    server_->setTransportSettings(std::move(settingsCopy));
   }
 
   ~EchoServer() {

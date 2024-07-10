@@ -12,20 +12,16 @@
 namespace quic {
 
 QuicAsyncTransportServer::QuicAsyncTransportServer(
-    QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook)
+    QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook,
+    quic::TransportSettings ts)
     : asyncTransportHook_(std::move(asyncTransportHook)),
-      quicServer_(quic::QuicServer::createQuicServer()) {
+      quicServer_(quic::QuicServer::createQuicServer(std::move(ts))) {
   CHECK(asyncTransportHook_);
 }
 
 void QuicAsyncTransportServer::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
   fizzCtx_ = std::move(ctx);
-}
-
-void QuicAsyncTransportServer::setTransportSettings(
-    const quic::TransportSettings& ts) {
-  quicServer_->setTransportSettings(ts);
 }
 
 void QuicAsyncTransportServer::start(

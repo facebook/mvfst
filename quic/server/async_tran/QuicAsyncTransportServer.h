@@ -21,7 +21,8 @@ namespace quic {
 class QuicAsyncTransportServer {
  public:
   explicit QuicAsyncTransportServer(
-      QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook);
+      QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook,
+      quic::TransportSettings ts = quic::TransportSettings());
   virtual ~QuicAsyncTransportServer() = default;
 
   void setFizzContext(
@@ -38,8 +39,6 @@ class QuicAsyncTransportServer {
   }
 
   void shutdown();
-
-  void setTransportSettings(const quic::TransportSettings& ts);
 
  protected:
   void createAcceptors(std::vector<folly::EventBase*>& evbs);

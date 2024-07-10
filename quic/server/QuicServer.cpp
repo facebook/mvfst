@@ -60,7 +60,10 @@ void unownedEvbDeleter(folly::IOExecutor*) {}
 //
 namespace quic {
 
-QuicServer::QuicServer() : mainThreadId_(std::this_thread::get_id()) {
+QuicServer::QuicServer(TransportSettings transportSettings)
+    : transportSettings_(
+          validateTransportSettings(std::move(transportSettings))),
+      mainThreadId_(std::this_thread::get_id()) {
 #ifdef _WIN32
   listenerSocketFactory_ = std::make_unique<QuicReusePortUDPSocketFactory>(
       true /* reusePort*/, true /* reuseAddr */);
@@ -189,13 +192,6 @@ void QuicServer::initializeImpl(
   CHECK(shutdown_);
   shutdown_ = false;
 
-  // setting default stateless reset token if not set
-  if (!transportSettings_.statelessResetTokenSecret) {
-    std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
-    folly::Random::secureRandom(secret.data(), secret.size());
-    transportSettings_.statelessResetTokenSecret = secret;
-  }
-
   // it the connid algo factory is not set, use default impl
   if (!connIdAlgoFactory_) {
     connIdAlgoFactory_ = std::make_unique<DefaultConnectionIdAlgoFactory>();
@@ -239,11 +235,10 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   } else {
     sec = QuicServerWorker::SetEventCallback::NONE;
   }
-  auto worker =
-      std::make_unique<QuicServerWorker>(this->shared_from_this(), sec);
+  auto worker = std::make_unique<QuicServerWorker>(
+      this->shared_from_this(), transportSettings_, sec);
   worker->setNewConnectionSocketFactory(socketFactory_.get());
   worker->setSupportedVersions(supportedVersions_);
-  worker->setTransportSettings(transportSettings_);
   worker->rejectNewConnections(rejectNewConnections_);
   worker->setProcessId(processId_);
   worker->setHostId(hostId_);
@@ -632,14 +627,6 @@ const TransportSettings& QuicServer::getTransportSettings() const noexcept {
   return transportSettings_;
 }
 
-void QuicServer::setTransportSettings(TransportSettings transportSettings) {
-  checkRunningInThread(mainThreadId_);
-  transportSettings_ = transportSettings;
-  runOnAllWorkers([transportSettings](auto worker) mutable {
-    worker->setTransportSettings(transportSettings);
-  });
-}
-
 void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {
   rejectNewConnections_ = rejectFn;
   runOnAllWorkers([rejectFn](auto worker) mutable {
@@ -839,6 +826,18 @@ void QuicServer::setSocketOptions(
 void QuicServer::setBindV6Only(bool bindV6Only) {
   checkRunningInThread(mainThreadId_);
   bindOptions_.bindV6Only = bindV6Only;
+}
+
+// STATIC
+TransportSettings QuicServer::validateTransportSettings(
+    TransportSettings transportSettings) {
+  // setting default stateless reset token if not set
+  if (!transportSettings.statelessResetTokenSecret) {
+    std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
+    folly::Random::secureRandom(secret.data(), secret.size());
+    transportSettings.statelessResetTokenSecret = secret;
+  }
+  return transportSettings;
 }
 
 } // namespace quic

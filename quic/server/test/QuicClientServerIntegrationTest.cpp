@@ -73,11 +73,10 @@ class ServerTransportParameters : public testing::Test {
 
   // start server with the transport settings that unit test can set accordingly
   void startServer() {
-    server_ = QuicServer::createQuicServer();
+    serverTs_.statelessResetTokenSecret = getRandSecret();
+    server_ = QuicServer::createQuicServer(serverTs_);
     // set server configs
     server_->setFizzContext(quic::test::createServerCtx());
-    serverTs_.statelessResetTokenSecret = getRandSecret();
-    server_->setTransportSettings(serverTs_);
     server_->setQuicServerTransportFactory(
         std::make_unique<QuicTransportFactory>());
     // start server
@@ -157,53 +156,51 @@ TEST_F(ServerTransportParameters, InvariantlyAdvertisedParameters) {
   client_.reset();
 }
 
-TEST_F(ServerTransportParameters, DatagramTest) {
-  // turn off datagram support to begin with
+TEST_F(ServerTransportParameters, DatagramTestDisabled) {
+  // turn off datagram support
   serverTs_.datagramConfig.enabled = false;
   startServer();
 
-  {
-    // create & connect client
-    client_ = createQuicClient();
-    clientConnect();
+  // create & connect client
+  client_ = createQuicClient();
+  clientConnect();
 
-    // validate no datagram support was advertised by server
-    auto clientConn =
-        dynamic_cast<const QuicClientConnectionState*>(client_->getState());
-    const auto& serverTransportParams =
-        clientConn->clientHandshakeLayer->getServerTransportParams();
-    CHECK(serverTransportParams.has_value());
+  // validate no datagram support was advertised by server
+  auto clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+  const auto& serverTransportParams =
+      clientConn->clientHandshakeLayer->getServerTransportParams();
+  CHECK(serverTransportParams.has_value());
 
-    auto param = getIntegerParameter(
-        TransportParameterId::max_datagram_frame_size,
-        serverTransportParams->parameters);
-    EXPECT_FALSE(param.has_value());
-    client_.reset();
-  }
+  auto param = getIntegerParameter(
+      TransportParameterId::max_datagram_frame_size,
+      serverTransportParams->parameters);
+  EXPECT_FALSE(param.has_value());
+  client_.reset();
+}
 
-  {
-    // now enable datagram support
-    serverTs_.datagramConfig.enabled = true;
-    server_->setTransportSettings(serverTs_);
+TEST_F(ServerTransportParameters, DatagramTestEnabled) {
+  // turn on datagram support
+  serverTs_.datagramConfig.enabled = true;
+  startServer();
 
-    // create & connect client
-    client_ = createQuicClient();
-    clientConnect();
+  // create & connect client
+  client_ = createQuicClient();
+  clientConnect();
 
-    // validate datagram support was advertised by server
-    auto clientConn =
-        dynamic_cast<const QuicClientConnectionState*>(client_->getState());
-    const auto& serverTransportParams =
-        clientConn->clientHandshakeLayer->getServerTransportParams();
-    CHECK(serverTransportParams.has_value());
+  // validate datagram support was advertised by server
+  auto clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+  const auto& serverTransportParams =
+      clientConn->clientHandshakeLayer->getServerTransportParams();
+  CHECK(serverTransportParams.has_value());
 
-    auto param = getIntegerParameter(
-        TransportParameterId::max_datagram_frame_size,
-        serverTransportParams->parameters);
-    CHECK(param.has_value());
-    // also validate value because why not
-    EXPECT_EQ(param.value(), kMaxDatagramFrameSize);
-  }
+  auto param = getIntegerParameter(
+      TransportParameterId::max_datagram_frame_size,
+      serverTransportParams->parameters);
+  CHECK(param.has_value());
+  // also validate value because why not
+  EXPECT_EQ(param.value(), kMaxDatagramFrameSize);
 }
 
 TEST_F(ServerTransportParameters, disableMigrationParam) {

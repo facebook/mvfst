@@ -118,24 +118,24 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<QuicServer> createServer(
       ProcessId processId,
       bool withRetryPacket = false) {
-    auto server = QuicServer::createQuicServer();
-    auto transportSettings = server->getTransportSettings();
+    quic::TransportSettings transportSettings;
+    transportSettings.zeroRttSourceTokenMatchingPolicy =
+        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+    std::array<uint8_t, kRetryTokenSecretLength> secret{};
+    folly::Random::secureRandom(secret.data(), secret.size());
+    transportSettings.retryTokenSecret = secret;
+    auto server = QuicServer::createQuicServer(transportSettings);
+
     auto statsFactory = std::make_unique<NiceMock<MockQuicStatsFactory>>();
     ON_CALL(*statsFactory, make()).WillByDefault(Invoke([&]() {
       auto newStatsCallback = std::make_unique<NiceMock<MockQuicStats>>();
       statsCallbacks_.push_back(newStatsCallback.get());
       return newStatsCallback;
     }));
-    transportSettings.zeroRttSourceTokenMatchingPolicy =
-        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
-    std::array<uint8_t, kRetryTokenSecretLength> secret;
-    folly::Random::secureRandom(secret.data(), secret.size());
-    transportSettings.retryTokenSecret = secret;
     if (withRetryPacket) {
       server->setRateLimit([]() { return 0u; }, 1s);
     }
     server->setTransportStatsCallbackFactory(std::move(statsFactory));
-    server->setTransportSettings(transportSettings);
     server->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>());
     server->setQuicUDPSocketFactory(

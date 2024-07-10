@@ -36,8 +36,10 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
           const quic::TransportSettings&,
           const folly::IPAddress&)>;
 
-  static std::shared_ptr<QuicServer> createQuicServer() {
-    return std::shared_ptr<QuicServer>(new QuicServer());
+  static std::shared_ptr<QuicServer> createQuicServer(
+      TransportSettings transportSettings = TransportSettings()) {
+    return std::shared_ptr<QuicServer>(
+        new QuicServer(std::move(transportSettings)));
   }
 
   ~QuicServer() override;
@@ -170,11 +172,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * Get transport settings.
    */
   const TransportSettings& getTransportSettings() const noexcept;
-
-  /**
-   * Set initial flow control settings for the connection.
-   */
-  void setTransportSettings(TransportSettings transportSettings);
 
   /**
    * Tells the server to start rejecting any new connection. The parameter
@@ -350,7 +347,10 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void getAllConnectionsStats(std::vector<QuicConnectionStats>& stats);
 
  private:
-  QuicServer();
+  explicit QuicServer(TransportSettings transportSettings);
+
+  static TransportSettings validateTransportSettings(
+      TransportSettings transportSettings);
 
   /**
    * Routes the given data for the given client to the correct worker that may
@@ -407,7 +407,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   std::atomic<bool> shutdown_{true};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
-  TransportSettings transportSettings_;
+  const TransportSettings transportSettings_;
   std::mutex startMutex_;
   std::atomic<bool> initialized_{false};
   std::atomic<bool> takeoverHandlerInitialized_{false};

@@ -449,15 +449,8 @@ class TPerfServer {
       bool overridePacketSize)
       : host_(host),
         port_(port),
-        acceptObserver_(std::make_unique<TPerfAcceptObserver>()),
-        server_(QuicServer::createQuicServer()) {
+        acceptObserver_(std::make_unique<TPerfAcceptObserver>()) {
     eventBase_.setName("tperf_server");
-    server_->setQuicServerTransportFactory(
-        std::make_unique<TPerfServerTransportFactory>(
-            blockSize, numStreams, maxBytesPerStream, dsrEnabled));
-    auto serverCtx = quic::test::createServerCtx();
-    serverCtx->setClock(std::make_shared<fizz::SystemClock>());
-    server_->setFizzContext(serverCtx);
     quic::TransportSettings settings;
     if (useInplaceWrite && gso) {
       settings.dataPathType = DataPathType::ContinuousMemory;
@@ -501,9 +494,16 @@ class TPerfServer {
     }
     settings.dscpValue = FLAGS_dscp;
 
+    server_ = QuicServer::createQuicServer(settings);
+    server_->setQuicServerTransportFactory(
+        std::make_unique<TPerfServerTransportFactory>(
+            blockSize, numStreams, maxBytesPerStream, dsrEnabled));
+    auto serverCtx = quic::test::createServerCtx();
+    serverCtx->setClock(std::make_shared<fizz::SystemClock>());
+    server_->setFizzContext(serverCtx);
+
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
-    server_->setTransportSettings(settings);
   }
 
   void start() {

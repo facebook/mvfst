@@ -57,13 +57,25 @@ int QuicServerWorker::getUnfinishedHandshakeCount() {
 
 QuicServerWorker::QuicServerWorker(
     std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
+    TransportSettings transportSettings,
     SetEventCallback ec)
     : callback_(std::move(callback)),
       setEventCallback_(ec),
+      transportSettings_(
+          validateTransportSettings(std::move(transportSettings))),
       takeoverPktHandler_(this),
       observerList_(this) {
   pending0RttData_.setPruneHook(
       [&](auto, auto) { QUIC_STATS(statsCallback_, onZeroRttBufferedPruned); });
+
+  if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
+    // TODO: maxBatchSize is only a good start value when each transport does
+    // its own socket writing. If we experiment with multiple transports GSO
+    // together, we will need a better value.
+    bufAccessor_ = std::make_unique<SimpleBufAccessor>(
+        kDefaultMaxUDPPayload * transportSettings_.maxBatchSize);
+    VLOG(10) << "GSO write buf accessor created for ContinuousMemory data path";
+  }
 }
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
@@ -1225,24 +1237,15 @@ void QuicServerWorker::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
   ctx_ = ctx;
 }
-
-void QuicServerWorker::setTransportSettings(
+TransportSettings QuicServerWorker::validateTransportSettings(
     TransportSettings transportSettings) {
-  transportSettings_ = transportSettings;
-  if (transportSettings_.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO) {
-    if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
+  if (transportSettings.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO) {
+    if (transportSettings.dataPathType == DataPathType::ContinuousMemory) {
       LOG(ERROR) << "Unsupported data path type and batching mode combination";
     }
-    transportSettings_.dataPathType = DataPathType::ChainedMemory;
+    transportSettings.dataPathType = DataPathType::ChainedMemory;
   }
-  if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
-    // TODO: maxBatchSize is only a good start value when each transport does
-    // its own socket writing. If we experiment with multiple transports GSO
-    // together, we will need a better value.
-    bufAccessor_ = std::make_unique<SimpleBufAccessor>(
-        kDefaultMaxUDPPayload * transportSettings_.maxBatchSize);
-    VLOG(10) << "GSO write buf accessor created for ContinuousMemory data path";
-  }
+  return transportSettings;
 }
 
 void QuicServerWorker::rejectNewConnections(
