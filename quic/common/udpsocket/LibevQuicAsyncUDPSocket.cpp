@@ -418,13 +418,27 @@ int LibevQuicAsyncUDPSocket::recvmmsg(
     unsigned int vlen,
     unsigned int flags,
     struct timespec* timeout) {
-#ifdef FOLLY_HAVE_RECVMMSG
-  return ::recvmmsg(fd_, msgvec, vlen, (int)flags, timeout);
-#else
-  // TODO: share cross-platform code with folly's AsyncUDPSocket.
-  LOG(FATAL) << "no recvmmsg";
-  return -1;
+#if !FOLLY_MOBILE
+  if (reinterpret_cast<void*>(::recvmmsg) != nullptr) {
+    return ::recvmmsg(fd_, msgvec, vlen, (int)flags, timeout);
+  }
 #endif
+  // if recvmmsg is not supported, implement it using recvmsg
+  for (unsigned int i = 0; i < vlen; i++) {
+    ssize_t ret = ::recvmsg(fd_, &msgvec[i].msg_hdr, flags);
+    // in case of an error
+    // we return the number of msgs received if > 0
+    // or an error if no msg was received
+    if (ret < 0) {
+      if (i) {
+        return static_cast<int>(i);
+      }
+      return static_cast<int>(ret);
+    } else {
+      msgvec[i].msg_len = ret;
+    }
+  }
+  return static_cast<int>(vlen);
 }
 
 bool LibevQuicAsyncUDPSocket::setGRO(bool /* bVal */) {
