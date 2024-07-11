@@ -816,13 +816,16 @@ TrafficKey getQuicTestKey() {
 
 std::unique_ptr<folly::IOBuf> getProtectionKey() {
   FizzCryptoFactory factory;
-  auto secret = folly::range(getRandSecret());
+  auto secret = getRandSecret();
   auto pnCipher =
       factory.makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto deriver = factory.getFizzFactory()->makeKeyDeriver(
       fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   return deriver->expandLabel(
-      secret, kQuicPNLabel, folly::IOBuf::create(0), pnCipher->keyLength());
+      folly::range(secret),
+      kQuicPNLabel,
+      folly::IOBuf::create(0),
+      pnCipher->keyLength());
 }
 } // namespace test
 } // namespace quic
