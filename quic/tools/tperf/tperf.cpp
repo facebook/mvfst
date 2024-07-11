@@ -488,10 +488,7 @@ class TPerfServer {
       settings.ccaConfig.leaveHeadroomForCwndLimited = true;
     }
 
-    if (FLAGS_read_ecn) {
-      settings.readEcnOnIngress = FLAGS_read_ecn;
-      settings.shouldRecvBatch = false;
-    }
+    settings.readEcnOnIngress = FLAGS_read_ecn;
     settings.dscpValue = FLAGS_dscp;
 
     server_ = QuicServer::createQuicServer(settings);
@@ -692,7 +689,6 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     settings.advertisedInitialConnectionFlowControlWindow = window_;
     settings.autotuneReceiveConnFlowControl = autotuneWindow_;
     settings.connectUDP = true;
-    settings.shouldRecvBatch = true;
     settings.shouldUseRecvmmsgForBatchRecv = true;
     settings.maxRecvBatchSize = 64;
     settings.numGROBuffers_ = 64;
@@ -735,10 +731,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       settings.ccaConfig.leaveHeadroomForCwndLimited = true;
     }
 
-    if (FLAGS_read_ecn) {
-      settings.readEcnOnIngress = FLAGS_read_ecn;
-      settings.shouldRecvBatch = false;
-    }
+    settings.readEcnOnIngress = FLAGS_read_ecn;
     settings.dscpValue = FLAGS_dscp;
 
     quicClient_->setTransportSettings(settings);

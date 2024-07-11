@@ -247,8 +247,6 @@ struct TransportSettings {
   // Maximum size of the batch that should be used when receiving packets from
   // the kernel in one event loop.
   uint16_t maxRecvBatchSize{5};
-  // Whether or not we should recv data in a batch.
-  bool shouldRecvBatch{false};
   // Whether to use new receive path for recvmmsg.
   bool shouldUseWrapperRecvmmsgForBatchRecv{false};
   // Whether or not use recvmmsg.
