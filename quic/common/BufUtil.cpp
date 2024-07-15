@@ -175,7 +175,7 @@ void BufWriter::insert(const ChainedByteRangeHead* data) {
 }
 
 void BufWriter::insert(const ChainedByteRangeHead* data, size_t limit) {
-  copy(&data->head, limit);
+  copy(data->getHead(), limit);
 }
 
 void BufWriter::append(size_t len) {
@@ -222,7 +222,7 @@ void BufWriter::copy(const ChainedByteRange* data, size_t limit) {
       break;
     }
     curBuf = curBuf->getNext();
-  } while (remaining && curBuf != data);
+  } while (remaining && curBuf);
   CHECK_GE(limit, totalInserted);
 }
 

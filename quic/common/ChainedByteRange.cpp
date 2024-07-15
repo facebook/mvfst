@@ -9,34 +9,14 @@
 
 namespace quic {
 
-[[nodiscard]] bool ChainedByteRange::empty() const {
-  if (range_.size() != 0) {
-    return false;
-  }
-  for (auto* current = next_; current != this; current = current->next_) {
-    if (current->range_.size() != 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
-[[nodiscard]] std::string ChainedByteRange::toStr() const {
+[[nodiscard]] std::string ChainedByteRangeHead::toStr() const {
   std::string result;
-  result.reserve(computeChainDataLength());
-  result.append(range_.toString());
-  for (auto* current = next_; current != this; current = current->next_) {
+  result.reserve(chainLength_);
+  result.append(head_.range_.toString());
+  for (auto* current = head_.next_; current; current = current->next_) {
     result.append(current->range_.toString());
   }
   return result;
-}
-
-[[nodiscard]] size_t ChainedByteRange::computeChainDataLength() const {
-  size_t fullLength = range_.size();
-  for (auto* current = next_; current != this; current = current->next_) {
-    fullLength += current->range_.size();
-  }
-  return fullLength;
 }
 
 ChainedByteRangeHead::ChainedByteRangeHead(const Buf& buf) {
@@ -50,20 +30,18 @@ ChainedByteRangeHead::ChainedByteRangeHead(const Buf& buf) {
   }
 
   CHECK(it != buf->end());
-  head.range_ = *it++;
-  chainLength_ += head.range_.size();
+  head_.range_ = *it++;
+  chainLength_ += head_.range_.size();
 
-  ChainedByteRange* cur = &head;
+  ChainedByteRange* cur = &head_;
   for (; it != buf->end(); it++) {
     chainLength_ += it->size();
     auto next = std::make_unique<ChainedByteRange>().release();
     next->range_ = *it;
-    next->prev_ = cur;
     cur->next_ = next;
     cur = next;
   }
-  cur->next_ = &head;
-  head.prev_ = cur;
+  tail_ = cur;
 }
 
 void ChainedByteRangeHead::append(const Buf& buf) {
@@ -79,13 +57,12 @@ void ChainedByteRangeHead::append(const Buf& buf) {
   CHECK(it != buf->end());
   // We know that *it is non-empty at this point because of the initial
   // check that the chain is non-empty.
-  if (head.range_.empty()) {
-    head.range_ = *it;
+  if (head_.range_.empty()) {
+    head_.range_ = *it;
     chainLength_ += it->size();
     it++;
   }
 
-  ChainedByteRange* tail = head.prev_;
   while (it != buf->end()) {
     if (it->empty()) {
       it++;
@@ -94,40 +71,28 @@ void ChainedByteRangeHead::append(const Buf& buf) {
 
     auto* newElement = std::make_unique<ChainedByteRange>(*it).release();
     chainLength_ += it->size();
-    newElement->next_ = &head;
-    newElement->prev_ = tail;
 
-    tail->next_ = newElement;
-    tail = newElement;
-    head.prev_ = newElement;
+    tail_->next_ = newElement;
+    tail_ = newElement;
 
     it++;
   }
 }
 
 void ChainedByteRangeHead::append(ChainedByteRangeHead&& chainHead) {
-  ChainedByteRange* oldTail = head.prev_;
-  // Since we're merging the input chain into this one, we need to create a
-  // ChainedByteRange for the data that's held as the first buffer in the input
-  // chain.
-  ChainedByteRange* headSubstitute =
-      std::make_unique<ChainedByteRange>(chainHead.head.getRange()).release();
-  ChainedByteRange* newTail = (chainHead.head.prev_ == &chainHead.head)
-      ? headSubstitute
-      : chainHead.head.prev_;
+  ChainedByteRange* otherHead =
+      std::make_unique<ChainedByteRange>(chainHead.head_.getRange()).release();
+  bool chainHeadIsChained = chainHead.isChained();
 
-  headSubstitute->next_ =
-      (newTail == &chainHead.head) ? headSubstitute : chainHead.head.next_;
-  chainHead.head.next_->prev_ = headSubstitute;
-  headSubstitute->prev_ = oldTail;
-  oldTail->next_ = headSubstitute;
-  newTail->next_ = &head;
-  head.prev_ = newTail;
+  tail_->next_ = otherHead;
+  otherHead->next_ = chainHead.head_.next_;
+  tail_ = (chainHeadIsChained ? chainHead.tail_ : otherHead);
 
   chainLength_ += chainHead.chainLength_;
 
-  chainHead.head.next_ = chainHead.head.prev_ = &chainHead.head;
+  chainHead.head_.next_ = nullptr;
   chainHead.chainLength_ = 0;
+  chainHead.tail_ = &chainHead.head_;
 }
 
 ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
@@ -144,17 +109,18 @@ ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
 
   chainLength_ -= len;
 
-  if (head.length() > len) {
+  if (head_.length() > len) {
     // Just need to trim a little off the head.
-    ret.head.range_ =
-        folly::ByteRange(head.range_.begin(), head.range_.begin() + len);
-    ret.head.next_ = &ret.head;
-    ret.head.prev_ = &ret.head;
-    head.trimStart(len);
+    ret.head_.range_ =
+        folly::ByteRange(head_.range_.begin(), head_.range_.begin() + len);
+    ret.head_.next_ = nullptr;
+    ret.tail_ = &ret.head_;
+    head_.trimStart(len);
     return ret;
   }
 
-  ChainedByteRange* current = &head;
+  ChainedByteRange* current = &head_;
+  ChainedByteRange* previousToCurrent = current;
   /**
    * Find the last ChainedByteRange containing range requested. This will
    * definitively terminate without looping back to head since we know length >
@@ -165,6 +131,9 @@ ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
       break;
     }
     len -= current->length();
+    if (current != previousToCurrent) {
+      previousToCurrent = previousToCurrent->next_;
+    }
     current = current->next_;
   }
 
@@ -174,22 +143,23 @@ ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
      * We make head take up the place of the first ChainedByteRange in the
      * second chain.
      */
-    ChainedByteRange* tailOfSecondPart =
-        (head.prev_ == current) ? &head : head.prev_;
-    ChainedByteRange* tailOfFirstPart =
-        (current->prev_ == &head ? &ret.head : current->prev_);
+    ret.head_.range_ = head_.range_;
+    head_.range_ = current->range_;
 
-    ret.head.range_ = head.range_;
-    ret.head.next_ = head.next_;
-    ret.head.prev_ = tailOfFirstPart;
-    ret.head.next_->prev_ = &ret.head;
-    tailOfFirstPart->next_ = &ret.head;
+    if (previousToCurrent == &head_) {
+      // No modifications to ret, since it's going to be the only member in
+      // the chain.
+      head_.next_ = current->next_;
+    } else {
+      ret.head_.next_ = head_.next_;
+      ret.tail_ = previousToCurrent;
+      previousToCurrent->next_ = nullptr;
+      head_.next_ = current->next_;
+    }
 
-    head.range_ = current->range_;
-    head.next_ = current->next_;
-    head.prev_ = tailOfSecondPart;
-    head.next_->prev_ = &head;
-    tailOfSecondPart->next_ = &head;
+    if (tail_ == current) {
+      tail_ = &head_;
+    }
 
     delete current;
   } else {
@@ -197,26 +167,23 @@ ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
      * In this case, we're splitting somewhere in the middle of a
      * ChainedByteRange.
      */
-    ChainedByteRange* tailOfFirstPart = current;
-    ChainedByteRange* tailOfSecondPart =
-        (head.prev_ == tailOfFirstPart) ? &head : head.prev_;
-
-    ret.head.range_ = head.range_;
-
-    head.range_ =
+    ret.head_.range_ = head_.range_;
+    head_.range_ =
         folly::ByteRange(current->range_.begin() + len, current->range_.end());
     current->range_ = folly::ByteRange(
         current->range_.begin(), current->range_.begin() + len);
 
-    ret.head.next_ = head.next_;
-    ret.head.prev_ = tailOfFirstPart;
-    ret.head.next_->prev_ = &ret.head;
+    ret.head_.next_ = head_.next_;
+    ret.tail_ = current;
 
-    head.next_ = tailOfFirstPart->next_;
-    tailOfFirstPart->next_->prev_ = &head;
-    head.prev_ = tailOfSecondPart;
+    if (current == tail_) {
+      head_.next_ = nullptr;
+      tail_ = &head_;
+    } else {
+      head_.next_ = current->next_;
+    }
 
-    tailOfFirstPart->next_ = &ret.head;
+    ret.tail_->next_ = nullptr;
   }
 
   return ret;
@@ -229,31 +196,26 @@ size_t ChainedByteRangeHead::trimStartAtMost(size_t len) {
 }
 
 void ChainedByteRangeHead::resetChain() {
-  ChainedByteRange* curr = head.next_;
-  while (curr != &head) {
+  ChainedByteRange* curr = head_.next_;
+  while (curr) {
     auto* next = curr->next_;
     delete curr;
     curr = next;
   }
-  head.next_ = &head;
-  head.prev_ = &head;
+  head_.next_ = nullptr;
+  tail_ = &head_;
   chainLength_ = 0;
+  head_.range_.clear();
 }
 
 void ChainedByteRangeHead::moveChain(ChainedByteRangeHead&& other) {
-  head.range_ = other.head.range_;
-  ChainedByteRange* headNext = other.head.next_;
-  ChainedByteRange* headPrev = other.head.prev_;
-  headNext->prev_ = &head;
-  headPrev->next_ = &head;
-  head.next_ = other.head.next_;
-  head.prev_ = other.head.prev_;
+  auto* prevTail = tail_;
+  tail_ = other.isChained() ? other.tail_ : &head_;
+  other.tail_ = isChained() ? prevTail : &other.head_;
 
-  other.head.range_ = folly::ByteRange();
-  other.head.next_ = &other.head;
-  other.head.prev_ = &other.head;
-  chainLength_ = other.chainLength_;
-  other.chainLength_ = 0;
+  std::swap(head_.range_, other.head_.range_);
+  std::swap(head_.next_, other.head_.next_);
+  std::swap(chainLength_, other.chainLength_);
 }
 
 } // namespace quic

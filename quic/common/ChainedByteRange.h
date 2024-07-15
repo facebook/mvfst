@@ -13,16 +13,16 @@ namespace quic {
 
 /*
  * The ChainedByteRange depicts one block of contiguous
- * memory, and has a next_ and a prev_ pointer. It has APIs
+ * memory, and has a next_ pointer. It has APIs
  * that can be used to trim the start or end of this specific
  * contiguous memory block.
  */
 class ChainedByteRange {
  public:
-  ChainedByteRange() : next_(this), prev_(this) {}
+  ChainedByteRange() : next_(nullptr) {}
 
   explicit ChainedByteRange(folly::ByteRange range)
-      : range_(range), next_(this), prev_(this) {}
+      : range_(range), next_(nullptr) {}
 
   /**
    * Returns the length only of this ChainedByteRange
@@ -30,15 +30,6 @@ class ChainedByteRange {
   [[nodiscard]] size_t length() const {
     return range_.size();
   }
-
-  /**
-   * Check whether the entire chain is empty
-   */
-  [[nodiscard]] bool empty() const;
-
-  [[nodiscard]] std::string toStr() const;
-
-  [[nodiscard]] size_t computeChainDataLength() const;
 
   /**
    * Trim the start of this specific contiguous memory block
@@ -56,15 +47,9 @@ class ChainedByteRange {
     return next_;
   }
 
-  [[nodiscard]] ChainedByteRange* getPrev() const {
-    return prev_;
-  }
-
  private:
   folly::ByteRange range_;
   ChainedByteRange* next_{nullptr};
-  ChainedByteRange* prev_{nullptr};
-
   friend class ChainedByteRangeHead;
 };
 
@@ -77,8 +62,6 @@ class ChainedByteRange {
  */
 class ChainedByteRangeHead {
  public:
-  ChainedByteRange head;
-
   explicit ChainedByteRangeHead(const Buf& buf);
 
   ChainedByteRangeHead() = default;
@@ -88,13 +71,16 @@ class ChainedByteRangeHead {
   }
 
   ChainedByteRangeHead& operator=(ChainedByteRangeHead&& other) noexcept {
-    resetChain();
     moveChain(std::move(other));
     return *this;
   }
 
   ~ChainedByteRangeHead() {
     resetChain();
+  }
+
+  bool isChained() const {
+    return head_.next_ != nullptr;
   }
 
   [[nodiscard]] bool empty() const {
@@ -104,6 +90,8 @@ class ChainedByteRangeHead {
   [[nodiscard]] size_t chainLength() const {
     return chainLength_;
   }
+
+  [[nodiscard]] std::string toStr() const;
 
   /**
    * Splits off the initial n bytes from the chain and returns them.
@@ -116,12 +104,20 @@ class ChainedByteRangeHead {
 
   void append(ChainedByteRangeHead&& chainHead);
 
+  const ChainedByteRange* getHead() const {
+    return &head_;
+  }
+
  private:
   void resetChain();
 
   void moveChain(ChainedByteRangeHead&& other);
 
+  ChainedByteRange head_;
+
   size_t chainLength_{0};
+
+  ChainedByteRange* tail_{&head_};
 };
 
 } // namespace quic

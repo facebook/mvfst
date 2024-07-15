@@ -19,17 +19,8 @@ using namespace quic;
 
 namespace {
 void checkConsistency(const ChainedByteRangeHead& queue) {
-  size_t len = queue.head.computeChainDataLength();
+  size_t len = queue.chainLength();
   EXPECT_EQ(len, queue.chainLength());
-
-  ChainedByteRange* current = queue.head.getNext();
-  EXPECT_EQ(queue.head.getNext()->getPrev(), &queue.head);
-  EXPECT_EQ(queue.head.getPrev()->getNext(), &queue.head);
-  while (current != &queue.head) {
-    EXPECT_EQ(current->getNext()->getPrev(), current);
-    EXPECT_EQ(current->getPrev()->getNext(), current);
-    current = current->getNext();
-  }
 }
 
 } // namespace
@@ -46,7 +37,7 @@ TEST(ChainedByteRangeHead, AppendBasic) {
   queue.append(kHello);
   queue.append(kSpace);
   checkConsistency(queue);
-  EXPECT_EQ(queue.head.computeChainDataLength(), 6);
+  EXPECT_EQ(queue.chainLength(), 6);
 }
 
 TEST(ChainedByteRangeHead, Append) {
@@ -76,7 +67,7 @@ TEST(ChainedByteRangeHead, AppendHead) {
   queue2.append(kCommaSpace);
   queue.append(std::move(queue2));
   checkConsistency(queue);
-  EXPECT_EQ(queue.head.computeChainDataLength(), 7);
+  EXPECT_EQ(queue.chainLength(), 7);
 }
 
 TEST(ChainedByteRangeHead, AppendHead2) {
@@ -88,7 +79,7 @@ TEST(ChainedByteRangeHead, AppendHead2) {
   queue2.append(kWorld);
   queue.append(std::move(queue2));
   checkConsistency(queue);
-  EXPECT_EQ(queue.head.computeChainDataLength(), 12);
+  EXPECT_EQ(queue.chainLength(), 12);
 }
 
 TEST(ChainedByteRangeHead, AppendHead3) {
@@ -99,7 +90,7 @@ TEST(ChainedByteRangeHead, AppendHead3) {
   queue2.append(kSpace);
   queue.append(std::move(queue2));
   checkConsistency(queue);
-  EXPECT_EQ(queue.head.computeChainDataLength(), 7);
+  EXPECT_EQ(queue.chainLength(), 7);
 }
 
 TEST(ChainedByteRangeHead, AppendHead4) {
@@ -110,7 +101,7 @@ TEST(ChainedByteRangeHead, AppendHead4) {
   queue2.append(kSpace);
   queue.append(std::move(queue2));
   checkConsistency(queue);
-  EXPECT_EQ(queue.head.computeChainDataLength(), 7);
+  EXPECT_EQ(queue.chainLength(), 7);
 }
 
 TEST(ChainedByteRangeHead, AppendMultipleEmpty) {
@@ -125,7 +116,7 @@ TEST(ChainedByteRangeHead, AppendMultipleEmpty) {
   ChainedByteRangeHead chainedByteRangeHead;
   chainedByteRangeHead.append(buf);
   EXPECT_EQ(chainedByteRangeHead.chainLength(), 15);
-  EXPECT_EQ(chainedByteRangeHead.head.toStr(), "appleballdogcat");
+  EXPECT_EQ(chainedByteRangeHead.toStr(), "appleballdogcat");
 }
 
 TEST(ChainedByteRangeHead, AppendStringPiece) {
@@ -137,13 +128,13 @@ TEST(ChainedByteRangeHead, AppendStringPiece) {
   queue2.append(helloWorld);
   checkConsistency(queue);
   checkConsistency(queue2);
-  EXPECT_EQ(s.length(), queue.head.computeChainDataLength());
-  EXPECT_EQ(s.length(), queue2.head.computeChainDataLength());
+  EXPECT_EQ(s.length(), queue.chainLength());
+  EXPECT_EQ(s.length(), queue2.chainLength());
   EXPECT_EQ(
       0,
       memcmp(
-          queue.head.getRange().data(),
-          queue2.head.getRange().data(),
+          queue.getHead()->getRange().data(),
+          queue2.getHead()->getRange().data(),
           s.length()));
 }
 
@@ -155,43 +146,43 @@ TEST(ChainedByteRangeHead, Splitttt) {
   queue.append(kEmpty);
   queue.append(kWorld);
   checkConsistency(queue);
-  EXPECT_EQ(12, queue.head.computeChainDataLength());
+  EXPECT_EQ(12, queue.chainLength());
 
   auto prefix = queue.splitAtMost(1);
   checkConsistency(queue);
-  EXPECT_EQ(1, prefix.head.computeChainDataLength());
-  EXPECT_EQ(11, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "H");
+  EXPECT_EQ(1, prefix.chainLength());
+  EXPECT_EQ(11, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "H");
   ChainedByteRangeHead rch1(std::move(prefix));
 
   prefix = queue.splitAtMost(2);
   checkConsistency(queue);
-  EXPECT_EQ(2, prefix.head.computeChainDataLength());
-  EXPECT_EQ(9, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "el");
+  EXPECT_EQ(2, prefix.chainLength());
+  EXPECT_EQ(9, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "el");
   ChainedByteRangeHead rch2(std::move(prefix));
 
   prefix = queue.splitAtMost(3);
   checkConsistency(queue);
-  EXPECT_EQ(3, prefix.head.computeChainDataLength());
-  EXPECT_EQ(6, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "lo,");
+  EXPECT_EQ(3, prefix.chainLength());
+  EXPECT_EQ(6, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "lo,");
   ChainedByteRangeHead rch3(std::move(prefix));
 
   prefix = queue.splitAtMost(1);
   checkConsistency(queue);
-  EXPECT_EQ(1, prefix.head.computeChainDataLength());
-  EXPECT_EQ(5, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), " ");
+  EXPECT_EQ(1, prefix.chainLength());
+  EXPECT_EQ(5, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), " ");
   ChainedByteRangeHead rch4(std::move(prefix));
 
   prefix = queue.splitAtMost(5);
   checkConsistency(queue);
-  EXPECT_EQ(5, prefix.head.computeChainDataLength());
+  EXPECT_EQ(5, prefix.chainLength());
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.chainLength(), 0);
-  EXPECT_TRUE(queue.head.getRange().empty());
-  EXPECT_EQ(prefix.head.toStr(), "World");
+  EXPECT_TRUE(queue.getHead()->getRange().empty());
+  EXPECT_EQ(prefix.toStr(), "World");
   ChainedByteRangeHead rch5(std::move(prefix));
 
   auto helloComma = IOBuf::copyBuffer(SCL("Hello,"));
@@ -199,31 +190,20 @@ TEST(ChainedByteRangeHead, Splitttt) {
   checkConsistency(queue);
   prefix = queue.splitAtMost(3);
   checkConsistency(queue);
-  EXPECT_EQ(3, prefix.head.computeChainDataLength());
+  EXPECT_EQ(3, prefix.chainLength());
   EXPECT_EQ(3, queue.chainLength());
-  EXPECT_EQ(prefix.head.toStr(), "Hel");
+  EXPECT_EQ(prefix.toStr(), "Hel");
   ChainedByteRangeHead rch6(std::move(prefix));
 
   auto spaceWorld = IOBuf::copyBuffer(SCL(" World"));
   queue.append(spaceWorld);
   checkConsistency(queue);
   prefix = queue.splitAtMost(13);
-  EXPECT_EQ(9, prefix.head.computeChainDataLength());
+  EXPECT_EQ(9, prefix.chainLength());
   EXPECT_EQ(0, queue.chainLength());
-  EXPECT_EQ(prefix.head.toStr(), "lo, World");
+  EXPECT_EQ(prefix.toStr(), "lo, World");
   checkConsistency(queue);
   ChainedByteRangeHead rch7(std::move(prefix));
-}
-
-TEST(ChainedByteRangeHead, Empty) {
-  ChainedByteRangeHead emptyQueue;
-  checkConsistency(emptyQueue);
-  EXPECT_TRUE(emptyQueue.empty());
-  EXPECT_EQ(emptyQueue.chainLength(), 0);
-
-  emptyQueue.append(folly::IOBuf::copyBuffer("apple"));
-  checkConsistency(emptyQueue);
-  EXPECT_FALSE(emptyQueue.head.empty());
 }
 
 TEST(ChainedByteRangeHead, FromIobuf) {
@@ -234,10 +214,9 @@ TEST(ChainedByteRangeHead, FromIobuf) {
   buf->appendToChain(folly::IOBuf::copyBuffer(""));
   buf->appendToChain(folly::IOBuf::copyBuffer("dog"));
   buf->appendToChain(folly::IOBuf::copyBuffer("cat"));
-
   ChainedByteRangeHead chainedByteRangeHead(buf);
   EXPECT_EQ(chainedByteRangeHead.chainLength(), 15);
-  EXPECT_EQ(chainedByteRangeHead.head.toStr(), "appleballdogcat");
+  EXPECT_EQ(chainedByteRangeHead.toStr(), "appleballdogcat");
 }
 
 TEST(ChainedByteRangeHead, FromIobufEmpty) {
@@ -250,21 +229,21 @@ TEST(ChainedByteRangeHead, TrimStart) {
   auto cbr = std::make_unique<ChainedByteRange>(
       folly::ByteRange(kHello->data(), kHello->length()));
   cbr->trimStart(3);
-  EXPECT_EQ(cbr->toStr(), "lo");
+  EXPECT_EQ(cbr->getRange().toString(), "lo");
 }
 
 TEST(ChainedByteRangeHead, SplitHeadFromChainOfOne) {
   ChainedByteRangeHead queue;
   queue.append(kHello);
   checkConsistency(queue);
-  EXPECT_EQ(5, queue.head.computeChainDataLength());
+  EXPECT_EQ(5, queue.chainLength());
 
   auto prefix = queue.splitAtMost(3);
   checkConsistency(queue);
-  EXPECT_EQ(3, prefix.head.computeChainDataLength());
-  EXPECT_EQ(2, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "Hel");
-  EXPECT_EQ(queue.head.toStr(), "lo");
+  EXPECT_EQ(3, prefix.chainLength());
+  EXPECT_EQ(2, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "Hel");
+  EXPECT_EQ(queue.toStr(), "lo");
 }
 
 TEST(ChainedByteRangeHead, MoveAssignmentOperator) {
@@ -282,14 +261,14 @@ TEST(ChainedByteRangeHead, SplitHeadFromChainOfTwo) {
   queue.append(kHello);
   queue.append(kWorld);
   checkConsistency(queue);
-  EXPECT_EQ(10, queue.head.computeChainDataLength());
+  EXPECT_EQ(10, queue.chainLength());
 
   auto prefix = queue.splitAtMost(3);
   checkConsistency(queue);
-  EXPECT_EQ(3, prefix.head.computeChainDataLength());
-  EXPECT_EQ(7, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "Hel");
-  EXPECT_EQ(queue.head.toStr(), "loWorld");
+  EXPECT_EQ(3, prefix.chainLength());
+  EXPECT_EQ(7, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "Hel");
+  EXPECT_EQ(queue.toStr(), "loWorld");
 }
 
 TEST(ChainedByteRangeHead, SplitOneAndHalfFromChainOfTwo) {
@@ -297,14 +276,14 @@ TEST(ChainedByteRangeHead, SplitOneAndHalfFromChainOfTwo) {
   queue.append(kHello);
   queue.append(kWorld);
   checkConsistency(queue);
-  EXPECT_EQ(10, queue.head.computeChainDataLength());
+  EXPECT_EQ(10, queue.chainLength());
 
   auto prefix = queue.splitAtMost(7);
   checkConsistency(queue);
-  EXPECT_EQ(7, prefix.head.computeChainDataLength());
-  EXPECT_EQ(3, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "HelloWo");
-  EXPECT_EQ(queue.head.toStr(), "rld");
+  EXPECT_EQ(7, prefix.chainLength());
+  EXPECT_EQ(3, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "HelloWo");
+  EXPECT_EQ(queue.toStr(), "rld");
 }
 
 TEST(ChainedByteRangeHead, SplitOneAndHalfFromChainOfThree) {
@@ -313,14 +292,14 @@ TEST(ChainedByteRangeHead, SplitOneAndHalfFromChainOfThree) {
   queue.append(kWorld);
   queue.append(kHello);
   checkConsistency(queue);
-  EXPECT_EQ(15, queue.head.computeChainDataLength());
+  EXPECT_EQ(15, queue.chainLength());
 
   auto prefix = queue.splitAtMost(7);
   checkConsistency(queue);
-  EXPECT_EQ(7, prefix.head.computeChainDataLength());
-  EXPECT_EQ(8, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "HelloWo");
-  EXPECT_EQ(queue.head.toStr(), "rldHello");
+  EXPECT_EQ(7, prefix.chainLength());
+  EXPECT_EQ(8, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "HelloWo");
+  EXPECT_EQ(queue.toStr(), "rldHello");
 }
 
 TEST(ChainedByteRangeHead, SplitOneAndHalfFromChainOfFour) {
@@ -330,14 +309,14 @@ TEST(ChainedByteRangeHead, SplitOneAndHalfFromChainOfFour) {
   queue.append(kHello);
   queue.append(kWorld);
   checkConsistency(queue);
-  EXPECT_EQ(20, queue.head.computeChainDataLength());
+  EXPECT_EQ(20, queue.chainLength());
 
   auto prefix = queue.splitAtMost(7);
   checkConsistency(queue);
-  EXPECT_EQ(7, prefix.head.computeChainDataLength());
-  EXPECT_EQ(13, queue.head.computeChainDataLength());
-  EXPECT_EQ(prefix.head.toStr(), "HelloWo");
-  EXPECT_EQ(queue.head.toStr(), "rldHelloWorld");
+  EXPECT_EQ(7, prefix.chainLength());
+  EXPECT_EQ(13, queue.chainLength());
+  EXPECT_EQ(prefix.toStr(), "HelloWo");
+  EXPECT_EQ(queue.toStr(), "rldHelloWorld");
 }
 
 TEST(ChainedByteRangeHead, SplitZero) {
@@ -345,19 +324,19 @@ TEST(ChainedByteRangeHead, SplitZero) {
   auto helloWorld = IOBuf::copyBuffer(SCL("Hello world"));
   queue.append(helloWorld);
   auto splitRch = queue.splitAtMost(0);
-  EXPECT_EQ(splitRch.head.computeChainDataLength(), 0);
+  EXPECT_EQ(splitRch.chainLength(), 0);
 }
 
 TEST(ChainedByteRangeHead, SplitEmpty) {
   ChainedByteRangeHead queue;
   auto splitRch = queue.splitAtMost(0);
-  EXPECT_EQ(splitRch.head.computeChainDataLength(), 0);
+  EXPECT_EQ(splitRch.chainLength(), 0);
 }
 
 TEST(ChainedByteRangeHead, SplitEmptt) {
   ChainedByteRangeHead queue;
   auto splitRch = queue.splitAtMost(1);
-  EXPECT_EQ(splitRch.head.computeChainDataLength(), 0);
+  EXPECT_EQ(splitRch.chainLength(), 0);
 }
 
 TEST(ChainedByteRangeHead, TrimStartAtMost) {
@@ -427,16 +406,6 @@ TEST(ChainedByteRangeHead, TrimStartClearChain) {
   checkConsistency(queue);
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.chainLength(), 0);
-  EXPECT_TRUE(queue.head.empty());
-}
-
-TEST(ChainedByteRangeHead, TestEmptyWithMiddleEmptyBuffer) {
-  ChainedByteRangeHead queue1;
-  queue1.append(kHello);
-  ChainedByteRangeHead queue2;
-  queue1.append(std::move(queue2));
-  queue1.append(kWorld);
-  EXPECT_FALSE(queue1.head.getNext()->empty());
 }
 
 TEST(ChainedByteRangeHead, TestMove) {
