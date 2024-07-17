@@ -140,7 +140,7 @@ class BufWriter {
   }
 
   void copy(const folly::IOBuf* data, size_t limit);
-  void copy(const ChainedByteRange* data, size_t limit);
+  void copy(const ChainedByteRangeHead* data, size_t limit);
 
  private:
   folly::IOBuf& iobuf_;

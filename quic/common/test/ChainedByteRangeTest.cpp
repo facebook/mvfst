@@ -225,13 +225,6 @@ TEST(ChainedByteRangeHead, FromIobufEmpty) {
   EXPECT_TRUE(chainedByteRangeHead.empty());
 }
 
-TEST(ChainedByteRangeHead, TrimStart) {
-  auto cbr = std::make_unique<ChainedByteRange>(
-      folly::ByteRange(kHello->data(), kHello->length()));
-  cbr->trimStart(3);
-  EXPECT_EQ(cbr->getRange().toString(), "lo");
-}
-
 TEST(ChainedByteRangeHead, SplitHeadFromChainOfOne) {
   ChainedByteRangeHead queue;
   queue.append(kHello);

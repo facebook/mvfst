@@ -12,48 +12,6 @@
 namespace quic {
 
 /*
- * The ChainedByteRange depicts one block of contiguous
- * memory, and has a next_ pointer. It has APIs
- * that can be used to trim the start or end of this specific
- * contiguous memory block.
- */
-class ChainedByteRange {
- public:
-  ChainedByteRange() : next_(nullptr) {}
-
-  explicit ChainedByteRange(folly::ByteRange range)
-      : range_(range), next_(nullptr) {}
-
-  /**
-   * Returns the length only of this ChainedByteRange
-   */
-  [[nodiscard]] size_t length() const {
-    return range_.size();
-  }
-
-  /**
-   * Trim the start of this specific contiguous memory block
-   */
-  void trimStart(size_t n) {
-    n = std::min(n, range_.size());
-    range_.advance(n);
-  }
-
-  [[nodiscard]] folly::ByteRange getRange() const {
-    return range_;
-  }
-
-  [[nodiscard]] ChainedByteRange* getNext() const {
-    return next_;
-  }
-
- private:
-  folly::ByteRange range_;
-  ChainedByteRange* next_{nullptr};
-  friend class ChainedByteRangeHead;
-};
-
-/*
  * The ChainedByteRangeHead depicts the head of a chain of ChainedByteRanges.
  * It caches the length of the total chain, which is useful in many cases
  * because we don't want to walk the entire chain to get the length.
@@ -61,6 +19,48 @@ class ChainedByteRange {
  * with the splitAtMost and trimStartAtMost APIs.
  */
 class ChainedByteRangeHead {
+ private:
+  /*
+   * The ChainedByteRange depicts one block of contiguous
+   * memory, and has a next_ pointer. It has APIs
+   * that can be used to trim the start or end of this specific
+   * contiguous memory block.
+   */
+  class ChainedByteRange {
+   public:
+    ChainedByteRange() = default;
+
+    explicit ChainedByteRange(folly::ByteRange range) : range_(range) {}
+
+    /**
+     * Returns the length only of this ChainedByteRange
+     */
+    [[nodiscard]] size_t length() const {
+      return range_.size();
+    }
+
+    /**
+     * Trim the start of this specific contiguous memory block
+     */
+    void trimStart(size_t n) {
+      n = std::min(n, range_.size());
+      range_.advance(n);
+    }
+
+    [[nodiscard]] folly::ByteRange getRange() const {
+      return range_;
+    }
+
+    [[nodiscard]] ChainedByteRange* getNext() const {
+      return next_;
+    }
+
+   private:
+    folly::ByteRange range_;
+    ChainedByteRange* next_{nullptr};
+    friend class ChainedByteRangeHead;
+  };
+
  public:
   explicit ChainedByteRangeHead(const Buf& buf);
 

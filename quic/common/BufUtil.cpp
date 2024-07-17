@@ -175,7 +175,7 @@ void BufWriter::insert(const ChainedByteRangeHead* data) {
 }
 
 void BufWriter::insert(const ChainedByteRangeHead* data, size_t limit) {
-  copy(data->getHead(), limit);
+  copy(data, limit);
 }
 
 void BufWriter::append(size_t len) {
@@ -205,13 +205,13 @@ void BufWriter::copy(const folly::IOBuf* data, size_t limit) {
   CHECK_GE(limit, totalInserted);
 }
 
-void BufWriter::copy(const ChainedByteRange* data, size_t limit) {
+void BufWriter::copy(const ChainedByteRangeHead* data, size_t limit) {
   if (!limit) {
     return;
   }
   sizeCheck(limit);
   size_t totalInserted = 0;
-  const ChainedByteRange* curBuf = data;
+  const auto* curBuf = data->getHead();
   auto remaining = limit;
   do {
     auto lenToCopy = std::min(curBuf->length(), remaining);
