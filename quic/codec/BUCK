@@ -116,6 +116,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:random",
+        "//folly/io:iobuf",
     ],
     exported_deps = [
         ":packet_number",

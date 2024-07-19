@@ -44,11 +44,18 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) override {
     _insert(buf, limit);
   }
+
+  void insert(const ChainedByteRangeHead& ChainedByteRangeHead, size_t limit)
+      override {
+    _insertRch(ChainedByteRangeHead, limit);
+  }
+
   MOCK_METHOD(void, appendFrame, (QuicWriteFrame));
   MOCK_METHOD(void, appendPaddingFrame, ());
   MOCK_METHOD(void, markNonEmpty, ());
   MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&));
   MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&, size_t));
+  MOCK_METHOD(void, _insertRch, (const ChainedByteRangeHead&, size_t));
   MOCK_METHOD(void, insert, (const BufQueue&, size_t));
   MOCK_METHOD(void, push, (const uint8_t*, size_t));
   MOCK_METHOD(void, write, (const QuicInteger&));

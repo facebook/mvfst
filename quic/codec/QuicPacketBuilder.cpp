@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/io/IOBuf.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <algorithm>
 
@@ -207,6 +208,28 @@ void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
   folly::io::Cursor cursor(buf.front());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
+  insert(std::move(streamData));
+}
+
+void RegularQuicPacketBuilder::insert(
+    const ChainedByteRangeHead& buf,
+    size_t limit) {
+  limit = std::min(limit, buf.chainLength());
+  std::unique_ptr<folly::IOBuf> streamData = folly::IOBuf::wrapBuffer(
+      buf.getHead()->getRange().begin(),
+      std::min(limit, buf.getHead()->length()));
+  limit -= std::min(limit, buf.getHead()->length());
+
+  auto* current = buf.getHead()->getNext();
+  while (limit > 0) {
+    size_t amountToChopOff = std::min(limit, current->length());
+    auto tempBuf =
+        folly::IOBuf::wrapBuffer(current->getRange().begin(), amountToChopOff);
+    streamData->appendToChain(std::move(tempBuf));
+    limit -= amountToChopOff;
+    current = current->getNext();
+  }
+
   insert(std::move(streamData));
 }
 
@@ -660,6 +683,13 @@ void InplaceQuicPacketBuilder::insert(
 void InplaceQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
   remainingBytes_ -= limit;
   bufWriter_.insert(buf.front(), limit);
+}
+
+void InplaceQuicPacketBuilder::insert(
+    const ChainedByteRangeHead& buf,
+    size_t limit) {
+  remainingBytes_ -= limit;
+  bufWriter_.insert(&buf, limit);
 }
 
 void InplaceQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
