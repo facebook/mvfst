@@ -37,7 +37,7 @@ cpp_unittest(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
-        "//fizz/protocol/test:test_messages",
+        "//fizz/protocol/test:test_util",
         "//quic:constants",
         "//quic/common/test:test_utils",
         "//quic/server/handshake:server_extension",

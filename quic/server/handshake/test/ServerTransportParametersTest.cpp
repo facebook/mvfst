@@ -14,7 +14,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/server/handshake/ServerTransportParametersExtension.h>
 
-#include <fizz/protocol/test/TestMessages.h>
+#include <fizz/protocol/test/TestUtil.h>
 
 using namespace fizz;
 using namespace fizz::test;
