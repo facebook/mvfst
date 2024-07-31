@@ -198,18 +198,6 @@ class QuicTransportBase : public QuicSocket,
       bool eof,
       ByteEventCallback* cb = nullptr) override;
 
-  // TODO: Maybe I should virtualize DSR related APIs and only implement in
-  // QuicServerTransport
-  WriteResult writeBufMeta(
-      StreamId id,
-      const BufferMeta& data,
-      bool eof,
-      ByteEventCallback* cb = nullptr) override;
-
-  WriteResult setDSRPacketizationRequestSender(
-      StreamId id,
-      std::unique_ptr<DSRPacketizationRequestSender> sender) override;
-
   folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
       StreamId id,
       uint64_t offset,

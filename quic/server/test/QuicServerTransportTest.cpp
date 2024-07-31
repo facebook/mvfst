@@ -67,6 +67,10 @@ class QuicServerTransportTest : public QuicServerTransportAfterStartTestBase {
   void SetUp() override {
     QuicServerTransportAfterStartTestBase::SetUp();
   }
+
+  auto getTxMatcher(StreamId id, uint64_t offset) {
+    return MockByteEventCallback::getTxMatcher(id, offset);
+  }
 };
 
 TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
@@ -3252,6 +3256,215 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdExceptionInvalidDuplicate) {
 
   EXPECT_EQ(conn.peerConnectionIds.size(), 2);
   EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
+}
+
+TEST_F(QuicServerTransportTest, WriteBufMetaWithoutRealData) {
+  auto streamId = server->createBidirectionalStream().value();
+  size_t bufferLength = 2000;
+  BufferMeta meta(bufferLength);
+  auto result = server->writeBufMeta(streamId, meta, true);
+  EXPECT_TRUE(result.hasError());
+}
+
+TEST_F(QuicServerTransportTest, ResetDSRStream) {
+  auto& conn = server->getConnectionState();
+  server->getNonConstConn().transportSettings.writeConnectionDataPacketsLimit =
+      1;
+  auto streamId = server->createBidirectionalStream().value();
+  BufferMeta meta(conn.udpSendPacketLen * 5);
+  auto buf = buildRandomInputData(200);
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  EXPECT_CALL(*dsrSender, release()).Times(1);
+  server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
+  EXPECT_TRUE(server->writeChain(streamId, std::move(buf), false).hasValue());
+  ASSERT_NE(conn.streamManager->getStream(streamId), nullptr);
+  EXPECT_TRUE(server->writeBufMeta(streamId, meta, false).hasValue());
+  loopForWrites();
+  auto stream = conn.streamManager->getStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  conn.streamManager->getStream(streamId)->writeBufMeta.split(
+      conn.udpSendPacketLen - 200);
+
+  server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  loopForWrites();
+  auto packet = getLastOutstandingPacket(
+                    server->getConnectionState(), PacketNumberSpace::AppData)
+                    ->packet;
+  EXPECT_GE(packet.frames.size(), 1);
+
+  bool foundReset = false;
+  for (auto& frame : packet.frames) {
+    auto rstStream = frame.asRstStreamFrame();
+    if (!rstStream) {
+      continue;
+    }
+    EXPECT_EQ(streamId, rstStream->streamId);
+    EXPECT_GT(rstStream->offset, 200);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstStream->errorCode);
+    foundReset = true;
+  }
+  EXPECT_TRUE(foundReset);
+}
+
+TEST_F(QuicServerTransportTest, SetDSRSenderAndWriteBufMetaIntoStream) {
+  auto streamId = server->createBidirectionalStream().value();
+  size_t bufferLength = 2000;
+  BufferMeta meta(bufferLength);
+  auto buf = buildRandomInputData(20);
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
+  // Some amount of real data needs to be written first:
+  server->writeChain(streamId, std::move(buf), false);
+  server->writeBufMeta(streamId, meta, true);
+  auto& stream =
+      *server->getConnectionState().streamManager->findStream(streamId);
+  EXPECT_GE(stream.writeBufMeta.offset, 20);
+  EXPECT_EQ(stream.writeBufMeta.length, bufferLength);
+  EXPECT_TRUE(stream.writeBufMeta.eof);
+  EXPECT_EQ(
+      *stream.finalWriteOffset,
+      stream.writeBufMeta.offset + stream.writeBufMeta.length);
+}
+
+TEST_F(QuicServerTransportTest, InvokeTxCallbacksSingleByteDSR) {
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> dsrByteTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  StrictMock<MockByteEventCallback> pastlastByteTxCb;
+  auto stream = server->createBidirectionalStream().value();
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  server->setDSRPacketizationRequestSender(stream, std::move(dsrSender));
+
+  auto buf = buildRandomInputData(1);
+  server->writeChain(stream, buf->clone(), false /* eof */);
+  server->writeBufMeta(stream, BufferMeta(1), false);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(dsrByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
+      .Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
+      .Times(1);
+  EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 2)))
+      .Times(1);
+  server->registerTxCallback(stream, 0, &firstByteTxCb);
+  server->registerTxCallback(stream, 1, &dsrByteTxCb);
+  server->registerTxCallback(stream, 1, &lastByteTxCb);
+  server->registerTxCallback(stream, 2, &pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&dsrByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+
+  // first and last byte TX callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(dsrByteTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  server->getConnectionState().oneRttWriteCipher = test::createNoOpAead();
+  auto temp = test::createNoOpHeaderCipher();
+  temp->setDefaultKey();
+  server->getConnectionState().oneRttWriteHeaderCipher = std::move(temp);
+  CHECK(server->getConnectionState().oneRttWriteCipher->getKey().has_value());
+  CHECK(server->getConnectionState().oneRttWriteHeaderCipher);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+
+  // try to set the first and last byte offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(dsrByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
+      .Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
+      .Times(1);
+  server->registerTxCallback(stream, 0, &firstByteTxCb);
+  server->registerTxCallback(stream, 1, &dsrByteTxCb);
+  server->registerTxCallback(stream, 1, &lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&dsrByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(dsrByteTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  loopForWrites(); // have to loop since processed async
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&dsrByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // Even if we register pastlastByte again, it shouldn't trigger
+  // onByteEventRegistered because this is a duplicate registration.
+  EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 2)))
+      .Times(0);
+  auto ret = server->registerTxCallback(stream, 2, &pastlastByteTxCb);
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, ret.error());
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+
+  // pastlastByteTxCb::onByteEvent will never get called
+  // cancel gets called instead
+  // Even though we attempted to register the ByteEvent twice,  it resulted in
+  // an error. So, onByteEventCanceled should be called only once.
+  EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 2)))
+      .Times(1);
+  server->close(none);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+}
+
+TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
+  // register all possible ways to get a DeliveryCb
+  //
+  // applications built atop QUIC may capture both first and last byte timings,
+  // which in this test are the same byte
+  StrictMock<MockDeliveryCallback> writeChainDeliveryCb;
+  StrictMock<MockDeliveryCallback> writeBufMetaDeliveryCb;
+  StrictMock<MockDeliveryCallback> firstByteDeliveryCb;
+  StrictMock<MockDeliveryCallback> lastByteDeliveryCb;
+  StrictMock<MockDeliveryCallback> unsentByteDeliveryCb;
+  auto stream = server->createBidirectionalStream().value();
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  server->setDSRPacketizationRequestSender(stream, std::move(dsrSender));
+
+  auto buf = buildRandomInputData(1);
+  server->writeChain(
+      stream, buf->clone(), false /* eof */, &writeChainDeliveryCb);
+  server->writeBufMeta(stream, BufferMeta(1), false, &writeBufMetaDeliveryCb);
+  server->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  server->registerDeliveryCallback(stream, 1, &lastByteDeliveryCb);
+  server->registerDeliveryCallback(stream, 2, &unsentByteDeliveryCb);
+
+  // writeChain, first, last byte callbacks triggered after delivery
+  auto& conn = server->getConnectionState();
+  folly::SocketAddress addr;
+  conn.streamManager->addDeliverable(stream);
+  conn.lossState.srtt = 100us;
+  NetworkData networkData;
+  auto streamState = conn.streamManager->getStream(stream);
+  streamState->ackedIntervals.insert(0, 1);
+  EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  EXPECT_CALL(writeBufMetaDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
+  EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
+  server->onNetworkData(addr, std::move(networkData));
+  Mock::VerifyAndClearExpectations(&writeChainDeliveryCb);
+  Mock::VerifyAndClearExpectations(&writeBufMetaDeliveryCb);
+  Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
+
+  // try to set both offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, _)).Times(1);
+  EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 1, _)).Times(1);
+  server->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  server->registerDeliveryCallback(stream, 1, &lastByteDeliveryCb);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
+
+  // unsentByteDeliveryCb::onByteEvent will never get called
+  // cancel gets called instead
+  EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 2)).Times(1);
+  server->close(none);
+  Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
 }
 
 class QuicUnencryptedServerTransportTest : public QuicServerTransportTest {

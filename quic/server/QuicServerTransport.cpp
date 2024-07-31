@@ -13,6 +13,7 @@
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/TransportSettingsFunctions.h>
 
 #include <quic/common/Optional.h>
@@ -1158,6 +1159,154 @@ QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
     connStats.localAddress = serverConn_->serverAddr;
   }
   return connStats;
+}
+
+QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
+    StreamId id,
+    const BufferMeta& data,
+    bool eof,
+    ByteEventCallback* cb) {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  [[maybe_unused]] auto self = sharedGuard();
+  try {
+    // Check whether stream exists before calling getStream to avoid
+    // creating a peer stream if it does not exist yet.
+    if (!conn_->streamManager->streamExists(id)) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
+    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    if (!stream->writable()) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+    }
+    if (!stream->dsrSender) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    if (stream->currentWriteOffset == 0 && stream->writeBuffer.empty()) {
+      // If nothing has been written to writeBuffer ever, meta writing isn't
+      // allowed.
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    // Register DeliveryCallback for the data + eof offset.
+    if (cb) {
+      auto dataLength = data.length + (eof ? 1 : 0);
+      if (dataLength) {
+        auto currentLargestWriteOffset = getLargestWriteOffsetSeen(*stream);
+        registerDeliveryCallback(
+            id, currentLargestWriteOffset + dataLength - 1, cb);
+      }
+    }
+    bool wasAppLimitedOrIdle = false;
+    if (conn_->congestionController) {
+      wasAppLimitedOrIdle = conn_->congestionController->isAppLimited();
+      wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
+    }
+    writeBufMetaToQuicStream(*stream, data, eof);
+    // If we were previously app limited restart pacing with the current rate.
+    if (wasAppLimitedOrIdle && conn_->pacer) {
+      conn_->pacer->reset();
+    }
+    updateWriteLooper(true);
+  } catch (const QuicTransportException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+  } catch (const QuicInternalException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(ex.errorCode());
+  } catch (const std::exception& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  return folly::unit;
+}
+
+QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
+    StreamId id,
+    std::unique_ptr<DSRPacketizationRequestSender> sender) {
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  [[maybe_unused]] auto self = sharedGuard();
+  try {
+    // Check whether stream exists before calling getStream to avoid
+    // creating a peer stream if it does not exist yet.
+    if (!conn_->streamManager->streamExists(id)) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
+    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    // Only allow resetting it back to nullptr once set.
+    if (stream->dsrSender && sender != nullptr) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    if (stream->dsrSender != nullptr) {
+      // If any of these aren't true then we are abandoning stream data.
+      CHECK_EQ(stream->writeBufMeta.length, 0) << stream;
+      CHECK_EQ(stream->lossBufMetas.size(), 0) << stream;
+      CHECK_EQ(stream->retransmissionBufMetas.size(), 0) << stream;
+      stream->dsrSender->release();
+      stream->dsrSender = nullptr;
+      return folly::unit;
+    }
+    if (!stream->writable()) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+    }
+    stream->dsrSender = std::move(sender);
+    // Default to disabling opportunistic ACKing for DSR since it causes extra
+    // writes and spurious losses.
+    conn_->transportSettings.opportunisticAcking = false;
+    // Also turn on the default of 5 nexts per stream which has empirically
+    // shown good results.
+    if (conn_->transportSettings.priorityQueueWritesPerStream == 1) {
+      conn_->transportSettings.priorityQueueWritesPerStream = 5;
+      conn_->streamManager->writeQueue().setMaxNextsPerStream(5);
+    }
+
+    // Fow now, no appLimited or appIdle update here since we are not writing
+    // either BufferMetas yet. The first BufferMeta write will update it.
+  } catch (const QuicTransportException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+  } catch (const QuicInternalException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(ex.errorCode());
+  } catch (const std::exception& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  return folly::unit;
 }
 
 CipherInfo QuicServerTransport::getOneRttCipherInfo() const {

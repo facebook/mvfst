@@ -119,6 +119,16 @@ class QuicClientTransport
         label, context, keyLength);
   }
 
+  WriteResult writeBufMeta(
+      StreamId /* id */,
+      const BufferMeta& /* data */,
+      bool /* eof */,
+      ByteEventCallback* /* cb */) override;
+
+  WriteResult setDSRPacketizationRequestSender(
+      StreamId /* id */,
+      std::unique_ptr<DSRPacketizationRequestSender> /* sender */) override;
+
   enum class ZeroRttAttemptState : uint8_t {
     NotAttempted = 0,
     Accepted,

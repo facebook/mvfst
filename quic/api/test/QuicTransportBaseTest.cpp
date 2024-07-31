@@ -262,6 +262,20 @@ class TestQuicTransport
     closeUdpSocket();
   }
 
+  WriteResult writeBufMeta(
+      StreamId /* id */,
+      const BufferMeta& /* data */,
+      bool /* eof */,
+      ByteEventCallback* /* cb */) override {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+
+  WriteResult setDSRPacketizationRequestSender(
+      StreamId /* id */,
+      std::unique_ptr<DSRPacketizationRequestSender> /* sender */) override {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+
   Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override {
     return none;

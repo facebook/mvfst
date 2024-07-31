@@ -869,6 +869,20 @@ void QuicClientTransport::onReadData(
   maybeSendTransportKnobs();
 }
 
+QuicSocket::WriteResult QuicClientTransport::writeBufMeta(
+    StreamId /* id */,
+    const BufferMeta& /* data */,
+    bool /* eof */,
+    ByteEventCallback* /* cb */) {
+  return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+}
+
+QuicSocket::WriteResult QuicClientTransport::setDSRPacketizationRequestSender(
+    StreamId /* id */,
+    std::unique_ptr<DSRPacketizationRequestSender> /* sender */) {
+  return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+}
+
 void QuicClientTransport::writeData() {
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;

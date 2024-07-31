@@ -47,6 +47,10 @@ class TestingQuicServerTransport : public QuicServerTransport {
     return this;
   }
 
+  QuicConnectionStateBase& getConnectionState() {
+    return *conn_;
+  }
+
   const QuicServerConnectionState& getConn() const {
     return *dynamic_cast<QuicServerConnectionState*>(conn_.get());
   }
