@@ -144,15 +144,11 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
   void runLoopCallback() noexcept override;
 
   // Utils
-  void addWriteCallback(AsyncTransport::WriteCallback* callback, size_t offset);
-  void handleWriteOffsetError(
-      AsyncTransport::WriteCallback* callback,
-      LocalErrorCode error);
+  void addWriteCallback(AsyncTransport::WriteCallback* callback);
   bool handleWriteStateError(AsyncTransport::WriteCallback* callback);
   void handleRead();
   void send(uint64_t maxToSend);
-  folly::Expected<size_t, LocalErrorCode> getStreamWriteOffset() const;
-  void invokeWriteCallbacks(size_t sentOffset);
+  void invokeWriteCallbacks();
   void failWrites(const folly::AsyncSocketException& ex);
   void closeNowImpl(folly::AsyncSocketException&& ex);
 
@@ -160,7 +156,8 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
   CloseState state_{CloseState::OPEN};
   std::shared_ptr<quic::QuicSocket> sock_;
   Optional<quic::StreamId> id_;
-  enum class EOFState { NOT_SEEN, QUEUED, DELIVERED };
+  uint64_t streamWriteOffset_{0};
+  enum class EOFState { NOT_SEEN, QUEUED, DELIVERED, ERROR };
   EOFState readEOF_{EOFState::NOT_SEEN};
   EOFState writeEOF_{EOFState::NOT_SEEN};
   AsyncTransport::ReadCallback* readCb_{nullptr};

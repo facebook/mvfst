@@ -61,6 +61,7 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
     for (auto& p : writeCallbacks_) {
       p.first += *streamWriteOffset;
     }
+    streamWriteOffset_ += *streamWriteOffset;
     sock_->notifyPendingWriteOnStream(*id_, this);
   }
 }
@@ -95,22 +96,12 @@ folly::AsyncTransport::ReadCallback* QuicStreamAsyncTransport::getReadCallback()
 }
 
 void QuicStreamAsyncTransport::addWriteCallback(
-    AsyncTransport::WriteCallback* callback,
-    size_t offset) {
+    AsyncTransport::WriteCallback* callback) {
   size_t size = writeBuf_.chainLength();
-  writeCallbacks_.emplace_back(offset + size, callback);
+  writeCallbacks_.emplace_back(streamWriteOffset_ + size, callback);
   if (id_) {
     sock_->notifyPendingWriteOnStream(*id_, this);
   }
-}
-
-void QuicStreamAsyncTransport::handleWriteOffsetError(
-    AsyncTransport::WriteCallback* callback,
-    LocalErrorCode error) {
-  folly::AsyncSocketException ex(
-      folly::AsyncSocketException::UNKNOWN,
-      folly::to<std::string>("Quic write error: ", toString(error)));
-  callback->writeErr(0, ex);
 }
 
 bool QuicStreamAsyncTransport::handleWriteStateError(
@@ -134,14 +125,6 @@ bool QuicStreamAsyncTransport::handleWriteStateError(
   }
 }
 
-folly::Expected<size_t, LocalErrorCode>
-QuicStreamAsyncTransport::getStreamWriteOffset() const {
-  if (!id_) {
-    return 0;
-  }
-  return sock_->getStreamWriteOffset(*id_);
-}
-
 void QuicStreamAsyncTransport::write(
     AsyncTransport::WriteCallback* callback,
     const void* buf,
@@ -150,13 +133,8 @@ void QuicStreamAsyncTransport::write(
   if (handleWriteStateError(callback)) {
     return;
   }
-  auto streamWriteOffset = getStreamWriteOffset();
-  if (streamWriteOffset.hasError()) {
-    handleWriteOffsetError(callback, streamWriteOffset.error());
-    return;
-  }
   writeBuf_.append(folly::IOBuf::wrapBuffer(buf, bytes));
-  addWriteCallback(callback, *streamWriteOffset);
+  addWriteCallback(callback);
 }
 
 void QuicStreamAsyncTransport::writev(
@@ -167,15 +145,10 @@ void QuicStreamAsyncTransport::writev(
   if (handleWriteStateError(callback)) {
     return;
   }
-  auto streamWriteOffset = getStreamWriteOffset();
-  if (streamWriteOffset.hasError()) {
-    handleWriteOffsetError(callback, streamWriteOffset.error());
-    return;
-  }
   for (size_t i = 0; i < count; i++) {
     writeBuf_.append(folly::IOBuf::wrapBuffer(vec[i].iov_base, vec[i].iov_len));
   }
-  addWriteCallback(callback, *streamWriteOffset);
+  addWriteCallback(callback);
 }
 
 void QuicStreamAsyncTransport::writeChain(
@@ -185,13 +158,8 @@ void QuicStreamAsyncTransport::writeChain(
   if (handleWriteStateError(callback)) {
     return;
   }
-  auto streamWriteOffset = getStreamWriteOffset();
-  if (streamWriteOffset.hasError()) {
-    handleWriteOffsetError(callback, streamWriteOffset.error());
-    return;
-  }
   writeBuf_.append(std::move(buf));
-  addWriteCallback(callback, *streamWriteOffset);
+  addWriteCallback(callback);
 }
 
 void QuicStreamAsyncTransport::close() {
@@ -323,12 +291,11 @@ bool QuicStreamAsyncTransport::isEorTrackingEnabled() const {
 void QuicStreamAsyncTransport::setEorTracking(bool /*track*/) {}
 
 size_t QuicStreamAsyncTransport::getAppBytesWritten() const {
-  auto res = getStreamWriteOffset();
-  // TODO: track written bytes to have it available after QUIC stream closure
-  return res.hasError() ? 0 : res.value();
+  return streamWriteOffset_ + writeBuf_.chainLength();
 }
 
 size_t QuicStreamAsyncTransport::getRawBytesWritten() const {
+  // TOOD: should this include QUIC framing overhead?
   return getAppBytesWritten();
 }
 
@@ -438,23 +405,14 @@ void QuicStreamAsyncTransport::handleRead() {
 }
 
 void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
+  VLOG(4) << __func__ << " " << maxToSend;
   CHECK(id_);
   // overkill until there are delivery cbs
   folly::DelayedDestruction::DestructorGuard dg(this);
   uint64_t toSend =
       std::min(maxToSend, folly::to<uint64_t>(writeBuf_.chainLength()));
-  auto streamWriteOffset = sock_->getStreamWriteOffset(*id_);
-  if (streamWriteOffset.hasError()) {
-    // handle error
-    folly::AsyncSocketException ex(
-        folly::AsyncSocketException::UNKNOWN,
-        folly::to<std::string>(
-            "Quic write error: ", toString(streamWriteOffset.error())));
-    failWrites(ex);
-    return;
-  }
 
-  uint64_t sentOffset = *streamWriteOffset + toSend;
+  uint64_t sentOffset = streamWriteOffset_ + toSend;
   bool writeEOF =
       (writeEOF_ == EOFState::QUEUED && writeBuf_.chainLength() == toSend);
   auto res = sock_->writeChain(
@@ -472,16 +430,27 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   if (writeEOF) {
     writeEOF_ = EOFState::DELIVERED;
   } else if (writeBuf_.chainLength()) {
-    sock_->notifyPendingWriteOnStream(*id_, this);
+    VLOG(4) << __func__ << " buffered data, requesting callback";
+    auto res2 = sock_->notifyPendingWriteOnStream(*id_, this);
+    if (!res2) {
+      folly::AsyncSocketException ex(
+          folly::AsyncSocketException::UNKNOWN,
+          folly::to<std::string>("Quic write error: ", toString(res2.error())));
+      failWrites(ex);
+      return;
+    }
   }
   // not actually sent.  Mirrors AsyncSocket and invokes when data is in
   // transport buffers
-  invokeWriteCallbacks(sentOffset);
+  streamWriteOffset_ = sentOffset;
+  invokeWriteCallbacks();
 }
 
-void QuicStreamAsyncTransport::invokeWriteCallbacks(size_t sentOffset) {
+void QuicStreamAsyncTransport::invokeWriteCallbacks() {
+  VLOG(4) << __func__ << " " << streamWriteOffset_;
   while (!writeCallbacks_.empty() &&
-         writeCallbacks_.front().first <= sentOffset) {
+         writeCallbacks_.front().first <= streamWriteOffset_) {
+    VLOG(4) << __func__ << " " << writeCallbacks_.front().first;
     auto wcb = writeCallbacks_.front().second;
     writeCallbacks_.pop_front();
     wcb->writeSuccess();
@@ -493,6 +462,7 @@ void QuicStreamAsyncTransport::invokeWriteCallbacks(size_t sentOffset) {
 
 void QuicStreamAsyncTransport::failWrites(
     const folly::AsyncSocketException& ex) {
+  VLOG(4) << __func__;
   while (!writeCallbacks_.empty()) {
     auto& front = writeCallbacks_.front();
     auto wcb = front.second;
@@ -500,6 +470,7 @@ void QuicStreamAsyncTransport::failWrites(
     // TODO: track bytesWritten, when buffer was split it may not be 0
     wcb->writeErr(0, ex);
   }
+  writeEOF_ = EOFState::ERROR;
 }
 
 void QuicStreamAsyncTransport::onStreamWriteReady(

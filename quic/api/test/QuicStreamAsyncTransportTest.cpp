@@ -36,6 +36,7 @@ class QuicStreamAsyncTransportTest : public Test {
     folly::test::MockReadCallback readCb;
     QuicStreamAsyncTransport::UniquePtr transport;
     std::array<uint8_t, 1024> buf;
+    bool echoFirstReadOnly{false};
     uint8_t serverDone{2}; // need to finish reads & writes
   };
 
@@ -83,52 +84,52 @@ class QuicStreamAsyncTransportTest : public Test {
     serverAddr_ = server_->getAddress();
   }
 
-  void serverExpectNewBidiStreamFromClient() {
+  void serverExpectNewBidiStreamFromClient(bool echoFirstReadOnly = true) {
     EXPECT_CALL(serverConnectionCB_, onNewBidirectionalStream(_))
-        .WillOnce(Invoke([this](StreamId id) {
+        .WillOnce(Invoke([this, echoFirstReadOnly](StreamId id) {
           auto stream = std::make_unique<Stream>();
           stream->transport =
               QuicStreamAsyncTransport::createWithExistingStream(
                   serverSocket_, id);
+          stream->echoFirstReadOnly = echoFirstReadOnly;
 
-          auto& transport = stream->transport;
           auto& readCb = stream->readCb;
-          auto& writeCb = stream->writeCb;
-          auto& streamBuf = stream->buf;
-          auto& serverDone = stream->serverDone;
-          streams_[id] = std::move(stream);
 
           EXPECT_CALL(readCb, readEOF_())
-              .WillOnce(Invoke([&transport, &serverDone] {
-                if (--serverDone == 0) {
-                  transport->close();
+              .WillOnce(Invoke([stream = stream.get()] {
+                stream->transport->shutdownWrite();
+                if (--stream->serverDone == 0) {
+                  stream->transport->close();
                 }
               }));
           EXPECT_CALL(readCb, isBufferMovable_()).WillRepeatedly(Return(false));
           EXPECT_CALL(readCb, getReadBuffer(_, _))
-              .WillRepeatedly(Invoke([&streamBuf](void** buf, size_t* len) {
-                *buf = streamBuf.data();
-                *len = streamBuf.size();
-              }));
-          EXPECT_CALL(readCb, readDataAvailable_(_))
-              .WillRepeatedly(Invoke(
-                  [&streamBuf, &serverDone, &writeCb, &transport](auto len) {
-                    auto echoData = folly::IOBuf::copyBuffer("echo ");
-                    echoData->appendChain(
-                        folly::IOBuf::wrapBuffer(streamBuf.data(), len));
-                    EXPECT_CALL(writeCb, writeSuccess_())
-                        .WillOnce(Return())
-                        .RetiresOnSaturation();
-                    if (transport->good()) {
-                      // Echo the first readDataAvailable_ only
-                      transport->writeChain(&writeCb, std::move(echoData));
-                      transport->shutdownWrite();
-                      if (--serverDone == 0) {
-                        transport->close();
-                      }
-                    }
+              .WillRepeatedly(
+                  Invoke([stream = stream.get()](void** buf, size_t* len) {
+                    *buf = stream->buf.data();
+                    *len = stream->buf.size();
                   }));
-          transport->setReadCB(&readCb);
+          EXPECT_CALL(readCb, readDataAvailable_(_))
+              .WillRepeatedly(Invoke([stream = stream.get()](auto len) {
+                auto echoData = folly::IOBuf::copyBuffer("echo ");
+                echoData->appendChain(
+                    folly::IOBuf::wrapBuffer(stream->buf.data(), len));
+                EXPECT_CALL(stream->writeCb, writeSuccess_())
+                    .WillOnce(Return())
+                    .RetiresOnSaturation();
+                if (stream->transport->good()) {
+                  stream->transport->writeChain(
+                      &stream->writeCb, std::move(echoData));
+                  if (stream->echoFirstReadOnly) {
+                    stream->transport->shutdownWrite();
+                    if (--stream->serverDone == 0) {
+                      stream->transport->close();
+                    }
+                  }
+                }
+              }));
+          stream->transport->setReadCB(&readCb);
+          streams_[id] = std::move(stream);
         }))
         .RetiresOnSaturation();
   }
@@ -335,6 +336,38 @@ TEST_F(QuicStreamAsyncTransportTest, closeNow) {
   // The quic socket is still good
   EXPECT_TRUE(client_->good());
   clientEvb_.loopOnce();
+}
+
+// Test to ensure that write callbacks are correctly scheduled even when
+// write invoked from writeSuccess
+TEST_F(QuicStreamAsyncTransportTest, WriteFromWriteSuccess) {
+  serverExpectNewBidiStreamFromClient(false);
+  auto clientStream = createClient();
+  folly::test::MockWriteCallback writeCb1, writeCb2;
+  bool wcb2Fire = false;
+  EXPECT_CALL(writeCb1, writeSuccess_()).WillOnce(Invoke([&] {
+    // write from writeSuccess, should get correct offset
+    clientStream->transport->writeChain(&writeCb2, buildRandomInputData(1000));
+  }));
+  EXPECT_CALL(writeCb2, writeSuccess_()).WillOnce(Invoke([&] {
+    wcb2Fire = true;
+    clientStream->transport->shutdownWrite();
+  }));
+  // fill fc window exactly,
+  clientStream->transport->writeChain(&writeCb1, buildRandomInputData(66560));
+  clientEvb_.loopOnce();
+  EXPECT_FALSE(wcb2Fire);
+  EXPECT_EQ(clientStream->transport->getAppBytesWritten(), 67560);
+
+  EXPECT_CALL(clientStream->readCb, readDataAvailable_(_))
+      .WillRepeatedly(Return());
+  bool done = false;
+  EXPECT_CALL(clientStream->readCb, readEOF_()).WillOnce(Assign(&done, true));
+  // eventually all gets flushed
+  while (!done) {
+    clientEvb_.loopOnce();
+  }
+  EXPECT_TRUE(wcb2Fire);
 }
 
 } // namespace quic::test
