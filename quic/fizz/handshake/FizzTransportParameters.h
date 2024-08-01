@@ -192,7 +192,7 @@ inline void validateTransportExtensions(
         throw fizz::FizzException(
             fmt::format(
                 "unexpected extension type ({:#x}) for quic v1",
-                extension.extension_type),
+                folly::to_underlying(extension.extension_type)),
             fizz::AlertDescription::illegal_parameter);
       }
       found = true;
