@@ -98,7 +98,7 @@ class BufAppender {
 
 class BufWriter {
  public:
-  explicit BufWriter(folly::IOBuf& iobuf, size_t most);
+  explicit BufWriter(uint8_t* buffer, size_t most);
 
   template <class T>
   void writeBE(T data) {
@@ -126,6 +126,14 @@ class BufWriter {
   void insert(const ChainedByteRangeHead* data);
   void insert(const ChainedByteRangeHead* data, size_t limit);
 
+  uint8_t* tail() {
+    return writableTail_;
+  }
+
+  size_t getBytesWritten() {
+    return written_;
+  }
+
   void append(size_t len);
 
  private:
@@ -134,8 +142,7 @@ class BufWriter {
   // should let BufWriter check the size and return error code if it fails to
   // write.
   void sizeCheck(size_t dataSize) {
-    DCHECK(iobuf_.tailroom() >= dataSize && written_ + dataSize <= most_)
-        << "Buffer room=" << iobuf_.tailroom() << " inputSize=" << dataSize
+    DCHECK(written_ + dataSize <= most_)
         << " written=" << written_ << " limit=" << most_;
   }
 
@@ -143,8 +150,9 @@ class BufWriter {
   void copy(const ChainedByteRangeHead* data, size_t limit);
 
  private:
-  folly::IOBuf& iobuf_;
-  size_t most_;
+  uint8_t* buffer_;
+  uint8_t* writableTail_;
+  const size_t most_;
   size_t written_{0};
   size_t appendCount_{0};
 };

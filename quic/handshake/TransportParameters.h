@@ -90,7 +90,7 @@ struct TransportParameter {
         folly::IOBuf::createCombined(static_cast<size_t>(getEncodedSize()));
 
     // write parameter; need to improve QuicInteger encoding methods
-    BufWriter writer(*res, res->capacity());
+    BufWriter writer(res->writableData(), res->capacity());
     auto appenderOp = [&](auto val) { writer.writeBE(val); };
     CHECK(encodeQuicInteger(u64_tp(parameter), appenderOp));
 
@@ -102,6 +102,7 @@ struct TransportParameter {
       writer.insert(value.get());
     }
 
+    res->append(writer.getBytesWritten());
     return res;
   }
 };

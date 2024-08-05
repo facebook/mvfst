@@ -148,17 +148,13 @@ void BufAppender::insert(std::unique_ptr<folly::IOBuf> data) {
   crtBuf_ = dataPtr;
 }
 
-BufWriter::BufWriter(folly::IOBuf& iobuf, size_t most)
-    : iobuf_(iobuf), most_(most) {
-  CHECK(iobuf_.tailroom() >= most_)
-      << "Buffer room=" << iobuf_.tailroom() << " limit=" << most_;
-}
+BufWriter::BufWriter(uint8_t* buffer, size_t most)
+    : buffer_(buffer), writableTail_(buffer), most_(most) {}
 
 void BufWriter::push(const uint8_t* data, size_t len) {
   sizeCheck(len);
-  memcpy(iobuf_.writableTail(), data, len);
-  iobuf_.append(len);
-  written_ += len;
+  memcpy(writableTail_, data, len);
+  append(len);
 }
 
 void BufWriter::insert(const folly::IOBuf* data) {
@@ -179,7 +175,7 @@ void BufWriter::insert(const ChainedByteRangeHead* data, size_t limit) {
 }
 
 void BufWriter::append(size_t len) {
-  iobuf_.append(len);
+  writableTail_ += len;
   written_ += len;
   appendCount_ += len;
 }
@@ -229,7 +225,7 @@ void BufWriter::copy(const ChainedByteRangeHead* data, size_t limit) {
 void BufWriter::backFill(const uint8_t* data, size_t len, size_t destOffset) {
   CHECK_GE(appendCount_, len);
   appendCount_ -= len;
-  CHECK_LE(destOffset + len, iobuf_.length());
-  memcpy(iobuf_.writableData() + destOffset, data, len);
+  CHECK_LE(destOffset + len, most_);
+  memcpy(buffer_ + destOffset, data, len);
 }
 } // namespace quic

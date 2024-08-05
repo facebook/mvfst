@@ -348,7 +348,7 @@ void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
   LOG_IF(ERROR, packetLength > kDefaultUDPSendPacketLen)
       << "Retry packet length exceeds default packet length";
   packetBuf_ = folly::IOBuf::create(packetLength);
-  BufWriter bufWriter(*packetBuf_, packetLength);
+  BufWriter bufWriter(packetBuf_->writableData(), packetLength);
 
   // ODCID length
   bufWriter.writeBE<uint8_t>(originalDestinationConnectionId_.size());
@@ -380,6 +380,8 @@ void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
 
   // Token
   bufWriter.push((const uint8_t*)token_->data(), token_->length());
+
+  packetBuf_->append(bufWriter.getBytesWritten());
 }
 
 Buf PseudoRetryPacketBuilder::buildPacket() && {
@@ -470,7 +472,7 @@ InplaceSizeEnforcedPacketBuilder::buildPacket() && {
   size_t encryptedPacketSize =
       header_.length() + body_.length() + cipherOverhead_;
   size_t paddingSize = enforcedSize_ - encryptedPacketSize;
-  BufWriter bodyWriter(*iobuf_, paddingSize);
+  BufWriter bodyWriter(iobuf_->writableTail(), paddingSize);
 
   // Store counters on the stack to overhead from function calls
   size_t extraDataWritten = 0;
@@ -487,9 +489,10 @@ InplaceSizeEnforcedPacketBuilder::buildPacket() && {
       std::move(packet_),
       std::move(header_),
       folly::IOBuf::wrapBufferAsValue(
-          body_.data(), iobuf_->tail() - body_.data()));
+          body_.data(), bodyWriter.tail() - body_.data()));
 
   // Release internal iobuf
+  iobuf_->append(bodyWriter.getBytesWritten());
   bufAccessor_.release(std::move(iobuf_));
   return builtPacket;
 }
@@ -618,7 +621,7 @@ InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(
     uint8_t frameHint)
     : bufAccessor_(bufAccessor),
       iobuf_(bufAccessor_.obtain()),
-      bufWriter_(*iobuf_, remainingBytes),
+      bufWriter_(iobuf_->writableTail(), remainingBytes),
       remainingBytes_(remainingBytes),
       largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
@@ -721,7 +724,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
   size_t extraDataWritten = 0;
-  size_t bodyLength = iobuf_->tail() - bodyStart_;
+  size_t bodyLength = bufWriter_.tail() - bodyStart_;
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !packet_.empty && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
@@ -731,7 +734,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   }
   if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
     QuicInteger pktLen(
-        packetNumberEncoding_->length + (iobuf_->tail() - bodyStart_) +
+        packetNumberEncoding_->length + (bufWriter_.tail() - bodyStart_) +
         cipherOverhead_);
     pktLen.encode(
         [&](auto val) {
@@ -751,10 +754,10 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   }
   CHECK(
       headerStart_ && headerStart_ >= iobuf_->data() &&
-      headerStart_ < iobuf_->tail());
+      headerStart_ < bufWriter_.tail());
   CHECK(
       !bodyStart_ ||
-      (bodyStart_ > headerStart_ && bodyStart_ <= iobuf_->tail()));
+      (bodyStart_ > headerStart_ && bodyStart_ <= bufWriter_.tail()));
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
   // for encryption.
   PacketBuilderInterface::Packet builtPacket(
@@ -763,7 +766,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
                         headerStart_, (bodyStart_ - headerStart_))
                   : folly::IOBuf()),
       (bodyStart_ ? folly::IOBuf::wrapBufferAsValue(
-                        bodyStart_, iobuf_->tail() - bodyStart_)
+                        bodyStart_, bufWriter_.tail() - bodyStart_)
                   : folly::IOBuf()));
   releaseOutputBufferInternal();
   return builtPacket;
@@ -808,6 +811,7 @@ void InplaceQuicPacketBuilder::releaseOutputBuffer() && {
 
 void InplaceQuicPacketBuilder::releaseOutputBufferInternal() {
   if (iobuf_) {
+    iobuf_->append(bufWriter_.getBytesWritten());
     bufAccessor_.release(std::move(iobuf_));
   }
 }
@@ -835,7 +839,7 @@ void InplaceQuicPacketBuilder::encodePacketHeader() {
         longHeader, bufWriter_, remainingBytes_, largestAckedPacketNum_);
     if (longHeader.getHeaderType() != LongHeader::Types::Retry) {
       // Remember the position to write packet number and packet length.
-      packetLenOffset_ = iobuf_->length();
+      packetLenOffset_ = bufWriter_.getBytesWritten();
       // With this builder, we will have to always use kMaxPacketLenSize to
       // write packet length.
       packetNumOffset_ = packetLenOffset_ + kMaxPacketLenSize;
@@ -854,7 +858,7 @@ void InplaceQuicPacketBuilder::encodePacketHeader() {
           packetNumberEncoding_->length);
     }
   }
-  bodyStart_ = iobuf_->tail();
+  bodyStart_ = bufWriter_.tail();
 }
 
 } // namespace quic
