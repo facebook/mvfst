@@ -392,6 +392,9 @@ struct TransportSettings {
   bool enableWriterBackpressure{false};
   // Ack timeout = SRTT * ackTimerFactor
   double ackTimerFactor{kAckTimerFactor};
+  // If flow control updates should be sent based on time passed since last
+  // update.
+  bool enableFlowControlTimeBasedUpdates{true};
 };
 
 } // namespace quic

@@ -34,7 +34,8 @@ Optional<uint64_t> calculateNewWindowUpdate(
       (updateTime - *lastSendTime) >
           transportSettings.flowControlRttFrequency * srtt;
   // If we are autotuning then frequent updates aren't required.
-  if (enoughTimeElapsed && !transportSettings.autotuneReceiveConnFlowControl) {
+  if (transportSettings.enableFlowControlTimeBasedUpdates &&
+      enoughTimeElapsed && !transportSettings.autotuneReceiveConnFlowControl) {
     return nextAdvertisedOffset;
   }
   bool enoughWindowElapsed = (curAdvertisedOffset - curReadOffset) *
