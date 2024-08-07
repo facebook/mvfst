@@ -390,6 +390,8 @@ struct TransportSettings {
   // QuicBatchingMode::BATCHING_MODE_NONE and DataPathType::ChainedMemory
   // and requires useSockWritableEvents to be enabled.
   bool enableWriterBackpressure{false};
+  // Ack timeout = SRTT * ackTimerFactor
+  double ackTimerFactor{kAckTimerFactor};
 };
 
 } // namespace quic

@@ -2690,7 +2690,7 @@ void QuicTransportBase::scheduleAckTimeout() {
   if (conn_->pendingEvents.scheduleAckTimeout) {
     if (!isTimeoutScheduled(&ackTimeout_)) {
       auto factoredRtt = std::chrono::duration_cast<std::chrono::microseconds>(
-          kAckTimerFactor * conn_->lossState.srtt);
+          conn_->transportSettings.ackTimerFactor * conn_->lossState.srtt);
       // If we are using ACK_FREQUENCY, disable the factored RTT heuristic
       // and only use the update max ACK delay.
       if (conn_->ackStates.appDataAckState.ackFrequencySequenceNumber) {
