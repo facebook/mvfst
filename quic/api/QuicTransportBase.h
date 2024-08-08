@@ -1015,6 +1015,18 @@ class QuicTransportBase : public QuicSocket,
   void onSocketWritable() noexcept override;
   void maybeStopWriteLooperAndArmSocketWritableEvent();
 
+  /**
+   * Checks the idle timer on write events, and if it's past the idle timeout,
+   * calls the timer finctions.
+   */
+  void checkIdleTimer(TimePoint now);
+  struct IdleTimeoutCheck {
+    std::chrono::milliseconds idleTimeoutMs{0};
+    Optional<TimePoint> lastTimeIdleTimeoutScheduled_;
+    bool forcedIdleTimeoutScheduled_{false};
+  };
+  IdleTimeoutCheck idleTimeoutCheck_;
+
  private:
   /**
    * Helper functions to handle new streams.

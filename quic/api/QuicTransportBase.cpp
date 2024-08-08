@@ -1122,6 +1122,13 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
     return;
   }
 
+  if (conn_->transportSettings.checkIdleTimerOnWrite) {
+    checkIdleTimer(Clock::now());
+    if (closeState_ == CloseState::CLOSED) {
+      return;
+    }
+  }
+
   // If socket writable events are in use, do nothing if we are already waiting
   // for the write event.
   if (conn_->transportSettings.useSockWritableEvents &&
@@ -1961,6 +1968,34 @@ void QuicTransportBase::onNetworkData(
   }
 }
 
+void QuicTransportBase::checkIdleTimer(TimePoint now) {
+  if (closeState_ == CloseState::CLOSED) {
+    return;
+  }
+  if (!idleTimeout_.isTimerCallbackScheduled()) {
+    return;
+  }
+  if (!idleTimeoutCheck_.lastTimeIdleTimeoutScheduled_.has_value()) {
+    return;
+  }
+  if (idleTimeoutCheck_.forcedIdleTimeoutScheduled_) {
+    return;
+  }
+
+  if ((now - *idleTimeoutCheck_.lastTimeIdleTimeoutScheduled_) >=
+      idleTimeoutCheck_.idleTimeoutMs) {
+    // Call timer expiration async.
+    idleTimeoutCheck_.forcedIdleTimeoutScheduled_ = true;
+    runOnEvbAsync([](auto self) {
+      if (!self->good() || self->closeState_ == CloseState::CLOSED) {
+        // The connection was probably closed.
+        return;
+      }
+      self->idleTimeout_.timeoutExpired();
+    });
+  }
+}
+
 void QuicTransportBase::setIdleTimer() {
   if (closeState_ == CloseState::CLOSED) {
     return;
@@ -1975,6 +2010,10 @@ void QuicTransportBase::setIdleTimer() {
   auto peerIdleTimeout =
       conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
   auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
+
+  idleTimeoutCheck_.idleTimeoutMs = idleTimeout;
+  idleTimeoutCheck_.lastTimeIdleTimeoutScheduled_ = Clock::now();
+
   scheduleTimeout(&idleTimeout_, idleTimeout);
   auto idleTimeoutCount = idleTimeout.count();
   if (conn_->transportSettings.enableKeepalive) {

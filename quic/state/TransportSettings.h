@@ -395,6 +395,8 @@ struct TransportSettings {
   // If flow control updates should be sent based on time passed since last
   // update.
   bool enableFlowControlTimeBasedUpdates{true};
+  // Check if idle timer needs to be triggered manually.
+  bool checkIdleTimerOnWrite{false};
 };
 
 } // namespace quic
