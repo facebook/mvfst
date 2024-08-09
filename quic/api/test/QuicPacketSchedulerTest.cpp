@@ -912,7 +912,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   auto buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), 0);
   bufAccessor.release(std::move(buf));
@@ -955,7 +955,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   auto buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), 0);
   bufAccessor.release(std::move(buf));
@@ -1818,7 +1818,7 @@ TEST_F(
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   auto buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), 0);
   bufAccessor.release(std::move(buf));
@@ -1862,7 +1862,7 @@ TEST_F(
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   auto buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), 0);
   bufAccessor.release(std::move(buf));

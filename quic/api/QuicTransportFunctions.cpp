@@ -14,6 +14,7 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
@@ -231,14 +232,11 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
     IOBufQuicBatch& ioBufBatch,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
-  auto buf = connection.bufAccessor->obtain();
-  auto prevSize = buf->length();
-  connection.bufAccessor->release(std::move(buf));
+  auto prevSize = connection.bufAccessor->length();
 
   auto rollbackBuf = [&]() {
-    auto buf = connection.bufAccessor->obtain();
-    buf->trimEnd(buf->length() - prevSize);
-    connection.bufAccessor->release(std::move(buf));
+    connection.bufAccessor->trimEnd(
+        connection.bufAccessor->length() - prevSize);
   };
 
   // It's the scheduler's job to invoke encode header
@@ -272,16 +270,17 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   }
   CHECK(!packet->header.isChained());
   auto headerLen = packet->header.length();
-  buf = connection.bufAccessor->obtain();
   CHECK(
-      packet->body.data() > buf->data() && packet->body.tail() <= buf->tail());
+      packet->body.data() > connection.bufAccessor->data() &&
+      packet->body.tail() <= connection.bufAccessor->tail());
   CHECK(
-      packet->header.data() >= buf->data() &&
-      packet->header.tail() < buf->tail());
+      packet->header.data() >= connection.bufAccessor->data() &&
+      packet->header.tail() < connection.bufAccessor->tail());
   // Trim off everything before the current packet, and the header length, so
   // buf's data starts from the body part of buf.
-  buf->trimStart(prevSize + headerLen);
+  connection.bufAccessor->trimStart(prevSize + headerLen);
   // buf and packetBuf is actually the same.
+  auto buf = connection.bufAccessor->obtain();
   auto packetBuf =
       aead.inplaceEncrypt(std::move(buf), &packet->header, packetNum);
   CHECK(packetBuf->headroom() == headerLen + prevSize);
@@ -1627,9 +1626,9 @@ WriteQuicDataResult writeConnectionDataToSocket(
   if (connection.transportSettings.dataPathType ==
       DataPathType::ContinuousMemory) {
     CHECK(connection.bufAccessor->ownsBuffer());
-    auto buf = connection.bufAccessor->obtain();
-    CHECK(buf->length() == 0 && buf->headroom() == 0);
-    connection.bufAccessor->release(std::move(buf));
+    CHECK(
+        connection.bufAccessor->length() == 0 &&
+        connection.bufAccessor->headroom() == 0);
   }
   return {ioBufBatch.getPktSent(), 0, bytesWritten};
 }

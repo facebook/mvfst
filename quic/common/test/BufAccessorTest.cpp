@@ -10,8 +10,8 @@
 #include <folly/portability/GTest.h>
 
 namespace quic {
-TEST(SimpleBufAccessor, BasicAccess) {
-  SimpleBufAccessor accessor(1000);
+TEST(BufAccessor, BasicAccess) {
+  BufAccessor accessor(1000);
   EXPECT_TRUE(accessor.ownsBuffer());
   auto buf = accessor.obtain();
   EXPECT_LE(1000, buf->capacity());
@@ -23,15 +23,15 @@ TEST(SimpleBufAccessor, BasicAccess) {
   EXPECT_DEATH(accessor.release(std::move(buf)), "");
 }
 
-TEST(SimpleBufAccessor, CapacityMatch) {
-  SimpleBufAccessor accessor(1000);
+TEST(BufAccessor, CapacityMatch) {
+  BufAccessor accessor(1000);
   auto buf = accessor.obtain();
   buf = folly::IOBuf::create(2000);
   EXPECT_DEATH(accessor.release(std::move(buf)), "");
 }
 
-TEST(SimpleBufAccessor, RefuseChainedBuf) {
-  SimpleBufAccessor accessor(1000);
+TEST(BufAccessor, RefuseChainedBuf) {
+  BufAccessor accessor(1000);
   auto buf = accessor.obtain();
   buf->prependChain(folly::IOBuf::create(0));
   EXPECT_DEATH(accessor.release(std::move(buf)), "");

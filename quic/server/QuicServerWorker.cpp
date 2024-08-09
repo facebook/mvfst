@@ -72,7 +72,7 @@ QuicServerWorker::QuicServerWorker(
     // TODO: maxBatchSize is only a good start value when each transport does
     // its own socket writing. If we experiment with multiple transports GSO
     // together, we will need a better value.
-    bufAccessor_ = std::make_unique<SimpleBufAccessor>(
+    bufAccessor_ = std::make_unique<BufAccessor>(
         kDefaultMaxUDPPayload * transportSettings_.maxBatchSize);
     VLOG(10) << "GSO write buf accessor created for ContinuousMemory data path";
   }

@@ -69,7 +69,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
   size_t length = 100;
   bool eof = false;
   auto dcid = test::getTestConnectionId();
-  SimpleBufAccessor accessor{16 * kDefaultMaxUDPPayload};
+  BufAccessor accessor{16 * kDefaultMaxUDPPayload};
   UdpSocketPacketGroupWriter packetGroupWriter(
       *socket, peerAddress, std::move(batchWriter));
   auto ret = packetGroupWriter.writeSingleQuicPacket(
@@ -109,7 +109,7 @@ TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
   size_t offset = 0;
   size_t length = 100;
   bool eof = false;
-  SimpleBufAccessor accessor{16 * kDefaultMaxUDPPayload};
+  BufAccessor accessor{16 * kDefaultMaxUDPPayload};
   auto ret = packetGroupWriter.writeSingleQuicPacket(
       accessor,
       test::getTestConnectionId(),

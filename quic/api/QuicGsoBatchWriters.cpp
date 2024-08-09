@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicGsoBatchWriters.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 
 namespace {
@@ -106,8 +107,7 @@ bool GSOInplacePacketBatchWriter::append(
     const folly::SocketAddress& /* addr */,
     QuicAsyncUDPSocket* /* sock */) {
   CHECK(!needsFlush(size));
-  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
-  auto& buf = scopedBufAccessor.buf();
+  auto& buf = conn_.bufAccessor->buf();
   if (!lastPacketEnd_) {
     CHECK(prevSize_ == 0 && numPackets_ == 0);
     prevSize_ = size;
@@ -134,9 +134,8 @@ bool GSOInplacePacketBatchWriter::append(
 ssize_t GSOInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   CHECK(lastPacketEnd_);
-  auto& buf = scopedBufAccessor.buf();
+  auto& buf = conn_.bufAccessor->buf();
   CHECK(!buf->isChained());
   CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail())
       << "lastPacketEnd_=" << (uintptr_t)lastPacketEnd_
@@ -198,11 +197,11 @@ size_t GSOInplacePacketBatchWriter::size() const {
   if (empty()) {
     return 0;
   }
-  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
   CHECK(lastPacketEnd_);
-  auto& buf = scopedBufAccessor.buf();
-  CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail());
-  size_t ret = lastPacketEnd_ - buf->data();
+  CHECK(
+      lastPacketEnd_ >= conn_.bufAccessor->data() &&
+      lastPacketEnd_ <= conn_.bufAccessor->tail());
+  size_t ret = lastPacketEnd_ - conn_.bufAccessor->data();
   return ret;
 }
 

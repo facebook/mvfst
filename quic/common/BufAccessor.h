@@ -11,64 +11,63 @@
 
 namespace quic {
 
+/*
+ * We use the BufAccessor in order to access a section of contiguous memory.
+ * Right now, it works on an unchained IOBuf under the hood, but the plan is
+ * to change it to have a uint8_t* under the hood. Once that's done, we can
+ * remove the IOBuf-specific APIs, namely buf(), obtain(), and release().
+ */
 class BufAccessor {
  public:
-  virtual ~BufAccessor() = default;
+  explicit BufAccessor(Buf buf);
 
-  /**
-   * BufAccessor gives caller the internal IOBuf.
-   */
-  virtual Buf obtain() = 0;
+  // The result capacity could be higher than the desired capacity.
+  explicit BufAccessor(size_t capacity);
+
+  ~BufAccessor() = default;
+
+  // API will be removed once we make the BufAccessor work on a uint8_t* instead
+  // of an IOBuf.
+  Buf& buf();
+
+  // API will be removed once we make the BufAccessor work on a uint8_t* instead
+  // of an IOBuf.
+  Buf obtain();
 
   /**
    * Caller releases the IOBuf back to the accessor to own. The capacity has to
-   * match the original IOBuf.
+   * match the original IOBuf. API will be removed once we make the BufAccessor
+   * work on a uint8_t* instead of an IOBuf.
    */
-  virtual void release(Buf buf) = 0;
+  void release(Buf buf);
 
   /**
    * Returns whether the BufAccessor currently owns an IOBuf.
    */
-  virtual bool ownsBuffer() const = 0;
-};
+  bool ownsBuffer() const;
 
-class SimpleBufAccessor : public BufAccessor {
- public:
-  explicit SimpleBufAccessor(Buf buf);
+  // Mirrored APIs from IOBuf.h
+  const uint8_t* tail() const;
+  const uint8_t* data() const;
+  std::size_t tailroom() const;
+  std::size_t headroom() const;
 
-  // The result capacity could be higher than the desired capacity.
-  explicit SimpleBufAccessor(size_t capacity);
+  std::size_t length() const;
 
-  ~SimpleBufAccessor() override = default;
+  void clear();
 
-  Buf obtain() override;
+  bool isChained() const;
 
-  void release(Buf buf) override;
+  void trimEnd(std::size_t amount);
 
-  bool ownsBuffer() const override;
+  void trimStart(std::size_t amount);
+
+  uint8_t* writableTail();
+
+  void append(std::size_t amount);
 
  private:
   Buf buf_;
   size_t capacity_;
-};
-
-struct ScopedBufAccessor {
- public:
-  explicit ScopedBufAccessor(BufAccessor* accessor) : bufAccessor_(accessor) {
-    CHECK(bufAccessor_->ownsBuffer());
-    buf_ = bufAccessor_->obtain();
-  }
-
-  ~ScopedBufAccessor() {
-    bufAccessor_->release(std::move(buf_));
-  }
-
-  std::unique_ptr<folly::IOBuf>& buf() {
-    return buf_;
-  }
-
- private:
-  BufAccessor* bufAccessor_;
-  std::unique_ptr<folly::IOBuf> buf_;
 };
 } // namespace quic

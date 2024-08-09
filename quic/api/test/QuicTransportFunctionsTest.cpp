@@ -4287,12 +4287,11 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFramesAckFreq) {
 TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  auto simpleBufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn->udpSendPacketLen * 16);
-  auto outputBuf = simpleBufAccessor->obtain();
+  auto bufAccessor = std::make_unique<BufAccessor>(conn->udpSendPacketLen * 16);
+  auto outputBuf = bufAccessor->obtain();
   auto bufPtr = outputBuf.get();
-  simpleBufAccessor->release(std::move(outputBuf));
-  conn->bufAccessor = simpleBufAccessor.get();
+  bufAccessor->release(std::move(outputBuf));
+  conn->bufAccessor = bufAccessor.get();
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb =
@@ -4330,12 +4329,11 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
 TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderRollbackBuf) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  auto simpleBufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn->udpSendPacketLen * 16);
-  auto outputBuf = simpleBufAccessor->obtain();
+  auto bufAccessor = std::make_unique<BufAccessor>(conn->udpSendPacketLen * 16);
+  auto outputBuf = bufAccessor->obtain();
   auto bufPtr = outputBuf.get();
-  simpleBufAccessor->release(std::move(outputBuf));
-  conn->bufAccessor = simpleBufAccessor.get();
+  bufAccessor->release(std::move(outputBuf));
+  conn->bufAccessor = bufAccessor.get();
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb =
@@ -4359,12 +4357,11 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderRollbackBuf) {
 TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  auto simpleBufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn->udpSendPacketLen * 16);
-  auto outputBuf = simpleBufAccessor->obtain();
+  auto bufAccessor = std::make_unique<BufAccessor>(conn->udpSendPacketLen * 16);
+  auto outputBuf = bufAccessor->obtain();
   auto bufPtr = outputBuf.get();
-  simpleBufAccessor->release(std::move(outputBuf));
-  conn->bufAccessor = simpleBufAccessor.get();
+  bufAccessor->release(std::move(outputBuf));
+  conn->bufAccessor = bufAccessor.get();
   conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb =
@@ -4409,7 +4406,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   quic::test::MockAsyncUDPSocket mockSock(qEvb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
 
-  SimpleBufAccessor bufAccessor(
+  BufAccessor bufAccessor(
       conn->udpSendPacketLen * conn->transportSettings.maxBatchSize);
   conn->bufAccessor = &bufAccessor;
   auto buf = bufAccessor.obtain();

@@ -209,7 +209,7 @@ class QuicClientTransport
   }
 
   void createBufAccessor(size_t capacity) override {
-    bufAccessor_ = std::make_unique<SimpleBufAccessor>(capacity);
+    bufAccessor_ = std::make_unique<BufAccessor>(capacity);
     conn_->bufAccessor = bufAccessor_.get();
   }
 

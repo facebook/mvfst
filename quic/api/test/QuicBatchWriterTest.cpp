@@ -350,7 +350,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -373,7 +373,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterAppendLimit) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -404,7 +404,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -438,7 +438,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
   quic::test::MockAsyncUDPSocket sock(qEvb);
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   gsoSupported_ = true;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
@@ -487,7 +487,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteOne) {
   quic::test::MockAsyncUDPSocket sock(qEvb);
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   gsoSupported_ = true;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
@@ -528,7 +528,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   quic::test::MockAsyncUDPSocket sock(qEvb);
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   gsoSupported_ = true;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
@@ -576,7 +576,7 @@ TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
 
   uint32_t batchSize = 20;
   auto bufAccessor =
-      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
   conn_.udpSendPacketLen = 1000;
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
@@ -618,8 +618,7 @@ class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
       : conn_(FizzServerQuicHandshakeContext::Builder().build()) {}
 
   void SetUp() override {
-    bufAccessor_ =
-        std::make_unique<quic::SimpleBufAccessor>(conn_.udpSendPacketLen);
+    bufAccessor_ = std::make_unique<quic::BufAccessor>(conn_.udpSendPacketLen);
     conn_.bufAccessor = bufAccessor_.get();
   }
 
@@ -641,7 +640,7 @@ class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
   }
 
  protected:
-  std::unique_ptr<quic::SimpleBufAccessor> bufAccessor_;
+  std::unique_ptr<quic::BufAccessor> bufAccessor_;
   QuicServerConnectionState conn_;
 };
 

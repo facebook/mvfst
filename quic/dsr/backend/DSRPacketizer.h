@@ -234,7 +234,7 @@ class XskPacketGroupWriter : public PacketGroupWriter {
   folly::SocketAddress vipAddress_;
   facebook::xdpsocket::XskBuffer currentXskBuffer_;
   BufQuicBatchResult result_;
-  std::unique_ptr<SimpleBufAccessor> bufAccessor_;
+  std::unique_ptr<BufAccessor> bufAccessor_;
 };
 
 #endif

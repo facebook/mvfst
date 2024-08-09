@@ -7,6 +7,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicPacketScheduler.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <cstdint>
 
@@ -902,8 +903,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     size_t prevSize = 0;
     if (conn_.transportSettings.dataPathType ==
         DataPathType::ContinuousMemory) {
-      ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
-      prevSize = scopedBufAccessor.buf()->length();
+      prevSize = conn_.bufAccessor->length();
     }
     // Reusing the same builder throughout loop bodies will lead to frames
     // belong to different original packets being written into the same clone
@@ -968,9 +968,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
       // when peer fail to parse them.
       internalBuilder.reset();
       CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
-      ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
-      auto& buf = scopedBufAccessor.buf();
-      buf->trimEnd(buf->length() - prevSize);
+      conn_.bufAccessor->trimEnd(conn_.bufAccessor->length() - prevSize);
     }
   }
   return SchedulingResult(none, none, 0);

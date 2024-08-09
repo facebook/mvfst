@@ -150,8 +150,7 @@ BufQuicBatchResult PacketGroupWriter::writePacketsGroup(
 static auto& getThreadLocalConn(size_t maxPackets = 44) {
   static thread_local QuicConnectionStateBase fakeConn{QuicNodeType::Server};
   static thread_local bool initAccessor [[maybe_unused]] = [&]() {
-    fakeConn.bufAccessor =
-        new SimpleBufAccessor{kDefaultMaxUDPPayload * maxPackets};
+    fakeConn.bufAccessor = new BufAccessor{kDefaultMaxUDPPayload * maxPackets};
     // Store this so we can use it to set the batch writer.
     fakeConn.transportSettings.maxBatchSize = maxPackets;
     return true;
@@ -232,7 +231,7 @@ BufAccessor* XskPacketGroupWriter::getBufAccessor() {
       [](void* /* buf */, void* /* userData */) {
         // Empty destructor because we don't own the buffer
       });
-  bufAccessor_ = std::make_unique<SimpleBufAccessor>(std::move(ioBuf));
+  bufAccessor_ = std::make_unique<BufAccessor>(std::move(ioBuf));
   return bufAccessor_.get();
 }
 

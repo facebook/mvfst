@@ -37,9 +37,7 @@ ssize_t SinglePacketBatchWriter::write(
 
 // SinglePacketInplaceBatchWriter
 void SinglePacketInplaceBatchWriter::reset() {
-  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
-  auto& buf = scopedBufAccessor.buf();
-  buf->clear();
+  conn_.bufAccessor->clear();
 }
 
 bool SinglePacketInplaceBatchWriter::append(
@@ -54,18 +52,15 @@ bool SinglePacketInplaceBatchWriter::append(
 ssize_t SinglePacketInplaceBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
-  auto& buf = scopedBufAccessor.buf();
-  CHECK(!buf->isChained());
+  auto& buf = conn_.bufAccessor->buf();
+  CHECK(!conn_.bufAccessor->isChained());
   auto ret = sock.write(address, buf);
-  buf->clear();
+  conn_.bufAccessor->clear();
   return ret;
 }
 
 bool SinglePacketInplaceBatchWriter::empty() const {
-  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
-  auto& buf = scopedBufAccessor.buf();
-  return buf->length() == 0;
+  return conn_.bufAccessor->length() == 0;
 }
 
 // SinglePacketBackpressureBatchWriter

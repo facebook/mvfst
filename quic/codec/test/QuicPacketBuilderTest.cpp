@@ -100,10 +100,9 @@ class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {
             pktSizeLimit, std::move(header), largestAckedPacketNum);
       case TestFlavor::Inplace:
         CHECK(outputBufSize);
-        simpleBufAccessor_ =
-            std::make_unique<SimpleBufAccessor>(*outputBufSize);
+        BufAccessor_ = std::make_unique<BufAccessor>(*outputBufSize);
         return std::make_unique<InplaceQuicPacketBuilder>(
-            *simpleBufAccessor_,
+            *BufAccessor_,
             pktSizeLimit,
             std::move(header),
             largestAckedPacketNum);
@@ -112,7 +111,7 @@ class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {
   }
 
  protected:
-  std::unique_ptr<BufAccessor> simpleBufAccessor_;
+  std::unique_ptr<BufAccessor> BufAccessor_;
 };
 
 TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
@@ -328,7 +327,7 @@ TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
   } else {
     EXPECT_EQ(builtOut.body.isManagedOne(), false);
     InplaceSizeEnforcedPacketBuilder sizeEnforcedBuilder(
-        *simpleBufAccessor_, std::move(builtOut), enforcedSize, cipherOverhead);
+        *BufAccessor_, std::move(builtOut), enforcedSize, cipherOverhead);
     EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
     auto out = std::move(sizeEnforcedBuilder).buildPacket();
     EXPECT_EQ(
@@ -483,7 +482,7 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
 }
 
 TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInDtor) {
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   EXPECT_TRUE(bufAccessor.ownsBuffer());
   auto builder = std::make_unique<InplaceQuicPacketBuilder>(
       bufAccessor,
@@ -496,7 +495,7 @@ TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInDtor) {
 }
 
 TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInBuild) {
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   EXPECT_TRUE(bufAccessor.ownsBuffer());
   auto builder = std::make_unique<InplaceQuicPacketBuilder>(
       bufAccessor,
@@ -511,7 +510,7 @@ TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInBuild) {
 }
 
 TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
-  SimpleBufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(2000);
   EXPECT_TRUE(bufAccessor.ownsBuffer());
   auto builder1 = std::make_unique<InplaceQuicPacketBuilder>(
       bufAccessor,
