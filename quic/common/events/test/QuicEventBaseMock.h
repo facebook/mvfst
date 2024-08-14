@@ -54,6 +54,7 @@ class QuicEventBaseMock : public QuicEventBase {
   MOCK_METHOD((bool), loopIgnoreKeepAlive, ());
   MOCK_METHOD((void), terminateLoopSoon, ());
   MOCK_METHOD((std::chrono::milliseconds), getTimerTickInterval, (), (const));
+  MOCK_METHOD((void), wakeUpImmediatelyOnPendingScheduledEvents, ());
 };
 
 } // namespace quic::test

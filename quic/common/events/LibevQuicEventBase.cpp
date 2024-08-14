@@ -29,6 +29,16 @@ void libEvPrepareCallback(
   CHECK(self != nullptr);
   self->checkCallbacks();
 }
+
+void libEvAsyncCallback(
+    struct ev_loop* /* loop */,
+    ev_async* w,
+    int /* revents */) {
+  auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
+  CHECK(self != nullptr);
+  self->checkCallbacks();
+}
+
 } // namespace
 
 namespace quic {
@@ -37,10 +47,15 @@ LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
   ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
   prepareWatcher_.data = this;
   ev_prepare_start(ev_loop_, &prepareWatcher_);
+
+  ev_async_init(&asyncWatcher_, libEvAsyncCallback);
+  asyncWatcher_.data = this;
+  ev_async_start(ev_loop_, &asyncWatcher_);
 }
 
 LibevQuicEventBase::~LibevQuicEventBase() {
   ev_prepare_stop(ev_loop_, &prepareWatcher_);
+  ev_async_stop(ev_loop_, &asyncWatcher_);
 
   struct FunctionLoopCallbackDisposer {
     void operator()(FunctionLoopCallback* callback) {
@@ -143,6 +158,13 @@ void LibevQuicEventBase::checkCallbacks() {
     currentLoopWrappers.front().runLoopCallback();
   }
   runOnceCallbackWrappers_ = nullptr;
+
+  if (wakeUpImmediatelyOnPendingScheduledEvents_ &&
+      !loopCallbackWrappers_.empty()) {
+    // We have newly added events for the next loop. Wake up as soon as
+    // possible.
+    ev_async_send(ev_loop_, &asyncWatcher_);
+  }
 }
 
 bool LibevQuicEventBase::isInEventBaseThread() const {

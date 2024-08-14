@@ -111,6 +111,10 @@ class LibevQuicEventBase
     return std::chrono::milliseconds(1);
   }
 
+  void wakeUpImmediatelyOnPendingScheduledEvents() override {
+    wakeUpImmediatelyOnPendingScheduledEvents_ = true;
+  }
+
   struct ev_loop* getLibevLoop() {
     return ev_loop_;
   }
@@ -223,5 +227,7 @@ class LibevQuicEventBase
   // We're using it to execute delayed work given to us via runInLoop.
   ev_prepare prepareWatcher_;
   std::atomic<std::thread::id> loopThreadId_;
+  bool wakeUpImmediatelyOnPendingScheduledEvents_{false};
+  ev_async asyncWatcher_;
 };
 } // namespace quic
