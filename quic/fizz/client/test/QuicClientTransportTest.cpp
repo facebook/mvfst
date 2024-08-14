@@ -3942,12 +3942,22 @@ TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
-  auto aead = dynamic_cast<const MockAead*>(
-      client->getNonConstConn().readCodec->getOneRttReadCipher());
-  ASSERT_TRUE(aead);
+  std::unique_ptr<MockAead> currentOneRttReadCipher =
+      std::make_unique<MockAead>();
+  MockAead* currentOneRttReadCipherRawPtr = currentOneRttReadCipher.get();
+  client->getNonConstConn().readCodec->setOneRttReadCipher(
+      std::move(currentOneRttReadCipher));
+
+  std::unique_ptr<MockAead> nextOneRttReadCipher = std::make_unique<MockAead>();
+  MockAead* nextOneRttReadCipherRawPtr = nextOneRttReadCipher.get();
+  client->getNonConstConn().readCodec->setNextOneRttReadCipher(
+      std::move(nextOneRttReadCipher));
+
   // Make the decrypt fail
-  EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return none; }));
+  ON_CALL(*currentOneRttReadCipherRawPtr, _tryDecrypt(_, _, _))
+      .WillByDefault(Invoke([&](auto&, auto, auto) { return none; }));
+  ON_CALL(*nextOneRttReadCipherRawPtr, _tryDecrypt(_, _, _))
+      .WillByDefault(Invoke([&](auto&, auto, auto) { return none; }));
   // Alter the expected token so it definitely won't match the one in conn
   auto token = *client->getConn().statelessResetToken;
   token[0] = ~token[0];
