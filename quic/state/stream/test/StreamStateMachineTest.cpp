@@ -802,8 +802,8 @@ TEST_F(QuicUnidirectionalStreamTest, OpenFinalAckStreamFrame) {
   stream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(1),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(std::move(buf), 1, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf), 1, false)));
   sendAckSMHandler(stream, streamFrame);
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
   EXPECT_EQ(stream.recvState, StreamRecvState::Invalid);
@@ -883,7 +883,7 @@ TEST_F(QuicOpenStateTest, DSRFullStreamAcked) {
       true,
       1,
       PacketNumberSpace::AppData);
-  ASSERT_EQ(stream->writeBuffer.chainLength(), 0);
+  ASSERT_EQ(stream->pendingWrites.chainLength(), 0);
   ASSERT_NE(
       stream->retransmissionBufMetas.end(),
       stream->retransmissionBufMetas.find(bufMetaStartingOffset));

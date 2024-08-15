@@ -317,7 +317,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     ConnectionId dstConnId,
     PacketNum packetNum,
     QuicVersion version,
-    folly::IOBuf& data,
+    ChainedByteRangeHead& data,
     const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset,
@@ -342,7 +342,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
   }
   builder->encodePacketHeader();
   builder->accountForCipherOverhead(aead.getCipherOverhead());
-  auto res = writeCryptoFrame(offset, data.clone(), *builder);
+  auto res = writeCryptoFrame(offset, data, *builder);
   CHECK(res.hasValue()) << "failed to write crypto frame";
   return std::move(*builder).buildPacket();
 }
@@ -353,7 +353,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
     PacketNum packetNum,
     QuicVersion version,
     ProtectionType protectionType,
-    folly::IOBuf& data,
+    ChainedByteRangeHead& data,
     const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset,
@@ -385,7 +385,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
       packetSizeLimit, std::move(*header), largestAcked);
   builder.encodePacketHeader();
   builder.accountForCipherOverhead(aead.getCipherOverhead());
-  auto res = writeCryptoFrame(offset, data.clone(), builder);
+  auto res = writeCryptoFrame(offset, data, builder);
   CHECK(res.hasValue()) << "failed to write crypto frame";
   return std::move(builder).buildPacket();
 }
@@ -732,12 +732,6 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
       .setDetailsPerStream(
           CongestionController::AckEvent::AckPacket::DetailsPerStream())
       .build();
-}
-
-Optional<WriteCryptoFrame>
-writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
-  BufQueue bufQueue(std::move(data));
-  return writeCryptoFrame(offsetIn, bufQueue, builder);
 }
 
 void overridePacketWithToken(

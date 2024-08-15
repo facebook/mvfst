@@ -1991,7 +1991,8 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLost) {
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 20;
   stream.currentWriteOffset = 21;
-  stream.lossBuffer.emplace_back(IOBuf::create(10), 10, false);
+  auto dataBuf = IOBuf::create(10);
+  stream.lossBuffer.emplace_back(ChainedByteRangeHead(dataBuf), 10, false);
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
@@ -2012,8 +2013,12 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmitting) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 12;
+
+  auto retxBufData = IOBuf::create(10);
   stream.retransmissionBuffer.emplace(
-      0, std::make_unique<StreamBuffer>(IOBuf::create(10), 10, false));
+      0,
+      std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(retxBufData), 10, false));
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
@@ -2092,7 +2097,9 @@ TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenFIN) {
 TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenNoFIN) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
-  stream.writeBuffer.append(buildRandomInputData(20));
+  auto randomInputData = buildRandomInputData(20);
+  stream.pendingWrites.append(randomInputData);
+  stream.writeBuffer.append(std::move(randomInputData));
   EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
 }
 
@@ -2208,7 +2215,8 @@ TEST_F(QuicStreamFunctionsTest, LossBufferEmptyNoChange) {
 TEST_F(QuicStreamFunctionsTest, LossBufferHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
-  stream.lossBuffer.emplace_back(IOBuf::create(10), 10, false);
+  auto dataBuf = IOBuf::create(10);
+  stream.lossBuffer.emplace_back(ChainedByteRangeHead(dataBuf), 10, false);
   conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
@@ -2242,7 +2250,8 @@ TEST_F(QuicStreamFunctionsTest, LossBufferStillHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   conn.streamManager->addLoss(id);
-  stream.lossBuffer.emplace_back(IOBuf::create(10), 10, false);
+  auto dataBuf = IOBuf::create(10);
+  stream.lossBuffer.emplace_back(ChainedByteRangeHead(dataBuf), 10, false);
   conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
@@ -2270,6 +2279,7 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
   // Fin
   writeDataToQuicStream(stream, nullptr, true);
   stream.writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream.pendingWrites));
   stream.currentWriteOffset += 100;
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn.streamManager->updateWritableStreams(stream);
@@ -2284,7 +2294,7 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
 TEST_F(QuicStreamFunctionsTest, AckCryptoStream) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   conn.cryptoState->handshakeStream.retransmissionBuffer.emplace(
-      0, std::make_unique<StreamBuffer>(chlo->clone(), 0));
+      0, std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(chlo), 0));
   processCryptoStreamAck(conn.cryptoState->handshakeStream, 0, chlo->length());
   EXPECT_EQ(conn.cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
 }
@@ -2293,7 +2303,7 @@ TEST_F(QuicStreamFunctionsTest, AckCryptoStreamOffsetLengthMismatch) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   auto& cryptoStream = conn.cryptoState->handshakeStream;
   cryptoStream.retransmissionBuffer.emplace(
-      0, std::make_unique<StreamBuffer>(chlo->clone(), 0));
+      0, std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(chlo), 0));
   processCryptoStreamAck(cryptoStream, 1, chlo->length());
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 

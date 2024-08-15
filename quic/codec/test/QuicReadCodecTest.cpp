@@ -198,7 +198,8 @@ TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
       kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
   builder.encodePacketHeader();
   builder.accountForCipherOverhead(0);
-  writeCryptoFrame(0, folly::IOBuf::copyBuffer("CHLO"), builder);
+  auto cryptoFrameBuf = folly::IOBuf::copyBuffer("CHLO");
+  writeCryptoFrame(0, ChainedByteRangeHead(cryptoFrameBuf), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   auto packetQueue = bufToQueue(std::move(packet));
 
@@ -654,12 +655,14 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
   auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
   auto headerCipher =
       cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
+  auto initialCryptoPacketBuf = folly::IOBuf::copyBuffer("CHLO");
+  ChainedByteRangeHead initialCryptoPacketRch(initialCryptoPacketBuf);
   auto packet = createInitialCryptoPacket(
       getTestConnectionId(),
       connId,
       packetNum,
       QuicVersion::MVFST,
-      *folly::IOBuf::copyBuffer("CHLO"),
+      initialCryptoPacketRch,
       *aead,
       offset);
 
@@ -689,12 +692,14 @@ TEST_F(QuicReadCodecTest, TestInitialPacketExtractToken) {
   auto headerCipher =
       cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
   std::string token = "aswerdfewdewrgetg";
+  auto initialCryptoPacketBuf = folly::IOBuf::copyBuffer("CHLO");
+  ChainedByteRangeHead initialCryptoPacketRch(initialCryptoPacketBuf);
   auto packet = createInitialCryptoPacket(
       getTestConnectionId(),
       connId,
       packetNum,
       QuicVersion::MVFST,
-      *folly::IOBuf::copyBuffer("CHLO"),
+      initialCryptoPacketRch,
       *aead,
       offset,
       0 /* offset */,
@@ -723,12 +728,14 @@ TEST_F(QuicReadCodecTest, TestHandshakeDone) {
   auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
   auto headerCipher =
       cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
+  auto initialCryptoPacketBuf = folly::IOBuf::copyBuffer("CHLO");
+  ChainedByteRangeHead initialCryptoPacketRch(initialCryptoPacketBuf);
   auto packet = createInitialCryptoPacket(
       getTestConnectionId(),
       connId,
       packetNum,
       QuicVersion::MVFST,
-      *folly::IOBuf::copyBuffer("CHLO"),
+      initialCryptoPacketRch,
       *aead,
       offset);
 

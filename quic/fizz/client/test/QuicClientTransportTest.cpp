@@ -5593,6 +5593,7 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
       *client->getConn().initialDestinationConnectionId));
   mockClientHandshake->setServerTransportParams(std::move(*params));
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
+  ChainedByteRangeHead serverHelloRch(serverHello);
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
   auto packet = createCryptoPacket(
@@ -5601,7 +5602,7 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
       nextPacketNum,
       QuicVersion::QUIC_V1,
       ProtectionType::Initial,
-      *serverHello,
+      serverHelloRch,
       aead,
       0 /* largestAcked */);
   auto packetData = packetToBufCleartext(
@@ -5632,6 +5633,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       *client->getConn().initialDestinationConnectionId));
   mockClientHandshake->setServerTransportParams(std::move(*params));
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
+  ChainedByteRangeHead serverHelloRch(serverHello);
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
   auto packet = createCryptoPacket(
@@ -5640,7 +5642,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       nextPacketNum,
       QuicVersion::QUIC_V1,
       ProtectionType::Initial,
-      *serverHello,
+      serverHelloRch,
       aead,
       0 /* largestAcked */);
   auto packetData = packetToBufCleartext(
@@ -5671,13 +5673,14 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
   EXPECT_EQ(client->getConn().pendingOneRttData.size(), 1);
 
   auto cryptoData = folly::IOBuf::copyBuffer("Crypto data!");
+  ChainedByteRangeHead cryptoDataRch(cryptoData);
   auto cryptoPacket1 = packetToBuf(createCryptoPacket(
       *serverChosenConnId,
       *originalConnId,
       handshakePacketNum++,
       QuicVersion::QUIC_V1,
       ProtectionType::Handshake,
-      *cryptoData,
+      cryptoDataRch,
       *createNoOpAead(),
       0 /* largestAcked */));
   deliverData(cryptoPacket1->coalesce());
@@ -5708,7 +5711,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       handshakePacketNum++,
       QuicVersion::QUIC_V1,
       ProtectionType::Handshake,
-      *cryptoData,
+      cryptoDataRch,
       *createNoOpAead(),
       0,
       cryptoData->length()));
@@ -5741,6 +5744,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingDataBufferLimit) {
       *client->getConn().initialDestinationConnectionId));
   mockClientHandshake->setServerTransportParams(std::move(*params));
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
+  ChainedByteRangeHead serverHelloRch(serverHello);
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
   auto packet = createCryptoPacket(
@@ -5749,7 +5753,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingDataBufferLimit) {
       nextPacketNum,
       QuicVersion::QUIC_V1,
       ProtectionType::Initial,
-      *serverHello,
+      serverHelloRch,
       aead,
       0 /* largestAcked */);
   auto packetData = packetToBufCleartext(
@@ -5839,6 +5843,7 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
+  ChainedByteRangeHead serverHelloRch(serverHello);
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
   auto largestRecvdPacketNum =
@@ -5850,7 +5855,7 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
       nextPacketNum,
       QuicVersion::QUIC_V1,
       ProtectionType::Initial,
-      *serverHello,
+      serverHelloRch,
       aead,
       0 /* largestAcked */);
 

@@ -1186,9 +1186,8 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
     if (!stream->dsrSender) {
       return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
-    if (stream->currentWriteOffset == 0 && stream->writeBuffer.empty()) {
-      // If nothing has been written to writeBuffer ever, meta writing isn't
-      // allowed.
+    if (stream->currentWriteOffset == 0 && stream->pendingWrites.empty()) {
+      // If nothing has been written ever, meta writing isn't allowed.
       return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
     // Register DeliveryCallback for the data + eof offset.

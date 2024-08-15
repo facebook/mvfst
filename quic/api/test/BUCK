@@ -97,6 +97,7 @@ cpp_unittest(
     ],
     deps = [
         ":mocks",
+        "//folly:range",
         "//quic/api:transport",
         "//quic/common/events:folly_eventbase",
         "//quic/common/test:test_utils",

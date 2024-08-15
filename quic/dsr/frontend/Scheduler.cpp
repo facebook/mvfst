@@ -87,7 +87,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
         stream->lossBufMetas.front()
             .length, // flowControlLen shouldn't be used to limit loss write
         stream->lossBufMetas.front().eof,
-        stream->currentWriteOffset + stream->writeBuffer.chainLength());
+        stream->currentWriteOffset + stream->pendingWrites.chainLength());
     if (encodedSize > 0) {
       if (builder.remainingSpace() < encodedSize) {
         return result;
@@ -113,8 +113,8 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   if (connWritableBytes == 0) {
     return result;
   }
-  // When stream still has writeBuffer, getSendStreamFlowControlBytesWire counts
-  // from currentWriteOffset which isn't right for BufMetas.
+  // When stream still has pendingWrites, getSendStreamFlowControlBytesWire
+  // counts from currentWriteOffset which isn't right for BufMetas.
   auto streamFlowControlLen = std::min(
       getSendStreamFlowControlBytesWire(*stream),
       stream->flowControlState.peerAdvertisedMaxOffset -
@@ -131,7 +131,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
       stream->writeBufMeta.length,
       flowControlLen,
       canWriteFin,
-      stream->currentWriteOffset + stream->writeBuffer.chainLength());
+      stream->currentWriteOffset + stream->pendingWrites.chainLength());
   if (encodedSize > 0) {
     if (builder.remainingSpace() < encodedSize) {
       return result;

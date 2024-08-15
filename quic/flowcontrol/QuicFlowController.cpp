@@ -247,13 +247,13 @@ void updateFlowControlOnResetStream(QuicStreamState& stream) {
   decrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurStreamBufferLen,
       static_cast<uint64_t>(
-          stream.writeBuffer.chainLength() + stream.writeBufMeta.length));
+          stream.pendingWrites.chainLength() + stream.writeBufMeta.length));
 }
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
   // Only write blocked when stream becomes blocked
   if (getSendStreamFlowControlBytesWire(stream) == 0 &&
-      stream.writeBuffer.empty() && stream.writeBufMeta.length == 0) {
+      stream.pendingWrites.empty() && stream.writeBufMeta.length == 0) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
     if (stream.conn.qLogger) {
@@ -290,7 +290,7 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
   } else {
     shouldEmitStreamBlockedFrame =
         getSendStreamFlowControlBytesWire(stream) == 0 &&
-        (!stream.writeBuffer.empty() || stream.writeBufMeta.length > 0);
+        (!stream.pendingWrites.empty() || stream.writeBufMeta.length > 0);
   }
 
   if (shouldEmitStreamBlockedFrame &&
@@ -314,7 +314,7 @@ void handleStreamWindowUpdate(
     stream.flowControlState.peerAdvertisedMaxOffset = maximumData;
     stream.flowControlState.pendingBlockedFrame = false;
     if (stream.flowControlState.peerAdvertisedMaxOffset >
-        stream.currentWriteOffset + stream.writeBuffer.chainLength() +
+        stream.currentWriteOffset + stream.pendingWrites.chainLength() +
             stream.writeBufMeta.length) {
       updateFlowControlList(stream);
     }
@@ -368,7 +368,7 @@ uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
 uint64_t getSendStreamFlowControlBytesAPI(const QuicStreamState& stream) {
   auto sendFlowControlBytes = getSendStreamFlowControlBytesWire(stream);
   auto dataInBuffer =
-      stream.writeBuffer.chainLength() + stream.writeBufMeta.length;
+      stream.pendingWrites.chainLength() + stream.writeBufMeta.length;
   if (dataInBuffer > sendFlowControlBytes) {
     return 0;
   } else {

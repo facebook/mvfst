@@ -46,11 +46,11 @@ class PacketRebuilder {
     return stream.sendState == StreamSendState::Open;
   }
 
-  const BufQueue* cloneCryptoRetransmissionBuffer(
+  const ChainedByteRangeHead* cloneCryptoRetransmissionBuffer(
       const WriteCryptoFrame& frame,
       const QuicCryptoStream& stream);
 
-  const BufQueue* cloneRetransmissionBuffer(
+  const ChainedByteRangeHead* cloneRetransmissionBuffer(
       const WriteStreamFrame& frame,
       const QuicStreamState* stream);
 

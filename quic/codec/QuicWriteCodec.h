@@ -60,6 +60,11 @@ Optional<uint64_t> writeStreamFrameHeader(
     OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt,
     bool appendFrame = true);
 
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    const ChainedByteRangeHead& writeBuffer,
+    uint64_t dataLen);
+
 /**
  * Write stream frama data into builder
  * This writes dataLen worth of bytes from the parameter writeBuffer into the
@@ -95,7 +100,7 @@ void writeStreamFrameData(
  */
 Optional<WriteCryptoFrame> writeCryptoFrame(
     uint64_t offsetIn,
-    const BufQueue& data,
+    const ChainedByteRangeHead& data,
     PacketBuilderInterface& builder);
 
 /**

@@ -206,7 +206,7 @@ void verifyCorrectness(
   auto stream = conn.streamManager->findStream(id);
   ASSERT_TRUE(stream);
   if (writeAll) {
-    EXPECT_TRUE(stream->writeBuffer.empty());
+    EXPECT_TRUE(stream->pendingWrites.empty());
   }
   EXPECT_EQ(stream->currentWriteOffset, endOffset + (finSet ? 1 : 0));
   EXPECT_EQ(
@@ -220,7 +220,7 @@ void verifyCorrectness(
   std::vector<StreamBuffer> rtxCopy;
   for (auto& itr : stream->retransmissionBuffer) {
     rtxCopy.push_back(StreamBuffer(
-        itr.second->data.front()->clone(),
+        folly::IOBuf::copyBuffer(itr.second->data.getHead()->getRange()),
         itr.second->offset,
         itr.second->eof));
   }
@@ -297,7 +297,8 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
     curBuf->append(curBuf->capacity());
     curBuf = curBuf->next();
   } while (curBuf != largeBuf.get());
-  lossStreamState->lossBuffer.emplace_back(std::move(largeBuf), 31, false);
+  ChainedByteRangeHead largeBufRch(largeBuf);
+  lossStreamState->lossBuffer.emplace_back(std::move(largeBufRch), 31, false);
   conn.streamManager->updateWritableStreams(*lossStreamState);
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
@@ -2097,9 +2098,9 @@ TEST_F(QuicTransportTest, RstStream) {
   ASSERT_TRUE(stream);
   EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
-  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_TRUE(stream->pendingWrites.empty());
   EXPECT_FALSE(stream->writable());
-  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_TRUE(stream->pendingWrites.empty());
   EXPECT_FALSE(writableContains(
       *transport_->getConnectionState().streamManager, stream->id));
 }
@@ -2849,7 +2850,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
 
   EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
-  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_TRUE(stream->pendingWrites.empty());
   EXPECT_FALSE(stream->writable());
   EXPECT_FALSE(writableContains(
       *transport_->getConnectionState().streamManager, stream->id));
@@ -2888,7 +2889,7 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
   // this steam unwriable and drop current writeBuffer and
   // retransmissionBuffer:
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
-  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_TRUE(stream->pendingWrites.empty());
   EXPECT_FALSE(stream->writable());
 }
 
@@ -2919,7 +2920,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
 
   EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
-  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_TRUE(stream->pendingWrites.empty());
   EXPECT_FALSE(stream->writable());
   EXPECT_FALSE(writableContains(
       *transport_->getConnectionState().streamManager, stream->id));
@@ -3221,11 +3222,12 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   conn.lossState.srtt = 100us;
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
+  auto retxBufferData = folly::IOBuf::copyBuffer("But i'm not delivered yet");
   streamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(51),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(retxBufferData), 51, false)));
 
   folly::SocketAddress addr;
   NetworkData emptyData;
@@ -3269,13 +3271,15 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
   streamState->lossBuffer.clear();
+  auto retxBufferData = folly::IOBuf::copyBuffer("But i'm not delivered yet");
   streamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(51),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false)));
-  streamState->lossBuffer.emplace_back(
-      folly::IOBuf::copyBuffer("And I'm lost"), 31, false);
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(retxBufferData), 51, false)));
+  auto lossBufferData = folly::IOBuf::copyBuffer("And I'm lost");
+  ChainedByteRangeHead lossBufferRch(lossBufferData);
+  streamState->lossBuffer.emplace_back(std::move(lossBufferRch), 31, false);
   streamState->ackedIntervals.insert(0, 30);
 
   folly::SocketAddress addr;

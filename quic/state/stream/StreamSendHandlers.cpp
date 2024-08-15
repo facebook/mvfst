@@ -153,7 +153,7 @@ void sendAckSMHandler(
     case StreamSendState::Closed:
     case StreamSendState::ResetSent: {
       DCHECK(stream.retransmissionBuffer.empty());
-      DCHECK(stream.writeBuffer.empty());
+      DCHECK(stream.pendingWrites.empty());
       break;
     }
     case StreamSendState::Invalid: {

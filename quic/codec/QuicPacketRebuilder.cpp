@@ -279,7 +279,7 @@ Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   return cloneOutstandingPacket(packet);
 }
 
-const BufQueue* PacketRebuilder::cloneCryptoRetransmissionBuffer(
+const ChainedByteRangeHead* PacketRebuilder::cloneCryptoRetransmissionBuffer(
     const WriteCryptoFrame& frame,
     const QuicCryptoStream& stream) {
   /**
@@ -303,7 +303,7 @@ const BufQueue* PacketRebuilder::cloneCryptoRetransmissionBuffer(
   return &(iter->second->data);
 }
 
-const BufQueue* PacketRebuilder::cloneRetransmissionBuffer(
+const ChainedByteRangeHead* PacketRebuilder::cloneRetransmissionBuffer(
     const WriteStreamFrame& frame,
     const QuicStreamState* stream) {
   /**

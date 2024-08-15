@@ -335,12 +335,15 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterAPIWrite) {
   EXPECT_FALSE(conn_.streamManager->hasBlocked());
 
   stream.currentWriteOffset = 400;
-  stream.writeBuffer.append(IOBuf::copyBuffer("1234"));
+  auto dataBuf = IOBuf::copyBuffer("1234");
+  stream.pendingWrites.append(dataBuf);
+  stream.writeBuffer.append(std::move(dataBuf));
   EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(0);
   maybeWriteBlockAfterAPIWrite(stream);
   EXPECT_FALSE(conn_.streamManager->hasBlocked());
 
   stream.writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream.pendingWrites));
   stream.currentWriteOffset = 600;
   stream.flowControlState.peerAdvertisedMaxOffset = 600;
   EXPECT_CALL(*quicStats_, onStreamFlowControlBlocked()).Times(1);
@@ -840,6 +843,7 @@ TEST_F(QuicFlowControlTest, WritableList) {
   // Fin
   writeDataToQuicStream(stream, nullptr, true);
   stream.writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream.pendingWrites));
   stream.currentWriteOffset += 100;
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn_.streamManager->updateWritableStreams(stream);
@@ -865,6 +869,7 @@ TEST_F(QuicFlowControlTest, GetSendStreamFlowControlBytesAPIEmpty) {
   auto buf = IOBuf::create(200);
   buf->append(200);
 
+  stream.pendingWrites.append(buf);
   stream.writeBuffer.append(std::move(buf));
 
   stream.flowControlState.peerAdvertisedMaxOffset = 300;
@@ -878,6 +883,7 @@ TEST_F(QuicFlowControlTest, GetSendStreamFlowControlBytesAPIPartial) {
   auto buf = IOBuf::create(200);
   buf->append(200);
 
+  stream.pendingWrites.append(buf);
   stream.writeBuffer.append(std::move(buf));
 
   stream.flowControlState.peerAdvertisedMaxOffset = 500;
@@ -966,7 +972,9 @@ TEST_F(QuicFlowControlTest, StreamFlowControlWithBufMeta) {
   QuicStreamState stream(id, conn_);
   stream.flowControlState.peerAdvertisedMaxOffset = 1000;
   stream.currentWriteOffset = 200;
-  stream.writeBuffer.append(buildRandomInputData(100));
+  auto inputData = buildRandomInputData(100);
+  stream.pendingWrites.append(inputData);
+  stream.writeBuffer.append(std::move(inputData));
   EXPECT_EQ(800, getSendStreamFlowControlBytesWire(stream));
   EXPECT_EQ(700, getSendStreamFlowControlBytesAPI(stream));
 
@@ -978,6 +986,7 @@ TEST_F(QuicFlowControlTest, StreamFlowControlWithBufMeta) {
 
   stream.currentWriteOffset += stream.writeBuffer.chainLength();
   stream.writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream.pendingWrites));
   EXPECT_EQ(700, getSendStreamFlowControlBytesWire(stream));
   EXPECT_EQ(400, getSendStreamFlowControlBytesAPI(stream));
 }

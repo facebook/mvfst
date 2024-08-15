@@ -44,6 +44,21 @@ ChainedByteRangeHead::ChainedByteRangeHead(const Buf& buf) {
   tail_ = cur;
 }
 
+ChainedByteRangeHead::ChainedByteRangeHead(
+    ChainedByteRangeHead&& other) noexcept {
+  moveChain(std::move(other));
+}
+
+ChainedByteRangeHead& ChainedByteRangeHead::operator=(
+    ChainedByteRangeHead&& other) noexcept {
+  moveChain(std::move(other));
+  return *this;
+}
+
+ChainedByteRangeHead::~ChainedByteRangeHead() {
+  resetChain();
+}
+
 void ChainedByteRangeHead::append(const Buf& buf) {
   if (!buf || buf->empty()) {
     return;

@@ -297,13 +297,14 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     auto nextPacketNum = clientNextInitialPacketNum++;
     auto aead = getInitialCipher(version);
     auto headerCipher = getInitialHeaderCipher(version);
+    ChainedByteRangeHead chloRch(chlo);
     auto initialPacket = packetToBufCleartext(
         createInitialCryptoPacket(
             *clientConnectionId,
             *initialDestinationConnectionId,
             nextPacketNum,
             version,
-            *chlo,
+            chloRch,
             *aead,
             0 /* largestAcked */),
         *aead,
@@ -324,6 +325,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
             *server->getConn().cryptoState, EncryptionLevel::Handshake)
             ->currentReadOffset;
     auto handshakeCipher = test::createNoOpAead();
+    ChainedByteRangeHead finishedRch(finished);
     auto finishedPacket = packetToBufCleartext(
         createCryptoPacket(
             *clientConnectionId,
@@ -331,7 +333,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
             nextPacketNum,
             version,
             ProtectionType::Handshake,
-            *finished,
+            finishedRch,
             *handshakeCipher,
             0 /* largestAcked */,
             offset),

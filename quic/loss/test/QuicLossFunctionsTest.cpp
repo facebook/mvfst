@@ -511,8 +511,49 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
 
   auto& buffer = stream1->lossBuffer.front();
   EXPECT_EQ(buffer.offset, 0);
-  IOBufEqualTo eq;
-  EXPECT_TRUE(eq(buf, buffer.data.move()));
+  EXPECT_EQ(
+      folly::ByteRange(buf->data(), buf->length()),
+      buffer.data.getHead()->getRange());
+}
+
+bool areEqual(folly::IOBuf* ptr, ChainedByteRangeHead* rch) {
+  if (ptr->computeChainDataLength() != rch->chainLength()) {
+    return false;
+  }
+
+  auto* chainedByteRange = rch->getHead();
+
+  const uint8_t* currentIOBufDataPtr = ptr->data();
+  const uint8_t* currentRchDataPtr = chainedByteRange->getRange().data();
+
+  uint32_t remainingLenIOBuf = ptr->length();
+  uint32_t remainingLenRch = chainedByteRange->getRange().size();
+
+  for (uint32_t i = 0; i < rch->chainLength(); i++) {
+    while (remainingLenIOBuf == 0) {
+      ptr = ptr->next();
+      remainingLenIOBuf = ptr->length();
+      currentIOBufDataPtr = ptr->data();
+    }
+
+    while (remainingLenRch == 0) {
+      chainedByteRange = chainedByteRange->getNext();
+      remainingLenRch = chainedByteRange->getRange().size();
+      currentRchDataPtr = chainedByteRange->getRange().data();
+    }
+
+    if (*currentIOBufDataPtr != *currentRchDataPtr) {
+      return false;
+    }
+
+    remainingLenIOBuf--;
+    remainingLenRch--;
+
+    currentIOBufDataPtr++;
+    currentRchDataPtr++;
+  }
+
+  return true;
 }
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
@@ -568,8 +609,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
   combined->prependChain(buf2->clone());
   auto& buffer = stream1->lossBuffer.front();
   EXPECT_EQ(buffer.offset, 0);
-  IOBufEqualTo eq;
-  EXPECT_TRUE(eq(combined, buffer.data.move()));
+  EXPECT_TRUE(areEqual(combined.get(), &buffer.data));
 }
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
@@ -636,12 +676,15 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
 
   auto& buffer1 = stream1->lossBuffer[0];
   EXPECT_EQ(buffer1.offset, 0);
-  IOBufEqualTo eq;
-  EXPECT_TRUE(eq(buf1, buffer1.data.move()));
+  EXPECT_EQ(
+      folly::ByteRange(buf1->data(), buf1->length()),
+      buffer1.data.getHead()->getRange());
 
   auto& buffer3 = stream1->lossBuffer[1];
   EXPECT_EQ(buffer3.offset, 40);
-  EXPECT_TRUE(eq(buf3, buffer3.data.move()));
+  EXPECT_EQ(
+      folly::ByteRange(buf3->data(), buf3->length()),
+      buffer3.data.getHead()->getRange());
 }
 
 TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
@@ -704,7 +747,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossAfterStreamReset) {
 
   EXPECT_TRUE(stream1->lossBuffer.empty());
   EXPECT_TRUE(stream1->retransmissionBuffer.empty());
-  EXPECT_TRUE(stream1->writeBuffer.empty());
+  EXPECT_TRUE(stream1->pendingWrites.empty());
 }
 
 TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
@@ -1178,7 +1221,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithLostInitialData) {
   conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
 
   auto buf = buildRandomInputData(20);
-  StreamBuffer initialData(std::move(buf), 0);
+  WriteStreamBuffer initialData(ChainedByteRangeHead(buf), 0);
   conn->cryptoState->initialStream.lossBuffer.push_back(std::move(initialData));
 
   ASSERT_TRUE(conn->outstandings.packets.empty())
@@ -1208,7 +1251,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithLostHandshakeData) {
   conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
 
   auto buf = buildRandomInputData(20);
-  StreamBuffer handshakeData(std::move(buf), 0);
+  WriteStreamBuffer handshakeData(ChainedByteRangeHead(buf), 0);
   conn->cryptoState->handshakeStream.lossBuffer.push_back(
       std::move(handshakeData));
 
@@ -1238,7 +1281,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithLostAppData) {
   conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
 
   auto buf = buildRandomInputData(20);
-  StreamBuffer appData(std::move(buf), 0);
+  WriteStreamBuffer appData(ChainedByteRangeHead(buf), 0);
   conn->cryptoState->oneRttStream.lossBuffer.push_back(std::move(appData));
 
   ASSERT_TRUE(conn->outstandings.packets.empty())
@@ -2374,13 +2417,15 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
       false,
       0 /* PacketNum */,
       PacketNumberSpace::AppData);
-  ASSERT_EQ(0, stream->writeBuffer.chainLength());
+  ASSERT_EQ(0, stream->pendingWrites.chainLength());
   auto retxIter = stream->retransmissionBuffer.find(0);
   ASSERT_NE(stream->retransmissionBuffer.end(), retxIter);
   ASSERT_EQ(0, retxIter->second->offset);
   ASSERT_FALSE(retxIter->second->eof);
-  ASSERT_TRUE(folly::IOBufEqualTo()(
-      *folly::IOBuf::copyBuffer("grape"), *retxIter->second->data.front()));
+  auto expectedBuf = folly::IOBuf::copyBuffer("grape");
+  ASSERT_EQ(
+      folly::ByteRange(expectedBuf->buffer(), expectedBuf->length()),
+      retxIter->second->data.getHead()->getRange());
   ASSERT_EQ(stream->currentWriteOffset, bufMetaStartingOffset);
 
   // Send BufMeta in 3 chunks:

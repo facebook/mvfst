@@ -538,7 +538,7 @@ bool StreamFrameScheduler::writeStreamFrame(
 
   uint64_t flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(stream), connWritableBytes);
-  uint64_t bufferLen = stream.writeBuffer.chainLength();
+  uint64_t bufferLen = stream.pendingWrites.chainLength();
   // We should never write a FIN from the non-DSR scheduler for a DSR stream.
   bool canWriteFin = stream.finalWriteOffset.has_value() &&
       bufferLen <= flowControlLen && stream.writeBufMeta.offset == 0;
@@ -555,7 +555,7 @@ bool StreamFrameScheduler::writeStreamFrame(
   if (!dataLen) {
     return false;
   }
-  writeStreamFrameData(builder, stream.writeBuffer, *dataLen);
+  writeStreamFrameData(builder, stream.pendingWrites, *dataLen);
   VLOG(4) << "Wrote stream frame stream=" << stream.id
           << " offset=" << stream.currentWriteOffset
           << " bytesWritten=" << *dataLen
@@ -803,7 +803,7 @@ CryptoStreamScheduler::CryptoStreamScheduler(
 bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
   bool cryptoDataWritten = false;
   uint64_t writableData =
-      folly::to<uint64_t>(cryptoStream_.writeBuffer.chainLength());
+      folly::to<uint64_t>(cryptoStream_.pendingWrites.chainLength());
   // We use the crypto scheduler to reschedule the retransmissions of the
   // crypto streams so that we know that retransmissions of the crypto data
   // will always take precedence over the crypto data.
@@ -819,7 +819,7 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
 
   if (writableData != 0) {
     auto res = writeCryptoFrame(
-        cryptoStream_.currentWriteOffset, cryptoStream_.writeBuffer, builder);
+        cryptoStream_.currentWriteOffset, cryptoStream_.pendingWrites, builder);
     if (res) {
       VLOG(4) << "Wrote crypto frame"
               << " offset=" << cryptoStream_.currentWriteOffset
@@ -831,7 +831,7 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
 }
 
 bool CryptoStreamScheduler::hasData() const {
-  return !cryptoStream_.writeBuffer.empty() ||
+  return !cryptoStream_.pendingWrites.empty() ||
       !cryptoStream_.lossBuffer.empty();
 }
 

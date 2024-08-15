@@ -4682,7 +4682,9 @@ TEST_P(
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
-  stream->writeBuffer.append(IOBuf::copyBuffer("hello"));
+  auto dataBuf = IOBuf::copyBuffer("hello");
+  stream->pendingWrites.append(dataBuf);
+  stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
   conn->streamManager->addWritable(*stream);
@@ -4744,7 +4746,9 @@ TEST_P(
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
-  stream->writeBuffer.append(IOBuf::copyBuffer("hello"));
+  auto dataBuf = IOBuf::copyBuffer("hello");
+  stream->pendingWrites.append(dataBuf);
+  stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
   conn->streamManager->addWritable(*stream);
@@ -4778,7 +4782,9 @@ TEST_P(
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
-  stream->writeBuffer.append(IOBuf::copyBuffer("hello"));
+  auto dataBuf = IOBuf::copyBuffer("hello");
+  stream->pendingWrites.append(dataBuf);
+  stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
   conn->streamManager->addWritable(*stream);
@@ -4816,7 +4822,9 @@ TEST_P(
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
-  stream->writeBuffer.append(IOBuf::copyBuffer("hello"));
+  auto dataBuf = IOBuf::copyBuffer("hello");
+  stream->pendingWrites.append(dataBuf);
+  stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
   conn->streamManager->addWritable(*stream);
@@ -4882,7 +4890,9 @@ TEST_P(
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
   std::string testString = "hello";
-  stream->writeBuffer.append(IOBuf::copyBuffer(testString));
+  auto dataBuf = IOBuf::copyBuffer(testString);
+  stream->pendingWrites.append(dataBuf);
+  stream->writeBuffer.append(std::move(dataBuf));
   conn->flowControlState.sumCurStreamBufferLen = testString.length();
 
   // Insert streamId into the list.
@@ -4950,7 +4960,9 @@ TEST_P(
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
-  stream->writeBuffer.append(IOBuf::copyBuffer("hello"));
+  auto dataBuf = IOBuf::copyBuffer("hello");
+  stream->pendingWrites.append(dataBuf);
+  stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
   conn->streamManager->addWritable(*stream);

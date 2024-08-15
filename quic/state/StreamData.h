@@ -93,6 +93,28 @@ struct StreamBuffer {
   StreamBuffer& operator=(StreamBuffer&& other) = default;
 };
 
+struct WriteStreamBuffer {
+  ChainedByteRangeHead data;
+  uint64_t offset;
+  bool eof{false};
+
+  WriteStreamBuffer(
+      ChainedByteRangeHead&& dataIn,
+      uint64_t offsetIn,
+      bool eofIn = false) noexcept
+      : data(std::move(dataIn)), offset(offsetIn), eof(eofIn) {}
+
+  WriteStreamBuffer(WriteStreamBuffer&& other)
+      : data(std::move(other.data)), offset(other.offset), eof(other.eof) {}
+
+  WriteStreamBuffer& operator=(WriteStreamBuffer&& other) noexcept {
+    data = std::move(other.data);
+    offset = other.offset;
+    eof = other.eof;
+    return *this;
+  }
+};
+
 struct QuicStreamLike {
   QuicStreamLike() = default;
 
@@ -105,13 +127,15 @@ struct QuicStreamLike {
   CircularDeque<StreamBuffer> readBuffer;
 
   // List of bytes that have been written to the QUIC layer.
+  uint64_t writeBufferStartOffset{0};
   BufQueue writeBuffer{};
+  ChainedByteRangeHead pendingWrites{};
 
   // Stores a map of offset:buffers which have been written to the socket and
   // are currently un-acked. Each one represents one StreamFrame that was
   // written. We need to buffer these because these might be retransmitted in
   // the future. These are associated with the starting offset of the buffer.
-  folly::F14FastMap<uint64_t, std::unique_ptr<StreamBuffer>>
+  folly::F14FastMap<uint64_t, std::unique_ptr<WriteStreamBuffer>>
       retransmissionBuffer;
 
   // Tracks intervals which we have received ACKs for. E.g. in the case of all
@@ -125,10 +149,10 @@ struct QuicStreamLike {
 
   // Stores a list of buffers which have been marked as loss by loss detector.
   // Each one represents one StreamFrame that was written.
-  CircularDeque<StreamBuffer> lossBuffer;
+  CircularDeque<WriteStreamBuffer> lossBuffer;
 
-  // Current offset of the start bytes in the write buffer.
-  // This changes when we pop stuff off the writeBuffer.
+  // Current offset of the start bytes in the pending writes chain.
+  // This changes when we pop stuff off the pendingWrites chain.
   // In a non-DSR stream, when we are finished writing out all the bytes until
   // FIN, this will be one greater than finalWriteOffset.
   // When DSR is used, this still points to the starting bytes in the write
@@ -179,7 +203,7 @@ struct QuicStreamLike {
    * Either insert a new entry into the loss buffer, or merge the buffer with
    * an existing entry.
    */
-  void insertIntoLossBuffer(std::unique_ptr<StreamBuffer> buf) {
+  void insertIntoLossBuffer(std::unique_ptr<WriteStreamBuffer> buf) {
     // We assume here that we won't try to insert an overlapping buffer, as
     // that should never happen in the loss buffer.
     auto lossItr = std::upper_bound(
@@ -190,10 +214,10 @@ struct QuicStreamLike {
     if (!lossBuffer.empty() && lossItr != lossBuffer.begin() &&
         std::prev(lossItr)->offset + std::prev(lossItr)->data.chainLength() ==
             buf->offset) {
-      std::prev(lossItr)->data.append(buf->data.move());
+      std::prev(lossItr)->data.append(std::move(buf->data));
       std::prev(lossItr)->eof = buf->eof;
     } else {
-      lossBuffer.insert(lossItr, std::move(*buf));
+      lossBuffer.emplace(lossItr, std::move(*buf));
     }
   }
 
@@ -225,18 +249,17 @@ struct QuicStreamLike {
         size_t amountToSplit = removedStartOffset > lossStartOffset
             ? static_cast<size_t>(removedStartOffset - lossStartOffset)
             : 0;
-        Buf splitBuf = nullptr;
+        ChainedByteRangeHead splitBuf;
         if (amountToSplit > 0) {
           splitBuf = lossItr->data.splitAtMost(amountToSplit);
-          CHECK(splitBuf);
           lossItr->offset += amountToSplit;
         }
         lossItr->offset += lossItr->data.trimStartAtMost(len);
         if (lossItr->data.empty() && lossItr->eof == eof) {
           lossBuffer.erase(lossItr);
         }
-        if (splitBuf) {
-          insertIntoLossBuffer(std::make_unique<StreamBuffer>(
+        if (!splitBuf.empty()) {
+          insertIntoLossBuffer(std::make_unique<WriteStreamBuffer>(
               std::move(splitBuf), lossStartOffset, false));
         }
         return;
@@ -400,9 +423,9 @@ struct QuicStreamState : public QuicStreamLike {
 
   // If the stream has writable data that's not backed by DSR. That is, in a
   // regular stream write, it will be able to write something. So it either
-  // needs to have writeBuffer, or it has EOF to send.
+  // needs to have data in the pendingWrites chain, or it has EOF to send.
   bool hasWritableData() const {
-    if (!writeBuffer.empty()) {
+    if (!pendingWrites.empty()) {
       CHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
       return flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
     }
@@ -458,7 +481,7 @@ struct QuicStreamState : public QuicStreamLike {
     if (writeBufMeta.offset == 0) {
       return currentWriteOffset;
     }
-    if (!writeBuffer.empty()) {
+    if (!pendingWrites.empty()) {
       return currentWriteOffset;
     }
     return writeBufMeta.offset;
@@ -478,7 +501,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   // BufferMeta that has been written to the QUIC layer.
   // When offset is 0, nothing has been written to it. On first write, its
-  // starting offset will be currentWriteOffset + writeBuffer.chainLength().
+  // starting offset will be currentWriteOffset + pendingWrites.chainLength().
   WriteBufferMeta writeBufMeta;
 
   // A map to store sent WriteBufferMetas for potential retransmission.

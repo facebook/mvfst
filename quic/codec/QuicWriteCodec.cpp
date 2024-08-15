@@ -169,6 +169,15 @@ Optional<uint64_t> writeStreamFrameHeader(
 
 void writeStreamFrameData(
     PacketBuilderInterface& builder,
+    const ChainedByteRangeHead& writeBuffer,
+    uint64_t dataLen) {
+  if (dataLen > 0) {
+    builder.insert(writeBuffer, dataLen);
+  }
+}
+
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
     const BufQueue& writeBuffer,
     uint64_t dataLen) {
   if (dataLen > 0) {
@@ -187,7 +196,7 @@ void writeStreamFrameData(
 
 Optional<WriteCryptoFrame> writeCryptoFrame(
     uint64_t offsetIn,
-    const BufQueue& data,
+    const ChainedByteRangeHead& data,
     PacketBuilderInterface& builder) {
   uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
   QuicInteger intFrameType(static_cast<uint8_t>(FrameType::CRYPTO_FRAME));

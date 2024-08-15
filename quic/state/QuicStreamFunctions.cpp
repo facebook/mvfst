@@ -44,10 +44,10 @@ void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
     // write a blocked frame first time the stream becomes blocked
     maybeWriteBlockAfterAPIWrite(stream);
   }
+  stream.pendingWrites.append(data);
   stream.writeBuffer.append(std::move(data));
   if (eof) {
-    auto bufferSize =
-        stream.writeBuffer.front() ? stream.writeBuffer.chainLength() : 0;
+    auto bufferSize = stream.pendingWrites.chainLength();
     stream.finalWriteOffset = stream.currentWriteOffset + bufferSize;
   }
   updateFlowControlOnWriteToStream(stream, len);
@@ -62,7 +62,7 @@ void writeBufMetaToQuicStream(
     maybeWriteBlockAfterAPIWrite(stream);
   }
   auto realDataLength =
-      stream.currentWriteOffset + stream.writeBuffer.chainLength();
+      stream.currentWriteOffset + stream.pendingWrites.chainLength();
   CHECK_GT(realDataLength, 0)
       << "Real data has to be written to a stream before any buffer meta is"
       << "written to it.";
@@ -83,6 +83,7 @@ void writeBufMetaToQuicStream(
 }
 
 void writeDataToQuicStream(QuicCryptoStream& stream, Buf data) {
+  stream.pendingWrites.append(data);
   stream.writeBuffer.append(std::move(data));
 }
 
@@ -390,7 +391,7 @@ bool allBytesTillFinAcked(const QuicStreamState& stream) {
    * 5. We have no bytes that are detected as lost.
    */
   return stream.hasSentFIN() && stream.retransmissionBuffer.empty() &&
-      stream.retransmissionBufMetas.empty() && stream.writeBuffer.empty() &&
+      stream.retransmissionBufMetas.empty() && stream.pendingWrites.empty() &&
       !stream.hasWritableBufMeta() && stream.lossBuffer.empty() &&
       stream.lossBufMetas.empty();
 }
@@ -409,7 +410,7 @@ void appendPendingStreamReset(
    * we risk using a value > peer's flow control limit.
    */
   bool writeBufWritten = stream.writeBufMeta.offset &&
-      (stream.currentWriteOffset + stream.writeBuffer.chainLength() !=
+      (stream.currentWriteOffset + stream.pendingWrites.chainLength() !=
        stream.writeBufMeta.offset);
   conn.pendingEvents.resets.emplace(
       std::piecewise_construct,
@@ -426,7 +427,7 @@ void appendPendingStreamReset(
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
   return stream.finalWriteOffset.value_or(std::max<uint64_t>(
-      stream.currentWriteOffset + stream.writeBuffer.chainLength(),
+      stream.currentWriteOffset + stream.pendingWrites.chainLength(),
       stream.writeBufMeta.offset + stream.writeBufMeta.length));
 }
 

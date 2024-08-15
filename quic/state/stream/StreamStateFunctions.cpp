@@ -15,6 +15,7 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   updateFlowControlOnResetStream(stream);
   stream.retransmissionBuffer.clear();
   stream.writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream.pendingWrites)); // Will be destructed
   stream.readBuffer.clear();
   stream.lossBuffer.clear();
   stream.streamWriteError = error;

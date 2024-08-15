@@ -31,13 +31,13 @@ namespace {
  */
 bool cryptoHasWritableData(const quic::QuicConnectionStateBase& conn) {
   return (conn.initialWriteCipher &&
-          (!conn.cryptoState->initialStream.writeBuffer.empty() ||
+          (!conn.cryptoState->initialStream.pendingWrites.empty() ||
            !conn.cryptoState->initialStream.lossBuffer.empty())) ||
       (conn.handshakeWriteCipher &&
-       (!conn.cryptoState->handshakeStream.writeBuffer.empty() ||
+       (!conn.cryptoState->handshakeStream.pendingWrites.empty() ||
         !conn.cryptoState->handshakeStream.lossBuffer.empty())) ||
       (conn.oneRttWriteCipher &&
-       (!conn.cryptoState->oneRttStream.writeBuffer.empty() ||
+       (!conn.cryptoState->oneRttStream.pendingWrites.empty() ||
         !conn.cryptoState->oneRttStream.lossBuffer.empty()));
 }
 
@@ -415,8 +415,9 @@ void handleNewStreamDataWritten(
   // Idealy we should also check this data doesn't exist in either retx buffer
   // or loss buffer, but that's an expensive search.
   stream.currentWriteOffset += frameLen;
-  auto bufWritten = stream.writeBuffer.splitAtMost(folly::to<size_t>(frameLen));
-  DCHECK_EQ(bufWritten->computeChainDataLength(), frameLen);
+  ChainedByteRangeHead bufWritten(
+      stream.pendingWrites.splitAtMost(folly::to<size_t>(frameLen)));
+  DCHECK_EQ(bufWritten.chainLength(), frameLen);
   // TODO: If we want to be able to write FIN out of order for DSR-ed streams,
   // this needs to be fixed:
   stream.currentWriteOffset += frameFin ? 1 : 0;
@@ -424,7 +425,7 @@ void handleNewStreamDataWritten(
             .emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(originalOffset),
-                std::forward_as_tuple(std::make_unique<StreamBuffer>(
+                std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
                     std::move(bufWritten), originalOffset, frameFin)))
             .second);
 }
@@ -456,24 +457,30 @@ void handleRetransmissionWritten(
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    CircularDeque<StreamBuffer>::iterator lossBufferIter) {
+    CircularDeque<WriteStreamBuffer>::iterator lossBufferIter) {
   auto bufferLen = lossBufferIter->data.chainLength();
-  Buf bufWritten;
   if (frameLen == bufferLen && frameFin == lossBufferIter->eof) {
     // The buffer is entirely retransmitted
-    bufWritten = lossBufferIter->data.move();
+    ChainedByteRangeHead bufWritten(std::move(lossBufferIter->data));
     stream.lossBuffer.erase(lossBufferIter);
+    CHECK(stream.retransmissionBuffer
+              .emplace(
+                  std::piecewise_construct,
+                  std::forward_as_tuple(frameOffset),
+                  std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+                      std::move(bufWritten), frameOffset, frameFin)))
+              .second);
   } else {
     lossBufferIter->offset += frameLen;
-    bufWritten = lossBufferIter->data.splitAtMost(frameLen);
+    ChainedByteRangeHead bufWritten(lossBufferIter->data.splitAtMost(frameLen));
+    CHECK(stream.retransmissionBuffer
+              .emplace(
+                  std::piecewise_construct,
+                  std::forward_as_tuple(frameOffset),
+                  std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+                      std::move(bufWritten), frameOffset, frameFin)))
+              .second);
   }
-  CHECK(stream.retransmissionBuffer
-            .emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(frameOffset),
-                std::forward_as_tuple(std::make_unique<StreamBuffer>(
-                    std::move(bufWritten), frameOffset, frameFin)))
-            .second);
 }
 
 void handleRetransmissionBufMetaWritten(
@@ -1899,7 +1906,7 @@ void implicitAckCryptoStream(
   cryptoStream->lossBuffer.clear();
   CHECK(cryptoStream->retransmissionBuffer.empty());
   // The write buffer should be empty, there's no optional crypto data.
-  CHECK(cryptoStream->writeBuffer.empty());
+  CHECK(cryptoStream->pendingWrites.empty());
 }
 
 void handshakeConfirmed(QuicConnectionStateBase& conn) {

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/Range.h>
 #include <quic/api/QuicTransportFunctions.h>
 
 #include <quic/api/test/Mocks.h>
@@ -278,17 +279,20 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_EQ(stream2->currentWriteOffset, 13);
   EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 17);
 
-  IOBufEqualTo eq;
-
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
   auto& rt1 = *stream1->retransmissionBuffer.at(0);
   EXPECT_EQ(rt1.offset, 0);
-  EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey w"), *rt1.data.front()));
+  std::string expected = "hey w";
+  EXPECT_EQ(
+      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      rt1.data.getHead()->getRange());
 
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 1);
   auto& rt2 = *stream2->retransmissionBuffer.at(0);
   EXPECT_EQ(rt2.offset, 0);
-  EXPECT_TRUE(eq(*buf, *rt2.data.front()));
+  EXPECT_EQ(
+      folly::ByteRange(buf->buffer(), buf->length()),
+      rt2.data.getHead()->getRange());
   EXPECT_TRUE(rt2.eof);
 
   // Testing retransmission
@@ -342,22 +346,34 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_EQ(stream1->lossBuffer.size(), 0);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 2);
   auto& rt3 = *stream1->retransmissionBuffer.at(5);
-  EXPECT_TRUE(eq(IOBuf::copyBuffer("hats up"), rt3.data.move()));
+  expected = "hats up";
+  EXPECT_EQ(
+      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      rt3.data.getHead()->getRange());
 
   auto& rt4 = *stream1->retransmissionBuffer.at(0);
-  EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey w"), *rt4.data.front()));
+  expected = "hey w";
+  EXPECT_EQ(
+      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      rt4.data.getHead()->getRange());
 
   // loss buffer should be split into 2. Part in retransmission buffer and
   // part remains in loss buffer.
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 1);
   auto& rt5 = *stream2->retransmissionBuffer.at(0);
-  EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey wh"), *rt5.data.front()));
+  expected = "hey wh";
+  EXPECT_EQ(
+      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      rt5.data.getHead()->getRange());
   EXPECT_EQ(rt5.offset, 0);
   EXPECT_EQ(rt5.eof, 0);
 
   auto& rt6 = stream2->lossBuffer.front();
-  EXPECT_TRUE(eq(*IOBuf::copyBuffer("ats up"), *rt6.data.front()));
+  expected = "ats up";
+  EXPECT_EQ(
+      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      rt6.data.getHead()->getRange());
   EXPECT_EQ(rt6.offset, 6);
   EXPECT_EQ(rt6.eof, 1);
 
@@ -394,8 +410,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
-  const IOBufEqualTo eq;
-
   auto conn = createConn();
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -466,7 +480,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
     ASSERT_EQ(stream1->retransmissionBuffer.size(), 1);
     auto& rt = *stream1->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
-    EXPECT_TRUE(eq(*buf, *rt.data.front()));
+    EXPECT_EQ(
+        folly::ByteRange(buf->data(), buf->length()),
+        rt.data.getHead()->getRange());
     EXPECT_TRUE(rt.eof);
     stream1->lossBuffer.push_back(std::move(rt));
   }
@@ -474,7 +490,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
     ASSERT_EQ(stream2->retransmissionBuffer.size(), 1);
     auto& rt = *stream2->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
-    EXPECT_TRUE(eq(*buf, *rt.data.front()));
+    EXPECT_EQ(
+        folly::ByteRange(buf->data(), buf->length()),
+        rt.data.getHead()->getRange());
     EXPECT_TRUE(rt.eof);
     stream2->lossBuffer.push_back(std::move(rt));
   }
@@ -546,8 +564,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
 TEST_F(
     QuicTransportFunctionsTest,
     TestUpdateConnectionPacketRetransWithNewData) {
-  const IOBufEqualTo eq;
-
   auto conn = createConn();
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -635,7 +651,9 @@ TEST_F(
     ASSERT_EQ(stream1->retransmissionBuffer.size(), 1);
     auto& rt = *stream1->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
-    EXPECT_TRUE(eq(*buf, *rt.data.front()));
+    EXPECT_EQ(
+        folly::ByteRange(buf->data(), buf->length()),
+        rt.data.getHead()->getRange());
     EXPECT_TRUE(rt.eof);
     stream1->lossBuffer.push_back(std::move(rt));
   }
@@ -643,7 +661,10 @@ TEST_F(
     ASSERT_EQ(stream2->retransmissionBuffer.size(), 1);
     auto& rt = *stream2->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
-    EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey w"), *rt.data.front()));
+    auto expectedBuf = IOBuf::copyBuffer("hey w");
+    EXPECT_EQ(
+        folly::ByteRange(expectedBuf->data(), expectedBuf->length()),
+        rt.data.getHead()->getRange());
     EXPECT_FALSE(rt.eof);
     stream2->lossBuffer.push_back(std::move(rt));
   }
@@ -651,7 +672,9 @@ TEST_F(
     ASSERT_EQ(stream3->retransmissionBuffer.size(), 1);
     auto& rt = *stream3->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
-    EXPECT_TRUE(eq(*buf, *rt.data.front()));
+    EXPECT_EQ(
+        folly::ByteRange(buf->data(), buf->length()),
+        rt.data.getHead()->getRange());
     EXPECT_FALSE(rt.eof);
     stream3->lossBuffer.push_back(std::move(rt));
   }
@@ -856,7 +879,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
 
   EXPECT_EQ(stream1->currentWriteOffset, 1);
   EXPECT_EQ(rt1.offset, 0);
-  EXPECT_EQ(rt1.data.front()->computeChainDataLength(), 0);
+  EXPECT_EQ(rt1.data.chainLength(), 0);
   EXPECT_TRUE(rt1.eof);
 }
 
@@ -907,9 +930,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
   auto& rt1 = *stream1->retransmissionBuffer.at(0);
   EXPECT_EQ(rt1.offset, 0);
-  EXPECT_EQ(
-      rt1.data.front()->computeChainDataLength(),
-      buf->computeChainDataLength());
+  EXPECT_EQ(rt1.data.chainLength(), buf->computeChainDataLength());
   EXPECT_FALSE(rt1.eof);
 }
 
@@ -1043,11 +1064,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
 
   auto initialStream =
       getCryptoStream(*conn->cryptoState, EncryptionLevel::Initial);
-  ASSERT_TRUE(initialStream->writeBuffer.empty());
+  ASSERT_TRUE(initialStream->pendingWrites.empty());
   ASSERT_TRUE(initialStream->retransmissionBuffer.empty());
   ASSERT_TRUE(initialStream->lossBuffer.empty());
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
   packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
+  initialStream->pendingWrites.append(data);
   initialStream->writeBuffer.append(data->clone());
   updateConnection(
       *conn,
@@ -1067,7 +1089,9 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       WriteCryptoFrame(data->length(), data->length()));
   packet.packet.frames.push_back(
       WriteCryptoFrame(data->length() * 2, data->length()));
+  initialStream->pendingWrites.append(data);
   initialStream->writeBuffer.append(data->clone());
+  initialStream->pendingWrites.append(data);
   initialStream->writeBuffer.append(data->clone());
   updateConnection(
       *conn,
@@ -1081,12 +1105,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
   EXPECT_EQ(3, initialStream->retransmissionBuffer.size());
-  EXPECT_TRUE(initialStream->writeBuffer.empty());
+  EXPECT_TRUE(initialStream->pendingWrites.empty());
   EXPECT_TRUE(initialStream->lossBuffer.empty());
 
   // Fake loss.
-  Buf firstBuf =
-      initialStream->retransmissionBuffer.find(0)->second->data.move();
+  ChainedByteRangeHead firstBuf(
+      std::move(initialStream->retransmissionBuffer.find(0)->second->data));
   initialStream->retransmissionBuffer.erase(0);
   initialStream->lossBuffer.emplace_back(std::move(firstBuf), 0, false);
   conn->outstandings.packets.pop_front();
@@ -1094,11 +1118,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
 
   auto handshakeStream =
       getCryptoStream(*conn->cryptoState, EncryptionLevel::Handshake);
-  ASSERT_TRUE(handshakeStream->writeBuffer.empty());
+  ASSERT_TRUE(handshakeStream->pendingWrites.empty());
   ASSERT_TRUE(handshakeStream->retransmissionBuffer.empty());
   ASSERT_TRUE(handshakeStream->lossBuffer.empty());
   packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
+  handshakeStream->pendingWrites.append(data);
   handshakeStream->writeBuffer.append(data->clone());
   updateConnection(
       *conn,
@@ -1116,6 +1141,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   packet.packet.frames.push_back(
       WriteCryptoFrame(data->length(), data->length()));
+  handshakeStream->pendingWrites.append(data);
   handshakeStream->writeBuffer.append(data->clone());
   updateConnection(
       *conn,
@@ -1129,11 +1155,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(3, conn->outstandings.packets.size());
   EXPECT_EQ(2, handshakeStream->retransmissionBuffer.size());
-  EXPECT_TRUE(handshakeStream->writeBuffer.empty());
+  EXPECT_TRUE(handshakeStream->pendingWrites.empty());
   EXPECT_TRUE(handshakeStream->lossBuffer.empty());
 
   // Fake loss.
-  firstBuf = handshakeStream->retransmissionBuffer.find(0)->second->data.move();
+  firstBuf = ChainedByteRangeHead(
+      std::move(handshakeStream->retransmissionBuffer.find(0)->second->data));
   handshakeStream->retransmissionBuffer.erase(0);
   handshakeStream->lossBuffer.emplace_back(std::move(firstBuf), 0, false);
   auto& op = conn->outstandings.packets.front();
@@ -1149,7 +1176,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
-  EXPECT_TRUE(initialStream->writeBuffer.empty());
+  EXPECT_TRUE(initialStream->pendingWrites.empty());
   EXPECT_TRUE(initialStream->lossBuffer.empty());
 
   implicitAckCryptoStream(*conn, EncryptionLevel::Handshake);
@@ -1157,7 +1184,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_TRUE(conn->outstandings.packets.empty());
   EXPECT_TRUE(handshakeStream->retransmissionBuffer.empty());
-  EXPECT_TRUE(handshakeStream->writeBuffer.empty());
+  EXPECT_TRUE(handshakeStream->pendingWrites.empty());
   EXPECT_TRUE(handshakeStream->lossBuffer.empty());
 }
 
@@ -3310,7 +3337,7 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
   EXPECT_EQ(conn->udpSendPacketLen, res.bytesWritten);
   ASSERT_EQ(1, conn->outstandings.packets.size());
   ASSERT_EQ(1, cryptoStream->retransmissionBuffer.size());
-  ASSERT_TRUE(cryptoStream->writeBuffer.empty());
+  ASSERT_TRUE(cryptoStream->pendingWrites.empty());
 
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 0;
@@ -3663,8 +3690,9 @@ TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteMismatch) {
 
 TEST_F(QuicTransportFunctionsTest, HasCryptoDataToWrite) {
   auto conn = createConn();
+  auto dataBuf = folly::IOBuf::copyBuffer("Grab your coat and get your hat");
   conn->cryptoState->initialStream.lossBuffer.emplace_back(
-      folly::IOBuf::copyBuffer("Grab your coat and get your hat"), 0, false);
+      ChainedByteRangeHead(dataBuf), 0, false);
   EXPECT_EQ(WriteDataReason::CRYPTO_STREAM, hasNonAckDataToWrite(*conn));
   conn->initialWriteCipher.reset();
   EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
@@ -4155,19 +4183,21 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
       LongHeader::Types::Handshake);
   ASSERT_FALSE(initialStream->retransmissionBuffer.empty());
   ASSERT_FALSE(handshakeStream->retransmissionBuffer.empty());
-  initialStream->insertIntoLossBuffer(std::make_unique<StreamBuffer>(
-      folly::IOBuf::copyBuffer(
-          "I don't see the dialup info in the meeting invite"),
-      0,
-      false));
-  handshakeStream->insertIntoLossBuffer(std::make_unique<StreamBuffer>(
-      folly::IOBuf::copyBuffer("Traffic Protocol Weekly Sync"), 0, false));
+  auto lossBufferData1 = folly::IOBuf::copyBuffer(
+      "I don't see the dialup info in the meeting invite");
+  initialStream->insertIntoLossBuffer(std::make_unique<WriteStreamBuffer>(
+      ChainedByteRangeHead(lossBufferData1), 0, false));
+
+  auto lossBufferData2 =
+      folly::IOBuf::copyBuffer("Traffic Protocol Weekly Sync");
+  handshakeStream->insertIntoLossBuffer(std::make_unique<WriteStreamBuffer>(
+      ChainedByteRangeHead(lossBufferData2), 0, false));
 
   handshakeConfirmed(*conn);
-  EXPECT_TRUE(initialStream->writeBuffer.empty());
+  EXPECT_TRUE(initialStream->pendingWrites.empty());
   EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
   EXPECT_TRUE(initialStream->lossBuffer.empty());
-  EXPECT_TRUE(handshakeStream->writeBuffer.empty());
+  EXPECT_TRUE(handshakeStream->pendingWrites.empty());
   EXPECT_TRUE(handshakeStream->retransmissionBuffer.empty());
   EXPECT_TRUE(handshakeStream->lossBuffer.empty());
   EXPECT_EQ(nullptr, conn->initialWriteCipher);

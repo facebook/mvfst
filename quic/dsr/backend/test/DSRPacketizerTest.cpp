@@ -146,6 +146,7 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
   stream->currentWriteOffset = stream->writeBuffer.chainLength();
   stream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
   // Move part of the BufMetas to lossBufMetas

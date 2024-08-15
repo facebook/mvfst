@@ -172,7 +172,7 @@ void handleRetransmissionWritten(
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    CircularDeque<StreamBuffer>::iterator lossBufferIter);
+    CircularDeque<WriteStreamBuffer>::iterator lossBufferIter);
 
 /**
  * Update the connection and stream state after stream data is written and deal

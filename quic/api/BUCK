@@ -14,6 +14,9 @@ mvfst_cpp_library(
         "QuicBatchWriterFactory.h",
         "QuicGsoBatchWriters.h",
     ],
+    deps = [
+        "//quic/common:buf_accessor",
+    ],
     exported_deps = [
         "//folly:network_address",
         "//folly:portability",
@@ -45,6 +48,7 @@ mvfst_cpp_library(
         "//folly:chrono",
         "//folly:scope_guard",
         "//folly/tracing:static_tracepoint",
+        "//quic/common:buf_accessor",
         "//quic/common:socket_util",
         "//quic/common:time_util",
         "//quic/congestion_control:ecn_l4s_tracker",

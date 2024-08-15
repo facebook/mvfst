@@ -66,18 +66,11 @@ class ChainedByteRangeHead {
 
   ChainedByteRangeHead() = default;
 
-  ChainedByteRangeHead(ChainedByteRangeHead&& other) noexcept {
-    moveChain(std::move(other));
-  }
+  ChainedByteRangeHead(ChainedByteRangeHead&& other) noexcept;
 
-  ChainedByteRangeHead& operator=(ChainedByteRangeHead&& other) noexcept {
-    moveChain(std::move(other));
-    return *this;
-  }
+  ChainedByteRangeHead& operator=(ChainedByteRangeHead&& other) noexcept;
 
-  ~ChainedByteRangeHead() {
-    resetChain();
-  }
+  ~ChainedByteRangeHead();
 
   bool isChained() const {
     return head_.next_ != nullptr;

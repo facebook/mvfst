@@ -76,7 +76,7 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimit) {
   // Pretend we sent the non DSR data
   stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
   stream->currentWriteOffset = stream->writeBuffer.chainLength();
-  stream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream);
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 2;
@@ -108,7 +108,7 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimitNoLimit) {
   // Pretend we sent the non DSR data
   stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
   stream->currentWriteOffset = stream->writeBuffer.chainLength();
-  stream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream);
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 2;
@@ -140,7 +140,7 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   // Pretend we sent the non DSR data
   stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
   stream->currentWriteOffset = stream->writeBuffer.chainLength();
-  stream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
@@ -162,7 +162,7 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
   // Pretend we sent the non DSR data
   stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
   stream->currentWriteOffset = stream->writeBuffer.chainLength();
-  stream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream);
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -192,7 +192,8 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   // Pretend we sent the non DSR data on second stream
   stream2->ackedIntervals.insert(0, stream2->writeBuffer.chainLength() - 1);
   stream2->currentWriteOffset = stream2->writeBuffer.chainLength();
-  stream2->writeBuffer.move();
+  ChainedByteRangeHead(
+      std::move(stream2->pendingWrites)); // Destruct the pendingWrites
   conn_.streamManager->updateWritableStreams(*stream2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
@@ -221,7 +222,7 @@ TEST_F(WriteFunctionsTest, WriteThreeStreamsNonDsrAndDsr) {
   // Pretend we sent the non DSR data for last stream
   stream3->ackedIntervals.insert(0, stream3->writeBuffer.chainLength() - 1);
   stream3->currentWriteOffset = stream3->writeBuffer.chainLength();
-  stream3->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream3->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream3);
   EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
@@ -245,7 +246,7 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsNonIncremental) {
   // Pretend we sent the non DSR data on first stream
   stream1->ackedIntervals.insert(0, stream1->writeBuffer.chainLength() - 1);
   stream1->currentWriteOffset = stream1->writeBuffer.chainLength();
-  stream1->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream1->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream1);
   auto cid = getTestConnectionId();
   size_t packetLimit = 2;
@@ -269,7 +270,7 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsIncremental) {
   // Pretend we sent the non DSR data on second stream
   stream2->ackedIntervals.insert(0, stream2->writeBuffer.chainLength() - 1);
   stream2->currentWriteOffset = stream2->writeBuffer.chainLength();
-  stream2->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream2->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 2;
@@ -289,7 +290,7 @@ TEST_F(WriteFunctionsTest, LossAndFreshTwoInstructionsInTwoPackets) {
   // Pretend we sent the non DSR data
   stream->ackedIntervals.insert(0, stream->writeBuffer.chainLength() - 1);
   stream->currentWriteOffset = stream->writeBuffer.chainLength();
-  stream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(stream->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
   // Move part of the BufMetas to lossBufMetas

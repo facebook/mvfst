@@ -199,12 +199,14 @@ TEST_P(QuicPacketBuilderTest, LongHeaderRegularPacket) {
     return rawBuilder;
   };
 
+  auto chloBuf = folly::IOBuf::copyBuffer("CHLO");
+  ChainedByteRangeHead chloRch(chloBuf);
   auto resultRegularPacket = createInitialCryptoPacket(
       serverConnId,
       clientConnId,
       pktNum,
       ver,
-      *folly::IOBuf::copyBuffer("CHLO"),
+      chloRch,
       *cleartextAead,
       0 /* largestAcked */,
       0 /* offset */,

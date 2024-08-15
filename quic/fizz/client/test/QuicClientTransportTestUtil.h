@@ -605,6 +605,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   void recvServerHello(const folly::SocketAddress& addr) {
     auto serverHello = folly::IOBuf::copyBuffer("Fake SHLO");
+    ChainedByteRangeHead serverHelloRch(serverHello);
     PacketNum nextPacketNum = initialPacketNum++;
     auto& aead = getInitialCipher();
     auto packet = packetToBufCleartext(
@@ -614,7 +615,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
             nextPacketNum,
             version,
             ProtectionType::Initial,
-            *serverHello,
+            serverHelloRch,
             aead,
             0 /* largestAcked */),
         aead,
@@ -654,13 +655,14 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   void recvTicket(Optional<uint64_t> offsetOverride = none) {
     auto negotiatedVersion = *client->getConn().version;
     auto ticket = folly::IOBuf::copyBuffer("NST");
+    ChainedByteRangeHead ticketRch(ticket);
     auto packet = packetToBuf(createCryptoPacket(
         *serverChosenConnId,
         *originalConnId,
         appDataPacketNum++,
         negotiatedVersion,
         ProtectionType::KeyPhaseZero,
-        *ticket,
+        ticketRch,
         *createNoOpAead(),
         0 /* largestAcked */,
         offsetOverride

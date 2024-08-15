@@ -318,12 +318,13 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
-  BufQueue data{};
+  ChainedByteRangeHead data;
   auto iob = folly::IOBuf::createChain(200, 200);
   iob->append(200);
-  data.append(std::move(iob));
+  data.append(iob);
   ASSERT_EQ(data.chainLength(), 200);
-  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  auto streamBuffer =
+      std::make_unique<WriteStreamBuffer>(std::move(data), 0, false);
   streamState->insertIntoLossBuffer(std::move(streamBuffer));
 
   TimePoint startTime = Clock::now();
@@ -397,12 +398,13 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
-  BufQueue data{};
+  ChainedByteRangeHead data;
   auto iob = folly::IOBuf::createChain(200, 200);
   iob->append(200);
-  data.append(std::move(iob));
+  data.append(iob);
   ASSERT_EQ(data.chainLength(), 200);
-  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  auto streamBuffer =
+      std::make_unique<WriteStreamBuffer>(std::move(data), 0, false);
   streamState->insertIntoLossBuffer(std::move(streamBuffer));
 
   TimePoint startTime = Clock::now();
@@ -482,12 +484,13 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
-  BufQueue data{};
+  ChainedByteRangeHead data;
   auto iob = folly::IOBuf::createChain(200, 200);
   iob->append(200);
-  data.append(std::move(iob));
+  data.append(iob);
   ASSERT_EQ(data.chainLength(), 200);
-  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  auto streamBuffer =
+      std::make_unique<WriteStreamBuffer>(std::move(data), 0, false);
   streamState->insertIntoLossBuffer(std::move(streamBuffer));
 
   TimePoint startTime = Clock::now();
@@ -564,12 +567,13 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
-  BufQueue data{};
+  ChainedByteRangeHead data;
   auto iob = folly::IOBuf::createChain(200, 200);
   iob->append(200);
-  data.append(std::move(iob));
+  data.append(iob);
   ASSERT_EQ(data.chainLength(), 200);
-  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  auto streamBuffer =
+      std::make_unique<WriteStreamBuffer>(std::move(data), 0, false);
   streamState->insertIntoLossBuffer(std::move(streamBuffer));
 
   TimePoint startTime = Clock::now();

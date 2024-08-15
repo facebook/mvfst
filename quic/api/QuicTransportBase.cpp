@@ -560,7 +560,7 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
   }
   try {
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-    return stream->writeBuffer.chainLength();
+    return stream->pendingWrites.chainLength();
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return folly::makeUnexpected(ex.errorCode());
@@ -1672,6 +1672,10 @@ void QuicTransportBase::handleDeliveryCallbacks() {
     auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
 
     while (maxOffsetToDeliver.has_value()) {
+      size_t amountTrimmed = stream->writeBuffer.trimStartAtMost(
+          *maxOffsetToDeliver - stream->writeBufferStartOffset);
+      stream->writeBufferStartOffset += amountTrimmed;
+
       auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
       if (deliveryCallbacksForAckedStream == deliveryCallbacks_.end() ||
           deliveryCallbacksForAckedStream->second.empty()) {

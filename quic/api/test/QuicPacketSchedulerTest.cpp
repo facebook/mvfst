@@ -321,8 +321,10 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
               "CryptoOnlyScheduler")
               .cryptoFrames())
           .build();
+  Buf helloBuf = folly::IOBuf::copyBuffer("chlo");
+  ChainedByteRangeHead clientHelloData(helloBuf);
   conn.cryptoState->initialStream.lossBuffer.push_back(
-      StreamBuffer{folly::IOBuf::copyBuffer("chlo"), 0, false});
+      WriteStreamBuffer{std::move(clientHelloData), 0, false});
   auto result = scheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
   auto packetLength = result.packet->header.computeChainDataLength() +
@@ -348,13 +350,15 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   PacketBuilderWrapper builderWrapper(builder, 13);
   CryptoStreamScheduler scheduler(
       conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake));
-  conn.cryptoState->handshakeStream.lossBuffer.push_back(
-      StreamBuffer{folly::IOBuf::copyBuffer("shlo"), 0, false});
-  conn.cryptoState->handshakeStream.lossBuffer.push_back(StreamBuffer{
-      folly::IOBuf::copyBuffer(
-          "certificatethatisverylongseriouslythisisextremelylongandcannotfitintoapacket"),
-      7,
-      false});
+
+  Buf helloBuf = folly::IOBuf::copyBuffer("shlo");
+  Buf certBuf = folly::IOBuf::copyBuffer(
+      "certificatethatisverylongseriouslythisisextremelylongandcannotfitintoapacket");
+
+  conn.cryptoState->handshakeStream.lossBuffer.emplace_back(
+      ChainedByteRangeHead(helloBuf), 0, false);
+  conn.cryptoState->handshakeStream.lossBuffer.emplace_back(
+      ChainedByteRangeHead(certBuf), 7, false);
   EXPECT_TRUE(scheduler.writeCryptoData(builderWrapper));
 }
 
@@ -382,10 +386,10 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
               "CryptoOnlyScheduler")
               .cryptoFrames())
           .build();
-  conn.cryptoState->initialStream.lossBuffer.push_back(StreamBuffer{
-      folly::IOBuf::copyBuffer("return the special duration value max"),
-      0,
-      false});
+  Buf lossBuffer =
+      folly::IOBuf::copyBuffer("return the special duration value max");
+  conn.cryptoState->initialStream.lossBuffer.emplace_back(
+      ChainedByteRangeHead(lossBuffer), 0, false);
   auto result = cryptoOnlyScheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
   auto packetLength = result.packet->header.computeChainDataLength() +
@@ -662,11 +666,12 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
 
   // Add some crypto data for the outstanding packet to make it look legit.
   // This is so cloning scheduler can actually copy something.
+  Buf cryptoBuf = folly::IOBuf::copyBuffer("test");
+  ChainedByteRangeHead cryptoRch(cryptoBuf);
   getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake)
       ->retransmissionBuffer.emplace(
           0,
-          std::make_unique<StreamBuffer>(
-              folly::IOBuf::copyBuffer("test"), 0, false));
+          std::make_unique<WriteStreamBuffer>(std::move(cryptoRch), 0, false));
   conn.outstandings.packets.back().packet.frames.push_back(
       WriteCryptoFrame(0, 4));
 
@@ -1493,6 +1498,8 @@ TEST_F(
   dsrStream->ackedIntervals.insert(0, dsrStream->writeBuffer.chainLength() - 1);
   dsrStream->currentWriteOffset = dsrStream->writeBuffer.chainLength();
   dsrStream->writeBuffer.move();
+  ChainedByteRangeHead(std::move(
+      dsrStream->pendingWrites)); // Move and destruct the pending writes
   conn.streamManager->updateWritableStreams(*dsrStream);
 
   // The default is to wraparound initially.
@@ -1909,8 +1916,11 @@ TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
   auto lowPriStream = conn.streamManager->findStream(lowPriStreamId);
   auto highPriStream = conn.streamManager->findStream(highPriStreamId);
 
+  Buf lossBuffer = folly::IOBuf::copyBuffer("Onegin");
+  ChainedByteRangeHead lossBufferRch(lossBuffer);
+
   lowPriStream->lossBuffer.push_back(
-      StreamBuffer(folly::IOBuf::copyBuffer("Onegin"), 0, false));
+      WriteStreamBuffer(std::move(lossBufferRch), 0, false));
   conn.streamManager->updateWritableStreams(*lowPriStream);
   conn.streamManager->setStreamPriority(lowPriStream->id, Priority(5, false));
 
@@ -1969,7 +1979,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
   EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
-  EXPECT_EQ(0, stream->writeBuffer.chainLength());
+  EXPECT_EQ(0, stream->pendingWrites.chainLength());
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
 
@@ -2041,7 +2051,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
   EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
-  EXPECT_EQ(0, stream->writeBuffer.chainLength());
+  EXPECT_EQ(0, stream->pendingWrites.chainLength());
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
 
@@ -2081,7 +2091,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
   EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
-  EXPECT_EQ(0, stream->writeBuffer.chainLength());
+  EXPECT_EQ(0, stream->pendingWrites.chainLength());
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
 
@@ -2133,7 +2143,7 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   // Fake a loss data for stream2:
   stream2->currentWriteOffset = 201;
   auto lossData = buildRandomInputData(200);
-  stream2->lossBuffer.emplace_back(std::move(lossData), 0, true);
+  stream2->lossBuffer.emplace_back(ChainedByteRangeHead(lossData), 0, true);
   conn.streamManager->updateWritableStreams(*stream2);
 
   StreamFrameScheduler scheduler(conn);
@@ -2154,7 +2164,7 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId1, writeStreamFrame1.streamId);
   EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
-  EXPECT_EQ(0, stream1->writeBuffer.chainLength());
+  EXPECT_EQ(0, stream1->pendingWrites.chainLength());
   EXPECT_EQ(1, stream1->retransmissionBuffer.size());
   EXPECT_EQ(1000, stream1->retransmissionBuffer[0]->data.chainLength());
 

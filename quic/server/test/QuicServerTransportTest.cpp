@@ -817,11 +817,13 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
+
+  auto wordsBuf2 = IOBuf::copyBuffer(words.at(2));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   writeDataToQuicStream(*stream, IOBuf::copyBuffer(words.at(3)), false);
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -875,11 +877,12 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
+  auto wordsBuf2 = IOBuf::copyBuffer(words.at(2));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -919,11 +922,12 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
+  auto wordsBuf2 = IOBuf::copyBuffer(words.at(2));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -964,11 +968,12 @@ TEST_F(QuicServerTransportTest, RecvInvalidMaxStreamData) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
+  auto wordsBuf2 = IOBuf::copyBuffer(words.at(2));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1006,11 +1011,12 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
+  auto wordsBuf2 = IOBuf::copyBuffer(words.at(2));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1087,11 +1093,12 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream1->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream1->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
+  auto wordsBuf2 = IOBuf::copyBuffer(words.at(2));
   stream1->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream1->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream1->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream1->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1102,8 +1109,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream2->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          IOBuf::copyBuffer(words.at(2)), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream2->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream2->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream2->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -3570,13 +3577,15 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadCleartextEncryption) {
   PacketNum nextPacket = clientNextInitialPacketNum++;
   auto aead = cryptoFactory.getServerInitialCipher(
       *clientConnectionId, QuicVersion::MVFST);
+  auto chloBuf = IOBuf::copyBuffer("CHLO");
+  ChainedByteRangeHead chloRch(chloBuf);
   auto packetData = packetToBufCleartext(
       createInitialCryptoPacket(
           *clientConnectionId,
           *initialDestinationConnectionId,
           nextPacket,
           QuicVersion::MVFST,
-          *IOBuf::copyBuffer("CHLO"),
+          chloRch,
           *aead,
           0 /* largestAcked */),
       *aead,
@@ -4214,13 +4223,14 @@ TEST_F(QuicUnencryptedServerTransportTest, TestCorruptedDstCidInitialTest) {
   EXPECT_TRUE(clientConnectionId);
   EXPECT_NE(*initialDestinationConnectionId, corruptedDstCid);
 
+  ChainedByteRangeHead chloRch(chlo);
   auto initialPacket = packetToBufCleartext(
       createInitialCryptoPacket(
           *clientConnectionId,
           corruptedDstCid,
           nextPacketNum,
           QuicVersion::MVFST,
-          *chlo,
+          chloRch,
           *aead,
           0 /* largestAcked */),
       *aead,
@@ -4489,13 +4499,15 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
   PacketNum nextPacket = clientNextInitialPacketNum++;
   auto aead = getInitialCipher();
   auto headerCipher = getInitialHeaderCipher();
+  auto chloBuf = IOBuf::copyBuffer("CHLO");
+  ChainedByteRangeHead chloRch(chloBuf);
   auto packet = createCryptoPacket(
       *clientConnectionId,
       *initialDestinationConnectionId,
       nextPacket,
       QuicVersion::MVFST,
       ProtectionType::Initial,
-      *IOBuf::copyBuffer("CHLO"),
+      chloRch,
       *aead,
       0 /* largestAcked */);
   auto packetData =

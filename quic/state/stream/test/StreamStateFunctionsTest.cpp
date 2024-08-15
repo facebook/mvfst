@@ -36,10 +36,12 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
       StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15));
   writeDataToQuicStream(
       stream, folly::IOBuf::copyBuffer("What is it then?"), false);
+
+  std::string retxBufData = "How would I know?";
+  Buf retxBuf = folly::IOBuf::copyBuffer(retxBufData);
   stream.retransmissionBuffer.emplace(
       34,
-      std::make_unique<StreamBuffer>(
-          folly::IOBuf::copyBuffer("How would I know?"), 34));
+      std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(retxBuf), 34));
   auto currentWriteOffset = stream.currentWriteOffset;
   auto currentReadOffset = stream.currentReadOffset;
   EXPECT_TRUE(stream.writable());

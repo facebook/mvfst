@@ -148,19 +148,20 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeFrame(maxDataFrame, regularBuilder1);
   writeFrame(maxStreamDataFrame, regularBuilder1);
-  writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
+  writeCryptoFrame(
+      cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(8, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(buf->clone(), 0, true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf), 0, true)));
   conn.cryptoState->oneRttStream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(cryptoBuf->clone(), 0, true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(cryptoBuf), 0, true)));
   // Write an updated ackState that should be used when rebuilding the AckFrame
   conn.ackStates.appDataAckState.acks.insert(1000, 1200);
   conn.ackStates.appDataAckState.largestRecvdPacketTime.assign(
@@ -310,7 +311,8 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(nullptr, 0, true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(), 0, true)));
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -363,14 +365,15 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
-  writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
+  writeCryptoFrame(
+      cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(2, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(buf->clone(), 0, true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf), 0, true)));
   // Do not add the buf to crypto stream's retransmission buffer,
   // imagine it was cleared
 
@@ -412,7 +415,8 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
   auto cryptoBuf = folly::IOBuf::copyBuffer("NewSessionTicket");
 
   // Write them with a regular builder
-  writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
+  writeCryptoFrame(
+      cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(1, packet1.packet.frames.size());
   // Do not add the buf to crypto stream's retransmission buffer,
@@ -477,8 +481,8 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(buf->clone(), 0, true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf), 0, true)));
 
   // new builder has a much smaller writable bytes limit
   ShortHeader shortHeader2(
@@ -582,13 +586,13 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(buf1->clone(), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf1), 0, false)));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(buf1->computeChainDataLength()),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          buf2->clone(), buf1->computeChainDataLength(), true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf2), buf1->computeChainDataLength(), true)));
 
   MockQuicPacketBuilder mockBuilder;
   size_t packetLimit = 1200;
@@ -596,10 +600,11 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
     return packetLimit;
   }));
   // write data twice
-  EXPECT_CALL(mockBuilder, insert(_, _))
+  EXPECT_CALL(mockBuilder, _insertRch(_, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([&](const BufQueue&, size_t limit) { packetLimit -= limit; }));
+      .WillRepeatedly(Invoke([&](const ChainedByteRangeHead&, size_t limit) {
+        packetLimit -= limit;
+      }));
   // Append frame twice
   EXPECT_CALL(mockBuilder, appendFrame(_)).Times(2);
   // initial byte:
@@ -649,19 +654,19 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       0,
       true,
       none);
-  writeStreamFrameData(regularBuilder, nullptr, 0);
+  writeStreamFrameData(regularBuilder, ChainedByteRangeHead(), 0);
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1200);
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(
-          std::make_unique<StreamBuffer>(buf1->clone(), 0, false)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf1), 0, false)));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(buf1->computeChainDataLength()),
-      std::forward_as_tuple(std::make_unique<StreamBuffer>(
-          nullptr, buf1->computeChainDataLength(), true)));
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(), buf1->computeChainDataLength(), true)));
 
   MockQuicPacketBuilder mockBuilder;
   size_t packetLimit = 1200;
@@ -669,10 +674,11 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
     return packetLimit;
   }));
   // write data only
-  EXPECT_CALL(mockBuilder, insert(_, _))
+  EXPECT_CALL(mockBuilder, _insertRch(_, _))
       .Times(1)
-      .WillOnce(
-          Invoke([&](const BufQueue&, size_t limit) { packetLimit -= limit; }));
+      .WillOnce(Invoke([&](const ChainedByteRangeHead&, size_t limit) {
+        packetLimit -= limit;
+      }));
   // Append frame twice
   EXPECT_CALL(mockBuilder, appendFrame(_)).Times(2);
   // initial byte:
