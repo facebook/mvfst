@@ -67,6 +67,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"ignoreInflightHi\": true, "
       "\"ignoreLoss\": true, "
       "\"enableRenoCoexistence\": true, "
+      "\"paceInitCwnd\": false, "
       "\"overrideCruisePacingGain\": 7.9, "
       "\"overrideCruiseCwndGain\": -0.1, "
       "\"overrideStartupPacingGain\": -0.5 "
@@ -83,6 +84,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.ignoreInflightHi, true);
   EXPECT_EQ(config.ignoreLoss, true);
   EXPECT_EQ(config.enableRenoCoexistence, true);
+  EXPECT_EQ(config.paceInitCwnd, false);
   EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
   EXPECT_EQ(config.overrideCruiseCwndGain, -0.1f);
   EXPECT_EQ(config.overrideStartupPacingGain, -0.5f);

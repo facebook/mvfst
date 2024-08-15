@@ -249,6 +249,11 @@ void Bbr2CongestionController::enterStartup() {
 }
 
 void Bbr2CongestionController::setPacing() {
+  if (!conn_.transportSettings.ccaConfig.paceInitCwnd &&
+      conn_.lossState.totalBytesSent <
+          conn_.transportSettings.initCwndInMss * conn_.udpSendPacketLen) {
+    return;
+  }
   uint64_t pacingWindow =
       bandwidth_ * minRtt_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
   VLOG(6) << "Setting pacing to "

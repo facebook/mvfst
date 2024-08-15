@@ -81,6 +81,10 @@ struct CongestionControlConfig {
   bool enableRenoCoexistence{false};
 
   // Used by: BBR2
+  // Whether BBR2 paces the initial congestion window.
+  bool paceInitCwnd{true};
+
+  // Used by: BBR2
   // Use a different pacing gain during ProbeBW Cruise and Refill.
   // If value < 0, use the default pacing gain.
   float overrideCruisePacingGain{-1.0};
