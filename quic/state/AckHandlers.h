@@ -104,4 +104,12 @@ void updateEcnCountEchoed(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& readAckFrame);
+
+/**
+ * Modifies the state in the QuicConnectionStateBase when a packet that
+ * was marked as lost is acked.
+ */
+void modifyStateForSpuriousLoss(
+    QuicConnectionStateBase& conn,
+    OutstandingPacketWrapper& spuriouslyLostPacket);
 } // namespace quic

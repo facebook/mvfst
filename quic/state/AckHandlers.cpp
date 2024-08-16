@@ -229,45 +229,8 @@ AckEvent processAckFrame(
       // If we hit a packet which has been lost we need to count the spurious
       // loss and ignore all other processing.
       if (rPacketIt->declaredLost) {
-        CHECK_GT(conn.outstandings.declaredLostCount, 0);
-        conn.lossState.totalPacketsSpuriouslyMarkedLost++;
-        if (conn.transportSettings.useAdaptiveLossReorderingThresholds) {
-          if (rPacketIt->metadata.lossReorderDistance.has_value() &&
-              rPacketIt->metadata.lossReorderDistance.value() >
-                  conn.lossState.reorderingThreshold) {
-            conn.lossState.reorderingThreshold =
-                rPacketIt->metadata.lossReorderDistance.value();
-          }
-        }
-        if (conn.transportSettings.useAdaptiveLossTimeThresholds) {
-          if (rPacketIt->metadata.lossTimeoutDividend.has_value() &&
-              rPacketIt->metadata.lossTimeoutDividend.value() >
-                  conn.transportSettings.timeReorderingThreshDividend) {
-            conn.transportSettings.timeReorderingThreshDividend =
-                rPacketIt->metadata.lossTimeoutDividend.value();
-          }
-        }
-        if (conn.transportSettings.removeFromLossBufferOnSpurious) {
-          for (auto& f : rPacketIt->packet.frames) {
-            auto streamFrame = f.asWriteStreamFrame();
-            if (streamFrame) {
-              auto stream =
-                  conn.streamManager->findStream(streamFrame->streamId);
-              if (stream) {
-                stream->removeFromLossBuffer(
-                    streamFrame->offset, streamFrame->len, streamFrame->fin);
-                stream->updateAckedIntervals(
-                    streamFrame->offset, streamFrame->len, streamFrame->fin);
-                conn.streamManager->updateWritableStreams(*stream);
-              }
-            }
-          }
-        }
+        modifyStateForSpuriousLoss(conn, *rPacketIt);
         QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
-        // Decrement the counter, trust that we will erase this as part of
-        // the bulk erase.
-        CHECK_GT(conn.outstandings.declaredLostCount, 0);
-        conn.outstandings.declaredLostCount--;
         if (spuriousLossEvent) {
           spuriousLossEvent->addSpuriousPacket(
               rPacketIt->metadata,
@@ -793,5 +756,45 @@ void updateEcnCountEchoed(
       std::max(ackState.ecnECT1CountEchoed, readAckFrame.ecnECT1Count);
   ackState.ecnCECountEchoed =
       std::max(ackState.ecnCECountEchoed, readAckFrame.ecnCECount);
+}
+
+void modifyStateForSpuriousLoss(
+    QuicConnectionStateBase& conn,
+    OutstandingPacketWrapper& spuriouslyLostPacket) {
+  CHECK_GT(conn.outstandings.declaredLostCount, 0);
+  conn.lossState.totalPacketsSpuriouslyMarkedLost++;
+  if (conn.transportSettings.useAdaptiveLossReorderingThresholds) {
+    if (spuriouslyLostPacket.metadata.lossReorderDistance.has_value() &&
+        spuriouslyLostPacket.metadata.lossReorderDistance.value() >
+            conn.lossState.reorderingThreshold) {
+      conn.lossState.reorderingThreshold =
+          spuriouslyLostPacket.metadata.lossReorderDistance.value();
+    }
+  }
+  if (conn.transportSettings.useAdaptiveLossTimeThresholds) {
+    if (spuriouslyLostPacket.metadata.lossTimeoutDividend.has_value() &&
+        spuriouslyLostPacket.metadata.lossTimeoutDividend.value() >
+            conn.transportSettings.timeReorderingThreshDividend) {
+      conn.transportSettings.timeReorderingThreshDividend =
+          spuriouslyLostPacket.metadata.lossTimeoutDividend.value();
+    }
+  }
+  if (conn.transportSettings.removeFromLossBufferOnSpurious) {
+    for (auto& f : spuriouslyLostPacket.packet.frames) {
+      auto streamFrame = f.asWriteStreamFrame();
+      if (streamFrame) {
+        auto stream = conn.streamManager->findStream(streamFrame->streamId);
+        if (stream) {
+          stream->removeFromLossBuffer(
+              streamFrame->offset, streamFrame->len, streamFrame->fin);
+          stream->updateAckedIntervals(
+              streamFrame->offset, streamFrame->len, streamFrame->fin);
+          conn.streamManager->updateWritableStreams(*stream);
+        }
+      }
+    }
+  }
+  CHECK_GT(conn.outstandings.declaredLostCount, 0);
+  conn.outstandings.declaredLostCount--;
 }
 } // namespace quic
