@@ -118,6 +118,11 @@ bool QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
         TransportErrorCode::INTERNAL_ERROR);
   }
 
+  if (mainPeerId->size() == 0) {
+    // No need to rotate CIDs if peer's CID is 0 length.
+    return true;
+  }
+
   // Retrieve the sequence number of the current cId, and find an unused
   // ConnectionIdData.
   for (auto it = peerConnectionIds.begin(); it != end; it++) {

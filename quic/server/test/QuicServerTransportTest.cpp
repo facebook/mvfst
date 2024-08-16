@@ -1721,6 +1721,19 @@ TEST_F(QuicServerTransportTest, SwitchServerCidsMultipleCids) {
   EXPECT_EQ(secondCid.connId, *replacedCid);
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    TestRetireAndSwitchPeerConnectionIdsEmptyPeerCid) {
+  auto& conn = server->getNonConstConn();
+
+  conn.clientConnectionId = ConnectionId(std::vector<uint8_t>{});
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+
+  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+}
+
 TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFrames) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
