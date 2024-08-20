@@ -54,4 +54,21 @@ void QuicAsyncUDPSocket::fromMsg(
 #endif
 }
 
+Optional<ReceivedUdpPacket::Timings::SocketTimestampExt>
+QuicAsyncUDPSocket::convertToSocketTimestampExt(
+    const QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::Timestamp&
+        ts) {
+  std::chrono::nanoseconds duration = std::chrono::seconds(ts[0].tv_sec) +
+      std::chrono::nanoseconds(ts[0].tv_nsec);
+  if (duration == duration.zero()) {
+    return none;
+  }
+
+  ReceivedUdpPacket::Timings::SocketTimestampExt sockTsExt;
+  sockTsExt.rawDuration = duration;
+  sockTsExt.systemClock.raw = std::chrono::system_clock::time_point(
+      std::chrono::duration_cast<std::chrono::system_clock::duration>(
+          duration));
+  return sockTsExt;
+}
 } // namespace quic

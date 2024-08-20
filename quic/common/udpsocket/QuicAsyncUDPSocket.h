@@ -336,5 +336,10 @@ class QuicAsyncUDPSocket {
   static void fromMsg(
       [[maybe_unused]] ReadCallback::OnDataAvailableParams& params,
       [[maybe_unused]] struct msghdr& msg);
+
+  static Optional<ReceivedUdpPacket::Timings::SocketTimestampExt>
+  convertToSocketTimestampExt(
+      const QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::Timestamp&
+          ts);
 };
 } // namespace quic

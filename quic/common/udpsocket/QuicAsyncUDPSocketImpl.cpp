@@ -125,24 +125,7 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     // ts[1] -> hardware timestamp transformed to userspace time (deprecated)
     // ts[2] -> hardware timestamp
     if (params.ts.has_value()) {
-      const auto timespecToTimestamp = [](const timespec& ts)
-          -> Optional<ReceivedUdpPacket::Timings::SocketTimestampExt> {
-        std::chrono::nanoseconds duration = std::chrono::seconds(ts.tv_sec) +
-            std::chrono::nanoseconds(ts.tv_nsec);
-        if (duration == duration.zero()) {
-          return none;
-        }
-
-        ReceivedUdpPacket::Timings::SocketTimestampExt sockTsExt;
-        sockTsExt.rawDuration = duration;
-        sockTsExt.systemClock.raw = std::chrono::system_clock::time_point(
-            std::chrono::duration_cast<std::chrono::system_clock::duration>(
-                duration));
-        return sockTsExt;
-      };
-
-      const auto& ts = *params.ts;
-      timings.maybeSoftwareTs = timespecToTimestamp(ts[0]);
+      timings.maybeSoftwareTs = convertToSocketTimestampExt(*params.ts);
     }
 
     VLOG(10) << "Got data from socket peer=" << *peerAddress
