@@ -401,6 +401,8 @@ struct TransportSettings {
   bool enableFlowControlTimeBasedUpdates{true};
   // Check if idle timer needs to be triggered manually.
   bool checkIdleTimerOnWrite{false};
+  // Whether to process callbacks per received packet.
+  bool processCallbacksPerPacket{false};
 };
 
 } // namespace quic

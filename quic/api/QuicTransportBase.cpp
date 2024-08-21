@@ -1906,16 +1906,23 @@ void QuicTransportBase::onNetworkData(
     }
 
     auto packets = std::move(networkData).movePackets();
+    bool processedCallbacks = false;
     for (auto& packet : packets) {
       onReadData(peer, std::move(packet));
       if (conn_->peerConnectionError) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));
         return;
+      } else if (conn_->transportSettings.processCallbacksPerPacket) {
+        processCallbacksAfterNetworkData();
+        processedCallbacks = true;
       }
     }
 
-    processCallbacksAfterNetworkData();
+    // This avoids calling it again for the last packet.
+    if (!processedCallbacks) {
+      processCallbacksAfterNetworkData();
+    }
     if (closeState_ != CloseState::CLOSED) {
       if (currentAckStateVersion(*conn_) != originalAckVersion) {
         setIdleTimer();
