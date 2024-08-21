@@ -40,7 +40,10 @@ constexpr float kBeta = 0.7;
 constexpr float kLossThreshold = 0.02;
 constexpr float kHeadroomFactor = 0.15;
 
-quic::Bandwidth kMinPacingRateForSendQuantum{1200 * 1000, 1s};
+#ifndef CLANG_LAZY_INIT
+#define CLANG_LAZY_INIT
+#endif
+CLANG_LAZY_INIT quic::Bandwidth kMinPacingRateForSendQuantum{1200 * 1000, 1s};
 // The experimental pacer currently achieves ~99% of the target rate
 // we should not reduce the target by adding an extra margin.
 // TODO: add the margin back if the pacer performance improves further.

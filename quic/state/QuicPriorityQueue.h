@@ -52,7 +52,10 @@ struct Priority {
   }
 };
 
-extern const Priority kDefaultPriority;
+#ifndef CLANG_LAZY_INIT
+#define CLANG_LAZY_INIT
+#endif
+CLANG_LAZY_INIT extern const Priority kDefaultPriority;
 
 /**
  * Priority queue for Quic streams. This is based on

@@ -18,8 +18,12 @@
 using namespace std::chrono_literals;
 
 namespace {
-quic::Bandwidth kLowPacingRateForSendQuantum{1200 * 1000, 1s};
-quic::Bandwidth kHighPacingRateForSendQuantum{24, 1us};
+
+#ifndef CLANG_LAZY_INIT
+#define CLANG_LAZY_INIT
+#endif
+CLANG_LAZY_INIT quic::Bandwidth kLowPacingRateForSendQuantum{1200 * 1000, 1s};
+CLANG_LAZY_INIT quic::Bandwidth kHighPacingRateForSendQuantum{24, 1us};
 // See BBRInflight(gain) function in
 // https://tools.ietf.org/html/draft-cardwell-iccrg-bbr-congestion-control-00#section-4.2.3.2
 uint64_t kQuantaFactor = 3;
