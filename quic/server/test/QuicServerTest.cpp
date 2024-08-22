@@ -1406,6 +1406,42 @@ TEST_F(QuicServerWorkerTest, AcceptObserverRemoveCallbackThenDestroyWorker) {
   worker_ = nullptr;
 }
 
+TEST_F(QuicServerWorkerTest, PacketWithZeroHostIdFromExistingConnection) {
+  // create a connection with host id 0
+  auto connId = getTestConnectionId(0);
+  createQuicConnection(kClientAddr, connId);
+  transport_->QuicServerTransport::setRoutingCallback(worker_.get());
+  worker_->onConnectionIdAvailable(transport_, connId);
+  PacketNum num = 1;
+  auto data = folly::IOBuf::copyBuffer("data");
+
+  // a non-initial packet with a different connection id while its host id is
+  // also 0
+  auto newConnId = connId;
+  newConnId.data()[7] = 0;
+  ShortHeader shortHeaderConnId(ProtectionType::KeyPhaseZero, newConnId, num);
+
+  // instead of reporting the drop reason ROUTING_ERROR_WRONG_HOST, it should
+  // be CANNOT_FORWARD_DATA
+  EXPECT_CALL(
+      *quicStats_,
+      onPacketDropped(PacketDropReason(PacketDropReason::CANNOT_FORWARD_DATA)));
+
+  RoutingData routingData(
+      HeaderForm::Short,
+      false,
+      false,
+      shortHeaderConnId.getConnectionId(),
+      none);
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now(), 0),
+      none);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
+}
+
 auto createInitialStream(
     ConnectionId srcConnId,
     ConnectionId destConnId,

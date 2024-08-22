@@ -661,6 +661,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   uint8_t workerId_{0};
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   uint32_t hostId_{0};
+  uint32_t prevHostId_{0};
   ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
   // QuicServerWorker maintains ownership of the info stats callback
   std::unique_ptr<QuicTransportStatsCallback> statsCallback_;

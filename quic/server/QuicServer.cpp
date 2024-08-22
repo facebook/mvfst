@@ -209,6 +209,7 @@ void QuicServer::initializeImpl(
 }
 
 void QuicServer::initializeWorkers(bool useDefaultTransport) {
+  VLOG(4) << "Initializing workers";
   CHECK(workers_.empty());
   // iterate in the order of insertion in vector
   auto workerEvbs = workerEvbs_.rlock();
@@ -564,8 +565,12 @@ void QuicServer::runOnAllWorkersSync(
 
 void QuicServer::setHostId(uint32_t hostId) noexcept {
   checkRunningInThread(mainThreadId_);
-  CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   hostId_ = hostId;
+  VLOG(4) << "Setting hostId to " << hostId_ << " for quic server ";
+  if (initialized_) {
+    runOnAllWorkersSync(
+        [hostId](auto worker) mutable { worker->setHostId(hostId); });
+  }
 }
 
 void QuicServer::setConnectionIdVersion(

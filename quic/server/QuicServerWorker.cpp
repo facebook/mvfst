@@ -741,7 +741,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
   }
 
   const auto& connIdParams = maybeParsedConnIdParam.value();
-  if (connIdParams.hostId != hostId_) {
+  if (connIdParams.hostId != prevHostId_ && connIdParams.hostId != hostId_) {
     VLOG(3) << fmt::format(
         "Dropping packet routed to wrong host, from client={}, routingInfo={},",
         client.describe(),
@@ -1209,6 +1209,7 @@ uint8_t QuicServerWorker::getWorkerId() const noexcept {
 }
 
 void QuicServerWorker::setHostId(uint32_t hostId) noexcept {
+  prevHostId_ = hostId_;
   hostId_ = hostId;
 }
 
