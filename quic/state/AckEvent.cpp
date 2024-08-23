@@ -125,6 +125,23 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
       std::move(receiveRelativeTimeStampUsec));
 }
 
+void AckEvent::AckPacket::Builder::buildInto(
+    std::vector<AckPacket>& ackedPacketsVec) && {
+  CHECK(packetNum.has_value());
+  CHECK(outstandingPacketMetadata);
+  CHECK(detailsPerStream.has_value());
+  ackedPacketsVec.emplace_back(
+      packetNum.value(),
+      nonDsrPacketSequenceNumber.value(),
+      *outstandingPacketMetadata,
+      detailsPerStream.value(),
+      lastAckedPacketInfo ? Optional<OutstandingPacket::LastAckedPacketInfo>(
+                                *lastAckedPacketInfo)
+                          : none,
+      isAppLimited,
+      std::move(receiveRelativeTimeStampUsec));
+}
+
 AckEvent::Builder&& AckEvent::Builder::setAckTime(TimePoint ackTimeIn) {
   maybeAckTime = ackTimeIn;
   return std::move(*this);

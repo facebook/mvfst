@@ -266,6 +266,7 @@ struct AckEvent {
       Builder&& setReceiveDeltaTimeStamp(
           OptionalMicros&& receiveRelativeTimeStampUsec);
       AckPacket build() &&;
+      void buildInto(std::vector<AckPacket>& ackedPacketsVec) &&;
       explicit Builder() = default;
 
      private:
@@ -279,7 +280,10 @@ struct AckEvent {
       bool isAppLimited{false};
     };
 
-   private:
+    // Better to use the Builder to construct. The reason we're not marking this
+    // as private is because we need to be able to construct this in-place in
+    // the AckEvent::Builder::buildInto, where we use emplace_back to emplace it
+    // into the back of a vector.
     explicit AckPacket(
         quic::PacketNum packetNumIn,
         uint64_t nonDsrPacketSequenceNumberIn,

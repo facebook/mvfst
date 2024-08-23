@@ -455,25 +455,23 @@ AckEvent processAckFrame(
     }
     auto maybeRxTimestamp = packetReceiveTimeStamps.find(
         outstandingPacket->packet.header.getPacketSequenceNum());
-    ack.ackedPackets.emplace_back(
-        CongestionController::AckEvent::AckPacket::Builder()
-            .setPacketNum(
-                outstandingPacket->packet.header.getPacketSequenceNum())
-            .setNonDsrPacketSequenceNumber(
-                outstandingPacket->nonDsrPacketSequenceNumber.value_or(0))
-            .setOutstandingPacketMetadata(outstandingPacket->metadata)
-            .setDetailsPerStream(std::move(detailsPerStream))
-            .setLastAckedPacketInfo(
-                outstandingPacket->lastAckedPacketInfo
-                    ? &outstandingPacket->lastAckedPacketInfo.value()
-                    : nullptr)
-            .setAppLimited(outstandingPacket->isAppLimited)
-            .setReceiveDeltaTimeStamp(
-                maybeRxTimestamp != packetReceiveTimeStamps.end()
-                    ? OptionalMicros(
-                          std::chrono::microseconds(maybeRxTimestamp->second))
-                    : std::nullopt)
-            .build());
+    CongestionController::AckEvent::AckPacket::Builder()
+        .setPacketNum(outstandingPacket->packet.header.getPacketSequenceNum())
+        .setNonDsrPacketSequenceNumber(
+            outstandingPacket->nonDsrPacketSequenceNumber.value_or(0))
+        .setOutstandingPacketMetadata(outstandingPacket->metadata)
+        .setDetailsPerStream(std::move(detailsPerStream))
+        .setLastAckedPacketInfo(
+            outstandingPacket->lastAckedPacketInfo
+                ? &outstandingPacket->lastAckedPacketInfo.value()
+                : nullptr)
+        .setAppLimited(outstandingPacket->isAppLimited)
+        .setReceiveDeltaTimeStamp(
+            maybeRxTimestamp != packetReceiveTimeStamps.end()
+                ? OptionalMicros(
+                      std::chrono::microseconds(maybeRxTimestamp->second))
+                : std::nullopt)
+        .buildInto(ack.ackedPackets);
   }
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
