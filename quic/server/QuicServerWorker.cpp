@@ -353,6 +353,13 @@ void QuicServerWorker::onDataAvailable(
   // we've flushed it.
   Buf data = std::move(readBuffer_);
 
+  folly::Optional<ReceivedUdpPacket::Timings::SocketTimestampExt>
+      maybeSockTsExt;
+  if (params.ts.has_value()) {
+    maybeSockTsExt =
+        QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
+  }
+
   if (params.gro <= 0) {
     if (truncated) {
       // This is an error, drop the packet.
@@ -363,6 +370,7 @@ void QuicServerWorker::onDataAvailable(
     QUIC_STATS(statsCallback_, onRead, len);
     ReceivedUdpPacket udpPacket(std::move(data));
     udpPacket.timings.receiveTimePoint = packetReceiveTime;
+    udpPacket.timings.maybeSoftwareTs = maybeSockTsExt;
     udpPacket.tosValue = params.tos;
     handleNetworkData(client, udpPacket);
   } else {
@@ -388,6 +396,7 @@ void QuicServerWorker::onDataAvailable(
         ReceivedUdpPacket udpPacket(std::move(data));
         udpPacket.timings.receiveTimePoint = packetReceiveTime;
         udpPacket.tosValue = params.tos;
+        udpPacket.timings.maybeSoftwareTs = maybeSockTsExt;
         handleNetworkData(client, udpPacket);
         break;
       }
@@ -403,6 +412,7 @@ void QuicServerWorker::onDataAvailable(
       ReceivedUdpPacket udpPacket(std::move(tmp));
       udpPacket.timings.receiveTimePoint = packetReceiveTime;
       udpPacket.tosValue = params.tos;
+      udpPacket.timings.maybeSoftwareTs = maybeSockTsExt;
       handleNetworkData(client, udpPacket);
     }
   }

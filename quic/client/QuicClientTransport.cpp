@@ -1232,6 +1232,12 @@ void QuicClientTransport::recvMsg(
       }
     }
 #endif
+    ReceivedUdpPacket::Timings timings;
+    if (params.ts.has_value()) {
+      timings.maybeSoftwareTs =
+          QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
+    }
+
     size_t bytesRead = size_t(ret);
     totalData += bytesRead;
     if (!server) {
@@ -1259,21 +1265,21 @@ void QuicClientTransport::recvMsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedUdpPacket(
-              std::move(tmp), ReceivedUdpPacket::Timings{}, params.tos));
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedUdpPacket(
-              std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
         }
       }
     } else {
-      networkData.addPacket(ReceivedUdpPacket(
-          std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
+      networkData.addPacket(
+          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
     }
     maybeQlogDatagram(bytesRead);
   }
@@ -1388,6 +1394,12 @@ void QuicClientTransport::recvMmsg(
       server->setFromSockaddr(rawAddr, kAddrLen);
     }
 
+    ReceivedUdpPacket::Timings timings;
+    if (params.ts.has_value()) {
+      timings.maybeSoftwareTs =
+          QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
+    }
+
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
     readBuffer->append(bytesRead);
     if (params.gro > 0) {
@@ -1409,21 +1421,21 @@ void QuicClientTransport::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(ReceivedUdpPacket(
-              std::move(tmp), ReceivedUdpPacket::Timings{}, params.tos));
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(ReceivedUdpPacket(
-              std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
         }
       }
     } else {
-      networkData.addPacket(ReceivedUdpPacket(
-          std::move(readBuffer), ReceivedUdpPacket::Timings{}, params.tos));
+      networkData.addPacket(
+          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
     }
 
     maybeQlogDatagram(bytesRead);
