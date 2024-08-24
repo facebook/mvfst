@@ -233,8 +233,14 @@ class SocketObserverInterface {
       // TOS value
       const uint8_t packetTos;
 
+      // Socket RX timestamp, in system clock time.
+      const Optional<std::chrono::system_clock::time_point>
+          maybePacketSoftwareRxTimestamp;
+
       struct BuilderFields {
         Optional<TimePoint> maybePacketReceiveTime;
+        Optional<std::chrono::system_clock::time_point>
+            maybePacketSoftwareRxTimestamp;
         Optional<uint64_t> maybePacketNumBytes;
         Optional<uint8_t> maybePacketTos;
         explicit BuilderFields() = default;
@@ -242,6 +248,9 @@ class SocketObserverInterface {
 
       struct Builder : public BuilderFields {
         Builder&& setPacketReceiveTime(const TimePoint packetReceiveTimeIn);
+        Builder&& setPacketSoftwareRxTimestamp(
+            const std::chrono::system_clock::time_point
+                packetSoftwareRxTimestampIn);
         Builder&& setPacketNumBytes(const uint64_t packetNumBytesIn);
         Builder&& setPacketTos(const uint8_t packettos);
         ReceivedUdpPacket build() &&;

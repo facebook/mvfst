@@ -310,6 +310,14 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
 
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder&&
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
+    setPacketSoftwareRxTimestamp(const std::chrono::system_clock::time_point
+                                     packetSoftwareRxTimestampIn) {
+  maybePacketSoftwareRxTimestamp = packetSoftwareRxTimestampIn;
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
     setPacketNumBytes(const uint64_t packetNumBytesIn) {
   maybePacketNumBytes = packetNumBytesIn;
   return std::move(*this);
@@ -335,7 +343,9 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
           *CHECK_NOTNULL(builderFields.maybePacketReceiveTime.get_pointer())),
       packetNumBytes(
           *CHECK_NOTNULL(builderFields.maybePacketNumBytes.get_pointer())),
-      packetTos(*CHECK_NOTNULL(builderFields.maybePacketTos.get_pointer())) {}
+      packetTos(*CHECK_NOTNULL(builderFields.maybePacketTos.get_pointer())),
+      maybePacketSoftwareRxTimestamp(
+          builderFields.maybePacketSoftwareRxTimestamp) {}
 
 SocketObserverInterface::PacketsReceivedEvent::Builder&&
 SocketObserverInterface::PacketsReceivedEvent::Builder::setReceiveLoopTime(

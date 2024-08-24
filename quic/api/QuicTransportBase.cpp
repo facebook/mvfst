@@ -1887,13 +1887,18 @@ void QuicTransportBase::onNetworkData(
                          .setNumPacketsReceived(networkData.getPackets().size())
                          .setNumBytesReceived(networkData.getTotalData());
       for (auto& packet : networkData.getPackets()) {
-        builder.addReceivedUdpPacket(
+        auto receivedUdpPacketBuilder =
             SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
                 Builder()
                     .setPacketReceiveTime(packet.timings.receiveTimePoint)
                     .setPacketNumBytes(packet.buf.chainLength())
-                    .setPacketTos(packet.tosValue)
-                    .build());
+                    .setPacketTos(packet.tosValue);
+        if (packet.timings.maybeSoftwareTs) {
+          receivedUdpPacketBuilder.setPacketSoftwareRxTimestamp(
+              packet.timings.maybeSoftwareTs->systemClock.raw);
+        }
+        builder.addReceivedUdpPacket(
+            std::move(receivedUdpPacketBuilder).build());
       }
 
       getSocketObserverContainer()
