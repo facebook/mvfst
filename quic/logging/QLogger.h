@@ -124,7 +124,13 @@ class QLogger {
       bool incremental) = 0;
   virtual void
   addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe) = 0;
-
+  virtual void addNetworkPathModelUpdate(
+      uint64_t inflightHi,
+      uint64_t inflightLo,
+      uint64_t bandwidthHiBytes,
+      std::chrono::microseconds bandwidthHiInterval,
+      uint64_t bandwidthLoBytes,
+      std::chrono::microseconds bandwidthLoInterval) = 0;
   virtual void setDcid(Optional<ConnectionId> connID) = 0;
   virtual void setScid(Optional<ConnectionId> connID) = 0;
 };

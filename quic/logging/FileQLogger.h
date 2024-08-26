@@ -113,7 +113,13 @@ class FileQLogger : public BaseQLogger {
       bool incremental) override;
   void addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe)
       override;
-
+  void addNetworkPathModelUpdate(
+      uint64_t inflightHi,
+      uint64_t inflightLo,
+      uint64_t bandwidthHiBytes,
+      std::chrono::microseconds bandwidthHiInterval,
+      uint64_t bandwidthLoBytes,
+      std::chrono::microseconds bandwidthLoInterval) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
   folly::dynamic toDynamicBase() const;

@@ -70,5 +70,14 @@ class MockQLogger : public QLogger {
       void,
       addL4sWeightUpdate,
       (double l4sWeight, uint32_t newEct1, uint32_t newCe));
+  MOCK_METHOD(
+      void,
+      addNetworkPathModelUpdate,
+      (uint64_t inflightHi,
+       uint64_t inflightLo,
+       uint64_t bandwidthHiBytes,
+       std::chrono::microseconds bandwidthHiInterval,
+       uint64_t bandwidthLoBytes,
+       std::chrono::microseconds bandwidthLoInterval));
 };
 } // namespace quic::test

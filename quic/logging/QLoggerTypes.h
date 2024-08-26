@@ -395,7 +395,8 @@ enum class QLogEventType : uint32_t {
   ConnectionMigration,
   PathValidation,
   PriorityUpdate,
-  L4sWeightUpdate
+  L4sWeightUpdate,
+  NetworkPathModelUpdate
 };
 
 folly::StringPiece toString(QLogEventType type);
@@ -776,6 +777,28 @@ class QLogL4sWeightUpdateEvent : public QLogEvent {
   double l4sWeight_;
   uint32_t newECT1Echoed_;
   uint32_t newCEEchoed_;
+};
+
+class QLogNetworkPathModelUpdateEvent : public QLogEvent {
+ public:
+  explicit QLogNetworkPathModelUpdateEvent(
+      uint64_t inflightHi,
+      uint64_t inflightLo,
+      uint64_t bandwidthHiBytes,
+      std::chrono::microseconds bandwidthHiInterval,
+      uint64_t bandwidthLoBytes,
+      std::chrono::microseconds bandwidthLoInterval,
+      std::chrono::microseconds refTimeIn);
+  ~QLogNetworkPathModelUpdateEvent() override = default;
+
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
+
+  uint64_t inflightHi_;
+  uint64_t inflightLo_;
+  uint64_t bandwidthHiBytes_;
+  std::chrono::microseconds bandwidthHiInterval_;
+  uint64_t bandwidthLoBytes_;
+  std::chrono::microseconds bandwidthLoInterval_;
 };
 
 } // namespace quic

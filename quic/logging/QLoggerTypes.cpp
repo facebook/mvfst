@@ -982,6 +982,40 @@ folly::dynamic QLogL4sWeightUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogNetworkPathModelUpdateEvent::QLogNetworkPathModelUpdateEvent(
+    uint64_t inflightHi,
+    uint64_t inflightLo,
+    uint64_t bandwidthHiBytes,
+    std::chrono::microseconds bandwidthHiInterval,
+    uint64_t bandwidthLoBytes,
+    std::chrono::microseconds bandwidthLoInterval,
+    std::chrono::microseconds refTimeIn)
+    : inflightHi_(inflightHi),
+      inflightLo_(inflightLo),
+      bandwidthHiBytes_(bandwidthHiBytes),
+      bandwidthHiInterval_(bandwidthHiInterval),
+      bandwidthLoBytes_(bandwidthLoBytes),
+      bandwidthLoInterval_(bandwidthLoInterval) {
+  eventType = QLogEventType::NetworkPathModelUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogNetworkPathModelUpdateEvent::toDynamic() const {
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "metric_update",
+      toString(eventType));
+  folly::dynamic data = folly::dynamic::object();
+  data["inflight_hi"] = inflightHi_;
+  data["inflight_lo"] = inflightLo_;
+  data["bandwidth_hi_bytes"] = bandwidthHiBytes_;
+  data["bandwidth_hi_interval"] = bandwidthHiInterval_.count();
+  data["bandwidth_lo_bytes"] = bandwidthLoBytes_;
+  data["bandwidth_lo_interval"] = bandwidthLoInterval_.count();
+  d.push_back(std::move(data));
+  return d;
+}
+
 folly::StringPiece toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -1030,6 +1064,8 @@ folly::StringPiece toString(QLogEventType type) {
       return "priority";
     case QLogEventType::L4sWeightUpdate:
       return "l4s_weight_update";
+    case QLogEventType::NetworkPathModelUpdate:
+      return "network_path_model_update";
   }
   folly::assume_unreachable();
 }

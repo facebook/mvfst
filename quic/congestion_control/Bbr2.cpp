@@ -106,6 +106,15 @@ void Bbr2CongestionController::onPacketAckOrLoss(
         getCongestionWindow(),
         kCongestionPacketAck,
         bbr2StateToString(state_));
+    conn_.qLogger->addNetworkPathModelUpdate(
+        inflightHi_.value_or(0),
+        inflightLo_.value_or(0),
+        bandwidthHi_.has_value() ? bandwidthHi_->units : 0,
+        bandwidthHi_.has_value() ? bandwidthHi_->interval
+                                 : std::chrono::microseconds(1),
+        bandwidthLo_.has_value() ? bandwidthLo_->units : 0,
+        bandwidthLo_.has_value() ? bandwidthLo_->interval
+                                 : std::chrono::microseconds(1));
   }
   if (ackEvent) {
     subtractAndCheckUnderflow(

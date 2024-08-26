@@ -509,6 +509,25 @@ void FileQLogger::addL4sWeightUpdate(
       l4sWeight, newEct1, newCe, refTime));
 }
 
+void FileQLogger::addNetworkPathModelUpdate(
+    uint64_t inflightHi,
+    uint64_t inflightLo,
+    uint64_t bandwidthHiBytes,
+    std::chrono::microseconds bandwidthHiInterval,
+    uint64_t bandwidthLoBytes,
+    std::chrono::microseconds bandwidthLoInterval) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now().time_since_epoch());
+  handleEvent(std::make_unique<quic::QLogNetworkPathModelUpdateEvent>(
+      inflightHi,
+      inflightLo,
+      bandwidthHiBytes,
+      bandwidthHiInterval,
+      bandwidthLoBytes,
+      bandwidthLoInterval,
+      refTime));
+}
+
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   if (streaming_) {
     return;
