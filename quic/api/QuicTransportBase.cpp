@@ -1671,11 +1671,16 @@ void QuicTransportBase::handleDeliveryCallbacks() {
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
     auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
 
-    while (maxOffsetToDeliver.has_value()) {
+    if (maxOffsetToDeliver.has_value()) {
       size_t amountTrimmed = stream->writeBuffer.trimStartAtMost(
           *maxOffsetToDeliver - stream->writeBufferStartOffset);
       stream->writeBufferStartOffset += amountTrimmed;
+    }
 
+    // TODO: We probably want to change how this is written. The condition in
+    // the while loop is misleading because maxOffsetToDeliver isn't changed
+    // within the body.
+    while (maxOffsetToDeliver.has_value()) {
       auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
       if (deliveryCallbacksForAckedStream == deliveryCallbacks_.end() ||
           deliveryCallbacksForAckedStream->second.empty()) {
