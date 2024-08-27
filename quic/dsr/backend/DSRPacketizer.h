@@ -24,7 +24,10 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/Aead.h>
+
+#if defined(__linux__)
 #include <quic/xsk/BaseXskContainer.h>
+#endif
 
 namespace quic {
 
