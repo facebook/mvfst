@@ -1034,6 +1034,10 @@ class QuicTransportBase : public QuicSocket,
   void handleNewStreams(std::vector<StreamId>& newPeerStreams);
   void handleNewGroupedStreams(std::vector<StreamId>& newPeerStreams);
 
+  bool hasDeliveryCallbacksToCall(
+      StreamId streamId,
+      uint64_t maxOffsetToDeliver) const;
+
   /**
    * Helper to log new stream event to observer.
    */

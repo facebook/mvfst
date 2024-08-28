@@ -1643,6 +1643,17 @@ void QuicTransportBase::handleNewGroupedStreams(
   streamStorage.clear();
 }
 
+bool QuicTransportBase::hasDeliveryCallbacksToCall(
+    StreamId streamId,
+    uint64_t maxOffsetToDeliver) const {
+  auto callbacksIt = deliveryCallbacks_.find(streamId);
+  if (callbacksIt == deliveryCallbacks_.end() || callbacksIt->second.empty()) {
+    return false;
+  }
+
+  return (callbacksIt->second.front().offset <= maxOffsetToDeliver);
+}
+
 void QuicTransportBase::handleNewStreamCallbacks(
     std::vector<StreamId>& streamStorage) {
   streamStorage = conn_->streamManager->consumeNewPeerStreams();
@@ -1677,34 +1688,25 @@ void QuicTransportBase::handleDeliveryCallbacks() {
       stream->writeBufferStartOffset += amountTrimmed;
     }
 
-    // TODO: We probably want to change how this is written. The condition in
-    // the while loop is misleading because maxOffsetToDeliver isn't changed
-    // within the body.
-    while (maxOffsetToDeliver.has_value()) {
-      auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
-      if (deliveryCallbacksForAckedStream == deliveryCallbacks_.end() ||
-          deliveryCallbacksForAckedStream->second.empty()) {
-        break;
-      }
-      if (deliveryCallbacksForAckedStream->second.front().offset >
-          *maxOffsetToDeliver) {
-        break;
-      }
-      auto deliveryCallbackAndOffset =
-          deliveryCallbacksForAckedStream->second.front();
-      deliveryCallbacksForAckedStream->second.pop_front();
-      auto currentDeliveryCallbackOffset = deliveryCallbackAndOffset.offset;
-      auto deliveryCallback = deliveryCallbackAndOffset.callback;
+    if (maxOffsetToDeliver.has_value()) {
+      while (hasDeliveryCallbacksToCall(streamId, *maxOffsetToDeliver)) {
+        auto& deliveryCallbacksForAckedStream = deliveryCallbacks_.at(streamId);
+        auto deliveryCallbackAndOffset =
+            deliveryCallbacksForAckedStream.front();
+        deliveryCallbacksForAckedStream.pop_front();
+        auto currentDeliveryCallbackOffset = deliveryCallbackAndOffset.offset;
+        auto deliveryCallback = deliveryCallbackAndOffset.callback;
 
-      ByteEvent byteEvent{
-          streamId,
-          currentDeliveryCallbackOffset,
-          ByteEvent::Type::ACK,
-          conn_->lossState.srtt};
-      deliveryCallback->onByteEvent(byteEvent);
+        ByteEvent byteEvent{
+            streamId,
+            currentDeliveryCallbackOffset,
+            ByteEvent::Type::ACK,
+            conn_->lossState.srtt};
+        deliveryCallback->onByteEvent(byteEvent);
 
-      if (closeState_ != CloseState::OPEN) {
-        return;
+        if (closeState_ != CloseState::OPEN) {
+          return;
+        }
       }
     }
     auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
