@@ -23,27 +23,29 @@ uint64_t PacketRebuilder::getHeaderBytes() const {
   return builder_.getHeaderBytes();
 }
 
-PacketEvent PacketRebuilder::cloneOutstandingPacket(
+ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
     OutstandingPacketWrapper& packet) {
-  // Either the packet has never been cloned before, or it's associatedEvent is
-  // still in the outstandings.packetEvents set.
+  // Either the packet has never been cloned before, or it's
+  // maybeClonedPacketIdentifier is still in the
+  // outstandings.clonedPacketIdentifiers set.
   DCHECK(
-      !packet.associatedEvent ||
-      conn_.outstandings.packetEvents.count(*packet.associatedEvent));
-  if (!packet.associatedEvent) {
+      !packet.maybeClonedPacketIdentifier ||
+      conn_.outstandings.clonedPacketIdentifiers.count(
+          *packet.maybeClonedPacketIdentifier));
+  if (!packet.maybeClonedPacketIdentifier) {
     auto packetNum = packet.packet.header.getPacketSequenceNum();
     auto packetNumberSpace = packet.packet.header.getPacketNumberSpace();
-    PacketEvent event(packetNumberSpace, packetNum);
-    DCHECK(!conn_.outstandings.packetEvents.count(event));
-    packet.associatedEvent = event;
-    conn_.outstandings.packetEvents.insert(event);
+    ClonedPacketIdentifier event(packetNumberSpace, packetNum);
+    DCHECK(!conn_.outstandings.clonedPacketIdentifiers.count(event));
+    packet.maybeClonedPacketIdentifier = event;
+    conn_.outstandings.clonedPacketIdentifiers.insert(event);
     ++conn_.outstandings
           .clonedPacketCount[packet.packet.header.getPacketNumberSpace()];
   }
-  return *packet.associatedEvent;
+  return *packet.maybeClonedPacketIdentifier;
 }
 
-Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
+Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
     OutstandingPacketWrapper& packet) {
   // TODO: if PMTU changes between the transmission of the original packet and
   // now, then we cannot clone everything in the packet.
@@ -58,10 +60,10 @@ Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   // First check if there's an ACK in this packet. We do this because we need
   // to know before we rebuild a stream frame whether there is an ACK in this
   // packet. If there is an ACK, we have to always encode the stream frame's
-  // length. This forces the associatedEvent code to reconsider the packet for
-  // ACK processing. We should always be able to write an ACK since the min
-  // ACK frame size is 4, while 1500 MTU stream frame lengths are going to be
-  // 2 bytes maximum.
+  // length. This forces the maybeClonedPacketIdentifier code to reconsider the
+  // packet for ACK processing. We should always be able to write an ACK since
+  // the min ACK frame size is 4, while 1500 MTU stream frame lengths are going
+  // to be 2 bytes maximum.
   bool hasAckFrame = false;
   for (const auto& frame : packet.packet.frames) {
     if (frame.asWriteAckFrame()) {

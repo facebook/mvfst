@@ -620,7 +620,7 @@ bool handleStreamBufMetaWritten(
 
 void updateConnection(
     QuicConnectionStateBase& conn,
-    Optional<PacketEvent> packetEvent,
+    Optional<ClonedPacketIdentifier> clonedPacketIdentifier,
     RegularQuicWritePacket packet,
     TimePoint sentTime,
     uint32_t encodedSize,
@@ -728,7 +728,7 @@ void updateConnection(
         if (resetIter != conn.pendingEvents.resets.end()) {
           conn.pendingEvents.resets.erase(resetIter);
         } else {
-          DCHECK(packetEvent.has_value())
+          DCHECK(clonedPacketIdentifier.has_value())
               << " reset missing from pendingEvents for non-clone packet";
         }
         break;
@@ -786,7 +786,7 @@ void updateConnection(
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         retransmittable = true;
         // We don't want this triggered for cloned frames.
-        if (!packetEvent.has_value()) {
+        if (!clonedPacketIdentifier.has_value()) {
           updateSimpleFrameOnPacketSent(conn, simpleFrame);
         }
         break;
@@ -852,7 +852,7 @@ void updateConnection(
   }
 
   if (!retransmittable && !isPing) {
-    DCHECK(!packetEvent);
+    DCHECK(!clonedPacketIdentifier);
     return;
   }
   conn.lossState.totalAckElicitingPacketsSent++;
@@ -905,9 +905,10 @@ void updateConnection(
         conn.lossState.totalBytesSentAtLastAck,
         conn.lossState.totalBytesAckedAtLastAck);
   }
-  if (packetEvent) {
-    DCHECK(conn.outstandings.packetEvents.count(*packetEvent));
-    pkt.associatedEvent = std::move(packetEvent);
+  if (clonedPacketIdentifier) {
+    DCHECK(conn.outstandings.clonedPacketIdentifiers.count(
+        *clonedPacketIdentifier));
+    pkt.maybeClonedPacketIdentifier = std::move(clonedPacketIdentifier);
     conn.lossState.totalBytesCloned += encodedSize;
   }
   pkt.isDSRPacket = isDSRPacket;
@@ -935,7 +936,7 @@ void updateConnection(
     conn.pathValidationLimiter->onPacketSent(pkt.metadata.encodedSize);
   }
   conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
-  if (pkt.associatedEvent) {
+  if (pkt.maybeClonedPacketIdentifier) {
     ++conn.outstandings.clonedPacketCount[packetNumberSpace];
     ++conn.lossState.timeoutBasedRtxCount;
   } else {
@@ -1599,7 +1600,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
     auto& result = ret.result;
     updateConnection(
         connection,
-        std::move(result->packetEvent),
+        std::move(result->clonedPacketIdentifier),
         std::move(result->packet->packet),
         sentTime,
         folly::to<uint32_t>(ret.encodedSize),

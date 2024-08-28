@@ -924,9 +924,9 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     }
     // If the packet is already a clone that has been processed, we don't clone
     // it again.
-    if (outstandingPacket.associatedEvent &&
-        conn_.outstandings.packetEvents.count(
-            *outstandingPacket.associatedEvent) == 0) {
+    if (outstandingPacket.maybeClonedPacketIdentifier &&
+        conn_.outstandings.clonedPacketIdentifiers.count(
+            *outstandingPacket.maybeClonedPacketIdentifier) == 0) {
       continue;
     }
     // I think this only fail if udpSendPacketLen somehow shrinks in the middle

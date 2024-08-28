@@ -356,18 +356,22 @@ bool processOutstandingsForLoss(
       CHECK_GT(conn.outstandings.dsrCount, 0);
       --conn.outstandings.dsrCount;
     }
-    if (pkt.associatedEvent) {
+    if (pkt.maybeClonedPacketIdentifier) {
       CHECK(conn.outstandings.clonedPacketCount[pnSpace]);
       --conn.outstandings.clonedPacketCount[pnSpace];
     }
-    // Invoke LossVisitor if the packet doesn't have a associated PacketEvent;
-    // or if the PacketEvent is present in conn.outstandings.packetEvents.
-    bool processed = pkt.associatedEvent &&
-        !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
+    // Invoke LossVisitor if the packet doesn't have a associated
+    // ClonedPacketIdentifier; or if the ClonedPacketIdentifier is present in
+    // conn.outstandings.clonedPacketIdentifiers.
+    bool processed = pkt.maybeClonedPacketIdentifier &&
+        !conn.outstandings.clonedPacketIdentifiers.count(
+            *pkt.maybeClonedPacketIdentifier);
     lossVisitor(conn, pkt.packet, processed);
-    // Remove the PacketEvent from the outstandings.packetEvents set
-    if (pkt.associatedEvent) {
-      conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
+    // Remove the ClonedPacketIdentifier from the
+    // outstandings.clonedPacketIdentifiers set
+    if (pkt.maybeClonedPacketIdentifier) {
+      conn.outstandings.clonedPacketIdentifiers.erase(
+          *pkt.maybeClonedPacketIdentifier);
     }
     if (!processed) {
       CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
@@ -508,8 +512,9 @@ Optional<CongestionController::LossEvent> detectLossPackets(
     if (earliest->metadata.scheduledForDestruction) {
       earliest++;
     }
-    if (!earliest->associatedEvent ||
-        conn.outstandings.packetEvents.count(*earliest->associatedEvent)) {
+    if (!earliest->maybeClonedPacketIdentifier ||
+        conn.outstandings.clonedPacketIdentifiers.count(
+            *earliest->maybeClonedPacketIdentifier)) {
       break;
     }
   }

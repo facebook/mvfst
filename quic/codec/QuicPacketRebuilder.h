@@ -27,7 +27,8 @@ class PacketRebuilder {
       PacketBuilderInterface& regularBuilder,
       QuicConnectionStateBase& conn);
 
-  Optional<PacketEvent> rebuildFromPacket(OutstandingPacketWrapper& packet);
+  Optional<ClonedPacketIdentifier> rebuildFromPacket(
+      OutstandingPacketWrapper& packet);
 
   // TODO: Same as passing cipherOverhead into the CloningScheduler, this really
   // is a sad way to solve the writableBytes problem.
@@ -36,11 +37,12 @@ class PacketRebuilder {
  private:
   /**
    * A helper function that takes a OutstandingPacketWrapper that's not
-   * processed, and return its associatedEvent. If this packet has never been
-   * cloned, then create the associatedEvent and add it into
-   * outstandings.packetEvents first.
+   * processed, and return its maybeClonedPacketIdentifier. If this packet has
+   * never been cloned, then create the maybeClonedPacketIdentifier and add it
+   * into outstandings.clonedPacketIdentifiers first.
    */
-  PacketEvent cloneOutstandingPacket(OutstandingPacketWrapper& packet);
+  ClonedPacketIdentifier cloneOutstandingPacket(
+      OutstandingPacketWrapper& packet);
 
   bool retransmittable(const QuicStreamState& stream) const {
     return stream.sendState == StreamSendState::Open;
