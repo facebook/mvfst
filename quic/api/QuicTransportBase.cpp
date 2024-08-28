@@ -1927,6 +1927,7 @@ void QuicTransportBase::onNetworkData(
         return;
       } else if (conn_->transportSettings.processCallbacksPerPacket) {
         processCallbacksAfterNetworkData();
+        invokeReadDataAndCallbacks();
         processedCallbacks = true;
       }
     }
