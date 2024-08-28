@@ -9,8 +9,8 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/congestion_control/Bandwidth.h>
-#include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/OutstandingPacket.h>
+#include <quic/state/PacketEvent.h>
 #include <sys/types.h>
 
 namespace quic {

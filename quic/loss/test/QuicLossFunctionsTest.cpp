@@ -95,7 +95,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   PacketNum sendPacket(
       QuicConnectionStateBase& conn,
       TimePoint time,
-      Optional<ClonedPacketIdentifier> maybeClonedPacketIdentifier,
+      Optional<PacketEvent> associatedEvent,
       PacketType packetType,
       Optional<uint16_t> forcedSize = none,
       bool isDsr = false);
@@ -189,7 +189,7 @@ auto testingLossMarkFunc(std::vector<PacketNum>& lostPackets) {
 PacketNum QuicLossFunctionsTest::sendPacket(
     QuicConnectionStateBase& conn,
     TimePoint time,
-    Optional<ClonedPacketIdentifier> maybeClonedPacketIdentifier,
+    Optional<PacketEvent> associatedEvent,
     PacketType packetType,
     Optional<uint16_t> forcedSize,
     bool isDsr) {
@@ -265,29 +265,28 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  outstandingPacket.maybeClonedPacketIdentifier = maybeClonedPacketIdentifier;
+  outstandingPacket.associatedEvent = associatedEvent;
   conn.lossState.lastRetransmittablePacketSentTime = time;
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(outstandingPacket);
   }
-  if (maybeClonedPacketIdentifier) {
+  if (associatedEvent) {
     conn.outstandings.clonedPacketCount[packetNumberSpace]++;
     // Simulates what the real writer does.
     auto it = std::find_if(
         conn.outstandings.packets.begin(),
         conn.outstandings.packets.end(),
-        [&maybeClonedPacketIdentifier](const auto& packet) {
+        [&associatedEvent](const auto& packet) {
           auto packetNum = packet.packet.header.getPacketSequenceNum();
           auto packetNumSpace = packet.packet.header.getPacketNumberSpace();
-          return packetNum == maybeClonedPacketIdentifier->packetNumber &&
-              packetNumSpace == maybeClonedPacketIdentifier->packetNumberSpace;
+          return packetNum == associatedEvent->packetNumber &&
+              packetNumSpace == associatedEvent->packetNumberSpace;
         });
     if (it != conn.outstandings.packets.end()) {
-      if (!it->maybeClonedPacketIdentifier) {
-        conn.outstandings.clonedPacketIdentifiers.emplace(
-            *maybeClonedPacketIdentifier);
+      if (!it->associatedEvent) {
+        conn.outstandings.packetEvents.emplace(*associatedEvent);
         conn.outstandings.clonedPacketCount[packetNumberSpace]++;
-        it->maybeClonedPacketIdentifier = *maybeClonedPacketIdentifier;
+        it->associatedEvent = *associatedEvent;
       }
     }
   } else {
@@ -319,18 +318,18 @@ RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
 TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onPTO()).Times(0);
-  ClonedPacketIdentifier clonedPacketIdentifier1(
+  PacketEvent packetEvent1(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
-  sendPacket(*conn, Clock::now(), clonedPacketIdentifier1, PacketType::OneRtt);
-  ClonedPacketIdentifier clonedPacketIdentifier2(
+  sendPacket(*conn, Clock::now(), packetEvent1, PacketType::OneRtt);
+  PacketEvent packetEvent2(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
-  sendPacket(*conn, Clock::now(), clonedPacketIdentifier2, PacketType::OneRtt);
-  ClonedPacketIdentifier clonedPacketIdentifier3(
+  sendPacket(*conn, Clock::now(), packetEvent2, PacketType::OneRtt);
+  PacketEvent packetEvent3(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
-  sendPacket(*conn, Clock::now(), clonedPacketIdentifier3, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), packetEvent3, PacketType::OneRtt);
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
   setLossDetectionAlarm(*conn, timeout);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
@@ -451,13 +450,11 @@ TEST_F(QuicLossFunctionsTest, TestOnPTOSkipProcessed) {
   conn->congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .WillRepeatedly(Return());
-  // By adding an maybeClonedPacketIdentifier that doesn't exist in the
-  // outstandings.clonedPacketIdentifiers, they are all processed and will skip
-  // lossVisitor
+  // By adding an associatedEvent that doesn't exist in the
+  // outstandings.packetEvents, they are all processed and will skip lossVisitor
   for (auto i = 0; i < 10; i++) {
-    ClonedPacketIdentifier clonedPacketIdentifier(
-        PacketNumberSpace::AppData, i);
-    sendPacket(*conn, TimePoint(), clonedPacketIdentifier, PacketType::OneRtt);
+    PacketEvent packetEvent(PacketNumberSpace::AppData, i);
+    sendPacket(*conn, TimePoint(), packetEvent, PacketType::OneRtt);
   }
   EXPECT_EQ(10, conn->outstandings.packets.size());
   std::vector<PacketNum> lostPackets;
@@ -1431,9 +1428,8 @@ TEST_F(QuicLossFunctionsTest, SkipLossVisitor) {
   PacketNum lastSent;
   for (size_t i = 0; i < 5; i++) {
     lastSent = conn->ackStates.appDataAckState.nextPacketNum;
-    ClonedPacketIdentifier clonedPacketIdentifier(
-        PacketNumberSpace::AppData, lastSent);
-    sendPacket(*conn, Clock::now(), clonedPacketIdentifier, PacketType::OneRtt);
+    PacketEvent packetEvent(PacketNumberSpace::AppData, lastSent);
+    sendPacket(*conn, Clock::now(), packetEvent, PacketType::OneRtt);
   }
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
@@ -1466,17 +1462,14 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
   PacketNum lastSent;
   lastSent = sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  ClonedPacketIdentifier clonedPacketIdentifier(
-      PacketNumberSpace::AppData, lastSent);
+  PacketEvent event(PacketNumberSpace::AppData, lastSent);
   for (size_t i = 0; i < 6; i++) {
-    lastSent = sendPacket(
-        *conn, Clock::now(), clonedPacketIdentifier, PacketType::OneRtt);
+    lastSent = sendPacket(*conn, Clock::now(), event, PacketType::OneRtt);
   }
   EXPECT_EQ(7, conn->outstandings.packets.size());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // Add the ClonedPacketIdentifier to the outstandings.clonedPacketIdentifiers
-  // set
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  // Add the PacketEvent to the outstandings.packetEvents set
+  conn->outstandings.packetEvents.insert(event);
 
   // Ack the last sent packet. Despite three losses, lossVisitor only visit one
   // packet
@@ -1500,10 +1493,10 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
 
 TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
   auto conn = createConn();
-  ClonedPacketIdentifier clonedPacketIdentifier1(
+  PacketEvent packetEvent1(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
-  sendPacket(*conn, Clock::now(), clonedPacketIdentifier1, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), packetEvent1, PacketType::OneRtt);
   sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
   sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
   sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
@@ -1527,7 +1520,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
   MockAsyncUDPSocket socket(qEvb);
   auto conn = createConn();
   ASSERT_TRUE(conn->outstandings.packets.empty());
-  ASSERT_TRUE(conn->outstandings.clonedPacketIdentifiers.empty());
+  ASSERT_TRUE(conn->outstandings.packetEvents.empty());
   auto stream1Id =
       conn->streamManager->createNextBidirectionalStream().value()->id;
   auto buf = folly::IOBuf::copyBuffer("I wrestled by the sea.");
@@ -1550,7 +1543,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
   EXPECT_FALSE(conn->streamManager->pendingWindowUpdate(stream2->id));
   EXPECT_FALSE(conn->pendingEvents.connWindowUpdate);
   ASSERT_EQ(1, conn->outstandings.packets.size());
-  ASSERT_TRUE(conn->outstandings.clonedPacketIdentifiers.empty());
+  ASSERT_TRUE(conn->outstandings.packetEvents.empty());
   uint32_t streamDataCounter = 0, streamWindowUpdateCounter = 0,
            connWindowUpdateCounter = 0;
   auto strippedPacket = stripPaddingFrames(
@@ -1645,9 +1638,8 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejected) {
   conn->congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .WillRepeatedly(Return());
-  // By adding an maybeClonedPacketIdentifier that doesn't exist in the
-  // outstandings.clonedPacketIdentifiers, they are all processed and will skip
-  // lossVisitor
+  // By adding an associatedEvent that doesn't exist in the
+  // outstandings.packetEvents, they are all processed and will skip lossVisitor
   for (auto i = 0; i < 2; i++) {
     sendPacket(*conn, TimePoint(), none, PacketType::OneRtt);
     sendPacket(*conn, TimePoint(), none, PacketType::ZeroRtt);
@@ -1681,29 +1673,27 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   conn->congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .WillRepeatedly(Return());
-  // By adding an maybeClonedPacketIdentifier that doesn't exist in the
-  // outstandings.clonedPacketIdentifiers, they are all processed and will skip
-  // lossVisitor
+  // By adding an associatedEvent that doesn't exist in the
+  // outstandings.packetEvents, they are all processed and will skip lossVisitor
   std::set<PacketNum> zeroRttPackets;
-  Optional<ClonedPacketIdentifier> lastClonedPacketIdentifier;
+  Optional<PacketEvent> lastPacketEvent;
   for (auto i = 0; i < 2; i++) {
-    auto packetNum = sendPacket(
-        *conn, TimePoint(), lastClonedPacketIdentifier, PacketType::ZeroRtt);
-    lastClonedPacketIdentifier =
-        ClonedPacketIdentifier(PacketNumberSpace::AppData, packetNum);
+    auto packetNum =
+        sendPacket(*conn, TimePoint(), lastPacketEvent, PacketType::ZeroRtt);
+    lastPacketEvent = PacketEvent(PacketNumberSpace::AppData, packetNum);
     zeroRttPackets.emplace(packetNum);
   }
   zeroRttPackets.emplace(
       sendPacket(*conn, TimePoint(), none, PacketType::ZeroRtt));
   for (auto zeroRttPacketNum : zeroRttPackets) {
-    ClonedPacketIdentifier zeroRttPacketEvent(
+    PacketEvent zeroRttPacketEvent(
         PacketNumberSpace::AppData, zeroRttPacketNum);
     sendPacket(*conn, TimePoint(), zeroRttPacketEvent, PacketType::OneRtt);
   }
 
   EXPECT_EQ(6, conn->outstandings.packets.size());
   ASSERT_EQ(conn->outstandings.numClonedPackets(), 6);
-  ASSERT_EQ(conn->outstandings.clonedPacketIdentifiers.size(), 2);
+  ASSERT_EQ(conn->outstandings.packetEvents.size(), 2);
   ASSERT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
 
   std::vector<bool> lostPackets;
@@ -1712,7 +1702,7 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   markZeroRttPacketsLost(*conn, [&lostPackets](auto&, auto&, bool processed) {
     lostPackets.emplace_back(processed);
   });
-  ASSERT_EQ(conn->outstandings.clonedPacketIdentifiers.size(), 0);
+  ASSERT_EQ(conn->outstandings.packetEvents.size(), 0);
   EXPECT_EQ(3, conn->outstandings.packets.size());
   EXPECT_EQ(lostPackets.size(), 3);
   ASSERT_EQ(conn->outstandings.numClonedPackets(), 3);

@@ -1590,14 +1590,14 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   MaxDataFrame maxDataFrame(maxDataAmt);
   conn->pendingEvents.connWindowUpdate = true;
   writePacket.frames.push_back(std::move(maxDataFrame));
-  ClonedPacketIdentifier clonedPacketIdentifier(PacketNumberSpace::AppData, 1);
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  PacketEvent event(PacketNumberSpace::AppData, 1);
+  conn->outstandings.packetEvents.insert(event);
   auto futureMoment = thisMoment + 50ms;
   MockClock::mockNow = [=]() { return futureMoment; };
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      event,
       std::move(writePacket),
       MockClock::now(),
       1500,
@@ -1633,9 +1633,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
       getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
           ->metadata.encodedBodySize);
   EXPECT_EQ(
-      clonedPacketIdentifier,
+      event,
       *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-           ->maybeClonedPacketIdentifier);
+           ->associatedEvent);
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
 }
 
@@ -3745,12 +3745,11 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterAppData) {
       MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
   conn->pendingEvents.connWindowUpdate = true;
   packet.packet.frames.emplace_back(connWindowUpdate);
-  ClonedPacketIdentifier clonedPacketIdentifier(
-      PacketNumberSpace::AppData, 100);
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
+  conn->outstandings.packetEvents.insert(packetEvent);
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      packetEvent,
       packet.packet,
       TimePoint(),
       123,
@@ -3773,12 +3772,11 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterHandshake) {
       MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
   conn->pendingEvents.connWindowUpdate = true;
   packet.packet.frames.emplace_back(connWindowUpdate);
-  ClonedPacketIdentifier clonedPacketIdentifier(
-      PacketNumberSpace::AppData, 100);
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
+  conn->outstandings.packetEvents.insert(packetEvent);
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      packetEvent,
       packet.packet,
       TimePoint(),
       123,
@@ -3801,12 +3799,11 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterInitial) {
       MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
   conn->pendingEvents.connWindowUpdate = true;
   packet.packet.frames.emplace_back(connWindowUpdate);
-  ClonedPacketIdentifier clonedPacketIdentifier(
-      PacketNumberSpace::AppData, 100);
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
+  conn->outstandings.packetEvents.insert(packetEvent);
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      packetEvent,
       packet.packet,
       TimePoint(),
       123,
@@ -3842,18 +3839,18 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
 
 TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
   auto conn = createConn();
-  ClonedPacketIdentifier clonedPacketIdentifier(
+  PacketEvent packetEvent(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   StreamDataBlockedFrame blockedFrame(stream->id, 1000);
   packet.packet.frames.emplace_back(blockedFrame);
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  conn->outstandings.packetEvents.insert(packetEvent);
   // This shall not crash
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      packetEvent,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -3926,7 +3923,7 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
 
 TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   auto conn = createConn();
-  ClonedPacketIdentifier clonedPacketIdentifier(
+  PacketEvent packetEvent(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
@@ -3934,11 +3931,11 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   RstStreamFrame rstStreamFrame(
       stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
   packet.packet.frames.emplace_back(std::move(rstStreamFrame));
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  conn->outstandings.packetEvents.insert(packetEvent);
   // This shall not crash
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      packetEvent,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -3989,12 +3986,11 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   RstStreamFrame rstStreamFrame(
       stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
   packet.packet.frames.push_back(rstStreamFrame);
-  ClonedPacketIdentifier clonedPacketIdentifier(
-      PacketNumberSpace::AppData, 100);
-  conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
+  conn->outstandings.packetEvents.insert(packetEvent);
   updateConnection(
       *conn,
-      clonedPacketIdentifier,
+      packetEvent,
       packet.packet,
       TimePoint(),
       0,

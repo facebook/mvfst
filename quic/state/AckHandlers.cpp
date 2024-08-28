@@ -240,15 +240,14 @@ AckEvent processAckFrame(
         rPacketIt++;
         continue;
       }
-      bool needsProcess = !rPacketIt->maybeClonedPacketIdentifier ||
-          conn.outstandings.clonedPacketIdentifiers.count(
-              *rPacketIt->maybeClonedPacketIdentifier);
+      bool needsProcess = !rPacketIt->associatedEvent ||
+          conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent);
       if (needsProcess) {
         CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
         --conn.outstandings.packetCount[currentPacketNumberSpace];
       }
       ack.ackedBytes += rPacketIt->metadata.encodedSize;
-      if (rPacketIt->maybeClonedPacketIdentifier) {
+      if (rPacketIt->associatedEvent) {
         CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
         --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
       }
@@ -308,11 +307,9 @@ AckEvent processAckFrame(
         } // if (rttSample != rttSample.zero())
       } // if (!ack.implicit && currentPacketNum == frame.largestAcked)
 
-      // Remove this ClonedPacketIdentifier from the
-      // outstandings.clonedPacketIdentifiers set
-      if (rPacketIt->maybeClonedPacketIdentifier) {
-        conn.outstandings.clonedPacketIdentifiers.erase(
-            *rPacketIt->maybeClonedPacketIdentifier);
+      // Remove this PacketEvent from the outstandings.packetEvents set
+      if (rPacketIt->associatedEvent) {
+        conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);
       }
       if (!ack.largestNewlyAckedPacket ||
           *ack.largestNewlyAckedPacket < currentPacketNum) {
@@ -364,9 +361,8 @@ AckEvent processAckFrame(
   }
 
   // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
-  // frame types only if the packet doesn't have an associated
-  // ClonedPacketIdentifier; or the ClonedPacketIdentifier is in
-  // conn.outstandings.clonedPacketIdentifiers
+  // frame types only if the packet doesn't have an associated PacketEvent;
+  // or the PacketEvent is in conn.outstandings.packetEvents
   ack.ackedPackets.reserve(packetsWithHandlerContext.size());
   for (auto packetWithHandlerContextItr = packetsWithHandlerContext.rbegin();
        packetWithHandlerContextItr != packetsWithHandlerContext.rend();

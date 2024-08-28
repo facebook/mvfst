@@ -22,9 +22,9 @@
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/AckStates.h>
-#include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/LossState.h>
 #include <quic/state/OutstandingPacket.h>
+#include <quic/state/PacketEvent.h>
 #include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
@@ -49,10 +49,9 @@ struct OutstandingsInfo {
   std::deque<OutstandingPacketWrapper> packets;
 
   // All PacketEvents of this connection. If a OutstandingPacketWrapper doesn't
-  // have an maybeClonedPacketIdentifier or if it's not in this set, there is no
-  // need to process its frames upon ack or loss.
-  folly::F14FastSet<ClonedPacketIdentifier, ClonedPacketIdentifierHash>
-      clonedPacketIdentifiers;
+  // have an associatedEvent or if it's not in this set, there is no need to
+  // process its frames upon ack or loss.
+  folly::F14FastSet<PacketEvent, PacketEventHash> packetEvents;
 
   // Number of outstanding packets not including cloned
   EnumArray<PacketNumberSpace, uint64_t> packetCount{};
@@ -87,7 +86,7 @@ struct OutstandingsInfo {
 
   void reset() {
     packets.clear();
-    clonedPacketIdentifiers.clear();
+    packetEvents.clear();
     packetCount = {};
     clonedPacketCount = {};
     declaredLostCount = 0;

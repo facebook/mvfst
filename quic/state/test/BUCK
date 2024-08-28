@@ -134,13 +134,13 @@ cpp_unittest(
 )
 
 cpp_unittest(
-    name = "ClonedPacketIdentifierTest",
+    name = "PacketEventTest",
     srcs = [
-        "ClonedPacketIdentifierTest.cpp",
+        "PacketEventTest.cpp",
     ],
     deps = [
         "//folly/portability:gtest",
-        "//quic/state:cloned_packet_identifier",
+        "//quic/state:packet_event",
     ],
 )
 

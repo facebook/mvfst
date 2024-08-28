@@ -5,21 +5,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <quic/state/ClonedPacketIdentifier.h>
+#include <quic/state/PacketEvent.h>
 
 #include <folly/hash/Hash.h>
 #include <functional>
 
 namespace quic {
 
-ClonedPacketIdentifier::ClonedPacketIdentifier(
+PacketEvent::PacketEvent(
     PacketNumberSpace packetNumberSpaceIn,
     PacketNum packetNumberIn)
     : packetNumber(packetNumberIn), packetNumberSpace(packetNumberSpaceIn) {}
 
-bool operator==(
-    const ClonedPacketIdentifier& lhs,
-    const ClonedPacketIdentifier& rhs) {
+bool operator==(const PacketEvent& lhs, const PacketEvent& rhs) {
   return static_cast<std::underlying_type_t<PacketNumberSpace>>(
              lhs.packetNumberSpace) ==
       static_cast<std::underlying_type_t<PacketNumberSpace>>(
@@ -27,11 +25,11 @@ bool operator==(
       lhs.packetNumber == rhs.packetNumber;
 }
 
-size_t ClonedPacketIdentifierHash::operator()(
-    const ClonedPacketIdentifier& clonedPacketIdentifier) const noexcept {
+size_t PacketEventHash::operator()(
+    const PacketEvent& packetEvent) const noexcept {
   return folly::hash::hash_combine(
       static_cast<std::underlying_type_t<PacketNumberSpace>>(
-          clonedPacketIdentifier.packetNumberSpace),
-      clonedPacketIdentifier.packetNumber);
+          packetEvent.packetNumberSpace),
+      packetEvent.packetNumber);
 }
 } // namespace quic

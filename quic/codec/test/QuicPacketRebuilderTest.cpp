@@ -518,7 +518,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   rebuilder.rebuildFromPacket(outstandingPacket);
-  EXPECT_TRUE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
+  EXPECT_TRUE(outstandingPacket.associatedEvent.has_value());
   EXPECT_EQ(1, conn.outstandings.numClonedPackets());
 }
 
@@ -542,7 +542,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   EXPECT_EQ(none, rebuilder.rebuildFromPacket(outstandingPacket));
-  EXPECT_FALSE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
+  EXPECT_FALSE(outstandingPacket.associatedEvent.has_value());
   EXPECT_EQ(0, conn.outstandings.numClonedPackets());
 }
 

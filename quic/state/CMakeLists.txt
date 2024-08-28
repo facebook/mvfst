@@ -9,7 +9,7 @@ add_library(
   QuicStreamManager.cpp
   QuicStreamUtilities.cpp
   StateData.cpp
-  ClonedPacketIdentifier.cpp
+  PacketEvent.cpp
   PendingPathRateLimiter.cpp
   QuicPriorityQueue.cpp
 )

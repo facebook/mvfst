@@ -23,15 +23,15 @@
 namespace quic {
 
 struct SchedulingResult {
-  Optional<ClonedPacketIdentifier> clonedPacketIdentifier;
+  Optional<PacketEvent> packetEvent;
   Optional<PacketBuilderInterface::Packet> packet;
   size_t shortHeaderPadding;
 
   explicit SchedulingResult(
-      Optional<ClonedPacketIdentifier> clonedPacketIdentifierIn,
+      Optional<PacketEvent> packetEventIn,
       Optional<PacketBuilderInterface::Packet> packetIn,
       size_t shortHeaderPaddingIn = 0)
-      : clonedPacketIdentifier(std::move(clonedPacketIdentifierIn)),
+      : packetEvent(std::move(packetEventIn)),
         packet(std::move(packetIn)),
         shortHeaderPadding(shortHeaderPaddingIn) {}
 };
@@ -46,11 +46,10 @@ class QuicPacketScheduler {
 
   /**
    * Schedules frames and writes them to the builder and returns
-   * a pair of ClonedPacketIdentifier and the Packet that was built.
+   * a pair of PacketEvent and the Packet that was built.
    *
-   * Returns an optional ClonedPacketIdentifier which indicates if the built out
-   * packet is a clone and the associated ClonedPacketIdentifier for both origin
-   * and clone.
+   * Returns an optional PacketEvent which indicates if the built out packet is
+   * a clone and the associated PacketEvent for both origin and clone.
    */
   virtual SchedulingResult scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
@@ -359,9 +358,8 @@ class CloningScheduler : public QuicPacketScheduler {
   bool hasData() const override;
 
   /**
-   * Returns a optional ClonedPacketIdentifier which indicates if the built out
-   * packet is a clone and the associated ClonedPacketIdentifier for both origin
-   * and clone.
+   * Returns a optional PacketEvent which indicates if the built out packet is a
+   * clone and the associated PacketEvent for both origin and clone.
    */
   SchedulingResult scheduleFramesForPacket(
       PacketBuilderInterface&& builder,

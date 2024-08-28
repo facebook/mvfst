@@ -129,7 +129,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    * cwnd. So we must set the loss timer so that we can write this data with the
    * slack packet space for the clones.
    */
-  if (!hasDataToWrite && conn.outstandings.clonedPacketIdentifiers.empty() &&
+  if (!hasDataToWrite && conn.outstandings.packetEvents.empty() &&
       totalPacketsOutstanding == conn.outstandings.numClonedPackets()) {
     VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
              << " outstanding=" << totalPacketsOutstanding
@@ -172,8 +172,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
            << " haDataToWrite=" << hasDataToWrite
            << " outstanding=" << totalPacketsOutstanding
            << " outstanding clone=" << conn.outstandings.numClonedPackets()
-           << " clonedPacketIdentifiers="
-           << conn.outstandings.clonedPacketIdentifiers.size()
+           << " packetEvents=" << conn.outstandings.packetEvents.size()
            << " initialPackets="
            << conn.outstandings.packetCount[PacketNumberSpace::Initial]
            << " handshakePackets="
@@ -288,15 +287,12 @@ void markZeroRttPacketsLost(
         iter->packet.header.getProtectionType() == ProtectionType::ZeroRtt;
     if (isZeroRttPacket) {
       auto& pkt = *iter;
-      bool processed = pkt.maybeClonedPacketIdentifier &&
-          !conn.outstandings.clonedPacketIdentifiers.count(
-              *pkt.maybeClonedPacketIdentifier);
+      bool processed = pkt.associatedEvent &&
+          !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
       lossVisitor(conn, pkt.packet, processed);
-      // Remove the ClonedPacketIdentifier from the
-      // outstandings.clonedPacketIdentifiers set
-      if (pkt.maybeClonedPacketIdentifier) {
-        conn.outstandings.clonedPacketIdentifiers.erase(
-            *pkt.maybeClonedPacketIdentifier);
+      // Remove the PacketEvent from the outstandings.packetEvents set
+      if (pkt.associatedEvent) {
+        conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
         CHECK(conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
         --conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData];
       }

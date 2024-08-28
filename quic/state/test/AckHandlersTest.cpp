@@ -1879,9 +1879,9 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  // Give this outstandingPacket an maybeClonedPacketIdentifier that's not in
-  // outstandings.clonedPacketIdentifiers
-  outstandingPacket.maybeClonedPacketIdentifier.emplace(GetParam().pnSpace, 0);
+  // Give this outstandingPacket an associatedEvent that's not in
+  // outstandings.packetEvents
+  outstandingPacket.associatedEvent.emplace(GetParam().pnSpace, 0);
   conn.outstandings.packets.push_back(std::move(outstandingPacket));
   conn.outstandings.clonedPacketCount[GetParam().pnSpace]++;
 
@@ -2000,8 +2000,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  outstandingPacket1.maybeClonedPacketIdentifier.emplace(
-      GetParam().pnSpace, packetNum1);
+  outstandingPacket1.associatedEvent.emplace(GetParam().pnSpace, packetNum1);
 
   OutstandingPacketWrapper outstandingPacket2(
       std::move(regularPacket2),
@@ -2013,16 +2012,14 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  // The seconds packet has the same ClonedPacketIdentifier
-  outstandingPacket2.maybeClonedPacketIdentifier.emplace(
-      GetParam().pnSpace, packetNum1);
+  // The seconds packet has the same PacketEvent
+  outstandingPacket2.associatedEvent.emplace(GetParam().pnSpace, packetNum1);
 
   conn.outstandings.packetCount[GetParam().pnSpace]++;
   conn.outstandings.packets.push_back(std::move(outstandingPacket1));
   conn.outstandings.packets.push_back(std::move(outstandingPacket2));
   conn.outstandings.clonedPacketCount[GetParam().pnSpace] += 2;
-  conn.outstandings.clonedPacketIdentifiers.emplace(
-      GetParam().pnSpace, packetNum1);
+  conn.outstandings.packetEvents.emplace(GetParam().pnSpace, packetNum1);
 
   // A counting ack visitor
   uint16_t ackVisitorCounter = 0;
@@ -2080,8 +2077,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  outstandingPacket1.maybeClonedPacketIdentifier.emplace(
-      GetParam().pnSpace, packetNum1);
+  outstandingPacket1.associatedEvent.emplace(GetParam().pnSpace, packetNum1);
 
   conn.ackStates.appDataAckState.nextPacketNum++;
   auto packetNum2 = conn.ackStates.appDataAckState.nextPacketNum;
@@ -2105,8 +2101,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   conn.outstandings.packets.push_back(std::move(outstandingPacket1));
   conn.outstandings.packets.push_back(std::move(outstandingPacket2));
   conn.outstandings.clonedPacketCount[GetParam().pnSpace] = 1;
-  conn.outstandings.clonedPacketIdentifiers.emplace(
-      GetParam().pnSpace, packetNum1);
+  conn.outstandings.packetEvents.emplace(GetParam().pnSpace, packetNum1);
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = packetNum2;

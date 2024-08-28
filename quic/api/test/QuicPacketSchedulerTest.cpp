@@ -490,7 +490,7 @@ TEST_F(QuicPacketSchedulerTest, NoCloningForDSR) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_FALSE(result.clonedPacketIdentifier.hasValue());
+  EXPECT_FALSE(result.packetEvent.hasValue());
   EXPECT_FALSE(result.packet.hasValue());
 }
 
@@ -518,9 +518,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(
-      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
-  EXPECT_EQ(packetNum, result.clonedPacketIdentifier->packetNumber);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
 }
 
 TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
@@ -569,9 +568,8 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(regularBuilder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(
-      result.clonedPacketIdentifier.hasValue() && result.packet.hasValue());
-  EXPECT_EQ(packetNum, result.clonedPacketIdentifier->packetNumber);
+  EXPECT_TRUE(result.packetEvent.hasValue() && result.packet.hasValue());
+  EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
   // written packet should not have any frame in the builder
   auto& writtenPacket = *result.packet;
   auto shortHeader = writtenPacket.packet.header.asShort();
@@ -603,15 +601,14 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, but then mark the second one processed by
-  // adding a ClonedPacketIdentifier that's missing from the
-  // outstandings.clonedPacketIdentifiers set
+  // adding a PacketEvent that's missing from the outstandings.packetEvents set
   PacketNum expected = addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   addOutstandingPacket(conn);
-  conn.outstandings.packets.back().maybeClonedPacketIdentifier =
-      ClonedPacketIdentifier(PacketNumberSpace::AppData, 1);
+  conn.outstandings.packets.back().associatedEvent =
+      PacketEvent(PacketNumberSpace::AppData, 1);
   // There needs to have retransmittable frame for the rebuilder to work
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
@@ -626,9 +623,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
       conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(
-      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
-  EXPECT_EQ(expected, result.clonedPacketIdentifier->packetNumber);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(expected, result.packetEvent->packetNumber);
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
@@ -706,7 +702,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
   // Clone the packet.
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.clonedPacketIdentifier.has_value());
+  EXPECT_TRUE(result.packetEvent.has_value());
   EXPECT_TRUE(result.packet.has_value());
 
   // Cloned packet has to have crypto data and no acks.
@@ -777,9 +773,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(
-      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
-  EXPECT_EQ(expected, result.clonedPacketIdentifier->packetNumber);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(expected, result.packetEvent->packetNumber);
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
@@ -818,7 +813,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_EQ(none, result.clonedPacketIdentifier);
+  EXPECT_EQ(none, result.packetEvent);
   EXPECT_EQ(result.packet->packet.header.getHeaderForm(), HeaderForm::Short);
   ShortHeader& shortHeader = *result.packet->packet.header.asShort();
   EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader.getProtectionType());
@@ -844,7 +839,7 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "GiantsShoulder", 0);
-  ClonedPacketIdentifier expectedClonedPacketIdentifier(
+  PacketEvent expectedPacketEvent(
       PacketNumberSpace::AppData, addOutstandingPacket(conn));
   ASSERT_EQ(1, conn.outstandings.packets.size());
   conn.outstandings.packets.back().packet.frames.push_back(MaxDataFrame(1000));
@@ -868,8 +863,7 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto packetResult = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
-  EXPECT_EQ(
-      expectedClonedPacketIdentifier, *packetResult.clonedPacketIdentifier);
+  EXPECT_EQ(expectedPacketEvent, *packetResult.packetEvent);
   int32_t verifyConnWindowUpdate = 1, verifyStreamWindowUpdate = 1;
   for (const auto& frame : packetResult.packet->packet.frames) {
     switch (frame.type()) {
@@ -950,9 +944,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(
-      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
-  EXPECT_EQ(packetNum, result.clonedPacketIdentifier->packetNumber);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
 
   // Something was written into the buffer:
   EXPECT_TRUE(bufAccessor.ownsBuffer());
@@ -1030,9 +1023,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   auto cloneResult = cloningScheduler.scheduleFramesForPacket(
       std::move(internalBuilder), conn.udpSendPacketLen);
   EXPECT_TRUE(
-      cloneResult.clonedPacketIdentifier.has_value() &&
-      cloneResult.packet.has_value());
-  EXPECT_EQ(packetNum, cloneResult.clonedPacketIdentifier->packetNumber);
+      cloneResult.packetEvent.has_value() && cloneResult.packet.has_value());
+  EXPECT_EQ(packetNum, cloneResult.packetEvent->packetNumber);
 
   // Something was written into the buffer:
   EXPECT_TRUE(bufAccessor.ownsBuffer());
@@ -1097,7 +1089,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   auto cloneResult = cloningScheduler.scheduleFramesForPacket(
       std::move(throwawayBuilder), kDefaultUDPSendPacketLen);
   EXPECT_FALSE(cloneResult.packet.hasValue());
-  EXPECT_FALSE(cloneResult.clonedPacketIdentifier.hasValue());
+  EXPECT_FALSE(cloneResult.packetEvent.hasValue());
 }
 
 class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};
@@ -1863,7 +1855,7 @@ TEST_F(
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_FALSE(result.clonedPacketIdentifier.has_value());
+  EXPECT_FALSE(result.packetEvent.has_value());
 
   // Nothing was written into the buffer:
   EXPECT_TRUE(bufAccessor.ownsBuffer());
@@ -1903,7 +1895,7 @@ TEST_F(
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_FALSE(result.clonedPacketIdentifier.has_value());
+  EXPECT_FALSE(result.packetEvent.has_value());
 
   // Nothing was written into the buffer:
   EXPECT_TRUE(bufAccessor.ownsBuffer());
