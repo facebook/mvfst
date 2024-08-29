@@ -26,7 +26,7 @@
 #include <quic/handshake/Aead.h>
 
 #if defined(__linux__)
-#include <quic/xsk/BaseXskContainer.h>
+#include <quic/xsk/XskSender.h>
 #endif
 
 namespace quic {

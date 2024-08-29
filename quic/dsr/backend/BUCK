@@ -25,6 +25,6 @@ mvfst_cpp_library(
         "//quic/dsr:types",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/handshake:aead",
-        "//quic/xsk:xsk_container",
+        "//quic/xsk:xsk_sender",
     ],
 )
