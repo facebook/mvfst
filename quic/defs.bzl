@@ -182,7 +182,10 @@ def mvfst_cxx_test(
             "..",
         ],
         deps = deps,
-        platforms = (CXX,),
+        # Combination of `platforms = FBCODE` and `mangled_keys = ["deps"]`
+        # forces the unsuffixed target into fbcode platform
+        platforms = (FBCODE,),
+        mangled_keys = ["deps"],
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
     )
 
