@@ -8,8 +8,8 @@ mvfst_cpp_library(
         "OutstandingPacket.h",
     ],
     exported_deps = [
+        ":cloned_packet_identifier",
         ":loss_state",
-        ":packet_event",
         "//folly/io:socket_option_map",
         "//quic/codec:types",
     ],
@@ -52,12 +52,12 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
-    name = "packet_event",
+    name = "cloned_packet_identifier",
     srcs = [
-        "PacketEvent.cpp",
+        "ClonedPacketIdentifier.cpp",
     ],
     headers = [
-        "PacketEvent.h",
+        "ClonedPacketIdentifier.h",
     ],
     deps = [
         "//folly/hash:hash",
@@ -112,9 +112,9 @@ mvfst_cpp_library(
     exported_deps = [
         ":ack_event",
         ":ack_states",
+        ":cloned_packet_identifier",
         ":loss_state",
         ":outstanding_packet",
-        ":packet_event",
         ":quic_connection_stats",
         ":quic_priority_queue",
         ":retransmission_policy",

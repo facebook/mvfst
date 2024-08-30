@@ -148,7 +148,7 @@ TEST_F(Bbr2Test, GracefullyHandleMissingFields) {
 
   auto packet = makeTestingWritePacket(0, 0, 0, testStart_);
   packet.lastAckedPacketInfo.clear();
-  packet.associatedEvent.clear();
+  packet.maybeClonedPacketIdentifier.clear();
   EXPECT_NO_THROW(bbr2.onPacketSent(packet));
 
   EXPECT_NO_THROW(bbr2.onPacketAckOrLoss(nullptr, nullptr));

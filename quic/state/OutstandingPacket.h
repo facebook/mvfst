@@ -9,8 +9,8 @@
 
 #include <folly/io/SocketOptionMap.h>
 #include <quic/codec/Types.h>
+#include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/LossState.h>
-#include <quic/state/PacketEvent.h>
 #include <chrono>
 
 namespace quic {
@@ -174,9 +174,9 @@ struct OutstandingPacket {
   };
   Optional<LastAckedPacketInfo> lastAckedPacketInfo;
 
-  // PacketEvent associated with this OutstandingPacketWrapper. This will be a
-  // none if the packet isn't a clone and hasn't been cloned.
-  Optional<PacketEvent> associatedEvent;
+  // ClonedPacketIdentifier associated with this OutstandingPacketWrapper. This
+  // will be a none if the packet isn't a clone and hasn't been cloned.
+  Optional<ClonedPacketIdentifier> maybeClonedPacketIdentifier;
 
   OptionalIntegral<uint64_t> nonDsrPacketSequenceNumber;
 

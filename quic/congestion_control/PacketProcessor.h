@@ -9,8 +9,8 @@
 
 #include <folly/io/SocketOptionMap.h>
 #include <quic/congestion_control/CongestionController.h>
+#include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/OutstandingPacket.h>
-#include <quic/state/PacketEvent.h>
 
 namespace quic {
 

@@ -202,7 +202,7 @@ bool handleStreamBufMetaWritten(
  */
 void updateConnection(
     QuicConnectionStateBase& conn,
-    Optional<PacketEvent> packetEvent,
+    Optional<ClonedPacketIdentifier> clonedPacketIdentifier,
     RegularQuicWritePacket packet,
     TimePoint time,
     uint32_t encodedSize,

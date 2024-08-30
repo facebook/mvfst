@@ -23,8 +23,8 @@ mvfst_cpp_library(
     exported_deps = [
         ":bandwidth",
         "//quic:constants",
+        "//quic/state:cloned_packet_identifier",
         "//quic/state:outstanding_packet",
-        "//quic/state:packet_event",
     ],
 )
 
@@ -313,8 +313,8 @@ mvfst_cpp_library(
     exported_deps = [
         ":congestion_controller",
         "//folly/io:socket_option_map",
+        "//quic/state:cloned_packet_identifier",
         "//quic/state:outstanding_packet",
-        "//quic/state:packet_event",
     ],
 )
 

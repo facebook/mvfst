@@ -2497,7 +2497,9 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   size_t cloneCounter = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      [](const auto& packet) { return packet.associatedEvent.hasValue(); });
+      [](const auto& packet) {
+        return packet.maybeClonedPacketIdentifier.hasValue();
+      });
   EXPECT_LE(1, cloneCounter);
 }
 
