@@ -14,7 +14,6 @@ load(
     "FBCODE",
     "IOS",
     "MACOSX",
-    "WATCHOS",
     "WINDOWS",
 )
 load("@fbsource//tools/build_defs:fb_xplat_cxx_binary.bzl", "fb_xplat_cxx_binary")
@@ -56,7 +55,7 @@ WINDOWS_CLANG_CXX_FLAGS = [
     "-D_ENABLE_EXTENDED_ALIGNED_STORAGE",
 ]
 
-DEFAULT_APPLE_SDKS = (IOS, MACOSX, WATCHOS)
+DEFAULT_APPLE_SDKS = (IOS, MACOSX)
 DEFAULT_PLATFORMS = (CXX, ANDROID, APPLE, FBCODE, WINDOWS)
 
 def _compute_include_directories():
