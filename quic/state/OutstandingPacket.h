@@ -235,8 +235,17 @@ struct OutstandingPacket {
 };
 
 struct OutstandingPacketWrapper : OutstandingPacket {
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn_ =
-      nullptr;
+  /**
+   * --NOTE--:
+   * std::function's move constructor behaves differently from folly::Function.
+   * An std::function that's been moved from can still return true via operator
+   * bool() for some implementations.
+   *
+   * From the cppref docs: "other is in a valid but unspecified state"
+   * https://en.cppreference.com/w/cpp/utility/functional/function/function
+   */
+  folly::Function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn_{
+      nullptr};
 
   OutstandingPacketWrapper(
       RegularQuicWritePacket packetIn,
@@ -249,7 +258,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       uint64_t writeCount,
       Metadata::DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecs = 0us,
-      std::function<void(const quic::OutstandingPacketWrapper&)>
+      folly::Function<void(const quic::OutstandingPacketWrapper&)>
           packetDestroyFn = nullptr)
       : OutstandingPacket(
             std::move(packetIn),
@@ -267,14 +276,13 @@ struct OutstandingPacketWrapper : OutstandingPacket {
   OutstandingPacketWrapper(const OutstandingPacketWrapper& source) = delete;
   OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
 
-  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) = default;
+  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) noexcept = default;
 
   OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
     // If this->packetDestroyFn_ is populated, then this OutstandingPacket is
     // populated. We must call packetDestroyFn_(this) first, before moving the
     // rest of the fields from the source packet (rhs).
-
-    if (this != &rhs && packetDestroyFn_ != nullptr) {
+    if (this != &rhs && packetDestroyFn_) {
       packetDestroyFn_(*this);
     }
 
