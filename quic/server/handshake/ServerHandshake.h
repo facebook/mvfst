@@ -44,7 +44,7 @@ namespace quic {
  *     auto writeBytes = handshake->getWriteBytes();
  *     auto hanshakeState = handshake->getHandshakeState();
  *     writeBytesToSocket(writeBytes);
- *   } catch (const QuicTransportException& ex) {
+ *   } catch (const QuicTransportException&) {
  *     ....
  *   }
  *  }
