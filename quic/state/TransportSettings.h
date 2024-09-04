@@ -403,6 +403,9 @@ struct TransportSettings {
   bool checkIdleTimerOnWrite{false};
   // Whether to process callbacks per received packet.
   bool processCallbacksPerPacket{false};
+  // Whether to trigger an inline write loop after we've read packets, rather
+  // than deferring to a loop callback.
+  bool inlineWriteAfterRead{false};
 };
 
 } // namespace quic

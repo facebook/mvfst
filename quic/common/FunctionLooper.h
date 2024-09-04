@@ -51,7 +51,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
    * Starts running the loop callback in each loop iteration.
    * if this is already scheduled to run, run() will continue to run it.
    */
-  void run(bool thisIteration = false) noexcept;
+  void run(bool thisIteration = false, bool runInline = false) noexcept;
 
   void setPacingFunction(
       folly::Function<std::chrono::microseconds()>&& pacingFunc);

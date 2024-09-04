@@ -1114,7 +1114,7 @@ void QuicTransportBase::updatePeekLooper() {
   }
 }
 
-void QuicTransportBase::updateWriteLooper(bool thisIteration) {
+void QuicTransportBase::updateWriteLooper(bool thisIteration, bool runInline) {
   if (closeState_ == CloseState::CLOSED) {
     VLOG(10) << nodeToString(conn_->nodeType)
              << " stopping write looper because conn closed " << *this;
@@ -1141,7 +1141,7 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
     VLOG(10) << nodeToString(conn_->nodeType)
              << " running write looper thisIteration=" << thisIteration << " "
              << *this;
-    writeLooper_->run(thisIteration);
+    writeLooper_->run(thisIteration, runInline);
     if (conn_->loopDetectorCallback) {
       conn_->writeDebugState.needsWriteLoopDetect =
           (conn_->loopDetectorCallback != nullptr);
@@ -1878,7 +1878,7 @@ void QuicTransportBase::onNetworkData(
     checkForClosedStream();
     updateReadLooper();
     updatePeekLooper();
-    updateWriteLooper(true);
+    updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
   };
   try {
     conn_->lossState.totalBytesRecvd += networkData.getTotalData();

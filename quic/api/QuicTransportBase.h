@@ -705,7 +705,7 @@ class QuicTransportBase : public QuicSocket,
   void invokeStreamsAvailableCallbacks();
   void updateReadLooper();
   void updatePeekLooper();
-  void updateWriteLooper(bool thisIteration);
+  void updateWriteLooper(bool thisIteration, bool runInline = false);
   void handlePingCallbacks();
   void handleKnobCallbacks();
   void handleAckEventCallbacks();
