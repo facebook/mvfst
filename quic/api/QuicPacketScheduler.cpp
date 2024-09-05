@@ -333,10 +333,6 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
       none, std::move(builder).buildPacket(), shortHeaderPadding);
 }
 
-void FrameScheduler::writeNextAcks(PacketBuilderInterface& builder) {
-  ackScheduler_->writeNextAcks(builder);
-}
-
 bool FrameScheduler::hasData() const {
   return hasPendingAcks() || hasImmediateData();
 }

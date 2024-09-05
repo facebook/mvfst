@@ -320,9 +320,6 @@ class FrameScheduler : public QuicPacketScheduler {
 
   FOLLY_NODISCARD folly::StringPiece name() const override;
 
-  // Writes outstanding acks.
-  void writeNextAcks(PacketBuilderInterface& builder);
-
  private:
   Optional<StreamFrameScheduler> streamFrameScheduler_;
   Optional<AckScheduler> ackScheduler_;
