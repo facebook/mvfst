@@ -1219,6 +1219,10 @@ uint8_t QuicServerWorker::getWorkerId() const noexcept {
 }
 
 void QuicServerWorker::setHostId(uint32_t hostId) noexcept {
+  if (hostId_ == hostId) {
+    LOG(WARNING) << "HostId is already set to " << hostId;
+    return;
+  }
   prevHostId_ = hostId_;
   hostId_ = hostId;
 }
