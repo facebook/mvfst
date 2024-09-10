@@ -10,6 +10,7 @@ endif()
 quic_add_test(TARGET ClientStateMachineTest
   SOURCES
   ClientStateMachineTest.cpp
+  QuicClientTransportTest.cpp
   QuicConnectorTest.cpp
   DEPENDS
   Folly::folly

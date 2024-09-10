@@ -66,3 +66,16 @@ mvfst_cpp_library(
         "//quic/client:client",
     ],
 )
+
+cpp_unittest(
+    name = "QuicClientTransportTest",
+    srcs = [
+        "QuicClientTransportTest.cpp",
+    ],
+    deps = [
+        "//quic/client:client",
+        "//quic/client/test:mocks",
+        "//quic/common/events/test:QuicEventBaseMock",
+        "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",
+    ],
+)

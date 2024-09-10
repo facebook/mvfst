@@ -308,6 +308,25 @@ class QuicClientTransport
       const QuicWriteFrame& packetFrame,
       const ReadAckFrame&);
 
+  virtual void processPackets(
+      NetworkData&& networkData,
+      const Optional<folly::SocketAddress>& server);
+
+  void readWithRecvmmsgWrapper(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
+
+  void readWithRecvmmsg(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
+
+  void readWithRecvmsg(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
+
   Optional<std::string> hostname_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
