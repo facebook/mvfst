@@ -20,6 +20,7 @@ load("@fbsource//tools/build_defs:fb_xplat_cxx_binary.bzl", "fb_xplat_cxx_binary
 load("@fbsource//tools/build_defs:fb_xplat_cxx_library.bzl", "fb_xplat_cxx_library")
 load("@fbsource//tools/build_defs:fb_xplat_cxx_test.bzl", "fb_xplat_cxx_test")
 load("@fbsource//tools/build_defs:fbsource_utils.bzl", "is_arvr_mode")
+load("@fbsource//tools/build_defs:type_defs.bzl", "is_tuple")
 load("@fbsource//xplat/pfh/Infra_Networking_Core:DEFS.bzl", "Infra_Networking_Core")
 
 CXXFLAGS = [
@@ -117,6 +118,8 @@ def mvfst_cxx_library(
             "ovr_config//runtime:fbcode": False,
         })
 
+    if is_tuple(exported_deps):
+        exported_deps = list(exported_deps)
     exported_preprocessor_flags = kwargs.pop("exported_preprocessor_flags", [])
     if use_libev():
         exported_preprocessor_flags += ["-DMVFST_USE_LIBEV"]
