@@ -1865,4 +1865,8 @@ uint64_t QuicClientTransport::getNumAckFramesSent() const {
   return conn_->numAckFramesSent;
 }
 
+uint64_t QuicClientTransport::getNumFlowControlFramesSent() const {
+  return conn_->numWindowUpdateFramesSent;
+}
+
 } // namespace quic

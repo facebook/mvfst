@@ -495,6 +495,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Number of ack frames sent on connection across all packet number spaces.
   uint64_t numAckFramesSent{0};
 
+  // Number of flow control frames send on connection (both stream and
+  // connection wide).
+  uint64_t numWindowUpdateFramesSent{0};
+
   struct ConnectionFlowControlState {
     // The size of the connection flow control window.
     uint64_t windowSize{0};

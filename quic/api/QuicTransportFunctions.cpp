@@ -745,6 +745,7 @@ void updateConnection(
         VLOG(10) << nodeToString(conn.nodeType)
                  << " sent conn window update in packetNum=" << packetNum << " "
                  << conn;
+        ++conn.numWindowUpdateFramesSent;
         onConnWindowUpdateSent(conn, maxDataFrame.maximumData, sentTime);
         break;
       }
@@ -765,6 +766,7 @@ void updateConnection(
         VLOG(10) << nodeToString(conn.nodeType)
                  << " sent packet with window update packetNum=" << packetNum
                  << " stream=" << maxStreamDataFrame.streamId << " " << conn;
+        ++conn.numWindowUpdateFramesSent;
         onStreamWindowUpdateSent(
             *stream, maxStreamDataFrame.maximumData, sentTime);
         break;
