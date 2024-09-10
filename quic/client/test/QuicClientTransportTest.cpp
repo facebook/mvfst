@@ -9,6 +9,7 @@
 #include <quic/client/QuicClientTransport.h>
 #include <quic/client/test/Mocks.h>
 #include <quic/common/events/test/QuicEventBaseMock.h>
+#include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/test/QuicAsyncUDPSocketMock.h>
 
 using namespace ::testing;
@@ -41,6 +42,10 @@ class QuicClientTransportMock : public QuicClientTransport {
       const Optional<folly::SocketAddress>& server) override {
     networkDataVec_.push_back(std::move(networkData));
     server_ = server;
+  }
+
+  QuicClientConnectionState* getClientConn() {
+    return clientConn_;
   }
 
   std::vector<NetworkData> networkDataVec_;
@@ -100,11 +105,23 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
   int numRecvmsgCalls = 0;
   const int numCallsExpected =
       quicClient_->getTransportSettings().maxRecvBatchSize;
+  auto transportSettings = quicClient_->getTransportSettings();
+  transportSettings.networkDataPerSocketRead = true;
+  quicClient_->setTransportSettings(std::move(transportSettings));
+
+  quicClient_->getClientConn()->oneRttWriteCipher = test::createNoOpAead();
+  quicClient_->getClientConn()->streamManager->setMaxLocalBidirectionalStreams(
+      128);
+  StreamId streamId = quicClient_->createBidirectionalStream().value();
+  quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false);
+
   EXPECT_CALL(*sockPtr_, recvmsg(_, _))
       .WillRepeatedly(Invoke([&](struct msghdr* /* msg */, int /* flags */) {
         ++numRecvmsgCalls;
         return numRecvmsgCalls > numCallsExpected ? 0 : 42;
       }));
+  // update WriteLooper() will call runInLoop() only once.
+  EXPECT_CALL(*evb_, runInLoopWithCbPtr(_, _)).WillOnce(Return());
   quicClient_->readWithRecvmsgSinglePacketLoop(
       *sockPtr_, 1024 /* readBufferSize */);
   EXPECT_EQ(quicClient_->networkDataVec_.size(), numCallsExpected);

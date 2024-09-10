@@ -1874,13 +1874,20 @@ void QuicTransportBase::onNetworkData(
     const folly::SocketAddress& peer,
     NetworkData&& networkData) noexcept {
   [[maybe_unused]] auto self = sharedGuard();
+  bool scheduleUpdateWriteLooper = true;
   SCOPE_EXIT {
     checkForClosedStream();
     updateReadLooper();
     updatePeekLooper();
-    updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
+    if (scheduleUpdateWriteLooper) {
+      updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
+    }
   };
   try {
+    // If networkDataPerSocketRead is on, we will run the write looper manually
+    // after processing packets.
+    scheduleUpdateWriteLooper =
+        !conn_->transportSettings.networkDataPerSocketRead;
     conn_->lossState.totalBytesRecvd += networkData.getTotalData();
     auto originalAckVersion = currentAckStateVersion(*conn_);
 

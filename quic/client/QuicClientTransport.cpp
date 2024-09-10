@@ -1561,6 +1561,9 @@ void QuicClientTransport::readWithRecvmsgSinglePacketLoop(
     }
     processPackets(std::move(networkDataSinglePacket), server);
   }
+  // Call updateWriteLooper manually because processPackets()/onNetworkData()
+  // will not schedule it when transportSettings.networkDataPerSocketRead is on.
+  updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
 }
 
 void QuicClientTransport::readWithRecvmsg(

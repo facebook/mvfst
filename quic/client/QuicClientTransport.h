@@ -334,6 +334,8 @@ class QuicClientTransport
   Optional<std::string> hostname_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
+  QuicClientConnectionState* clientConn_;
+
  private:
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   struct RecvmmsgStorage {
@@ -366,7 +368,6 @@ class QuicClientTransport
   std::shared_ptr<QuicClientTransport> selfOwning_;
   bool happyEyeballsEnabled_{false};
   sa_family_t happyEyeballsCachedFamily_{AF_UNSPEC};
-  QuicClientConnectionState* clientConn_;
   std::vector<TransportParameter> customTransportParameters_;
   folly::SocketOptionMap socketOptions_;
   std::shared_ptr<QuicTransportStatsCallback> statsCallback_;

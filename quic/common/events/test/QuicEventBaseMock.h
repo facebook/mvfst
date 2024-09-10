@@ -14,7 +14,10 @@ namespace quic::test {
 
 class QuicEventBaseMock : public QuicEventBase {
  public:
-  MOCK_METHOD((void), runInLoop, (QuicEventBaseLoopCallback*, bool));
+  void runInLoop(QuicEventBaseLoopCallback* cb, bool thisIteration) override {
+    runInLoopWithCbPtr(cb, thisIteration);
+  }
+  MOCK_METHOD((void), runInLoopWithCbPtr, (QuicEventBaseLoopCallback*, bool));
   MOCK_METHOD((void), runInLoop, (folly::Function<void()>, bool));
   MOCK_METHOD((void), runAfterDelay, (folly::Function<void()>, uint32_t));
   MOCK_METHOD(

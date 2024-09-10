@@ -76,6 +76,7 @@ cpp_unittest(
         "//quic/client:client",
         "//quic/client/test:mocks",
         "//quic/common/events/test:QuicEventBaseMock",
+        "//quic/common/test:test_utils",
         "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",
     ],
 )
