@@ -70,19 +70,10 @@ def use_libev():
 
 def mvfst_cpp_library(name, autodeps_skip = False, **kwargs):
     preprocessor_flags = kwargs.pop("preprocessor_flags", [])
-    exported_deps = kwargs.pop("exported_deps", [])
-    mvfst_mobile_exported_deps = kwargs.pop("mvfst_mobile_exported_deps", [])
-    mvfst_non_mobile_exported_deps = kwargs.pop("mvfst_non_mobile_exported_deps", [])
-    exported_external_deps = kwargs.pop("exported_external_deps", [])
     if use_libev():
         preprocessor_flags += ["-DMVFST_USE_LIBEV"]
-        exported_external_deps += mvfst_mobile_exported_deps
-    else:
-        exported_deps += mvfst_non_mobile_exported_deps
 
     kwargs["preprocessor_flags"] = preprocessor_flags
-    kwargs["exported_deps"] = exported_deps
-    kwargs["exported_external_deps"] = exported_external_deps
     cpp_library(name = name, autodeps_skip = True, **kwargs)
 
     if not autodeps_skip:
@@ -127,13 +118,8 @@ def mvfst_cxx_library(
         })
 
     exported_preprocessor_flags = kwargs.pop("exported_preprocessor_flags", [])
-    mvfst_mobile_exported_deps = kwargs.pop("mvfst_mobile_exported_deps", [])
-    mvfst_non_mobile_exported_deps = kwargs.pop("mvfst_non_mobile_exported_deps", [])
     if use_libev():
         exported_preprocessor_flags += ["-DMVFST_USE_LIBEV"]
-        exported_deps = list(exported_deps) + mvfst_mobile_exported_deps
-    else:
-        exported_deps = list(exported_deps) + mvfst_non_mobile_exported_deps
 
     fb_xplat_cxx_library(
         name = name,
