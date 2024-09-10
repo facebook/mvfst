@@ -1861,4 +1861,8 @@ void QuicClientTransport::RecvmmsgStorage::resize(size_t numPackets) {
   }
 }
 
+uint64_t QuicClientTransport::getNumAckFramesSent() const {
+  return conn_->numAckFramesSent;
+}
+
 } // namespace quic

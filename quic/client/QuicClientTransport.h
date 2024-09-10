@@ -216,6 +216,8 @@ class QuicClientTransport
   Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override;
 
+  uint64_t getNumAckFramesSent() const;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(

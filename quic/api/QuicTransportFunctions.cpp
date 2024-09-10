@@ -709,6 +709,7 @@ void updateConnection(
                  << " sent packet with largestAcked="
                  << largestAckedPacketWritten << " packetNum=" << packetNum
                  << " " << conn;
+        ++conn.numAckFramesSent;
         updateAckSendStateOnSentPacketWithAcks(
             conn,
             getAckState(conn, packetNumberSpace),
