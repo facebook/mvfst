@@ -322,6 +322,10 @@ class QuicClientTransport
       uint64_t readBufferSize,
       uint16_t numPackets);
 
+  void readWithRecvmsgSinglePacketLoop(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize);
+
   void readWithRecvmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,

@@ -1541,6 +1541,28 @@ void QuicClientTransport::readWithRecvmmsg(
   processPackets(std::move(networkData), server);
 }
 
+void QuicClientTransport::readWithRecvmsgSinglePacketLoop(
+    QuicAsyncUDPSocket& sock,
+    uint64_t readBufferSize) {
+  size_t totalData = 0;
+  Optional<folly::SocketAddress> server;
+  for (size_t i = 0; i < conn_->transportSettings.maxRecvBatchSize; i++) {
+    auto networkDataSinglePacket = NetworkData();
+    networkDataSinglePacket.reserve(1);
+    recvMsg(
+        sock,
+        readBufferSize,
+        1 /* numPackets */,
+        networkDataSinglePacket,
+        server,
+        totalData);
+    if (networkDataSinglePacket.getPackets().size() == 0) {
+      break;
+    }
+    processPackets(std::move(networkDataSinglePacket), server);
+  }
+}
+
 void QuicClientTransport::readWithRecvmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
@@ -1568,6 +1590,8 @@ void QuicClientTransport::onNotifyDataAvailable(
     readWithRecvmmsgWrapper(sock, readBufferSize, numPackets);
   } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
     readWithRecvmmsg(sock, readBufferSize, numPackets);
+  } else if (conn_->transportSettings.networkDataPerSocketRead) {
+    readWithRecvmsgSinglePacketLoop(sock, readBufferSize);
   } else {
     readWithRecvmsg(sock, readBufferSize, numPackets);
   }

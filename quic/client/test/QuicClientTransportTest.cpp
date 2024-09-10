@@ -29,14 +29,21 @@ class QuicClientTransportMock : public QuicClientTransport {
       uint16_t numPackets) {
     QuicClientTransport::readWithRecvmsg(sock, readBufferSize, numPackets);
   }
+
+  void readWithRecvmsgSinglePacketLoop(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize) {
+    QuicClientTransport::readWithRecvmsgSinglePacketLoop(sock, readBufferSize);
+  }
+
   void processPackets(
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server) override {
-    networkData_ = std::move(networkData);
+    networkDataVec_.push_back(std::move(networkData));
     server_ = server;
   }
 
-  NetworkData networkData_;
+  std::vector<NetworkData> networkDataVec_;
   Optional<folly::SocketAddress> server_;
 };
 
@@ -85,7 +92,25 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsg) {
       }));
   quicClient_->readWithRecvmsg(
       *sockPtr_, 1024 /* readBufferSize */, 128 /* numPackets */);
-  EXPECT_EQ(quicClient_->networkData_.getPackets().size(), 1);
+  EXPECT_EQ(quicClient_->networkDataVec_.size(), 1);
+  EXPECT_EQ(quicClient_->networkDataVec_[0].getPackets().size(), 1);
+}
+
+TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
+  int numRecvmsgCalls = 0;
+  const int numCallsExpected =
+      quicClient_->getTransportSettings().maxRecvBatchSize;
+  EXPECT_CALL(*sockPtr_, recvmsg(_, _))
+      .WillRepeatedly(Invoke([&](struct msghdr* /* msg */, int /* flags */) {
+        ++numRecvmsgCalls;
+        return numRecvmsgCalls > numCallsExpected ? 0 : 42;
+      }));
+  quicClient_->readWithRecvmsgSinglePacketLoop(
+      *sockPtr_, 1024 /* readBufferSize */);
+  EXPECT_EQ(quicClient_->networkDataVec_.size(), numCallsExpected);
+  for (const auto& networkData : quicClient_->networkDataVec_) {
+    EXPECT_EQ(networkData.getPackets().size(), 1);
+  }
 }
 
 } // namespace quic::test
