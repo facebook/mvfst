@@ -88,6 +88,7 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD((void), setRecvTos, (bool));
   MOCK_METHOD((bool), getRecvTos, ());
   MOCK_METHOD((void), setTosOrTrafficClass, (uint8_t));
+  MOCK_METHOD((sa_family_t), getLocalAddressFamily, (), (const));
 };
 
 class MockErrMessageCallback

@@ -1169,7 +1169,7 @@ void QuicClientTransport::recvMsg(
     struct sockaddr_storage addrStorage {};
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
-      rawAddr->sa_family = sock.address().getFamily();
+      rawAddr->sa_family = sock.getLocalAddressFamily();
     }
 
     int flags = 0;

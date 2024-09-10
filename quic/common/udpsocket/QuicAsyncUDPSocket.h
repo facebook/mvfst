@@ -328,6 +328,10 @@ class QuicAsyncUDPSocket {
 
   virtual int getFD() = 0;
 
+  [[nodiscard]] virtual sa_family_t getLocalAddressFamily() const {
+    return address().getFamily();
+  }
+
   template <
       typename T,
       typename = std::enable_if_t<std::is_base_of_v<QuicAsyncUDPSocket, T>>>
