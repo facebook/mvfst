@@ -701,8 +701,7 @@ TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   auto kex = fizz::openssl::makeOpenSSLECKeyExchange<fizz::P256>();
 
   kex->setPrivateKey(fizz::test::getPrivateKey(fizz::test::kP256Key));
-  echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>(
-      std::make_shared<fizz::DefaultFactory>());
+  echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>();
   echDecrypter->addDecryptionConfig(
       fizz::ech::DecrypterParams{getECHConfig(), kex->clone()});
 
