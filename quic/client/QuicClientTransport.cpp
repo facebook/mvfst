@@ -1556,10 +1556,18 @@ void QuicClientTransport::readWithRecvmsgSinglePacketLoop(
         networkDataSinglePacket,
         server,
         totalData);
+    if (!socket_) {
+      // Socket has been closed.
+      return;
+    }
     if (networkDataSinglePacket.getPackets().size() == 0) {
       break;
     }
     processPackets(std::move(networkDataSinglePacket), server);
+    if (!socket_) {
+      // Socket has been closed.
+      return;
+    }
   }
   // Call updateWriteLooper manually because processPackets()/onNetworkData()
   // will not schedule it when transportSettings.networkDataPerSocketRead is on.
