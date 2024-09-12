@@ -41,7 +41,7 @@ class StatelessResetGenerator {
 
  private:
   std::string addressStr_;
-  fizz::HkdfImpl hkdf_;
+  fizz::Hkdf hkdf_;
   std::vector<uint8_t> extractedSecret_;
 };
 } // namespace quic
