@@ -1917,9 +1917,9 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
         EXPECT_EQ(protocotVersion, 0x0000001);
         uint16_t addrLen = (cursor.readBE<uint16_t>());
         struct sockaddr* sockaddr = nullptr;
-        std::pair<const uint8_t*, size_t> addrData = cursor.peek();
-        EXPECT_GE(addrData.second, addrLen);
-        sockaddr = (struct sockaddr*)addrData.first;
+        auto addrData = cursor.peek();
+        EXPECT_GE(addrData.size(), addrLen);
+        sockaddr = (struct sockaddr*)addrData.data();
         cursor.skip(addrLen);
 
         folly::SocketAddress actualClient;
