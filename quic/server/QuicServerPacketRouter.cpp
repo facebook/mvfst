@@ -208,10 +208,10 @@ void TakeoverPacketHandler::processForwardedPacket(
   }
   struct sockaddr* sockaddr = nullptr;
   uint8_t sockaddrBuf[kMaxBufSizeForTakeoverEncapsulation];
-  std::pair<const uint8_t*, size_t> addrData = cursor.peek();
-  if (addrData.second >= addrLen) {
+  auto addrData = cursor.peek();
+  if (addrData.size() >= addrLen) {
     // the address is contiguous in the queue
-    sockaddr = (struct sockaddr*)addrData.first;
+    sockaddr = (struct sockaddr*)addrData.data();
     cursor.skip(addrLen);
   } else {
     // the address is not contiguous, copy it to a local buffer
