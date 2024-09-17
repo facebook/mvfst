@@ -1636,13 +1636,15 @@ TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallback) {
 
   EXPECT_CALL(connCallback, onBidirectionalStreamsAvailable(_))
       .WillOnce(Invoke([](uint64_t numAvailableStreams) {
-        EXPECT_EQ(numAvailableStreams, 1);
+        EXPECT_EQ(numAvailableStreams, 10);
       }));
-  transport->addMaxStreamsFrame(MaxStreamsFrame(1, /*isBidirectionalIn=*/true));
-  EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 1);
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(10, /*isBidirectionalIn=*/true));
+  EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 10);
 
   // same value max streams frame doesn't trigger callback
-  transport->addMaxStreamsFrame(MaxStreamsFrame(1, /*isBidirectionalIn=*/true));
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(10, /*isBidirectionalIn=*/true));
 }
 
 TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallbackAfterExausted) {
