@@ -66,6 +66,10 @@ def _compute_include_directories():
     quic_path = base_path[6:]
     return ["/".join(len(quic_path.split("/")) * [".."])]
 
+def _compute_header_namespace():
+    base_path = native.package_name()
+    return base_path[6:]
+
 def use_libev():
     return read_bool("mvfst", "use_libev", False)
 
@@ -160,15 +164,13 @@ def mvfst_cxx_library(
 def mvfst_cxx_test(
         name,
         srcs,
-        raw_headers = [],
+        headers = [],
         deps = []):
     fb_xplat_cxx_test(
         name = name,
         srcs = srcs,
-        raw_headers = raw_headers,
-        include_directories = [
-            "..",
-        ],
+        headers = headers,
+        header_namespace = _compute_header_namespace(),
         deps = deps,
         # Combination of `platforms = FBCODE` and `mangled_keys = ["deps"]`
         # forces the unsuffixed target into fbcode platform
@@ -180,17 +182,17 @@ def mvfst_cxx_test(
 def mvfst_cxx_binary(
         name,
         srcs,
-        raw_headers = [],
-        deps = [],
-        **kwargs):
+        headers = [],
+        compatible_with = [],
+        compiler_flags = [],
+        deps = []):
     fb_xplat_cxx_binary(
         name = name,
         srcs = srcs,
-        raw_headers = raw_headers,
-        compiler_flags = kwargs.pop("compiler_flags", []) + CXXFLAGS,
-        include_directories = [
-            "..",
-        ],
+        headers = headers,
+        header_namespace = _compute_header_namespace(),
+        compatible_with = compatible_with,
+        compiler_flags = compiler_flags + CXXFLAGS,
         deps = deps,
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
         platforms = (CXX,),
