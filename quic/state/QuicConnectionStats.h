@@ -28,6 +28,7 @@ struct QuicConnectionStats {
   uint32_t ptoCount{0};
   std::chrono::microseconds srtt{0};
   std::chrono::microseconds mrtt{0};
+  std::chrono::microseconds lrtt{0};
   std::chrono::microseconds rttvar{0};
   uint64_t peerAckDelayExponent{0};
   uint64_t udpSendPacketLen{0};

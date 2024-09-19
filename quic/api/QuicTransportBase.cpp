@@ -2971,6 +2971,7 @@ QuicConnectionStats QuicTransportBase::getConnectionsStats() const {
   connStats.ptoCount = conn_->lossState.ptoCount;
   connStats.srtt = conn_->lossState.srtt;
   connStats.mrtt = conn_->lossState.mrtt;
+  connStats.lrtt = conn_->lossState.lrtt;
   connStats.rttvar = conn_->lossState.rttvar;
   connStats.peerAckDelayExponent = conn_->peerAckDelayExponent;
   connStats.udpSendPacketLen = conn_->udpSendPacketLen;
