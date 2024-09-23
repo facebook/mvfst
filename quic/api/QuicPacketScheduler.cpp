@@ -918,15 +918,25 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     }
-    // If the packet is already a clone that has been processed, we don't clone
-    // it again.
-    if (outstandingPacket.maybeClonedPacketIdentifier &&
-        conn_.outstandings.clonedPacketIdentifiers.count(
-            *outstandingPacket.maybeClonedPacketIdentifier) == 0) {
-      continue;
+    // The packet is already a clone
+    if (outstandingPacket.maybeClonedPacketIdentifier) {
+      // If packet has CRYPTO frame, don't clone it again even if not processed
+      // yet, move on to give next packet a chance to be cloned
+      const auto& frames = outstandingPacket.packet.frames;
+      if (conn_.transportSettings.cloneAllPacketsWithCryptoFrame &&
+          std::find_if(frames.begin(), frames.end(), [](const auto& frame) {
+            return frame.type() == QuicWriteFrame::Type::WriteCryptoFrame;
+          }) != frames.end()) {
+        continue;
+      }
+      // Otherwise, clone until it is processed
+      if (conn_.outstandings.clonedPacketIdentifiers.count(
+              *outstandingPacket.maybeClonedPacketIdentifier) == 0) {
+        continue;
+      }
     }
-    // I think this only fail if udpSendPacketLen somehow shrinks in the middle
-    // of a connection.
+    // I think this only fail if udpSendPacketLen somehow shrinks in the
+    // middle of a connection.
     if (outstandingPacket.metadata.encodedSize >
         writableBytes + cipherOverhead_) {
       continue;
@@ -936,13 +946,14 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     internalBuilder->encodePacketHeader();
     PacketRebuilder rebuilder(*internalBuilder, conn_);
 
-    // TODO: It's possible we write out a packet that's larger than the packet
-    // size limit. For example, when the packet sequence number has advanced to
-    // a point where we need more bytes to encoded it than that of the original
-    // packet. In that case, if the original packet is already at the packet
-    // size limit, we will generate a packet larger than the limit. We can
-    // either ignore the problem, hoping the packet will be able to travel the
-    // network just fine; Or we can throw away the built packet and send a ping.
+    // TODO: It's possible we write out a packet that's larger than the
+    // packet size limit. For example, when the packet sequence number
+    // has advanced to a point where we need more bytes to encoded it
+    // than that of the original packet. In that case, if the original
+    // packet is already at the packet size limit, we will generate a
+    // packet larger than the limit. We can either ignore the problem,
+    // hoping the packet will be able to travel the network just fine;
+    // Or we can throw away the built packet and send a ping.
 
     // Rebuilder will write the rest of frames
     auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
@@ -954,14 +965,15 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     } else if (
         conn_.transportSettings.dataPathType ==
         DataPathType::ContinuousMemory) {
-      // When we use Inplace packet building and reuse the write buffer, even if
-      // the packet rebuild has failed, there might be some bytes already
-      // written into the buffer and the buffer tail pointer has already moved.
-      // We need to roll back the tail pointer to the position before the packet
-      // building to exclude those bytes. Otherwise these bytes will be sitting
-      // in between legit packets inside the buffer and will either cause errors
-      // further down the write path, or be sent out and then dropped at peer
-      // when peer fail to parse them.
+      // When we use Inplace packet building and reuse the write buffer,
+      // even if the packet rebuild has failed, there might be some
+      // bytes already written into the buffer and the buffer tail
+      // pointer has already moved. We need to roll back the tail
+      // pointer to the position before the packet building to exclude
+      // those bytes. Otherwise these bytes will be sitting in between
+      // legit packets inside the buffer and will either cause errors
+      // further down the write path, or be sent out and then dropped at
+      // peer when peer fail to parse them.
       internalBuilder.reset();
       CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
       conn_.bufAccessor->trimEnd(conn_.bufAccessor->length() - prevSize);

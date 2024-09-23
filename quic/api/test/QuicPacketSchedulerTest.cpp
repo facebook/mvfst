@@ -108,7 +108,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
 namespace quic {
 namespace test {
 
-class QuicPacketSchedulerTest : public TestWithParam<PacketBuilderType> {
+class QuicPacketSchedulerTest : public testing::Test {
  public:
   QuicVersion version{QuicVersion::MVFST};
 };
@@ -602,16 +602,16 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
-  // Add two outstanding packets, but then mark the second one processed by
+  // Add two outstanding packets, but then mark the first one processed by
   // adding a ClonedPacketIdentifier that's missing from the
   // outstandings.clonedPacketIdentifiers set
-  PacketNum expected = addOutstandingPacket(conn);
-  // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandings.packets.back().packet.frames.push_back(
-      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   addOutstandingPacket(conn);
   conn.outstandings.packets.back().maybeClonedPacketIdentifier =
       ClonedPacketIdentifier(PacketNumberSpace::AppData, 1);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandings.packets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  PacketNum expected = addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
@@ -629,6 +629,94 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   EXPECT_TRUE(
       result.clonedPacketIdentifier.has_value() && result.packet.has_value());
   EXPECT_EQ(expected, result.clonedPacketIdentifier->packetNumber);
+}
+
+class CloneAllPacketsWithCryptoFrameTest : public QuicPacketSchedulerTest,
+                                           public WithParamInterface<bool> {};
+TEST_P(
+    CloneAllPacketsWithCryptoFrameTest,
+    TestCloneAllPacketsWithCryptoFrameTrueFalse) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.cloneAllPacketsWithCryptoFrame = GetParam();
+  FrameScheduler noopScheduler("frame", conn);
+  CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
+
+  // First packet has a crypto frame
+  PacketNum firstPacketNum = addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.push_back(
+      WriteCryptoFrame(0, 1));
+  ClonedPacketIdentifier clonedPacketIdentifier(
+      PacketNumberSpace::AppData, firstPacketNum);
+  conn.outstandings.packets.back().maybeClonedPacketIdentifier =
+      clonedPacketIdentifier;
+  // It is not processed yet
+  conn.outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandings.packets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+
+  PacketNum secondPacketNum = addOutstandingPacket(conn);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandings.packets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_TRUE(
+      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
+  EXPECT_EQ(
+      conn.transportSettings.cloneAllPacketsWithCryptoFrame ? secondPacketNum
+                                                            : firstPacketNum,
+      result.clonedPacketIdentifier->packetNumber);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    CloneAllPacketsWithCryptoFrameTest,
+    CloneAllPacketsWithCryptoFrameTest,
+    Bool());
+
+TEST_F(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.cloneAllPacketsWithCryptoFrame = true;
+  FrameScheduler noopScheduler("frame", conn);
+  CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
+
+  // First packet has a crypto frame
+  PacketNum firstPacketNum = addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.push_back(
+      WriteCryptoFrame(0, 1));
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandings.packets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+
+  addOutstandingPacket(conn);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandings.packets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_TRUE(
+      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
+  EXPECT_EQ(firstPacketNum, result.clonedPacketIdentifier->packetNumber);
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {

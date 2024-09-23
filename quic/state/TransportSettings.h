@@ -409,6 +409,7 @@ struct TransportSettings {
   // Whether to trigger packet processing per socket read rather than batch
   // receiving and then processing.
   bool networkDataPerSocketRead{false};
+  bool cloneAllPacketsWithCryptoFrame{false};
 };
 
 } // namespace quic
