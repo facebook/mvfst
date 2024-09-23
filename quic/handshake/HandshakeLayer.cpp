@@ -26,6 +26,8 @@ EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type) {
 
 folly::StringPiece getQuicVersionSalt(QuicVersion version) {
   switch (version) {
+    case QuicVersion::MVFST_EXPERIMENTAL4:
+      return kQuicExperimentalSalt;
     case QuicVersion::QUIC_V1:
       [[fallthrough]];
     case QuicVersion::QUIC_V1_ALIAS:

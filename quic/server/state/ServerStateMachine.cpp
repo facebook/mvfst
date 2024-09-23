@@ -99,6 +99,7 @@ void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
     // MVFST_EXPERIMENTAL3 is used to apply a 2x pace scaling for BBRv2
     // QuicServerWorker.cpp before CC is initialized.
+  } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL4) {
   }
 }
 
