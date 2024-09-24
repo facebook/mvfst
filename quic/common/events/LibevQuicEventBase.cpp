@@ -21,18 +21,18 @@ void libEvTimeoutCallback(
   wrapper->timeoutExpired();
 }
 
-void libEvPrepareCallback(
+void libEvTimeoutCallbackInternal(
     struct ev_loop* /* loop */,
-    ev_prepare* w,
+    ev_timer* w,
     int /* revents */) {
   auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
   CHECK(self != nullptr);
   self->checkCallbacks();
 }
 
-void libEvAsyncCallback(
+void libEvPrepareCallback(
     struct ev_loop* /* loop */,
-    ev_async* w,
+    ev_prepare* w,
     int /* revents */) {
   auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
   CHECK(self != nullptr);
@@ -47,15 +47,13 @@ LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
   ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
   prepareWatcher_.data = this;
   ev_prepare_start(ev_loop_, &prepareWatcher_);
-
-  ev_async_init(&asyncWatcher_, libEvAsyncCallback);
-  asyncWatcher_.data = this;
-  ev_async_start(ev_loop_, &asyncWatcher_);
 }
 
 LibevQuicEventBase::~LibevQuicEventBase() {
   ev_prepare_stop(ev_loop_, &prepareWatcher_);
-  ev_async_stop(ev_loop_, &asyncWatcher_);
+  if (internalTimerInitialized_) {
+    ev_timer_stop(ev_loop_, &ev_timer_internal_);
+  }
 
   struct FunctionLoopCallbackDisposer {
     void operator()(FunctionLoopCallback* callback) {
@@ -163,7 +161,20 @@ void LibevQuicEventBase::checkCallbacks() {
       !loopCallbackWrappers_.empty()) {
     // We have newly added events for the next loop. Wake up as soon as
     // possible.
-    ev_async_send(ev_loop_, &asyncWatcher_);
+    if (!internalTimerInitialized_) {
+      internalTimerInitialized_ = true;
+      ev_timer_init(
+          &ev_timer_internal_,
+          libEvTimeoutCallbackInternal,
+          0.0001 /* after */,
+          0. /* repeat */);
+      ev_timer_internal_.data = this;
+      ev_timer_start(ev_loop_, &ev_timer_internal_);
+    } else {
+      ev_timer_stop(ev_loop_, &ev_timer_internal_);
+      ev_timer_set(&ev_timer_internal_, 0.0001, 0.);
+      ev_timer_start(ev_loop_, &ev_timer_internal_);
+    }
   }
 }
 

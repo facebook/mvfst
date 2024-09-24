@@ -228,6 +228,7 @@ class LibevQuicEventBase
   ev_prepare prepareWatcher_;
   std::atomic<std::thread::id> loopThreadId_;
   bool wakeUpImmediatelyOnPendingScheduledEvents_{false};
-  ev_async asyncWatcher_;
+  ev_timer ev_timer_internal_;
+  bool internalTimerInitialized_{false};
 };
 } // namespace quic
