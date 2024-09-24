@@ -31,7 +31,7 @@ class LibevQuicEventBase
       public QuicTimer,
       public std::enable_shared_from_this<LibevQuicEventBase> {
  public:
-  explicit LibevQuicEventBase(struct ev_loop* loop, bool useEvCheck = false);
+  explicit LibevQuicEventBase(struct ev_loop* loop);
   ~LibevQuicEventBase() override;
 
   void runInLoop(
@@ -226,10 +226,8 @@ class LibevQuicEventBase
   // ev_prepare is supposed to run before the loop goes to sleep.
   // We're using it to execute delayed work given to us via runInLoop.
   ev_prepare prepareWatcher_;
-  ev_check checkWatcher_;
   std::atomic<std::thread::id> loopThreadId_;
   bool wakeUpImmediatelyOnPendingScheduledEvents_{false};
   ev_async asyncWatcher_;
-  bool useEvCheck_{false};
 };
 } // namespace quic

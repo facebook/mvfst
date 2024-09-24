@@ -30,15 +30,6 @@ void libEvPrepareCallback(
   self->checkCallbacks();
 }
 
-void libEvCheckCallback(
-    struct ev_loop* /* loop */,
-    ev_check* w,
-    int /* revents */) {
-  auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
-  CHECK(self != nullptr);
-  self->checkCallbacks();
-}
-
 void libEvAsyncCallback(
     struct ev_loop* /* loop */,
     ev_async* w,
@@ -51,18 +42,11 @@ void libEvAsyncCallback(
 } // namespace
 
 namespace quic {
-LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop, bool useEvCheck)
-    : ev_loop_(loop), useEvCheck_(useEvCheck) {
+LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
   loopThreadId_.store(std::this_thread::get_id(), std::memory_order_release);
-  if (useEvCheck_) {
-    ev_check_init(&checkWatcher_, libEvCheckCallback);
-    checkWatcher_.data = this;
-    ev_check_start(ev_loop_, &checkWatcher_);
-  } else {
-    ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
-    prepareWatcher_.data = this;
-    ev_prepare_start(ev_loop_, &prepareWatcher_);
-  }
+  ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
+  prepareWatcher_.data = this;
+  ev_prepare_start(ev_loop_, &prepareWatcher_);
 
   ev_async_init(&asyncWatcher_, libEvAsyncCallback);
   asyncWatcher_.data = this;
@@ -70,11 +54,7 @@ LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop, bool useEvCheck)
 }
 
 LibevQuicEventBase::~LibevQuicEventBase() {
-  if (useEvCheck_) {
-    ev_check_stop(ev_loop_, &checkWatcher_);
-  } else {
-    ev_prepare_stop(ev_loop_, &prepareWatcher_);
-  }
+  ev_prepare_stop(ev_loop_, &prepareWatcher_);
   ev_async_stop(ev_loop_, &asyncWatcher_);
 
   struct FunctionLoopCallbackDisposer {
