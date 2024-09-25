@@ -1325,6 +1325,33 @@ TEST_F(QuicLossFunctionsTest, PTOAvoidPointless) {
   EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData], 1);
 }
 
+TEST_F(QuicLossFunctionsTest, PTOAlwaysSendTwo) {
+  // If there is no lost data and the outstanding data is less than the
+  // kPacketToSendForPTO packets, send only the available outstanding count.
+  auto conn = createConn();
+  conn->transportSettings.alwaysPtoMultiple = true;
+
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher();
+
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+
+  conn->oneRttWriteCipher = createNoOpAead();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+
+  conn->outstandings.packetCount[PacketNumberSpace::Initial] = 1;
+  conn->outstandings.packetCount[PacketNumberSpace::Handshake] = 1;
+  conn->outstandings.packetCount[PacketNumberSpace::AppData] = 1;
+
+  onPTOAlarm(*conn);
+
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial], 2);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake], 2);
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData], 2);
+}
+
 TEST_F(QuicLossFunctionsTest, EmptyOutstandingNoTimeout) {
   auto conn = createConn();
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);

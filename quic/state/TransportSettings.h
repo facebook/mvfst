@@ -412,6 +412,8 @@ struct TransportSettings {
   bool cloneAllPacketsWithCryptoFrame{false};
   // Whether we allow PTOing of packets with just PING frames.
   bool ptoPingFrames{false};
+  // Always send multiple PTOs even if we don't have multiple packets.
+  bool alwaysPtoMultiple{false};
 };
 
 } // namespace quic
