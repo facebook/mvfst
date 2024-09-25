@@ -410,6 +410,8 @@ struct TransportSettings {
   // receiving and then processing.
   bool networkDataPerSocketRead{false};
   bool cloneAllPacketsWithCryptoFrame{false};
+  // Whether we allow PTOing of packets with just PING frames.
+  bool ptoPingFrames{false};
 };
 
 } // namespace quic
