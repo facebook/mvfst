@@ -787,6 +787,7 @@ void updateConnection(
         if (conn.transportSettings.ptoPingFrames) {
           retransmittable = true;
         }
+        conn.numPingFramesSent++;
         break;
       case QuicWriteFrame::Type::QuicSimpleFrame: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();

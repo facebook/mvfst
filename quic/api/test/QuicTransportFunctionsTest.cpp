@@ -1762,6 +1762,21 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
   EXPECT_THAT(detailsPerStream, IsEmpty());
 }
 
+TEST_F(QuicTransportFunctionsTest, TestPingFrameCounter) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet.packet.frames.push_back(PingFrame());
+  updateConnection(
+      *conn,
+      none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+  ASSERT_EQ(1, conn->numPingFramesSent);
+}
+
 TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
   uint64_t frameOffset = 0;
   uint64_t frameLen = 10;

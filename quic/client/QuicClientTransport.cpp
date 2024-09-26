@@ -1877,4 +1877,8 @@ uint64_t QuicClientTransport::getNumFlowControlFramesSent() const {
   return conn_->numWindowUpdateFramesSent;
 }
 
+uint64_t QuicClientTransport::getNumPingFramesSent() const {
+  return conn_->numPingFramesSent;
+}
+
 } // namespace quic

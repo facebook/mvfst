@@ -220,6 +220,8 @@ class QuicClientTransport
 
   uint64_t getNumFlowControlFramesSent() const;
 
+  uint64_t getNumPingFramesSent() const;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(
