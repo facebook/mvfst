@@ -13,6 +13,7 @@
 #include <condition_variable>
 #include <mutex>
 
+#include <fizz/backend/openssl/OpenSSL.h>
 #include <fizz/client/test/Mocks.h>
 #include <fizz/crypto/test/TestUtil.h>
 #include <fizz/protocol/clock/test/Mocks.h>

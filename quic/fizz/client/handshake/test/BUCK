@@ -11,6 +11,7 @@ cpp_unittest(
     deps = [
         "fbsource//third-party/googletest:gmock",
         ":mock_psk_cache",
+        "//fizz/backend:openssl",
         "//fizz/client/test:mocks",
         "//fizz/crypto/test:TestUtil",
         "//fizz/protocol/clock/test:mock_clock",

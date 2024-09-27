@@ -17,6 +17,7 @@
 #include <folly/fibers/Baton.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 
+#include <fizz/backend/openssl/OpenSSL.h>
 #include <fizz/compression/ZlibCertificateDecompressor.h>
 #include <fizz/compression/ZstdCertificateDecompressor.h>
 
