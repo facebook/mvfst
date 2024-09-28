@@ -4034,7 +4034,8 @@ WriteQuicDataResult QuicTransportBase::handleInitialWriteDataCommon(
   if ((initialCryptoStream.retransmissionBuffer.size() &&
        conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
        numProbePackets) ||
-      initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
+      initialScheduler.hasData() || toWriteInitialAcks(*conn_) ||
+      hasBufferedDataToWrite(*conn_)) {
     CHECK(conn_->initialHeaderCipher);
     return writeCryptoAndAckDataToSocket(
         *socket_,
@@ -4064,7 +4065,8 @@ WriteQuicDataResult QuicTransportBase::handleHandshakeWriteDataCommon(
       conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
   if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
        handshakeCryptoStream.retransmissionBuffer.size() && numProbePackets) ||
-      handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
+      handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_) ||
+      hasBufferedDataToWrite(*conn_)) {
     CHECK(conn_->handshakeWriteHeaderCipher);
     return writeCryptoAndAckDataToSocket(
         *socket_,
