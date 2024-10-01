@@ -21,6 +21,18 @@ mvfst_cpp_library(
 )
 
 cpp_unittest(
+    name = "acked_packet_iterator_test",
+    srcs = [
+        "AckedPacketIteratorTest.cpp",
+    ],
+    deps = [
+        "fbcode//quic/common/test:test_utils",
+        "fbcode//quic/state:ack_handler",
+        "fbsource//third-party/googletest:gmock",
+    ],
+)
+
+cpp_unittest(
     name = "QuicStateMachineTest",
     srcs = [
         "StateDataTest.cpp",

@@ -147,9 +147,11 @@ mvfst_cpp_library(
     name = "ack_handler",
     srcs = [
         "AckHandlers.cpp",
+        "AckedPacketIterator.cpp",
     ],
     headers = [
         "AckHandlers.h",
+        "AckedPacketIterator.h",
     ],
     deps = [
         ":state_functions",
@@ -159,9 +161,13 @@ mvfst_cpp_library(
         "//quic/loss:loss",
     ],
     exported_deps = [
-        ":quic_state_machine",
-        "//quic:constants",
-        "//quic/codec:types",
+        "fbcode//quic:constants",
+        "fbcode//quic/codec:types",
+        "fbcode//quic/common:optional",
+        "fbcode//quic/common:small_collections",
+        "fbcode//quic/congestion_control:congestion_controller",
+        "fbcode//quic/state:outstanding_packet",
+        "fbcode//quic/state:quic_state_machine",
     ],
 )
 
