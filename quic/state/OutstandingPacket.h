@@ -276,7 +276,8 @@ struct OutstandingPacketWrapper : OutstandingPacket {
   OutstandingPacketWrapper(const OutstandingPacketWrapper& source) = delete;
   OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
 
-  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) noexcept = default;
+  // TODO: bring noexcept back after retiring gcc 9: T202935929
+  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) = default;
 
   OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
     // If this->packetDestroyFn_ is populated, then this OutstandingPacket is
