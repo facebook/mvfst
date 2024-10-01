@@ -2744,7 +2744,7 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
 void QuicTransportBase::keepaliveTimeoutExpired() noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   conn_->pendingEvents.sendPing = true;
-  updateWriteLooper(true);
+  updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
 }
 
 void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
