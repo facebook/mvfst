@@ -9,6 +9,7 @@
 #include <folly/tracing/StaticTracepoint.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
+#include <quic/state/AckedPacketIterator.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <iterator>
@@ -147,12 +148,6 @@ AckEvent processAckFrame(
   // temporary storage to enable packets to be processed in sent order
   SmallVec<OutstandingPacketWithHandlerContext, 50> packetsWithHandlerContext;
 
-  auto currentPacketIt = getLastOutstandingPacket(
-      conn,
-      pnSpace,
-      true /* includeDeclaredLost */,
-      true /* includeScheduledForDestruction */);
-
   // Store first outstanding packet number to ignore old receive timestamps.
   const auto& firstOutstandingPacket =
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
@@ -182,178 +177,141 @@ AckEvent processAckFrame(
       spuriousLossEvent.emplace(ackReceiveTime);
     }
   }
-  auto ackBlockIt = frame.ackBlocks.cbegin();
-  while (ackBlockIt != frame.ackBlocks.cend() &&
-         currentPacketIt != conn.outstandings.packets.rend()) {
-    // In reverse order, find the first outstanding packet that has a packet
-    // number LE the endPacket of the current ack range.
-    auto rPacketIt = std::lower_bound(
-        currentPacketIt,
-        conn.outstandings.packets.rend(),
-        ackBlockIt->endPacket,
-        [&](const auto& packetWithTime, const auto& val) {
-          return packetWithTime.packet.header.getPacketSequenceNum() > val;
-        });
-    if (rPacketIt == conn.outstandings.packets.rend()) {
-      // This means that all the packets are greater than the end packet.
-      // Since we iterate the ACK blocks in reverse order of end packets, our
-      // work here is done.
-      VLOG(10) << __func__ << " less than all outstanding packets outstanding="
-               << conn.outstandings.numOutstanding() << " range=["
-               << ackBlockIt->startPacket << ", " << ackBlockIt->endPacket
-               << "]" << " " << conn;
-      ackBlockIt++;
-      break;
+
+  AckedPacketIterator ackedPacketIterator(frame.ackBlocks, conn, pnSpace);
+  while (ackedPacketIterator.valid()) {
+    auto currentPacketNum =
+        ackedPacketIterator->packet.header.getPacketSequenceNum();
+    auto currentPacketNumberSpace =
+        ackedPacketIterator->packet.header.getPacketNumberSpace();
+    ackedPacketIterator->metadata.scheduledForDestruction = true;
+    conn.outstandings.scheduledForDestructionCount++;
+    VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
+             << " space=" << currentPacketNumberSpace << conn;
+    // If we hit a packet which has been lost we need to count the spurious
+    // loss and ignore all other processing.
+    if (ackedPacketIterator->declaredLost) {
+      modifyStateForSpuriousLoss(conn, *ackedPacketIterator);
+      QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
+      if (spuriousLossEvent) {
+        spuriousLossEvent->addSpuriousPacket(
+            ackedPacketIterator->metadata,
+            ackedPacketIterator->packet.header.getPacketSequenceNum(),
+            ackedPacketIterator->packet.header.getPacketNumberSpace());
+      }
+      ackedPacketIterator.next();
+      continue;
+    }
+    bool needsProcess = !ackedPacketIterator->maybeClonedPacketIdentifier ||
+        conn.outstandings.clonedPacketIdentifiers.count(
+            *ackedPacketIterator->maybeClonedPacketIdentifier);
+    if (needsProcess) {
+      CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
+      --conn.outstandings.packetCount[currentPacketNumberSpace];
+    }
+    ack.ackedBytes += ackedPacketIterator->metadata.encodedSize;
+    if (ackedPacketIterator->maybeClonedPacketIdentifier) {
+      CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
+      --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
+    }
+    if (ackedPacketIterator->isDSRPacket) {
+      ++dsrPacketsAcked;
     }
 
-    while (rPacketIt != conn.outstandings.packets.rend()) {
-      auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
-      auto currentPacketNumberSpace =
-          rPacketIt->packet.header.getPacketNumberSpace();
-      if (pnSpace != currentPacketNumberSpace) {
-        // When the next packet is not in the same packet number space, we need
-        // to skip it in current ack processing. If the iterator has moved, that
-        // means we have found packets in the current space that are acked by
-        // this ack block. So the code erases the current iterator range and
-        // move the iterator to be the next search point.
-        rPacketIt++;
-        continue;
-      }
-      if (currentPacketNum < ackBlockIt->startPacket) {
-        break;
-      }
-      rPacketIt->metadata.scheduledForDestruction = true;
-      conn.outstandings.scheduledForDestructionCount++;
-      VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
-               << " space=" << currentPacketNumberSpace << conn;
-      // If we hit a packet which has been lost we need to count the spurious
-      // loss and ignore all other processing.
-      if (rPacketIt->declaredLost) {
-        modifyStateForSpuriousLoss(conn, *rPacketIt);
-        QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
-        if (spuriousLossEvent) {
-          spuriousLossEvent->addSpuriousPacket(
-              rPacketIt->metadata,
-              rPacketIt->packet.header.getPacketSequenceNum(),
-              rPacketIt->packet.header.getPacketNumberSpace());
-        }
-        rPacketIt++;
-        continue;
-      }
-      bool needsProcess = !rPacketIt->maybeClonedPacketIdentifier ||
-          conn.outstandings.clonedPacketIdentifiers.count(
-              *rPacketIt->maybeClonedPacketIdentifier);
-      if (needsProcess) {
-        CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
-        --conn.outstandings.packetCount[currentPacketNumberSpace];
-      }
-      ack.ackedBytes += rPacketIt->metadata.encodedSize;
-      if (rPacketIt->maybeClonedPacketIdentifier) {
-        CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
-        --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
-      }
-      if (rPacketIt->isDSRPacket) {
-        ++dsrPacketsAcked;
-      }
+    // Update RTT if current packet is the largestAcked in the frame
+    //
+    // An RTT sample is generated using only the largest acknowledged packet
+    // in the received ACK frame. To avoid generating multiple RTT samples
+    // for a single packet, an ACK frame SHOULD NOT be used to update RTT
+    // estimates if it does not newly acknowledge the largest acknowledged
+    // packet (RFC9002). This includes for minRTT estimates.
+    if (!ack.implicit && currentPacketNum == frame.largestAcked) {
+      auto ackReceiveTimeOrNow =
+          ackReceiveTime > ackedPacketIterator->metadata.time ? ackReceiveTime
+                                                              : nowTime;
 
-      // Update RTT if current packet is the largestAcked in the frame
+      // Use ceil to round up to next microsecond during conversion.
       //
-      // An RTT sample is generated using only the largest acknowledged packet
-      // in the received ACK frame. To avoid generating multiple RTT samples
-      // for a single packet, an ACK frame SHOULD NOT be used to update RTT
-      // estimates if it does not newly acknowledge the largest acknowledged
-      // packet (RFC9002). This includes for minRTT estimates.
-      if (!ack.implicit && currentPacketNum == frame.largestAcked) {
-        auto ackReceiveTimeOrNow = ackReceiveTime > rPacketIt->metadata.time
-            ? ackReceiveTime
-            : nowTime;
-
-        // Use ceil to round up to next microsecond during conversion.
-        //
-        // While unlikely, it's still technically possible for the RTT to be
-        // zero; ignore if this is the case.
-        auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
-            ackReceiveTimeOrNow - rPacketIt->metadata.time);
-        if (rttSample != rttSample.zero()) {
-          // notify observers
-          {
-            const auto socketObserverContainer =
-                conn.getSocketObserverContainer();
-            if (socketObserverContainer &&
-                socketObserverContainer->hasObserversForEvent<
-                    SocketObserverInterface::Events::rttSamples>()) {
-              socketObserverContainer->invokeInterfaceMethod<
-                  SocketObserverInterface::Events::rttSamples>(
-                  [event = SocketObserverInterface::PacketRTT(
-                       ackReceiveTimeOrNow,
-                       rttSample,
-                       frame.ackDelay,
-                       *rPacketIt)](auto observer, auto observed) {
-                    observer->rttSampleGenerated(observed, event);
-                  });
-            }
+      // While unlikely, it's still technically possible for the RTT to be
+      // zero; ignore if this is the case.
+      auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
+          ackReceiveTimeOrNow - ackedPacketIterator->metadata.time);
+      if (rttSample != rttSample.zero()) {
+        // notify observers
+        {
+          const auto socketObserverContainer =
+              conn.getSocketObserverContainer();
+          if (socketObserverContainer &&
+              socketObserverContainer->hasObserversForEvent<
+                  SocketObserverInterface::Events::rttSamples>()) {
+            socketObserverContainer->invokeInterfaceMethod<
+                SocketObserverInterface::Events::rttSamples>(
+                [event = SocketObserverInterface::PacketRTT(
+                     ackReceiveTimeOrNow,
+                     rttSample,
+                     frame.ackDelay,
+                     *ackedPacketIterator)](auto observer, auto observed) {
+                  observer->rttSampleGenerated(observed, event);
+                });
           }
-
-          // update AckEvent RTTs, which are used by CCA and other processing
-          CHECK(!ack.rttSample.has_value());
-          CHECK(!ack.rttSampleNoAckDelay.has_value());
-          ack.rttSample = rttSample;
-          ack.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
-              ? OptionalMicros(std::chrono::ceil<std::chrono::microseconds>(
-                    rttSample - frame.ackDelay))
-              : std::nullopt;
-
-          // update transport RTT
-          updateRtt(conn, rttSample, frame.ackDelay);
-        } // if (rttSample != rttSample.zero())
-      } // if (!ack.implicit && currentPacketNum == frame.largestAcked)
-
-      // Remove this ClonedPacketIdentifier from the
-      // outstandings.clonedPacketIdentifiers set
-      if (rPacketIt->maybeClonedPacketIdentifier) {
-        conn.outstandings.clonedPacketIdentifiers.erase(
-            *rPacketIt->maybeClonedPacketIdentifier);
-      }
-      if (!ack.largestNewlyAckedPacket ||
-          *ack.largestNewlyAckedPacket < currentPacketNum) {
-        ack.largestNewlyAckedPacket = currentPacketNum;
-        ack.largestNewlyAckedPacketSentTime = rPacketIt->metadata.time;
-        ack.largestNewlyAckedPacketAppLimited = rPacketIt->isAppLimited;
-      }
-      if (!ack.implicit) {
-        conn.lossState.totalBytesAcked += rPacketIt->metadata.encodedSize;
-        conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
-        conn.lossState.totalBytesAckedAtLastAck =
-            conn.lossState.totalBytesAcked;
-        conn.lossState.totalBodyBytesAcked +=
-            rPacketIt->metadata.encodedBodySize;
-        if (!lastAckedPacketSentTime) {
-          lastAckedPacketSentTime = rPacketIt->metadata.time;
         }
-        conn.lossState.lastAckedTime = ackReceiveTime;
-        conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
-      }
-      ack.totalBytesAcked = conn.lossState.totalBytesAcked;
 
-      {
-        OutstandingPacketWrapper* wrapper = &(*rPacketIt);
-        auto tmpIt = packetsWithHandlerContext.emplace(
-            std::find_if(
-                packetsWithHandlerContext.rbegin(),
-                packetsWithHandlerContext.rend(),
-                [&currentPacketNum](const auto& packetWithHandlerContext) {
-                  return packetWithHandlerContext.outstandingPacket->packet
-                             .header.getPacketSequenceNum() > currentPacketNum;
-                })
-                .base(),
-            OutstandingPacketWithHandlerContext(wrapper));
-        tmpIt->processAllFrames = needsProcess;
-      }
+        // update AckEvent RTTs, which are used by CCA and other processing
+        CHECK(!ack.rttSample.has_value());
+        CHECK(!ack.rttSampleNoAckDelay.has_value());
+        ack.rttSample = rttSample;
+        ack.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
+            ? OptionalMicros(std::chrono::ceil<std::chrono::microseconds>(
+                  rttSample - frame.ackDelay))
+            : std::nullopt;
 
-      rPacketIt++;
+        // update transport RTT
+        updateRtt(conn, rttSample, frame.ackDelay);
+      } // if (rttSample != rttSample.zero())
+    } // if (!ack.implicit && currentPacketNum == frame.largestAcked)
+
+    // Remove this ClonedPacketIdentifier from the
+    // outstandings.clonedPacketIdentifiers set
+    if (ackedPacketIterator->maybeClonedPacketIdentifier) {
+      conn.outstandings.clonedPacketIdentifiers.erase(
+          *ackedPacketIterator->maybeClonedPacketIdentifier);
     }
-    currentPacketIt = rPacketIt;
-    ackBlockIt++;
+    if (!ack.largestNewlyAckedPacket ||
+        *ack.largestNewlyAckedPacket < currentPacketNum) {
+      ack.largestNewlyAckedPacket = currentPacketNum;
+      ack.largestNewlyAckedPacketSentTime = ackedPacketIterator->metadata.time;
+      ack.largestNewlyAckedPacketAppLimited = ackedPacketIterator->isAppLimited;
+    }
+    if (!ack.implicit) {
+      conn.lossState.totalBytesAcked +=
+          ackedPacketIterator->metadata.encodedSize;
+      conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
+      conn.lossState.totalBytesAckedAtLastAck = conn.lossState.totalBytesAcked;
+      conn.lossState.totalBodyBytesAcked +=
+          ackedPacketIterator->metadata.encodedBodySize;
+      if (!lastAckedPacketSentTime) {
+        lastAckedPacketSentTime = ackedPacketIterator->metadata.time;
+      }
+      conn.lossState.lastAckedTime = ackReceiveTime;
+      conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
+    }
+    ack.totalBytesAcked = conn.lossState.totalBytesAcked;
+
+    {
+      OutstandingPacketWrapper* wrapper = &(*ackedPacketIterator);
+      auto tmpIt = packetsWithHandlerContext.emplace(
+          std::find_if(
+              packetsWithHandlerContext.rbegin(),
+              packetsWithHandlerContext.rend(),
+              [&currentPacketNum](const auto& packetWithHandlerContext) {
+                return packetWithHandlerContext.outstandingPacket->packet.header
+                           .getPacketSequenceNum() > currentPacketNum;
+              })
+              .base(),
+          OutstandingPacketWithHandlerContext(wrapper));
+      tmpIt->processAllFrames = needsProcess;
+    }
+    ackedPacketIterator.next();
   }
 
   // Store any (new) Rx timestamps reported by the peer.
