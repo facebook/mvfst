@@ -221,6 +221,17 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
   return result;
 }
 
+void updateErrnoCount(
+    QuicConnectionStateBase& connection,
+    IOBufQuicBatch& ioBufBatch) {
+  int lastErrno = ioBufBatch.getLastRetryableErrno();
+  if (lastErrno == EAGAIN || lastErrno == EWOULDBLOCK) {
+    connection.eagainOrEwouldblockCount++;
+  } else if (lastErrno == ENOBUFS) {
+    connection.enobufsCount++;
+  }
+}
+
 DataPathResult continuousMemoryBuildScheduleEncrypt(
     QuicConnectionStateBase& connection,
     PacketHeader header,
@@ -254,6 +265,7 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   if (!packet || packet->packet.frames.empty()) {
     rollbackBuf();
     ioBufBatch.flush();
+    updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
     }
@@ -263,6 +275,7 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
     // No more space remaining.
     rollbackBuf();
     ioBufBatch.flush();
+    updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
     }
@@ -307,6 +320,7 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   }
   // TODO: I think we should add an API that doesn't need a buffer.
   bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
+  updateErrnoCount(connection, ioBufBatch);
   return DataPathResult::makeWriteResult(
       ret, std::move(result), encodedSize, encodedBodySize);
 }
@@ -333,6 +347,7 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   auto& packet = result.packet;
   if (!packet || packet->packet.frames.empty()) {
     ioBufBatch.flush();
+    updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
     }
@@ -341,6 +356,7 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   if (packet->body.empty()) {
     // No more space remaining.
     ioBufBatch.flush();
+    updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
     }
@@ -378,6 +394,7 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
             << " encodedBodySize=" << encodedBodySize;
   }
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
+  updateErrnoCount(connection, ioBufBatch);
   return DataPathResult::makeWriteResult(
       ret, std::move(result), encodedSize, encodedBodySize);
 }
@@ -1525,7 +1542,9 @@ WriteQuicDataResult writeConnectionDataToSocket(
   // If we have a pending write to retry. Flush that first and make sure it
   // succeeds before scheduling any new data.
   if (pendingBufferedWrite) {
-    if (!ioBufBatch.flush()) {
+    bool flushSuccess = ioBufBatch.flush();
+    updateErrnoCount(connection, ioBufBatch);
+    if (!flushSuccess) {
       // Could not flush retried data. Return empty write result and wait for
       // next retry.
       return {0, 0, 0};
@@ -1591,6 +1610,7 @@ WriteQuicDataResult writeConnectionDataToSocket(
       // If we're returning because we couldn't schedule more packets,
       // make sure we flush the buffer in this function.
       ioBufBatch.flush();
+      updateErrnoCount(connection, ioBufBatch);
       return {ioBufBatch.getPktSent(), 0, bytesWritten};
     }
     // If we build a packet, we updateConnection(), even if write might have
@@ -1632,11 +1652,13 @@ WriteQuicDataResult writeConnectionDataToSocket(
       // With SinglePacketInplaceBatchWriter we always write one packet, and so
       // ioBufBatch needs a flush.
       ioBufBatch.flush();
+      updateErrnoCount(connection, ioBufBatch);
     }
   }
 
   // Ensure that the buffer is flushed before returning
   ioBufBatch.flush();
+  updateErrnoCount(connection, ioBufBatch);
 
   if (connection.transportSettings.dataPathType ==
       DataPathType::ContinuousMemory) {

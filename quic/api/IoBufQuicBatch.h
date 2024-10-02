@@ -42,6 +42,10 @@ class IOBufQuicBatch {
     return result_;
   }
 
+  [[nodiscard]] int getLastRetryableErrno() const {
+    return lastRetryableErrno_;
+  }
+
  private:
   void reset();
 
@@ -59,6 +63,7 @@ class IOBufQuicBatch {
   QuicTransportStatsCallback* statsCallback_{nullptr};
   QuicClientConnectionState::HappyEyeballsState* happyEyeballsState_;
   BufQuicBatchResult result_;
+  int lastRetryableErrno_{};
 };
 
 } // namespace quic

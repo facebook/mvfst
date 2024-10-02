@@ -1881,4 +1881,12 @@ uint64_t QuicClientTransport::getNumPingFramesSent() const {
   return conn_->numPingFramesSent;
 }
 
+uint64_t QuicClientTransport::getEagainOrEwouldblockCount() const {
+  return conn_->eagainOrEwouldblockCount;
+}
+
+uint64_t QuicClientTransport::getEnobufsCount() const {
+  return conn_->enobufsCount;
+}
+
 } // namespace quic

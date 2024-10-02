@@ -501,6 +501,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   uint64_t numPingFramesSent{0};
 
+  uint64_t eagainOrEwouldblockCount{0};
+  uint64_t enobufsCount{0};
+
   struct ConnectionFlowControlState {
     // The size of the connection flow control window.
     uint64_t windowSize{0};

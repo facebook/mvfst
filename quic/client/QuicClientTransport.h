@@ -222,6 +222,10 @@ class QuicClientTransport
 
   uint64_t getNumPingFramesSent() const;
 
+  uint64_t getEagainOrEwouldblockCount() const;
+
+  uint64_t getEnobufsCount() const;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(

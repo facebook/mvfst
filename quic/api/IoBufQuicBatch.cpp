@@ -71,6 +71,7 @@ bool IOBufQuicBatch::flushInternal() {
     auto consumed = batchWriter_->write(sock_, peerAddress_);
     if (consumed < 0) {
       firstSocketErrno = errno;
+      lastRetryableErrno_ = errno;
     }
     written = (consumed >= 0);
     if (happyEyeballsState_) {
