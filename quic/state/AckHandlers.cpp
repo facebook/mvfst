@@ -37,67 +37,8 @@ void removeOutstandingsForAck(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& frame) {
-  auto currentPacketIt = getLastOutstandingPacket(
-      conn,
-      pnSpace,
-      true /* includeDeclaredLost */,
-      true /* includeScheduledForDestruction */);
-
-  auto ackBlockIt = frame.ackBlocks.cbegin();
-  while (ackBlockIt != frame.ackBlocks.cend() &&
-         currentPacketIt != conn.outstandings.packets.rend()) {
-    // In reverse order, find the first outstanding packet that has a packet
-    // number LE the endPacket of the current ack range.
-    auto rPacketIt = std::lower_bound(
-        currentPacketIt,
-        conn.outstandings.packets.rend(),
-        ackBlockIt->endPacket,
-        [&](const auto& packetWithTime, const auto& val) {
-          return packetWithTime.packet.header.getPacketSequenceNum() > val;
-        });
-    if (rPacketIt == conn.outstandings.packets.rend()) {
-      return;
-    }
-
-    auto eraseEnd = rPacketIt;
-    while (rPacketIt != conn.outstandings.packets.rend()) {
-      auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
-      auto currentPacketNumberSpace =
-          rPacketIt->packet.header.getPacketNumberSpace();
-      if (pnSpace != currentPacketNumberSpace) {
-        // When the next packet is not in the same packet number space, we need
-        // to skip it in current ack processing. If the iterator has moved, that
-        // means we have found packets in the current space that are acked by
-        // this ack block. So the code erases the current iterator range and
-        // move the iterator to be the next search point.
-        if (rPacketIt != eraseEnd) {
-          auto nextElem = conn.outstandings.packets.erase(
-              rPacketIt.base(), eraseEnd.base());
-          rPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem) + 1;
-          eraseEnd = rPacketIt;
-        } else {
-          rPacketIt++;
-          eraseEnd = rPacketIt;
-        }
-        continue;
-      }
-      if (currentPacketNum < ackBlockIt->startPacket) {
-        break;
-      }
-      CHECK(rPacketIt->metadata.scheduledForDestruction);
-      CHECK_GT(conn.outstandings.scheduledForDestructionCount, 0);
-      conn.outstandings.scheduledForDestructionCount--;
-      rPacketIt++;
-    }
-    if (rPacketIt != eraseEnd) {
-      auto nextElem =
-          conn.outstandings.packets.erase(rPacketIt.base(), eraseEnd.base());
-      currentPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem);
-    } else {
-      currentPacketIt = rPacketIt;
-    }
-    ackBlockIt++;
-  }
+  AckedPacketIterator ackedPacketIterator(frame.ackBlocks, conn, pnSpace);
+  ackedPacketIterator.eraseAckedOutstandings();
 }
 
 /**
