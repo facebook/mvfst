@@ -33,6 +33,32 @@ OutstandingPacketWrapper* AckedPacketIterator::operator->() {
   return &(*outstandingsIter_);
 }
 
+void AckedPacketIterator::eraseAckedOutstandings() {
+  while (ackBlockIter_ != ackBlocks_.cend()) {
+    auto moveResult = moveToNextValidInAckBlock(*ackBlockIter_);
+    while (moveResult == MoveResult::SUCCESS) {
+      auto eraseEnd = outstandingsIter_;
+      while ((outstandingsIter_ != conn_.outstandings.packets.rend()) &&
+             (outstandingsIter_->packet.header.getPacketSequenceNum() >=
+              ackBlockIter_->startPacket) &&
+             (outstandingsIter_->packet.header.getPacketNumberSpace() ==
+              pnSpace_)) {
+        CHECK(outstandingsIter_->metadata.scheduledForDestruction);
+        CHECK_GT(conn_.outstandings.scheduledForDestructionCount, 0);
+        conn_.outstandings.scheduledForDestructionCount--;
+        outstandingsIter_++;
+      }
+      auto nextElem = conn_.outstandings.packets.erase(
+          outstandingsIter_.base(), eraseEnd.base());
+      outstandingsIter_ = std::reverse_iterator<decltype(nextElem)>(nextElem);
+      eraseEnd = outstandingsIter_;
+      moveResult = moveToNextValidInAckBlock(*ackBlockIter_);
+    }
+    ackBlockIter_++;
+  }
+  valid_ = false;
+}
+
 bool AckedPacketIterator::valid() {
   return valid_;
 }

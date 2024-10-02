@@ -27,6 +27,12 @@ class AckedPacketIterator {
 
   OutstandingPacketWrapper* operator->();
 
+  // Erase acked outstandings, starting at outstandingsIter_ and the ack
+  // block starting at ackBlockIter_. The most common use case would be to
+  // just create an AckedPacketIterator, call eraseAckedOutstandings, and
+  // then discard the iterator.
+  void eraseAckedOutstandings();
+
   bool valid();
 
   void next();
