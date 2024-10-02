@@ -77,6 +77,7 @@ quic_add_test(TARGET QuicBatchWriterTest
   mvfst_buf_accessor
   mvfst_server
   mvfst_transport
+  mvfst_test_utils
 )
 
 quic_add_test(TARGET QuicStreamAsyncTransportTest

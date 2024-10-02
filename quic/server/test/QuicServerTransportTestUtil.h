@@ -144,13 +144,14 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         std::make_unique<testing::NiceMock<quic::test::MockAsyncUDPSocket>>(
             qEvb_);
     socket = sock.get();
-    EXPECT_CALL(*sock, write(testing::_, testing::_))
-        .WillRepeatedly(
-            testing::Invoke([&](const folly::SocketAddress&,
-                                const std::unique_ptr<folly::IOBuf>& buf) {
-              serverWrites.push_back(buf->clone());
-              return buf->computeChainDataLength();
-            }));
+    EXPECT_CALL(*sock, write(testing::_, testing::_, testing::_))
+        .WillRepeatedly(testing::Invoke([&](const folly::SocketAddress&,
+                                            const struct iovec* vec,
+                                            size_t iovec_len) {
+          serverWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
+        }));
     EXPECT_CALL(*sock, address())
         .WillRepeatedly(testing::ReturnRef(serverAddr));
     supportedVersions = {QuicVersion::MVFST};

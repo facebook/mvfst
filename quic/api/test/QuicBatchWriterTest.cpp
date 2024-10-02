@@ -8,6 +8,7 @@
 #include <quic/api/QuicBatchWriter.h>
 #include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 
 #include <gtest/gtest.h>
@@ -464,12 +465,13 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteAll) {
   ASSERT_TRUE(
       batchWriter->append(nullptr, 700, folly::SocketAddress(), nullptr));
 
-  EXPECT_CALL(sock, writeGSO(_, _, _))
+  EXPECT_CALL(sock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf,
+                           const struct iovec* vec,
+                           size_t,
                            QuicAsyncUDPSocket::WriteOptions options) {
-        EXPECT_EQ(1000 * 5 + 700, buf->length());
+        EXPECT_EQ(1000 * 5 + 700, vec[0].iov_len);
         EXPECT_EQ(1000, options.gso);
         return 1000 * 5 + 700;
       }));
@@ -506,14 +508,13 @@ TEST_F(QuicBatchWriterTest, InplaceWriterWriteOne) {
   ASSERT_FALSE(
       batchWriter->append(nullptr, 1000, folly::SocketAddress(), nullptr));
 
-  EXPECT_CALL(sock, writeGSO(_, _, _))
+  EXPECT_CALL(sock, writeGSO(_, _, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf,
-                           auto) {
-        EXPECT_EQ(1000, buf->length());
-        return 1000;
-      }));
+      .WillOnce(Invoke(
+          [&](const auto& /* addr */, const struct iovec* vec, size_t, auto) {
+            EXPECT_EQ(1000, vec[0].iov_len);
+            return 1000;
+          }));
   EXPECT_EQ(1000, batchWriter->write(sock, folly::SocketAddress()));
 
   EXPECT_TRUE(bufAccessor->ownsBuffer());
@@ -550,12 +551,13 @@ TEST_F(QuicBatchWriterTest, InplaceWriterLastOneTooBig) {
   bufAccessor->release(std::move(buf));
   EXPECT_TRUE(batchWriter->needsFlush(1000));
 
-  EXPECT_CALL(sock, writeGSO(_, _, _))
+  EXPECT_CALL(sock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf,
+                           const struct iovec* vec,
+                           size_t,
                            QuicAsyncUDPSocket::WriteOptions options) {
-        EXPECT_EQ(5 * 700, buf->length());
+        EXPECT_EQ(5 * 700, vec[0].iov_len);
         EXPECT_EQ(700, options.gso);
         return 700 * 5;
       }));
@@ -598,14 +600,13 @@ TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   rawBuf->append(packetSizeBig);
   EXPECT_TRUE(batchWriter->needsFlush(packetSizeBig));
 
-  EXPECT_CALL(sock, writeGSO(_, _, _))
+  EXPECT_CALL(sock, writeGSO(_, _, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf,
-                           auto) {
-        EXPECT_EQ(700, buf->length());
-        return 700;
-      }));
+      .WillOnce(Invoke(
+          [&](const auto& /* addr */, const struct iovec* vec, size_t, auto) {
+            EXPECT_EQ(700, vec[0].iov_len);
+            return 700;
+          }));
   // No crash:
   EXPECT_EQ(700, batchWriter->write(sock, folly::SocketAddress()));
   EXPECT_EQ(1009, rawBuf->length());
@@ -751,13 +752,13 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestWrite) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   quic::test::MockAsyncUDPSocket sock(qEvb);
-  EXPECT_CALL(sock, write(_, _))
+  EXPECT_CALL(sock, write(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf) {
-        EXPECT_EQ(appendSize, buf->length());
-        return appendSize;
-      }));
+      .WillOnce(
+          Invoke([&](const auto& /* addr */, const struct iovec* vec, size_t) {
+            EXPECT_EQ(appendSize, vec[0].iov_len);
+            return appendSize;
+          }));
   EXPECT_EQ(appendSize, batchWriter->write(sock, folly::SocketAddress()));
   EXPECT_TRUE(batchWriter->empty());
 }
@@ -822,10 +823,11 @@ TEST_F(SinglePacketBackpressureBatchWriterTest, TestFailedWriteCachedOnEAGAIN) {
       folly::SocketAddress(),
       &sock_));
 
-  EXPECT_CALL(sock_, write(_, _))
+  EXPECT_CALL(sock_, write(_, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& /*buf*/) {
+                           const struct iovec* /* vec */,
+                           size_t /* iovec_len */) {
         errno = EAGAIN;
         return 0;
       }));
@@ -846,11 +848,12 @@ TEST_F(SinglePacketBackpressureBatchWriterTest, TestFailedWriteCachedOnEAGAIN) {
   EXPECT_FALSE(conn_.pendingWriteBatch_.buf);
 
   // The write succeeds
-  EXPECT_CALL(sock_, write(_, _))
+  EXPECT_CALL(sock_, write(_, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const auto& /* addr */,
-                           const std::unique_ptr<folly::IOBuf>& buf) {
-        return buf->computeChainDataLength();
+                           const struct iovec* vec,
+                           size_t iovec_len) {
+        return ::quic::test::getTotalIovecLen(vec, iovec_len);
       }));
   EXPECT_EQ(
       batchWriter->write(sock_, folly::SocketAddress()), testString.size());

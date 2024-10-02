@@ -32,7 +32,9 @@ bool SinglePacketBatchWriter::append(
 ssize_t SinglePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  return sock.write(address, buf_);
+  iovec vec[kNumIovecBufferChains];
+  size_t iovec_len = fillIovec(buf_, vec);
+  return sock.write(address, vec, iovec_len);
 }
 
 // SinglePacketInplaceBatchWriter
@@ -54,7 +56,10 @@ ssize_t SinglePacketInplaceBatchWriter::write(
     const folly::SocketAddress& address) {
   auto& buf = conn_.bufAccessor->buf();
   CHECK(!conn_.bufAccessor->isChained());
-  auto ret = sock.write(address, buf);
+
+  iovec vec[kNumIovecBufferChains];
+  size_t iovec_len = fillIovec(buf, vec);
+  auto ret = sock.write(address, vec, iovec_len);
   conn_.bufAccessor->clear();
   return ret;
 }
@@ -102,7 +107,9 @@ bool SinglePacketBackpressureBatchWriter::append(
 ssize_t SinglePacketBackpressureBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  auto written = sock.write(address, buf_);
+  iovec vec[kNumIovecBufferChains];
+  size_t iovec_len = fillIovec(buf_, vec);
+  auto written = sock.write(address, vec, iovec_len);
   lastWriteSuccessful_ = written > 0;
   return written;
 }
@@ -149,7 +156,9 @@ ssize_t SendmmsgPacketBatchWriter::write(
     const folly::SocketAddress& address) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
-    return sock.write(address, bufs_[0]);
+    iovec vec[kNumIovecBufferChains];
+    size_t iovec_len = fillIovec(bufs_.at(0), vec);
+    return sock.write(address, vec, iovec_len);
   }
 
   int ret = sock.writem(

@@ -489,13 +489,14 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   void startTransport() {
     client->addNewPeerAddress(serverAddr);
     client->setHostname(hostname_);
-    ON_CALL(*sock, write(testing::_, testing::_))
-        .WillByDefault(
-            testing::Invoke([&](const folly::SocketAddress&,
-                                const std::unique_ptr<folly::IOBuf>& buf) {
-              socketWrites.push_back(buf->clone());
-              return buf->computeChainDataLength();
-            }));
+    ON_CALL(*sock, write(testing::_, testing::_, testing::_))
+        .WillByDefault(testing::Invoke([&](const folly::SocketAddress&,
+                                           const struct iovec* vec,
+                                           size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
+        }));
     ON_CALL(*sock, address()).WillByDefault(testing::ReturnRef(serverAddr));
 
     setupCryptoLayer();
@@ -575,7 +576,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     EXPECT_CALL(*sock, setErrMessageCallback(client.get()));
     EXPECT_CALL(*sock, resumeRead(client.get()));
     EXPECT_CALL(*sock, setErrMessageCallback(nullptr));
-    EXPECT_CALL(*sock, write(testing::_, testing::_))
+    EXPECT_CALL(*sock, write(testing::_, testing::_, testing::_))
         .Times(testing::AtLeast(1));
   }
 

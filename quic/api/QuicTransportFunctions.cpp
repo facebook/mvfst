@@ -1319,7 +1319,9 @@ void writeCloseCommon(
   // best effort writing to the socket, ignore any errors.
 
   Buf packetBufPtr = packetBuf.clone();
-  auto ret = sock.write(connection.peerAddress, packetBufPtr);
+  iovec vec[kNumIovecBufferChains];
+  size_t iovec_len = fillIovec(packetBufPtr, vec);
+  auto ret = sock.write(connection.peerAddress, vec, iovec_len);
   connection.lossState.totalBytesSent += packetSize;
   if (ret < 0) {
     VLOG(4) << "Error writing connection close " << folly::errnoStr(errno)

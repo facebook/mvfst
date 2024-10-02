@@ -1041,9 +1041,11 @@ void QuicClientTransport::startCryptoHandshake() {
   conn_->transportParametersEncoded = true;
   if (!conn_->transportSettings.flowPriming.empty() &&
       conn_->peerAddress.isInitialized()) {
-    socket_->write(
-        conn_->peerAddress,
-        folly::IOBuf::copyBuffer(conn_->transportSettings.flowPriming));
+    auto flowPrimingBuf =
+        folly::IOBuf::copyBuffer(conn_->transportSettings.flowPriming);
+    iovec vec[kNumIovecBufferChains];
+    size_t iovec_len = fillIovec(flowPrimingBuf, vec);
+    socket_->write(conn_->peerAddress, vec, iovec_len);
   }
   handshakeLayer->connect(hostname_, std::move(paramsExtension));
 

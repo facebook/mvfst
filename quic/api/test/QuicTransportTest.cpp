@@ -142,12 +142,6 @@ RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
   return packet;
 }
 
-size_t bufLength(
-    const SocketAddress&,
-    const std::unique_ptr<folly::IOBuf>& buf) {
-  return buf->computeChainDataLength();
-}
-
 void dropPackets(QuicServerConnectionState& conn) {
   for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {
@@ -267,12 +261,12 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
           Invoke([&](const auto& /* packet */) { onPacketSentCounter++; }));
   // Probing will send out one. Then regular write may send out multiple ones:
   int socketWriteCounter = 0;
-  EXPECT_CALL(*socket_, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        socketWriteCounter++;
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            socketWriteCounter++;
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   transport_->writeChain(streamId, buf->clone(), true);
   loopForWrites();
   transport_->close(none);
@@ -1630,7 +1624,8 @@ TEST_F(QuicTransportTest, WriteSmall) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
 
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   transport_->setStreamPriority(stream, Priority(0, false));
   loopForWrites();
@@ -1639,7 +1634,8 @@ TEST_F(QuicTransportTest, WriteSmall) {
 
   // Test retransmission
   dropPackets(conn);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1661,9 +1657,9 @@ TEST_F(QuicTransportTest, WriteLarge) {
   auto buf =
       buildRandomInputData(NumFullPackets * kDefaultUDPSendPacketLen + 20);
   folly::IOBuf passedIn;
-  EXPECT_CALL(*socket_, write(_, _))
+  EXPECT_CALL(*socket_, write(_, _, _))
       .Times(NumFullPackets + 1)
-      .WillRepeatedly(Invoke(bufLength));
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
@@ -1672,9 +1668,9 @@ TEST_F(QuicTransportTest, WriteLarge) {
 
   // Test retransmission
   dropPackets(conn);
-  EXPECT_CALL(*socket_, write(_, _))
+  EXPECT_CALL(*socket_, write(_, _, _))
       .Times(NumFullPackets + 1)
-      .WillRepeatedly(Invoke(bufLength));
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1692,7 +1688,8 @@ TEST_F(QuicTransportTest, WriteLarge) {
 TEST_F(QuicTransportTest, WriteMultipleTimes) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
@@ -1703,7 +1700,8 @@ TEST_F(QuicTransportTest, WriteMultipleTimes) {
   conn.outstandings.reset();
   conn.streamManager->findStream(stream)->retransmissionBuffer.clear();
   buf = buildRandomInputData(50);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   verifyCorrectness(conn, originalWriteOffset, stream, *buf);
@@ -1715,14 +1713,16 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
   auto s1 = transport_->createBidirectionalStream().value();
   auto s2 = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(s1, buf->clone(), false);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
   verifyCorrectness(conn, 0, s1, *buf);
 
   auto buf2 = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(s2, buf2->clone(), false);
   loopForWrites();
   verifyCorrectness(conn, 0, s2, *buf2);
@@ -1730,7 +1730,8 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
   dropPackets(conn);
 
   // Should retransmit lost streams in a single packet
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1761,7 +1762,8 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto buf = buildRandomInputData(150);
   folly::IOBuf passedIn;
   // Write stream blocked frame
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(streamId, buf->clone(), false);
 
   loopForWrites();
@@ -1793,7 +1795,8 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   stream->flowControlState.pendingBlockedFrame = false;
   EXPECT_CALL(*mockQLogger, addTransportStateUpdate(getFlowControlEvent(200)));
   conn.streamManager->updateWritableStreams(*stream);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1809,7 +1812,9 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto num_outstandings = conn.outstandings.packets.size();
   stream->flowControlState.peerAdvertisedMaxOffset = 300;
   conn.streamManager->updateWritableStreams(*stream);
-  EXPECT_CALL(*socket_, write(_, _)).Times(2).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .Times(2)
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1841,7 +1846,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
 
   // Try again, verify that there should not be any Data blocked frame emitted
   // again.
-  EXPECT_CALL(*socket_, write(_, _)).Times(0);
+  EXPECT_CALL(*socket_, write(_, _, _)).Times(0);
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1854,7 +1859,8 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
 
   // Flow control lifted
   stream->conn.flowControlState.peerAdvertisedMaxOffset = 300;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1871,7 +1877,7 @@ TEST_F(QuicTransportTest, WriteErrorEagain) {
   // Test network error
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(SetErrnoAndReturn(EAGAIN, -1));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(SetErrnoAndReturn(EAGAIN, -1));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
 }
@@ -1880,7 +1886,7 @@ TEST_F(QuicTransportTest, WriteErrorBad) {
   // Test network error
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   EXPECT_TRUE(transport_->closed);
@@ -1898,7 +1904,8 @@ TEST_F(QuicTransportTest, WriteInvalid) {
 TEST_F(QuicTransportTest, WriteFin) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), true);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
@@ -1906,7 +1913,8 @@ TEST_F(QuicTransportTest, WriteFin) {
 
   // Test retransmission
   dropPackets(conn);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1923,10 +1931,12 @@ TEST_F(QuicTransportTest, WriteFin) {
 TEST_F(QuicTransportTest, WriteOnlyFin) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, nullptr, true);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
@@ -1934,7 +1944,8 @@ TEST_F(QuicTransportTest, WriteOnlyFin) {
 
   // Test retransmission
   dropPackets(conn);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -1951,7 +1962,8 @@ TEST_F(QuicTransportTest, WriteOnlyFin) {
 TEST_F(QuicTransportTest, WriteDataWithRetransmission) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
@@ -1959,7 +1971,8 @@ TEST_F(QuicTransportTest, WriteDataWithRetransmission) {
 
   dropPackets(conn);
   auto buf2 = buildRandomInputData(50);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf2->clone(), false);
   loopForWrites();
   // The first packet was lost. We should expect this packet contains both
@@ -1975,7 +1988,8 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
   PacketNum end = 15;
   conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
   addAckStatesWithCurrentTimestamps(conn.ackStates.appDataAckState, start, end);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -2001,7 +2015,8 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
   addAckStatesWithCurrentTimestamps(conn.ackStates.appDataAckState, start, end);
   conn.ackStates.appDataAckState.needsToSendAckImmediately = false;
   conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   // We should write acks if there is data pending
   transport_->writeChain(streamId, buf->clone(), true);
   loopForWrites();
@@ -2042,7 +2057,8 @@ TEST_F(QuicTransportTest, NoWritePendingAckIfHavingData) {
   addAckStatesWithCurrentTimestamps(conn.ackStates.appDataAckState, start, end);
   conn.ackStates.appDataAckState.needsToSendAckImmediately = false;
   conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   // We should write acks if there is data pending
   transport_->writeChain(streamId, buf->clone(), true);
   loopForWrites();
@@ -2071,7 +2087,8 @@ TEST_F(QuicTransportTest, NoWritePendingAckIfHavingData) {
 
 TEST_F(QuicTransportTest, RstStream) {
   auto streamId = transport_->createBidirectionalStream().value();
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
@@ -2107,7 +2124,8 @@ TEST_F(QuicTransportTest, RstStream) {
 
 TEST_F(QuicTransportTest, StopSending) {
   auto streamId = transport_->createBidirectionalStream().value();
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
@@ -2136,7 +2154,8 @@ TEST_F(QuicTransportTest, StopSending) {
 TEST_F(QuicTransportTest, StopSendingReadCallbackDefault) {
   auto streamId = transport_->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->setReadCallback(streamId, &readCb);
   transport_->setReadCallback(streamId, nullptr);
   loopForWrites();
@@ -2166,7 +2185,8 @@ TEST_F(QuicTransportTest, StopSendingReadCallbackDefault) {
 TEST_F(QuicTransportTest, StopSendingReadCallback) {
   auto streamId = transport_->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->setReadCallback(streamId, &readCb);
   transport_->setReadCallback(
       streamId, nullptr, GenericApplicationErrorCode::UNKNOWN);
@@ -2213,7 +2233,8 @@ TEST_F(QuicTransportTest, NoStopSendingReadCallback) {
 }
 
 TEST_F(QuicTransportTest, SendPathChallenge) {
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
@@ -2257,7 +2278,8 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
 }
 
 TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
@@ -2442,7 +2464,8 @@ TEST_F(QuicTransportTest, DoNotResendLostPathChallengeIfNotOutstanding) {
 }
 
 TEST_F(QuicTransportTest, SendPathResponse) {
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
   PathResponseFrame pathResponse(123);
@@ -2565,7 +2588,8 @@ TEST_F(QuicTransportTest, ResendPathResponseOnLoss) {
 }
 
 TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   NewConnectionIdFrame newConnId(
       1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
@@ -2656,7 +2680,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   EXPECT_TRUE(conn.writeDebugState.needsWriteLoopDetect);
   EXPECT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
   EXPECT_EQ(WriteDataReason::STREAM, conn.writeDebugState.writeDataReason);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(1000));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(Return(1000));
   loopForWrites();
   EXPECT_EQ(1, conn.outstandings.packets.size());
   EXPECT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
@@ -2667,7 +2691,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   EXPECT_TRUE(
       WriteDataReason::STREAM_WINDOW_UPDATE ==
       conn.writeDebugState.writeDataReason);
-  EXPECT_CALL(*socket_, write(_, _)).Times(0);
+  EXPECT_CALL(*socket_, write(_, _, _)).Times(0);
   EXPECT_CALL(
       *rawLoopDetectorCallback,
       onSuspiciousWriteLoops(1, WriteDataReason::STREAM_WINDOW_UPDATE, _, _))
@@ -2704,7 +2728,8 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
 }
 
 TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   RetireConnectionIdFrame retireConnId(1);
   sendSimpleFrame(conn, retireConnId);
@@ -2790,7 +2815,8 @@ TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   auto streamState = conn.streamManager->getStream(streamId);
 
@@ -2826,7 +2852,8 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   ASSERT_TRUE(stream);
   auto currentWriteOffset = stream->currentWriteOffset;
 
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   // 2 packets are outstanding: one for Stream frame one for RstStream frame:
@@ -2860,7 +2887,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
 
 TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
   auto streamId = transport_->createBidirectionalStream().value();
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(SetErrnoAndReturn(EAGAIN, -1));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(SetErrnoAndReturn(EAGAIN, -1));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
@@ -2897,7 +2924,7 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
 
 TEST_F(QuicTransportTest, RstStreamUDPWriteFailFatal) {
   auto streamId = transport_->createBidirectionalStream().value();
-  EXPECT_CALL(*socket_, write(_, _))
+  EXPECT_CALL(*socket_, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
@@ -2916,7 +2943,8 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   auto stream = conn.streamManager->findStream(streamId);
   ASSERT_TRUE(stream);
   auto currentWriteOffset = stream->currentWriteOffset;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
@@ -2960,7 +2988,8 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
 
 TEST_F(QuicTransportTest, DoubleReset) {
   auto streamId = transport_->createBidirectionalStream().value();
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   EXPECT_FALSE(
       transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN)
           .hasError());
@@ -2975,7 +3004,8 @@ TEST_F(QuicTransportTest, DoubleReset) {
 TEST_F(QuicTransportTest, WriteStreamDataSetLossAlarm) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(1);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   EXPECT_TRUE(transport_->isLossTimeoutScheduled());
@@ -2986,7 +3016,8 @@ TEST_F(QuicTransportTest, WriteAckNotSetLossAlarm) {
   addAckStatesWithCurrentTimestamps(
       conn.ackStates.appDataAckState, 0 /* start */, 100 /* ind */);
   conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto res = writeQuicDataToSocket(
       *socket_,
       conn,
@@ -3005,7 +3036,8 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
   conn.flowControlState.windowSize = 100;
   conn.flowControlState.advertisedMaxOffset = 0;
   conn.pendingEvents.connWindowUpdate = true;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto res = writeQuicDataToSocket(
       *socket_,
       conn,
@@ -3041,7 +3073,8 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
   streamState->flowControlState.advertisedMaxOffset = 0;
   MaxStreamDataFrame frame(stream, 100);
   conn.streamManager->queueWindowUpdate(stream);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   res = writeQuicDataToSocket(
       *socket_,
       conn,
@@ -3084,7 +3117,8 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesClosedTransport) {
   auto stream1 = transport_->createBidirectionalStream().value();
   auto buf1 = buildRandomInputData(20);
   TransportClosingDeliveryCallback dc(transport_.get(), 20);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream1, buf1->clone(), true, &dc);
   loopForWrites();
   transport_->close(none);
@@ -3094,7 +3128,8 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
   auto stream1 = transport_->createBidirectionalStream().value();
   auto buf1 = buildRandomInputData(20);
   TransportClosingDeliveryCallback dc(transport_.get(), 0);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->registerDeliveryCallback(stream1, 0, &dc);
   transport_->writeChain(stream1, buf1->clone(), true);
   loopForWrites();
@@ -3113,7 +3148,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
   NiceMock<MockDeliveryCallback> mockedDeliveryCallback;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->registerDeliveryCallback(stream, 1, &mockedDeliveryCallback);
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
@@ -3147,7 +3183,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
   NiceMock<MockDeliveryCallback> mockedDeliveryCallback;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->registerDeliveryCallback(stream, 1, &mockedDeliveryCallback);
   transport_->writeChain(stream, buf->clone(), true);
   loopForWrites();
@@ -3171,7 +3208,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
       mockedDeliveryCallback2;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->registerDeliveryCallback(stream, 50, &mockedDeliveryCallback1);
   transport_->registerDeliveryCallback(stream, 150, &mockedDeliveryCallback2);
   transport_->writeChain(stream, buf->clone(), false);
@@ -3212,7 +3250,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
       mockedDeliveryCallback2;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->registerDeliveryCallback(stream, 50, &mockedDeliveryCallback1);
   transport_->registerDeliveryCallback(stream, 150, &mockedDeliveryCallback2);
   transport_->writeChain(stream, buf->clone(), false);
@@ -3259,7 +3298,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
       mockedDeliveryCallback2, mockedDeliveryCallback3;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->registerDeliveryCallback(stream, 30, &mockedDeliveryCallback1);
   transport_->registerDeliveryCallback(stream, 50, &mockedDeliveryCallback2);
   transport_->registerDeliveryCallback(stream, 150, &mockedDeliveryCallback3);
@@ -4219,7 +4259,8 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   auto stream2 = conn.streamManager->getStream(s2);
   writeDataToQuicStream(*stream2, buf2->clone(), false);
 
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -4242,7 +4283,8 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.streamManager->writeQueue().setNextScheduledStream(s2);
   writableBytes = kDefaultUDPSendPacketLen - 100;
 
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -4266,7 +4308,8 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   // Test wrap around
   conn.streamManager->writeQueue().setNextScheduledStream(s2);
   writableBytes = kDefaultUDPSendPacketLen;
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -4392,7 +4435,8 @@ TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(kDefaultUDPSendPacketLen + 20);
   folly::IOBuf passedIn;
-  EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
   loopForWrites();
   transport_->scheduleLossTimeout(500ms);
@@ -4453,7 +4497,7 @@ TEST_F(QuicTransportTest, PacedWriteNoDataToWrite) {
   ASSERT_EQ(
       WriteDataReason::NO_WRITE,
       shouldWriteData(transport_->getConnectionState()));
-  EXPECT_CALL(*socket_, write(_, _)).Times(0);
+  EXPECT_CALL(*socket_, write(_, _, _)).Times(0);
   transport_->pacedWrite();
 }
 
@@ -4474,7 +4518,7 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, buf->clone(), false);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(Return(0));
   EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
   transport_->pacedWrite();
@@ -4499,7 +4543,7 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, buf->clone(), false);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(Return(0));
   EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
   EXPECT_CALL(*rawPacer, getTimeUntilNextWrite(_))
@@ -4510,7 +4554,7 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
 
   ASSERT_NE(WriteDataReason::NO_WRITE, shouldWriteData(conn));
   EXPECT_TRUE(transport_->isPacingScheduled());
-  EXPECT_CALL(*socket_, write(_, _)).Times(0);
+  EXPECT_CALL(*socket_, write(_, _, _)).Times(0);
   transport_->pacedWrite();
 }
 
@@ -4531,7 +4575,7 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, buf->clone(), false);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
+  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(Return(0));
   EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
   // This will write out everything. After that because there is no new data,

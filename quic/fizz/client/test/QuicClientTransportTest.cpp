@@ -1057,7 +1057,7 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
 
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
   client->addNewPeerAddress(serverAddr);
-  EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
+  EXPECT_CALL(*sock, write(_, _, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
   client->start(&clientConnSetupCallback, &clientConnCallback);
 
   EXPECT_FALSE(client->isClosed());
@@ -1162,11 +1162,13 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
   ConnectionCallbackThatWritesOnTransportReady callback(client);
   EXPECT_CALL(callback, onTransportReadyMock());
   EXPECT_CALL(callback, onReplaySafe()).Times(0);
-  ON_CALL(*sock, write(_, _))
+  ON_CALL(*sock, write(_, _, _))
       .WillByDefault(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            socketWrites.push_back(buf->clone());
-            return buf->computeChainDataLength();
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            socketWrites.push_back(
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+            return getTotalIovecLen(vec, iovec_len);
+            ;
           }));
   ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
 
@@ -1181,7 +1183,8 @@ TEST_F(QuicClientTransportTest, NetworkUnreachableIsFatalToConn) {
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
   EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
-  EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
+  EXPECT_CALL(*sock, write(_, _, _))
+      .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
   client->start(&clientConnSetupCallback, &clientConnCallback);
   loopForWrites();
 }
@@ -1380,14 +1383,16 @@ class QuicClientTransportHappyEyeballsTest
     auto& conn = client->getConn();
     setupInitialDcidForRetry();
     auto firstPacketType = GetParam();
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .Times(AtLeast(1))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                   const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                                   const struct iovec* vec,
+                                   size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
 
@@ -1406,7 +1411,7 @@ class QuicClientTransportHappyEyeballsTest
       EXPECT_CALL(clientConnSetupCallback, onTransportReady());
       EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     }
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     EXPECT_CALL(*secondSock, pauseRead());
     EXPECT_CALL(*secondSock, close());
     if (firstPacketType == ServerFirstPacketType::Retry) {
@@ -1428,13 +1433,15 @@ class QuicClientTransportHappyEyeballsTest
     auto firstPacketType = GetParam();
     setupInitialDcidForRetry();
 
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                   const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                                   const struct iovec* vec,
+                                   size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
 
@@ -1458,13 +1465,15 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(Invoke([&](const SocketAddress&,
-                             const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                             const struct iovec* vec,
+                             size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
     EXPECT_EQ(socketWrites.size(), 1);
@@ -1477,14 +1486,16 @@ class QuicClientTransportHappyEyeballsTest
       EXPECT_CALL(clientConnSetupCallback, onTransportReady());
       EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     }
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .Times(AtLeast(1))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                   const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                                   const struct iovec* vec,
+                                   size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     EXPECT_CALL(*secondSock, pauseRead());
     EXPECT_CALL(*secondSock, close());
     if (firstPacketType == ServerFirstPacketType::Retry) {
@@ -1506,13 +1517,15 @@ class QuicClientTransportHappyEyeballsTest
     auto firstPacketType = GetParam();
     setupInitialDcidForRetry();
 
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                   const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                                   const struct iovec* vec,
+                                   size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
     EXPECT_EQ(conn.peerAddress, firstAddress);
@@ -1536,12 +1549,14 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _))
         .WillOnce(Invoke([&](const SocketAddress&,
-                             const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                             const struct iovec* vec,
+                             size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
@@ -1556,15 +1571,17 @@ class QuicClientTransportHappyEyeballsTest
       EXPECT_CALL(clientConnSetupCallback, onTransportReady());
       EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     }
-    EXPECT_CALL(*sock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(_, _, _)).Times(0);
     EXPECT_CALL(*sock, pauseRead());
     EXPECT_CALL(*sock, close());
-    EXPECT_CALL(*secondSock, write(secondAddress, _))
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _))
         .Times(AtLeast(1))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                   const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
+                                   const struct iovec* vec,
+                                   size_t iovec_len) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
         }));
     if (firstPacketType == ServerFirstPacketType::Retry) {
       recvServerRetry(secondAddress);
@@ -1584,7 +1601,7 @@ class QuicClientTransportHappyEyeballsTest
     auto& conn = client->getConn();
     setupInitialDcidForRetry();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
     EXPECT_CALL(*secondSock, bind(_))
         .WillOnce(Invoke(
             [](const folly::SocketAddress&) { throw std::exception(); }));
@@ -1603,9 +1620,9 @@ class QuicClientTransportHappyEyeballsTest
     auto& conn = client->getConn();
     TransportSettings settings;
     client->setTransportSettings(settings);
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
-    EXPECT_CALL(*secondSock, write(_, _));
+    EXPECT_CALL(*secondSock, write(_, _, _));
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1615,8 +1632,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
                      .isTimerCallbackScheduled());
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1625,13 +1642,13 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
     // Socket is paused read once during happy eyeballs
     // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*sock, pauseRead()).Times(2);
     EXPECT_CALL(*sock, close()).Times(1);
-    EXPECT_CALL(*secondSock, write(_, _));
+    EXPECT_CALL(*secondSock, write(_, _, _));
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1641,8 +1658,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
                      .isTimerCallbackScheduled());
 
-    EXPECT_CALL(*sock, write(_, _)).Times(0);
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*sock, write(_, _, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1652,7 +1669,7 @@ class QuicClientTransportHappyEyeballsTest
       [[maybe_unused]] const SocketAddress& secondAddress) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
-    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
     // Socket is paused read once during happy eyeballs
     // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*sock, pauseRead()).Times(2);
@@ -1677,8 +1694,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
                      .isTimerCallbackScheduled());
 
-    EXPECT_CALL(*sock, write(_, _)).Times(0);
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*sock, write(_, _, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 #endif
@@ -1689,8 +1706,8 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1707,17 +1724,17 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
+    EXPECT_CALL(*sock, write(firstAddress, _, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _)).Times(1);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1727,8 +1744,8 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1745,21 +1762,21 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
     // Socket is paused read once during happy eyeballs
     // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*sock, pauseRead()).Times(2);
     EXPECT_CALL(*sock, close()).Times(1);
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(_, _)).Times(0);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
+    EXPECT_CALL(*sock, write(_, _, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _)).Times(1);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1770,8 +1787,8 @@ class QuicClientTransportHappyEyeballsTest
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1804,8 +1821,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(_, _)).Times(0);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
+    EXPECT_CALL(*sock, write(_, _, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _)).Times(1);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 #endif
@@ -1816,8 +1833,8 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1834,8 +1851,8 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
@@ -1843,8 +1860,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
+    EXPECT_CALL(*sock, write(firstAddress, _, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _)).Times(1);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1854,8 +1871,8 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1872,8 +1889,8 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
     // Socket is paused read once during happy eyeballs
     // Socket is paused read for the second time when QuicClientTransport dies
@@ -1885,8 +1902,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1897,8 +1914,8 @@ class QuicClientTransportHappyEyeballsTest
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1915,7 +1932,7 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
     union {
       struct cmsghdr hdr;
       unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
@@ -1936,8 +1953,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
 #endif
@@ -1948,8 +1965,8 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1966,9 +1983,9 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
-    EXPECT_CALL(*secondSock, write(secondAddress, _))
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
@@ -1976,8 +1993,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
+    EXPECT_CALL(*sock, write(firstAddress, _, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _)).Times(1);
     client->lossTimeout().cancelTimerCallback();
     client->lossTimeout().timeoutExpired();
   }
@@ -1987,8 +2004,8 @@ class QuicClientTransportHappyEyeballsTest
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -2005,9 +2022,9 @@ class QuicClientTransportHappyEyeballsTest
 
     // Manually expire loss timeout to trigger write to both first and second
     // socket
-    EXPECT_CALL(*sock, write(firstAddress, _))
+    EXPECT_CALL(*sock, write(firstAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    EXPECT_CALL(*secondSock, write(secondAddress, _))
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
     EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
     client->lossTimeout().cancelTimerCallback();
@@ -2023,8 +2040,8 @@ class QuicClientTransportHappyEyeballsTest
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -3996,11 +4013,12 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   std::unique_ptr<IOBuf> bytesWrittenToNetwork = nullptr;
 
-  EXPECT_CALL(*sock, write(_, _))
+  EXPECT_CALL(*sock, write(_, _, _))
       .WillRepeatedly(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            bytesWrittenToNetwork = buf->clone();
-            return buf->computeChainDataLength();
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            bytesWrittenToNetwork =
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len));
+            return getTotalIovecLen(vec, iovec_len);
           }));
 
   auto serverCid = recvServerRetry(serverAddr);
@@ -4637,7 +4655,8 @@ TEST_F(QuicClientTransportAfterStartTest, WriteThrowsExceptionWhileDraining) {
   auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str());
-  EXPECT_CALL(*sock, write(_, _)).WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
+  EXPECT_CALL(*sock, write(_, _, _))
+      .WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
   client->close(err);
   EXPECT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
 }
@@ -4860,13 +4879,15 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   auto streamId = client->createBidirectionalStream().value();
   auto& conn = client->getNonConstConn();
   conn.lossState.srtt = 10s;
-  EXPECT_CALL(*sock, write(_, _)).WillRepeatedly(Return(100));
+  EXPECT_CALL(*sock, write(_, _, _)).WillRepeatedly(Return(100));
   loopForWrites();
   Mock::VerifyAndClearExpectations(sock);
 
   // Close the client transport. There could be multiple writes given how many
   // ciphers we have.
-  EXPECT_CALL(*sock, write(_, _)).Times(AtLeast(1)).WillRepeatedly(Return(10));
+  EXPECT_CALL(*sock, write(_, _, _))
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(10));
   client->close(QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str()));
@@ -4874,7 +4895,7 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   Mock::VerifyAndClearExpectations(sock);
 
   // Then received some server packet, which won't trigger another close
-  EXPECT_CALL(*sock, write(_, _)).Times(0);
+  EXPECT_CALL(*sock, write(_, _, _)).Times(0);
   auto firstData = folly::IOBuf::copyBuffer(
       "I got a room full of your posters and your pictures, man");
   deliverDataWithoutErrorCheck(packetToBuf(createStreamPacket(
@@ -4892,7 +4913,9 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   conn.lastCloseSentTime = Clock::now() - 10s;
   conn.lossState.srtt = 1us;
   // Receive another server packet
-  EXPECT_CALL(*sock, write(_, _)).Times(AtLeast(1)).WillRepeatedly(Return(10));
+  EXPECT_CALL(*sock, write(_, _, _))
+      .Times(AtLeast(1))
+      .WillRepeatedly(Return(10));
   auto secondData = folly::IOBuf::copyBuffer(
       "Dear Slim, I wrote to you but you still ain't callin'");
   deliverDataWithoutErrorCheck(packetToBuf(createStreamPacket(
@@ -5424,13 +5447,14 @@ TEST_F(
       [&](const Optional<std::string>&, const Buf&) { return true; },
       []() -> Buf { return nullptr; });
 
-  EXPECT_CALL(*sock, write(firstAddress, _))
+  EXPECT_CALL(*sock, write(firstAddress, _, _))
       .WillRepeatedly(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            socketWrites.push_back(buf->clone());
-            return buf->computeChainDataLength();
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            socketWrites.push_back(
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+            return getTotalIovecLen(vec, iovec_len);
           }));
-  EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+  EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
   startClient();
   socketWrites.clear();
   auto& conn = client->getConn();
@@ -5460,20 +5484,21 @@ TEST_F(
 
   // Manually expire loss timeout to trigger write to both first and second
   // socket
-  EXPECT_CALL(*sock, write(firstAddress, _))
+  EXPECT_CALL(*sock, write(firstAddress, _, _))
       .Times(2)
       .WillRepeatedly(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
             socketWrites.push_back(
-                folly::IOBuf::copyBuffer(buf->data(), buf->length(), 0, 0));
-            return buf->length();
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+            return getTotalIovecLen(vec, iovec_len);
           }));
-  EXPECT_CALL(*secondSock, write(secondAddress, _))
+  EXPECT_CALL(*secondSock, write(secondAddress, _, _))
       .Times(2)
       .WillRepeatedly(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            socketWrites.push_back(buf->clone());
-            return buf->computeChainDataLength();
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            socketWrites.push_back(
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+            return getTotalIovecLen(vec, iovec_len);
           }));
   client->lossTimeout().cancelTimerCallback();
   client->lossTimeout().timeoutExpired();
@@ -5515,11 +5540,12 @@ TEST_F(
       [&](const Optional<std::string>&, const Buf&) { return true; },
       []() -> Buf { return nullptr; });
 
-  EXPECT_CALL(*sock, write(firstAddress, _))
+  EXPECT_CALL(*sock, write(firstAddress, _, _))
       .WillOnce(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            socketWrites.push_back(buf->clone());
-            return buf->computeChainDataLength();
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            socketWrites.push_back(
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+            return getTotalIovecLen(vec, iovec_len);
           }));
   startClient();
   socketWrites.clear();
@@ -5529,12 +5555,11 @@ TEST_F(
   ASSERT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
                   .isTimerCallbackScheduled());
 
-  EXPECT_CALL(*sock, write(firstAddress, _))
-      .WillOnce(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>&) {
-            errno = EBADF;
-            return -1;
-          }));
+  EXPECT_CALL(*sock, write(firstAddress, _, _))
+      .WillOnce(Invoke([&](const SocketAddress&, const struct iovec*, size_t) {
+        errno = EBADF;
+        return -1;
+      }));
   auto streamId = client->createBidirectionalStream().value();
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
@@ -5546,12 +5571,13 @@ TEST_F(
   EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
                    .isTimerCallbackScheduled());
 
-  EXPECT_CALL(*secondSock, write(secondAddress, _))
+  EXPECT_CALL(*secondSock, write(secondAddress, _, _))
       .Times(2)
       .WillRepeatedly(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            socketWrites.push_back(buf->clone());
-            return buf->computeChainDataLength();
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            socketWrites.push_back(
+                copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+            return getTotalIovecLen(vec, iovec_len);
           }));
   client->lossTimeout().cancelTimerCallback();
   client->lossTimeout().timeoutExpired();

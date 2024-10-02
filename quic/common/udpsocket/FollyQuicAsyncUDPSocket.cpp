@@ -57,8 +57,11 @@ void FollyQuicAsyncUDPSocket::setErrMessageCallback(
 
 ssize_t FollyQuicAsyncUDPSocket::write(
     const folly::SocketAddress& address,
-    const std::unique_ptr<folly::IOBuf>& buf) {
-  return follySocket_.write(address, buf);
+    const struct iovec* vec,
+    size_t iovec_len) {
+  folly::AsyncUDPSocket::WriteOptions writeOptions(
+      0 /*gsoVal*/, false /* zerocopyVal*/);
+  return follySocket_.writev(address, vec, iovec_len, writeOptions);
 }
 
 int FollyQuicAsyncUDPSocket::writem(
@@ -70,12 +73,13 @@ int FollyQuicAsyncUDPSocket::writem(
 
 ssize_t FollyQuicAsyncUDPSocket::writeGSO(
     const folly::SocketAddress& address,
-    const std::unique_ptr<folly::IOBuf>& buf,
+    const struct iovec* vec,
+    size_t iovec_len,
     WriteOptions options) {
   folly::AsyncUDPSocket::WriteOptions follyOptions(
       options.gso, options.zerocopy);
   follyOptions.txTime = options.txTime;
-  return follySocket_.writeGSO(address, buf, follyOptions);
+  return follySocket_.writev(address, vec, iovec_len, follyOptions);
 }
 
 int FollyQuicAsyncUDPSocket::writemGSO(

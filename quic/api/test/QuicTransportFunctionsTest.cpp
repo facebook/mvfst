@@ -2620,13 +2620,14 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(
           InvokeWithoutArgs([&writableBytes]() { return writableBytes; }));
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        EXPECT_LE(iobuf->computeChainDataLength(), 30);
-        writableBytes -= iobuf->computeChainDataLength();
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            size_t totalLen = getTotalIovecLen(vec, iovec_len);
+            EXPECT_LE(totalLen, 30);
+            writableBytes -= totalLen;
+            return totalLen;
+          }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   EXPECT_CALL(*quicStats_, onWrite(_));
   writeQuicDataToSocket(
@@ -2697,7 +2698,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
 
   // Limit to zero
   conn->transportSettings.writeConnectionDataPacketsLimit = 0;
-  EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
+  EXPECT_CALL(*rawSocket, write(_, _, _)).Times(0);
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
   auto res = writeQuicDataToSocket(
@@ -2720,14 +2721,14 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   conn->transportSettings.writeConnectionDataPacketsLimit =
       kDefaultWriteConnectionDataPacketLimit;
   uint64_t actualWritten = 0;
-  EXPECT_CALL(*rawSocket, write(_, _))
+  EXPECT_CALL(*rawSocket, write(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& iobuf) {
-        writableBytes -= iobuf->computeChainDataLength();
-        actualWritten += iobuf->computeChainDataLength();
-        return iobuf->computeChainDataLength();
-      }));
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            writableBytes -= getTotalIovecLen(vec, iovec_len);
+            actualWritten += getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
   res = writeQuicDataToSocket(
@@ -2754,13 +2755,13 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(
           InvokeWithoutArgs([&writableBytes]() { return writableBytes; }));
-  EXPECT_CALL(*rawSocket, write(_, _))
+  EXPECT_CALL(*rawSocket, write(_, _, _))
       .Times(kDefaultWriteConnectionDataPacketLimit * 2)
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        actualWritten += iobuf->computeChainDataLength();
-        return iobuf->computeChainDataLength();
-      }));
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            actualWritten += getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .Times(kDefaultWriteConnectionDataPacketLimit * 2);
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
@@ -2807,15 +2808,15 @@ TEST_F(
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(
           InvokeWithoutArgs([&writableBytes]() { return writableBytes; }));
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        EXPECT_LE(
-            iobuf->computeChainDataLength(),
-            *conn->writableBytesLimit - conn->lossState.totalBytesSent);
-        writableBytes -= iobuf->computeChainDataLength();
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            EXPECT_LE(
+                getTotalIovecLen(vec, iovec_len),
+                *conn->writableBytesLimit - conn->lossState.totalBytesSent);
+            writableBytes -= getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
   writeQuicDataToSocket(
       *rawSocket,
@@ -2962,13 +2963,13 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
 
   auto originalNextSeq = conn->ackStates.appDataAckState.nextPacketNum;
   uint64_t sentBytes = 0;
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        auto len = iobuf->computeChainDataLength();
-        sentBytes += len;
-        return len;
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            auto len = getTotalIovecLen(vec, iovec_len);
+            sentBytes += len;
+            return len;
+          }));
 
   // Artificially Block the stream
   stream1->flowControlState.peerAdvertisedMaxOffset = 10;
@@ -3033,13 +3034,13 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingNewData) {
 
   auto currentStreamWriteOffset = stream1->currentWriteOffset;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& iobuf) {
-        auto len = iobuf->computeChainDataLength();
-        EXPECT_EQ(conn->udpSendPacketLen - aead->getCipherOverhead(), len);
-        return len;
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            auto len = getTotalIovecLen(vec, iovec_len);
+            EXPECT_EQ(conn->udpSendPacketLen - aead->getCipherOverhead(), len);
+            return len;
+          }));
   writeProbingDataToSocketForTest(
       *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn));
   EXPECT_LT(currentPacketSeqNum, conn->ackStates.appDataAckState.nextPacketNum);
@@ -3061,7 +3062,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   auto socket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = socket.get();
-  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(100));
+  EXPECT_CALL(*rawSocket, write(_, _, _)).WillRepeatedly(Return(100));
   auto capturingAead = std::make_unique<MockAead>();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Where you wanna go");
@@ -3111,7 +3112,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
   auto socket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = socket.get();
-  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(100));
+  EXPECT_CALL(*rawSocket, write(_, _, _)).WillRepeatedly(Return(100));
   auto capturingAead = std::make_unique<MockAead>();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Where you wanna go");
@@ -3186,13 +3187,13 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
 
   auto currentStreamWriteOffset = cryptoStream->currentWriteOffset;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& iobuf) {
-        auto len = iobuf->computeChainDataLength();
-        EXPECT_EQ(conn.udpSendPacketLen - aead->getCipherOverhead(), len);
-        return len;
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            auto len = getTotalIovecLen(vec, iovec_len);
+            EXPECT_EQ(conn.udpSendPacketLen - aead->getCipherOverhead(), len);
+            return len;
+          }));
   writeCryptoDataProbesToSocketForTest(
       *rawSocket, conn, 1, *aead, *headerCipher, getVersion(conn));
   EXPECT_LT(currentPacketSeqNum, conn.ackStates.initialAckState->nextPacketNum);
@@ -3234,13 +3235,13 @@ TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
 
   auto currentStreamWriteOffset = cryptoStream->currentWriteOffset;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(2);
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        auto len = iobuf->computeChainDataLength();
-        EXPECT_EQ(conn.udpSendPacketLen - aead->getCipherOverhead(), len);
-        return len;
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            auto len = getTotalIovecLen(vec, iovec_len);
+            EXPECT_EQ(conn.udpSendPacketLen - aead->getCipherOverhead(), len);
+            return len;
+          }));
   writeCryptoDataProbesToSocketForTest(
       *rawSocket, conn, probesToSend, *aead, *headerCipher, getVersion(conn));
 
@@ -3265,7 +3266,7 @@ TEST_F(QuicTransportFunctionsTest, ProbingNotFallbackToPingWhenNoQuota) {
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
-  EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
+  EXPECT_CALL(*rawSocket, write(_, _, _)).Times(0);
   uint8_t probesToSend = 0;
   EXPECT_EQ(
       0,
@@ -3286,12 +3287,12 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
   auto socket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = socket.get();
-  EXPECT_CALL(*rawSocket, write(_, _))
+  EXPECT_CALL(*rawSocket, write(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& iobuf) {
-        return iobuf->computeChainDataLength();
-      }));
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   uint8_t probesToSend = 1;
   EXPECT_EQ(
       1,
@@ -3315,12 +3316,12 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToImmediateAck) {
   auto socket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = socket.get();
-  EXPECT_CALL(*rawSocket, write(_, _))
+  EXPECT_CALL(*rawSocket, write(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& iobuf) {
-        return iobuf->computeChainDataLength();
-      }));
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   uint8_t probesToSend = 1;
   EXPECT_EQ(
       1,
@@ -3464,13 +3465,13 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
       .WillRepeatedly(Return(0));
 
   uint64_t actualWritten = 0;
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        EXPECT_LE(iobuf->computeChainDataLength(), 30);
-        actualWritten += iobuf->computeChainDataLength();
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            EXPECT_LE(getTotalIovecLen(vec, iovec_len), 30);
+            actualWritten += getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
   auto res = writeQuicDataToSocket(
       *rawSocket,
@@ -4051,12 +4052,12 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
   uint64_t actualWritten = 0;
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        actualWritten += iobuf->computeChainDataLength();
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            actualWritten += getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(50));
   auto writeLoopBeginTime = Clock::now();
@@ -4111,7 +4112,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
   auto buf = buildRandomInputData(2048 * 2048);
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
-  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(1));
+  EXPECT_CALL(*rawSocket, write(_, _, _)).WillRepeatedly(Return(1));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(50));
   auto writeLoopBeginTime = Clock::now();
@@ -4248,11 +4249,11 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
   auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = sock.get();
 
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            return getTotalIovecLen(vec, iovec_len);
+          }));
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Drug facts");
@@ -4299,11 +4300,11 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFramesAckFreq) {
   auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
   auto rawSocket = sock.get();
 
-  EXPECT_CALL(*rawSocket, write(_, _))
-      .WillRepeatedly(Invoke([&](const SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
-        return iobuf->computeChainDataLength();
-      }));
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            return getTotalIovecLen(vec, iovec_len);
+          }));
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Drug facts");
@@ -4362,17 +4363,18 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Andante in C minor");
   writeDataToQuicStream(*stream, buf->clone(), true);
-  EXPECT_CALL(mockSock, writeGSO(_, _, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& sockBuf,
+                           const struct iovec* vec,
+                           size_t iovec_len,
                            auto) {
         EXPECT_GT(bufPtr->length(), 0);
-        EXPECT_GE(sockBuf->length(), buf->length());
-        EXPECT_EQ(sockBuf.get(), bufPtr);
-        EXPECT_TRUE(folly::IOBufEqualTo()(*sockBuf, *bufPtr));
-        EXPECT_FALSE(sockBuf->isChained());
-        return sockBuf->computeChainDataLength();
+        EXPECT_GE(vec[0].iov_len, buf->length());
+        EXPECT_TRUE(folly::IOBufEqualTo()(
+            *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
+        EXPECT_EQ(iovec_len, 1);
+        return getTotalIovecLen(vec, iovec_len);
       }));
   writeQuicDataToSocket(
       mockSock,
@@ -4401,7 +4403,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderRollbackBuf) {
       std::make_shared<FollyQuicEventBase>(&evb);
   quic::test::MockAsyncUDPSocket mockSock(qEvb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
-  EXPECT_CALL(mockSock, write(_, _)).Times(0);
+  EXPECT_CALL(mockSock, write(_, _, _)).Times(0);
   writeQuicDataToSocket(
       mockSock,
       *conn,
@@ -4432,17 +4434,18 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(conn->udpSendPacketLen * 10);
   writeDataToQuicStream(*stream, buf->clone(), true);
-  EXPECT_CALL(mockSock, writeGSO(_, _, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& sockBuf,
+                           const struct iovec* vec,
+                           size_t iovec_len,
                            QuicAsyncUDPSocket::WriteOptions options) {
         EXPECT_LE(options.gso, conn->udpSendPacketLen);
-        EXPECT_GT(bufPtr->length(), 0);
-        EXPECT_EQ(sockBuf.get(), bufPtr);
-        EXPECT_TRUE(folly::IOBufEqualTo()(*sockBuf, *bufPtr));
-        EXPECT_FALSE(sockBuf->isChained());
-        return sockBuf->length();
+        EXPECT_GT(vec[0].iov_len, 0);
+        EXPECT_TRUE(folly::IOBufEqualTo()(
+            *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
+        EXPECT_EQ(iovec_len, 1);
+        return getTotalIovecLen(vec, iovec_len);
       }));
   writeQuicDataToSocket(
       mockSock,
@@ -4479,20 +4482,21 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
       conn->udpSendPacketLen *
       conn->transportSettings.writeConnectionDataPacketsLimit);
   writeDataToQuicStream(*stream, inputBuf->clone(), true);
-  EXPECT_CALL(mockSock, writeGSO(_, _, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& sockBuf,
+                           const struct iovec* vec,
+                           size_t iovec_len,
                            QuicAsyncUDPSocket::WriteOptions options) {
         EXPECT_LE(options.gso, conn->udpSendPacketLen);
         EXPECT_GE(
             bufPtr->length(),
             conn->udpSendPacketLen *
                 conn->transportSettings.writeConnectionDataPacketsLimit);
-        EXPECT_EQ(sockBuf.get(), bufPtr);
-        EXPECT_TRUE(folly::IOBufEqualTo()(*sockBuf, *bufPtr));
-        EXPECT_FALSE(sockBuf->isChained());
-        return sockBuf->length();
+        EXPECT_TRUE(folly::IOBufEqualTo()(
+            *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
+        EXPECT_EQ(iovec_len, 1);
+        return getTotalIovecLen(vec, iovec_len);
       }));
   writeQuicDataToSocket(
       mockSock,
@@ -4515,14 +4519,15 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
       conn->outstandings.packets.front().metadata.encodedSize;
   auto outstandingPacketsCount = conn->outstandings.packets.size();
   ASSERT_EQ(firstPacketSize, conn->udpSendPacketLen);
-  EXPECT_CALL(mockSock, writeGSO(_, _, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& buf,
+                           const struct iovec* vec,
+                           size_t iovec_len,
                            auto) {
-        EXPECT_FALSE(buf->isChained());
-        EXPECT_EQ(buf->length(), firstPacketSize);
-        return buf->length();
+        EXPECT_EQ(iovec_len, 1);
+        EXPECT_EQ(vec[0].iov_len, firstPacketSize);
+        return getTotalIovecLen(vec, iovec_len);
       }));
   writeProbingDataToSocketForTest(
       mockSock,
@@ -4536,15 +4541,16 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   EXPECT_EQ(0, bufPtr->headroom());
 
   // Clone again, this time 2 pacckets.
-  EXPECT_CALL(mockSock, writeGSO(_, _, _))
+  EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
-                           const std::unique_ptr<folly::IOBuf>& buf,
+                           const struct iovec* vec,
+                           size_t iovec_len,
                            QuicAsyncUDPSocket::WriteOptions options) {
-        EXPECT_FALSE(buf->isChained());
+        EXPECT_EQ(iovec_len, 1);
         EXPECT_EQ(conn->udpSendPacketLen, options.gso);
-        EXPECT_EQ(buf->length(), conn->udpSendPacketLen * 2);
-        return buf->length();
+        EXPECT_EQ(vec[0].iov_len, conn->udpSendPacketLen * 2);
+        return getTotalIovecLen(vec, iovec_len);
       }));
   writeProbingDataToSocketForTest(
       mockSock,

@@ -74,7 +74,8 @@ void LibevQuicAsyncUDPSocket::pauseWrite() {
 
 ssize_t LibevQuicAsyncUDPSocket::write(
     const folly::SocketAddress& address,
-    const std::unique_ptr<folly::IOBuf>& buf) {
+    const struct iovec* vec,
+    size_t iovec_len) {
   if (fd_ == -1) {
     throw folly::AsyncSocketException(
         folly::AsyncSocketException::NOT_OPEN, "socket is not initialized");
@@ -95,15 +96,6 @@ ssize_t LibevQuicAsyncUDPSocket::write(
     }
     msg.msg_name = nullptr;
     msg.msg_namelen = 0;
-  }
-
-  iovec vec[16];
-  size_t iovec_len = buf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
-  if (UNLIKELY(iovec_len == 0)) {
-    buf->coalesce();
-    vec[0].iov_base = const_cast<uint8_t*>(buf->data());
-    vec[0].iov_len = buf->length();
-    iovec_len = 1;
   }
 
   msg.msg_iov = const_cast<struct iovec*>(vec);

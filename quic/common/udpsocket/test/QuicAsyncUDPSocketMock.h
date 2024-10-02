@@ -24,7 +24,7 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD(
       (ssize_t),
       write,
-      (const folly::SocketAddress&, const std::unique_ptr<folly::IOBuf>&));
+      (const folly::SocketAddress&, const struct iovec* vec, size_t iovec_len));
   MOCK_METHOD(
       (int),
       writem,
@@ -35,7 +35,8 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
       ssize_t,
       writeGSO,
       (const folly::SocketAddress&,
-       const std::unique_ptr<folly::IOBuf>&,
+       const struct iovec* vec,
+       size_t iovec_len,
        WriteOptions));
   MOCK_METHOD(
       (int),

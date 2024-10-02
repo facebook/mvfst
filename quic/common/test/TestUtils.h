@@ -580,5 +580,9 @@ class FakeServerHandshake : public FizzServerHandshake {
   Optional<uint64_t> clientActiveConnectionIdLimit_;
 };
 
+size_t getTotalIovecLen(const struct iovec* vec, size_t iovec_len);
+
+Buf copyChain(Buf&& input);
+
 } // namespace test
 } // namespace quic

@@ -9,6 +9,17 @@
 
 namespace quic {
 
+size_t fillIovec(std::unique_ptr<folly::IOBuf>& buf, iovec (&vec)[16]) {
+  size_t iovec_len = buf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
+  if (FOLLY_UNLIKELY(iovec_len == 0)) {
+    buf->coalesce();
+    vec[0].iov_base = const_cast<uint8_t*>(buf->data());
+    vec[0].iov_len = buf->length();
+    iovec_len = 1;
+  }
+  return iovec_len;
+}
+
 Buf BufQueue::splitAtMost(size_t len) {
   folly::IOBuf* current = chain_.get();
   // empty queue / requested 0 bytes

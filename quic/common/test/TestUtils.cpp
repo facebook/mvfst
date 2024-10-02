@@ -821,5 +821,26 @@ std::unique_ptr<folly::IOBuf> getProtectionKey() {
       folly::IOBuf::create(0),
       pnCipher->keyLength());
 }
+
+size_t getTotalIovecLen(const struct iovec* vec, size_t iovec_len) {
+  uint32_t result = 0;
+  for (uint32_t i = 0; i < iovec_len; i++) {
+    result += vec[i].iov_len;
+  }
+  return result;
+}
+
+Buf copyChain(Buf&& input) {
+  folly::IOBuf* current = input.get();
+  Buf headCopy = folly::IOBuf::copyBuffer(current->data(), current->length());
+  current = current->next();
+  while (current != input.get()) {
+    Buf currCopy = folly::IOBuf::copyBuffer(current->data(), current->length());
+    headCopy->appendToChain(std::move(currCopy));
+    current = current->next();
+  }
+  return headCopy;
+}
+
 } // namespace test
 } // namespace quic

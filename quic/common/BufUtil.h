@@ -13,6 +13,8 @@
 
 namespace quic {
 
+size_t fillIovec(std::unique_ptr<folly::IOBuf>& buf, iovec (&vec)[16]);
+
 class BufQueue {
  public:
   BufQueue() = default;

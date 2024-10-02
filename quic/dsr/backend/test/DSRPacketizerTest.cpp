@@ -171,18 +171,20 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
 
   std::vector<Buf> sentData;
   auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
-  EXPECT_CALL(*sock, writeGSO(conn_.peerAddress, _, _))
+  EXPECT_CALL(*sock, writeGSO(conn_.peerAddress, _, _, _))
       .WillRepeatedly(Invoke([&](const folly::SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& buf,
+                                 const struct iovec* vec,
+                                 size_t iovec_len,
                                  QuicAsyncUDPSocket::WriteOptions) {
-        sentData.push_back(buf->clone());
-        return buf->computeChainDataLength();
+        sentData.push_back(copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+        return getTotalIovecLen(vec, iovec_len);
       }));
-  EXPECT_CALL(*sock, write(conn_.peerAddress, _))
+  EXPECT_CALL(*sock, write(conn_.peerAddress, _, _))
       .WillRepeatedly(Invoke([&](const folly::SocketAddress&,
-                                 const std::unique_ptr<folly::IOBuf>& buf) {
-        sentData.push_back(buf->clone());
-        return buf->computeChainDataLength();
+                                 const struct iovec* vec,
+                                 size_t iovec_len) {
+        sentData.push_back(copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+        return getTotalIovecLen(vec, iovec_len);
       }));
   auto& instruction = pendingInstructions_.front();
   CipherBuilder builder;

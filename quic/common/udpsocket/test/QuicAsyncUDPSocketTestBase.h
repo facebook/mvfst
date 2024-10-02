@@ -60,7 +60,11 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
   // If an error is received, the read callback should not be triggered
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
 #endif // FOLLY_HAVE_MSG_ERRQUEUE
-  this->udpSocket_->write(addr, folly::IOBuf::copyBuffer("hey"));
+  auto sendBuf = folly::IOBuf::copyBuffer("hey");
+  iovec vec[quic::kNumIovecBufferChains];
+  size_t iovec_len =
+      sendBuf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
+  this->udpSocket_->write(addr, vec, iovec_len);
   this->udpSocket_->getEventBase()->loopForever();
   EXPECT_TRUE(errRecvd);
 }
@@ -72,7 +76,12 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
   folly::SocketAddress addr("127.0.0.1", 10000);
   EXPECT_CALL(this->errCb_, errMessage_(testing::_)).Times(0);
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
-  this->udpSocket_->write(addr, folly::IOBuf::copyBuffer("hey"));
+
+  auto sendBuf = folly::IOBuf::copyBuffer("hey");
+  iovec vec[quic::kNumIovecBufferChains];
+  size_t iovec_len =
+      sendBuf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
+  this->udpSocket_->write(addr, vec, iovec_len);
 
   class EvbTerminateTimeout : public quic::QuicTimerCallback {
    public:
@@ -113,7 +122,11 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
   // should not be triggered
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
 #endif // FOLLY_HAVE_MSG_ERRQUEUE
-  this->udpSocket_->write(addr, folly::IOBuf::copyBuffer("hey"));
+  auto sendBuf = folly::IOBuf::copyBuffer("hey");
+  iovec vec[quic::kNumIovecBufferChains];
+  size_t iovec_len =
+      sendBuf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
+  this->udpSocket_->write(addr, vec, iovec_len);
   this->udpSocket_->getEventBase()->loopForever();
   EXPECT_TRUE(errRecvd);
 }

@@ -70,7 +70,8 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   ssize_t write(
       const folly::SocketAddress& address,
-      const std::unique_ptr<folly::IOBuf>& buf) override;
+      const struct iovec* vec,
+      size_t iovec_len) override;
 
   int writem(
       folly::Range<folly::SocketAddress const*> addrs,
@@ -79,7 +80,8 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   ssize_t writeGSO(
       const folly::SocketAddress& address,
-      const std::unique_ptr<folly::IOBuf>& buf,
+      const struct iovec* vec,
+      size_t iovec_len,
       WriteOptions options) override;
 
   /**

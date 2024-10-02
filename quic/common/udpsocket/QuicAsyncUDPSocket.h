@@ -156,7 +156,8 @@ class QuicAsyncUDPSocket {
    */
   virtual ssize_t write(
       const folly::SocketAddress& /* address */,
-      const std::unique_ptr<folly::IOBuf>& /* buf */) = 0;
+      const struct iovec* vec,
+      size_t iovec_len) = 0;
 
   /**
    * Send the data in buffers to destination. Returns the return code from
@@ -189,7 +190,8 @@ class QuicAsyncUDPSocket {
    */
   virtual ssize_t writeGSO(
       const folly::SocketAddress& address,
-      const std::unique_ptr<folly::IOBuf>& buf,
+      const struct iovec* vec,
+      size_t iovec_len,
       WriteOptions options) = 0;
 
   /**

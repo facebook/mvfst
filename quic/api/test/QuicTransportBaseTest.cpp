@@ -1718,7 +1718,7 @@ TEST_P(QuicTransportImplTestBase, ReadDataAlsoChecksLossAlarm) {
 TEST_P(QuicTransportImplTestBase, ConnectionErrorOnWrite) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
-  EXPECT_CALL(*socketPtr, write(_, _))
+  EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
   transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr);
   transport->addDataToStream(
@@ -1743,10 +1743,12 @@ TEST_P(QuicTransportImplTestBase, ReadErrorUnsanitizedErrorMsg) {
         EXPECT_EQ("You need to calm down.", error.message);
       }));
 
-  EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
-    throw std::runtime_error("You need to calm down.");
-    return 0;
-  }));
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillOnce(
+          Invoke([](const folly::SocketAddress&, const struct iovec*, size_t) {
+            throw std::runtime_error("You need to calm down.");
+            return 0;
+          }));
   transport->writeChain(
       stream,
       folly::IOBuf::copyBuffer("You are being too loud."),
@@ -1765,10 +1767,12 @@ TEST_P(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
       onConnectionSetupError(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::string("Well there's your problem"))));
-  EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
-    throw std::runtime_error("Well there's your problem");
-    return 0;
-  }));
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillOnce(
+          Invoke([](const folly::SocketAddress&, const struct iovec*, size_t) {
+            throw std::runtime_error("Well there's your problem");
+            return 0;
+          }));
   transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
@@ -2939,7 +2943,7 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithActiveStream) {
   transport->notifyPendingWriteOnConnection(&wcbConn);
   transport->notifyPendingWriteOnStream(stream, &wcb);
   transport->setReadCallback(stream, &rcb);
-  EXPECT_CALL(*socketPtr, write(_, _))
+  EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 0)));
@@ -2993,7 +2997,7 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
 
   transport->setReadCallback(stream, &rcb);
-  EXPECT_CALL(*socketPtr, write(_, _))
+  EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 0)));
@@ -3055,7 +3059,7 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   transport->notifyPendingWriteOnStream(stream, &wcb);
   transport->setReadCallback(stream, &rcb);
   transport->setPeekCallback(stream, &pcb);
-  EXPECT_CALL(*socketPtr, write(_, _))
+  EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 0)));
@@ -3195,7 +3199,8 @@ TEST_P(QuicTransportImplTestBase, ExceptionInWriteLooperDoesNotCrash) {
   transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
-  EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillOnce(SetErrnoAndReturn(EBADF, -1));
   EXPECT_CALL(connSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](auto) { transport.reset(); }));
   transport->writeLooper()->runLoopCallback();
@@ -4913,14 +4918,14 @@ TEST_P(
       }));
 
   // Fail the first write loop.
-  EXPECT_CALL(*socketPtr, write(_, _))
+  EXPECT_CALL(*socketPtr, write(_, _, _))
       .Times(2) // We attempt to flush the batch twice inside the write loop.
                 // Fail both.
-      .WillRepeatedly(Invoke([&](const auto& /* addr */,
-                                 const std::unique_ptr<folly::IOBuf>& /*buf*/) {
-        errno = EAGAIN;
-        return 0;
-      }));
+      .WillRepeatedly(
+          Invoke([&](const folly::SocketAddress&, const struct iovec*, size_t) {
+            errno = EAGAIN;
+            return 0;
+          }));
 
   transport->writeLooper()->run(true /* thisIteration */);
   EXPECT_TRUE(transport->writeLooper()->isRunning());
@@ -4937,12 +4942,13 @@ TEST_P(
   EXPECT_TRUE(writeCallbackArmed);
 
   // Reset will make one write attempt. We don't care what happens to it
-  EXPECT_CALL(*socketPtr, write(_, _))
+  EXPECT_CALL(*socketPtr, write(_, _, _))
       .Times(1)
-      .WillRepeatedly(Invoke([&](const auto& /* addr */,
-                                 const std::unique_ptr<folly::IOBuf>& buf) {
+      .WillRepeatedly(Invoke([&](const folly::SocketAddress&,
+                                 const struct iovec* vec,
+                                 size_t iovec_len) {
         errno = 0;
-        return buf->computeChainDataLength();
+        return getTotalIovecLen(vec, iovec_len);
       }));
   transport.reset();
 }

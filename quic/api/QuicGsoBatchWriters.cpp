@@ -78,7 +78,9 @@ ssize_t GSOPacketBatchWriter::write(
   auto options =
       QuicAsyncUDPSocket::WriteOptions(gsoVal, false /*zerocopyVal*/);
   options.txTime = txTime_;
-  return sock.writeGSO(address, buf_, options);
+  iovec vec[kNumIovecBufferChains];
+  size_t iovec_len = fillIovec(buf_, vec);
+  return sock.writeGSO(address, vec, iovec_len, options);
 }
 
 GSOInplacePacketBatchWriter::GSOInplacePacketBatchWriter(
@@ -159,7 +161,9 @@ ssize_t GSOInplacePacketBatchWriter::write(
   auto options =
       QuicAsyncUDPSocket::WriteOptions(gsoVal, false /*zerocopyVal*/);
   options.txTime = txTime_;
-  auto bytesWritten = sock.writeGSO(address, buf, options);
+  iovec vec[kNumIovecBufferChains];
+  size_t iovec_len = fillIovec(buf, vec);
+  auto bytesWritten = sock.writeGSO(address, vec, iovec_len, options);
   /**
    * If there is one more bytes after lastPacketEnd_, that means there is a
    * packet we choose not to write in this batch (e.g., it has a size larger
@@ -281,8 +285,11 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
     const folly::SocketAddress& /*unused*/) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
-    return (currBufs_ > 1) ? sock.writeGSO(addrs_[0], bufs_[0], options_[0])
-                           : sock.write(addrs_[0], bufs_[0]);
+    iovec vec[kNumIovecBufferChains];
+    size_t iovec_len = fillIovec(bufs_[0], vec);
+    return (currBufs_ > 1)
+        ? sock.writeGSO(addrs_[0], vec, iovec_len, options_[0])
+        : sock.write(addrs_[0], vec, iovec_len);
   }
 
   int ret = sock.writemGSO(

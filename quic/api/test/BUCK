@@ -159,6 +159,7 @@ cpp_unittest(
     deps = [
         "//quic/api:quic_batch_writer",
         "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
         "//quic/common/testutil:mock_async_udp_socket",
         "//quic/common/udpsocket:folly_async_udp_socket",
         "//quic/fizz/server/handshake:fizz_server_handshake",

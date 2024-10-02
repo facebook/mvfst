@@ -69,6 +69,12 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 // larger than this, unless configured otherwise.
 constexpr uint16_t kDefaultUDPReadBufferSize = 1500;
 
+// UDP's typical MTU size is 1500, so a large number of buffers
+// does not make sense. We can optimize for buffer chains with
+// fewer than 16 buffers, which is the highest I can think of
+// for a real use case.
+constexpr size_t kNumIovecBufferChains = 16;
+
 // Number of GRO buffers to use
 // 1 means GRO is not enabled
 // 64 is the max possible value

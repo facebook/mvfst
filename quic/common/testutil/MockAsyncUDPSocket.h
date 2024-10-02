@@ -26,7 +26,7 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
   MOCK_METHOD(
       ssize_t,
       write,
-      (const folly::SocketAddress&, const std::unique_ptr<folly::IOBuf>&));
+      (const folly::SocketAddress&, const struct iovec*, size_t));
   MOCK_METHOD(
       int,
       writem,
@@ -37,7 +37,8 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
       ssize_t,
       writeGSO,
       (const folly::SocketAddress&,
-       const std::unique_ptr<folly::IOBuf>&,
+       const struct iovec*,
+       size_t,
        QuicAsyncUDPSocket::WriteOptions));
   MOCK_METHOD(
       ssize_t,
