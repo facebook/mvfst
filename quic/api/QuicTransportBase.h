@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
+#include <quic/api/QuicTransportBaseLite.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/FunctionLooper.h>
 #include <quic/common/NetworkData.h>
@@ -37,6 +38,7 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
  *    of the object that holds it to send graceful close messages to the peer.
  */
 class QuicTransportBase : public QuicSocket,
+                          public QuicTransportBaseLite,
                           QuicStreamPrioritiesObserver,
                           QuicAsyncUDPSocket::WriteCallback {
  public:

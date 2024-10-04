@@ -12,6 +12,7 @@
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicConstants.h>
+#include <quic/api/QuicSocketLite.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Optional.h>
 #include <quic/common/SmallCollections.h>
@@ -34,7 +35,7 @@ namespace quic {
 
 class DSRPacketizationRequestSender;
 
-class QuicSocket {
+class QuicSocket : virtual public QuicSocketLite {
  public:
   /**
    * Callback for connection set up events.

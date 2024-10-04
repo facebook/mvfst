@@ -40,7 +40,9 @@ mvfst_cpp_library(
         "IoBufQuicBatch.h",
         "QuicPacketScheduler.h",
         "QuicSocket.h",
+        "QuicSocketLite.h",
         "QuicTransportBase.h",
+        "QuicTransportBaseLite.h",
         "QuicTransportFunctions.h",
     ],
     deps = [
