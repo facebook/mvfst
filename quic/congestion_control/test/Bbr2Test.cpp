@@ -135,8 +135,10 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
             .build();
     ackEvent.ackedPackets.push_back(ackPkt);
   }
-  // The pace should be updated.
-  EXPECT_CALL(*rawPacer_, refreshPacingRate(_, _, _));
+  // The pace should be updated if paceInitCwnd is set.
+  if (conn_->transportSettings.ccaConfig.paceInitCwnd) {
+    EXPECT_CALL(*rawPacer_, refreshPacingRate(_, _, _));
+  }
   bbr2.onPacketAckOrLoss(&ackEvent, nullptr);
   // Cwnd should increase.
   EXPECT_GT(bbr2.getCongestionWindow(), cwnd);

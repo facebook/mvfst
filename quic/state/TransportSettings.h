@@ -82,7 +82,7 @@ struct CongestionControlConfig {
 
   // Used by: BBR2
   // Whether BBR2 paces the initial congestion window.
-  bool paceInitCwnd{true};
+  bool paceInitCwnd{false};
 
   // Used by: BBR2
   // Use a different pacing gain during ProbeBW Cruise and Refill.
@@ -97,7 +97,7 @@ struct CongestionControlConfig {
   // Used by: BBR2
   // Use a different pacing gain during Startup.
   // If value < 0, use the default pacing gain.
-  float overrideStartupPacingGain{-1.0};
+  float overrideStartupPacingGain{4.33f};
 
   // Used by: Cubic
   // The target fraction of packets to be marked with CE per-RTT when l4s is
