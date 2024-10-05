@@ -34,6 +34,7 @@ mvfst_cpp_library(
         "IoBufQuicBatch.cpp",
         "QuicPacketScheduler.cpp",
         "QuicTransportBase.cpp",
+        "QuicTransportBaseLite.cpp",
         "QuicTransportFunctions.cpp",
     ],
     headers = [

@@ -234,12 +234,6 @@ class QuicTransportBase : public QuicSocket,
 
   virtual void setAckRxTimestampsEnabled(bool enableAckRxTimestamps);
 
-  void setConnectionSetupCallback(
-      folly::MaybeManagedPtr<ConnectionSetupCallback> callback) final;
-
-  void setConnectionCallback(
-      folly::MaybeManagedPtr<ConnectionCallback> callback) final;
-
   void setEarlyDataAppParamsFunctions(
       folly::Function<bool(const Optional<std::string>&, const Buf&) const>
           validator,
@@ -849,15 +843,6 @@ class QuicTransportBase : public QuicSocket,
     }
   }
 
-  void resetConnectionCallbacks() {
-    connSetupCallback_ = nullptr;
-    connCallback_ = nullptr;
-  }
-
-  bool processCancelCode(const QuicError& cancelCode);
-  void processConnectionSetupCallbacks(QuicError&& cancelCode);
-  void processConnectionCallbacks(QuicError&& cancelCode);
-
   /**
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
    * required by this QuicSocket's packet processors.
@@ -866,10 +851,6 @@ class QuicTransportBase : public QuicSocket,
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
-  folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
-  folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
-  // A flag telling transport if the new onConnectionEnd(error) cb must be used.
-  bool useConnectionEndWithErrorCallback_{false};
 
   std::
       unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>
