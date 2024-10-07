@@ -55,6 +55,7 @@ add_library(
   mvfst_state_ack_handler
   AckEvent.cpp
   AckHandlers.cpp
+  AckedPacketIterator.cpp
 )
 
 set_property(TARGET mvfst_state_ack_handler PROPERTY VERSION ${PACKAGE_VERSION})
