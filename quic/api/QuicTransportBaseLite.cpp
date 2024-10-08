@@ -22,6 +22,15 @@ bool QuicTransportBaseLite::error() const {
   return conn_->localConnectionError.has_value();
 }
 
+uint64_t QuicTransportBaseLite::bufferSpaceAvailable() const {
+  auto bytesBuffered = conn_->flowControlState.sumCurStreamBufferLen;
+  auto totalBufferSpaceAvailable =
+      conn_->transportSettings.totalBufferSpaceAvailable;
+  return bytesBuffered > totalBufferSpaceAvailable
+      ? 0
+      : totalBufferSpaceAvailable - bytesBuffered;
+}
+
 void QuicTransportBaseLite::setConnectionSetupCallback(
     folly::MaybeManagedPtr<ConnectionSetupCallback> callback) {
   connSetupCallback_ = callback;
@@ -81,6 +90,18 @@ QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
 
 const folly::SocketAddress& QuicTransportBaseLite::getPeerAddress() const {
   return conn_->peerAddress;
+}
+
+std::shared_ptr<QuicEventBase> QuicTransportBaseLite::getEventBase() const {
+  return evb_;
+}
+
+Optional<std::string> QuicTransportBaseLite::getAppProtocol() const {
+  return conn_->handshakeLayer->getApplicationProtocol();
+}
+
+uint64_t QuicTransportBaseLite::getConnectionBufferAvailable() const {
+  return bufferSpaceAvailable();
 }
 
 bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {

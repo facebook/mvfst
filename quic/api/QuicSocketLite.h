@@ -229,6 +229,29 @@ class QuicSocketLite {
       folly::MaybeManagedPtr<ConnectionCallback> callback) = 0;
 
   /**
+   * Sets the size of the given stream's receive window, or the connection
+   * receive window if stream id is 0.  If the window size increases, a
+   * window update will be sent to the peer.  If it decreases, the transport
+   * will delay future window updates until the sender's available window is
+   * <= recvWindowSize.
+   */
+  virtual void setReceiveWindow(StreamId id, size_t recvWindowSize) = 0;
+
+  /**
+   * Set the size of the transport send buffer for the given stream.
+   * The maximum total amount of buffer space is the sum of maxUnacked and
+   * maxUnsent.  Bytes passed to writeChain count against unsent until the
+   * transport flushes them to the wire, after which they count against unacked.
+   */
+  virtual void
+  setSendBuffer(StreamId id, size_t maxUnacked, size_t maxUnsent) = 0;
+
+  /**
+   * Returns the event base associated with this socket
+   */
+  [[nodiscard]] virtual std::shared_ptr<QuicEventBase> getEventBase() const = 0;
+
+  /**
    * Get information on the state of the quic connection. Should only be used
    * for logging.
    */
@@ -272,6 +295,17 @@ class QuicSocketLite {
       const std::string& label,
       const Optional<folly::ByteRange>& context,
       uint16_t keyLength) const = 0;
+
+  /**
+   * Get the negotiated ALPN. If called before the transport is ready
+   * returns none
+   */
+  virtual Optional<std::string> getAppProtocol() const = 0;
+
+  /**
+   * Return the amount of transport buffer space available for writing
+   */
+  virtual uint64_t getConnectionBufferAvailable() const = 0;
 
   virtual ~QuicSocketLite() = default;
 };

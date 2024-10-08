@@ -47,8 +47,7 @@ QuicTransportBase::QuicTransportBase(
     std::shared_ptr<QuicEventBase> evb,
     std::unique_ptr<QuicAsyncUDPSocket> socket,
     bool useConnectionEndWithErrorCallback)
-    : QuicTransportBaseLite(useConnectionEndWithErrorCallback),
-      evb_(std::move(evb)),
+    : QuicTransportBaseLite(std::move(evb), useConnectionEndWithErrorCallback),
       socket_(std::move(socket)),
       lossTimeout_(this),
       ackTimeout_(this),
@@ -113,10 +112,6 @@ void QuicTransportBase::setCongestionControllerFactory(
   CHECK(conn_);
   conn_->congestionControllerFactory = ccFactory;
   conn_->congestionController.reset();
-}
-
-std::shared_ptr<QuicEventBase> QuicTransportBase::getEventBase() const {
-  return evb_;
 }
 
 const std::shared_ptr<QLogger> QuicTransportBase::getQLogger() const {
@@ -583,23 +578,6 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.usedZeroRtt = conn_->usedZeroRtt;
   transportInfo.maybeCCState = maybeCCState;
   return transportInfo;
-}
-
-Optional<std::string> QuicTransportBase::getAppProtocol() const {
-  return conn_->handshakeLayer->getApplicationProtocol();
-}
-
-uint64_t QuicTransportBase::getConnectionBufferAvailable() const {
-  return bufferSpaceAvailable();
-}
-
-uint64_t QuicTransportBase::bufferSpaceAvailable() const {
-  auto bytesBuffered = conn_->flowControlState.sumCurStreamBufferLen;
-  auto totalBufferSpaceAvailable =
-      conn_->transportSettings.totalBufferSpaceAvailable;
-  return bytesBuffered > totalBufferSpaceAvailable
-      ? 0
-      : totalBufferSpaceAvailable - bytesBuffered;
 }
 
 folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>

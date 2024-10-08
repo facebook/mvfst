@@ -53,8 +53,6 @@ class QuicTransportBase : public QuicSocket,
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
-  [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
-
   Optional<ConnectionId> getClientConnectionId() const override;
 
   Optional<ConnectionId> getServerConnectionId() const override;
@@ -84,17 +82,6 @@ class QuicTransportBase : public QuicSocket,
       StreamId id) const override;
 
   TransportInfo getTransportInfo() const override;
-
-  Optional<std::string> getAppProtocol() const override;
-
-  void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
-
-  void setSendBuffer(StreamId, size_t /*maxUnacked*/, size_t /*maxUnsent*/)
-      override {}
-
-  uint64_t getConnectionBufferAvailable() const override;
-
-  uint64_t bufferSpaceAvailable() const;
 
   folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const override;
@@ -832,7 +819,6 @@ class QuicTransportBase : public QuicSocket,
    */
   Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
-  std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
 
   struct ReadCallbackData {

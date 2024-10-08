@@ -15,12 +15,17 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
 
 class QuicTransportBaseLite : virtual public QuicSocketLite {
  public:
-  QuicTransportBaseLite(bool useConnectionEndWithErrorCallback)
-      : useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback) {}
+  QuicTransportBaseLite(
+      std::shared_ptr<QuicEventBase> evb,
+      bool useConnectionEndWithErrorCallback)
+      : evb_(evb),
+        useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback) {}
 
   bool good() const override;
 
   bool error() const override;
+
+  uint64_t bufferSpaceAvailable() const;
 
   /**
    * Returns whether or not the connection has a write cipher. This will be used
@@ -34,6 +39,13 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
   void setConnectionCallback(
       folly::MaybeManagedPtr<ConnectionCallback> callback) final;
 
+  void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
+
+  void setSendBuffer(StreamId, size_t /*maxUnacked*/, size_t /*maxUnsent*/)
+      override {}
+
+  [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
+
   folly::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
       StreamId id) const override;
 
@@ -42,6 +54,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
   }
 
   const folly::SocketAddress& getPeerAddress() const override;
+
+  Optional<std::string> getAppProtocol() const override;
+
+  uint64_t getConnectionBufferAvailable() const override;
 
  protected:
   void resetConnectionCallbacks() {
@@ -53,6 +69,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
 
   void processConnectionSetupCallbacks(QuicError&& cancelCode);
   void processConnectionCallbacks(QuicError&& cancelCode);
+
+  std::shared_ptr<QuicEventBase> evb_;
 
   CloseState closeState_{CloseState::OPEN};
 
