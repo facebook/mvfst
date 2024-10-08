@@ -27,8 +27,6 @@
 
 namespace quic {
 
-enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
-
 /**
  * Base class for the QUIC Transport. Implements common behavior for both
  * clients and servers. QuicTransportBase assumes the following:
@@ -70,11 +68,7 @@ class QuicTransportBase : public QuicSocket,
   const std::shared_ptr<QLogger> getQLogger() const;
 
   // QuicSocket interface
-  bool good() const override;
-
   bool replaySafe() const override;
-
-  bool error() const override;
 
   void close(Optional<QuicError> error) override;
 
@@ -313,12 +307,6 @@ class QuicTransportBase : public QuicSocket,
    * be destroyed.
    */
   virtual void unbindConnection() = 0;
-
-  /**
-   * Returns whether or not the connection has a write cipher. This will be used
-   * to decide to return the onTransportReady() callbacks.
-   */
-  virtual bool hasWriteCipher() const = 0;
 
   /**
    * Returns a shared_ptr which can be used as a guard to keep this
@@ -873,7 +861,6 @@ class QuicTransportBase : public QuicSocket,
 
   QuicSocket::WriteCallback* connWriteCallback_{nullptr};
   std::map<StreamId, QuicSocket::WriteCallback*> pendingWriteCallbacks_;
-  CloseState closeState_{CloseState::OPEN};
   bool transportReadyNotified_{false};
   bool handshakeDoneNotified_{false};
 

@@ -179,19 +179,7 @@ class QuicSocket : virtual public QuicSocketLite {
    */
   virtual const folly::SocketAddress& getLocalAddress() const = 0;
 
-  /**
-   * Determine if transport is open and ready to read or write.
-   *
-   * return true iff the transport is open and ready, false otherwise.
-   */
-  virtual bool good() const = 0;
-
   virtual bool replaySafe() const = 0;
-
-  /**
-   * Determine if an error has occurred with this transport.
-   */
-  virtual bool error() const = 0;
 
   /**
    * Close this socket with a drain period. If closing with an error, it may be

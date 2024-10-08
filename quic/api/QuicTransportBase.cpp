@@ -186,16 +186,8 @@ QuicTransportBase::~QuicTransportBase() {
   DCHECK(!socket_.get()); // should be no socket
 }
 
-bool QuicTransportBase::good() const {
-  return closeState_ == CloseState::OPEN && hasWriteCipher() && !error();
-}
-
 bool QuicTransportBase::replaySafe() const {
   return (conn_->oneRttWriteCipher != nullptr);
-}
-
-bool QuicTransportBase::error() const {
-  return conn_->localConnectionError.has_value();
 }
 
 void QuicTransportBase::close(Optional<QuicError> errorCode) {

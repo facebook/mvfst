@@ -14,6 +14,14 @@ constexpr auto APP_NO_ERROR = quic::GenericApplicationErrorCode::NO_ERROR;
 
 namespace quic {
 
+bool QuicTransportBaseLite::good() const {
+  return closeState_ == CloseState::OPEN && hasWriteCipher() && !error();
+}
+
+bool QuicTransportBaseLite::error() const {
+  return conn_->localConnectionError.has_value();
+}
+
 void QuicTransportBaseLite::setConnectionSetupCallback(
     folly::MaybeManagedPtr<ConnectionSetupCallback> callback) {
   connSetupCallback_ = callback;

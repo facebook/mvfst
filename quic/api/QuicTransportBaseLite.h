@@ -11,10 +11,22 @@
 
 namespace quic {
 
+enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
+
 class QuicTransportBaseLite : virtual public QuicSocketLite {
  public:
   QuicTransportBaseLite(bool useConnectionEndWithErrorCallback)
       : useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback) {}
+
+  bool good() const override;
+
+  bool error() const override;
+
+  /**
+   * Returns whether or not the connection has a write cipher. This will be used
+   * to decide to return the onTransportReady() callbacks.
+   */
+  virtual bool hasWriteCipher() const = 0;
 
   void setConnectionSetupCallback(
       folly::MaybeManagedPtr<ConnectionSetupCallback> callback) final;
@@ -41,6 +53,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
 
   void processConnectionSetupCallbacks(QuicError&& cancelCode);
   void processConnectionCallbacks(QuicError&& cancelCode);
+
+  CloseState closeState_{CloseState::OPEN};
 
   folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
   folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
