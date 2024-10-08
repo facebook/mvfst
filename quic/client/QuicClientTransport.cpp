@@ -1891,4 +1891,12 @@ uint64_t QuicClientTransport::getEnobufsCount() const {
   return conn_->enobufsCount;
 }
 
+uint64_t QuicClientTransport::getPtoCount() const {
+  return conn_->lossState.ptoCount;
+}
+
+uint64_t QuicClientTransport::getPacketsSentCount() const {
+  return conn_->lossState.totalPacketsSent;
+}
+
 } // namespace quic

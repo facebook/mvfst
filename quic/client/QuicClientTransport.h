@@ -226,6 +226,9 @@ class QuicClientTransport
 
   uint64_t getEnobufsCount() const;
 
+  uint64_t getPtoCount() const;
+  uint64_t getPacketsSentCount() const;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(
