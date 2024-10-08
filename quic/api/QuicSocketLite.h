@@ -8,8 +8,10 @@
 #pragma once
 
 #include <folly/MaybeManagedPtr.h>
+#include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicException.h>
 #include <quic/codec/Types.h>
+#include <quic/state/StateData.h>
 
 namespace quic {
 
@@ -167,6 +169,40 @@ class QuicSocketLite {
   };
 
   /**
+   * Information about the stream level transport info. Specific to QUIC.
+   */
+  struct StreamTransportInfo {
+    // Total time the stream has spent in head-of-line blocked state,
+    // in microseconds
+    std::chrono::microseconds totalHeadOfLineBlockedTime{0us};
+
+    // How many times the stream has entered the "head-of-line blocked" state
+    uint32_t holbCount{0};
+
+    // Is the stream head-of-line blocked?
+    bool isHolb{false};
+
+    // Number of packets transmitted that carry new STREAM frame for this stream
+    uint64_t numPacketsTxWithNewData{0};
+
+    // Number of packets that contain STREAM frame for this stream and are
+    // declared to be lost
+    uint64_t streamLossCount{0};
+
+    // Total number of 'new' stream bytes sent on this stream.
+    // Does not include retransmissions of stream bytes.
+    Optional<uint64_t> streamBytesSent{0};
+
+    // Total number of stream bytes received on this stream.
+    Optional<uint64_t> streamBytesReceived{0};
+
+    // Stream read error (if one occured)
+    Optional<QuicErrorCode> streamReadError;
+    // Stream write error (if one occured)
+    Optional<QuicErrorCode> streamWriteError;
+  };
+
+  /**
    * Sets connection setup callback. This callback must be set before using the
    * socket.
    */
@@ -179,6 +215,51 @@ class QuicSocketLite {
    */
   virtual void setConnectionCallback(
       folly::MaybeManagedPtr<ConnectionCallback> callback) = 0;
+
+  /**
+   * Get information on the state of the quic connection. Should only be used
+   * for logging.
+   */
+  virtual const QuicConnectionStateBase* getState() const = 0;
+
+  /**
+   * Get internal transport info similar to TCP information.
+   * Returns LocalErrorCode::STREAM_NOT_EXISTS if the stream is not found
+   */
+  virtual folly::Expected<StreamTransportInfo, LocalErrorCode>
+  getStreamTransportInfo(StreamId id) const = 0;
+
+  /**
+   * Get the peer socket address
+   */
+  virtual const folly::SocketAddress& getPeerAddress() const = 0;
+
+  /**
+   * Get the cert presented by peer
+   */
+  FOLLY_NODISCARD virtual const std::shared_ptr<
+      const folly::AsyncTransportCertificate>
+  getPeerCertificate() const {
+    return nullptr;
+  }
+
+  /**
+   * Get the cert presented by self
+   */
+  FOLLY_NODISCARD virtual const std::shared_ptr<
+      const folly::AsyncTransportCertificate>
+  getSelfCertificate() const {
+    return nullptr;
+  }
+
+  /**
+   * Derive exported key material (RFC5705) from the transport's TLS layer, if
+   * the transport is capable.
+   */
+  virtual Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+      const std::string& label,
+      const Optional<folly::ByteRange>& context,
+      uint16_t keyLength) const = 0;
 
   virtual ~QuicSocketLite() = default;
 };

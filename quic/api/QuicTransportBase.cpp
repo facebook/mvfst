@@ -166,10 +166,6 @@ Optional<ConnectionId> QuicTransportBase::getClientChosenDestConnectionId()
   return conn_->clientChosenDestConnectionId;
 }
 
-const folly::SocketAddress& QuicTransportBase::getPeerAddress() const {
-  return conn_->peerAddress;
-}
-
 const folly::SocketAddress& QuicTransportBase::getOriginalPeerAddress() const {
   return conn_->originalPeerAddress;
 }
@@ -3583,25 +3579,6 @@ void QuicTransportBase::pacedWriteDataToSocket() {
   // Do a burst write before waiting for an interval. This will also call
   // updateWriteLooper, but inside FunctionLooper we will ignore that.
   writeSocketDataAndCatch();
-}
-
-folly::Expected<QuicSocket::StreamTransportInfo, LocalErrorCode>
-QuicTransportBase::getStreamTransportInfo(StreamId id) const {
-  if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-  auto packets = getNumPacketsTxWithNewData(*stream);
-  return StreamTransportInfo{
-      stream->totalHolbTime,
-      stream->holbCount,
-      bool(stream->lastHolbTime),
-      packets,
-      stream->streamLossCount,
-      stream->finalWriteOffset,
-      stream->finalReadOffset,
-      stream->streamReadError,
-      stream->streamWriteError};
 }
 
 void QuicTransportBase::describe(std::ostream& os) const {

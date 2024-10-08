@@ -63,8 +63,6 @@ class QuicTransportBase : public QuicSocket,
 
   Optional<ConnectionId> getClientChosenDestConnectionId() const override;
 
-  const folly::SocketAddress& getPeerAddress() const override;
-
   const folly::SocketAddress& getOriginalPeerAddress() const override;
 
   const folly::SocketAddress& getLocalAddress() const override;
@@ -92,9 +90,6 @@ class QuicTransportBase : public QuicSocket,
       StreamId id) const override;
 
   TransportInfo getTransportInfo() const override;
-
-  folly::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
-      StreamId id) const override;
 
   Optional<std::string> getAppProtocol() const override;
 
@@ -851,10 +846,6 @@ class QuicTransportBase : public QuicSocket,
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
-
-  std::
-      unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>
-          conn_;
 
   struct ReadCallbackData {
     ReadCallback* readCb;

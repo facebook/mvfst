@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicTransportBaseLite.h>
+#include <quic/state/QuicStreamFunctions.h>
 
 namespace {
 constexpr auto APP_NO_ERROR = quic::GenericApplicationErrorCode::NO_ERROR;
@@ -49,6 +50,29 @@ void QuicTransportBaseLite::processConnectionCallbacks(QuicError&& cancelCode) {
   } else {
     connCallback_->onConnectionError(std::move(cancelCode));
   }
+}
+
+folly::Expected<QuicSocketLite::StreamTransportInfo, LocalErrorCode>
+QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto packets = getNumPacketsTxWithNewData(*stream);
+  return StreamTransportInfo{
+      stream->totalHolbTime,
+      stream->holbCount,
+      bool(stream->lastHolbTime),
+      packets,
+      stream->streamLossCount,
+      stream->finalWriteOffset,
+      stream->finalReadOffset,
+      stream->streamReadError,
+      stream->streamWriteError};
+}
+
+const folly::SocketAddress& QuicTransportBaseLite::getPeerAddress() const {
+  return conn_->peerAddress;
 }
 
 bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {

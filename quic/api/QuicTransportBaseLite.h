@@ -22,6 +22,15 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
   void setConnectionCallback(
       folly::MaybeManagedPtr<ConnectionCallback> callback) final;
 
+  folly::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
+      StreamId id) const override;
+
+  const QuicConnectionStateBase* getState() const override {
+    return conn_.get();
+  }
+
+  const folly::SocketAddress& getPeerAddress() const override;
+
  protected:
   void resetConnectionCallbacks() {
     connSetupCallback_ = nullptr;
@@ -37,6 +46,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
   folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.
   bool useConnectionEndWithErrorCallback_{false};
+
+  std::
+      unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>
+          conn_;
 };
 
 } // namespace quic
