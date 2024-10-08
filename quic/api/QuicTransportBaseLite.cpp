@@ -6,6 +6,8 @@
  */
 
 #include <quic/api/QuicTransportBaseLite.h>
+#include <quic/api/QuicTransportFunctions.h>
+#include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace {
@@ -104,6 +106,19 @@ uint64_t QuicTransportBaseLite::getConnectionBufferAvailable() const {
   return bufferSpaceAvailable();
 }
 
+folly::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
+QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  return QuicSocketLite::FlowControlState(
+      getSendStreamFlowControlBytesAPI(*stream),
+      stream->flowControlState.peerAdvertisedMaxOffset,
+      getRecvStreamFlowControlBytes(*stream),
+      stream->flowControlState.advertisedMaxOffset);
+}
+
 bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {
   bool noError = false;
   switch (cancelCode.code.type()) {
@@ -125,6 +140,20 @@ bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {
       noError = appErrorCode == APP_NO_ERROR;
   }
   return noError;
+}
+
+uint64_t QuicTransportBaseLite::maxWritableOnConn() const {
+  auto connWritableBytes = getSendConnFlowControlBytesAPI(*conn_);
+  auto availableBufferSpace = bufferSpaceAvailable();
+  uint64_t ret = std::min(connWritableBytes, availableBufferSpace);
+  uint8_t multiplier = conn_->transportSettings.backpressureHeadroomFactor;
+  if (multiplier > 0) {
+    auto headRoom = multiplier * congestionControlWritableBytes(*conn_);
+    auto bufferLen = conn_->flowControlState.sumCurStreamBufferLen;
+    headRoom -= bufferLen > headRoom ? headRoom : bufferLen;
+    ret = std::min(ret, headRoom);
+  }
+  return ret;
 }
 
 } // namespace quic

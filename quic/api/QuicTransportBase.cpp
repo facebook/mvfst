@@ -589,19 +589,6 @@ QuicTransportBase::getConnectionFlowControl() const {
       conn_->flowControlState.advertisedMaxOffset);
 }
 
-folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
-QuicTransportBase::getStreamFlowControl(StreamId id) const {
-  if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-  return QuicSocket::FlowControlState(
-      getSendStreamFlowControlBytesAPI(*stream),
-      stream->flowControlState.peerAdvertisedMaxOffset,
-      getRecvStreamFlowControlBytes(*stream),
-      stream->flowControlState.advertisedMaxOffset);
-}
-
 folly::Expected<uint64_t, LocalErrorCode>
 QuicTransportBase::getMaxWritableOnStream(StreamId id) const {
   if (!conn_->streamManager->streamExists(id)) {
@@ -2187,20 +2174,6 @@ uint64_t QuicTransportBase::maxWritableOnStream(
   auto connWritableBytes = maxWritableOnConn();
   auto streamFlowControlBytes = getSendStreamFlowControlBytesAPI(stream);
   return std::min(streamFlowControlBytes, connWritableBytes);
-}
-
-uint64_t QuicTransportBase::maxWritableOnConn() const {
-  auto connWritableBytes = getSendConnFlowControlBytesAPI(*conn_);
-  auto availableBufferSpace = bufferSpaceAvailable();
-  uint64_t ret = std::min(connWritableBytes, availableBufferSpace);
-  uint8_t multiplier = conn_->transportSettings.backpressureHeadroomFactor;
-  if (multiplier > 0) {
-    auto headRoom = multiplier * congestionControlWritableBytes(*conn_);
-    auto bufferLen = conn_->flowControlState.sumCurStreamBufferLen;
-    headRoom -= bufferLen > headRoom ? headRoom : bufferLen;
-    ret = std::min(ret, headRoom);
-  }
-  return ret;
 }
 
 QuicSocket::WriteResult QuicTransportBase::writeChain(

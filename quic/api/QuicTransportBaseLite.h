@@ -59,6 +59,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
 
   uint64_t getConnectionBufferAvailable() const override;
 
+  folly::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
+  getStreamFlowControl(StreamId id) const override;
+
+  [[nodiscard]] uint64_t maxWritableOnConn() const override;
+
  protected:
   void resetConnectionCallbacks() {
     connSetupCallback_ = nullptr;

@@ -11,6 +11,8 @@
 #include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicException.h>
 #include <quic/codec/Types.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
+#include <quic/handshake/TransportParameters.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -203,6 +205,41 @@ class QuicSocketLite {
   };
 
   /**
+   * Get the flow control settings for the given stream (or connection flow
+   * control by passing id=0).  Settings include send and receive window
+   * capacity and available.
+   */
+  struct FlowControlState {
+    // Number of bytes the peer has allowed me to send.
+    uint64_t sendWindowAvailable;
+    // The max offset provided by the peer.
+    uint64_t sendWindowMaxOffset;
+    // Number of bytes I have allowed the peer to send.
+    uint64_t receiveWindowAvailable;
+    // The max offset I have provided to the peer.
+    uint64_t receiveWindowMaxOffset;
+
+    FlowControlState(
+        uint64_t sendWindowAvailableIn,
+        uint64_t sendWindowMaxOffsetIn,
+        uint64_t receiveWindowAvailableIn,
+        uint64_t receiveWindowMaxOffsetIn)
+        : sendWindowAvailable(sendWindowAvailableIn),
+          sendWindowMaxOffset(sendWindowMaxOffsetIn),
+          receiveWindowAvailable(receiveWindowAvailableIn),
+          receiveWindowMaxOffset(receiveWindowMaxOffsetIn) {}
+  };
+
+  /**
+   * Application can invoke this function to signal the transport to
+   * initiate migration.
+   * @param socket The new socket that should be used by the transport.
+   * If this is null then do not replace the underlying socket.
+   */
+  virtual void onNetworkSwitch(std::unique_ptr<QuicAsyncUDPSocket> /*unused*/) {
+  }
+
+  /**
    * Determine if transport is open and ready to read or write.
    *
    * return true iff the transport is open and ready, false otherwise.
@@ -306,6 +343,24 @@ class QuicSocketLite {
    * Return the amount of transport buffer space available for writing
    */
   virtual uint64_t getConnectionBufferAvailable() const = 0;
+
+  // Returns none before the handshake is complete, otherwise is always
+  // non-empty.
+  virtual Optional<std::vector<TransportParameter>> getPeerTransportParams()
+      const = 0;
+
+  /**
+   * Returns the current flow control windows for the stream, id != 0.
+   * Use getConnectionFlowControl for connection flow control window.
+   */
+  virtual folly::Expected<FlowControlState, LocalErrorCode>
+  getStreamFlowControl(StreamId id) const = 0;
+
+  /**
+   * Similar to getMaxWritableOnStream() above, but returns the value for the
+   * whole connection.
+   */
+  [[nodiscard]] virtual uint64_t maxWritableOnConn() const = 0;
 
   virtual ~QuicSocketLite() = default;
 };

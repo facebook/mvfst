@@ -86,13 +86,8 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const override;
 
-  folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
-  getStreamFlowControl(StreamId id) const override;
-
   folly::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
       StreamId id) const override;
-
-  [[nodiscard]] uint64_t maxWritableOnConn() const override;
 
   folly::Expected<folly::Unit, LocalErrorCode> setConnectionFlowControlWindow(
       uint64_t windowSize) override;
