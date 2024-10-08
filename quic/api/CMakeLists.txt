@@ -47,6 +47,7 @@ add_library(
   QuicPacketScheduler.cpp
   QuicStreamAsyncTransport.cpp
   QuicTransportBase.cpp
+  QuicTransportBaseLite.cpp
   QuicTransportFunctions.cpp
 )
 
