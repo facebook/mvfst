@@ -412,6 +412,8 @@ struct TransportSettings {
   bool cloneAllPacketsWithCryptoFrame{false};
   // Always send multiple PTOs even if we don't have multiple packets.
   bool alwaysPtoMultiple{false};
+  // Use a reordering threshold heuristic of inflight / 2.
+  bool useInflightReorderingThreshold{false};
 };
 
 } // namespace quic

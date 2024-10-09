@@ -5164,6 +5164,25 @@ TEST_F(QuicServerTransportTest, TestAutotuneStreamFlowControlKnobHandler) {
   EXPECT_FALSE(transportSettings.autotuneReceiveStreamFlowControl);
 }
 
+TEST_F(QuicServerTransportTest, TestInflightReorderingThreshold) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  // autotuneReceiveStreamFlowControl is disabled by default
+  ASSERT_FALSE(transportSettings.useInflightReorderingThreshold);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
+        uint64_t(1)}});
+  EXPECT_TRUE(transportSettings.useInflightReorderingThreshold);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
+        uint64_t(0)}});
+  EXPECT_FALSE(transportSettings.useInflightReorderingThreshold);
+}
+
 TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
   auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();

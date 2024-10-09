@@ -351,7 +351,15 @@ bool processOutstandingsForLoss(
 
     bool lostByTimeout = (lossTime - pkt.metadata.time) > delayUntilLost;
     const auto reorderDistance = largestAckedForComparison - currentPacketNum;
-    bool lostByReorder = reorderDistance > conn.lossState.reorderingThreshold;
+    auto reorderingThreshold = conn.lossState.reorderingThreshold;
+
+    if (conn.transportSettings.useInflightReorderingThreshold) {
+      reorderingThreshold = std::max(
+          conn.lossState.reorderingThreshold,
+          std::min<uint32_t>(
+              conn.outstandings.numOutstanding() / 2, kMaxReorderingThreshold));
+    }
+    bool lostByReorder = reorderDistance > reorderingThreshold;
 
     if (!(lostByTimeout || lostByReorder)) {
       shouldSetTimer = true;

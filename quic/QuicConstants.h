@@ -200,7 +200,9 @@ BETTER_ENUM(
     // Controls new stream blocked condition.
     USE_NEW_STREAM_BLOCKED_CONDITION = 0x10008,
     // Controls autotune flow control on streams.
-    AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009)
+    AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009,
+    // Controls whether to use the inflight reordering heuristic.
+    INFLIGHT_REORDERING_THRESHOLD = 0x1000A)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
@@ -396,6 +398,7 @@ constexpr std::chrono::microseconds kDefaultInitialRtt = 50000us;
 constexpr std::chrono::microseconds kGranularity = 10000us;
 
 constexpr uint32_t kReorderingThreshold = 3;
+constexpr uint32_t kMaxReorderingThreshold = 256;
 
 // Current draft has 9 / 8. But our friends at Google told us they saw
 // improvement with 5 / 4. Our tests also showed reduced retransmission with

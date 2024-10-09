@@ -1151,6 +1151,19 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "AUTOTUNE_RECV_STREAM_FLOW_CONTROL KnobParam received: "
                 << autotuneReceiveStreamFlowControl;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        bool inflightReorderingThreshold =
+            static_cast<bool>(std::get<uint64_t>(value));
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.useInflightReorderingThreshold =
+            inflightReorderingThreshold;
+        VLOG(3) << "INFLIGHT_REORDERING_THRESHOLD KnobParam received: "
+                << inflightReorderingThreshold;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
