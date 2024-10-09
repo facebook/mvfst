@@ -176,9 +176,7 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
       case QuicWriteFrame::Type::PingFrame: {
         const PingFrame& pingFrame = *frame.asPingFrame();
         writeSuccess = writeFrame(pingFrame, builder_) != 0;
-        if (conn_.transportSettings.ptoPingFrames) {
-          notPureAck |= writeSuccess;
-        }
+        notPureAck |= writeSuccess;
         break;
       }
       case QuicWriteFrame::Type::QuicSimpleFrame: {

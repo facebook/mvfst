@@ -206,21 +206,8 @@ class QuicTransportFunctionsTest : public Test {
   std::unique_ptr<MockQuicStats> quicStats_;
 };
 
-TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPList) {
-  auto conn = createConn();
-  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  packet.packet.frames.push_back(PingFrame());
-  EXPECT_EQ(0, conn->outstandings.packets.size());
-  updateConnection(
-      *conn, none, packet.packet, Clock::now(), 50, 0, false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.packets.size());
-  // But it won't set loss detection alarm
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-}
-
 TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
   auto conn = createConn();
-  conn->transportSettings.ptoPingFrames = true;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(PingFrame());
   EXPECT_EQ(0, conn->outstandings.packets.size());

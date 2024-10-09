@@ -522,30 +522,6 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   EXPECT_EQ(1, conn.outstandings.numClonedPackets());
 }
 
-TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
-  RegularQuicPacketBuilder regularBuilder(
-      kDefaultUDPSendPacketLen, std::move(shortHeader1), 0);
-  regularBuilder.encodePacketHeader();
-  PingFrame pingFrame;
-  writeFrame(pingFrame, regularBuilder);
-  auto packet = std::move(regularBuilder).buildPacket();
-  auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 50);
-  EXPECT_EQ(1, outstandingPacket.packet.frames.size());
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  ShortHeader shortHeader2(
-      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
-  RegularQuicPacketBuilder regularBuilder2(
-      kDefaultUDPSendPacketLen, std::move(shortHeader2), 0);
-  regularBuilder2.encodePacketHeader();
-  PacketRebuilder rebuilder(regularBuilder2, conn);
-  EXPECT_EQ(none, rebuilder.rebuildFromPacket(outstandingPacket));
-  EXPECT_FALSE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
-  EXPECT_EQ(0, conn.outstandings.numClonedPackets());
-}
-
 TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
   ShortHeader shortHeader1(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
@@ -559,7 +535,6 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
   EXPECT_EQ(1, outstandingPacket.packet.frames.size());
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.transportSettings.ptoPingFrames = true;
   ShortHeader shortHeader2(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(

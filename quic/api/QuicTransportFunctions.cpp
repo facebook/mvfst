@@ -801,9 +801,7 @@ void updateConnection(
       case QuicWriteFrame::Type::PingFrame:
         conn.pendingEvents.sendPing = false;
         isPing = true;
-        if (conn.transportSettings.ptoPingFrames) {
-          retransmittable = true;
-        }
+        retransmittable = true;
         conn.numPingFramesSent++;
         break;
       case QuicWriteFrame::Type::QuicSimpleFrame: {
