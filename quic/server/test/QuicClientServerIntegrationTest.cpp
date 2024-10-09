@@ -152,8 +152,6 @@ TEST_F(ServerTransportParameters, InvariantlyAdvertisedParameters) {
     auto param = findParameter(serverTransportParams->parameters, paramId);
     EXPECT_NE(param, serverTransportParams->parameters.end());
   }
-
-  client_.reset();
 }
 
 TEST_F(ServerTransportParameters, DatagramTestDisabled) {
@@ -176,7 +174,6 @@ TEST_F(ServerTransportParameters, DatagramTestDisabled) {
       TransportParameterId::max_datagram_frame_size,
       serverTransportParams->parameters);
   EXPECT_FALSE(param.has_value());
-  client_.reset();
 }
 
 TEST_F(ServerTransportParameters, DatagramTestEnabled) {
