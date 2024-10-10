@@ -231,6 +231,233 @@ class QuicSocketLite {
   };
 
   /**
+   * ===== Read API ====
+   */
+
+  /**
+   * Callback class for receiving data on a stream
+   */
+  class ReadCallback {
+   public:
+    virtual ~ReadCallback() = default;
+
+    /**
+     * Called from the transport layer when there is data, EOF or an error
+     * available to read on the given stream ID
+     */
+    virtual void readAvailable(StreamId id) noexcept = 0;
+
+    /*
+     * Same as above, but called on streams within a group.
+     */
+    virtual void readAvailableWithGroup(StreamId, StreamGroupId) noexcept {}
+
+    /**
+     * Called from the transport layer when there is an error on the stream.
+     */
+    virtual void readError(StreamId id, QuicError error) noexcept = 0;
+
+    /**
+     * Same as above, but called on streams within a group.
+     */
+    virtual void
+    readErrorWithGroup(StreamId, StreamGroupId, QuicError) noexcept {}
+  };
+
+  /**
+   * ===== Peek/Consume API =====
+   */
+
+  /**
+   * Usage:
+   * class Application {
+   *   void onNewBidirectionalStream(StreamId id) {
+   *     socket_->setPeekCallback(id, this);
+   *   }
+   *
+   *   virtual void onDataAvailable(
+   *       StreamId id,
+   *       const folly::Range<PeekIterator>& peekData) noexcept override
+   *   {
+   *     auto amount = tryInterpret(peekData);
+   *     if (amount) {
+   *       socket_->consume(id, amount);
+   *     }
+   *   }
+   * };
+   */
+
+  using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
+  class PeekCallback {
+   public:
+    virtual ~PeekCallback() = default;
+
+    /**
+     * Called from the transport layer when there is new data available to
+     * peek on a given stream.
+     * Callback can be called multiple times and it is up to application to
+     * de-dupe already peeked ranges.
+     */
+    virtual void onDataAvailable(
+        StreamId id,
+        const folly::Range<PeekIterator>& peekData) noexcept = 0;
+
+    /**
+     * Called from the transport layer during peek time when there is an error
+     * on the stream.
+     */
+    virtual void peekError(StreamId id, QuicError error) noexcept = 0;
+  };
+
+  /**
+   * Structure used to communicate TX and ACK/Delivery notifications.
+   */
+  struct ByteEvent {
+    enum class Type { ACK = 1, TX = 2 };
+    static constexpr std::array<Type, 2> kByteEventTypes = {
+        {Type::ACK, Type::TX}};
+
+    StreamId id{0};
+    uint64_t offset{0};
+    Type type;
+
+    // sRTT at time of event
+    // TODO(bschlinker): Deprecate, caller can fetch transport state if
+    // desired.
+    std::chrono::microseconds srtt{0us};
+  };
+
+  /**
+   * Structure used to communicate cancellation of a ByteEvent.
+   *
+   * According to Dictionary.com, cancellation is more frequent in American
+   * English than cancellation. Yet in American English, the preferred style is
+   * typically not to double the final L, so cancel generally becomes canceled.
+   */
+  using ByteEventCancellation = ByteEvent;
+
+  /**
+   * Callback class for receiving byte event (TX/ACK) notifications.
+   */
+  class ByteEventCallback {
+   public:
+    virtual ~ByteEventCallback() = default;
+
+    /**
+     * Invoked when a byte event has been successfully registered.
+     * Since this is a convenience notification and not a mandatory callback,
+     * not marking this as pure virtual.
+     */
+    virtual void onByteEventRegistered(ByteEvent /* byteEvent */) {}
+
+    /**
+     * Invoked when the byte event has occurred.
+     */
+    virtual void onByteEvent(ByteEvent byteEvent) = 0;
+
+    /**
+     * Invoked if byte event is canceled due to reset, shutdown, or other error.
+     */
+    virtual void onByteEventCanceled(ByteEventCancellation cancellation) = 0;
+  };
+
+  /**
+   * Register a byte event to be triggered when specified event type occurs for
+   * the specified stream and offset.
+   *
+   * If the registration fails, the callback (ByteEventCallback* cb) will NEVER
+   * be invoked for anything. If the registration succeeds, the callback is
+   * guaranteed to receive an onByteEventRegistered() notification.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  registerByteEventCallback(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const uint64_t offset,
+      ByteEventCallback* cb) = 0;
+
+  /**
+   * ===== Datagram API =====
+   *
+   * Datagram support is experimental. Currently there isn't delivery callback
+   * or loss notification support for Datagram.
+   */
+
+  class DatagramCallback {
+   public:
+    virtual ~DatagramCallback() = default;
+
+    /**
+     * Notifies the DatagramCallback that datagrams are available for read.
+     */
+    virtual void onDatagramsAvailable() noexcept = 0;
+  };
+
+  /**
+   * Callback class for receiving write readiness notifications
+   */
+  class WriteCallback {
+   public:
+    virtual ~WriteCallback() = default;
+
+    /**
+     * Invoked when stream is ready to write after notifyPendingWriteOnStream
+     * has previously been called.
+     *
+     * maxToSend represents the amount of data that the transport layer expects
+     * to write to the network during this event loop, eg:
+     *   min(remaining flow control, remaining send buffer space)
+     */
+    virtual void onStreamWriteReady(
+        StreamId /* id */,
+        uint64_t /* maxToSend */) noexcept {}
+
+    /**
+     * Invoked when connection is ready to write after
+     * notifyPendingWriteOnConnection has previously been called.
+     *
+     * maxToSend represents the amount of data that the transport layer expects
+     * to write to the network during this event loop, eg:
+     *   min(remaining flow control, remaining send buffer space)
+     */
+    virtual void onConnectionWriteReady(uint64_t /* maxToSend */) noexcept {}
+
+    /**
+     * Invoked when a connection is being torn down after
+     * notifyPendingWriteOnStream has been called
+     */
+    virtual void onStreamWriteError(
+        StreamId /* id */,
+        QuicError /* error */) noexcept {}
+
+    /**
+     * Invoked when a connection is being torn down after
+     * notifyPendingWriteOnConnection has been called
+     */
+    virtual void onConnectionWriteError(QuicError
+                                        /* error */) noexcept {}
+  };
+
+  /**
+   * Inform the transport that there is data to write on this connection
+   * An app shouldn't mix connection and stream calls to this API
+   * Use this if the app wants to do prioritization.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  notifyPendingWriteOnConnection(WriteCallback* wcb) = 0;
+
+  /**
+   * Inform the transport that there is data to write on a given stream.
+   * An app shouldn't mix connection and stream calls to this API
+   * Use the Connection call if the app wants to do prioritization.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) = 0;
+
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+      unregisterStreamWriteCallback(StreamId) = 0;
+
+  /**
    * Application can invoke this function to signal the transport to
    * initiate migration.
    * @param socket The new socket that should be used by the transport.

@@ -357,7 +357,7 @@ class TestQuicTransport
     return conn_->oneRttWriteCipher != nullptr;
   }
 
-  std::shared_ptr<QuicTransportBase> sharedGuard() override {
+  std::shared_ptr<QuicTransportBaseLite> sharedGuard() override {
     return shared_from_this();
   }
 

@@ -387,7 +387,7 @@ bool QuicServerTransport::hasReadCipher() const {
       conn_->readCodec->getOneRttReadCipher() != nullptr;
 }
 
-std::shared_ptr<QuicTransportBase> QuicServerTransport::sharedGuard() {
+std::shared_ptr<QuicTransportBaseLite> QuicServerTransport::sharedGuard() {
   return shared_from_this();
 }
 

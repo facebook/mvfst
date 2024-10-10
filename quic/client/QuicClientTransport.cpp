@@ -1065,7 +1065,7 @@ bool QuicClientTransport::hasWriteCipher() const {
   return clientConn_->oneRttWriteCipher || clientConn_->zeroRttWriteCipher;
 }
 
-std::shared_ptr<QuicTransportBase> QuicClientTransport::sharedGuard() {
+std::shared_ptr<QuicTransportBaseLite> QuicClientTransport::sharedGuard() {
   return shared_from_this();
 }
 

@@ -12,7 +12,6 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/api/QuicTransportBaseLite.h>
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/common/FunctionLooper.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/common/events/QuicTimer.h>
@@ -37,8 +36,7 @@ namespace quic {
  */
 class QuicTransportBase : public QuicSocket,
                           public QuicTransportBaseLite,
-                          QuicStreamPrioritiesObserver,
-                          QuicAsyncUDPSocket::WriteCallback {
+                          QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
       std::shared_ptr<QuicEventBase> evb,
@@ -46,10 +44,6 @@ class QuicTransportBase : public QuicSocket,
       bool useConnectionEndWithErrorCallback = false);
 
   ~QuicTransportBase() override;
-
-  void scheduleTimeout(
-      QuicTimerCallback* callback,
-      std::chrono::milliseconds timeout);
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
@@ -154,16 +148,6 @@ class QuicTransportBase : public QuicSocket,
   bool isBidirectionalStream(StreamId stream) noexcept override;
   StreamDirectionality getStreamDirectionality(
       StreamId stream) noexcept override;
-
-  folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
-      StreamId id,
-      QuicSocket::WriteCallback* wcb) override;
-
-  folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnConnection(
-      QuicSocket::WriteCallback* wcb) override;
-
-  folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
-      StreamId id) override;
 
   WriteResult writeChain(
       StreamId id,
@@ -282,12 +266,6 @@ class QuicTransportBase : public QuicSocket,
    */
   virtual void unbindConnection() = 0;
 
-  /**
-   * Returns a shared_ptr which can be used as a guard to keep this
-   * object alive.
-   */
-  virtual std::shared_ptr<QuicTransportBase> sharedGuard() = 0;
-
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
       Priority priority) override;
@@ -315,16 +293,6 @@ class QuicTransportBase : public QuicSocket,
    * triggered by socket/NIC software or hardware timestamps.
    */
   folly::Expected<folly::Unit, LocalErrorCode> registerTxCallback(
-      const StreamId id,
-      const uint64_t offset,
-      ByteEventCallback* cb) override;
-
-  /**
-   * Register a byte event to be triggered when specified event type occurs for
-   * the specified stream and offset.
-   */
-  folly::Expected<folly::Unit, LocalErrorCode> registerByteEventCallback(
-      const ByteEvent::Type type,
       const StreamId id,
       const uint64_t offset,
       ByteEventCallback* cb) override;
@@ -404,28 +372,6 @@ class QuicTransportBase : public QuicSocket,
    */
   virtual void createBufAccessor(size_t /* capacity */) {}
 
-  // Timeout functions
-  class LossTimeout : public QuicTimerCallback {
-   public:
-    ~LossTimeout() override = default;
-
-    explicit LossTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->lossTimeoutExpired();
-    }
-
-    virtual void callbackCanceled() noexcept override {
-      // ignore. this usually means that the eventbase is dying, so we will be
-      // canceled anyway
-      return;
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
   class AckTimeout : public QuicTimerCallback {
    public:
     ~AckTimeout() override = default;
@@ -466,26 +412,6 @@ class QuicTransportBase : public QuicSocket,
     QuicTransportBase* transport_;
   };
 
-  class ExcessWriteTimeout : public QuicTimerCallback {
-   public:
-    ~ExcessWriteTimeout() override = default;
-
-    explicit ExcessWriteTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->excessWriteTimeoutExpired();
-    }
-
-    void callbackCanceled() noexcept override {
-      // Do nothing.
-      return;
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
   class PathValidationTimeout : public QuicTimerCallback {
    public:
     ~PathValidationTimeout() override = default;
@@ -501,27 +427,6 @@ class QuicTransportBase : public QuicSocket,
       // ignore. this usually means that the eventbase is dying, so we will be
       // canceled anyway
       return;
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
-  class IdleTimeout : public QuicTimerCallback {
-   public:
-    ~IdleTimeout() override = default;
-
-    explicit IdleTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->idleTimeoutExpired(true /* drain */);
-    }
-
-    void callbackCanceled() noexcept override {
-      // skip drain when canceling the timeout, to avoid scheduling a new
-      // drain timeout
-      transport_->idleTimeoutExpired(false /* drain */);
     }
 
    private:
@@ -564,8 +469,6 @@ class QuicTransportBase : public QuicSocket,
     QuicTransportBase* transport_;
   };
 
-  void scheduleLossTimeout(std::chrono::milliseconds timeout) override;
-  void cancelLossTimeout() override;
   bool isLossTimeoutScheduled() override; // TODO: make this const again
 
   // If you don't set it, the default is Cubic
@@ -575,8 +478,6 @@ class QuicTransportBase : public QuicSocket,
       std::shared_ptr<PacketProcessor> packetProcessor) override;
   void setThrottlingSignalProvider(
       std::shared_ptr<ThrottlingSignalProvider>) override;
-
-  void describe(std::ostream& os) const;
 
   virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
 
@@ -651,13 +552,11 @@ class QuicTransportBase : public QuicSocket,
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);
   void updateSocketTosSettings(uint8_t dscpValue);
-  void processCallbacksAfterWriteData();
+  void processCallbacksAfterWriteData() override;
   void processCallbacksAfterNetworkData();
-  void invokeReadDataAndCallbacks();
-  void invokePeekDataAndCallbacks();
   void invokeStreamsAvailableCallbacks();
-  void updateReadLooper();
-  void updatePeekLooper();
+  void updateReadLooper() override;
+  void updatePeekLooper() override;
   void updateWriteLooper(bool thisIteration, bool runInline = false) override;
   void handlePingCallbacks();
   void handleKnobCallbacks();
@@ -680,13 +579,10 @@ class QuicTransportBase : public QuicSocket,
 
   void cleanupAckEventState();
 
-  void runOnEvbAsync(
-      folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);
-
   void closeImpl(
       Optional<QuicError> error,
       bool drainConnection = true,
-      bool sendCloseImmediately = true);
+      bool sendCloseImmediately = true) override;
   void closeUdpSocket();
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
@@ -694,7 +590,7 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumePeek(
       StreamId id,
       bool resume);
-  void checkForClosedStream();
+  void checkForClosedStream() override;
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
       ReadCallback* cb,
@@ -706,35 +602,11 @@ class QuicTransportBase : public QuicSocket,
       bool bidirectional,
       const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
-  /**
-   * A wrapper around writeSocketData
-   *
-   * writeSocketDataAndCatch protects writeSocketData in a try-catch. It also
-   * dispatch the next write loop.
-   */
-  void writeSocketDataAndCatch();
-
-  /**
-   * Paced write data to socket when connection is paced.
-   *
-   * Whether connection is paced will be decided by TransportSettings and
-   * congection controller. When the connection is paced, this function writes
-   * out a burst size of packets and let the writeLooper schedule a callback to
-   * write another burst after a pacing interval if there are more data to
-   * write. When the connection isn't paced, this function does a normal write.
-   */
-  void pacedWriteDataToSocket();
-
-  uint64_t maxWritableOnStream(const QuicStreamState&) const;
-
-  void lossTimeoutExpired() noexcept;
   void ackTimeoutExpired() noexcept;
   void pathValidationTimeoutExpired() noexcept;
-  void idleTimeoutExpired(bool drain) noexcept;
   void keepaliveTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
-  void excessWriteTimeoutExpired() noexcept;
 
   void setIdleTimer() override;
   void scheduleAckTimeout() override;
@@ -758,18 +630,6 @@ class QuicTransportBase : public QuicSocket,
    * Callback when we receive a transport knob
    */
   virtual void onTransportKnobs(Buf knobBlob);
-
-  struct ByteEventDetail {
-    ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
-        : offset(offsetIn), callback(callbackIn) {}
-    uint64_t offset;
-    ByteEventCallback* callback;
-  };
-
-  using ByteEventMap = folly::F14FastMap<StreamId, std::deque<ByteEventDetail>>;
-  ByteEventMap& getByteEventMap(const ByteEvent::Type type);
-  FOLLY_NODISCARD const ByteEventMap& getByteEventMapConst(
-      const ByteEvent::Type type) const;
 
   /**
    * Helper function that calls passed function for each ByteEvent type.
@@ -796,51 +656,21 @@ class QuicTransportBase : public QuicSocket,
    */
   Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
-  struct ReadCallbackData {
-    ReadCallback* readCb;
-    bool resumed{true};
-    bool deliveredEOM{false};
-
-    ReadCallbackData(ReadCallback* readCallback) : readCb(readCallback) {}
-  };
-
-  struct PeekCallbackData {
-    PeekCallback* peekCb;
-    bool resumed{true};
-
-    PeekCallbackData(PeekCallback* peekCallback) : peekCb(peekCallback) {}
-  };
-
-  folly::F14FastMap<StreamId, ReadCallbackData> readCallbacks_;
-  folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
-
-  ByteEventMap deliveryCallbacks_;
-  ByteEventMap txCallbacks_;
-
-  DatagramCallback* datagramCallback_{nullptr};
   PingCallback* pingCallback_{nullptr};
 
-  QuicSocket::WriteCallback* connWriteCallback_{nullptr};
-  std::map<StreamId, QuicSocket::WriteCallback*> pendingWriteCallbacks_;
   bool handshakeDoneNotified_{false};
 
-  LossTimeout lossTimeout_;
   AckTimeout ackTimeout_;
   PathValidationTimeout pathValidationTimeout_;
-  IdleTimeout idleTimeout_;
   KeepaliveTimeout keepaliveTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
-  ExcessWriteTimeout excessWriteTimeout_;
   FunctionLooper::Ptr readLooper_;
   FunctionLooper::Ptr peekLooper_;
-  FunctionLooper::Ptr writeLooper_;
 
   // TODO: This is silly. We need a better solution.
   // Uninitialied local address as a fallback answer when socket isn't bound.
   folly::SocketAddress localFallbackAddress;
-
-  Optional<std::string> exceptionCloseWhat_;
 
   uint64_t qlogRefcnt_{0};
 
@@ -908,10 +738,6 @@ class QuicTransportBase : public QuicSocket,
   };
 
  protected:
-  void cancelTimeout(QuicTimerCallback* callback);
-
-  bool isTimeoutScheduled(QuicTimerCallback* callback) const;
-
   /**
    * Helper function to validate that the number of ECN packet marks match the
    * expected value, depending on the ECN state of the connection.
@@ -934,19 +760,6 @@ class QuicTransportBase : public QuicSocket,
       uint64_t packetLimit);
 
   void onSocketWritable() noexcept override;
-  void maybeStopWriteLooperAndArmSocketWritableEvent();
-
-  /**
-   * Checks the idle timer on write events, and if it's past the idle timeout,
-   * calls the timer finctions.
-   */
-  void checkIdleTimer(TimePoint now);
-  struct IdleTimeoutCheck {
-    std::chrono::milliseconds idleTimeoutMs{0};
-    Optional<TimePoint> lastTimeIdleTimeoutScheduled_;
-    bool forcedIdleTimeoutScheduled_{false};
-  };
-  IdleTimeoutCheck idleTimeoutCheck_;
 
  private:
   /**
@@ -971,7 +784,5 @@ class QuicTransportBase : public QuicSocket,
    */
   [[nodiscard]] bool checkCustomRetransmissionProfilesEnabled() const;
 };
-
-std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
 
 } // namespace quic

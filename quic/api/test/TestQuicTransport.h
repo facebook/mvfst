@@ -124,7 +124,7 @@ class TestQuicTransport
     return true;
   }
 
-  std::shared_ptr<QuicTransportBase> sharedGuard() override {
+  std::shared_ptr<QuicTransportBaseLite> sharedGuard() override {
     return shared_from_this();
   }
 

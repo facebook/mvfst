@@ -8,12 +8,14 @@
 #pragma once
 
 #include <quic/api/QuicSocketLite.h>
+#include <quic/common/FunctionLooper.h>
 
 namespace quic {
 
 enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
 
-class QuicTransportBaseLite : virtual public QuicSocketLite {
+class QuicTransportBaseLite : virtual public QuicSocketLite,
+                              QuicAsyncUDPSocket::WriteCallback {
  public:
   QuicTransportBaseLite(
       std::shared_ptr<QuicEventBase> evb,
@@ -21,7 +23,14 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
       bool useConnectionEndWithErrorCallback)
       : evb_(evb),
         socket_(std::move(socket)),
-        useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback) {}
+        useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),
+        lossTimeout_(this),
+        excessWriteTimeout_(this),
+        idleTimeout_(this),
+        writeLooper_(new FunctionLooper(
+            evb_,
+            [this]() { pacedWriteDataToSocket(); },
+            LooperType::WriteLooper)) {}
 
   /**
    * Invoked when we have to write some data to the wire.
@@ -30,6 +39,26 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
    * connection will be closed.
    */
   virtual void writeData() = 0;
+
+  folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
+      StreamId id,
+      QuicSocketLite::WriteCallback* wcb) override;
+
+  folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnConnection(
+      QuicSocketLite::WriteCallback* wcb) override;
+
+  folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
+      StreamId id) override;
+
+  /**
+   * Register a byte event to be triggered when specified event type occurs for
+   * the specified stream and offset.
+   */
+  folly::Expected<folly::Unit, LocalErrorCode> registerByteEventCallback(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const uint64_t offset,
+      ByteEventCallback* cb) override;
 
   bool good() const override;
 
@@ -54,6 +83,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
   void setSendBuffer(StreamId, size_t /*maxUnacked*/, size_t /*maxUnsent*/)
       override {}
 
+  uint64_t maxWritableOnStream(const QuicStreamState&) const;
+
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
 
   folly::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
@@ -74,15 +105,76 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
 
   [[nodiscard]] uint64_t maxWritableOnConn() const override;
 
-  virtual void scheduleLossTimeout(std::chrono::milliseconds /* timeout */) {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void scheduleTimeout(
+      QuicTimerCallback* callback,
+      std::chrono::milliseconds timeout);
 
-  virtual void cancelLossTimeout() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  class ExcessWriteTimeout : public QuicTimerCallback {
+   public:
+    ~ExcessWriteTimeout() override = default;
+
+    explicit ExcessWriteTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->excessWriteTimeoutExpired();
+    }
+
+    void callbackCanceled() noexcept override {
+      // Do nothing.
+      return;
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
+  // Timeout functions
+  class LossTimeout : public QuicTimerCallback {
+   public:
+    ~LossTimeout() override = default;
+
+    explicit LossTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->lossTimeoutExpired();
+    }
+
+    virtual void callbackCanceled() noexcept override {
+      // ignore. this usually means that the eventbase is dying, so we will be
+      // canceled anyway
+      return;
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
+  class IdleTimeout : public QuicTimerCallback {
+   public:
+    ~IdleTimeout() override = default;
+
+    explicit IdleTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->idleTimeoutExpired(true /* drain */);
+    }
+
+    void callbackCanceled() noexcept override {
+      // skip drain when canceling the timeout, to avoid scheduling a new
+      // drain timeout
+      transport_->idleTimeoutExpired(false /* drain */);
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
+  void scheduleLossTimeout(std::chrono::milliseconds timeout);
+
+  void cancelLossTimeout();
 
   virtual bool isLossTimeoutScheduled() {
     // TODO: Fill this in from QuicTransportBase and remove the "virtual"
@@ -90,7 +182,34 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
     return false;
   }
 
+  /**
+   * Returns a shared_ptr which can be used as a guard to keep this
+   * object alive.
+   */
+  virtual std::shared_ptr<QuicTransportBaseLite> sharedGuard() = 0;
+
+  void describe(std::ostream& os) const;
+
  protected:
+  /**
+   * A wrapper around writeSocketData
+   *
+   * writeSocketDataAndCatch protects writeSocketData in a try-catch. It also
+   * dispatch the next write loop.
+   */
+  void writeSocketDataAndCatch();
+
+  /**
+   * Paced write data to socket when connection is paced.
+   *
+   * Whether connection is paced will be decided by TransportSettings and
+   * congection controller. When the connection is paced, this function writes
+   * out a burst size of packets and let the writeLooper schedule a callback to
+   * write another burst after a pacing interval if there are more data to
+   * write. When the connection isn't paced, this function does a normal write.
+   */
+  void pacedWriteDataToSocket();
+
   /**
    * write data to socket
    *
@@ -101,12 +220,51 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
    */
   void writeSocketData();
 
+  virtual void closeImpl(
+      Optional<QuicError> /* error */,
+      bool /* drainConnection */ = true,
+      bool /* sendCloseImmediately */ = true) {
+    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
+    // qualifier
+  }
+
+  void runOnEvbAsync(
+      folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
+
   virtual void updateWriteLooper(
       bool /* thisIteration */,
       bool /* runInline */ = false) {
     // TODO: Fill this in from QuicTransportBase and remove the "virtual"
     // qualifier
   }
+
+  virtual void updateReadLooper() {
+    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
+    // qualifier
+  }
+
+  virtual void updatePeekLooper() {
+    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
+    // qualifier
+  }
+
+  void maybeStopWriteLooperAndArmSocketWritableEvent();
+
+  virtual void checkForClosedStream() {
+    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
+    // qualifier
+  }
+
+  void cancelTimeout(QuicTimerCallback* callback);
+
+  void excessWriteTimeoutExpired() noexcept;
+  void lossTimeoutExpired() noexcept;
+  void idleTimeoutExpired(bool drain) noexcept;
+
+  bool isTimeoutScheduled(QuicTimerCallback* callback) const;
+
+  void invokeReadDataAndCallbacks();
+  void invokePeekDataAndCallbacks();
 
   // Helpers to notify all registered observers about specific events during
   // socket write (if enabled in the observer's config).
@@ -122,6 +280,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
     // qualifier
   }
   virtual void notifyAppRateLimited() {
+    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
+    // qualifier
+  }
+
+  virtual void processCallbacksAfterWriteData() {
     // TODO: Fill this in from QuicTransportBase and remove the "virtual"
     // qualifier
   }
@@ -161,6 +324,64 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
 
   bool transportReadyNotified_{false};
 
+  struct ReadCallbackData {
+    ReadCallback* readCb;
+    bool resumed{true};
+    bool deliveredEOM{false};
+
+    ReadCallbackData(ReadCallback* readCallback) : readCb(readCallback) {}
+  };
+
+  struct PeekCallbackData {
+    PeekCallback* peekCb;
+    bool resumed{true};
+
+    PeekCallbackData(PeekCallback* peekCallback) : peekCb(peekCallback) {}
+  };
+
+  DatagramCallback* datagramCallback_{nullptr};
+
+  folly::F14FastMap<StreamId, ReadCallbackData> readCallbacks_;
+  folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
+
+  std::map<StreamId, QuicSocketLite::WriteCallback*> pendingWriteCallbacks_;
+  QuicSocketLite::WriteCallback* connWriteCallback_{nullptr};
+
+  struct ByteEventDetail {
+    ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
+        : offset(offsetIn), callback(callbackIn) {}
+    uint64_t offset;
+    ByteEventCallback* callback;
+  };
+
+  using ByteEventMap = folly::F14FastMap<StreamId, std::deque<ByteEventDetail>>;
+  ByteEventMap& getByteEventMap(const ByteEvent::Type type);
+  FOLLY_NODISCARD const ByteEventMap& getByteEventMapConst(
+      const ByteEvent::Type type) const;
+
+  ByteEventMap deliveryCallbacks_;
+  ByteEventMap txCallbacks_;
+
+  /**
+   * Checks the idle timer on write events, and if it's past the idle timeout,
+   * calls the timer finctions.
+   */
+  void checkIdleTimer(TimePoint now);
+  struct IdleTimeoutCheck {
+    std::chrono::milliseconds idleTimeoutMs{0};
+    Optional<TimePoint> lastTimeIdleTimeoutScheduled_;
+    bool forcedIdleTimeoutScheduled_{false};
+  };
+  IdleTimeoutCheck idleTimeoutCheck_;
+
+  LossTimeout lossTimeout_;
+  ExcessWriteTimeout excessWriteTimeout_;
+  IdleTimeout idleTimeout_;
+
+  FunctionLooper::Ptr writeLooper_;
+
+  Optional<std::string> exceptionCloseWhat_;
+
   std::
       unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>
           conn_;
@@ -174,5 +395,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite {
    */
   void updatePacketProcessorsPrewriteRequests();
 };
+
+std::ostream& operator<<(std::ostream& os, const QuicTransportBaseLite& qt);
 
 } // namespace quic

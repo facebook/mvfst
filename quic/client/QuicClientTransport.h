@@ -153,7 +153,7 @@ class QuicClientTransport
   void closeTransport() override;
   void unbindConnection() override;
   bool hasWriteCipher() const override;
-  std::shared_ptr<QuicTransportBase> sharedGuard() override;
+  std::shared_ptr<QuicTransportBaseLite> sharedGuard() override;
 
   // QuicAsyncUDPSocket::ReadCallback
   void onReadClosed() noexcept override {}

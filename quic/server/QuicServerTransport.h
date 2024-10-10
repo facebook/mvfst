@@ -144,7 +144,7 @@ class QuicServerTransport
   void closeTransport() override;
   void unbindConnection() override;
   bool hasWriteCipher() const override;
-  std::shared_ptr<QuicTransportBase> sharedGuard() override;
+  std::shared_ptr<QuicTransportBaseLite> sharedGuard() override;
   QuicConnectionStats getConnectionsStats() const override;
 
   WriteResult writeBufMeta(
