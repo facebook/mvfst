@@ -588,8 +588,7 @@ class TestQuicTransport
     return none;
   }
 
-  void updateWriteLooper(bool thisIteration, bool /* runInline */ = false)
-      override {
+  void updateWriteLooper(bool thisIteration, bool /* runInline */ = false) {
     QuicTransportBase::updateWriteLooper(thisIteration);
   }
 

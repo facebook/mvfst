@@ -433,24 +433,6 @@ class QuicTransportBase : public QuicSocket,
     QuicTransportBase* transport_;
   };
 
-  class KeepaliveTimeout : public QuicTimerCallback {
-   public:
-    ~KeepaliveTimeout() override = default;
-
-    explicit KeepaliveTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->keepaliveTimeoutExpired();
-    }
-    void callbackCanceled() noexcept override {
-      // Specifically do nothing since if we got canceled we shouldn't write.
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
   // DrainTimeout is a bit different from other timeouts. It needs to hold a
   // shared_ptr to the transport, since if a DrainTimeout is scheduled,
   // transport cannot die.
@@ -468,8 +450,6 @@ class QuicTransportBase : public QuicSocket,
    private:
     QuicTransportBase* transport_;
   };
-
-  bool isLossTimeoutScheduled() override; // TODO: make this const again
 
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
@@ -552,12 +532,8 @@ class QuicTransportBase : public QuicSocket,
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);
   void updateSocketTosSettings(uint8_t dscpValue);
-  void processCallbacksAfterWriteData() override;
   void processCallbacksAfterNetworkData();
   void invokeStreamsAvailableCallbacks();
-  void updateReadLooper() override;
-  void updatePeekLooper() override;
-  void updateWriteLooper(bool thisIteration, bool runInline = false) override;
   void handlePingCallbacks();
   void handleKnobCallbacks();
   void handleAckEventCallbacks();
@@ -604,11 +580,9 @@ class QuicTransportBase : public QuicSocket,
 
   void ackTimeoutExpired() noexcept;
   void pathValidationTimeoutExpired() noexcept;
-  void keepaliveTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
 
-  void setIdleTimer() override;
   void scheduleAckTimeout() override;
   void schedulePathValidationTimeout() override;
   void schedulePingTimeout(
@@ -662,11 +636,8 @@ class QuicTransportBase : public QuicSocket,
 
   AckTimeout ackTimeout_;
   PathValidationTimeout pathValidationTimeout_;
-  KeepaliveTimeout keepaliveTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
-  FunctionLooper::Ptr readLooper_;
-  FunctionLooper::Ptr peekLooper_;
 
   // TODO: This is silly. We need a better solution.
   // Uninitialied local address as a fallback answer when socket isn't bound.

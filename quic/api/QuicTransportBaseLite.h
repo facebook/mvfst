@@ -27,10 +27,19 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
         lossTimeout_(this),
         excessWriteTimeout_(this),
         idleTimeout_(this),
+        keepaliveTimeout_(this),
         writeLooper_(new FunctionLooper(
             evb_,
             [this]() { pacedWriteDataToSocket(); },
-            LooperType::WriteLooper)) {}
+            LooperType::WriteLooper)),
+        readLooper_(new FunctionLooper(
+            evb_,
+            [this]() { invokeReadDataAndCallbacks(); },
+            LooperType::ReadLooper)),
+        peekLooper_(new FunctionLooper(
+            evb_,
+            [this]() { invokePeekDataAndCallbacks(); },
+            LooperType::PeekLooper)) {}
 
   /**
    * Invoked when we have to write some data to the wire.
@@ -172,15 +181,29 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     QuicTransportBaseLite* transport_;
   };
 
+  class KeepaliveTimeout : public QuicTimerCallback {
+   public:
+    ~KeepaliveTimeout() override = default;
+
+    explicit KeepaliveTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->keepaliveTimeoutExpired();
+    }
+    void callbackCanceled() noexcept override {
+      // Specifically do nothing since if we got canceled we shouldn't write.
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
 
   void cancelLossTimeout();
 
-  virtual bool isLossTimeoutScheduled() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-    return false;
-  }
+  bool isLossTimeoutScheduled();
 
   /**
    * Returns a shared_ptr which can be used as a guard to keep this
@@ -231,22 +254,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
 
-  virtual void updateWriteLooper(
-      bool /* thisIteration */,
-      bool /* runInline */ = false) {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
-
-  virtual void updateReadLooper() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
-
-  virtual void updatePeekLooper() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void updateWriteLooper(bool thisIteration, bool runInline = false);
+  void updateReadLooper();
+  void updatePeekLooper();
 
   void maybeStopWriteLooperAndArmSocketWritableEvent();
 
@@ -260,6 +270,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void excessWriteTimeoutExpired() noexcept;
   void lossTimeoutExpired() noexcept;
   void idleTimeoutExpired(bool drain) noexcept;
+  void keepaliveTimeoutExpired() noexcept;
 
   bool isTimeoutScheduled(QuicTimerCallback* callback) const;
 
@@ -284,15 +295,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     // qualifier
   }
 
-  virtual void processCallbacksAfterWriteData() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void processCallbacksAfterWriteData();
 
-  virtual void setIdleTimer() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void setIdleTimer();
   virtual void scheduleAckTimeout() {
     // TODO: Fill this in from QuicTransportBase and remove the "virtual"
     // qualifier
@@ -377,8 +382,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   LossTimeout lossTimeout_;
   ExcessWriteTimeout excessWriteTimeout_;
   IdleTimeout idleTimeout_;
+  KeepaliveTimeout keepaliveTimeout_;
 
   FunctionLooper::Ptr writeLooper_;
+  FunctionLooper::Ptr readLooper_;
+  FunctionLooper::Ptr peekLooper_;
 
   Optional<std::string> exceptionCloseWhat_;
 

@@ -417,6 +417,119 @@ void QuicTransportBaseLite::runOnEvbAsync(
       true);
 }
 
+void QuicTransportBaseLite::updateWriteLooper(
+    bool thisIteration,
+    bool runInline) {
+  if (closeState_ == CloseState::CLOSED) {
+    VLOG(10) << nodeToString(conn_->nodeType)
+             << " stopping write looper because conn closed " << *this;
+    writeLooper_->stop();
+    return;
+  }
+
+  if (conn_->transportSettings.checkIdleTimerOnWrite) {
+    checkIdleTimer(Clock::now());
+    if (closeState_ == CloseState::CLOSED) {
+      return;
+    }
+  }
+
+  // If socket writable events are in use, do nothing if we are already waiting
+  // for the write event.
+  if (conn_->transportSettings.useSockWritableEvents &&
+      socket_->isWritableCallbackSet()) {
+    return;
+  }
+
+  auto writeDataReason = shouldWriteData(*conn_);
+  if (writeDataReason != WriteDataReason::NO_WRITE) {
+    VLOG(10) << nodeToString(conn_->nodeType)
+             << " running write looper thisIteration=" << thisIteration << " "
+             << *this;
+    writeLooper_->run(thisIteration, runInline);
+    if (conn_->loopDetectorCallback) {
+      conn_->writeDebugState.needsWriteLoopDetect =
+          (conn_->loopDetectorCallback != nullptr);
+    }
+  } else {
+    VLOG(10) << nodeToString(conn_->nodeType) << " stopping write looper "
+             << *this;
+    writeLooper_->stop();
+    if (conn_->loopDetectorCallback) {
+      conn_->writeDebugState.needsWriteLoopDetect = false;
+      conn_->writeDebugState.currentEmptyLoopCount = 0;
+    }
+  }
+  if (conn_->loopDetectorCallback) {
+    conn_->writeDebugState.writeDataReason = writeDataReason;
+  }
+}
+
+void QuicTransportBaseLite::updateReadLooper() {
+  if (closeState_ != CloseState::OPEN) {
+    VLOG(10) << "Stopping read looper " << *this;
+    readLooper_->stop();
+    return;
+  }
+  auto iter = std::find_if(
+      conn_->streamManager->readableStreams().begin(),
+      conn_->streamManager->readableStreams().end(),
+      [&readCallbacks = readCallbacks_](StreamId s) {
+        auto readCb = readCallbacks.find(s);
+        if (readCb == readCallbacks.end()) {
+          return false;
+        }
+        // TODO: if the stream has an error and it is also paused we should
+        // still return an error
+        return readCb->second.readCb && readCb->second.resumed;
+      });
+  if (iter != conn_->streamManager->readableStreams().end() ||
+      !conn_->datagramState.readBuffer.empty()) {
+    VLOG(10) << "Scheduling read looper " << *this;
+    readLooper_->run();
+  } else {
+    VLOG(10) << "Stopping read looper " << *this;
+    readLooper_->stop();
+  }
+}
+
+void QuicTransportBaseLite::updatePeekLooper() {
+  if (peekCallbacks_.empty() || closeState_ != CloseState::OPEN) {
+    VLOG(10) << "Stopping peek looper " << *this;
+    peekLooper_->stop();
+    return;
+  }
+  VLOG(10) << "Updating peek looper, has "
+           << conn_->streamManager->peekableStreams().size()
+           << " peekable streams";
+  auto iter = std::find_if(
+      conn_->streamManager->peekableStreams().begin(),
+      conn_->streamManager->peekableStreams().end(),
+      [&peekCallbacks = peekCallbacks_](StreamId s) {
+        VLOG(10) << "Checking stream=" << s;
+        auto peekCb = peekCallbacks.find(s);
+        if (peekCb == peekCallbacks.end()) {
+          VLOG(10) << "No peek callbacks for stream=" << s;
+          return false;
+        }
+        if (!peekCb->second.resumed) {
+          VLOG(10) << "peek callback for stream=" << s << " not resumed";
+        }
+
+        if (!peekCb->second.peekCb) {
+          VLOG(10) << "no peekCb in peekCb stream=" << s;
+        }
+        return peekCb->second.peekCb && peekCb->second.resumed;
+      });
+  if (iter != conn_->streamManager->peekableStreams().end()) {
+    VLOG(10) << "Scheduling peek looper " << *this;
+    peekLooper_->run();
+  } else {
+    VLOG(10) << "Stopping peek looper " << *this;
+    peekLooper_->stop();
+  }
+}
+
 void QuicTransportBaseLite::maybeStopWriteLooperAndArmSocketWritableEvent() {
   if (!socket_ || (closeState_ == CloseState::CLOSED)) {
     return;
@@ -682,6 +795,12 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
       !drain /* sendCloseImmediately */);
 }
 
+void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {
+  [[maybe_unused]] auto self = sharedGuard();
+  conn_->pendingEvents.sendPing = true;
+  updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
+}
+
 bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {
   bool noError = false;
   switch (cancelCode.code.type()) {
@@ -738,6 +857,10 @@ void QuicTransportBaseLite::scheduleLossTimeout(
 
 void QuicTransportBaseLite::cancelLossTimeout() {
   cancelTimeout(&lossTimeout_);
+}
+
+bool QuicTransportBaseLite::isLossTimeoutScheduled() {
+  return isTimeoutScheduled(&lossTimeout_);
 }
 
 bool QuicTransportBaseLite::isTimeoutScheduled(
@@ -854,6 +977,89 @@ void QuicTransportBaseLite::invokePeekDataAndCallbacks() {
     } else {
       VLOG(10) << "Not invoking peek callbacks on stream=" << streamId;
     }
+  }
+}
+
+void QuicTransportBaseLite::processCallbacksAfterWriteData() {
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  auto txStreamId = conn_->streamManager->popTx();
+  while (txStreamId.has_value()) {
+    auto streamId = *txStreamId;
+    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
+    auto largestOffsetTxed = getLargestWriteOffsetTxed(*stream);
+    // if it's in the set of streams with TX, we should have a valid offset
+    CHECK(largestOffsetTxed.has_value());
+
+    // lambda to help get the next callback to call for this stream
+    auto getNextTxCallbackForStreamAndCleanup =
+        [this, &largestOffsetTxed](
+            const auto& streamId) -> Optional<ByteEventDetail> {
+      auto txCallbacksForStreamIt = txCallbacks_.find(streamId);
+      if (txCallbacksForStreamIt == txCallbacks_.end() ||
+          txCallbacksForStreamIt->second.empty()) {
+        return none;
+      }
+
+      auto& txCallbacksForStream = txCallbacksForStreamIt->second;
+      if (txCallbacksForStream.front().offset > *largestOffsetTxed) {
+        return none;
+      }
+
+      // extract the callback, pop from the queue, then check for cleanup
+      auto result = txCallbacksForStream.front();
+      txCallbacksForStream.pop_front();
+      if (txCallbacksForStream.empty()) {
+        txCallbacks_.erase(txCallbacksForStreamIt);
+      }
+      return result;
+    };
+
+    Optional<ByteEventDetail> nextOffsetAndCallback;
+    while (
+        (nextOffsetAndCallback =
+             getNextTxCallbackForStreamAndCleanup(streamId))) {
+      ByteEvent byteEvent{
+          streamId, nextOffsetAndCallback->offset, ByteEvent::Type::TX};
+      nextOffsetAndCallback->callback->onByteEvent(byteEvent);
+
+      // connection may be closed by callback
+      if (closeState_ != CloseState::OPEN) {
+        return;
+      }
+    }
+
+    // pop the next stream
+    txStreamId = conn_->streamManager->popTx();
+  }
+}
+
+void QuicTransportBaseLite::setIdleTimer() {
+  if (closeState_ == CloseState::CLOSED) {
+    return;
+  }
+  cancelTimeout(&idleTimeout_);
+  cancelTimeout(&keepaliveTimeout_);
+  auto localIdleTimeout = conn_->transportSettings.idleTimeout;
+  // The local idle timeout being zero means it is disabled.
+  if (localIdleTimeout == 0ms) {
+    return;
+  }
+  auto peerIdleTimeout =
+      conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
+  auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
+
+  idleTimeoutCheck_.idleTimeoutMs = idleTimeout;
+  idleTimeoutCheck_.lastTimeIdleTimeoutScheduled_ = Clock::now();
+
+  scheduleTimeout(&idleTimeout_, idleTimeout);
+  auto idleTimeoutCount = idleTimeout.count();
+  if (conn_->transportSettings.enableKeepalive) {
+    std::chrono::milliseconds keepaliveTimeout = std::chrono::milliseconds(
+        idleTimeoutCount - static_cast<int64_t>(idleTimeoutCount * .15));
+    scheduleTimeout(&keepaliveTimeout_, keepaliveTimeout);
   }
 }
 
