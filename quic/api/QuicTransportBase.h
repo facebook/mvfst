@@ -270,14 +270,6 @@ class QuicTransportBase : public QuicSocket,
       ReceivedUdpPacket&& udpPacket) = 0;
 
   /**
-   * Invoked when we have to write some data to the wire.
-   * The subclass may use this to start writing data to the socket.
-   * It may also throw an exception in case of an error in which case the
-   * connection will be closed.
-   */
-  virtual void writeData() = 0;
-
-  /**
    * closeTransport is invoked on the sub-class when the transport is closed.
    * The sub-class may clean up any state during this call. The transport
    * may still be draining after this call.
@@ -572,9 +564,9 @@ class QuicTransportBase : public QuicSocket,
     QuicTransportBase* transport_;
   };
 
-  void scheduleLossTimeout(std::chrono::milliseconds timeout);
-  void cancelLossTimeout();
-  bool isLossTimeoutScheduled(); // TODO: make this const again
+  void scheduleLossTimeout(std::chrono::milliseconds timeout) override;
+  void cancelLossTimeout() override;
+  bool isLossTimeoutScheduled() override; // TODO: make this const again
 
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
@@ -666,7 +658,7 @@ class QuicTransportBase : public QuicSocket,
   void invokeStreamsAvailableCallbacks();
   void updateReadLooper();
   void updatePeekLooper();
-  void updateWriteLooper(bool thisIteration, bool runInline = false);
+  void updateWriteLooper(bool thisIteration, bool runInline = false) override;
   void handlePingCallbacks();
   void handleKnobCallbacks();
   void handleAckEventCallbacks();
@@ -715,16 +707,6 @@ class QuicTransportBase : public QuicSocket,
       const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
   /**
-   * write data to socket
-   *
-   * At transport layer, this is the simplest form of write. It writes data
-   * out to the network, and schedule necessary timers (ack, idle, loss). It is
-   * both pacing oblivious and writeLooper oblivious. Caller needs to explicitly
-   * invoke updateWriteLooper afterwards if that's desired.
-   */
-  void writeSocketData();
-
-  /**
    * A wrapper around writeSocketData
    *
    * writeSocketDataAndCatch protects writeSocketData in a try-catch. It also
@@ -754,9 +736,9 @@ class QuicTransportBase : public QuicSocket,
   void pingTimeoutExpired() noexcept;
   void excessWriteTimeoutExpired() noexcept;
 
-  void setIdleTimer();
-  void scheduleAckTimeout();
-  void schedulePathValidationTimeout();
+  void setIdleTimer() override;
+  void scheduleAckTimeout() override;
+  void schedulePathValidationTimeout() override;
   void schedulePingTimeout(
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
@@ -765,12 +747,12 @@ class QuicTransportBase : public QuicSocket,
 
   // Helpers to notify all registered observers about specific events during
   // socket write (if enabled in the observer's config).
-  void notifyStartWritingFromAppRateLimited();
+  void notifyStartWritingFromAppRateLimited() override;
   void notifyPacketsWritten(
       const uint64_t numPacketsWritten,
       const uint64_t numAckElicitingPacketsWritten,
-      const uint64_t numBytesWritten);
-  void notifyAppRateLimited();
+      const uint64_t numBytesWritten) override;
+  void notifyAppRateLimited() override;
 
   /**
    * Callback when we receive a transport knob
@@ -814,8 +796,6 @@ class QuicTransportBase : public QuicSocket,
    */
   Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
-  std::unique_ptr<QuicAsyncUDPSocket> socket_;
-
   struct ReadCallbackData {
     ReadCallback* readCb;
     bool resumed{true};
@@ -842,7 +822,6 @@ class QuicTransportBase : public QuicSocket,
 
   QuicSocket::WriteCallback* connWriteCallback_{nullptr};
   std::map<StreamId, QuicSocket::WriteCallback*> pendingWriteCallbacks_;
-  bool transportReadyNotified_{false};
   bool handshakeDoneNotified_{false};
 
   LossTimeout lossTimeout_;
@@ -991,14 +970,6 @@ class QuicTransportBase : public QuicSocket,
    * enabled, i.e. advertisedMaxStreamGroups in transport settings is > 0.
    */
   [[nodiscard]] bool checkCustomRetransmissionProfilesEnabled() const;
-
-  /**
-   * Helper function to collect prewrite requests from the PacketProcessors
-   * Currently this collects cmsgs to be written. The Cmsgs will be stored in
-   * the connection state and passed to AsyncUDPSocket in the next
-   * additionalCmsgs callback
-   */
-  void updatePacketProcessorsPrewriteRequests();
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

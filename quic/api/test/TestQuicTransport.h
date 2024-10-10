@@ -74,7 +74,8 @@ class TestQuicTransport
     return conn.version.value_or(*conn.originalVersion);
   }
 
-  void updateWriteLooper(bool thisIteration) {
+  void updateWriteLooper(bool thisIteration, bool /* runInline */ = false)
+      override {
     QuicTransportBase::updateWriteLooper(thisIteration);
   }
 

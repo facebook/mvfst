@@ -47,8 +47,10 @@ QuicTransportBase::QuicTransportBase(
     std::shared_ptr<QuicEventBase> evb,
     std::unique_ptr<QuicAsyncUDPSocket> socket,
     bool useConnectionEndWithErrorCallback)
-    : QuicTransportBaseLite(std::move(evb), useConnectionEndWithErrorCallback),
-      socket_(std::move(socket)),
+    : QuicTransportBaseLite(
+          std::move(evb),
+          std::move(socket),
+          useConnectionEndWithErrorCallback),
       lossTimeout_(this),
       ackTimeout_(this),
       pathValidationTimeout_(this),
@@ -2968,116 +2970,6 @@ QuicTransportBase::readDatagramBufs(size_t atMost) {
   return retDatagrams;
 }
 
-void QuicTransportBase::writeSocketData() {
-  if (socket_) {
-    ++(conn_->writeCount); // incremented on each write (or write attempt)
-
-    // record current number of sent packets to detect delta
-    const auto beforeTotalBytesSent = conn_->lossState.totalBytesSent;
-    const auto beforeTotalPacketsSent = conn_->lossState.totalPacketsSent;
-    const auto beforeTotalAckElicitingPacketsSent =
-        conn_->lossState.totalAckElicitingPacketsSent;
-    const auto beforeNumOutstandingPackets =
-        conn_->outstandings.numOutstanding();
-
-    updatePacketProcessorsPrewriteRequests();
-
-    // if we're starting to write from app limited, notify observers
-    if (conn_->appLimitedTracker.isAppLimited() &&
-        conn_->congestionController) {
-      conn_->appLimitedTracker.setNotAppLimited();
-      notifyStartWritingFromAppRateLimited();
-    }
-    writeData();
-    if (closeState_ != CloseState::CLOSED) {
-      if (conn_->pendingEvents.closeTransport == true) {
-        throw QuicTransportException(
-            "Max packet number reached",
-            TransportErrorCode::PROTOCOL_VIOLATION);
-      }
-      setLossDetectionAlarm(*conn_, *this);
-
-      // check for change in number of packets
-      const auto afterTotalBytesSent = conn_->lossState.totalBytesSent;
-      const auto afterTotalPacketsSent = conn_->lossState.totalPacketsSent;
-      const auto afterTotalAckElicitingPacketsSent =
-          conn_->lossState.totalAckElicitingPacketsSent;
-      const auto afterNumOutstandingPackets =
-          conn_->outstandings.numOutstanding();
-      CHECK_LE(beforeTotalPacketsSent, afterTotalPacketsSent);
-      CHECK_LE(
-          beforeTotalAckElicitingPacketsSent,
-          afterTotalAckElicitingPacketsSent);
-      CHECK_LE(beforeNumOutstandingPackets, afterNumOutstandingPackets);
-      CHECK_EQ(
-          afterNumOutstandingPackets - beforeNumOutstandingPackets,
-          afterTotalAckElicitingPacketsSent -
-              beforeTotalAckElicitingPacketsSent);
-      const bool newPackets = (afterTotalPacketsSent > beforeTotalPacketsSent);
-      const bool newOutstandingPackets =
-          (afterTotalAckElicitingPacketsSent >
-           beforeTotalAckElicitingPacketsSent);
-
-      // if packets sent, notify observers
-      if (newPackets) {
-        notifyPacketsWritten(
-            afterTotalPacketsSent - beforeTotalPacketsSent
-            /* numPacketsWritten */,
-            afterTotalAckElicitingPacketsSent -
-                beforeTotalAckElicitingPacketsSent
-            /* numAckElicitingPacketsWritten */,
-            afterTotalBytesSent - beforeTotalBytesSent /* numBytesWritten */);
-      }
-      if (conn_->loopDetectorCallback && newOutstandingPackets) {
-        conn_->writeDebugState.currentEmptyLoopCount = 0;
-      } else if (
-          conn_->writeDebugState.needsWriteLoopDetect &&
-          conn_->loopDetectorCallback) {
-        // TODO: Currently we will to get some stats first. Then we may filter
-        // out some errors here. For example, socket fail to write might be a
-        // legit case to filter out.
-        conn_->loopDetectorCallback->onSuspiciousWriteLoops(
-            ++conn_->writeDebugState.currentEmptyLoopCount,
-            conn_->writeDebugState.writeDataReason,
-            conn_->writeDebugState.noWriteReason,
-            conn_->writeDebugState.schedulerName);
-      }
-      // If we sent a new packet and the new packet was either the first
-      // packet after quiescence or after receiving a new packet.
-      if (newOutstandingPackets &&
-          (beforeNumOutstandingPackets == 0 ||
-           conn_->receivedNewPacketBeforeWrite)) {
-        // Reset the idle timer because we sent some data.
-        setIdleTimer();
-        conn_->receivedNewPacketBeforeWrite = false;
-      }
-      // Check if we are app-limited after finish this round of sending
-      auto currentSendBufLen = conn_->flowControlState.sumCurStreamBufferLen;
-      auto lossBufferEmpty = !conn_->streamManager->hasLoss() &&
-          conn_->cryptoState->initialStream.lossBuffer.empty() &&
-          conn_->cryptoState->handshakeStream.lossBuffer.empty() &&
-          conn_->cryptoState->oneRttStream.lossBuffer.empty();
-      if (conn_->congestionController &&
-          currentSendBufLen < conn_->udpSendPacketLen && lossBufferEmpty &&
-          conn_->congestionController->getWritableBytes()) {
-        conn_->congestionController->setAppLimited();
-        // notify via connection call and any observer callbacks
-        if (transportReadyNotified_ && connCallback_) {
-          connCallback_->onAppRateLimited();
-        }
-        conn_->appLimitedTracker.setAppLimited();
-        notifyAppRateLimited();
-      }
-    }
-  }
-  // Writing data could write out an ack which could cause us to cancel
-  // the ack timer. But we need to call scheduleAckTimeout() for it to take
-  // effect.
-  scheduleAckTimeout();
-  schedulePathValidationTimeout();
-  updateWriteLooper(false);
-}
-
 void QuicTransportBase::writeSocketDataAndCatch() {
   [[maybe_unused]] auto self = sharedGuard();
   try {
@@ -3765,24 +3657,6 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 
   conn_->retransmissionPolicies.emplace(groupId, *policy);
   return folly::unit;
-}
-
-void QuicTransportBase::updatePacketProcessorsPrewriteRequests() {
-  folly::SocketCmsgMap cmsgs;
-  for (const auto& pp : conn_->packetProcessors) {
-    // In case of overlapping cmsg keys, the priority is given to
-    // that were added to the QuicSocket first.
-    auto writeRequest = pp->prewrite();
-    if (writeRequest && writeRequest->cmsgs) {
-      cmsgs.insert(writeRequest->cmsgs->begin(), writeRequest->cmsgs->end());
-    }
-  }
-  if (!cmsgs.empty()) {
-    conn_->socketCmsgsState.additionalCmsgs = cmsgs;
-  } else {
-    conn_->socketCmsgsState.additionalCmsgs.reset();
-  }
-  conn_->socketCmsgsState.targetWriteCount = conn_->writeCount;
 }
 
 void QuicTransportBase::validateECNState() {
