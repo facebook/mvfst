@@ -145,6 +145,8 @@ class QuicClientTransport
                                          : ZeroRttAttemptState::Accepted;
   }
 
+  bool hasZeroRttWriteCipher() const;
+
   // From QuicTransportBase
   void onReadData(
       const folly::SocketAddress& peer,

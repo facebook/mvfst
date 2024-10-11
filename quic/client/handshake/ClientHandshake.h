@@ -157,6 +157,9 @@ class ClientHandshake : public Handshake {
   Buf readTrafficSecret_;
   Buf writeTrafficSecret_;
 
+  Optional<bool> zeroRttRejected_;
+  Optional<bool> canResendZeroRtt_;
+
  private:
   virtual Optional<CachedServerTransportParameters> connectImpl(
       Optional<std::string> hostname) = 0;
@@ -176,9 +179,6 @@ class ClientHandshake : public Handshake {
 
   QuicClientConnectionState* conn_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
-
-  Optional<bool> zeroRttRejected_;
-  Optional<bool> canResendZeroRtt_;
 
   bool waitForData_{false};
   bool earlyDataAttempted_{false};
