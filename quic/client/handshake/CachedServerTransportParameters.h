@@ -14,16 +14,16 @@
 namespace quic {
 
 struct CachedServerTransportParameters {
-  uint64_t idleTimeout;
-  uint64_t maxRecvPacketSize;
-  uint64_t initialMaxData;
-  uint64_t initialMaxStreamDataBidiLocal;
-  uint64_t initialMaxStreamDataBidiRemote;
-  uint64_t initialMaxStreamDataUni;
-  uint64_t initialMaxStreamsBidi;
-  uint64_t initialMaxStreamsUni;
-  uint64_t maxReceiveTimestampsPerAck;
-  uint64_t receiveTimestampsExponent;
+  uint64_t idleTimeout{0};
+  uint64_t maxRecvPacketSize{0};
+  uint64_t initialMaxData{0};
+  uint64_t initialMaxStreamDataBidiLocal{0};
+  uint64_t initialMaxStreamDataBidiRemote{0};
+  uint64_t initialMaxStreamDataUni{0};
+  uint64_t initialMaxStreamsBidi{0};
+  uint64_t initialMaxStreamsUni{0};
+  uint64_t maxReceiveTimestampsPerAck{0};
+  uint64_t receiveTimestampsExponent{0};
   bool knobFrameSupport{false};
   bool ackReceiveTimestampsEnabled{false};
 };
