@@ -51,10 +51,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,
-      QuicSocketLite::WriteCallback* wcb) override;
+      StreamWriteCallback* wcb) override;
 
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnConnection(
-      QuicSocketLite::WriteCallback* wcb) override;
+      ConnectionWriteCallback* wcb) override;
 
   folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
       StreamId id) override;
@@ -349,8 +349,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   folly::F14FastMap<StreamId, ReadCallbackData> readCallbacks_;
   folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
 
-  std::map<StreamId, QuicSocketLite::WriteCallback*> pendingWriteCallbacks_;
-  QuicSocketLite::WriteCallback* connWriteCallback_{nullptr};
+  ConnectionWriteCallback* connWriteCallback_{nullptr};
+  std::map<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
 
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)

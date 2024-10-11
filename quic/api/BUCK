@@ -29,6 +29,20 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "quic_callbacks",
+    srcs = [
+    ],
+    headers = [
+        "QuicCallbacks.h",
+    ],
+    deps = [
+    ],
+    exported_deps = [
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
     name = "transport",
     srcs = [
         "IoBufQuicBatch.cpp",
@@ -67,6 +81,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":quic_batch_writer",
+        ":quic_callbacks",
         "//folly:exception_wrapper",
         "//folly:expected",
         "//folly:maybe_managed_ptr",

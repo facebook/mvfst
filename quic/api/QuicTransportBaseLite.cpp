@@ -37,7 +37,7 @@ inline std::ostream& operator<<(
 
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBaseLite::notifyPendingWriteOnConnection(
-    QuicSocket::WriteCallback* wcb) {
+    ConnectionWriteCallback* wcb) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
@@ -78,7 +78,7 @@ QuicTransportBaseLite::unregisterStreamWriteCallback(StreamId id) {
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBaseLite::notifyPendingWriteOnStream(
     StreamId id,
-    QuicSocket::WriteCallback* wcb) {
+    StreamWriteCallback* wcb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }

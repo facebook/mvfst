@@ -10,6 +10,7 @@
 #include <folly/MaybeManagedPtr.h>
 #include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicException.h>
+#include <quic/api/QuicCallbacks.h>
 #include <quic/codec/Types.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/handshake/TransportParameters.h>
@@ -237,32 +238,7 @@ class QuicSocketLite {
   /**
    * Callback class for receiving data on a stream
    */
-  class ReadCallback {
-   public:
-    virtual ~ReadCallback() = default;
-
-    /**
-     * Called from the transport layer when there is data, EOF or an error
-     * available to read on the given stream ID
-     */
-    virtual void readAvailable(StreamId id) noexcept = 0;
-
-    /*
-     * Same as above, but called on streams within a group.
-     */
-    virtual void readAvailableWithGroup(StreamId, StreamGroupId) noexcept {}
-
-    /**
-     * Called from the transport layer when there is an error on the stream.
-     */
-    virtual void readError(StreamId id, QuicError error) noexcept = 0;
-
-    /**
-     * Same as above, but called on streams within a group.
-     */
-    virtual void
-    readErrorWithGroup(StreamId, StreamGroupId, QuicError) noexcept {}
-  };
+  using ReadCallback = StreamReadCallback;
 
   /**
    * ===== Peek/Consume API =====
@@ -396,46 +372,10 @@ class QuicSocketLite {
   /**
    * Callback class for receiving write readiness notifications
    */
-  class WriteCallback {
+  class WriteCallback : public quic::ConnectionWriteCallback,
+                        public quic::StreamWriteCallback {
    public:
-    virtual ~WriteCallback() = default;
-
-    /**
-     * Invoked when stream is ready to write after notifyPendingWriteOnStream
-     * has previously been called.
-     *
-     * maxToSend represents the amount of data that the transport layer expects
-     * to write to the network during this event loop, eg:
-     *   min(remaining flow control, remaining send buffer space)
-     */
-    virtual void onStreamWriteReady(
-        StreamId /* id */,
-        uint64_t /* maxToSend */) noexcept {}
-
-    /**
-     * Invoked when connection is ready to write after
-     * notifyPendingWriteOnConnection has previously been called.
-     *
-     * maxToSend represents the amount of data that the transport layer expects
-     * to write to the network during this event loop, eg:
-     *   min(remaining flow control, remaining send buffer space)
-     */
-    virtual void onConnectionWriteReady(uint64_t /* maxToSend */) noexcept {}
-
-    /**
-     * Invoked when a connection is being torn down after
-     * notifyPendingWriteOnStream has been called
-     */
-    virtual void onStreamWriteError(
-        StreamId /* id */,
-        QuicError /* error */) noexcept {}
-
-    /**
-     * Invoked when a connection is being torn down after
-     * notifyPendingWriteOnConnection has been called
-     */
-    virtual void onConnectionWriteError(QuicError
-                                        /* error */) noexcept {}
+    ~WriteCallback() override = default;
   };
 
   /**
@@ -444,7 +384,7 @@ class QuicSocketLite {
    * Use this if the app wants to do prioritization.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
-  notifyPendingWriteOnConnection(WriteCallback* wcb) = 0;
+  notifyPendingWriteOnConnection(ConnectionWriteCallback* wcb) = 0;
 
   /**
    * Inform the transport that there is data to write on a given stream.
@@ -452,7 +392,7 @@ class QuicSocketLite {
    * Use the Connection call if the app wants to do prioritization.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
-  notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) = 0;
+  notifyPendingWriteOnStream(StreamId id, StreamWriteCallback* wcb) = 0;
 
   virtual folly::Expected<folly::Unit, LocalErrorCode>
       unregisterStreamWriteCallback(StreamId) = 0;

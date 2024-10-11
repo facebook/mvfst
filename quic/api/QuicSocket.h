@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <folly/MaybeManagedPtr.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>

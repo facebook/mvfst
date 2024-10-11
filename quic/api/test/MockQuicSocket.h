@@ -200,11 +200,11 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       notifyPendingWriteOnConnection,
-      (WriteCallback*));
+      (ConnectionWriteCallback*));
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       notifyPendingWriteOnStream,
-      (StreamId, WriteCallback*));
+      (StreamId, StreamWriteCallback*));
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       unregisterStreamWriteCallback,
