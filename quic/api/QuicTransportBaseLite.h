@@ -28,6 +28,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
         excessWriteTimeout_(this),
         idleTimeout_(this),
         keepaliveTimeout_(this),
+        ackTimeout_(this),
+        pathValidationTimeout_(this),
         writeLooper_(new FunctionLooper(
             evb_,
             [this]() { pacedWriteDataToSocket(); },
@@ -199,11 +201,68 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     QuicTransportBaseLite* transport_;
   };
 
+  class AckTimeout : public QuicTimerCallback {
+   public:
+    ~AckTimeout() override = default;
+
+    explicit AckTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->ackTimeoutExpired();
+    }
+
+    virtual void callbackCanceled() noexcept override {
+      // ignore. this usually means that the eventbase is dying, so we will be
+      // canceled anyway
+      return;
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
+  class PathValidationTimeout : public QuicTimerCallback {
+   public:
+    ~PathValidationTimeout() override = default;
+
+    explicit PathValidationTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->pathValidationTimeoutExpired();
+    }
+
+    virtual void callbackCanceled() noexcept override {
+      // ignore. this usually means that the eventbase is dying, so we will be
+      // canceled anyway
+      return;
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
 
   void cancelLossTimeout();
 
   bool isLossTimeoutScheduled();
+
+  /**
+   * Get the number of pending byte events for the given stream.
+   */
+  FOLLY_NODISCARD size_t
+  getNumByteEventCallbacksForStream(const StreamId id) const override;
+
+  /**
+   * Get the number of pending byte events of specified type for given stream.
+   */
+  FOLLY_NODISCARD size_t getNumByteEventCallbacksForStream(
+      const ByteEvent::Type type,
+      const StreamId id) const override;
+
+  StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
 
   /**
    * Returns a shared_ptr which can be used as a guard to keep this
@@ -260,10 +319,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void maybeStopWriteLooperAndArmSocketWritableEvent();
 
-  virtual void checkForClosedStream() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void checkForClosedStream();
 
   void cancelTimeout(QuicTimerCallback* callback);
 
@@ -271,11 +327,32 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void lossTimeoutExpired() noexcept;
   void idleTimeoutExpired(bool drain) noexcept;
   void keepaliveTimeoutExpired() noexcept;
+  void ackTimeoutExpired() noexcept;
+  void pathValidationTimeoutExpired() noexcept;
 
   bool isTimeoutScheduled(QuicTimerCallback* callback) const;
 
   void invokeReadDataAndCallbacks();
   void invokePeekDataAndCallbacks();
+
+  /**
+   * Helper function that calls passed function for each ByteEvent type.
+   *
+   * Removes number of locations to update when a byte event is added.
+   */
+  void invokeForEachByteEventType(
+      const std::function<void(const ByteEvent::Type)>& fn) {
+    for (const auto& type : ByteEvent::kByteEventTypes) {
+      fn(type);
+    }
+  }
+
+  void invokeForEachByteEventTypeConst(
+      const std::function<void(const ByteEvent::Type)>& fn) const {
+    for (const auto& type : ByteEvent::kByteEventTypes) {
+      fn(type);
+    }
+  }
 
   // Helpers to notify all registered observers about specific events during
   // socket write (if enabled in the observer's config).
@@ -298,14 +375,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void processCallbacksAfterWriteData();
 
   void setIdleTimer();
-  virtual void scheduleAckTimeout() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
-  virtual void schedulePathValidationTimeout() {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void scheduleAckTimeout();
+  void schedulePathValidationTimeout();
 
   void resetConnectionCallbacks() {
     connSetupCallback_ = nullptr;
@@ -383,6 +454,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   ExcessWriteTimeout excessWriteTimeout_;
   IdleTimeout idleTimeout_;
   KeepaliveTimeout keepaliveTimeout_;
+  AckTimeout ackTimeout_;
+  PathValidationTimeout pathValidationTimeout_;
 
   FunctionLooper::Ptr writeLooper_;
   FunctionLooper::Ptr readLooper_;

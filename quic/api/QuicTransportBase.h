@@ -143,7 +143,6 @@ class QuicTransportBase : public QuicSocket,
   uint64_t getNumOpenableUnidirectionalStreams() const override;
   bool isClientStream(StreamId stream) noexcept override;
   bool isServerStream(StreamId stream) noexcept override;
-  StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
   bool isUnidirectionalStream(StreamId stream) noexcept override;
   bool isBidirectionalStream(StreamId stream) noexcept override;
   StreamDirectionality getStreamDirectionality(
@@ -337,19 +336,6 @@ class QuicTransportBase : public QuicSocket,
       ApplicationErrorCode error,
       folly::StringPiece errorMsg) override;
 
-  /**
-   * Get the number of pending byte events for the given stream.
-   */
-  FOLLY_NODISCARD size_t
-  getNumByteEventCallbacksForStream(const StreamId id) const override;
-
-  /**
-   * Get the number of pending byte events of specified type for given stream.
-   */
-  FOLLY_NODISCARD size_t getNumByteEventCallbacksForStream(
-      const ByteEvent::Type type,
-      const StreamId id) const override;
-
   /*
    * Set the background mode priority threshold and the target bw utilization
    * factor to use when in background mode.
@@ -372,26 +358,6 @@ class QuicTransportBase : public QuicSocket,
    */
   virtual void createBufAccessor(size_t /* capacity */) {}
 
-  class AckTimeout : public QuicTimerCallback {
-   public:
-    ~AckTimeout() override = default;
-
-    explicit AckTimeout(QuicTransportBase* transport) : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->ackTimeoutExpired();
-    }
-
-    virtual void callbackCanceled() noexcept override {
-      // ignore. this usually means that the eventbase is dying, so we will be
-      // canceled anyway
-      return;
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
   class PingTimeout : public QuicTimerCallback {
    public:
     ~PingTimeout() override = default;
@@ -405,27 +371,6 @@ class QuicTransportBase : public QuicSocket,
 
     void callbackCanceled() noexcept override {
       // ignore, as this happens only when event  base dies
-      return;
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
-  class PathValidationTimeout : public QuicTimerCallback {
-   public:
-    ~PathValidationTimeout() override = default;
-
-    explicit PathValidationTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->pathValidationTimeoutExpired();
-    }
-
-    virtual void callbackCanceled() noexcept override {
-      // ignore. this usually means that the eventbase is dying, so we will be
-      // canceled anyway
       return;
     }
 
@@ -566,7 +511,6 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumePeek(
       StreamId id,
       bool resume);
-  void checkForClosedStream() override;
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
       ReadCallback* cb,
@@ -578,13 +522,9 @@ class QuicTransportBase : public QuicSocket,
       bool bidirectional,
       const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
-  void ackTimeoutExpired() noexcept;
-  void pathValidationTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
 
-  void scheduleAckTimeout() override;
-  void schedulePathValidationTimeout() override;
   void schedulePingTimeout(
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
@@ -606,25 +546,6 @@ class QuicTransportBase : public QuicSocket,
   virtual void onTransportKnobs(Buf knobBlob);
 
   /**
-   * Helper function that calls passed function for each ByteEvent type.
-   *
-   * Removes number of locations to update when a byte event is added.
-   */
-  void invokeForEachByteEventType(
-      const std::function<void(const ByteEvent::Type)>& fn) {
-    for (const auto& type : ByteEvent::kByteEventTypes) {
-      fn(type);
-    }
-  }
-
-  void invokeForEachByteEventTypeConst(
-      const std::function<void(const ByteEvent::Type)>& fn) const {
-    for (const auto& type : ByteEvent::kByteEventTypes) {
-      fn(type);
-    }
-  }
-
-  /**
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
    * required by this QuicSocket's packet processors.
    */
@@ -634,8 +555,6 @@ class QuicTransportBase : public QuicSocket,
 
   bool handshakeDoneNotified_{false};
 
-  AckTimeout ackTimeout_;
-  PathValidationTimeout pathValidationTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
 

@@ -51,8 +51,6 @@ QuicTransportBase::QuicTransportBase(
           std::move(evb),
           std::move(socket),
           useConnectionEndWithErrorCallback),
-      ackTimeout_(this),
-      pathValidationTimeout_(this),
       drainTimeout_(this),
       pingTimeout_(this) {
   writeLooper_->setPacingFunction([this]() -> auto {
@@ -903,28 +901,6 @@ void QuicTransportBase::cancelByteEventCallbacks(const ByteEvent::Type type) {
   }
 }
 
-size_t QuicTransportBase::getNumByteEventCallbacksForStream(
-    const StreamId id) const {
-  size_t total = 0;
-  invokeForEachByteEventTypeConst(
-      ([this, id, &total](const ByteEvent::Type type) {
-        total += getNumByteEventCallbacksForStream(type, id);
-      }));
-  return total;
-}
-
-size_t QuicTransportBase::getNumByteEventCallbacksForStream(
-    const ByteEvent::Type type,
-    const StreamId id) const {
-  const auto& byteEventMap = getByteEventMapConst(type);
-  const auto byteEventMapIt = byteEventMap.find(id);
-  if (byteEventMapIt == byteEventMap.end()) {
-    return 0;
-  }
-  const auto& streamByteEvents = byteEventMapIt->second;
-  return streamByteEvents.size();
-}
-
 folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
     StreamId id,
     size_t maxLen) {
@@ -1686,11 +1662,6 @@ bool QuicTransportBase::isServerStream(StreamId stream) noexcept {
   return quic::isServerStream(stream);
 }
 
-StreamInitiator QuicTransportBase::getStreamInitiator(
-    StreamId stream) noexcept {
-  return quic::getStreamInitiator(conn_->nodeType, stream);
-}
-
 bool QuicTransportBase::isUnidirectionalStream(StreamId stream) noexcept {
   return quic::isUnidirectionalStream(stream);
 }
@@ -1856,86 +1827,6 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
   return folly::unit;
 }
 
-void QuicTransportBase::checkForClosedStream() {
-  if (closeState_ == CloseState::CLOSED) {
-    return;
-  }
-  auto itr = conn_->streamManager->closedStreams().begin();
-  while (itr != conn_->streamManager->closedStreams().end()) {
-    const auto& streamId = *itr;
-
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::streamEvents>()) {
-      getSocketObserverContainer()
-          ->invokeInterfaceMethod<
-              SocketObserverInterface::Events::streamEvents>(
-              [event = SocketObserverInterface::StreamCloseEvent(
-                   streamId,
-                   getStreamInitiator(streamId),
-                   getStreamDirectionality(streamId))](
-                  auto observer, auto observed) {
-                observer->streamClosed(observed, event);
-              });
-    }
-
-    // We may be in an active read cb when we close the stream
-    auto readCbIt = readCallbacks_.find(*itr);
-    // We use the read callback as a way to defer destruction of the stream.
-    if (readCbIt != readCallbacks_.end() &&
-        readCbIt->second.readCb != nullptr) {
-      if (conn_->transportSettings.removeStreamAfterEomCallbackUnset ||
-          !readCbIt->second.deliveredEOM) {
-        VLOG(10) << "Not closing stream=" << *itr
-                 << " because it has active read callback";
-        ++itr;
-        continue;
-      }
-    }
-    // We may be in the active peek cb when we close the stream
-    auto peekCbIt = peekCallbacks_.find(*itr);
-    if (peekCbIt != peekCallbacks_.end() &&
-        peekCbIt->second.peekCb != nullptr) {
-      VLOG(10) << "Not closing stream=" << *itr
-               << " because it has active peek callback";
-      ++itr;
-      continue;
-    }
-    // If we have pending byte events, delay closing the stream
-    auto numByteEventCb = getNumByteEventCallbacksForStream(*itr);
-    if (numByteEventCb > 0) {
-      VLOG(10) << "Not closing stream=" << *itr << " because it has "
-               << numByteEventCb << " pending byte event callbacks";
-      ++itr;
-      continue;
-    }
-
-    VLOG(10) << "Closing stream=" << *itr;
-    if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(
-          getClosingStream(folly::to<std::string>(*itr)));
-    }
-    if (connCallback_) {
-      connCallback_->onStreamPreReaped(*itr);
-    }
-    conn_->streamManager->removeClosedStream(*itr);
-    maybeSendStreamLimitUpdates(*conn_);
-    if (readCbIt != readCallbacks_.end()) {
-      readCallbacks_.erase(readCbIt);
-    }
-    if (peekCbIt != peekCallbacks_.end()) {
-      peekCallbacks_.erase(peekCbIt);
-    }
-    itr = conn_->streamManager->closedStreams().erase(itr);
-  } // while
-
-  if (closeState_ == CloseState::GRACEFUL_CLOSING &&
-      conn_->streamManager->streamCount() == 0) {
-    closeImpl(none);
-  }
-}
-
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setPingCallback(
     PingCallback* cb) {
   if (closeState_ != CloseState::OPEN) {
@@ -1963,66 +1854,10 @@ void QuicTransportBase::sendPing(std::chrono::milliseconds pingTimeout) {
   }
 }
 
-void QuicTransportBase::ackTimeoutExpired() noexcept {
-  CHECK_NE(closeState_, CloseState::CLOSED);
-  VLOG(10) << __func__ << " " << *this;
-  [[maybe_unused]] auto self = sharedGuard();
-  updateAckStateOnAckTimeout(*conn_);
-  pacedWriteDataToSocket();
-}
-
 void QuicTransportBase::pingTimeoutExpired() noexcept {
   // If timeout expired just call the  call back Provided
   if (pingCallback_ != nullptr) {
     pingCallback_->pingTimeout();
-  }
-}
-
-void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
-  CHECK(conn_->outstandingPathValidation);
-
-  conn_->pendingEvents.schedulePathValidationTimeout = false;
-  conn_->outstandingPathValidation.reset();
-  if (conn_->qLogger) {
-    conn_->qLogger->addPathValidationEvent(false);
-  }
-
-  // TODO junqiw probing is not supported, so pathValidation==connMigration
-  // We decide to close conn when pathValidation to migrated path fails.
-  [[maybe_unused]] auto self = sharedGuard();
-  closeImpl(QuicError(
-      QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
-      std::string("Path validation timed out")));
-}
-
-void QuicTransportBase::scheduleAckTimeout() {
-  if (closeState_ == CloseState::CLOSED) {
-    return;
-  }
-  if (conn_->pendingEvents.scheduleAckTimeout) {
-    if (!isTimeoutScheduled(&ackTimeout_)) {
-      auto factoredRtt = std::chrono::duration_cast<std::chrono::microseconds>(
-          conn_->transportSettings.ackTimerFactor * conn_->lossState.srtt);
-      // If we are using ACK_FREQUENCY, disable the factored RTT heuristic
-      // and only use the update max ACK delay.
-      if (conn_->ackStates.appDataAckState.ackFrequencySequenceNumber) {
-        factoredRtt = conn_->ackStates.maxAckDelay;
-      }
-      auto timeout = timeMax(
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              evb_->getTimerTickInterval()),
-          timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
-      auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
-      VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
-               << " factoredRtt=" << factoredRtt.count() << "us" << " "
-               << *this;
-      scheduleTimeout(&ackTimeout_, timeoutMs);
-    }
-  } else {
-    if (isTimeoutScheduled(&ackTimeout_)) {
-      VLOG(10) << __func__ << " cancel timeout " << *this;
-      cancelTimeout(&ackTimeout_);
-    }
   }
 }
 
@@ -2036,31 +1871,6 @@ void QuicTransportBase::schedulePingTimeout(
 
   pingCallback_ = pingCb;
   scheduleTimeout(&pingTimeout_, timeout);
-}
-
-void QuicTransportBase::schedulePathValidationTimeout() {
-  if (closeState_ == CloseState::CLOSED) {
-    return;
-  }
-  if (!conn_->pendingEvents.schedulePathValidationTimeout) {
-    if (isTimeoutScheduled(&pathValidationTimeout_)) {
-      VLOG(10) << __func__ << " cancel timeout " << *this;
-      // This means path validation succeeded, and we should have updated to
-      // correct state
-      cancelTimeout(&pathValidationTimeout_);
-    }
-  } else if (!isTimeoutScheduled(&pathValidationTimeout_)) {
-    auto pto = conn_->lossState.srtt +
-        std::max(4 * conn_->lossState.rttvar, kGranularity) +
-        conn_->lossState.maxAckDelay;
-
-    auto validationTimeout =
-        std::max(3 * pto, 6 * conn_->transportSettings.initialRtt);
-    auto timeoutMs =
-        folly::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
-    VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;
-    scheduleTimeout(&pathValidationTimeout_, timeoutMs);
-  }
 }
 
 void QuicTransportBase::setSupportedVersions(

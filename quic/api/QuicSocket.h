@@ -523,11 +523,6 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual bool isServerStream(StreamId stream) noexcept = 0;
 
   /**
-   * Returns initiator (self or peer) of a stream by ID.
-   */
-  virtual StreamInitiator getStreamInitiator(StreamId stream) noexcept = 0;
-
-  /**
    * Returns whether a stream ID represents a unidirectional stream.
    */
   virtual bool isUnidirectionalStream(StreamId stream) noexcept = 0;
@@ -638,19 +633,6 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual void resetNonControlStreams(
       ApplicationErrorCode error,
       folly::StringPiece errorMsg) = 0;
-
-  /**
-   * Get the number of pending byte events for the given stream.
-   */
-  FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(
-      const StreamId streamId) const = 0;
-
-  /**
-   * Get the number of pending byte events of specified type for given stream.
-   */
-  FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(
-      const ByteEvent::Type type,
-      const StreamId streamId) const = 0;
 
   /**
    * Write data/eof to the given stream.
@@ -951,24 +933,5 @@ class QuicSocket : virtual public QuicSocketLite {
   setStreamGroupRetransmissionPolicy(
       StreamGroupId groupId,
       std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept = 0;
-
- protected:
-  /**
-   * Returns the SocketObserverList or nullptr if not available.
-   *
-   * QuicSocket implementations that support observers should override this
-   * function and return the socket observer list that they hold in memory.
-   *
-   * We have a default implementation to ensure that there is no risk of a
-   * pure-virtual function being called during constructon or destruction of
-   * the socket. If this was to occur the derived class which implements this
-   * function may be unavailable leading to undefined behavior. While this is
-   * true for any pure-virtual function, the potential for this issue is
-   * greater for observers.
-   */
-  [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
-      const {
-    return nullptr;
-  }
 };
 } // namespace quic
