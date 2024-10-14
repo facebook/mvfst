@@ -259,12 +259,6 @@ class QuicTransportBase : public QuicSocket,
    */
   virtual void closeTransport() = 0;
 
-  /**
-   * Invoked after the drain timeout has exceeded and the connection state will
-   * be destroyed.
-   */
-  virtual void unbindConnection() = 0;
-
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
       Priority priority) override;
@@ -357,44 +351,6 @@ class QuicTransportBase : public QuicSocket,
    * Creates buf accessor for use with in-place batch writer.
    */
   virtual void createBufAccessor(size_t /* capacity */) {}
-
-  class PingTimeout : public QuicTimerCallback {
-   public:
-    ~PingTimeout() override = default;
-
-    explicit PingTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->pingTimeoutExpired();
-    }
-
-    void callbackCanceled() noexcept override {
-      // ignore, as this happens only when event  base dies
-      return;
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
-
-  // DrainTimeout is a bit different from other timeouts. It needs to hold a
-  // shared_ptr to the transport, since if a DrainTimeout is scheduled,
-  // transport cannot die.
-  class DrainTimeout : public QuicTimerCallback {
-   public:
-    ~DrainTimeout() override = default;
-
-    explicit DrainTimeout(QuicTransportBase* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->drainTimeoutExpired();
-    }
-
-   private:
-    QuicTransportBase* transport_;
-  };
 
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
@@ -504,7 +460,6 @@ class QuicTransportBase : public QuicSocket,
       Optional<QuicError> error,
       bool drainConnection = true,
       bool sendCloseImmediately = true) override;
-  void closeUdpSocket();
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
       bool resume);
@@ -521,9 +476,6 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
       bool bidirectional,
       const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
-
-  void drainTimeoutExpired() noexcept;
-  void pingTimeoutExpired() noexcept;
 
   void schedulePingTimeout(
       PingCallback* callback,
@@ -550,8 +502,6 @@ class QuicTransportBase : public QuicSocket,
    * required by this QuicSocket's packet processors.
    */
   Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
-
-  PingCallback* pingCallback_{nullptr};
 
   bool handshakeDoneNotified_{false};
 

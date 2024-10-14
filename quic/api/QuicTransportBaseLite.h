@@ -243,6 +243,44 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     QuicTransportBaseLite* transport_;
   };
 
+  class PingTimeout : public QuicTimerCallback {
+   public:
+    ~PingTimeout() override = default;
+
+    explicit PingTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->pingTimeoutExpired();
+    }
+
+    void callbackCanceled() noexcept override {
+      // ignore, as this happens only when event  base dies
+      return;
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
+  // DrainTimeout is a bit different from other timeouts. It needs to hold a
+  // shared_ptr to the transport, since if a DrainTimeout is scheduled,
+  // transport cannot die.
+  class DrainTimeout : public QuicTimerCallback {
+   public:
+    ~DrainTimeout() override = default;
+
+    explicit DrainTimeout(QuicTransportBaseLite* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->drainTimeoutExpired();
+    }
+
+   private:
+    QuicTransportBaseLite* transport_;
+  };
+
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
 
   void cancelLossTimeout();
@@ -261,6 +299,12 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   FOLLY_NODISCARD size_t getNumByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id) const override;
+
+  /**
+   * Invoked after the drain timeout has exceeded and the connection state will
+   * be destroyed.
+   */
+  virtual void unbindConnection() = 0;
 
   StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
 
@@ -309,6 +353,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     // TODO: Fill this in from QuicTransportBase and remove the "virtual"
     // qualifier
   }
+  void closeUdpSocket();
 
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
@@ -329,6 +374,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void keepaliveTimeoutExpired() noexcept;
   void ackTimeoutExpired() noexcept;
   void pathValidationTimeoutExpired() noexcept;
+  void drainTimeoutExpired() noexcept;
+  void pingTimeoutExpired() noexcept;
 
   bool isTimeoutScheduled(QuicTimerCallback* callback) const;
 
@@ -395,6 +442,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
   folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
+  PingCallback* pingCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.
   bool useConnectionEndWithErrorCallback_{false};
 

@@ -813,6 +813,23 @@ void QuicTransportBaseLite::writeSocketData() {
   updateWriteLooper(false);
 }
 
+void QuicTransportBaseLite::closeUdpSocket() {
+  if (!socket_) {
+    return;
+  }
+  if (getSocketObserverContainer()) {
+    SocketObserverInterface::ClosingEvent event; // empty for now
+    getSocketObserverContainer()->invokeInterfaceMethodAllObservers(
+        [&event](auto observer, auto observed) {
+          observer->closing(observed, event);
+        });
+  }
+  auto sock = std::move(socket_);
+  socket_ = nullptr;
+  sock->pauseRead();
+  sock->close();
+}
+
 void QuicTransportBaseLite::cancelTimeout(QuicTimerCallback* callback) {
   callback->cancelTimerCallback();
 }
@@ -904,6 +921,18 @@ void QuicTransportBaseLite::pathValidationTimeoutExpired() noexcept {
   closeImpl(QuicError(
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
       std::string("Path validation timed out")));
+}
+
+void QuicTransportBaseLite::drainTimeoutExpired() noexcept {
+  closeUdpSocket();
+  unbindConnection();
+}
+
+void QuicTransportBaseLite::pingTimeoutExpired() noexcept {
+  // If timeout expired just call the  call back Provided
+  if (pingCallback_ != nullptr) {
+    pingCallback_->pingTimeout();
+  }
 }
 
 bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {

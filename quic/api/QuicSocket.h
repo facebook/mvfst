@@ -697,29 +697,6 @@ class QuicSocket : virtual public QuicSocketLite {
   maybeResetStreamFromReadError(StreamId id, QuicErrorCode error) = 0;
 
   /**
-   * Callback class for pings
-   */
-  class PingCallback {
-   public:
-    virtual ~PingCallback() = default;
-
-    /**
-     * Invoked when the ping is acknowledged
-     */
-    virtual void pingAcknowledged() noexcept = 0;
-
-    /**
-     * Invoked if the ping times out
-     */
-    virtual void pingTimeout() noexcept = 0;
-
-    /**
-     * Invoked when a ping is received
-     */
-    virtual void onPing() noexcept = 0;
-  };
-
-  /**
    * Set the ping callback
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> setPingCallback(

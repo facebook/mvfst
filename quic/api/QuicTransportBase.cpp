@@ -400,28 +400,6 @@ void QuicTransportBase::closeImpl(
   }
 }
 
-void QuicTransportBase::closeUdpSocket() {
-  if (!socket_) {
-    return;
-  }
-  if (getSocketObserverContainer()) {
-    SocketObserverInterface::ClosingEvent event; // empty for now
-    getSocketObserverContainer()->invokeInterfaceMethodAllObservers(
-        [&event](auto observer, auto observed) {
-          observer->closing(observed, event);
-        });
-  }
-  auto sock = std::move(socket_);
-  socket_ = nullptr;
-  sock->pauseRead();
-  sock->close();
-}
-
-void QuicTransportBase::drainTimeoutExpired() noexcept {
-  closeUdpSocket();
-  unbindConnection();
-}
-
 folly::Expected<size_t, LocalErrorCode> QuicTransportBase::getStreamReadOffset(
     StreamId) const {
   return 0;
@@ -1851,13 +1829,6 @@ void QuicTransportBase::sendPing(std::chrono::milliseconds pingTimeout) {
   // Step 2: Schedule the timeout on event base
   if (pingCallback_ && pingTimeout != 0ms) {
     schedulePingTimeout(pingCallback_, pingTimeout);
-  }
-}
-
-void QuicTransportBase::pingTimeoutExpired() noexcept {
-  // If timeout expired just call the  call back Provided
-  if (pingCallback_ != nullptr) {
-    pingCallback_->pingTimeout();
   }
 }
 

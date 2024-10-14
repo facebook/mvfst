@@ -286,6 +286,29 @@ class QuicSocketLite {
   };
 
   /**
+   * Callback class for pings
+   */
+  class PingCallback {
+   public:
+    virtual ~PingCallback() = default;
+
+    /**
+     * Invoked when the ping is acknowledged
+     */
+    virtual void pingAcknowledged() noexcept = 0;
+
+    /**
+     * Invoked if the ping times out
+     */
+    virtual void pingTimeout() noexcept = 0;
+
+    /**
+     * Invoked when a ping is received
+     */
+    virtual void onPing() noexcept = 0;
+  };
+
+  /**
    * Structure used to communicate TX and ACK/Delivery notifications.
    */
   struct ByteEvent {
