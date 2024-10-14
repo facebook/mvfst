@@ -30,6 +30,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
         keepaliveTimeout_(this),
         ackTimeout_(this),
         pathValidationTimeout_(this),
+        drainTimeout_(this),
+        pingTimeout_(this),
         writeLooper_(new FunctionLooper(
             evb_,
             [this]() { pacedWriteDataToSocket(); },
@@ -115,6 +117,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   getStreamFlowControl(StreamId id) const override;
 
   [[nodiscard]] uint64_t maxWritableOnConn() const override;
+
+  virtual void cancelAllAppCallbacks(const QuicError& error) noexcept;
 
   void scheduleTimeout(
       QuicTimerCallback* callback,
@@ -301,6 +305,23 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       const StreamId id) const override;
 
   /**
+   * Cancel all byte event callbacks of all streams.
+   */
+  void cancelAllByteEventCallbacks() override;
+
+  /**
+   * Cancel all byte event callbacks of all streams of the given type.
+   */
+  void cancelByteEventCallbacks(const ByteEvent::Type type) override;
+
+  /**
+   * closeTransport is invoked on the sub-class when the transport is closed.
+   * The sub-class may clean up any state during this call. The transport
+   * may still be draining after this call.
+   */
+  virtual void closeTransport() = 0;
+
+  /**
    * Invoked after the drain timeout has exceeded and the connection state will
    * be destroyed.
    */
@@ -346,13 +367,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   void writeSocketData();
 
-  virtual void closeImpl(
-      Optional<QuicError> /* error */,
-      bool /* drainConnection */ = true,
-      bool /* sendCloseImmediately */ = true) {
-    // TODO: Fill this in from QuicTransportBase and remove the "virtual"
-    // qualifier
-  }
+  void closeImpl(
+      Optional<QuicError> error,
+      bool drainConnection = true,
+      bool sendCloseImmediately = true);
+
   void closeUdpSocket();
 
   void runOnEvbAsync(
@@ -504,6 +523,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   KeepaliveTimeout keepaliveTimeout_;
   AckTimeout ackTimeout_;
   PathValidationTimeout pathValidationTimeout_;
+  DrainTimeout drainTimeout_;
+  PingTimeout pingTimeout_;
 
   FunctionLooper::Ptr writeLooper_;
   FunctionLooper::Ptr readLooper_;

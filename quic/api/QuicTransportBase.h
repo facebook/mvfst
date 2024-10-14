@@ -252,13 +252,6 @@ class QuicTransportBase : public QuicSocket,
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) = 0;
 
-  /**
-   * closeTransport is invoked on the sub-class when the transport is closed.
-   * The sub-class may clean up any state during this call. The transport
-   * may still be draining after this call.
-   */
-  virtual void closeTransport() = 0;
-
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
       Priority priority) override;
@@ -312,16 +305,6 @@ class QuicTransportBase : public QuicSocket,
       const Optional<uint64_t>& offset = none) override;
 
   /**
-   * Cancel all byte event callbacks of all streams.
-   */
-  void cancelAllByteEventCallbacks() override;
-
-  /**
-   * Cancel all byte event callbacks of all streams of the given type.
-   */
-  void cancelByteEventCallbacks(const ByteEvent::Type type) override;
-
-  /**
    * Reset or send a stop sending on all non-control streams. Leaves the
    * connection otherwise unmodified. Note this will also trigger the
    * onStreamWriteError and readError callbacks immediately.
@@ -365,8 +348,6 @@ class QuicTransportBase : public QuicSocket,
   void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
     conn_->loopDetectorCallback = std::move(callback);
   }
-
-  virtual void cancelAllAppCallbacks(const QuicError& error) noexcept;
 
   FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
 
@@ -456,10 +437,6 @@ class QuicTransportBase : public QuicSocket,
 
   void cleanupAckEventState();
 
-  void closeImpl(
-      Optional<QuicError> error,
-      bool drainConnection = true,
-      bool sendCloseImmediately = true) override;
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
       bool resume);
@@ -504,9 +481,6 @@ class QuicTransportBase : public QuicSocket,
   Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   bool handshakeDoneNotified_{false};
-
-  DrainTimeout drainTimeout_;
-  PingTimeout pingTimeout_;
 
   // TODO: This is silly. We need a better solution.
   // Uninitialied local address as a fallback answer when socket isn't bound.

@@ -389,6 +389,16 @@ class QuicSocketLite {
       const StreamId streamId) const = 0;
 
   /**
+   * Cancel all byte event callbacks of all streams.
+   */
+  virtual void cancelAllByteEventCallbacks() = 0;
+
+  /**
+   * Cancel all byte event callbacks of all streams of the given type.
+   */
+  virtual void cancelByteEventCallbacks(const ByteEvent::Type type) = 0;
+
+  /**
    * ===== Datagram API =====
    *
    * Datagram support is experimental. Currently there isn't delivery callback

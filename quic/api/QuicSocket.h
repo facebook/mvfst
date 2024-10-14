@@ -616,16 +616,6 @@ class QuicSocket : virtual public QuicSocketLite {
       const Optional<uint64_t>& offset = none) = 0;
 
   /**
-   * Cancel all byte event callbacks of all streams.
-   */
-  virtual void cancelAllByteEventCallbacks() = 0;
-
-  /**
-   * Cancel all byte event callbacks of all streams of the given type.
-   */
-  virtual void cancelByteEventCallbacks(const ByteEvent::Type type) = 0;
-
-  /**
    * Reset or send a stop sending on all non-control streams. Leaves the
    * connection otherwise unmodified. Note this will also trigger the
    * onStreamWriteError and readError callbacks immediately.
