@@ -31,7 +31,14 @@ class LibevQuicEventBase
       public QuicTimer,
       public std::enable_shared_from_this<LibevQuicEventBase> {
  public:
-  explicit LibevQuicEventBase(struct ev_loop* loop);
+  class EvLoopWeak {
+   public:
+    // Returns nullptr if the loop has been destroyed.
+    virtual struct ev_loop* get() = 0;
+
+    virtual ~EvLoopWeak() = default;
+  };
+  explicit LibevQuicEventBase(std::unique_ptr<EvLoopWeak> loop);
   ~LibevQuicEventBase() override;
 
   void runInLoop(
@@ -117,6 +124,10 @@ class LibevQuicEventBase
 
   struct ev_loop* getLibevLoop() {
     return ev_loop_;
+  }
+
+  EvLoopWeak* getLoopWeak() {
+    return loopWeak_.get();
   }
 
   // This is public so the libev callback can access it
@@ -209,6 +220,7 @@ class LibevQuicEventBase
   };
 
   struct ev_loop* ev_loop_{EV_DEFAULT};
+  std::unique_ptr<EvLoopWeak> loopWeak_;
 
   folly::IntrusiveList<LoopCallbackWrapper, &LoopCallbackWrapper::listHook_>
       loopCallbackWrappers_;

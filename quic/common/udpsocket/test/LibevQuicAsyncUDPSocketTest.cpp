@@ -12,11 +12,25 @@
 
 using namespace ::testing;
 
+struct EvLoop : public quic::LibevQuicEventBase::EvLoopWeak {
+  EvLoop() : evLoop_(ev_loop_new(0)) {}
+
+  ~EvLoop() override {
+    ev_loop_destroy(evLoop_);
+  }
+
+  struct ev_loop* get() override {
+    return evLoop_;
+  }
+
+  struct ev_loop* evLoop_;
+};
+
 class LibevQuicAsyncUDPSocketProvider {
  public:
   static std::shared_ptr<quic::QuicAsyncUDPSocket> makeQuicAsyncUDPSocket() {
-    static struct ev_loop* evLoop = ev_loop_new(0);
-    auto evb = std::make_shared<quic::LibevQuicEventBase>(evLoop);
+    auto evb =
+        std::make_shared<quic::LibevQuicEventBase>(std::make_unique<EvLoop>());
     return std::make_shared<quic::LibevQuicAsyncUDPSocket>(evb);
   }
 };

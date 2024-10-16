@@ -42,7 +42,8 @@ void libEvPrepareCallback(
 } // namespace
 
 namespace quic {
-LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
+LibevQuicEventBase::LibevQuicEventBase(std::unique_ptr<EvLoopWeak> loop)
+    : ev_loop_(loop->get()), loopWeak_(std::move(loop)) {
   loopThreadId_.store(std::this_thread::get_id(), std::memory_order_release);
   ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
   prepareWatcher_.data = this;
@@ -50,9 +51,12 @@ LibevQuicEventBase::LibevQuicEventBase(struct ev_loop* loop) : ev_loop_(loop) {
 }
 
 LibevQuicEventBase::~LibevQuicEventBase() {
-  ev_prepare_stop(ev_loop_, &prepareWatcher_);
-  if (internalTimerInitialized_) {
-    ev_timer_stop(ev_loop_, &ev_timer_internal_);
+  // If the loop has been destroyed, skip the ev loop operations.
+  if (loopWeak_->get()) {
+    ev_prepare_stop(ev_loop_, &prepareWatcher_);
+    if (internalTimerInitialized_) {
+      ev_timer_stop(ev_loop_, &ev_timer_internal_);
+    }
   }
 
   struct FunctionLoopCallbackDisposer {
