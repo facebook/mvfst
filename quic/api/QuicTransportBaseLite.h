@@ -57,6 +57,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void closeNow(Optional<QuicError> error) override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> stopSending(
+      StreamId id,
+      ApplicationErrorCode error) override;
+
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,
       StreamWriteCallback* wcb) override;
@@ -66,6 +70,38 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
       StreamId id) override;
+
+  /**
+   * Invoke onCanceled on all the delivery callbacks registered for streamId.
+   */
+  void cancelDeliveryCallbacksForStream(StreamId id) override;
+
+  /**
+   * Invoke onCanceled on all the delivery callbacks registered for streamId for
+   * offsets lower than the offset provided.
+   */
+  void cancelDeliveryCallbacksForStream(StreamId id, uint64_t offset) override;
+
+  /**
+   * Cancel byte event callbacks for given stream.
+   *
+   * If an offset is provided, cancels only callbacks with an offset less than
+   * or equal to the provided offset, otherwise cancels all callbacks.
+   */
+  void cancelByteEventCallbacksForStream(
+      const StreamId id,
+      const Optional<uint64_t>& offset = none) override;
+
+  /**
+   * Cancel byte event callbacks for given type and stream.
+   *
+   * If an offset is provided, cancels only callbacks with an offset less than
+   * or equal to the provided offset, otherwise cancels all callbacks.
+   */
+  void cancelByteEventCallbacksForStream(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const Optional<uint64_t>& offset = none) override;
 
   /**
    * Register a byte event to be triggered when specified event type occurs for
@@ -94,6 +130,12 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void setConnectionCallback(
       folly::MaybeManagedPtr<ConnectionCallback> callback) final;
+
+  folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
+      StreamId id,
+      ReadCallback* cb,
+      Optional<ApplicationErrorCode> err =
+          GenericApplicationErrorCode::NO_ERROR) override;
 
   void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 
@@ -439,6 +481,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void invokeReadDataAndCallbacks();
   void invokePeekDataAndCallbacks();
+
+  folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
+      StreamId id,
+      ReadCallback* cb,
+      Optional<ApplicationErrorCode> err) noexcept;
 
   /**
    * Helper function that calls passed function for each ByteEvent type.

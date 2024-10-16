@@ -72,6 +72,33 @@ void QuicTransportBaseLite::closeNow(Optional<QuicError> errorCode) {
   }
 }
 
+folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::stopSending(
+    StreamId id,
+    ApplicationErrorCode error) {
+  if (isSendingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  auto* stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  if (stream->recvState == StreamRecvState::Closed) {
+    // skip STOP_SENDING if ingress is already closed
+    return folly::unit;
+  }
+
+  if (conn_->transportSettings.dropIngressOnStopSending) {
+    processTxStopSending(*stream);
+  }
+  // send STOP_SENDING frame to peer
+  sendSimpleFrame(*conn_, StopSendingFrame(id, error));
+  updateWriteLooper(true);
+  return folly::unit;
+}
+
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBaseLite::notifyPendingWriteOnConnection(
     ConnectionWriteCallback* wcb) {
@@ -110,6 +137,83 @@ QuicTransportBaseLite::unregisterStreamWriteCallback(StreamId id) {
   }
   pendingWriteCallbacks_.erase(id);
   return folly::unit;
+}
+
+void QuicTransportBaseLite::cancelDeliveryCallbacksForStream(StreamId id) {
+  cancelByteEventCallbacksForStream(ByteEvent::Type::ACK, id);
+}
+
+void QuicTransportBaseLite::cancelDeliveryCallbacksForStream(
+    StreamId id,
+    uint64_t offset) {
+  cancelByteEventCallbacksForStream(ByteEvent::Type::ACK, id, offset);
+}
+
+void QuicTransportBaseLite::cancelByteEventCallbacksForStream(
+    const StreamId id,
+    const Optional<uint64_t>& offset) {
+  invokeForEachByteEventType(([this, id, &offset](const ByteEvent::Type type) {
+    cancelByteEventCallbacksForStream(type, id, offset);
+  }));
+}
+
+void QuicTransportBaseLite::cancelByteEventCallbacksForStream(
+    const ByteEvent::Type type,
+    const StreamId id,
+    const Optional<uint64_t>& offset) {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return;
+  }
+
+  auto& byteEventMap = getByteEventMap(type);
+  auto byteEventMapIt = byteEventMap.find(id);
+  if (byteEventMapIt == byteEventMap.end()) {
+    switch (type) {
+      case ByteEvent::Type::ACK:
+        conn_->streamManager->removeDeliverable(id);
+        break;
+      case ByteEvent::Type::TX:
+        conn_->streamManager->removeTx(id);
+        break;
+    }
+    return;
+  }
+  auto& streamByteEvents = byteEventMapIt->second;
+
+  // Callbacks are kept sorted by offset, so we can just walk the queue and
+  // invoke those with offset below provided offset.
+  while (!streamByteEvents.empty()) {
+    // decomposition not supported for xplat
+    const auto cbOffset = streamByteEvents.front().offset;
+    const auto callback = streamByteEvents.front().callback;
+    if (!offset.has_value() || cbOffset < *offset) {
+      streamByteEvents.pop_front();
+      ByteEventCancellation cancellation{id, cbOffset, type};
+      callback->onByteEventCanceled(cancellation);
+      if (closeState_ != CloseState::OPEN) {
+        // socket got closed - we can't use streamByteEvents anymore,
+        // closeImpl should take care of cleaning up any remaining callbacks
+        return;
+      }
+    } else {
+      // Only larger or equal offsets left, exit the loop.
+      break;
+    }
+  }
+
+  // Clean up state for this stream if no callbacks left to invoke.
+  if (streamByteEvents.empty()) {
+    switch (type) {
+      case ByteEvent::Type::ACK:
+        conn_->streamManager->removeDeliverable(id);
+        break;
+      case ByteEvent::Type::TX:
+        conn_->streamManager->removeTx(id);
+        break;
+    }
+    // The callback could have changed the map so erase by id.
+    byteEventMap.erase(id);
+  }
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -302,6 +406,23 @@ void QuicTransportBaseLite::setConnectionSetupCallback(
 void QuicTransportBaseLite::setConnectionCallback(
     folly::MaybeManagedPtr<ConnectionCallback> callback) {
   connCallback_ = callback;
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::setReadCallback(
+    StreamId id,
+    ReadCallback* cb,
+    Optional<ApplicationErrorCode> err) {
+  if (isSendingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  return setReadCallbackInternal(id, cb, err);
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -1498,6 +1619,35 @@ void QuicTransportBaseLite::invokePeekDataAndCallbacks() {
       VLOG(10) << "Not invoking peek callbacks on stream=" << streamId;
     }
   }
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::setReadCallbackInternal(
+    StreamId id,
+    ReadCallback* cb,
+    Optional<ApplicationErrorCode> err) noexcept {
+  VLOG(4) << "Setting setReadCallback for stream=" << id << " cb=" << cb << " "
+          << *this;
+  auto readCbIt = readCallbacks_.find(id);
+  if (readCbIt == readCallbacks_.end()) {
+    // Don't allow initial setting of a nullptr callback.
+    if (!cb) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    readCbIt = readCallbacks_.emplace(id, ReadCallbackData(cb)).first;
+  }
+  auto& readCb = readCbIt->second.readCb;
+  if (readCb == nullptr && cb != nullptr) {
+    // It's already been set to nullptr we do not allow unsetting it.
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  } else {
+    readCb = cb;
+    if (readCb == nullptr && err) {
+      return stopSending(id, err.value());
+    }
+  }
+  updateReadLooper();
+  return folly::unit;
 }
 
 void QuicTransportBaseLite::processCallbacksAfterWriteData() {

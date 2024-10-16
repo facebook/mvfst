@@ -240,26 +240,6 @@ class QuicSocket : virtual public QuicSocketLite {
       StreamId id) = 0;
 
   /**
-   * Set the read callback for the given stream.  Note that read callback is
-   * expected to be set all the time. Removing read callback indicates that
-   * stream is no longer intended to be read again. This will issue a
-   * StopSending if cb is being set to nullptr after previously being not
-   * nullptr. The err parameter is used to control the error sent in the
-   * StopSending. By default when cb is nullptr this function will cause the
-   * transport to send a StopSending frame with
-   * GenericApplicationErrorCode::NO_ERROR. If err is specified to be
-   * none, no StopSending will be sent.
-   *
-   * Users should remove the callback via setReadCallback(id, nullptr) after
-   * reading an error or eof to allow streams to be reaped by the transport.
-   */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
-      StreamId id,
-      ReadCallback* cb,
-      Optional<ApplicationErrorCode> err =
-          GenericApplicationErrorCode::NO_ERROR) = 0;
-
-  /**
    * Convenience function that sets the read callbacks of all streams to be
    * nullptr.
    */
@@ -277,36 +257,12 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual void unsetAllDeliveryCallbacks() = 0;
 
   /**
-   * Invoke onCanceled on all the delivery callbacks registered for streamId.
-   */
-  virtual void cancelDeliveryCallbacksForStream(StreamId streamId) = 0;
-
-  /**
-   * Invoke onCanceled on all the delivery callbacks registered for streamId for
-   * offsets lower than the offset provided.
-   */
-  virtual void cancelDeliveryCallbacksForStream(
-      StreamId streamId,
-      uint64_t offset) = 0;
-
-  /**
    * Pause/Resume read callback being triggered when data is available.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> pauseRead(
       StreamId id) = 0;
   virtual folly::Expected<folly::Unit, LocalErrorCode> resumeRead(
       StreamId id) = 0;
-
-  /**
-   * Initiates sending of a StopSending frame for a given stream to the peer.
-   * This is called a "solicited reset". On receipt of the StopSending frame
-   * the peer should, but may not, send a ResetStream frame for the requested
-   * stream. A caller can use this function when they are no longer processing
-   * received data on the stream.
-   */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> stopSending(
-      StreamId id,
-      ApplicationErrorCode error) = 0;
 
   /**
    * Read from the given stream, up to maxLen bytes.  If maxLen is 0, transport
@@ -541,27 +497,6 @@ class QuicSocket : virtual public QuicSocketLite {
       const StreamId id,
       const uint64_t offset,
       ByteEventCallback* cb) = 0;
-
-  /**
-   * Cancel byte event callbacks for given stream.
-   *
-   * If an offset is provided, cancels only callbacks with an offset less than
-   * or equal to the provided offset, otherwise cancels all callbacks.
-   */
-  virtual void cancelByteEventCallbacksForStream(
-      const StreamId id,
-      const Optional<uint64_t>& offset = none) = 0;
-
-  /**
-   * Cancel byte event callbacks for given type and stream.
-   *
-   * If an offset is provided, cancels only callbacks with an offset less than
-   * or equal to the provided offset, otherwise cancels all callbacks.
-   */
-  virtual void cancelByteEventCallbacksForStream(
-      const ByteEvent::Type type,
-      const StreamId id,
-      const Optional<uint64_t>& offset = none) = 0;
 
   /**
    * Reset or send a stop sending on all non-control streams. Leaves the

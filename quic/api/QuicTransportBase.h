@@ -86,19 +86,11 @@ class QuicTransportBase : public QuicSocket,
       StreamId id,
       uint64_t windowSize) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
-      StreamId id,
-      ReadCallback* cb,
-      Optional<ApplicationErrorCode> err =
-          GenericApplicationErrorCode::NO_ERROR) override;
   void unsetAllReadCallbacks() override;
   void unsetAllPeekCallbacks() override;
   void unsetAllDeliveryCallbacks() override;
   folly::Expected<folly::Unit, LocalErrorCode> pauseRead(StreamId id) override;
   folly::Expected<folly::Unit, LocalErrorCode> resumeRead(StreamId id) override;
-  folly::Expected<folly::Unit, LocalErrorCode> stopSending(
-      StreamId id,
-      ApplicationErrorCode error) override;
 
   folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
       StreamId id,
@@ -229,17 +221,6 @@ class QuicTransportBase : public QuicSocket,
       StreamId id) override;
 
   /**
-   * Invoke onCanceled on all the delivery callbacks registered for streamId.
-   */
-  void cancelDeliveryCallbacksForStream(StreamId id) override;
-
-  /**
-   * Invoke onCanceled on all the delivery callbacks registered for streamId for
-   * offsets lower than the offset provided.
-   */
-  void cancelDeliveryCallbacksForStream(StreamId id, uint64_t offset) override;
-
-  /**
    * Register a callback to be invoked when the stream offset was transmitted.
    *
    * Currently, an offset is considered "transmitted" if it has been written to
@@ -251,27 +232,6 @@ class QuicTransportBase : public QuicSocket,
       const StreamId id,
       const uint64_t offset,
       ByteEventCallback* cb) override;
-
-  /**
-   * Cancel byte event callbacks for given stream.
-   *
-   * If an offset is provided, cancels only callbacks with an offset less than
-   * or equal to the provided offset, otherwise cancels all callbacks.
-   */
-  void cancelByteEventCallbacksForStream(
-      const StreamId id,
-      const Optional<uint64_t>& offset = none) override;
-
-  /**
-   * Cancel byte event callbacks for given type and stream.
-   *
-   * If an offset is provided, cancels only callbacks with an offset less than
-   * or equal to the provided offset, otherwise cancels all callbacks.
-   */
-  void cancelByteEventCallbacksForStream(
-      const ByteEvent::Type type,
-      const StreamId id,
-      const Optional<uint64_t>& offset = none) override;
 
   /**
    * Reset or send a stop sending on all non-control streams. Leaves the
@@ -401,10 +361,6 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumePeek(
       StreamId id,
       bool resume);
-  folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
-      StreamId id,
-      ReadCallback* cb,
-      Optional<ApplicationErrorCode> err) noexcept;
   folly::Expected<folly::Unit, LocalErrorCode> setPeekCallbackInternal(
       StreamId id,
       PeekCallback* cb) noexcept;

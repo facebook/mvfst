@@ -241,6 +241,26 @@ class QuicSocketLite {
   using ReadCallback = StreamReadCallback;
 
   /**
+   * Set the read callback for the given stream.  Note that read callback is
+   * expected to be set all the time. Removing read callback indicates that
+   * stream is no longer intended to be read again. This will issue a
+   * StopSending if cb is being set to nullptr after previously being not
+   * nullptr. The err parameter is used to control the error sent in the
+   * StopSending. By default when cb is nullptr this function will cause the
+   * transport to send a StopSending frame with
+   * GenericApplicationErrorCode::NO_ERROR. If err is specified to be
+   * none, no StopSending will be sent.
+   *
+   * Users should remove the callback via setReadCallback(id, nullptr) after
+   * reading an error or eof to allow streams to be reaped by the transport.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
+      StreamId id,
+      ReadCallback* cb,
+      Optional<ApplicationErrorCode> err =
+          GenericApplicationErrorCode::NO_ERROR) = 0;
+
+  /**
    * ===== Peek/Consume API =====
    */
 
@@ -477,6 +497,17 @@ class QuicSocketLite {
   virtual void closeNow(Optional<QuicError> errorCode) = 0;
 
   /**
+   * Initiates sending of a StopSending frame for a given stream to the peer.
+   * This is called a "solicited reset". On receipt of the StopSending frame
+   * the peer should, but may not, send a ResetStream frame for the requested
+   * stream. A caller can use this function when they are no longer processing
+   * received data on the stream.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> stopSending(
+      StreamId id,
+      ApplicationErrorCode error) = 0;
+
+  /**
    * Sets connection setup callback. This callback must be set before using the
    * socket.
    */
@@ -489,6 +520,40 @@ class QuicSocketLite {
    */
   virtual void setConnectionCallback(
       folly::MaybeManagedPtr<ConnectionCallback> callback) = 0;
+
+  /**
+   * Invoke onCanceled on all the delivery callbacks registered for streamId.
+   */
+  virtual void cancelDeliveryCallbacksForStream(StreamId streamId) = 0;
+
+  /**
+   * Invoke onCanceled on all the delivery callbacks registered for streamId for
+   * offsets lower than the offset provided.
+   */
+  virtual void cancelDeliveryCallbacksForStream(
+      StreamId streamId,
+      uint64_t offset) = 0;
+
+  /**
+   * Cancel byte event callbacks for given stream.
+   *
+   * If an offset is provided, cancels only callbacks with an offset less than
+   * or equal to the provided offset, otherwise cancels all callbacks.
+   */
+  virtual void cancelByteEventCallbacksForStream(
+      const StreamId id,
+      const Optional<uint64_t>& offset = none) = 0;
+
+  /**
+   * Cancel byte event callbacks for given type and stream.
+   *
+   * If an offset is provided, cancels only callbacks with an offset less than
+   * or equal to the provided offset, otherwise cancels all callbacks.
+   */
+  virtual void cancelByteEventCallbacksForStream(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const Optional<uint64_t>& offset = none) = 0;
 
   /**
    * Sets the size of the given stream's receive window, or the connection
