@@ -465,6 +465,18 @@ class QuicSocketLite {
   virtual bool error() const = 0;
 
   /**
+   * Close this socket with a drain period. If closing with an error, it may be
+   * specified.
+   */
+  virtual void close(Optional<QuicError> errorCode) = 0;
+
+  /**
+   * Close this socket without a drain period. If closing with an error, it may
+   * be specified.
+   */
+  virtual void closeNow(Optional<QuicError> errorCode) = 0;
+
+  /**
    * Sets connection setup callback. This callback must be set before using the
    * socket.
    */
@@ -495,6 +507,17 @@ class QuicSocketLite {
    */
   virtual void
   setSendBuffer(StreamId id, size_t maxUnacked, size_t maxUnsent) = 0;
+
+  /**
+   * Settings for the transport. This takes effect only before the transport
+   * is connected.
+   */
+  virtual void setTransportSettings(TransportSettings transportSettings) = 0;
+
+  /**
+   * Set congestion control type.
+   */
+  virtual void setCongestionControl(CongestionControlType type) = 0;
 
   /**
    * Returns the event base associated with this socket
@@ -568,6 +591,8 @@ class QuicSocketLite {
    */
   virtual folly::Expected<FlowControlState, LocalErrorCode>
   getStreamFlowControl(StreamId id) const = 0;
+
+  virtual const TransportSettings& getTransportSettings() const = 0;
 
   /**
    * Similar to getMaxWritableOnStream() above, but returns the value for the

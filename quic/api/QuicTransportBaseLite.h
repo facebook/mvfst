@@ -53,6 +53,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void writeData() = 0;
 
+  void close(Optional<QuicError> error) override;
+
+  void closeNow(Optional<QuicError> error) override;
+
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,
       StreamWriteCallback* wcb) override;
@@ -96,6 +100,14 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void setSendBuffer(StreamId, size_t /*maxUnacked*/, size_t /*maxUnsent*/)
       override {}
 
+  /**
+   * Set the initial flow control window for the connection.
+   */
+  void setTransportSettings(TransportSettings transportSettings) override;
+
+  // If you don't set it, the default is Cubic
+  void setCongestionControl(CongestionControlType type) override;
+
   uint64_t maxWritableOnStream(const QuicStreamState&) const;
 
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
@@ -115,6 +127,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   folly::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
   getStreamFlowControl(StreamId id) const override;
+
+  /**
+   * Retrieve the transport settings
+   */
+  const TransportSettings& getTransportSettings() const override;
 
   [[nodiscard]] uint64_t maxWritableOnConn() const override;
 
@@ -337,6 +354,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void describe(std::ostream& os) const;
 
+  /*
+   * Creates buf accessor for use with in-place batch writer.
+   */
+  virtual void createBufAccessor(size_t /* capacity */) {}
+
  protected:
   /**
    * A wrapper around writeSocketData
@@ -453,6 +475,13 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void processConnectionSetupCallbacks(QuicError&& cancelCode);
   void processConnectionCallbacks(QuicError&& cancelCode);
+
+  void updateCongestionControlSettings(
+      const TransportSettings& transportSettings);
+
+  void validateCongestionAndPacing(CongestionControlType& type);
+
+  void updateSocketTosSettings(uint8_t dscpValue);
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;

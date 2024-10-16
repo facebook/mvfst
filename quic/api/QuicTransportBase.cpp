@@ -16,7 +16,6 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/congestion_control/Pacer.h>
-#include <quic/congestion_control/TokenlessPacer.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -26,7 +25,6 @@
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <memory>
-#include <sstream>
 
 namespace {
 /**
@@ -34,11 +32,6 @@ namespace {
  * Used by close() and closeNow().
  */
 constexpr auto APP_NO_ERROR = quic::GenericApplicationErrorCode::NO_ERROR;
-quic::QuicError maybeSetGenericAppError(
-    quic::Optional<quic::QuicError>&& error) {
-  return std::move(error).value_or(
-      quic::QuicError{APP_NO_ERROR, quic::toString(APP_NO_ERROR)});
-}
 } // namespace
 
 namespace quic {
@@ -149,33 +142,6 @@ QuicTransportBase::~QuicTransportBase() {
 
 bool QuicTransportBase::replaySafe() const {
   return (conn_->oneRttWriteCipher != nullptr);
-}
-
-void QuicTransportBase::close(Optional<QuicError> errorCode) {
-  [[maybe_unused]] auto self = sharedGuard();
-  // The caller probably doesn't need a conn callback any more because they
-  // explicitly called close.
-  resetConnectionCallbacks();
-
-  // If we were called with no error code, ensure that we are going to write
-  // an application close, so the peer knows it didn't come from the transport.
-  errorCode = maybeSetGenericAppError(std::move(errorCode));
-  closeImpl(std::move(errorCode), true);
-}
-
-void QuicTransportBase::closeNow(Optional<QuicError> errorCode) {
-  DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
-  [[maybe_unused]] auto self = sharedGuard();
-  VLOG(4) << __func__ << " " << *this;
-  errorCode = maybeSetGenericAppError(std::move(errorCode));
-  closeImpl(std::move(errorCode), false);
-  // the drain timeout may have been scheduled by a previous close, in which
-  // case, our close would not take effect. This cancels the drain timeout in
-  // this case and expires the timeout.
-  if (isTimeoutScheduled(&drainTimeout_)) {
-    cancelTimeout(&drainTimeout_);
-    drainTimeoutExpired();
-  }
 }
 
 void QuicTransportBase::closeGracefully() {
@@ -1825,83 +1791,6 @@ QuicTransportBase::readDatagramBufs(size_t atMost) {
   return retDatagrams;
 }
 
-void QuicTransportBase::setTransportSettings(
-    TransportSettings transportSettings) {
-  if (conn_->nodeType == QuicNodeType::Client) {
-    if (useSinglePacketInplaceBatchWriter(
-            transportSettings.maxBatchSize, transportSettings.dataPathType)) {
-      createBufAccessor(conn_->udpSendPacketLen);
-    } else if (
-        transportSettings.dataPathType ==
-        quic::DataPathType::ContinuousMemory) {
-      // Create generic buf for in-place batch writer.
-      createBufAccessor(
-          conn_->udpSendPacketLen * transportSettings.maxBatchSize);
-    }
-  }
-
-  // If transport parameters are encoded, we can only update congestion
-  // control related params. Setting other transport settings again would be
-  // buggy.
-  // TODO should we throw or return Expected here?
-  if (conn_->transportParametersEncoded) {
-    updateCongestionControlSettings(transportSettings);
-  } else {
-    // TODO: We should let chain based GSO to use bufAccessor in the future as
-    // well.
-    CHECK(
-        conn_->bufAccessor ||
-        transportSettings.dataPathType != DataPathType::ContinuousMemory);
-    conn_->transportSettings = std::move(transportSettings);
-    conn_->streamManager->refreshTransportSettings(conn_->transportSettings);
-  }
-
-  // A few values cannot be overridden to be lower than default:
-  // TODO refactor transport settings to avoid having to update params twice.
-  if (conn_->transportSettings.defaultCongestionController !=
-      CongestionControlType::None) {
-    conn_->transportSettings.initCwndInMss =
-        std::max(conn_->transportSettings.initCwndInMss, kInitCwndInMss);
-    conn_->transportSettings.minCwndInMss =
-        std::max(conn_->transportSettings.minCwndInMss, kMinCwndInMss);
-    conn_->transportSettings.initCwndInMss = std::max(
-        conn_->transportSettings.minCwndInMss,
-        conn_->transportSettings.initCwndInMss);
-  }
-
-  validateCongestionAndPacing(
-      conn_->transportSettings.defaultCongestionController);
-  if (conn_->transportSettings.pacingEnabled) {
-    if (writeLooper_->hasPacingTimer()) {
-      bool usingBbr =
-          (conn_->transportSettings.defaultCongestionController ==
-               CongestionControlType::BBR ||
-           conn_->transportSettings.defaultCongestionController ==
-               CongestionControlType::BBRTesting ||
-           conn_->transportSettings.defaultCongestionController ==
-               CongestionControlType::BBR2);
-      auto minCwnd = usingBbr ? kMinCwndInMssForBbr
-                              : conn_->transportSettings.minCwndInMss;
-      conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
-      conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
-      conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
-    } else {
-      LOG(ERROR) << "Pacing cannot be enabled without a timer";
-      conn_->transportSettings.pacingEnabled = false;
-    }
-  }
-  setCongestionControl(conn_->transportSettings.defaultCongestionController);
-  if (conn_->transportSettings.datagramConfig.enabled) {
-    conn_->datagramState.maxReadFrameSize = kMaxDatagramFrameSize;
-    conn_->datagramState.maxReadBufferSize =
-        conn_->transportSettings.datagramConfig.readBufSize;
-    conn_->datagramState.maxWriteBufferSize =
-        conn_->transportSettings.datagramConfig.writeBufSize;
-  }
-
-  updateSocketTosSettings(conn_->transportSettings.dscpValue);
-}
-
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
   if (conn_->pacer) {
@@ -1912,48 +1801,6 @@ QuicTransportBase::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
         << "Cannot set max pacing rate without a pacer. Pacing Enabled = "
         << conn_->transportSettings.pacingEnabled;
     return folly::makeUnexpected(LocalErrorCode::PACER_NOT_AVAILABLE);
-  }
-}
-
-void QuicTransportBase::updateCongestionControlSettings(
-    const TransportSettings& transportSettings) {
-  conn_->transportSettings.defaultCongestionController =
-      transportSettings.defaultCongestionController;
-  conn_->transportSettings.initCwndInMss = transportSettings.initCwndInMss;
-  conn_->transportSettings.minCwndInMss = transportSettings.minCwndInMss;
-  conn_->transportSettings.maxCwndInMss = transportSettings.maxCwndInMss;
-  conn_->transportSettings.limitedCwndInMss =
-      transportSettings.limitedCwndInMss;
-  conn_->transportSettings.pacingEnabled = transportSettings.pacingEnabled;
-  conn_->transportSettings.pacingTickInterval =
-      transportSettings.pacingTickInterval;
-  conn_->transportSettings.pacingTimerResolution =
-      transportSettings.pacingTimerResolution;
-  conn_->transportSettings.minBurstPackets = transportSettings.minBurstPackets;
-  conn_->transportSettings.copaDeltaParam = transportSettings.copaDeltaParam;
-  conn_->transportSettings.copaUseRttStanding =
-      transportSettings.copaUseRttStanding;
-}
-
-void QuicTransportBase::updateSocketTosSettings(uint8_t dscpValue) {
-  const auto initialTosValue = conn_->socketTos.value;
-  conn_->socketTos.fields.dscp = dscpValue;
-  if (conn_->transportSettings.enableEcnOnEgress) {
-    if (conn_->transportSettings.useL4sEcn) {
-      conn_->socketTos.fields.ecn = kEcnECT1;
-      conn_->ecnState = ECNState::AttemptingL4S;
-    } else {
-      conn_->socketTos.fields.ecn = kEcnECT0;
-      conn_->ecnState = ECNState::AttemptingECN;
-    }
-  } else {
-    conn_->socketTos.fields.ecn = 0;
-    conn_->ecnState = ECNState::NotAttempted;
-  }
-
-  if (socket_ && socket_->isBound() &&
-      conn_->socketTos.value != initialTosValue) {
-    socket_->setTosOrTrafficClass(conn_->socketTos.value);
   }
 }
 
@@ -1969,10 +1816,6 @@ QuicTransportBase::setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) {
 
 bool QuicTransportBase::isKnobSupported() const {
   return conn_->peerAdvertisedKnobFrameSupport;
-}
-
-const TransportSettings& QuicTransportBase::getTransportSettings() const {
-  return conn_->transportSettings;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -2005,58 +1848,6 @@ folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
     return stream->priority;
   }
   return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-}
-
-void QuicTransportBase::validateCongestionAndPacing(
-    CongestionControlType& type) {
-  // Fallback to Cubic if Pacing isn't enabled with BBR together
-  if ((type == CongestionControlType::BBR ||
-       type == CongestionControlType::BBRTesting ||
-       type == CongestionControlType::BBR2) &&
-      (!conn_->transportSettings.pacingEnabled ||
-       !writeLooper_->hasPacingTimer())) {
-    LOG(ERROR) << "Unpaced BBR isn't supported";
-    type = CongestionControlType::Cubic;
-  }
-
-  if (type == CongestionControlType::BBR2 ||
-      type == CongestionControlType::BBRTesting) {
-    // We need to have the pacer rate be as accurate as possible for BBR2 and
-    // BBRTesting.
-    // The current BBR behavior is dependent on the existing pacing
-    // behavior so the override is only for BBR2.
-    // TODO: This should be removed once the pacer changes are adopted as
-    // the defaults or the pacer is fixed in another way.
-    // TODO: the override should include setting
-    // conn_->transportSettings.experimentalPacer to true. This has been
-    // temporarily removed for testing.
-    conn_->transportSettings.defaultRttFactor = {1, 1};
-    conn_->transportSettings.startupRttFactor = {1, 1};
-    if (conn_->pacer) {
-      conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
-      conn_->pacer->setRttFactor(
-          conn_->transportSettings.defaultRttFactor.first,
-          conn_->transportSettings.defaultRttFactor.second);
-    }
-    writeLooper_->setFireLoopEarly(true);
-  }
-}
-
-void QuicTransportBase::setCongestionControl(CongestionControlType type) {
-  DCHECK(conn_);
-  if (!conn_->congestionController ||
-      type != conn_->congestionController->type()) {
-    CHECK(conn_->congestionControllerFactory);
-    validateCongestionAndPacing(type);
-    conn_->congestionController =
-        conn_->congestionControllerFactory->makeCongestionController(
-            *conn_, type);
-    if (conn_->qLogger) {
-      std::stringstream s;
-      s << "CCA set to " << congestionControlTypeToString(type);
-      conn_->qLogger->addTransportStateUpdate(s.str());
-    }
-  }
 }
 
 void QuicTransportBase::addPacketProcessor(

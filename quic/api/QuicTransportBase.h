@@ -62,11 +62,7 @@ class QuicTransportBase : public QuicSocket,
   // QuicSocket interface
   bool replaySafe() const override;
 
-  void close(Optional<QuicError> error) override;
-
   void closeGracefully() override;
-
-  void closeNow(Optional<QuicError> error) override;
 
   folly::Expected<size_t, LocalErrorCode> getStreamReadOffset(
       StreamId id) const override;
@@ -202,11 +198,6 @@ class QuicTransportBase : public QuicSocket,
   Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
   /**
-   * Set the initial flow control window for the connection.
-   */
-  void setTransportSettings(TransportSettings transportSettings) override;
-
-  /**
    * Sets the maximum pacing rate in Bytes per second to be used
    * if pacing is enabled.
    */
@@ -234,11 +225,6 @@ class QuicTransportBase : public QuicSocket,
    */
   virtual void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
-
-  /**
-   * Retrieve the transport settings
-   */
-  const TransportSettings& getTransportSettings() const override;
 
   // Subclass API.
 
@@ -330,14 +316,6 @@ class QuicTransportBase : public QuicSocket,
    */
   void clearBackgroundModeParameters();
 
-  /*
-   * Creates buf accessor for use with in-place batch writer.
-   */
-  virtual void createBufAccessor(size_t /* capacity */) {}
-
-  // If you don't set it, the default is Cubic
-  void setCongestionControl(CongestionControlType type) override;
-
   void addPacketProcessor(
       std::shared_ptr<PacketProcessor> packetProcessor) override;
   void setThrottlingSignalProvider(
@@ -411,9 +389,6 @@ class QuicTransportBase : public QuicSocket,
   }
 
  protected:
-  void updateCongestionControlSettings(
-      const TransportSettings& transportSettings);
-  void updateSocketTosSettings(uint8_t dscpValue);
   void processCallbacksAfterNetworkData();
   void invokeStreamsAvailableCallbacks();
   void handlePingCallbacks();
@@ -457,8 +432,6 @@ class QuicTransportBase : public QuicSocket,
   void schedulePingTimeout(
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
-
-  void validateCongestionAndPacing(CongestionControlType& type);
 
   // Helpers to notify all registered observers about specific events during
   // socket write (if enabled in the observer's config).

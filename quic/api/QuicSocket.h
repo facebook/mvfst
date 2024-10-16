@@ -174,22 +174,10 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual bool replaySafe() const = 0;
 
   /**
-   * Close this socket with a drain period. If closing with an error, it may be
-   * specified.
-   */
-  virtual void close(Optional<QuicError> errorCode) = 0;
-
-  /**
    * Close this socket gracefully, by waiting for all the streams to be idle
    * first.
    */
   virtual void closeGracefully() = 0;
-
-  /**
-   * Close this socket without a drain period. If closing with an error, it may
-   * be specified.
-   */
-  virtual void closeNow(Optional<QuicError> errorCode) = 0;
 
   /**
    * Returns the current offset already read or written by the application on
@@ -237,14 +225,6 @@ class QuicSocket : virtual public QuicSocketLite {
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
   setStreamFlowControlWindow(StreamId id, uint64_t windowSize) = 0;
-
-  /**
-   * Settings for the transport. This takes effect only before the transport
-   * is connected.
-   */
-  virtual void setTransportSettings(TransportSettings transportSettings) = 0;
-
-  virtual const TransportSettings& getTransportSettings() const = 0;
 
   /**
    * Sets the maximum pacing rate in Bytes per second to be used
@@ -732,11 +712,6 @@ class QuicSocket : virtual public QuicSocketLite {
    * createStream() or receiving onNewBidirectionalStream()
    */
   virtual Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
-
-  /**
-   * Set congestion control type.
-   */
-  virtual void setCongestionControl(CongestionControlType type) = 0;
 
   /**
    * Add a packet processor
