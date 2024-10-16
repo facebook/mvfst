@@ -203,6 +203,8 @@ class QuicStreamManager {
     lossStreams_ = std::move(other.lossStreams_);
     lossDSRStreams_ = std::move(other.lossDSRStreams_);
     readableStreams_ = std::move(other.readableStreams_);
+    unidirectionalReadableStreams_ =
+        std::move(other.unidirectionalReadableStreams_);
     peekableStreams_ = std::move(other.peekableStreams_);
     writeQueue_ = std::move(other.writeQueue_);
     controlWriteQueue_ = std::move(other.controlWriteQueue_);
@@ -799,6 +801,10 @@ class QuicStreamManager {
     return readableStreams_;
   }
 
+  auto& readableUnidirectionalStreams() {
+    return unidirectionalReadableStreams_;
+  }
+
   // TODO figure out a better interface here.
   /*
    * Returns a mutable reference to the underlying peekable streams container.
@@ -1001,6 +1007,7 @@ class QuicStreamManager {
     deliverableStreams_.clear();
     txStreams_.clear();
     readableStreams_.clear();
+    unidirectionalReadableStreams_.clear();
     peekableStreams_.clear();
     flowControlUpdated_.clear();
   }
@@ -1081,6 +1088,9 @@ class QuicStreamManager {
   folly::Expected<StreamGroupId, LocalErrorCode> createNextStreamGroup(
       StreamGroupId& groupId,
       StreamIdSet& streamGroups);
+
+  void addToReadableStreams(const QuicStreamState& stream);
+  void removeFromReadableStreams(const QuicStreamState& stream);
 
   QuicConnectionStateBase& conn_;
   QuicNodeType nodeType_;
@@ -1201,6 +1211,12 @@ class QuicStreamManager {
 
   // Set of streams that have pending reads
   folly::F14FastSet<StreamId> readableStreams_;
+
+  // Set of unidirectional streams that have pending reads.
+  // Used separately from readableStreams_ when
+  // unidirectionalStreamsReadCallbacksFirst = true to prioritize unidirectional
+  // streams read callbacks.
+  folly::F14FastSet<StreamId> unidirectionalReadableStreams_;
 
   // Set of streams that have pending peeks
   folly::F14FastSet<StreamId> peekableStreams_;

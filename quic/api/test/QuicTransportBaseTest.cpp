@@ -960,6 +960,52 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailable) {
   transport.reset();
 }
 
+TEST_P(
+    QuicTransportImplTestBase,
+    ReadCallbackDataAvailableWithUnidirPrioritized) {
+  InSequence seq;
+
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.unidirectionalStreamsReadCallbacksFirst = true;
+  transport->setTransportSettings(transportSettings);
+
+  auto& streamManager = *transport->transportConn->streamManager;
+  auto nextPeerUniStream =
+      streamManager.nextAcceptablePeerUnidirectionalStreamId();
+  EXPECT_TRUE(nextPeerUniStream.has_value());
+  StreamId qpackStream = streamManager.getStream(*nextPeerUniStream)->id;
+
+  auto requestStream = transport->createBidirectionalStream().value();
+
+  NiceMock<MockReadCallback> requestStreamCb;
+  NiceMock<MockReadCallback> qpackStreamCb;
+
+  transport->setReadCallback(requestStream, &requestStreamCb);
+  transport->setReadCallback(qpackStream, &qpackStreamCb);
+
+  transport->addDataToStream(
+      qpackStream,
+      StreamBuffer(
+          folly::IOBuf::copyBuffer(
+              "and i'm qpack data i will block you no tomorrow"),
+          0));
+  transport->addDataToStream(
+      requestStream, StreamBuffer(folly::IOBuf::copyBuffer("i'm headers"), 0));
+
+  bool qpackCbCalled = false;
+
+  EXPECT_CALL(qpackStreamCb, readAvailable(qpackStream))
+      .WillOnce(Invoke([&](StreamId) {
+        EXPECT_FALSE(qpackCbCalled);
+        qpackCbCalled = true;
+      }));
+  EXPECT_CALL(requestStreamCb, readAvailable(requestStream))
+      .WillOnce(Invoke([&](StreamId) { EXPECT_TRUE(qpackCbCalled); }));
+  transport->driveReadCallbacks();
+
+  transport.reset();
+}
+
 TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableNoReap) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();

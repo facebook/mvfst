@@ -648,6 +648,78 @@ TEST_P(QuicStreamManagerTest, TestClearActionable) {
   EXPECT_TRUE(manager.peekableStreams().empty());
 }
 
+TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSet) {
+  conn.transportSettings.unidirectionalStreamsReadCallbacksFirst = true;
+  auto& manager = *conn.streamManager;
+
+  StreamId id = 1;
+  auto stream = manager.createNextUnidirectionalStream().value();
+  stream->readBuffer.emplace_back(folly::IOBuf::copyBuffer("blah blah"), 0);
+  manager.queueFlowControlUpdated(id);
+  manager.addDeliverable(id);
+  manager.updateReadableStreams(*stream);
+  manager.updatePeekableStreams(*stream);
+
+  EXPECT_TRUE(manager.flowControlUpdatedContains(id));
+  EXPECT_TRUE(manager.deliverableContains(id));
+  EXPECT_TRUE(manager.readableStreams().empty());
+  EXPECT_FALSE(manager.readableUnidirectionalStreams().empty());
+  EXPECT_FALSE(manager.peekableStreams().empty());
+  manager.clearActionable();
+  EXPECT_FALSE(manager.flowControlUpdatedContains(id));
+  EXPECT_FALSE(manager.deliverableContains(id));
+  EXPECT_TRUE(manager.readableStreams().empty());
+  EXPECT_TRUE(manager.peekableStreams().empty());
+}
+
+TEST_P(
+    QuicStreamManagerTest,
+    TestUnidirectionalStreamsSeparateSetRemoveStream) {
+  conn.transportSettings.unidirectionalStreamsReadCallbacksFirst = true;
+  auto& manager = *conn.streamManager;
+
+  auto stream = manager.createNextUnidirectionalStream().value();
+  stream->readBuffer.emplace_back(folly::IOBuf::copyBuffer("blah blah"), 0);
+  manager.updateReadableStreams(*stream);
+  manager.updatePeekableStreams(*stream);
+
+  EXPECT_TRUE(manager.readableStreams().empty());
+  EXPECT_FALSE(manager.readableUnidirectionalStreams().empty());
+  EXPECT_FALSE(manager.peekableStreams().empty());
+
+  // Remove data from stream.
+  stream->readBuffer.clear();
+  manager.updateReadableStreams(*stream);
+
+  EXPECT_TRUE(manager.readableStreams().empty());
+  EXPECT_TRUE(manager.readableUnidirectionalStreams().empty());
+}
+
+TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSetTwoStreams) {
+  conn.transportSettings.unidirectionalStreamsReadCallbacksFirst = true;
+  auto& manager = *conn.streamManager;
+
+  auto stream = manager.createNextBidirectionalStream().value();
+  stream->readBuffer.emplace_back(
+      folly::IOBuf::copyBuffer("and i'm headers"), 0);
+
+  manager.updateReadableStreams(*stream);
+  manager.updatePeekableStreams(*stream);
+
+  EXPECT_EQ(manager.readableStreams().size(), 1);
+  EXPECT_EQ(manager.readableUnidirectionalStreams().size(), 0);
+
+  auto stream2 = manager.createNextUnidirectionalStream().value();
+  stream2->readBuffer.emplace_back(
+      folly::IOBuf::copyBuffer("look at me, i am qpack data"), 0);
+
+  manager.updateReadableStreams(*stream2);
+  manager.updatePeekableStreams(*stream2);
+
+  EXPECT_EQ(manager.readableStreams().size(), 1);
+  EXPECT_EQ(manager.readableUnidirectionalStreams().size(), 1);
+}
+
 TEST_P(QuicStreamManagerTest, WriteBufferMeta) {
   auto& manager = *conn.streamManager;
   auto stream = manager.createNextUnidirectionalStream().value();

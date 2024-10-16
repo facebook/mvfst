@@ -472,19 +472,26 @@ void QuicTransportBaseLite::updateReadLooper() {
     readLooper_->stop();
     return;
   }
+  auto matcherFn = [&readCallbacks = readCallbacks_](StreamId s) {
+    auto readCb = readCallbacks.find(s);
+    if (readCb == readCallbacks.end()) {
+      return false;
+    }
+    // TODO: if the stream has an error and it is also paused we should
+    // still return an error
+    return readCb->second.readCb && readCb->second.resumed;
+  };
   auto iter = std::find_if(
       conn_->streamManager->readableStreams().begin(),
       conn_->streamManager->readableStreams().end(),
-      [&readCallbacks = readCallbacks_](StreamId s) {
-        auto readCb = readCallbacks.find(s);
-        if (readCb == readCallbacks.end()) {
-          return false;
-        }
-        // TODO: if the stream has an error and it is also paused we should
-        // still return an error
-        return readCb->second.readCb && readCb->second.resumed;
-      });
+      matcherFn);
+  auto unidirIter = std::find_if(
+      conn_->streamManager->readableUnidirectionalStreams().begin(),
+      conn_->streamManager->readableUnidirectionalStreams().end(),
+      matcherFn);
   if (iter != conn_->streamManager->readableStreams().end() ||
+      unidirIter !=
+          conn_->streamManager->readableUnidirectionalStreams().end() ||
       !conn_->datagramState.readBuffer.empty()) {
     VLOG(10) << "Scheduling read looper " << *this;
     readLooper_->run();
@@ -1307,15 +1314,30 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks() {
   };
   // Need a copy since the set can change during callbacks.
   std::vector<StreamId> readableStreamsCopy;
+
   const auto& readableStreams = self->conn_->streamManager->readableStreams();
-  readableStreamsCopy.reserve(readableStreams.size());
+  const auto& readableUnidirectionalStreams =
+      self->conn_->streamManager->readableUnidirectionalStreams();
+
+  readableStreamsCopy.reserve(
+      readableStreams.size() + readableUnidirectionalStreams.size());
+
+  if (self->conn_->transportSettings.unidirectionalStreamsReadCallbacksFirst) {
+    std::copy(
+        readableUnidirectionalStreams.begin(),
+        readableUnidirectionalStreams.end(),
+        std::back_inserter(readableStreamsCopy));
+  }
+
   std::copy(
       readableStreams.begin(),
       readableStreams.end(),
       std::back_inserter(readableStreamsCopy));
+
   if (self->conn_->transportSettings.orderedReadCallbacks) {
     std::sort(readableStreamsCopy.begin(), readableStreamsCopy.end());
   }
+
   for (StreamId streamId : readableStreamsCopy) {
     auto callback = self->readCallbacks_.find(streamId);
     if (callback == self->readCallbacks_.end()) {
@@ -1325,7 +1347,14 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks() {
     auto readCb = callback->second.readCb;
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
     if (readCb && stream->streamReadError) {
-      self->conn_->streamManager->readableStreams().erase(streamId);
+      if (self->conn_->transportSettings
+              .unidirectionalStreamsReadCallbacksFirst &&
+          isUnidirectionalStream(streamId)) {
+        self->conn_->streamManager->readableUnidirectionalStreams().erase(
+            streamId);
+      } else {
+        self->conn_->streamManager->readableStreams().erase(streamId);
+      }
       readCallbacks_.erase(callback);
       // if there is an error on the stream - it's not readable anymore, so
       // we cannot peek into it as well.

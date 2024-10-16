@@ -555,7 +555,12 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   }
   VLOG(10) << "Removing closed stream=" << streamId;
   DCHECK(it->second.inTerminalStates());
-  readableStreams_.erase(streamId);
+  if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
+      isUnidirectionalStream(streamId)) {
+    unidirectionalReadableStreams_.erase(streamId);
+  } else {
+    readableStreams_.erase(streamId);
+  }
   peekableStreams_.erase(streamId);
   removeWritable(it->second);
   blockedStreams_.erase(streamId);
@@ -624,12 +629,31 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   notifyStreamPriorityChanges();
 }
 
+void QuicStreamManager::addToReadableStreams(const QuicStreamState& stream) {
+  if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
+      isUnidirectionalStream(stream.id)) {
+    unidirectionalReadableStreams_.emplace(stream.id);
+  } else {
+    readableStreams_.emplace(stream.id);
+  }
+}
+
+void QuicStreamManager::removeFromReadableStreams(
+    const QuicStreamState& stream) {
+  if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
+      isUnidirectionalStream(stream.id)) {
+    unidirectionalReadableStreams_.erase(stream.id);
+  } else {
+    readableStreams_.erase(stream.id);
+  }
+}
+
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
   updateHolBlockedTime(stream);
   if (stream.hasReadableData() || stream.streamReadError.has_value()) {
-    readableStreams_.emplace(stream.id);
+    addToReadableStreams(stream);
   } else {
-    readableStreams_.erase(stream.id);
+    removeFromReadableStreams(stream);
   }
 }
 
