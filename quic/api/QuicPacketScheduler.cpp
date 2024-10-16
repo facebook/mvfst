@@ -920,14 +920,19 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     }
     // The packet is already a clone
     if (outstandingPacket.maybeClonedPacketIdentifier) {
-      // If packet has CRYPTO frame, don't clone it again even if not processed
-      // yet, move on to give next packet a chance to be cloned
       const auto& frames = outstandingPacket.packet.frames;
-      if (conn_.transportSettings.cloneAllPacketsWithCryptoFrame &&
-          std::find_if(frames.begin(), frames.end(), [](const auto& frame) {
-            return frame.type() == QuicWriteFrame::Type::WriteCryptoFrame;
-          }) != frames.end()) {
-        continue;
+      if (conn_.transportSettings.cloneAllPacketsWithCryptoFrame) {
+        // Has CRYPTO frame
+        if (std::find_if(frames.begin(), frames.end(), [](const auto& frame) {
+              return frame.type() == QuicWriteFrame::Type::WriteCryptoFrame;
+            }) != frames.end()) {
+          auto mostRecentOutstandingPacketIdentifier =
+              conn_.outstandings.packets.back().maybeClonedPacketIdentifier;
+          if (mostRecentOutstandingPacketIdentifier ==
+              outstandingPacket.maybeClonedPacketIdentifier) {
+            continue;
+          }
+        }
       }
       // Otherwise, clone until it is processed
       if (conn_.outstandings.clonedPacketIdentifiers.count(

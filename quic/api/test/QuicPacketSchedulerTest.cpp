@@ -642,29 +642,60 @@ TEST_P(
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
 
-  // First packet has a crypto frame
-  PacketNum firstPacketNum = addOutstandingPacket(conn);
-  conn.outstandings.packets.back().packet.frames.push_back(
-      WriteCryptoFrame(0, 1));
-  ClonedPacketIdentifier clonedPacketIdentifier(
-      PacketNumberSpace::AppData, firstPacketNum);
-  conn.outstandings.packets.back().maybeClonedPacketIdentifier =
-      clonedPacketIdentifier;
-  // It is not processed yet
-  conn.outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
-  // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandings.packets.back().packet.frames.push_back(
-      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  PacketNum firstPacketNum = addInitialOutstandingPacket(conn);
+  {
+    conn.outstandings.packets.back().packet.frames.push_back(
+        WriteCryptoFrame(0, 1));
+    ClonedPacketIdentifier clonedPacketIdentifier(
+        PacketNumberSpace::Initial, firstPacketNum);
+    conn.outstandings.packets.back().maybeClonedPacketIdentifier =
+        clonedPacketIdentifier;
+    // It is not processed yet
+    conn.outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+    // There needs to have retransmittable frame for the rebuilder to work
+    conn.outstandings.packets.back().packet.frames.push_back(
+        MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  }
 
-  PacketNum secondPacketNum = addOutstandingPacket(conn);
-  // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandings.packets.back().packet.frames.push_back(
-      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  PacketNum secondPacketNum = addInitialOutstandingPacket(conn);
+  {
+    conn.outstandings.packets.back().packet.frames.push_back(
+        WriteCryptoFrame(0, 1));
+    ClonedPacketIdentifier clonedPacketIdentifier(
+        PacketNumberSpace::Initial, secondPacketNum);
+    conn.outstandings.packets.back().maybeClonedPacketIdentifier =
+        clonedPacketIdentifier;
+    // It is not processed yet
+    conn.outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+    // There needs to have retransmittable frame for the rebuilder to work
+    conn.outstandings.packets.back().packet.frames.push_back(
+        MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  }
 
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
+  // Add a third outstanding packet, which is a clone of the first packet
+  {
+    addInitialOutstandingPacket(conn);
+    conn.outstandings.packets.back().packet.frames.push_back(
+        WriteCryptoFrame(0, 1));
+    ClonedPacketIdentifier clonedPacketIdentifier(
+        PacketNumberSpace::Initial, firstPacketNum);
+    conn.outstandings.packets.back().maybeClonedPacketIdentifier =
+        clonedPacketIdentifier;
+    // It is not processed yet
+    conn.outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
+    // There needs to have retransmittable frame for the rebuilder to work
+    conn.outstandings.packets.back().packet.frames.push_back(
+        MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  }
+
+  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
+  ConnectionId srcConnId(zeroConnIdData);
+  LongHeader header(
+      LongHeader::Types::Initial,
+      srcConnId,
       conn.clientConnectionId.value_or(getTestConnectionId()),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
+      QuicVersion::MVFST);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
@@ -692,22 +723,26 @@ TEST_F(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
 
   // First packet has a crypto frame
-  PacketNum firstPacketNum = addOutstandingPacket(conn);
+  PacketNum firstPacketNum = addInitialOutstandingPacket(conn);
   conn.outstandings.packets.back().packet.frames.push_back(
       WriteCryptoFrame(0, 1));
   // There needs to have retransmittable frame for the rebuilder to work
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
 
-  addOutstandingPacket(conn);
+  addInitialOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
 
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
+  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
+  ConnectionId srcConnId(zeroConnIdData);
+  LongHeader header(
+      LongHeader::Types::Initial,
+      srcConnId,
       conn.clientConnectionId.value_or(getTestConnectionId()),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
+      QuicVersion::MVFST);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
