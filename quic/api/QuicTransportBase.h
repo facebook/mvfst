@@ -205,19 +205,6 @@ class QuicTransportBase : public QuicSocket,
       uint64_t maxRateBytesPerSec) override;
 
   /**
-   * Set a "knob". This will emit a knob frame to the peer, which the peer
-   * application can act on by e.g. changing transport settings during the
-   * connection.
-   */
-  folly::Expected<folly::Unit, LocalErrorCode>
-  setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override;
-
-  /**
-   * Can Knob Frames be exchanged with the peer on this connection?
-   */
-  FOLLY_NODISCARD bool isKnobSupported() const override;
-
-  /**
    * Set factory to create specific congestion controller instances
    * for a given connection.
    * Deletes current congestion controller instance, to create new controller
@@ -237,10 +224,6 @@ class QuicTransportBase : public QuicSocket,
   virtual void onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) = 0;
-
-  folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
-      StreamId id,
-      Priority priority) override;
 
   folly::Expected<Priority, LocalErrorCode> getStreamPriority(
       StreamId id) override;

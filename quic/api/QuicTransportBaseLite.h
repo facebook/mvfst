@@ -108,6 +108,23 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
 
+  /**
+   * Set a "knob". This will emit a knob frame to the peer, which the peer
+   * application can act on by e.g. changing transport settings during the
+   * connection.
+   */
+  folly::Expected<folly::Unit, LocalErrorCode>
+  setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override;
+
+  /**
+   * Can Knob Frames be exchanged with the peer on this connection?
+   */
+  FOLLY_NODISCARD bool isKnobSupported() const override;
+
+  folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
+      StreamId id,
+      Priority priority) override;
+
   uint64_t maxWritableOnStream(const QuicStreamState&) const;
 
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;

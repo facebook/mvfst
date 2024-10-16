@@ -1804,41 +1804,6 @@ QuicTransportBase::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
   }
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) {
-  if (isKnobSupported()) {
-    sendSimpleFrame(*conn_, KnobFrame(knobSpace, knobId, std::move(knobBlob)));
-    return folly::unit;
-  }
-  LOG(ERROR) << "Cannot set knob. Peer does not support the knob frame";
-  return folly::makeUnexpected(LocalErrorCode::KNOB_FRAME_UNSUPPORTED);
-}
-
-bool QuicTransportBase::isKnobSupported() const {
-  return conn_->peerAdvertisedKnobFrameSupport;
-}
-
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setStreamPriority(StreamId id, Priority priority) {
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (priority.level > kDefaultMaxPriority) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  if (!conn_->streamManager->streamExists(id)) {
-    // It's not an error to try to prioritize a non-existent stream.
-    return folly::unit;
-  }
-  // It's not an error to prioritize a stream after it's sent its FIN - this
-  // can reprioritize retransmissions.
-  bool updated = conn_->streamManager->setStreamPriority(id, priority);
-  if (updated && conn_->qLogger) {
-    conn_->qLogger->addPriorityUpdate(id, priority.level, priority.incremental);
-  }
-  return folly::unit;
-}
-
 folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
     StreamId id) {
   if (closeState_ != CloseState::OPEN) {

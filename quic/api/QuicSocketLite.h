@@ -520,6 +520,38 @@ class QuicSocketLite {
   virtual void setCongestionControl(CongestionControlType type) = 0;
 
   /**
+   * Set a "knob". This will emit a knob frame to the peer, which the peer
+   * application can act on by e.g. changing transport settings during the
+   * connection.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) = 0;
+
+  /**
+   * Can Knob Frames be exchanged with the peer on this connection?
+   */
+  FOLLY_NODISCARD virtual bool isKnobSupported() const = 0;
+
+  /**
+   * Set stream priority.
+   * level: can only be in [0, 7].
+   */
+  folly::Expected<folly::Unit, LocalErrorCode>
+  setStreamPriority(StreamId id, PriorityLevel level, bool incremental) {
+    return setStreamPriority(id, Priority(level, incremental));
+  }
+
+  /**
+   * Set stream priority.
+   * level: can only be in [0, 7].
+   * incremental: true/false
+   * orderId: uint64
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
+      StreamId id,
+      Priority priority) = 0;
+
+  /**
    * Returns the event base associated with this socket
    */
   [[nodiscard]] virtual std::shared_ptr<QuicEventBase> getEventBase() const = 0;
