@@ -5606,6 +5606,9 @@ class QuicServerTransportCertTest : public QuicServerTransportTest {
     std::string getIdentity() const override {
       return "";
     }
+    std::optional<std::string> getDER() const override {
+      return std::nullopt;
+    }
   };
 };
 
