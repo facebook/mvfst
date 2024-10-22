@@ -103,6 +103,8 @@ constexpr uint64_t kDefaultQuicTransportKnobSpace = 0xfaceb001;
 // Default knob id for transport knobs (used for internal use-cases only)
 constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 
+FOLLY_PUSH_WARNING
+FOLLY_CLANG_DISABLE_WARNING("-Wglobal-constructors")
 BETTER_ENUM(
     PacketDropReason,
     uint8_t,
@@ -203,6 +205,7 @@ BETTER_ENUM(
     AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009,
     // Controls whether to use the inflight reordering heuristic.
     INFLIGHT_REORDERING_THRESHOLD = 0x1000A)
+FOLLY_POP_WARNING
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
