@@ -398,7 +398,7 @@ struct TransportSettings {
   double ackTimerFactor{kAckTimerFactor};
   // If flow control updates should be sent based on time passed since last
   // update.
-  bool enableFlowControlTimeBasedUpdates{true};
+  bool disableFlowControlTimeBasedUpdates{false};
   // Check if idle timer needs to be triggered manually.
   bool checkIdleTimerOnWrite{false};
   // Whether to process callbacks per received packet.
