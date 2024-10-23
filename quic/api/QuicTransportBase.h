@@ -124,19 +124,6 @@ class QuicTransportBase : public QuicSocket,
   StreamDirectionality getStreamDirectionality(
       StreamId stream) noexcept override;
 
-  WriteResult writeChain(
-      StreamId id,
-      Buf data,
-      bool eof,
-      ByteEventCallback* cb = nullptr) override;
-
-  folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
-      StreamId id,
-      uint64_t offset,
-      ByteEventCallback* cb) override;
-
-  Optional<LocalErrorCode> shutdownWrite(StreamId id) override;
-
   folly::Expected<folly::Unit, LocalErrorCode> resetStream(
       StreamId id,
       ApplicationErrorCode errorCode) override;

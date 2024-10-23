@@ -70,6 +70,19 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   bool isUnidirectionalStream(StreamId stream) noexcept override;
   bool isBidirectionalStream(StreamId stream) noexcept override;
 
+  WriteResult writeChain(
+      StreamId id,
+      Buf data,
+      bool eof,
+      ByteEventCallback* cb = nullptr) override;
+
+  Optional<LocalErrorCode> shutdownWrite(StreamId id) override;
+
+  folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
+      StreamId id,
+      uint64_t offset,
+      ByteEventCallback* cb) override;
+
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,
       StreamWriteCallback* wcb) override;

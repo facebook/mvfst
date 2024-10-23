@@ -500,6 +500,51 @@ class QuicSocketLite {
   };
 
   /**
+   * Write data/eof to the given stream.
+   *
+   * Passing a delivery callback registers a callback from the transport when
+   * the peer has acknowledged the receipt of all the data/eof passed to write.
+   *
+   * An error code is present if there was an error with the write.
+   */
+  using WriteResult = folly::Expected<folly::Unit, LocalErrorCode>;
+  virtual WriteResult writeChain(
+      StreamId id,
+      Buf data,
+      bool eof,
+      ByteEventCallback* cb = nullptr) = 0;
+
+  /**
+   * Write a data representation in the form of BufferMeta to the given stream.
+   */
+  virtual WriteResult writeBufMeta(
+      StreamId id,
+      const BufferMeta& data,
+      bool eof,
+      ByteEventCallback* cb = nullptr) = 0;
+
+  /**
+   * Set the DSRPacketizationRequestSender for a stream.
+   */
+  virtual WriteResult setDSRPacketizationRequestSender(
+      StreamId id,
+      std::unique_ptr<DSRPacketizationRequestSender> sender) = 0;
+
+  /**
+   * Close the stream for writing.  Equivalent to writeChain(id, nullptr, true).
+   */
+  virtual Optional<LocalErrorCode> shutdownWrite(StreamId id) = 0;
+
+  /**
+   * Register a callback to be invoked when the peer has acknowledged the
+   * given offset on the given stream.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
+      StreamId id,
+      uint64_t offset,
+      ByteEventCallback* cb) = 0;
+
+  /**
    * Inform the transport that there is data to write on this connection
    * An app shouldn't mix connection and stream calls to this API
    * Use this if the app wants to do prioritization.

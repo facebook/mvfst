@@ -125,6 +125,90 @@ bool QuicTransportBaseLite::isBidirectionalStream(StreamId stream) noexcept {
   return quic::isBidirectionalStream(stream);
 }
 
+QuicSocket::WriteResult QuicTransportBaseLite::writeChain(
+    StreamId id,
+    Buf data,
+    bool eof,
+    ByteEventCallback* cb) {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  [[maybe_unused]] auto self = sharedGuard();
+  try {
+    // Check whether stream exists before calling getStream to avoid
+    // creating a peer stream if it does not exist yet.
+    if (!conn_->streamManager->streamExists(id)) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
+    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    if (!stream->writable()) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+    }
+    // Register DeliveryCallback for the data + eof offset.
+    if (cb) {
+      auto dataLength =
+          (data ? data->computeChainDataLength() : 0) + (eof ? 1 : 0);
+      if (dataLength) {
+        auto currentLargestWriteOffset = getLargestWriteOffsetSeen(*stream);
+        registerDeliveryCallback(
+            id, currentLargestWriteOffset + dataLength - 1, cb);
+      }
+    }
+    bool wasAppLimitedOrIdle = false;
+    if (conn_->congestionController) {
+      wasAppLimitedOrIdle = conn_->congestionController->isAppLimited();
+      wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
+    }
+    writeDataToQuicStream(*stream, std::move(data), eof);
+    // If we were previously app limited restart pacing with the current rate.
+    if (wasAppLimitedOrIdle && conn_->pacer) {
+      conn_->pacer->reset();
+    }
+    updateWriteLooper(true);
+  } catch (const QuicTransportException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+  } catch (const QuicInternalException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(ex.errorCode());
+  } catch (const std::exception& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  return folly::unit;
+}
+
+Optional<LocalErrorCode> QuicTransportBaseLite::shutdownWrite(StreamId id) {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return LocalErrorCode::INVALID_OPERATION;
+  }
+  return none;
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::registerDeliveryCallback(
+    StreamId id,
+    uint64_t offset,
+    ByteEventCallback* cb) {
+  return registerByteEventCallback(ByteEvent::Type::ACK, id, offset, cb);
+}
+
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBaseLite::notifyPendingWriteOnConnection(
     ConnectionWriteCallback* wcb) {
