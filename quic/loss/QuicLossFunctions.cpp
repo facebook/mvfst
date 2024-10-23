@@ -100,13 +100,6 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
           packetCount[PacketNumberSpace::AppData];
     }
   }
-  if (conn.transportSettings.alwaysPtoMultiple) {
-    for (auto& numProbes : numProbePackets) {
-      if (numProbes > 0) {
-        numProbes = kPacketToSendForPTO;
-      }
-    }
-  }
 }
 
 template <class T, size_t N>
