@@ -232,6 +232,46 @@ class QuicSocketLite {
   };
 
   /**
+   * Creates a bidirectional stream.  This assigns a stream ID but does not
+   * send anything to the peer.
+   *
+   * If replaySafe is false, the transport will buffer (up to the send buffer
+   * limits) any writes on this stream until the transport is replay safe.
+   */
+  virtual folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
+      bool replaySafe = true) = 0;
+
+  /**
+   * Creates a unidirectional stream.  This assigns a stream ID but does not
+   * send anything to the peer.
+   *
+   * If replaySafe is false, the transport will buffer (up to the send buffer
+   * limits) any writes on this stream until the transport is replay safe.
+   */
+  virtual folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
+      bool replaySafe = true) = 0;
+
+  /**
+   * Returns the number of bidirectional streams that can be opened.
+   */
+  virtual uint64_t getNumOpenableBidirectionalStreams() const = 0;
+
+  /**
+   * Returns the number of unidirectional streams that can be opened.
+   */
+  virtual uint64_t getNumOpenableUnidirectionalStreams() const = 0;
+
+  /**
+   * Returns whether a stream ID represents a unidirectional stream.
+   */
+  virtual bool isUnidirectionalStream(StreamId stream) noexcept = 0;
+
+  /**
+   * Returns whether a stream ID represents a bidirectional stream.
+   */
+  virtual bool isBidirectionalStream(StreamId stream) noexcept = 0;
+
+  /**
    * ===== Read API ====
    */
 
@@ -239,6 +279,21 @@ class QuicSocketLite {
    * Callback class for receiving data on a stream
    */
   using ReadCallback = StreamReadCallback;
+
+  /**
+   * Read from the given stream, up to maxLen bytes.  If maxLen is 0, transport
+   * will return all available bytes.
+   *
+   * The return value is Expected.  If the value hasError(), then a read error
+   * occurred and it can be obtained with error().  If the value hasValue(),
+   * then value() returns a pair of the data (if any) and the EOF marker.
+   *
+   * Calling read() when there is no data/eof to deliver will return an
+   * EAGAIN-like error code.
+   */
+  virtual folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
+      StreamId id,
+      size_t maxLen) = 0;
 
   /**
    * Set the read callback for the given stream.  Note that read callback is

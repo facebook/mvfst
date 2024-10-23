@@ -484,61 +484,6 @@ void QuicTransportBase::invokeStreamsAvailableCallbacks() {
   }
 }
 
-folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
-    StreamId id,
-    size_t maxLen) {
-  if (isSendingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  [[maybe_unused]] auto self = sharedGuard();
-  SCOPE_EXIT {
-    updateReadLooper();
-    updatePeekLooper(); // read can affect "peek" API
-    updateWriteLooper(true);
-  };
-  try {
-    if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-    }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-    auto result = readDataFromQuicStream(*stream, maxLen);
-    if (result.second) {
-      VLOG(10) << "Delivered eof to app for stream=" << stream->id << " "
-               << *this;
-      auto it = readCallbacks_.find(id);
-      if (it != readCallbacks_.end()) {
-        // it's highly unlikely that someone called read() without having a read
-        // callback so we don't deal with the case of someone installing a read
-        // callback after reading the EOM.
-        it->second.deliveredEOM = true;
-      }
-    }
-    return folly::makeExpected<LocalErrorCode>(std::move(result));
-  } catch (const QuicTransportException& ex) {
-    VLOG(4) << "read() error " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
-    return folly::makeUnexpected(ex.errorCode());
-  } catch (const std::exception& ex) {
-    VLOG(4) << "read()  error " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("read() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
-  }
-}
-
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
     StreamId id,
     const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
@@ -1153,64 +1098,6 @@ void QuicTransportBase::onNetworkData(
   }
 }
 
-uint64_t QuicTransportBase::getNumOpenableBidirectionalStreams() const {
-  return conn_->streamManager->openableLocalBidirectionalStreams();
-}
-
-uint64_t QuicTransportBase::getNumOpenableUnidirectionalStreams() const {
-  return conn_->streamManager->openableLocalUnidirectionalStreams();
-}
-
-folly::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createStreamInternal(
-    bool bidirectional,
-    const OptionalIntegral<StreamGroupId>& streamGroupId) {
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  folly::Expected<QuicStreamState*, LocalErrorCode> streamResult;
-  if (bidirectional) {
-    streamResult =
-        conn_->streamManager->createNextBidirectionalStream(streamGroupId);
-  } else {
-    streamResult =
-        conn_->streamManager->createNextUnidirectionalStream(streamGroupId);
-  }
-  if (streamResult) {
-    const StreamId streamId = streamResult.value()->id;
-
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::streamEvents>()) {
-      getSocketObserverContainer()
-          ->invokeInterfaceMethod<
-              SocketObserverInterface::Events::streamEvents>(
-              [event = SocketObserverInterface::StreamOpenEvent(
-                   streamId,
-                   getStreamInitiator(streamId),
-                   getStreamDirectionality(streamId))](
-                  auto observer, auto observed) {
-                observer->streamOpened(observed, event);
-              });
-    }
-
-    return streamId;
-  } else {
-    return folly::makeUnexpected(streamResult.error());
-  }
-}
-
-folly::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createBidirectionalStream(bool /*replaySafe*/) {
-  return createStreamInternal(true);
-}
-
-folly::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createUnidirectionalStream(bool /*replaySafe*/) {
-  return createStreamInternal(false);
-}
-
 folly::Expected<StreamGroupId, LocalErrorCode>
 QuicTransportBase::createBidirectionalStreamGroup() {
   if (closeState_ != CloseState::OPEN) {
@@ -1243,14 +1130,6 @@ bool QuicTransportBase::isClientStream(StreamId stream) noexcept {
 
 bool QuicTransportBase::isServerStream(StreamId stream) noexcept {
   return quic::isServerStream(stream);
-}
-
-bool QuicTransportBase::isUnidirectionalStream(StreamId stream) noexcept {
-  return quic::isUnidirectionalStream(stream);
-}
-
-bool QuicTransportBase::isBidirectionalStream(StreamId stream) noexcept {
-  return quic::isBidirectionalStream(stream);
 }
 
 StreamDirectionality QuicTransportBase::getStreamDirectionality(

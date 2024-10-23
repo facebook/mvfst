@@ -61,6 +61,15 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       ApplicationErrorCode error) override;
 
+  folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
+      bool replaySafe = true) override;
+  folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
+      bool replaySafe = true) override;
+  uint64_t getNumOpenableBidirectionalStreams() const override;
+  uint64_t getNumOpenableUnidirectionalStreams() const override;
+  bool isUnidirectionalStream(StreamId stream) noexcept override;
+  bool isBidirectionalStream(StreamId stream) noexcept override;
+
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,
       StreamWriteCallback* wcb) override;
@@ -136,6 +145,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       ReadCallback* cb,
       Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) override;
+
+  folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
+      StreamId id,
+      size_t maxLen) override;
 
   void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 
@@ -454,6 +467,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool sendCloseImmediately = true);
 
   void closeUdpSocket();
+
+  folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
+      bool bidirectional,
+      const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func);

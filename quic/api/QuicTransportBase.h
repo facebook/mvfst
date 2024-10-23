@@ -92,10 +92,6 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> pauseRead(StreamId id) override;
   folly::Expected<folly::Unit, LocalErrorCode> resumeRead(StreamId id) override;
 
-  folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
-      StreamId id,
-      size_t maxLen) override;
-
   folly::Expected<folly::Unit, LocalErrorCode> setPeekCallback(
       StreamId id,
       PeekCallback* cb) override;
@@ -115,10 +111,6 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, std::pair<LocalErrorCode, Optional<uint64_t>>>
   consume(StreamId id, uint64_t offset, size_t amount) override;
 
-  folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
-      bool replaySafe = true) override;
-  folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
-      bool replaySafe = true) override;
   folly::Expected<StreamGroupId, LocalErrorCode>
   createBidirectionalStreamGroup() override;
   folly::Expected<StreamGroupId, LocalErrorCode>
@@ -127,12 +119,8 @@ class QuicTransportBase : public QuicSocket,
       StreamGroupId groupId) override;
   folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStreamInGroup(
       StreamGroupId groupId) override;
-  uint64_t getNumOpenableBidirectionalStreams() const override;
-  uint64_t getNumOpenableUnidirectionalStreams() const override;
   bool isClientStream(StreamId stream) noexcept override;
   bool isServerStream(StreamId stream) noexcept override;
-  bool isUnidirectionalStream(StreamId stream) noexcept override;
-  bool isBidirectionalStream(StreamId stream) noexcept override;
   StreamDirectionality getStreamDirectionality(
       StreamId stream) noexcept override;
 
@@ -364,9 +352,6 @@ class QuicTransportBase : public QuicSocket,
   folly::Expected<folly::Unit, LocalErrorCode> setPeekCallbackInternal(
       StreamId id,
       PeekCallback* cb) noexcept;
-  folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
-      bool bidirectional,
-      const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
   void schedulePingTimeout(
       PingCallback* callback,
