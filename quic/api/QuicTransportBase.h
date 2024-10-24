@@ -300,6 +300,10 @@ class QuicTransportBase : public QuicSocket,
     return conn_->retransmissionPolicies;
   }
 
+  [[nodiscard]] QuicAsyncUDPSocket* getUdpSocket() const {
+    return socket_.get();
+  }
+
  protected:
   void processCallbacksAfterNetworkData();
   void invokeStreamsAvailableCallbacks();
