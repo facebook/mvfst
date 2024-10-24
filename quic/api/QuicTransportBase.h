@@ -11,7 +11,6 @@
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/api/QuicTransportBaseLite.h>
-#include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/common/events/QuicTimer.h>
@@ -140,8 +139,6 @@ class QuicTransportBase : public QuicSocket,
   const QuicConnectionStateBase* getState() const override {
     return conn_.get();
   }
-
-  virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
 
   virtual void setAckRxTimestampsEnabled(bool enableAckRxTimestamps);
 
@@ -319,12 +316,6 @@ class QuicTransportBase : public QuicSocket,
       const uint64_t numBytesWritten) override;
   void notifyAppRateLimited() override;
 
-  /**
-   * The callback function for AsyncUDPSocket to provide the additional cmsgs
-   * required by this QuicSocket's packet processors.
-   */
-  Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
-
   bool handshakeDoneNotified_{false};
 
   // TODO: This is silly. We need a better solution.
@@ -397,17 +388,6 @@ class QuicTransportBase : public QuicSocket,
   };
 
  protected:
-  WriteQuicDataResult handleInitialWriteDataCommon(
-      const ConnectionId& srcConnId,
-      const ConnectionId& dstConnId,
-      uint64_t packetLimit,
-      const std::string& token = "");
-
-  WriteQuicDataResult handleHandshakeWriteDataCommon(
-      const ConnectionId& srcConnId,
-      const ConnectionId& dstConnId,
-      uint64_t packetLimit);
-
   void onSocketWritable() noexcept override;
 
  private:

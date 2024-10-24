@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/api/QuicSocketLite.h>
+#include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/FunctionLooper.h>
 
 namespace quic {
@@ -193,6 +194,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
+
+  virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
 
   void addPacketProcessor(
       std::shared_ptr<PacketProcessor> packetProcessor) override;
@@ -518,6 +521,17 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void handleConnWritable();
   void cleanupAckEventState();
 
+  WriteQuicDataResult handleInitialWriteDataCommon(
+      const ConnectionId& srcConnId,
+      const ConnectionId& dstConnId,
+      uint64_t packetLimit,
+      const std::string& token = "");
+
+  WriteQuicDataResult handleHandshakeWriteDataCommon(
+      const ConnectionId& srcConnId,
+      const ConnectionId& dstConnId,
+      uint64_t packetLimit);
+
   void closeUdpSocket();
 
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
@@ -555,6 +569,12 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       ReadCallback* cb,
       Optional<ApplicationErrorCode> err) noexcept;
+
+  /**
+   * The callback function for AsyncUDPSocket to provide the additional cmsgs
+   * required by this QuicSocket's packet processors.
+   */
+  Optional<folly::SocketCmsgMap> getAdditionalCmsgsForAsyncUDPSocket();
 
   /**
    * Helper function that calls passed function for each ByteEvent type.

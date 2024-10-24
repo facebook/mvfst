@@ -722,12 +722,6 @@ void QuicTransportBase::schedulePingTimeout(
   scheduleTimeout(&pingTimeout_, timeout);
 }
 
-void QuicTransportBase::setSupportedVersions(
-    const std::vector<QuicVersion>& versions) {
-  conn_->originalVersion = versions.at(0);
-  conn_->supportedVersions = versions;
-}
-
 void QuicTransportBase::setAckRxTimestampsEnabled(bool enableAckRxTimestamps) {
   if (!enableAckRxTimestamps) {
     conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.clear();
@@ -1184,79 +1178,6 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 
   conn_->retransmissionPolicies.emplace(groupId, *policy);
   return folly::unit;
-}
-
-Optional<folly::SocketCmsgMap>
-QuicTransportBase::getAdditionalCmsgsForAsyncUDPSocket() {
-  if (conn_->socketCmsgsState.additionalCmsgs) {
-    // This callback should be happening for the target write
-    DCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
-    return conn_->socketCmsgsState.additionalCmsgs;
-  }
-  return none;
-}
-
-WriteQuicDataResult QuicTransportBase::handleInitialWriteDataCommon(
-    const ConnectionId& srcConnId,
-    const ConnectionId& dstConnId,
-    uint64_t packetLimit,
-    const std::string& token) {
-  CHECK(conn_->initialWriteCipher);
-  auto version = conn_->version.value_or(*(conn_->originalVersion));
-  auto& initialCryptoStream =
-      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
-  CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
-  auto& numProbePackets =
-      conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
-  if ((initialCryptoStream.retransmissionBuffer.size() &&
-       conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
-       numProbePackets) ||
-      initialScheduler.hasData() || toWriteInitialAcks(*conn_) ||
-      hasBufferedDataToWrite(*conn_)) {
-    CHECK(conn_->initialHeaderCipher);
-    return writeCryptoAndAckDataToSocket(
-        *socket_,
-        *conn_,
-        srcConnId /* src */,
-        dstConnId /* dst */,
-        LongHeader::Types::Initial,
-        *conn_->initialWriteCipher,
-        *conn_->initialHeaderCipher,
-        version,
-        packetLimit,
-        token);
-  }
-  return WriteQuicDataResult{};
-}
-
-WriteQuicDataResult QuicTransportBase::handleHandshakeWriteDataCommon(
-    const ConnectionId& srcConnId,
-    const ConnectionId& dstConnId,
-    uint64_t packetLimit) {
-  auto version = conn_->version.value_or(*(conn_->originalVersion));
-  CHECK(conn_->handshakeWriteCipher);
-  auto& handshakeCryptoStream =
-      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
-  CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
-  auto& numProbePackets =
-      conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
-  if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
-       handshakeCryptoStream.retransmissionBuffer.size() && numProbePackets) ||
-      handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_) ||
-      hasBufferedDataToWrite(*conn_)) {
-    CHECK(conn_->handshakeWriteHeaderCipher);
-    return writeCryptoAndAckDataToSocket(
-        *socket_,
-        *conn_,
-        srcConnId /* src */,
-        dstConnId /* dst */,
-        LongHeader::Types::Handshake,
-        *conn_->handshakeWriteCipher,
-        *conn_->handshakeWriteHeaderCipher,
-        version,
-        packetLimit);
-  }
-  return WriteQuicDataResult{};
 }
 
 } // namespace quic
