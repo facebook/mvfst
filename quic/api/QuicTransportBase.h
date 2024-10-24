@@ -141,12 +141,6 @@ class QuicTransportBase : public QuicSocket,
     return conn_.get();
   }
 
-  // Interface with the Transport layer when data is available.
-  // This is invoked when new data is received from the UDP socket.
-  virtual void onNetworkData(
-      const folly::SocketAddress& peer,
-      NetworkData&& data) noexcept;
-
   virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
 
   virtual void setAckRxTimestampsEnabled(bool enableAckRxTimestamps);
@@ -179,16 +173,6 @@ class QuicTransportBase : public QuicSocket,
       std::shared_ptr<CongestionControllerFactory> factory);
 
   // Subclass API.
-
-  /**
-   * Invoked when a new packet is read from the network.
-   * peer is the address of the peer that was in the packet.
-   * The sub-class may throw an exception if there was an error in processing
-   * the packet in which case the connection will be closed.
-   */
-  virtual void onReadData(
-      const folly::SocketAddress& peer,
-      ReceivedUdpPacket&& udpPacket) = 0;
 
   folly::Expected<Priority, LocalErrorCode> getStreamPriority(
       StreamId id) override;
@@ -305,28 +289,12 @@ class QuicTransportBase : public QuicSocket,
   }
 
  protected:
-  void processCallbacksAfterNetworkData();
-  void invokeStreamsAvailableCallbacks();
-  void handlePingCallbacks();
-  void handleKnobCallbacks();
-  void handleAckEventCallbacks();
-  void handleCancelByteEventCallbacks();
-  void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
-  void handleNewGroupedStreamCallbacks(std::vector<StreamId>& newPeerStreams);
-  void handleDeliveryCallbacks();
-  void handleStreamFlowControlUpdatedCallbacks(
-      std::vector<StreamId>& streamStorage);
-  void handleStreamStopSendingCallbacks();
-  void handleConnWritable();
-
   /*
    * Observe changes in stream priorities and handle background mode.
    *
    * Implements the QuicStreamPrioritiesObserver interface
    */
   void onStreamPrioritiesChange() override;
-
-  void cleanupAckEventState();
 
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
@@ -350,11 +318,6 @@ class QuicTransportBase : public QuicSocket,
       const uint64_t numAckElicitingPacketsWritten,
       const uint64_t numBytesWritten) override;
   void notifyAppRateLimited() override;
-
-  /**
-   * Callback when we receive a transport knob
-   */
-  virtual void onTransportKnobs(Buf knobBlob);
 
   /**
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
@@ -434,16 +397,6 @@ class QuicTransportBase : public QuicSocket,
   };
 
  protected:
-  /**
-   * Helper function to validate that the number of ECN packet marks match the
-   * expected value, depending on the ECN state of the connection.
-   *
-   * If ECN is enabled, this function validates it's working correctly. If ECN
-   * is not enabled or has already failed validation, this function does
-   * nothing.
-   */
-  void validateECNState();
-
   WriteQuicDataResult handleInitialWriteDataCommon(
       const ConnectionId& srcConnId,
       const ConnectionId& dstConnId,
@@ -458,21 +411,6 @@ class QuicTransportBase : public QuicSocket,
   void onSocketWritable() noexcept override;
 
  private:
-  /**
-   * Helper functions to handle new streams.
-   */
-  void handleNewStreams(std::vector<StreamId>& newPeerStreams);
-  void handleNewGroupedStreams(std::vector<StreamId>& newPeerStreams);
-
-  bool hasDeliveryCallbacksToCall(
-      StreamId streamId,
-      uint64_t maxOffsetToDeliver) const;
-
-  /**
-   * Helper to log new stream event to observer.
-   */
-  void logStreamOpenEvent(StreamId streamId);
-
   /**
    * Helper to check if using custom retransmission profiles is feasible.
    * Custom retransmission profiles are only applicable when stream groups are

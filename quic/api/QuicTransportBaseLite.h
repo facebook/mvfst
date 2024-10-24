@@ -53,6 +53,22 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void writeData() = 0;
 
+  // Interface with the Transport layer when data is available.
+  // This is invoked when new data is received from the UDP socket.
+  virtual void onNetworkData(
+      const folly::SocketAddress& peer,
+      NetworkData&& data) noexcept;
+
+  /**
+   * Invoked when a new packet is read from the network.
+   * peer is the address of the peer that was in the packet.
+   * The sub-class may throw an exception if there was an error in processing
+   * the packet in which case the connection will be closed.
+   */
+  virtual void onReadData(
+      const folly::SocketAddress& peer,
+      ReceivedUdpPacket&& udpPacket) = 0;
+
   void close(Optional<QuicError> error) override;
 
   void closeNow(Optional<QuicError> error) override;
@@ -486,6 +502,22 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool drainConnection = true,
       bool sendCloseImmediately = true);
 
+  void processCallbacksAfterNetworkData();
+
+  void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
+  void handleNewGroupedStreamCallbacks(std::vector<StreamId>& newPeerStreams);
+  void handlePingCallbacks();
+  void handleKnobCallbacks();
+  void handleAckEventCallbacks();
+  void handleCancelByteEventCallbacks();
+  void invokeStreamsAvailableCallbacks();
+  void handleDeliveryCallbacks();
+  void handleStreamFlowControlUpdatedCallbacks(
+      std::vector<StreamId>& streamStorage);
+  void handleStreamStopSendingCallbacks();
+  void handleConnWritable();
+  void cleanupAckEventState();
+
   void closeUdpSocket();
 
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
@@ -561,6 +593,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     // qualifier
   }
 
+  /**
+   * Callback when we receive a transport knob
+   */
+  virtual void onTransportKnobs(Buf knobBlob);
+
   void processCallbacksAfterWriteData();
 
   void setIdleTimer();
@@ -583,6 +620,16 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void validateCongestionAndPacing(CongestionControlType& type);
 
   void updateSocketTosSettings(uint8_t dscpValue);
+
+  /**
+   * Helper function to validate that the number of ECN packet marks match the
+   * expected value, depending on the ECN state of the connection.
+   *
+   * If ECN is enabled, this function validates it's working correctly. If ECN
+   * is not enabled or has already failed validation, this function does
+   * nothing.
+   */
+  void validateECNState();
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
@@ -667,6 +714,21 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
           conn_;
 
  private:
+  /**
+   * Helper functions to handle new streams.
+   */
+  void handleNewStreams(std::vector<StreamId>& newPeerStreams);
+  void handleNewGroupedStreams(std::vector<StreamId>& newPeerStreams);
+
+  /**
+   * Helper to log new stream event to observer.
+   */
+  void logStreamOpenEvent(StreamId streamId);
+
+  bool hasDeliveryCallbacksToCall(
+      StreamId streamId,
+      uint64_t maxOffsetToDeliver) const;
+
   /**
    * Helper function to collect prewrite requests from the PacketProcessors
    * Currently this collects cmsgs to be written. The Cmsgs will be stored in
