@@ -162,8 +162,6 @@ class QuicTransportBase : public QuicSocket,
 
   void attachEventBase(std::shared_ptr<QuicEventBase> evb) override;
 
-  Optional<LocalErrorCode> setControlStream(StreamId id) override;
-
   /**
    * Sets the maximum pacing rate in Bytes per second to be used
    * if pacing is enabled.
@@ -234,8 +232,6 @@ class QuicTransportBase : public QuicSocket,
    */
   void clearBackgroundModeParameters();
 
-  void addPacketProcessor(
-      std::shared_ptr<PacketProcessor> packetProcessor) override;
   void setThrottlingSignalProvider(
       std::shared_ptr<ThrottlingSignalProvider>) override;
 
@@ -244,8 +240,6 @@ class QuicTransportBase : public QuicSocket,
   void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
     conn_->loopDetectorCallback = std::move(callback);
   }
-
-  FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
 
   /**
    * Set the read callback for Datagrams

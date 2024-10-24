@@ -153,6 +153,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void setConnectionCallback(
       folly::MaybeManagedPtr<ConnectionCallback> callback) final;
 
+  Optional<LocalErrorCode> setControlStream(StreamId id) override;
+
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
       StreamId id,
       ReadCallback* cb,
@@ -175,6 +177,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
+
+  void addPacketProcessor(
+      std::shared_ptr<PacketProcessor> packetProcessor) override;
 
   /**
    * Set a "knob". This will emit a knob frame to the peer, which the peer
@@ -430,6 +435,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   virtual void unbindConnection() = 0;
 
   StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
+
+  FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
 
   /**
    * Returns a shared_ptr which can be used as a guard to keep this

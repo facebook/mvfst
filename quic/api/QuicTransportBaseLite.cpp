@@ -518,6 +518,15 @@ void QuicTransportBaseLite::setConnectionCallback(
   connCallback_ = callback;
 }
 
+Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
+  if (!conn_->streamManager->streamExists(id)) {
+    return LocalErrorCode::STREAM_NOT_EXISTS;
+  }
+  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  conn_->streamManager->setStreamAsControl(*stream);
+  return none;
+}
+
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBaseLite::setReadCallback(
     StreamId id,
@@ -1682,6 +1691,49 @@ StreamInitiator QuicTransportBaseLite::getStreamInitiator(
   return quic::getStreamInitiator(conn_->nodeType, stream);
 }
 
+QuicConnectionStats QuicTransportBaseLite::getConnectionsStats() const {
+  QuicConnectionStats connStats;
+  if (!conn_) {
+    return connStats;
+  }
+  connStats.peerAddress = conn_->peerAddress;
+  connStats.duration = Clock::now() - conn_->connectionTime;
+  if (conn_->congestionController) {
+    connStats.cwnd_bytes = conn_->congestionController->getCongestionWindow();
+    connStats.congestionController = conn_->congestionController->type();
+    conn_->congestionController->getStats(connStats.congestionControllerStats);
+  }
+  connStats.ptoCount = conn_->lossState.ptoCount;
+  connStats.srtt = conn_->lossState.srtt;
+  connStats.mrtt = conn_->lossState.mrtt;
+  connStats.lrtt = conn_->lossState.lrtt;
+  connStats.rttvar = conn_->lossState.rttvar;
+  connStats.peerAckDelayExponent = conn_->peerAckDelayExponent;
+  connStats.udpSendPacketLen = conn_->udpSendPacketLen;
+  if (conn_->streamManager) {
+    connStats.numStreams = conn_->streamManager->streams().size();
+  }
+
+  if (conn_->clientChosenDestConnectionId.hasValue()) {
+    connStats.clientChosenDestConnectionId =
+        conn_->clientChosenDestConnectionId->hex();
+  }
+  if (conn_->clientConnectionId.hasValue()) {
+    connStats.clientConnectionId = conn_->clientConnectionId->hex();
+  }
+  if (conn_->serverConnectionId.hasValue()) {
+    connStats.serverConnectionId = conn_->serverConnectionId->hex();
+  }
+
+  connStats.totalBytesSent = conn_->lossState.totalBytesSent;
+  connStats.totalBytesReceived = conn_->lossState.totalBytesRecvd;
+  connStats.totalBytesRetransmitted = conn_->lossState.totalBytesRetransmitted;
+  if (conn_->version.hasValue()) {
+    connStats.version = static_cast<uint32_t>(*conn_->version);
+  }
+  return connStats;
+}
+
 const TransportSettings& QuicTransportBaseLite::getTransportSettings() const {
   return conn_->transportSettings;
 }
@@ -2029,6 +2081,12 @@ void QuicTransportBaseLite::setCongestionControl(CongestionControlType type) {
       conn_->qLogger->addTransportStateUpdate(s.str());
     }
   }
+}
+
+void QuicTransportBaseLite::addPacketProcessor(
+    std::shared_ptr<PacketProcessor> packetProcessor) {
+  DCHECK(conn_);
+  conn_->packetProcessors.push_back(std::move(packetProcessor));
 }
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::setKnob(

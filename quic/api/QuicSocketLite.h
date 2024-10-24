@@ -622,6 +622,15 @@ class QuicSocketLite {
       folly::MaybeManagedPtr<ConnectionCallback> callback) = 0;
 
   /**
+   * Signal the transport that a certain stream is a control stream.
+   * A control stream outlives all the other streams in a connection, therefore,
+   * if the transport knows about it, can enable some optimizations.
+   * Applications should declare all their control streams after either calling
+   * createStream() or receiving onNewBidirectionalStream()
+   */
+  virtual Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
+
+  /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */
   virtual void cancelDeliveryCallbacksForStream(StreamId streamId) = 0;
@@ -683,6 +692,12 @@ class QuicSocketLite {
    * Set congestion control type.
    */
   virtual void setCongestionControl(CongestionControlType type) = 0;
+
+  /**
+   * Add a packet processor
+   */
+  virtual void addPacketProcessor(
+      std::shared_ptr<PacketProcessor> packetProcessor) = 0;
 
   /**
    * Set a "knob". This will emit a knob frame to the peer, which the peer
@@ -801,6 +816,11 @@ class QuicSocketLite {
    * Returns initiator (self or peer) of a stream by ID.
    */
   virtual StreamInitiator getStreamInitiator(StreamId stream) noexcept = 0;
+
+  /**
+   * Returns varios stats of the connection.
+   */
+  FOLLY_NODISCARD virtual QuicConnectionStats getConnectionsStats() const = 0;
 
   virtual ~QuicSocketLite() = default;
 

@@ -504,21 +504,6 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual bool isDetachable() = 0;
 
   /**
-   * Signal the transport that a certain stream is a control stream.
-   * A control stream outlives all the other streams in a connection, therefore,
-   * if the transport knows about it, can enable some optimizations.
-   * Applications should declare all their control streams after either calling
-   * createStream() or receiving onNewBidirectionalStream()
-   */
-  virtual Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
-
-  /**
-   * Add a packet processor
-   */
-  virtual void addPacketProcessor(
-      std::shared_ptr<PacketProcessor> packetProcessor) = 0;
-
-  /**
    * Set a throttling signal provider
    */
   virtual void setThrottlingSignalProvider(
@@ -621,11 +606,6 @@ class QuicSocket : virtual public QuicSocketLite {
     }
     return {};
   }
-
-  /**
-   * Returns varios stats of the connection.
-   */
-  FOLLY_NODISCARD virtual QuicConnectionStats getConnectionsStats() const = 0;
 
   /**
    * ===== Datagram API =====
