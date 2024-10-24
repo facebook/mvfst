@@ -1107,7 +1107,7 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
       connection,
       srcConnId,
       dstConnId,
-      std::move(builder),
+      builder,
       LongHeader::typeToPacketNumberSpace(packetType),
       scheduler,
       congestionControlWritableBytes,
@@ -1120,6 +1120,27 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
 
   packetsWritten += writeResult.packetsWritten;
   bytesWritten += writeResult.bytesWritten;
+
+  if (connection.transportSettings.immediatelyRetransmitInitialPackets &&
+      packetsWritten > 0 && packetsWritten < packetLimit) {
+    auto remainingLimit = packetLimit - packetsWritten;
+    auto cloneResult = writeProbingDataToSocket(
+        sock,
+        connection,
+        srcConnId,
+        dstConnId,
+        builder,
+        encryptionLevel,
+        LongHeader::typeToPacketNumberSpace(packetType),
+        scheduler,
+        packetsWritten < remainingLimit ? packetsWritten : remainingLimit,
+        cleartextCipher,
+        headerCipher,
+        version,
+        token);
+    probesWritten += cloneResult.probesWritten;
+    bytesWritten += cloneResult.bytesWritten;
+  }
 
   VLOG_IF(10, packetsWritten || probesWritten)
       << nodeToString(connection.nodeType)

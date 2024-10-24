@@ -415,6 +415,7 @@ struct TransportSettings {
   // Raise read callbacks for all unidirectional streams first on data
   // reception.
   bool unidirectionalStreamsReadCallbacksFirst{false};
+  bool immediatelyRetransmitInitialPackets{false};
 };
 
 } // namespace quic

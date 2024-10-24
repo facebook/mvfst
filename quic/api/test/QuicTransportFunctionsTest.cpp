@@ -3372,6 +3372,38 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
   EXPECT_EQ(0, res.probesWritten);
 }
 
+TEST_F(QuicTransportFunctionsTest, ImmediatelyRetransmitInitialPackets) {
+  auto conn = createConn();
+  conn->transportSettings.immediatelyRetransmitInitialPackets = true;
+  auto cryptoStream = &conn->cryptoState->initialStream;
+  auto buf = buildRandomInputData(1600);
+  writeDataToQuicStream(*cryptoStream, buf->clone());
+  EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  auto rawSocket = socket.get();
+  auto res = writeCryptoAndAckDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      LongHeader::Types::Initial,
+      *conn->initialWriteCipher,
+      *conn->initialHeaderCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_GE(res.bytesWritten, buf->computeChainDataLength());
+
+  EXPECT_EQ(2, res.packetsWritten);
+  EXPECT_EQ(2, res.probesWritten);
+  EXPECT_EQ(conn->udpSendPacketLen * 4, res.bytesWritten);
+  ASSERT_EQ(4, conn->outstandings.packets.size());
+  ASSERT_EQ(2, cryptoStream->retransmissionBuffer.size());
+  ASSERT_TRUE(cryptoStream->pendingWrites.empty());
+}
+
 TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
   auto conn = createConn();
   EventBase evb;
