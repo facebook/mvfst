@@ -564,7 +564,8 @@ void QuicServer::runOnAllWorkersSync(
 }
 
 void QuicServer::setHostId(uint32_t hostId) noexcept {
-  checkRunningInThread(mainThreadId_);
+  // TODO(damlaj): T205141168; lift commmented checkRunningInThread check below
+  // checkRunningInThread(mainThreadId_);
   if (hostId_ == hostId) {
     LOG(WARNING) << "HostId is already set to " << hostId;
     return;
