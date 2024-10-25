@@ -26,8 +26,6 @@ class TestQuicTransport
       ConnectionCallback* connCb)
       : QuicTransportBase(std::move(evb), std::move(socket)),
         observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
-    setConnectionSetupCallback(connSetupCb);
-    setConnectionCallback(connCb);
     conn_.reset(new QuicServerConnectionState(
         FizzServerQuicHandshakeContext::Builder().build()));
     conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});
@@ -36,6 +34,8 @@ class TestQuicTransport
     conn_->observerContainer = observerContainer_;
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher();
+    setConnectionSetupCallback(connSetupCb);
+    setConnectionCallbackFromCtor(connCb);
   }
 
   ~TestQuicTransport() override {

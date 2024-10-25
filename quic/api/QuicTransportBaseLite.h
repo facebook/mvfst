@@ -471,6 +471,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   virtual void createBufAccessor(size_t /* capacity */) {}
 
  protected:
+  void setConnectionCallbackFromCtor(
+      folly::MaybeManagedPtr<ConnectionCallback> callback);
+
   /**
    * A wrapper around writeSocketData
    *

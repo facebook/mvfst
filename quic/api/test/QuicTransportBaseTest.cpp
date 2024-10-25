@@ -235,8 +235,6 @@ class TestQuicTransport
       ConnectionCallback* connCb)
       : QuicTransportBase(std::move(evb), std::move(socket)),
         observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
-    setConnectionSetupCallback(connSetupCb);
-    setConnectionCallback(connCb);
     auto conn = std::make_unique<QuicServerConnectionState>(
         FizzServerQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = ConnectionId({10, 9, 8, 7});
@@ -247,6 +245,8 @@ class TestQuicTransport
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
+    setConnectionSetupCallback(connSetupCb);
+    setConnectionCallbackFromCtor(connCb);
   }
 
   ~TestQuicTransport() override {
@@ -709,6 +709,23 @@ TEST_P(QuicTransportImplTestBase, IdleTimeoutExpiredDestroysTransport) {
   EXPECT_CALL(connSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](auto) { transport = nullptr; }));
   transport->invokeIdleTimeout();
+}
+
+TEST_P(QuicTransportImplTestBase, DelayConnCallback) {
+  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
+      0, /*force=*/true);
+  transport->setConnectionCallback(nullptr);
+
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(10, /*isBidirectionalIn=*/true));
+
+  transport->setConnectionCallback(&connCallback);
+  EXPECT_CALL(connCallback, onBidirectionalStreamsAvailable(_))
+      .WillOnce(Invoke([](uint64_t numAvailableStreams) {
+        EXPECT_EQ(numAvailableStreams, 10);
+      }));
+  transport->getEventBase()->loopOnce();
+  transport.reset();
 }
 
 TEST_P(QuicTransportImplTestBase, IdleTimeoutStreamMaessage) {

@@ -67,7 +67,7 @@ QuicServerTransport::QuicServerTransport(
   conn_.reset(tempConn.release());
   conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   setConnectionSetupCallback(connSetupCb);
-  setConnectionCallback(connStreamsCb);
+  setConnectionCallbackFromCtor(connStreamsCb);
   registerAllTransportKnobParamHandlers();
 }
 

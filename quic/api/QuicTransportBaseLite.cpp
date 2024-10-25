@@ -646,6 +646,14 @@ void QuicTransportBaseLite::setConnectionSetupCallback(
 void QuicTransportBaseLite::setConnectionCallback(
     folly::MaybeManagedPtr<ConnectionCallback> callback) {
   connCallback_ = callback;
+  if (connCallback_) {
+    runOnEvbAsync([](auto self) { self->processCallbacksAfterNetworkData(); });
+  }
+}
+
+void QuicTransportBaseLite::setConnectionCallbackFromCtor(
+    folly::MaybeManagedPtr<ConnectionCallback> callback) {
+  connCallback_ = callback;
 }
 
 Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
@@ -1501,6 +1509,10 @@ void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
   }
+  if (!connCallback_ || !conn_->streamManager) {
+    return;
+  }
+
   // We reuse this storage for storing streams which need callbacks.
   std::vector<StreamId> tempStorage;
 
