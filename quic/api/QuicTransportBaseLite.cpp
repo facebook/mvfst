@@ -785,7 +785,7 @@ void QuicTransportBaseLite::processConnectionCallbacks(QuicError&& cancelCode) {
     return;
   }
 
-  if (bool noError = processCancelCode(cancelCode)) {
+  if (processCancelCode(cancelCode)) {
     connCallback_->onConnectionEnd();
   } else {
     connCallback_->onConnectionError(std::move(cancelCode));
