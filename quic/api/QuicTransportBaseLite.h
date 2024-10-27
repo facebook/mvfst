@@ -39,7 +39,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
             LooperType::WriteLooper)),
         readLooper_(new FunctionLooper(
             evb_,
-            [this]() { invokeReadDataAndCallbacks(); },
+            [this]() { invokeReadDataAndCallbacks(true); },
             LooperType::ReadLooper)),
         peekLooper_(new FunctionLooper(
             evb_,
@@ -565,7 +565,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   bool isTimeoutScheduled(QuicTimerCallback* callback) const;
 
-  void invokeReadDataAndCallbacks();
+  void invokeReadDataAndCallbacks(bool updateLoopersAndCheckForClosedStream);
   void invokePeekDataAndCallbacks();
 
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(

@@ -50,20 +50,15 @@ void QuicTransportBaseLite::onNetworkData(
     const folly::SocketAddress& peer,
     NetworkData&& networkData) noexcept {
   [[maybe_unused]] auto self = sharedGuard();
-  bool scheduleUpdateWriteLooper = true;
   SCOPE_EXIT {
-    checkForClosedStream();
-    updateReadLooper();
-    updatePeekLooper();
-    if (scheduleUpdateWriteLooper) {
+    if (!conn_->transportSettings.networkDataPerSocketRead) {
+      checkForClosedStream();
+      updateReadLooper();
+      updatePeekLooper();
       updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
     }
   };
   try {
-    // If networkDataPerSocketRead is on, we will run the write looper manually
-    // after processing packets.
-    scheduleUpdateWriteLooper =
-        !conn_->transportSettings.networkDataPerSocketRead;
     conn_->lossState.totalBytesRecvd += networkData.getTotalData();
     auto originalAckVersion = currentAckStateVersion(*conn_);
 
@@ -101,7 +96,6 @@ void QuicTransportBaseLite::onNetworkData(
     }
 
     auto packets = std::move(networkData).movePackets();
-    bool processedCallbacks = false;
     for (auto& packet : packets) {
       onReadData(peer, std::move(packet));
       if (conn_->peerConnectionError) {
@@ -109,14 +103,11 @@ void QuicTransportBaseLite::onNetworkData(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));
         return;
       } else if (conn_->transportSettings.processCallbacksPerPacket) {
-        processCallbacksAfterNetworkData();
-        invokeReadDataAndCallbacks();
-        processedCallbacks = true;
+        invokeReadDataAndCallbacks(false);
       }
     }
 
-    // This avoids calling it again for the last packet.
-    if (!processedCallbacks) {
+    if (!conn_->transportSettings.networkDataPerSocketRead) {
       processCallbacksAfterNetworkData();
     }
     if (closeState_ != CloseState::CLOSED) {
@@ -2271,12 +2262,15 @@ bool QuicTransportBaseLite::isTimeoutScheduled(
   return callback->isTimerCallbackScheduled();
 }
 
-void QuicTransportBaseLite::invokeReadDataAndCallbacks() {
+void QuicTransportBaseLite::invokeReadDataAndCallbacks(
+    bool updateLoopersAndCheckForClosedStream) {
   auto self = sharedGuard();
   SCOPE_EXIT {
-    self->checkForClosedStream();
-    self->updateReadLooper();
-    self->updateWriteLooper(true);
+    if (updateLoopersAndCheckForClosedStream) {
+      self->checkForClosedStream();
+      self->updateReadLooper();
+      self->updateWriteLooper(true);
+    }
   };
   // Need a copy since the set can change during callbacks.
   std::vector<StreamId> readableStreamsCopy;

@@ -1575,8 +1575,11 @@ void QuicClientTransport::readWithRecvmsgSinglePacketLoop(
       return;
     }
   }
-  // Call updateWriteLooper manually because processPackets()/onNetworkData()
+  // Call callbacks/updates manually because processPackets()/onNetworkData()
   // will not schedule it when transportSettings.networkDataPerSocketRead is on.
+  processCallbacksAfterNetworkData();
+  checkForClosedStream();
+  updateReadLooper();
   updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
 }
 
