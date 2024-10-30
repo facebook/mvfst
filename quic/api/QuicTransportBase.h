@@ -307,15 +307,6 @@ class QuicTransportBase : public QuicSocket,
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
 
-  // Helpers to notify all registered observers about specific events during
-  // socket write (if enabled in the observer's config).
-  void notifyStartWritingFromAppRateLimited() override;
-  void notifyPacketsWritten(
-      const uint64_t numPacketsWritten,
-      const uint64_t numAckElicitingPacketsWritten,
-      const uint64_t numBytesWritten) override;
-  void notifyAppRateLimited() override;
-
   bool handshakeDoneNotified_{false};
 
   // TODO: This is silly. We need a better solution.
@@ -330,62 +321,6 @@ class QuicTransportBase : public QuicSocket,
   // mode.
   Optional<PriorityLevel> backgroundPriorityThreshold_;
   Optional<float> backgroundUtilizationFactor_;
-
-  /**
-   * Container for use in QuicTransportBase implementations.
-   *
-   * Contains a SocketObserverContainer and hands out weak or raw pointers.
-   *
-   * Weak pointers are used to meet the needs of QuicConnectionStateBase:
-   *   - QuicConnectionStateBase needs a pointer to the SocketObserverContainer
-   *     so that loss / ACK / other processing logic can access the observer
-   *     container and send the observers notifications. There may not be a
-   *     SocketObserverContainer if the QuicTransportBase implementation does
-   *     not support it.
-   *
-   *   - A SocketObserverContainer must not outlive the instance of the
-   *     QuicTransportBase implementation that it is associated with. This is
-   *     because observers are notified that the object being observed has been
-   *     destroyed when the container is destroyed, and thus if the container
-   *     outlives the lifetime of the transport, then the observers will think
-   *     the transport is still alive when it is in fact dead.
-
-   *   - By storing a weak pointer to the SocketObserverContainer in the
-   *     QuicConnectionStateBase, we provide access to the observer container
-   *     without extending its lifetime. In parallel, because it is a managed
-   *     pointer, we avoid the possibility of dereferencing a stale pointer
-   *     (e.g., a pointer pointing to an object that has since been destroyed).
-   *
-   * We store a shared_ptr inside of this container and then distribute weak_ptr
-   * to reduce the risk of a shared_ptr<SocketObserverContainer> mistakenly
-   * being held elsewhere.
-   */
-  class WrappedSocketObserverContainer {
-   public:
-    explicit WrappedSocketObserverContainer(QuicSocket* socket)
-        : observerContainer_(
-              std::make_shared<SocketObserverContainer>(socket)) {}
-
-    [[nodiscard]] SocketObserverContainer* getPtr() const {
-      return observerContainer_.get();
-    }
-
-    [[nodiscard]] std::weak_ptr<SocketObserverContainer> getWeakPtr() const {
-      return observerContainer_;
-    }
-
-    // deleted constructors (unnecessary, difficult to safely support)
-    WrappedSocketObserverContainer(const WrappedSocketObserverContainer&) =
-        delete;
-    WrappedSocketObserverContainer(WrappedSocketObserverContainer&&) = delete;
-    WrappedSocketObserverContainer& operator=(
-        const WrappedSocketObserverContainer&) = delete;
-    WrappedSocketObserverContainer& operator=(
-        WrappedSocketObserverContainer&& rhs) = delete;
-
-   private:
-    std::shared_ptr<SocketObserverContainer> observerContainer_;
-  };
 
  protected:
   void onSocketWritable() noexcept override;

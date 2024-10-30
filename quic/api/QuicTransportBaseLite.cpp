@@ -2438,6 +2438,103 @@ QuicTransportBaseLite::getAdditionalCmsgsForAsyncUDPSocket() {
   return none;
 }
 
+void QuicTransportBaseLite::notifyStartWritingFromAppRateLimited() {
+  if (getSocketObserverContainer() &&
+      getSocketObserverContainer()
+          ->hasObserversForEvent<
+              SocketObserverInterface::Events::appRateLimitedEvents>()) {
+    getSocketObserverContainer()
+        ->invokeInterfaceMethod<
+            SocketObserverInterface::Events::appRateLimitedEvents>(
+            [event =
+                 SocketObserverInterface::AppLimitedEvent::Builder()
+                     .setOutstandingPackets(conn_->outstandings.packets)
+                     .setWriteCount(conn_->writeCount)
+                     .setLastPacketSentTime(
+                         conn_->lossState.maybeLastPacketSentTime)
+                     .setCwndInBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getCongestionWindow())
+                             : none)
+                     .setWritableBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getWritableBytes())
+                             : none)
+                     .build()](auto observer, auto observed) {
+              observer->startWritingFromAppLimited(observed, event);
+            });
+  }
+}
+
+void QuicTransportBaseLite::notifyPacketsWritten(
+    const uint64_t numPacketsWritten,
+    const uint64_t numAckElicitingPacketsWritten,
+    const uint64_t numBytesWritten) {
+  if (getSocketObserverContainer() &&
+      getSocketObserverContainer()
+          ->hasObserversForEvent<
+              SocketObserverInterface::Events::packetsWrittenEvents>()) {
+    getSocketObserverContainer()
+        ->invokeInterfaceMethod<
+            SocketObserverInterface::Events::packetsWrittenEvents>(
+            [event =
+                 SocketObserverInterface::PacketsWrittenEvent::Builder()
+                     .setOutstandingPackets(conn_->outstandings.packets)
+                     .setWriteCount(conn_->writeCount)
+                     .setLastPacketSentTime(
+                         conn_->lossState.maybeLastPacketSentTime)
+                     .setCwndInBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getCongestionWindow())
+                             : none)
+                     .setWritableBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getWritableBytes())
+                             : none)
+                     .setNumPacketsWritten(numPacketsWritten)
+                     .setNumAckElicitingPacketsWritten(
+                         numAckElicitingPacketsWritten)
+                     .setNumBytesWritten(numBytesWritten)
+                     .build()](auto observer, auto observed) {
+              observer->packetsWritten(observed, event);
+            });
+  }
+}
+
+void QuicTransportBaseLite::notifyAppRateLimited() {
+  if (getSocketObserverContainer() &&
+      getSocketObserverContainer()
+          ->hasObserversForEvent<
+              SocketObserverInterface::Events::appRateLimitedEvents>()) {
+    getSocketObserverContainer()
+        ->invokeInterfaceMethod<
+            SocketObserverInterface::Events::appRateLimitedEvents>(
+            [event =
+                 SocketObserverInterface::AppLimitedEvent::Builder()
+                     .setOutstandingPackets(conn_->outstandings.packets)
+                     .setWriteCount(conn_->writeCount)
+                     .setLastPacketSentTime(
+                         conn_->lossState.maybeLastPacketSentTime)
+                     .setCwndInBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getCongestionWindow())
+                             : none)
+                     .setWritableBytes(
+                         conn_->congestionController
+                             ? Optional<uint64_t>(conn_->congestionController
+                                                      ->getWritableBytes())
+                             : none)
+                     .build()](auto observer, auto observed) {
+              observer->appRateLimited(observed, event);
+            });
+  }
+}
+
 void QuicTransportBaseLite::onTransportKnobs(Buf knobBlob) {
   // Not yet implemented,
   VLOG(4) << "Received transport knobs: "
