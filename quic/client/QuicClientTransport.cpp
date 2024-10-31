@@ -1293,6 +1293,68 @@ void QuicClientTransport::recvMsg(
       networkData.getPackets().size(), networkData.getTotalData());
 }
 
+void QuicClientTransport::recvFrom(
+    QuicAsyncUDPSocket& sock,
+    uint64_t readBufferSize,
+    int numPackets,
+    NetworkData& networkData,
+    Optional<folly::SocketAddress>& server,
+    size_t& totalData) {
+  for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
+    // We create 1 buffer per packet so that it is not shared, this enables
+    // us to decrypt in place. If the fizz decrypt api could decrypt in-place
+    // even if shared, then we could allocate one giant IOBuf here.
+    Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
+    struct iovec vec;
+    vec.iov_base = readBuffer->writableData();
+    vec.iov_len = readBufferSize;
+
+    sockaddr* rawAddr{nullptr};
+    struct sockaddr_storage addrStorage {};
+    if (!server) {
+      rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
+      rawAddr->sa_family = sock.getLocalAddressFamily();
+    }
+
+    ssize_t ret =
+        sock.recvfrom(readBuffer->writableData(), readBufferSize, &addrStorage);
+    if (ret < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        // If we got a retriable error, let us continue.
+        if (conn_->loopDetectorCallback) {
+          conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+        }
+        break;
+      }
+      // If we got a non-retriable error, we might have received
+      // a packet that we could process, however let's just quit early.
+      sock.pauseRead();
+      if (conn_->loopDetectorCallback) {
+        conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
+      }
+      return onReadError(folly::AsyncSocketException(
+          folly::AsyncSocketException::INTERNAL_ERROR,
+          "::recvmsg() failed",
+          errno));
+    } else if (ret == 0) {
+      break;
+    }
+
+    size_t bytesRead = size_t(ret);
+    totalData += bytesRead;
+    if (!server) {
+      server = folly::SocketAddress();
+      server->setFromSockaddr(rawAddr, kAddrLen);
+    }
+    VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
+    readBuffer->append(bytesRead);
+
+    networkData.addPacket(ReceivedUdpPacket(std::move(readBuffer)));
+  }
+  trackDatagramsReceived(
+      networkData.getPackets().size(), networkData.getTotalData());
+}
+
 void QuicClientTransport::recvMmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
@@ -1598,6 +1660,18 @@ void QuicClientTransport::readWithRecvmsg(
   processPackets(std::move(networkData), server);
 }
 
+void QuicClientTransport::readWithRecvfrom(
+    QuicAsyncUDPSocket& sock,
+    uint64_t readBufferSize,
+    uint16_t numPackets) {
+  NetworkData networkData;
+  networkData.reserve(numPackets);
+  size_t totalData = 0;
+  Optional<folly::SocketAddress> server;
+  recvFrom(sock, readBufferSize, numPackets, networkData, server, totalData);
+  processPackets(std::move(networkData), server);
+}
+
 void QuicClientTransport::onNotifyDataAvailable(
     QuicAsyncUDPSocket& sock) noexcept {
   auto self = this->shared_from_this();
@@ -1606,7 +1680,9 @@ void QuicClientTransport::onNotifyDataAvailable(
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
   const uint16_t numPackets = conn_->transportSettings.maxRecvBatchSize;
 
-  if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
+  if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
+    readWithRecvfrom(sock, readBufferSize, numPackets);
+  } else if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
     readWithRecvmmsgWrapper(sock, readBufferSize, numPackets);
   } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
     readWithRecvmmsg(sock, readBufferSize, numPackets);

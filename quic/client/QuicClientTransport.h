@@ -263,6 +263,14 @@ class QuicClientTransport
   bool shouldOnlyNotify() override;
   void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
 
+  void recvFrom(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      int numPackets,
+      NetworkData& networkData,
+      Optional<folly::SocketAddress>& server,
+      size_t& totalData);
+
   void recvMsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
@@ -326,6 +334,11 @@ class QuicClientTransport
   virtual void processPackets(
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server);
+
+  void readWithRecvfrom(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
 
   void readWithRecvmmsgWrapper(
       QuicAsyncUDPSocket& sock,

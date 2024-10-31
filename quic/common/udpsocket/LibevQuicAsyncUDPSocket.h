@@ -69,6 +69,11 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
     LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
   }
 
+  ssize_t recvfrom(
+      uint8_t* buf,
+      size_t bufSize,
+      sockaddr_storage* sockaddrStorage) override;
+
   ssize_t recvmsg(struct msghdr* msg, int flags) override;
 
   int recvmmsg(

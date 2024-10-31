@@ -209,6 +209,13 @@ class QuicAsyncUDPSocket {
       size_t count,
       const WriteOptions* options) = 0;
 
+  virtual ssize_t recvfrom(
+      uint8_t* /* buf */,
+      size_t /* bufSize */,
+      sockaddr_storage* /* sockaddrStorage */) {
+    return -1;
+  }
+
   virtual ssize_t recvmsg(struct msghdr* /* msg */, int /* flags */) = 0;
 
   virtual int recvmmsg(
