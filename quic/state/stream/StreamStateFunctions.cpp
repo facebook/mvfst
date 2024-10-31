@@ -50,8 +50,7 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
   stream.readBuffer.clear();
   stream.finalReadOffset = frame.offset;
   stream.streamReadError = frame.errorCode;
-  bool appReadAllBytes = stream.finalReadOffset &&
-      stream.currentReadOffset > *stream.finalReadOffset;
+  bool appReadAllBytes = stream.currentReadOffset > *stream.finalReadOffset;
   if (!appReadAllBytes) {
     // If the currentReadOffset > finalReadOffset we have already processed
     // all the bytes until FIN, so we don't need to do anything for the read
