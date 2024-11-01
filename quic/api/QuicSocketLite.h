@@ -573,6 +573,13 @@ class QuicSocketLite {
   }
 
   /**
+   * Cancel the given stream
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> resetStream(
+      StreamId id,
+      ApplicationErrorCode error) = 0;
+
+  /**
    * Determine if transport is open and ready to read or write.
    *
    * return true iff the transport is open and ready, false otherwise.

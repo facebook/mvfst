@@ -123,10 +123,6 @@ class QuicTransportBase : public QuicSocket,
   StreamDirectionality getStreamDirectionality(
       StreamId stream) noexcept override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> resetStream(
-      StreamId id,
-      ApplicationErrorCode errorCode) override;
-
   folly::Expected<folly::Unit, LocalErrorCode> maybeResetStreamFromReadError(
       StreamId id,
       QuicErrorCode error) override;
@@ -159,15 +155,6 @@ class QuicTransportBase : public QuicSocket,
    */
   folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
       uint64_t maxRateBytesPerSec) override;
-
-  /**
-   * Set factory to create specific congestion controller instances
-   * for a given connection.
-   * Deletes current congestion controller instance, to create new controller
-   * call setCongestionControl() or setTransportSettings().
-   */
-  virtual void setCongestionControllerFactory(
-      std::shared_ptr<CongestionControllerFactory> factory);
 
   // Subclass API.
 
@@ -321,9 +308,6 @@ class QuicTransportBase : public QuicSocket,
   // mode.
   Optional<PriorityLevel> backgroundPriorityThreshold_;
   Optional<float> backgroundUtilizationFactor_;
-
- protected:
-  void onSocketWritable() noexcept override;
 
  private:
   /**

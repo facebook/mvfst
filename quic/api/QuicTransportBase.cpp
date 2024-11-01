@@ -22,7 +22,6 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/SimpleFrameFunctions.h>
-#include <quic/state/stream/StreamSendHandlers.h>
 #include <memory>
 
 namespace {
@@ -62,14 +61,6 @@ void QuicTransportBase::setPacingTimer(
   if (pacingTimer) {
     writeLooper_->setPacingTimer(std::move(pacingTimer));
   }
-}
-
-void QuicTransportBase::setCongestionControllerFactory(
-    std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  CHECK(ccFactory);
-  CHECK(conn_);
-  conn_->congestionControllerFactory = ccFactory;
-  conn_->congestionController.reset();
 }
 
 const std::shared_ptr<QLogger> QuicTransportBase::getQLogger() const {
@@ -623,66 +614,6 @@ QuicTransportBase::registerTxCallback(
   return registerByteEventCallback(ByteEvent::Type::TX, id, offset, cb);
 }
 
-folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
-    StreamId id,
-    ApplicationErrorCode errorCode) {
-  if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  [[maybe_unused]] auto self = sharedGuard();
-  SCOPE_EXIT {
-    checkForClosedStream();
-    updateReadLooper();
-    updatePeekLooper();
-    updateWriteLooper(true);
-  };
-  try {
-    // Check whether stream exists before calling getStream to avoid
-    // creating a peer stream if it does not exist yet.
-    if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-    }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-    // Invoke state machine
-    sendRstSMHandler(*stream, errorCode);
-
-    for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
-         closeState_ == CloseState::OPEN &&
-         pendingResetIt != conn_->pendingEvents.resets.end();
-         pendingResetIt++) {
-      cancelByteEventCallbacksForStream(pendingResetIt->first);
-    }
-    pendingWriteCallbacks_.erase(id);
-    QUIC_STATS(conn_->statsCallback, onQuicStreamReset, errorCode);
-  } catch (const QuicTransportException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return folly::makeUnexpected(ex.errorCode());
-  } catch (const std::exception& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("resetStream() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
-  }
-  return folly::unit;
-}
-
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setPingCallback(
     PingCallback* cb) {
   if (closeState_ != CloseState::OPEN) {
@@ -967,16 +898,6 @@ void QuicTransportBase::detachEventBase() {
 #endif
 
   evb_ = nullptr;
-}
-
-void QuicTransportBase::onSocketWritable() noexcept {
-  // Remove the writable callback.
-  socket_->pauseWrite();
-
-  // Try to write.
-  // If write fails again, pacedWriteDataToSocket() will re-arm the write event
-  // and stop the write looper.
-  writeLooper_->run(true /* thisIteration */);
 }
 
 inline std::ostream& operator<<(

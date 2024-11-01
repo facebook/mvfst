@@ -449,13 +449,6 @@ class QuicSocket : virtual public QuicSocketLite {
       folly::StringPiece errorMsg) = 0;
 
   /**
-   * Cancel the given stream
-   */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> resetStream(
-      StreamId id,
-      ApplicationErrorCode error) = 0;
-
-  /**
    * Helper method to check a generic error for an Application error, and reset
    * the stream with the reciprocal error.
    *

@@ -110,6 +110,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
       StreamId id) override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> resetStream(
+      StreamId id,
+      ApplicationErrorCode errorCode) override;
+
   /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */
@@ -196,6 +200,15 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void setCongestionControl(CongestionControlType type) override;
 
   virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
+
+  /**
+   * Set factory to create specific congestion controller instances
+   * for a given connection.
+   * Deletes current congestion controller instance, to create new controller
+   * call setCongestionControl() or setTransportSettings().
+   */
+  virtual void setCongestionControllerFactory(
+      std::shared_ptr<CongestionControllerFactory> factory);
 
   void addPacketProcessor(
       std::shared_ptr<PacketProcessor> packetProcessor) override;
@@ -509,6 +522,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool sendCloseImmediately = true);
 
   void processCallbacksAfterNetworkData();
+
+  void onSocketWritable() noexcept override;
 
   void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
   void handleNewGroupedStreamCallbacks(std::vector<StreamId>& newPeerStreams);
