@@ -52,8 +52,7 @@ QuicFrame parseQuicFrame(
           receiveTimeStampsConfig));
 }
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
   EXPECT_CALL(pktBuilder, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
@@ -2434,5 +2433,4 @@ INSTANTIATE_TEST_SUITE_P(
         FrameType::ACK_RECEIVE_TIMESTAMPS));
 // Values(FrameType::ACK, FrameType::ACK_ECN,
 // FrameType::ACK_RECEIVE_TIMESTAMPS));
-} // namespace test
-} // namespace quic
+} // namespace quic::test

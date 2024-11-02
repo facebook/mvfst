@@ -20,8 +20,7 @@
 using namespace folly;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 void verifyStreamReset(
     const QuicStreamState& stream,
@@ -900,5 +899,4 @@ TEST_F(QuicOpenStateTest, DSRFullStreamAcked) {
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

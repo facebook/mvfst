@@ -14,8 +14,7 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 bool operator==(
     const SendInstruction& instruction,
@@ -112,5 +111,4 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
   EXPECT_TRUE(expectedSecondFrame == packet.sendInstructions[1]);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

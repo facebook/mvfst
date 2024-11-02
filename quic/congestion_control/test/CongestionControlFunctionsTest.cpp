@@ -13,8 +13,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class CongestionControlFunctionsTest : public Test {};
 
@@ -71,5 +70,4 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
       conn.transportSettings.writeConnectionDataPacketsLimit, result.burstSize);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -15,8 +15,7 @@ using namespace std;
 using namespace folly;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class FunctionLooperTest : public Test {};
 
@@ -286,5 +285,4 @@ TEST(FunctionLooperTest, NoLoopCallbackInPacingMode) {
   looper->stop();
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

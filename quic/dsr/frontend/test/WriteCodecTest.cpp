@@ -18,8 +18,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class WriteCodecTest : public DSRCommonTestFixture {
  public:
@@ -306,5 +305,4 @@ TEST_F(WriteCodecTest, NoFINNoData) {
           bufMetaStartingOffset),
       QuicInternalException);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

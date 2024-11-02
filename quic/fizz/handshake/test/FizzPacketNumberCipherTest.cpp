@@ -15,8 +15,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 struct HeaderParams {
   fizz::CipherSuite cipher;
@@ -128,5 +127,4 @@ INSTANTIATE_TEST_SUITE_P(
             folly::StringPiece{"772aa701"},
             folly::StringPiece{"ce"}}));
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

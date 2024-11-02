@@ -17,8 +17,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 std::pair<uint8_t, Buf> encodeShortHeader(const ShortHeader& header) {
   ShortHeader headerCopy = header;
@@ -291,5 +290,4 @@ TEST_F(PacketHeaderTest, ShortHeader) {
 
   EXPECT_EQ(readHeader.asShort()->getConnectionId(), connid);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

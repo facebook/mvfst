@@ -16,8 +16,7 @@
 using namespace folly;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class QuicFlowControlTest : public Test {
  public:
@@ -991,5 +990,4 @@ TEST_F(QuicFlowControlTest, StreamFlowControlWithBufMeta) {
   EXPECT_EQ(400, getSendStreamFlowControlBytesAPI(stream));
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

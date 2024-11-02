@@ -7,8 +7,7 @@
 
 #include <quic/tools/tperf/TperfQLogger.h>
 
-namespace quic {
-namespace tperf {
+namespace quic::tperf {
 
 TperfQLogger::TperfQLogger(VantagePoint vantagePoint, const std::string& path)
     : FileQLogger(
@@ -57,5 +56,4 @@ void TperfQLogger::addPacingMetricUpdate(
   }
   FileQLogger::addPacingMetricUpdate(pacingBurstSize, pacingInterval);
 }
-} // namespace tperf
-} // namespace quic
+} // namespace quic::tperf

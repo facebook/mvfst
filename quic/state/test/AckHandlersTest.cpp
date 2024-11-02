@@ -27,8 +27,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 struct AckHandlersTestParam {
   PacketNumberSpace pnSpace;
@@ -7342,5 +7341,4 @@ INSTANTIATE_TEST_SUITE_P(
         AckHandlersTestParam{
             PacketNumberSpace::AppData,
             FrameType::ACK_RECEIVE_TIMESTAMPS}));
-} // namespace test
-} // namespace quic
+} // namespace quic::test

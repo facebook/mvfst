@@ -13,8 +13,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class BbrBandwidthSamplerTest : public Test {
  protected:
@@ -312,5 +311,4 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   sampler.onPacketAcked(ackEvent2, 0);
   EXPECT_EQ(bandwidth, sampler.getBandwidth());
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

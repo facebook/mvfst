@@ -21,8 +21,7 @@ Optional<AppToken> decodeAppToken(const folly::IOBuf& buf);
 
 } // namespace quic
 
-namespace fizz {
-namespace detail {
+namespace fizz::detail {
 
 template <>
 struct Reader<folly::IPAddress> {
@@ -54,5 +53,4 @@ struct Sizer<folly::IPAddress> {
   }
 };
 
-} // namespace detail
-} // namespace fizz
+} // namespace fizz::detail

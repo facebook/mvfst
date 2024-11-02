@@ -12,8 +12,7 @@
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/state/StateData.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockCongestionControllerFactory : public CongestionControllerFactory {
  public:
@@ -117,5 +116,4 @@ class MockQuicStreamPrioritiesObserver : public QuicStreamPrioritiesObserver {
  public:
   MOCK_METHOD(void, onStreamPrioritiesChange, ());
 };
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -13,8 +13,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class NewRenoTest : public Test {};
 
@@ -259,5 +258,4 @@ TEST_F(NewRenoTest, RemoveBytesWithoutLossOrAck) {
   reno.onRemoveBytesFromInflight(2);
   EXPECT_EQ(reno.getWritableBytes(), originalWritableBytes - ackedSize + 2);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

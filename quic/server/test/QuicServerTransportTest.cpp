@@ -21,8 +21,7 @@
 using namespace testing;
 using namespace folly;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 namespace {
 using ByteEvent = QuicTransportBase::ByteEvent;
@@ -5656,5 +5655,4 @@ TEST_F(QuicServerTransportCertTest, TestGetSelfCertificate) {
   conn.serverHandshakeLayer = serverHandshakeLayer;
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

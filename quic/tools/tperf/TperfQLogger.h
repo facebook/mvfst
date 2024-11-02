@@ -10,8 +10,7 @@
 #include <quic/logging/FileQLogger.h>
 #include <quic/tools/tperf/PacingObserver.h>
 
-namespace quic {
-namespace tperf {
+namespace quic::tperf {
 class TperfQLogger : public FileQLogger {
  public:
   explicit TperfQLogger(VantagePoint vantagePoint, const std::string& path);
@@ -38,5 +37,4 @@ class TperfQLogger : public FileQLogger {
   std::string path_;
   std::unique_ptr<PacingObserver> pacingObserver_;
 };
-} // namespace tperf
-} // namespace quic
+} // namespace quic::tperf

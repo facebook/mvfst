@@ -39,8 +39,7 @@ using namespace testing;
 
 static constexpr folly::StringPiece kTestHostname = "www.facebook.com";
 
-namespace quic {
-namespace test {
+namespace quic::test {
 class MockServerHandshakeCallback : public ServerHandshake::HandshakeCallback {
  public:
   ~MockServerHandshakeCallback() override = default;
@@ -883,5 +882,4 @@ TEST_F(ServerHandshakeZeroRttTest, TestRejectZeroRttInvalidToken) {
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Established);
   expectOneRttCipher(true);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

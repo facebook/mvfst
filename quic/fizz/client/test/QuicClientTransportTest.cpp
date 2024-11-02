@@ -35,8 +35,7 @@ using namespace testing;
 using namespace folly;
 using namespace quic::samples;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 namespace {
 std::vector<uint8_t> kInitialDstConnIdVecForRetryTest =
@@ -5940,5 +5939,4 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   socket.pauseRead();
   socket.close();
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

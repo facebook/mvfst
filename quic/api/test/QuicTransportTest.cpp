@@ -34,8 +34,7 @@ using namespace folly;
 // using namespace folly::test;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 /**
  * A DeliveryCallback that closes your transport when it's canceled, or when
@@ -5445,5 +5444,4 @@ TEST_F(QuicTransportTest, ValidateL4SFailure) {
   }
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

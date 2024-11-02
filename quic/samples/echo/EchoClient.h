@@ -31,8 +31,7 @@
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/samples/echo/LogQuicStats.h>
 
-namespace quic {
-namespace samples {
+namespace quic::samples {
 
 constexpr size_t kNumTestStreamGroups = 2;
 
@@ -387,5 +386,4 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   std::string clientCertPath_;
   std::string clientKeyPath_;
 };
-} // namespace samples
-} // namespace quic
+} // namespace quic::samples

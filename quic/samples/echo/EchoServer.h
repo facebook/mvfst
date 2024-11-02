@@ -17,8 +17,7 @@
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
 
-namespace quic {
-namespace samples {
+namespace quic::samples {
 
 class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
  public:
@@ -129,5 +128,4 @@ class EchoServer {
   std::shared_ptr<quic::QuicServer> server_;
   std::vector<std::string> alpns_;
 };
-} // namespace samples
-} // namespace quic
+} // namespace quic::samples

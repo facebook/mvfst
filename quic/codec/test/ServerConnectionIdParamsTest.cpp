@@ -8,8 +8,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/codec/QuicConnectionId.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 TEST(ServerConnectionIdParamsTest, EqOpTest) {
   ServerConnectionIdParams first(1, 5, 7);
   ServerConnectionIdParams second(1, 7, 5);
@@ -17,5 +16,4 @@ TEST(ServerConnectionIdParamsTest, EqOpTest) {
   EXPECT_EQ(first, third);
   EXPECT_NE(first, second);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -19,8 +19,7 @@
 using namespace fizz;
 using namespace fizz::test;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 static ClientHello getClientHello(QuicVersion version) {
   auto chlo = TestMessages::clientHello();
@@ -202,5 +201,4 @@ TEST(ServerTransportParametersTest, TestMvfstFields) {
   EXPECT_FALSE(hasOriginalDestCid);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

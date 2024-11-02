@@ -17,8 +17,7 @@
 using namespace testing;
 using namespace folly;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 struct IntegerParams {
   uint64_t decoded;
@@ -150,5 +149,4 @@ INSTANTIATE_TEST_SUITE_P(
         IntegerParams({37, "25", false}),
         IntegerParams({std::numeric_limits<uint64_t>::max(), "25", true})));
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

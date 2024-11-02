@@ -11,8 +11,7 @@
 
 #include <quic/common/BufUtil.h>
 
-namespace quic {
-namespace samples {
+namespace quic::samples {
 class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
                     public quic::QuicSocket::ConnectionCallback,
                     public quic::QuicSocket::ReadCallback,
@@ -242,5 +241,4 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   std::map<quic::StreamGroupId, PerStreamData> streamGroupsData_;
   bool disableRtx_{false};
 };
-} // namespace samples
-} // namespace quic
+} // namespace quic::samples

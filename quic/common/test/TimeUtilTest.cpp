@@ -9,8 +9,7 @@
 
 #include <gtest/gtest.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 using namespace quic;
 
@@ -41,5 +40,4 @@ TEST(TimeUtil, TestMaxFive) {
   std::chrono::milliseconds ms4 = 10ms;
   EXPECT_EQ(timeMax(ms1, ms2, ms3, ms4).count(), 40);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

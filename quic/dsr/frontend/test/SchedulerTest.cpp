@@ -15,8 +15,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class SchedulerTest : public DSRCommonTestFixture {
  public:
@@ -95,5 +94,4 @@ TEST_F(SchedulerTest, ScheduleStream) {
   EXPECT_TRUE(conn_.streamManager->writableDSRStreams().empty());
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

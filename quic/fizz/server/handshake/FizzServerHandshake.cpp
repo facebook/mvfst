@@ -19,11 +19,9 @@
 // QuicServerConnectionState.
 #include <quic/server/state/ServerStateMachine.h>
 
-namespace fizz {
-namespace server {
+namespace fizz::server {
 struct ResumptionState;
-} // namespace server
-} // namespace fizz
+} // namespace fizz::server
 
 namespace {
 class FailingAppTokenValidator : public fizz::server::AppTokenValidator {

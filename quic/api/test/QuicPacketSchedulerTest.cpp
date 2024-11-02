@@ -105,8 +105,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
 
 } // namespace
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class QuicPacketSchedulerTest : public testing::Test {
  public:
@@ -2730,5 +2729,4 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
   EXPECT_LT(packetLength, conn.udpSendPacketLen);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

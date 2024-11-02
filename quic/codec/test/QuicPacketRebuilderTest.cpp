@@ -22,8 +22,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 OutstandingPacketWrapper makeDummyOutstandingPacket(
     const RegularQuicWritePacket& writePacket,
@@ -695,5 +694,4 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   PacketRebuilder rebuilder(mockBuilder, conn);
   EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

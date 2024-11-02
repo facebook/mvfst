@@ -7,8 +7,7 @@
 
 #include <quic/congestion_control/QuicCubic.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class TestingCubic : public Cubic {
  public:
@@ -25,5 +24,4 @@ class TestingCubic : public Cubic {
   }
 };
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

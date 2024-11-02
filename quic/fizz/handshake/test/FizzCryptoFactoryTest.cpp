@@ -15,8 +15,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class QuicFizzTestFactory : public QuicFizzFactory {
  public:
@@ -114,5 +113,4 @@ TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
   EXPECT_EQ(secretHex2, expectedKey2);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -18,8 +18,7 @@
 constexpr const auto kNumLoops = 64;
 constexpr const auto kMaxBufs = 10;
 
-namespace quic {
-namespace testing {
+namespace quic::testing {
 void RunTest(int numBatch) {
   folly::EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb =
@@ -62,5 +61,4 @@ TEST(QuicBatch, TestBatchingNoFlush) {
 TEST(QuicBatch, TestBatching) {
   RunTest(kMaxBufs);
 }
-} // namespace testing
-} // namespace quic
+} // namespace quic::testing

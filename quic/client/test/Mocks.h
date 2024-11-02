@@ -18,8 +18,7 @@
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockClientHandshakeFactory : public ClientHandshakeFactory {
  public:
@@ -136,5 +135,4 @@ class MockQuicClientTransport : public quic::QuicClientTransport {
   TestType testType_;
 };
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

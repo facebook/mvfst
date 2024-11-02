@@ -24,8 +24,7 @@
 using namespace folly;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 using PacketStreamDetails = OutstandingPacketMetadata::StreamDetails;
 
@@ -4842,5 +4841,4 @@ TEST_F(QuicTransportFunctionsTest, onQuicStreamClosed) {
   EXPECT_EQ(conn->streamManager->streamCount(), 0);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

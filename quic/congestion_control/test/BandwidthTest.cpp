@@ -11,8 +11,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class BandwidthTest : public Test {};
 
@@ -96,5 +95,4 @@ TEST_F(BandwidthTest, Addition) {
   EXPECT_EQ(Bandwidth(45000000, 1s), first);
   EXPECT_TRUE(first.isAppLimited);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

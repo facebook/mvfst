@@ -23,8 +23,7 @@
 using namespace fizz::server;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   QuicServerConnectionState conn(
@@ -646,5 +645,4 @@ TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenAddrMatch) {
   EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

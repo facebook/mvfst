@@ -14,8 +14,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 // TODO: Add UT for different latency factor values
 class CopaTest : public Test {
@@ -567,5 +566,4 @@ TEST_F(CopaTest, PacketLossInvokesPacer) {
   copa.onPacketAckOrLoss(none, lossEvent);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -31,8 +31,7 @@
 using namespace testing;
 using namespace folly;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 constexpr uint8_t kStreamIncrement = 0x04;
 using ByteEvent = QuicTransportBase::ByteEvent;
@@ -5093,5 +5092,4 @@ TEST_P(QuicTransportImplTestBase, TestCheckIdleTimerTimerActiveConnExpired) {
   transport.reset();
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

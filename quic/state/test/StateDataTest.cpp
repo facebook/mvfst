@@ -18,8 +18,7 @@ using namespace testing;
 
 constexpr QuicVersion kVersion = static_cast<QuicVersion>(0);
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class StateDataTest : public Test {};
 
@@ -303,5 +302,4 @@ TEST_F(
       maxWindowBytes);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

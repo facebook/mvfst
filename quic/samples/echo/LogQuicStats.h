@@ -13,8 +13,7 @@
 #include <quic/codec/Types.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
-namespace quic {
-namespace samples {
+namespace quic::samples {
 class LogQuicStats : public quic::QuicTransportStatsCallback {
  public:
   explicit LogQuicStats(const std::string& prefix) : prefix_(prefix + " ") {}
@@ -293,5 +292,4 @@ class LogQuicStatsFactory : public QuicTransportStatsCallbackFactory {
   }
 };
 
-} // namespace samples
-} // namespace quic
+} // namespace quic::samples

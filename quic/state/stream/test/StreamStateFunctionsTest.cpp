@@ -19,8 +19,7 @@
 
 using namespace ::testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class StreamStateFunctionsTests : public Test {};
 
@@ -346,5 +345,4 @@ TEST_F(StreamStateFunctionsTests, ResetAfterReadingAllBytesTillFin) {
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
   EXPECT_FALSE(conn.pendingEvents.connWindowUpdate);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

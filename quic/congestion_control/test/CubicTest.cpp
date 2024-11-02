@@ -12,8 +12,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class CubicTest : public Test {};
 
@@ -319,5 +318,4 @@ TEST_F(CubicTest, InitCwnd) {
   EXPECT_EQ(cubic.getWritableBytes(), 123456);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

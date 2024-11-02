@@ -13,8 +13,7 @@
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 // Forward declaration
 std::array<uint8_t, kStatelessResetTokenSecretLength> getRandSecret();
@@ -100,5 +99,4 @@ class MockAead : public Aead {
   }
 };
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

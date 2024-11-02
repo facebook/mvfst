@@ -14,8 +14,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class TokenlessPacerTest : public Test {
  public:
@@ -280,5 +279,4 @@ TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsDefault) {
   EXPECT_EQ(tick, pacer.getTimeUntilNextWrite(timestamp));
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

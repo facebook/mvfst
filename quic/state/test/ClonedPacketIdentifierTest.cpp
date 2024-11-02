@@ -9,8 +9,7 @@
 
 #include <folly/portability/GTest.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 TEST(ClonedPacketIdentifierTest, EqTest) {
   ClonedPacketIdentifier initialClonedPacketIdentifier(
       PacketNumberSpace::Initial, 0);
@@ -45,5 +44,4 @@ TEST(ClonedPacketIdentifierTest, HashTest) {
       hashObj(initialClonedPacketIdentifier0),
       hashObj(handshakeClonedPacketIdentifier0));
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

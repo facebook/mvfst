@@ -11,8 +11,7 @@
 
 #include <folly/portability/GTest.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 TEST(ConnectionIdTest, TestConnidLen) {
   std::string out = folly::unhexlify("ffaabbee00");
@@ -62,5 +61,4 @@ TEST(ConnectionIdTest, ConnIdSize) {
   EXPECT_NO_THROW(ConnectionId{testconnid});
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

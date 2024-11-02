@@ -17,8 +17,7 @@
 
 #include <cstdint>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 void expectAppTokenEqual(
     const Optional<AppToken>& decodedAppToken,
@@ -273,5 +272,4 @@ TEST(AppTokenTest, TestEncodeAndDecodeCwndHint) {
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

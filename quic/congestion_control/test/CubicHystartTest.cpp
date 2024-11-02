@@ -11,8 +11,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class CubicHystartTest : public Test {};
 
@@ -307,5 +306,4 @@ TEST_F(CubicHystartTest, ReduceByCubicReductionFactor) {
   EXPECT_EQ(initCwnd * kDefaultCubicReductionFactor, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

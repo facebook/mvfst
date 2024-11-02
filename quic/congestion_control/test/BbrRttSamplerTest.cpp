@@ -12,8 +12,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class BbrMinRttSamplerTest : public Test {};
 
@@ -42,5 +41,4 @@ TEST_F(BbrMinRttSamplerTest, NewSampleAndExpiration) {
   EXPECT_TRUE(sampler.minRttExpired());
   EXPECT_EQ(100us, sampler.minRtt());
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -63,8 +63,7 @@ auto getOutstandingPacketMatcher(
 }
 } // namespace
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockLossTimeout {
  public:
@@ -3454,5 +3453,4 @@ TEST_F(
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

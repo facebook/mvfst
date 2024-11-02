@@ -11,8 +11,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class QuicPacingFunctionsTest : public Test {};
 
@@ -30,5 +29,4 @@ TEST_F(QuicPacingFunctionsTest, OnClose) {
   EXPECT_FALSE(conn.canBePaced);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

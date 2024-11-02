@@ -25,8 +25,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 std::function<MockClock::time_point()> MockClock::mockNow;
 
@@ -842,5 +841,4 @@ Buf copyChain(Buf&& input) {
   return headCopy;
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

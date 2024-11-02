@@ -43,8 +43,7 @@ const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
 const folly::SocketAddress kClientAddr2("1.2.3.5", 1235);
 const folly::SocketAddress kClientAddr3("1.2.3.6", 1236);
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 MATCHER_P(NetworkDataMatches, networkData, "") {
   for (size_t i = 0; i < arg.getPackets().size(); ++i) {
@@ -3232,5 +3231,4 @@ TEST_F(QuicServerTest, OneEVB) {
   evb.loop();
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

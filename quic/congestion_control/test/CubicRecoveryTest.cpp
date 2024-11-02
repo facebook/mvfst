@@ -11,8 +11,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class CubicRecoveryTest : public Test {};
 
@@ -165,5 +164,4 @@ TEST_F(CubicRecoveryTest, AckNotLargestNotChangeCwnd) {
   // Cwnd never changed during the whole time, and inflight is 0 at this point:
   EXPECT_EQ(cwndAfterLoss, cubic.getWritableBytes());
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

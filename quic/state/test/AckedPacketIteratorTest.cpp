@@ -13,8 +13,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class AckedPacketIteratorTest : public virtual testing::Test {
  public:
@@ -396,5 +395,4 @@ TEST_F(AckedPacketIteratorTest, ErasureTwoOpIntervals) {
   EXPECT_THAT(expectedOutstandings, ContainerEq(getOutstandings()));
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

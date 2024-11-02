@@ -16,11 +16,9 @@
 #include <memory>
 #include <string>
 
-namespace fizz {
-namespace server {
+namespace fizz::server {
 struct ResumptionState;
-} // namespace server
-} // namespace fizz
+} // namespace fizz::server
 
 namespace quic {
 struct QuicServerConnectionState;

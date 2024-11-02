@@ -11,8 +11,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class CubicStateTest : public Test {};
 
@@ -107,5 +106,4 @@ TEST_F(CubicStateTest, SteadyLoss) {
   cubic.onPacketAckOrLoss(none, lossEvent);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

@@ -15,8 +15,7 @@
 using namespace fizz;
 using namespace fizz::test;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 static EncryptedExtensions getEncryptedExtensions() {
   auto ee = TestMessages::encryptedExt();
@@ -204,5 +203,4 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   auto val = decodeQuicInteger(cursor1);
   EXPECT_EQ(val->first, 12);
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

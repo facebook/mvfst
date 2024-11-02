@@ -12,8 +12,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 struct Packet8DecodeData {
   PacketNum largestReceivedUdpPacketNum;
@@ -105,5 +104,4 @@ TEST_F(EncodingTest, Draft17Example) {
   EXPECT_EQ(3, encodePacketNumber(0xace8fe, 0xabe8bc).length);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

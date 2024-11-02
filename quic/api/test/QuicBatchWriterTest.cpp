@@ -18,8 +18,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace testing {
+namespace quic::testing {
 
 constexpr const auto kStrLen = 10;
 constexpr const auto kStrLenGT = 20;
@@ -864,5 +863,4 @@ TEST_F(SinglePacketBackpressureBatchWriterTest, TestFailedWriteCachedOnEAGAIN) {
   EXPECT_FALSE(conn_.pendingWriteBatch_.buf);
 }
 
-} // namespace testing
-} // namespace quic
+} // namespace quic::testing

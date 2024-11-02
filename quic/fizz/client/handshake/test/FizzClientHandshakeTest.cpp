@@ -38,8 +38,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class ClientHandshakeTest : public Test, public boost::static_visitor<> {
  public:
@@ -714,5 +713,4 @@ TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   EXPECT_NE(handshakeBytes.find("public.dummy.com"), handshakeBytes.size());
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

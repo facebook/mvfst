@@ -11,8 +11,7 @@
 #include <folly/Format.h>
 #include <folly/portability/GTest.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 struct QuicKnobsParsingTestFixture {
   std::string serializedKnobs;
@@ -246,5 +245,4 @@ TEST(QuicKnobsParsingTest, UInt64Max) {
   run(fixture);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

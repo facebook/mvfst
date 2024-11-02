@@ -12,8 +12,7 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/test/TestUtils.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockConnectionIdAlgo : public ConnectionIdAlgo {
  public:
@@ -145,5 +144,4 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   std::unique_ptr<folly::IOBuf> data_{folly::IOBuf::create(100)};
   BufAppender appender_{data_.get(), 100};
 };
-} // namespace test
-} // namespace quic
+} // namespace quic::test

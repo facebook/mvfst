@@ -8,8 +8,7 @@
 #include <folly/portability/GMock.h>
 #include <quic/congestion_control/Bbr.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockMinRttSampler : public BbrCongestionController::MinRttSampler {
  public:
@@ -41,5 +40,4 @@ class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
   MOCK_METHOD(void, setWindowLength, (const uint64_t), (noexcept));
 };
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

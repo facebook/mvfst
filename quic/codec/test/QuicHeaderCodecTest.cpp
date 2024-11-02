@@ -14,8 +14,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class QuicHeaderCodecTest : public Test {};
 
@@ -61,5 +60,4 @@ TEST_F(QuicHeaderCodecTest, ShortHeaderTest) {
     EXPECT_EQ(getTestConnectionId(), header->asShort()->getConnectionId());
   }
 }
-} // namespace test
-} // namespace quic
+} // namespace quic::test

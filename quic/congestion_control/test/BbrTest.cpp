@@ -16,8 +16,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class BbrTest : public Test {};
 
@@ -833,5 +832,4 @@ TEST_F(BbrTest, GetBandwidthSample) {
   EXPECT_EQ(testBandwidth, bbr.getBandwidth().value());
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

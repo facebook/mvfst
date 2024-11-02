@@ -28,8 +28,7 @@
 
 #include <quic/codec/QuicConnectionId.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockClock {
  public:
@@ -584,5 +583,4 @@ size_t getTotalIovecLen(const struct iovec* vec, size_t iovec_len);
 
 Buf copyChain(Buf&& input);
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

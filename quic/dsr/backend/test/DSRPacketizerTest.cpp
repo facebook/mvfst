@@ -27,8 +27,7 @@ fizz::TrafficKey getFizzTestKey() {
 }
 } // namespace
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class DSRPacketizerTest : public DSRCommonTestFixture {};
 
@@ -215,5 +214,4 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   EXPECT_GT(sentData[1]->computeChainDataLength(), 500);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

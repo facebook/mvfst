@@ -18,8 +18,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 using UnderlyingFrameType = std::underlying_type<FrameType>::type;
 
@@ -924,5 +923,4 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
   EXPECT_THROW(decodeAckFrequencyFrame(cursor), QuicTransportException);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

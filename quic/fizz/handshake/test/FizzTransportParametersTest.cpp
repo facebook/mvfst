@@ -15,8 +15,7 @@
 using namespace fizz;
 using namespace folly;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class QuicExtensionsTest : public testing::Test {
  protected:
@@ -173,5 +172,4 @@ TEST_F(QuicExtensionsTest, TestTicketParamsD29) {
   checkEncode(std::move(*ext), ticketParamsD29, kQuicDraft);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

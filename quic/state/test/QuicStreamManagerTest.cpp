@@ -18,8 +18,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 struct StreamManagerTestParam {
   bool notifyOnNewStreamsExplicitly{false};
@@ -1000,5 +999,4 @@ INSTANTIATE_TEST_SUITE_P(
         StreamManagerTestParam{true, false},
         StreamManagerTestParam{true, true}));
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

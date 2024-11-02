@@ -109,8 +109,7 @@ DEFINE_bool(
     "Whether to read and echo ecn marking from ingress packets");
 DEFINE_uint32(dscp, 0, "DSCP value to use for outgoing packets");
 
-namespace quic {
-namespace tperf {
+namespace quic::tperf {
 
 namespace {
 
@@ -766,8 +765,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   bool useInplaceWrite_{false};
 };
 
-} // namespace tperf
-} // namespace quic
+} // namespace quic::tperf
 
 using namespace quic::tperf;
 

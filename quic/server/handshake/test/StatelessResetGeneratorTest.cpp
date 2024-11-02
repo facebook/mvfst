@@ -13,8 +13,7 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class StatelessResetGeneratorTest : public Test {};
 
@@ -55,5 +54,4 @@ TEST_F(StatelessResetGeneratorTest, DifferentSecretSameAddress) {
       generator2.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})));
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test
