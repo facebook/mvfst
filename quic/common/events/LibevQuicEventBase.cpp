@@ -126,6 +126,9 @@ void LibevQuicEventBase::scheduleLibevTimeoutImpl(
         libEvTimeoutCallback,
         seconds /* after */,
         0. /* repeat */);
+    if (prioritizeTimers_) {
+      ev_set_priority(&wrapper->ev_timer_, EV_MAXPRI);
+    }
     setImplHandle(timerCallback, wrapper);
   } else {
     // We already have a wrapper. Just re-arm it.
@@ -144,7 +147,8 @@ void LibevQuicEventBase::scheduleTimerFDTimeoutImpl(
   if (wrapper == nullptr) {
     // This is the first time this timer callback is getting scheduled. Create
     // a wrapper for it.
-    wrapper = new TimerCallbackWrapperTimerFD(timerCallback, ev_loop_);
+    wrapper = new TimerCallbackWrapperTimerFD(
+        timerCallback, ev_loop_, prioritizeTimers_);
     wrapper->ev_io_watcher_.data = wrapper;
     setImplHandle(timerCallback, wrapper);
   }

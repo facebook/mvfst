@@ -140,6 +140,10 @@ class LibevQuicEventBase
 #endif
   }
 
+  void prioritizeTimers() {
+    prioritizeTimers_ = true;
+  }
+
   struct ev_loop* getLibevLoop() {
     return ev_loop_;
   }
@@ -191,9 +195,10 @@ class LibevQuicEventBase
   class TimerCallbackWrapperTimerFD
       : public QuicTimerCallback::TimerCallbackImpl {
    public:
-    explicit TimerCallbackWrapperTimerFD(
+    TimerCallbackWrapperTimerFD(
         QuicTimerCallback* callback,
-        struct ev_loop* ev_loop)
+        struct ev_loop* ev_loop,
+        bool prioritizeTimers)
         : callback_(callback), ev_loop_(ev_loop) {
 #if defined(HAS_TIMERFD)
       ev_io_watcher_.fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
@@ -211,6 +216,9 @@ class LibevQuicEventBase
           },
           ev_io_watcher_.fd,
           EV_READ);
+      if (prioritizeTimers) {
+        ev_set_priority(&ev_io_watcher_, EV_MAXPRI);
+      }
 #else
       LOG(FATAL) << "TimerFD not supported on this platform";
 #endif
@@ -339,5 +347,6 @@ class LibevQuicEventBase
   ev_timer ev_timer_internal_;
   bool internalTimerInitialized_{false};
   bool useTimerFd_{false};
+  bool prioritizeTimers_{false};
 };
 } // namespace quic
