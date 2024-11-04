@@ -87,9 +87,42 @@ void writeDataToQuicStream(QuicCryptoStream& stream, Buf data) {
   stream.writeBuffer.append(std::move(data));
 }
 
+// Helper function which appends a raw data range to what MUST be a "tail" of
+// a logic IOBuf chain, buf. The function will pack data into the available
+// tail agressively, and allocate in terms of appendLen until the push is
+// complete.
+static void pushToTail(folly::IOBuf* dst, Buf src, size_t allocSize) {
+  size_t appended = 0;
+  auto len = src->length();
+  auto data = src->data();
+  while (appended < len) {
+    // If there's no tail room or that buffer is shared, trying to use the tail
+    // will cause problems.
+    if (dst->tailroom() == 0 || dst->isSharedOne()) {
+      // If the buffer we are pushing has tail room, just use that one.
+      // Otherwise, we have to allocate one.
+      Buf newBuf;
+      if (src->tailroom() > 0 && !src->isSharedOne()) {
+        src->trimStart(appended);
+        dst->appendChain(std::move(src));
+        return;
+      }
+      newBuf = folly::IOBuf::createCombined(allocSize);
+      dst->appendChain(std::move(newBuf));
+      dst = dst->next();
+    }
+    auto toAppend = std::min(dst->tailroom(), len - appended);
+    memcpy(dst->writableTail(), data, toAppend);
+    dst->append(toAppend);
+    appended += toAppend;
+    data += toAppend;
+  }
+}
+
 void appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
+    uint32_t coalescingSize,
     folly::Function<void(uint64_t, uint64_t)>&& connFlowControlVisitor) {
   auto& readBuffer = stream.readBuffer;
   auto it = readBuffer.begin();
@@ -210,7 +243,20 @@ void appendDataToReadBufferCommon(
         currentEnd > itEnd) {
       // Right overlap. Not done.
       current->data.trimStartAtMost(itEnd - current->offset);
-      it->data.append(current->data.move());
+      if (coalescingSize > kDefaultUDPSendPacketLen) {
+        auto itData = it->data.move();
+        auto itDataTail = itData->prev();
+        auto currentData = current->data.move();
+        while (currentData != nullptr) {
+          auto rest = currentData->pop();
+          pushToTail(itDataTail, std::move(currentData), coalescingSize);
+          itDataTail = itData->prev();
+          currentData = std::move(rest);
+        }
+        it->data.append(std::move(itData));
+      } else {
+        it->data.append(current->data.move());
+      }
       current = &(*it);
       currentAlreadyInserted = true;
       DCHECK(!startOverlap);
@@ -245,6 +291,7 @@ void appendDataToReadBuffer(QuicStreamState& stream, StreamBuffer buffer) {
   appendDataToReadBufferCommon(
       stream,
       std::move(buffer),
+      stream.conn.transportSettings.readCoalescingSize,
       [&stream](uint64_t previousMaxOffsetObserved, uint64_t bufferEndOffset) {
         updateFlowControlOnStreamData(
             stream, previousMaxOffsetObserved, bufferEndOffset);
@@ -253,7 +300,7 @@ void appendDataToReadBuffer(QuicStreamState& stream, StreamBuffer buffer) {
 
 void appendDataToReadBuffer(QuicCryptoStream& stream, StreamBuffer buffer) {
   appendDataToReadBufferCommon(
-      stream, std::move(buffer), [](uint64_t, uint64_t) {});
+      stream, std::move(buffer), 0, [](uint64_t, uint64_t) {});
 }
 
 std::pair<Buf, bool> readDataInOrderFromReadBuffer(

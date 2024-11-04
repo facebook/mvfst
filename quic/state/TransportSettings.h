@@ -418,6 +418,10 @@ struct TransportSettings {
   // reception.
   bool unidirectionalStreamsReadCallbacksFirst{false};
   bool immediatelyRetransmitInitialPackets{false};
+  // If > 0 this represents the coalescing of appends to the read buffer
+  // which will be applied. i.e. when used the underlying IOBufs in the read
+  // buffer will mostly be in chunks of this size.
+  uint32_t readCoalescingSize{0};
 };
 
 } // namespace quic

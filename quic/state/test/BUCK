@@ -51,6 +51,7 @@ cpp_unittest(
     srcs = [
         "QuicStreamFunctionsTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
         "fbsource//third-party/googletest:gmock",
         "//quic/client:state_and_handshake",

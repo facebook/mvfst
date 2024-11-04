@@ -46,7 +46,10 @@ class QuicStreamFunctionsTest : public Test {
         kDefaultMaxStreamsBidirectional);
     conn.streamManager->setMaxLocalUnidirectionalStreams(
         kDefaultMaxStreamsUnidirectional);
+    maybeSetReadCoalescing();
   }
+
+  virtual void maybeSetReadCoalescing() {}
 
   QuicClientConnectionState conn;
 };
@@ -74,21 +77,40 @@ class QuicServerStreamFunctionsTest : public Test {
   QuicServerConnectionState conn;
 };
 
-TEST_F(QuicStreamFunctionsTest, TestCreateBidirectionalStream) {
+struct ReadCoalescingParam {
+  size_t readCoalescingSize;
+};
+
+class QuicStreamFunctionsTestBase
+    : public QuicStreamFunctionsTest,
+      public WithParamInterface<ReadCoalescingParam> {
+  void maybeSetReadCoalescing() override {
+    conn.transportSettings.readCoalescingSize = GetParam().readCoalescingSize;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicStreamFunctionsTestBase,
+    QuicStreamFunctionsTestBase,
+    ::testing::Values(
+        ReadCoalescingParam{.readCoalescingSize = 0},
+        ReadCoalescingParam{.readCoalescingSize = 8196}));
+
+TEST_P(QuicStreamFunctionsTestBase, TestCreateBidirectionalStream) {
   const auto stream =
       conn.streamManager->createNextBidirectionalStream().value();
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(stream->id, 0x00);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestCreateUnidirectionalStream) {
+TEST_P(QuicStreamFunctionsTestBase, TestCreateUnidirectionalStream) {
   const auto stream =
       conn.streamManager->createNextUnidirectionalStream().value();
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(stream->id, 0x02);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestCreateBoth) {
+TEST_P(QuicStreamFunctionsTestBase, TestCreateBoth) {
   for (int i = 0; i < 50; i++) {
     auto stream = conn.streamManager->createNextUnidirectionalStream().value();
     ASSERT_EQ(conn.streamManager->streamCount(), i + 1);
@@ -101,7 +123,7 @@ TEST_F(QuicStreamFunctionsTest, TestCreateBoth) {
   }
 }
 
-TEST_F(QuicStreamFunctionsTest, TestWriteStream) {
+TEST_P(QuicStreamFunctionsTestBase, TestWriteStream) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you");
   auto buf2 = IOBuf::copyBuffer("and this is crazy");
@@ -115,7 +137,7 @@ TEST_F(QuicStreamFunctionsTest, TestWriteStream) {
   EXPECT_TRUE(eq(stream->writeBuffer.move(), buf1));
 }
 
-TEST_F(QuicStreamFunctionsTest, TestReadDataWrittenInOrder) {
+TEST_P(QuicStreamFunctionsTestBase, TestReadDataWrittenInOrder) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
@@ -151,7 +173,7 @@ TEST_F(QuicStreamFunctionsTest, TestReadDataWrittenInOrder) {
   EXPECT_TRUE(readData4.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeContiguousData) {
+TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeContiguousData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
@@ -199,7 +221,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeContiguousData) {
   EXPECT_TRUE(peekCbCalled);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeNonContiguousData) {
+TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
@@ -287,7 +309,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeNonContiguousData) {
   EXPECT_TRUE(cbCalled);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeEmptyData) {
+TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeEmptyData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   bool cbCalled = false;
@@ -307,7 +329,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeEmptyData) {
   EXPECT_TRUE(cbCalled);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeEmptyDataEof) {
+TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeEmptyDataEof) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   bool cbCalled = false;
@@ -329,7 +351,7 @@ TEST_F(QuicStreamFunctionsTest, TestPeekAndConsumeEmptyDataEof) {
   EXPECT_TRUE(cbCalled);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestReadDataFromMultipleBufs) {
+TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufs) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you ");
   buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
@@ -360,7 +382,48 @@ TEST_F(QuicStreamFunctionsTest, TestReadDataFromMultipleBufs) {
   EXPECT_EQ(nullptr, readData2.first);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestReadDataOutOfOrder) {
+TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufsShared) {
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto buf1 = IOBuf::copyBuffer("I just met you ");
+  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->coalesceWithHeadroomTailroom(0, 8000);
+
+  auto buf2 = IOBuf::copyBuffer("Here's my number ");
+  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+
+  // Manually share the buffers like multiple stream frames in a packet.
+  auto buf3 = buf1->clone();
+  buf3->trimStart(buf3->length());
+  memcpy(buf3->writableTail(), " it's hard to look right at you", 31);
+  buf3->append(31);
+
+  auto streamLastMaxOffset = stream->maxOffsetObserved;
+  auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
+  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
+  appendDataToReadBuffer(
+      *stream,
+      StreamBuffer(std::move(buf2), buf1->computeChainDataLength(), false));
+  appendDataToReadBuffer(
+      *stream,
+      StreamBuffer(std::move(buf3), buf1->computeChainDataLength() + 33, true));
+
+  EXPECT_EQ(
+      stream->maxOffsetObserved - streamLastMaxOffset,
+      conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
+  EXPECT_EQ(
+      stream->maxOffsetObserved - streamLastMaxOffset,
+      conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
+  auto readData1 = readDataFromQuicStream(*stream, 100);
+  EXPECT_EQ(
+      "I just met you and this is crazy. Here's my number so call me maybe it's hard to look right at you",
+      readData1.first->to<std::string>());
+  EXPECT_TRUE(readData1.first);
+
+  auto readData2 = readDataFromQuicStream(*stream, 30);
+  EXPECT_EQ(nullptr, readData2.first);
+}
+
+TEST_P(QuicStreamFunctionsTestBase, TestReadDataOutOfOrder) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer(" you ");
   buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
@@ -397,7 +460,7 @@ TEST_F(QuicStreamFunctionsTest, TestReadDataOutOfOrder) {
   EXPECT_TRUE(readData4.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestReadOverlappingData) {
+TEST_P(QuicStreamFunctionsTestBase, TestReadOverlappingData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you ");
   buf1->prependChain(IOBuf::copyBuffer("and this"));
@@ -425,7 +488,7 @@ TEST_F(QuicStreamFunctionsTest, TestReadOverlappingData) {
   EXPECT_TRUE(readData1.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestCompleteOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestCompleteOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("met you ");
   auto buf2 = IOBuf::copyBuffer("this is");
@@ -448,7 +511,7 @@ TEST_F(QuicStreamFunctionsTest, TestCompleteOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestTotalOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestTotalOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("met you ");
   auto streamLastMaxOffset = stream->maxOffsetObserved;
@@ -468,7 +531,7 @@ TEST_F(QuicStreamFunctionsTest, TestTotalOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestSubsetOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestSubsetOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("met you ");
   auto buf2 = IOBuf::copyBuffer("you");
@@ -490,7 +553,7 @@ TEST_F(QuicStreamFunctionsTest, TestSubsetOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestLeftOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestLeftOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("met you ");
   auto buf2 = IOBuf::copyBuffer("I just met");
@@ -510,7 +573,7 @@ TEST_F(QuicStreamFunctionsTest, TestLeftOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestLeftNoOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestLeftNoOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("met you ");
   auto buf2 = IOBuf::copyBuffer("I just");
@@ -533,7 +596,7 @@ TEST_F(QuicStreamFunctionsTest, TestLeftNoOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestRightOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestRightOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer(" met you ");
@@ -556,7 +619,7 @@ TEST_F(QuicStreamFunctionsTest, TestRightOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 } // namespace test
 
-TEST_F(QuicStreamFunctionsTest, TestRightNoOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestRightNoOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("met you ");
@@ -576,7 +639,7 @@ TEST_F(QuicStreamFunctionsTest, TestRightNoOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestRightLeftOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestRightLeftOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met");
   auto buf2 = IOBuf::copyBuffer("met you");
@@ -598,7 +661,7 @@ TEST_F(QuicStreamFunctionsTest, TestRightLeftOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInsertVariations) {
+TEST_P(QuicStreamFunctionsTestBase, TestInsertVariations) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("met you ");
   auto buf2 = IOBuf::copyBuffer("this is crazy.");
@@ -638,7 +701,7 @@ TEST_F(QuicStreamFunctionsTest, TestInsertVariations) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestAppendAlreadyReadData) {
+TEST_P(QuicStreamFunctionsTestBase, TestAppendAlreadyReadData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you and this is crazy");
   auto buf2 = IOBuf::copyBuffer("I just met you and this is");
@@ -692,7 +755,7 @@ TEST_F(QuicStreamFunctionsTest, TestAppendAlreadyReadData) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestEmptyEOF) {
+TEST_P(QuicStreamFunctionsTestBase, TestEmptyEOF) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("");
@@ -714,7 +777,7 @@ TEST_F(QuicStreamFunctionsTest, TestEmptyEOF) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestEmptyEOFOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestEmptyEOFOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("");
@@ -729,7 +792,7 @@ TEST_F(QuicStreamFunctionsTest, TestEmptyEOFOverlap) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestOverlapEOF) {
+TEST_P(QuicStreamFunctionsTestBase, TestOverlapEOF) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -745,13 +808,13 @@ TEST_F(QuicStreamFunctionsTest, TestOverlapEOF) {
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
-TEST_F(QuicStreamFunctionsTest, TestEmptyBuffer) {
+TEST_P(QuicStreamFunctionsTestBase, TestEmptyBuffer) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("");
   appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidEOFWithAlreadyReadData) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithAlreadyReadData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer(" met you");
@@ -766,7 +829,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidEOFWithAlreadyReadData) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidEOFWithSubsetData) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithSubsetData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("I");
@@ -777,7 +840,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidEOFWithSubsetData) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidEOFWithNoOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithNoOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I");
@@ -788,7 +851,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidEOFWithNoOverlap) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFWithCompleteOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFWithCompleteOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I just met");
@@ -799,7 +862,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFWithCompleteOverlap) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFNotLastBuffer) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFNotLastBuffer) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   auto buf1 = IOBuf::copyBuffer("just met");
@@ -813,7 +876,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFNotLastBuffer) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFRightOverlap) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFRightOverlap) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   auto buf1 = IOBuf::copyBuffer("just met");
@@ -825,7 +888,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFRightOverlap) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFRightOverlapNotLast) {
+TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFRightOverlapNotLast) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   auto buf1 = IOBuf::copyBuffer("just met");
@@ -839,7 +902,7 @@ TEST_F(QuicStreamFunctionsTest, TestInvalidExistingEOFRightOverlapNotLast) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, SetInvalidMaxStreams) {
+TEST_P(QuicStreamFunctionsTestBase, SetInvalidMaxStreams) {
   conn.streamManager->setMaxLocalBidirectionalStreams(100, true);
   conn.streamManager->setMaxLocalUnidirectionalStreams(100, true);
   conn.streamManager->setMaxLocalBidirectionalStreams(0);
@@ -854,7 +917,7 @@ TEST_F(QuicStreamFunctionsTest, SetInvalidMaxStreams) {
       QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, GetOrCreateClientCryptoStream) {
+TEST_P(QuicStreamFunctionsTestBase, GetOrCreateClientCryptoStream) {
   EXPECT_NE(conn.cryptoState, nullptr);
 }
 
@@ -892,7 +955,7 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateExistingClientStream) {
   conn.streamManager->getStream(outOfOrderStream2);
 }
 
-TEST_F(QuicStreamFunctionsTest, GetOrCreateExistingServerStream) {
+TEST_P(QuicStreamFunctionsTestBase, GetOrCreateExistingServerStream) {
   StreamId outOfOrderStream1 = 101;
   StreamId outOfOrderStream2 = 49;
   auto stream = conn.streamManager->getStream(outOfOrderStream1);
@@ -922,7 +985,9 @@ TEST_F(
       (outOfOrderStream2) / kStreamIncrement);
 }
 
-TEST_F(QuicStreamFunctionsTest, GetOrCreateServerStreamAfterClosingLastStream) {
+TEST_P(
+    QuicStreamFunctionsTestBase,
+    GetOrCreateServerStreamAfterClosingLastStream) {
   StreamId outOfOrderStream1 = 97;
   StreamId outOfOrderStream2 = 101;
   conn.streamManager->getStream(outOfOrderStream1);
@@ -933,7 +998,7 @@ TEST_F(QuicStreamFunctionsTest, GetOrCreateServerStreamAfterClosingLastStream) {
       (outOfOrderStream2 + 1) / kStreamIncrement);
 }
 
-TEST_F(QuicStreamFunctionsTest, GetOrCreateClosedServerStream) {
+TEST_P(QuicStreamFunctionsTestBase, GetOrCreateClosedServerStream) {
   StreamId outOfOrderStream1 = 97;
   StreamId closedStream = 49;
   conn.streamManager->getStream(outOfOrderStream1);
@@ -947,13 +1012,13 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateServerStreamOnServer) {
       conn.streamManager->getStream(serverStream), QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, GetOrCreateClientStreamOnClient) {
+TEST_P(QuicStreamFunctionsTestBase, GetOrCreateClientStreamOnClient) {
   StreamId clientStream = 100;
   EXPECT_THROW(
       conn.streamManager->getStream(clientStream), QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, GetOrCreateNonClientOrServer) {
+TEST_P(QuicStreamFunctionsTestBase, GetOrCreateNonClientOrServer) {
   StreamId streamZero = 0;
   EXPECT_THROW(
       conn.streamManager->getStream(streamZero), QuicTransportException);
@@ -976,7 +1041,7 @@ TEST_F(QuicServerStreamFunctionsTest, CreateQuicStreamServerOutOfOrder) {
       26);
 }
 
-TEST_F(QuicStreamFunctionsTest, CreateQuicStreamClientOutOfOrder) {
+TEST_P(QuicStreamFunctionsTestBase, CreateQuicStreamClientOutOfOrder) {
   StreamId outOfOrderStream1 = 96;
   StreamId outOfOrderStream2 = 48;
   conn.streamManager->createStream(outOfOrderStream1);
@@ -1001,7 +1066,7 @@ TEST_F(QuicServerStreamFunctionsTest, CreateClosedServerStream) {
   EXPECT_FALSE(conn.streamManager->createStream(outOfOrderStream2));
 }
 
-TEST_F(QuicStreamFunctionsTest, CreateClosedClientStream) {
+TEST_P(QuicStreamFunctionsTestBase, CreateClosedClientStream) {
   StreamId outOfOrderStream1 = 96;
   StreamId outOfOrderStream2 = 48;
   conn.streamManager->createStream(outOfOrderStream1).value();
@@ -1009,7 +1074,7 @@ TEST_F(QuicStreamFunctionsTest, CreateClosedClientStream) {
   EXPECT_FALSE(conn.streamManager->createStream(outOfOrderStream2));
 }
 
-TEST_F(QuicStreamFunctionsTest, CreateInvalidServerStreamOnClient) {
+TEST_P(QuicStreamFunctionsTestBase, CreateInvalidServerStreamOnClient) {
   StreamId serverStream = 0x09;
   EXPECT_THROW(
       conn.streamManager->createStream(serverStream), QuicTransportException);
@@ -1021,14 +1086,14 @@ TEST_F(QuicServerStreamFunctionsTest, CreateInvalidClientStreamOnServer) {
       conn.streamManager->createStream(clientStream), QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, CreateAlreadyExistingStream) {
+TEST_P(QuicStreamFunctionsTestBase, CreateAlreadyExistingStream) {
   StreamId stream = 0x08;
   conn.streamManager->createStream(stream).value();
   EXPECT_THROW(
       conn.streamManager->createStream(stream), QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, IsClientStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsClientStream) {
   EXPECT_TRUE(isClientStream(0));
   EXPECT_TRUE(isClientStream(0x04));
   EXPECT_TRUE(isClientStream(104));
@@ -1038,7 +1103,7 @@ TEST_F(QuicStreamFunctionsTest, IsClientStream) {
   EXPECT_FALSE(isClientStream(0x11));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsServerStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsServerStream) {
   EXPECT_TRUE(isServerStream(0x05));
   EXPECT_TRUE(isServerStream(105));
   EXPECT_TRUE(isServerStream(0x25));
@@ -1047,7 +1112,7 @@ TEST_F(QuicStreamFunctionsTest, IsServerStream) {
   EXPECT_FALSE(isServerStream(0));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsUnidirectionalStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsUnidirectionalStream) {
   EXPECT_TRUE(isUnidirectionalStream(0x02));
   EXPECT_TRUE(isUnidirectionalStream(0x03));
   EXPECT_TRUE(isUnidirectionalStream(0xff));
@@ -1056,7 +1121,7 @@ TEST_F(QuicStreamFunctionsTest, IsUnidirectionalStream) {
   EXPECT_FALSE(isUnidirectionalStream(0xf1));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsBidirectionalStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsBidirectionalStream) {
   EXPECT_TRUE(isBidirectionalStream(0x01));
   EXPECT_TRUE(isBidirectionalStream(0xf0));
   EXPECT_TRUE(isBidirectionalStream(0xf1));
@@ -1065,7 +1130,7 @@ TEST_F(QuicStreamFunctionsTest, IsBidirectionalStream) {
   EXPECT_FALSE(isBidirectionalStream(0xff));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsServerUnidirectionalStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsServerUnidirectionalStream) {
   EXPECT_TRUE(isServerUnidirectionalStream(0x03));
   EXPECT_TRUE(isServerUnidirectionalStream(0x07));
   EXPECT_TRUE(isServerUnidirectionalStream(0x0f));
@@ -1078,7 +1143,7 @@ TEST_F(QuicStreamFunctionsTest, IsServerUnidirectionalStream) {
   EXPECT_FALSE(isServerUnidirectionalStream(0xfd));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsClientBidirectionalStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsClientBidirectionalStream) {
   EXPECT_TRUE(isClientBidirectionalStream(0x00));
   EXPECT_TRUE(isClientBidirectionalStream(0x04));
   EXPECT_TRUE(isClientBidirectionalStream(0x08));
@@ -1091,7 +1156,7 @@ TEST_F(QuicStreamFunctionsTest, IsClientBidirectionalStream) {
   EXPECT_FALSE(isClientBidirectionalStream(0xff));
 }
 
-TEST_F(QuicStreamFunctionsTest, GetStreamDirectionality) {
+TEST_P(QuicStreamFunctionsTestBase, GetStreamDirectionality) {
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0x01));
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0xf0));
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0xf1));
@@ -1103,7 +1168,7 @@ TEST_F(QuicStreamFunctionsTest, GetStreamDirectionality) {
       StreamDirectionality::Unidirectional, getStreamDirectionality(0xff));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsSendingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState(
@@ -1132,7 +1197,7 @@ TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
   EXPECT_TRUE(isSendingStream(nodeType, id));
 }
 
-TEST_F(QuicStreamFunctionsTest, IsReceivingStream) {
+TEST_P(QuicStreamFunctionsTestBase, IsReceivingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState(
@@ -1161,7 +1226,7 @@ TEST_F(QuicStreamFunctionsTest, IsReceivingStream) {
   EXPECT_TRUE(isReceivingStream(nodeType, id));
 }
 
-TEST_F(QuicStreamFunctionsTest, GetStreamInitiatorBidirectional) {
+TEST_P(QuicStreamFunctionsTestBase, GetStreamInitiatorBidirectional) {
   const auto clientStream1Id =
       conn.streamManager->createNextBidirectionalStream().value()->id;
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
@@ -1245,7 +1310,7 @@ TEST_F(QuicServerStreamFunctionsTest, GetStreamInitiatorBidirectional) {
       getStreamInitiator(conn.nodeType, clientStream2Id));
 }
 
-TEST_F(QuicStreamFunctionsTest, GetStreamInitiatorUnidirectional) {
+TEST_P(QuicStreamFunctionsTestBase, GetStreamInitiatorUnidirectional) {
   const auto clientStream1Id =
       conn.streamManager->createNextUnidirectionalStream().value()->id;
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
@@ -1329,7 +1394,7 @@ TEST_F(QuicServerStreamFunctionsTest, GetStreamInitiatorUnidirectional) {
       getStreamInitiator(conn.nodeType, clientStream2Id));
 }
 
-TEST_F(QuicStreamFunctionsTest, HasReadableDataNoData) {
+TEST_P(QuicStreamFunctionsTestBase, HasReadableDataNoData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1338,12 +1403,12 @@ TEST_F(QuicStreamFunctionsTest, HasReadableDataNoData) {
   EXPECT_FALSE(stream->hasReadableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasReadableDataNoDataInBuf) {
+TEST_P(QuicStreamFunctionsTestBase, HasReadableDataNoDataInBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   EXPECT_FALSE(stream->hasReadableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasReadableDataEofInBuf) {
+TEST_P(QuicStreamFunctionsTestBase, HasReadableDataEofInBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 1, true));
@@ -1357,7 +1422,7 @@ TEST_F(QuicStreamFunctionsTest, HasReadableDataEofInBuf) {
   EXPECT_TRUE(read2.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, HasReadableDataEofInEmptyBuf) {
+TEST_P(QuicStreamFunctionsTestBase, HasReadableDataEofInEmptyBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
@@ -1369,13 +1434,13 @@ TEST_F(QuicStreamFunctionsTest, HasReadableDataEofInEmptyBuf) {
   EXPECT_TRUE(read2.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, HasReadableDataOnlyEof) {
+TEST_P(QuicStreamFunctionsTestBase, HasReadableDataOnlyEof) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
   EXPECT_TRUE(stream->hasReadableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasReadableData) {
+TEST_P(QuicStreamFunctionsTestBase, HasReadableData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I ");
   auto buf2 = IOBuf::copyBuffer("met");
@@ -1395,7 +1460,7 @@ TEST_F(QuicStreamFunctionsTest, HasReadableData) {
   EXPECT_FALSE(stream->hasReadableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasPeekableDataGappedData) {
+TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataGappedData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1404,12 +1469,12 @@ TEST_F(QuicStreamFunctionsTest, HasPeekableDataGappedData) {
   EXPECT_TRUE(stream->hasPeekableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasPeekableDataNoDataInBuf) {
+TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataNoDataInBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   EXPECT_FALSE(stream->hasPeekableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasPeekableDataEofInBuf) {
+TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataEofInBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 1, true));
@@ -1423,7 +1488,7 @@ TEST_F(QuicStreamFunctionsTest, HasPeekableDataEofInBuf) {
   EXPECT_TRUE(read2.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, HasPeekableDataEofInEmptyBuf) {
+TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataEofInEmptyBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
   appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
@@ -1435,13 +1500,13 @@ TEST_F(QuicStreamFunctionsTest, HasPeekableDataEofInEmptyBuf) {
   EXPECT_TRUE(read2.second);
 }
 
-TEST_F(QuicStreamFunctionsTest, HasPeekableDataOnlyEof) {
+TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataOnlyEof) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
   EXPECT_FALSE(stream->hasPeekableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, HasPeekableData) {
+TEST_P(QuicStreamFunctionsTestBase, HasPeekableData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I ");
   auto buf2 = IOBuf::copyBuffer("met");
@@ -1461,7 +1526,7 @@ TEST_F(QuicStreamFunctionsTest, HasPeekableData) {
   EXPECT_FALSE(stream->hasPeekableData());
 }
 
-TEST_F(QuicStreamFunctionsTest, UpdatesLastHolbTime) {
+TEST_P(QuicStreamFunctionsTestBase, UpdatesLastHolbTime) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1474,7 +1539,9 @@ TEST_F(QuicStreamFunctionsTest, UpdatesLastHolbTime) {
   EXPECT_TRUE(stream->lastHolbTime);
 }
 
-TEST_F(QuicStreamFunctionsTest, HolbTimingUpdateReadingListIdempotentWrtHolb) {
+TEST_P(
+    QuicStreamFunctionsTestBase,
+    HolbTimingUpdateReadingListIdempotentWrtHolb) {
   // test that calling uRL in succession (without new data or readsd)
   // does not affect the HOLB state
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -1575,7 +1642,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingUpdateReadingListIdempotentWrtHolb) {
   EXPECT_EQ(2, stream->holbCount);
 }
 
-TEST_F(QuicStreamFunctionsTest, HolbTimingFirstBufferHOLBlocked) {
+TEST_P(QuicStreamFunctionsTestBase, HolbTimingFirstBufferHOLBlocked) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1606,7 +1673,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingFirstBufferHOLBlocked) {
   EXPECT_EQ(1, stream->holbCount);
 }
 
-TEST_F(QuicStreamFunctionsTest, HolbTimingReadingEntireStream) {
+TEST_P(QuicStreamFunctionsTestBase, HolbTimingReadingEntireStream) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1628,7 +1695,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingReadingEntireStream) {
   EXPECT_EQ(1, stream->holbCount);
 }
 
-TEST_F(QuicStreamFunctionsTest, HolbTimingLockstepScenario) {
+TEST_P(QuicStreamFunctionsTestBase, HolbTimingLockstepScenario) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1682,7 +1749,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingLockstepScenario) {
   EXPECT_EQ(2, stream->holbCount);
 }
 
-TEST_F(QuicStreamFunctionsTest, HolbTimingReadDataCallsUpdateRL) {
+TEST_P(QuicStreamFunctionsTestBase, HolbTimingReadDataCallsUpdateRL) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
@@ -1699,7 +1766,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingReadDataCallsUpdateRL) {
   EXPECT_EQ(1, stream->holbCount);
 }
 
-TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
+TEST_P(QuicStreamFunctionsTestBase, RemovedClosedState) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   conn.streamManager->readableStreams().emplace(streamId);
@@ -1846,7 +1913,7 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerUnidirectionalQuicStream) {
       conn.streamManager->getStream(serverStream3), QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, ClientGetServerQuicStream) {
+TEST_P(QuicStreamFunctionsTestBase, ClientGetServerQuicStream) {
   StreamId serverStream = 0x09;
   EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
@@ -1858,7 +1925,7 @@ TEST_F(QuicStreamFunctionsTest, ClientGetServerQuicStream) {
   EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 3);
 }
 
-TEST_F(QuicStreamFunctionsTest, ClientGetClientQuicStream) {
+TEST_P(QuicStreamFunctionsTestBase, ClientGetClientQuicStream) {
   StreamId clientStream = 0x0C;
   conn.streamManager->createStream(clientStream).value();
 
@@ -1882,7 +1949,7 @@ TEST_F(QuicStreamFunctionsTest, ClientGetClientQuicStream) {
       conn.streamManager->getStream(clientStream3), QuicTransportException);
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamExists) {
+TEST_P(QuicStreamFunctionsTestBase, StreamExists) {
   StreamId localStream = 12;
   StreamId peerStream = 13;
 
@@ -1920,7 +1987,7 @@ TEST_F(QuicStreamFunctionsTest, StreamExists) {
   EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened2));
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamLimitUpdates) {
+TEST_P(QuicStreamFunctionsTestBase, StreamLimitUpdates) {
   StreamId peerStream = 13;
   StreamId peerAutoOpened = 5;
   StreamId peerAutoOpened2 = 9;
@@ -1948,7 +2015,7 @@ TEST_F(QuicStreamFunctionsTest, StreamLimitUpdates) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi + 1);
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAcked) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAcked) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 1;
@@ -1956,7 +2023,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAcked) {
   EXPECT_TRUE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedDSR) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedDSR) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 1;
@@ -1964,7 +2031,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedDSR) {
   EXPECT_TRUE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedFinOnly) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedFinOnly) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 0;
@@ -1972,7 +2039,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedFinOnly) {
   EXPECT_TRUE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedFinOnlyDSR) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedFinOnlyDSR) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 0;
@@ -1980,13 +2047,13 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedFinOnlyDSR) {
   EXPECT_TRUE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedNewStream) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedNewStream) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLost) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedStillLost) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 20;
@@ -1996,7 +2063,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLost) {
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLostDSR) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedStillLostDSR) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 20;
@@ -2009,7 +2076,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLostDSR) {
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmitting) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedStillRetransmitting) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 12;
@@ -2022,7 +2089,9 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmitting) {
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmittingDSR) {
+TEST_P(
+    QuicStreamFunctionsTestBase,
+    AllBytesTillFinAckedStillRetransmittingDSR) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 12;
@@ -2034,7 +2103,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmittingDSR) {
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillWriting) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedStillWriting) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 10;
@@ -2044,7 +2113,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillWriting) {
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillWritingDSR) {
+TEST_P(QuicStreamFunctionsTestBase, AllBytesTillFinAckedStillWritingDSR) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 10;
@@ -2088,13 +2157,13 @@ TEST_F(
   EXPECT_EQ(rst.offset, len);
 }
 
-TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenFIN) {
+TEST_P(QuicStreamFunctionsTestBase, LargestWriteOffsetSeenFIN) {
   QuicStreamState stream(3, conn);
   stream.finalWriteOffset = 100;
   EXPECT_EQ(100, getLargestWriteOffsetSeen(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenNoFIN) {
+TEST_P(QuicStreamFunctionsTestBase, LargestWriteOffsetSeenNoFIN) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
   auto randomInputData = buildRandomInputData(20);
@@ -2103,7 +2172,7 @@ TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenNoFIN) {
   EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenDSRNoFIN) {
+TEST_P(QuicStreamFunctionsTestBase, LargestWriteOffsetSeenDSRNoFIN) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 10;
   stream.writeBufMeta.offset = 100;
@@ -2111,7 +2180,7 @@ TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenDSRNoFIN) {
   EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedNothingTxed) {
+TEST_P(QuicStreamFunctionsTestBase, StreamLargestWriteOffsetTxedNothingTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 0;
   stream.writeBufMeta.offset = 0;
@@ -2127,14 +2196,16 @@ TEST_F(
   EXPECT_EQ(54, getLargestWriteOffsetTxed(stream).value());
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteTxed) {
+TEST_P(QuicStreamFunctionsTestBase, StreamLargestWriteOffsetTxedOneByteTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 1;
   ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
   EXPECT_EQ(0, getLargestWriteOffsetTxed(stream).value());
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteDSRTxed) {
+TEST_P(
+    QuicStreamFunctionsTestBase,
+    StreamLargestWriteOffsetTxedOneByteDSRTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 1;
   stream.writeBufMeta.offset = 2;
@@ -2142,7 +2213,9 @@ TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteDSRTxed) {
   EXPECT_EQ(1, getLargestWriteOffsetTxed(stream).value());
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedHundredBytesTxed) {
+TEST_P(
+    QuicStreamFunctionsTestBase,
+    StreamLargestWriteOffsetTxedHundredBytesTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
   ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
@@ -2184,20 +2257,20 @@ TEST_F(
   EXPECT_EQ(9, getLargestWriteOffsetTxed(stream).value());
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverNothingAcked) {
+TEST_P(QuicStreamFunctionsTestBase, StreamNextOffsetToDeliverNothingAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
   EXPECT_EQ(none, getLargestDeliverableOffset(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverAllAcked) {
+TEST_P(QuicStreamFunctionsTestBase, StreamNextOffsetToDeliverAllAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
   stream.ackedIntervals.insert(0, 99);
   EXPECT_EQ(99, getLargestDeliverableOffset(stream).value());
 }
 
-TEST_F(QuicStreamFunctionsTest, LossBufferEmpty) {
+TEST_P(QuicStreamFunctionsTestBase, LossBufferEmpty) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   conn.streamManager->addLoss(id);
@@ -2205,14 +2278,14 @@ TEST_F(QuicStreamFunctionsTest, LossBufferEmpty) {
   EXPECT_FALSE(conn.streamManager->hasLoss());
 }
 
-TEST_F(QuicStreamFunctionsTest, LossBufferEmptyNoChange) {
+TEST_P(QuicStreamFunctionsTestBase, LossBufferEmptyNoChange) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   conn.streamManager->updateWritableStreams(stream);
   EXPECT_FALSE(conn.streamManager->hasLoss());
 }
 
-TEST_F(QuicStreamFunctionsTest, LossBufferHasData) {
+TEST_P(QuicStreamFunctionsTestBase, LossBufferHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   auto dataBuf = IOBuf::create(10);
@@ -2221,7 +2294,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferHasData) {
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
-TEST_F(QuicStreamFunctionsTest, LossBufferMetaHasData) {
+TEST_P(QuicStreamFunctionsTestBase, LossBufferMetaHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   WriteBufferMeta::Builder b;
@@ -2233,7 +2306,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferMetaHasData) {
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
-TEST_F(QuicStreamFunctionsTest, LossBufferMetaStillHasData) {
+TEST_P(QuicStreamFunctionsTestBase, LossBufferMetaStillHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   conn.streamManager->addLoss(id);
@@ -2246,7 +2319,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferMetaStillHasData) {
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
-TEST_F(QuicStreamFunctionsTest, LossBufferStillHasData) {
+TEST_P(QuicStreamFunctionsTestBase, LossBufferStillHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);
   conn.streamManager->addLoss(id);
@@ -2256,7 +2329,7 @@ TEST_F(QuicStreamFunctionsTest, LossBufferStillHasData) {
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
-TEST_F(QuicStreamFunctionsTest, WritableList) {
+TEST_P(QuicStreamFunctionsTestBase, WritableList) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentWriteOffset = 100;
@@ -2291,7 +2364,7 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
   EXPECT_FALSE(writableContains(*stream.conn.streamManager, id));
 }
 
-TEST_F(QuicStreamFunctionsTest, AckCryptoStream) {
+TEST_P(QuicStreamFunctionsTestBase, AckCryptoStream) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   conn.cryptoState->handshakeStream.retransmissionBuffer.emplace(
       0, std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(chlo), 0));
@@ -2299,7 +2372,7 @@ TEST_F(QuicStreamFunctionsTest, AckCryptoStream) {
   EXPECT_EQ(conn.cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
 }
 
-TEST_F(QuicStreamFunctionsTest, AckCryptoStreamOffsetLengthMismatch) {
+TEST_P(QuicStreamFunctionsTestBase, AckCryptoStreamOffsetLengthMismatch) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   auto& cryptoStream = conn.cryptoState->handshakeStream;
   cryptoStream.retransmissionBuffer.emplace(

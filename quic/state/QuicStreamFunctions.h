@@ -136,6 +136,7 @@ uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream);
 void appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
+    uint32_t coalescingSize,
     folly::Function<void(uint64_t, uint64_t)>&& connFlowControlVisitor);
 
 /**

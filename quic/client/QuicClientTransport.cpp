@@ -1680,16 +1680,21 @@ void QuicClientTransport::onNotifyDataAvailable(
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
   const uint16_t numPackets = conn_->transportSettings.maxRecvBatchSize;
 
+  const size_t readAllocSize =
+      conn_->transportSettings.readCoalescingSize > kDefaultUDPSendPacketLen
+      ? conn_->transportSettings.readCoalescingSize
+      : readBufferSize;
+
   if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
-    readWithRecvfrom(sock, readBufferSize, numPackets);
+    readWithRecvfrom(sock, readAllocSize, numPackets);
   } else if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
-    readWithRecvmmsgWrapper(sock, readBufferSize, numPackets);
+    readWithRecvmmsgWrapper(sock, readAllocSize, numPackets);
   } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
-    readWithRecvmmsg(sock, readBufferSize, numPackets);
+    readWithRecvmmsg(sock, readAllocSize, numPackets);
   } else if (conn_->transportSettings.networkDataPerSocketRead) {
-    readWithRecvmsgSinglePacketLoop(sock, readBufferSize);
+    readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
   } else {
-    readWithRecvmsg(sock, readBufferSize, numPackets);
+    readWithRecvmsg(sock, readAllocSize, numPackets);
   }
 }
 
