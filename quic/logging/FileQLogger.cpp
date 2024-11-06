@@ -250,6 +250,7 @@ void FileQLogger::addTransportSummary(const TransportSummaryArgs& args) {
       args.usedZeroRtt,
       args.quicVersion,
       args.dsrPacketCount,
+      std::move(args.alpn),
       refTime));
 }
 

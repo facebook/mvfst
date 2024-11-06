@@ -483,6 +483,7 @@ class QLogTransportSummaryEvent : public QLogEvent {
       bool usedZeroRtt,
       QuicVersion version,
       uint64_t dsrPacketCount,
+      std::string alpn,
       std::chrono::microseconds refTimeIn);
   ~QLogTransportSummaryEvent() override = default;
   uint64_t totalBytesSent;
@@ -503,6 +504,7 @@ class QLogTransportSummaryEvent : public QLogEvent {
   bool usedZeroRtt;
   QuicVersion quicVersion;
   uint64_t dsrPacketCount;
+  std::string alpn;
 
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };

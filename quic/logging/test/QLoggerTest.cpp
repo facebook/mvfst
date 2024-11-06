@@ -116,7 +116,8 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
        47,
        false,
        QuicVersion::MVFST,
-       37});
+       37,
+       "blah"});
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogTransportSummaryEvent*>(p.get());
@@ -138,6 +139,7 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
   EXPECT_EQ(gotEvent->finalPacketLossTimeReorderingThreshDividend, 47);
   EXPECT_EQ(gotEvent->usedZeroRtt, false);
   EXPECT_EQ(gotEvent->dsrPacketCount, 37);
+  EXPECT_EQ(gotEvent->alpn, "blah");
 }
 
 TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
@@ -856,7 +858,8 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        "final_packet_loss_time_reordering_threshold_dividend": 15,
        "used_zero_rtt": true,
        "quic_version": 4207849474,
-       "dsr_packet_count": 37
+       "dsr_packet_count": 37,
+       "alpn": "blah"
      }
    ]
  ])");
@@ -880,7 +883,8 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        15,
        true,
        QuicVersion::MVFST,
-       37});
+       37,
+       "blah"});
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

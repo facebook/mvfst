@@ -423,6 +423,7 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
     bool usedZeroRttIn,
     QuicVersion quicVersionIn,
     uint64_t dsrPacketCountIn,
+    std::string alpnIn,
     std::chrono::microseconds refTimeIn)
     : totalBytesSent{totalBytesSentIn},
       totalBytesRecvd{totalBytesRecvdIn},
@@ -442,7 +443,8 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
           finalPacketLossTimeReorderingThreshDividend},
       usedZeroRtt{usedZeroRttIn},
       quicVersion{quicVersionIn},
-      dsrPacketCount{dsrPacketCountIn} {
+      dsrPacketCount{dsrPacketCountIn},
+      alpn{alpnIn} {
   eventType = QLogEventType::TransportSummary;
   refTime = refTimeIn;
 }
@@ -479,6 +481,7 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
       static_cast<std::underlying_type<decltype(quicVersion)>::type>(
           quicVersion);
   data["dsr_packet_count"] = dsrPacketCount;
+  data["alpn"] = alpn;
 
   d.push_back(std::move(data));
   return d;
