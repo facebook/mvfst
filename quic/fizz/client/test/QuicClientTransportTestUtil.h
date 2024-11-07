@@ -344,6 +344,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   std::unique_ptr<Aead> oneRttWriteCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
+  Optional<std::string> alpn_{folly::none};
 
   FizzCryptoFactory cryptoFactory_;
   const CryptoFactory& getCryptoFactory() const override {
@@ -359,7 +360,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
         "getReadRecordLayerEncryptionLevel not implemented");
   }
   const Optional<std::string>& getApplicationProtocol() const override {
-    throw std::runtime_error("getApplicationProtocol not implemented");
+    return alpn_;
   }
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
