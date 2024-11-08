@@ -384,45 +384,6 @@ class QuicSocket : virtual public QuicSocketLite {
       StreamId stream) noexcept = 0;
 
   /**
-   * Callback class for receiving ack notifications
-   */
-  class DeliveryCallback : public ByteEventCallback {
-   public:
-    ~DeliveryCallback() override = default;
-
-    /**
-     * Invoked when the peer has acknowledged the receipt of the specified
-     * offset.  rtt is the current RTT estimate for the connection.
-     */
-    virtual void onDeliveryAck(
-        StreamId id,
-        uint64_t offset,
-        std::chrono::microseconds rtt) = 0;
-
-    /**
-     * Invoked on registered delivery callbacks when the bytes will never be
-     * delivered (due to a reset or other error).
-     */
-    virtual void onCanceled(StreamId id, uint64_t offset) = 0;
-
-   private:
-    // Temporary shim during transition to ByteEvent
-    void onByteEventRegistered(ByteEvent /* byteEvent */) final {
-      // Not supported
-    }
-    void onByteEvent(ByteEvent byteEvent) final {
-      CHECK_EQ((int)ByteEvent::Type::ACK, (int)byteEvent.type); // sanity
-      onDeliveryAck(byteEvent.id, byteEvent.offset, byteEvent.srtt);
-    }
-
-    // Temporary shim during transition to ByteEvent
-    void onByteEventCanceled(ByteEventCancellation cancellation) final {
-      CHECK_EQ((int)ByteEvent::Type::ACK, (int)cancellation.type); // sanity
-      onCanceled(cancellation.id, cancellation.offset);
-    }
-  };
-
-  /**
    * Register a callback to be invoked when the stream offset was transmitted.
    *
    * Currently, an offset is considered "transmitted" if it has been written to
