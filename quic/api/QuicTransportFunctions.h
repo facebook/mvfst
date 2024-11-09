@@ -12,7 +12,6 @@
 #include <quic/QuicException.h>
 #include <quic/api/IoBufQuicBatch.h>
 #include <quic/api/QuicPacketScheduler.h>
-#include <quic/api/QuicSocket.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/state/StateData.h>
