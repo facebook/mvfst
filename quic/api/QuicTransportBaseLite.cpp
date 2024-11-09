@@ -247,7 +247,7 @@ bool QuicTransportBaseLite::isBidirectionalStream(StreamId stream) noexcept {
   return quic::isBidirectionalStream(stream);
 }
 
-QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
+QuicSocket::WriteResult QuicTransportBaseLite::writeChain(
     StreamId id,
     Buf data,
     bool eof,
