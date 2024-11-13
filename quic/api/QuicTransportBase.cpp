@@ -42,12 +42,6 @@ QuicTransportBase::QuicTransportBase(
           std::move(evb),
           std::move(socket),
           useConnectionEndWithErrorCallback) {
-  writeLooper_->setPacingFunction([this]() -> auto {
-    if (isConnectionPaced(*conn_)) {
-      return conn_->pacer->getTimeUntilNextWrite();
-    }
-    return 0us;
-  });
   if (socket_) {
     folly::Function<Optional<folly::SocketCmsgMap>()> func = [&]() {
       return getAdditionalCmsgsForAsyncUDPSocket();

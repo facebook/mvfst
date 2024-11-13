@@ -4525,13 +4525,16 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
 
 TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   transport_->setPacingTimer(std::make_shared<HighResQuicTimer>(&evb_, 1ms));
+  TransportSettings transportSettings;
+  transportSettings.pacingEnabled = true;
+  transport_->setTransportSettings(transportSettings);
+
   auto& conn = transport_->getConnectionState();
   conn.udpSendPacketLen = 100;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
-  conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
   auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();

@@ -2745,6 +2745,12 @@ void QuicTransportBaseLite::setTransportSettings(
   validateCongestionAndPacing(
       conn_->transportSettings.defaultCongestionController);
   if (conn_->transportSettings.pacingEnabled) {
+    writeLooper_->setPacingFunction([this]() -> auto {
+      if (isConnectionPaced(*conn_)) {
+        return conn_->pacer->getTimeUntilNextWrite();
+      }
+      return 0us;
+    });
     if (writeLooper_->hasPacingTimer()) {
       bool usingBbr =
           (conn_->transportSettings.defaultCongestionController ==
