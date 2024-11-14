@@ -29,10 +29,6 @@ void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
   pacingTimer_ = std::move(pacingTimer);
 }
 
-bool FunctionLooper::hasPacingTimer() const noexcept {
-  return pacingTimer_ != nullptr;
-}
-
 void FunctionLooper::setPacingFunction(
     folly::Function<std::chrono::microseconds()>&& pacingFunc) {
   CHECK(pacingFunc);
@@ -59,12 +55,18 @@ void FunctionLooper::commonLoopBody() noexcept {
 }
 
 bool FunctionLooper::schedulePacingTimeout() noexcept {
-  if (pacingFunc_ && pacingTimer_ && !isTimerCallbackScheduled()) {
+  if (pacingFunc_ && (pacingTimer_ || evb_) && !isTimerCallbackScheduled()) {
     auto timeUntilWrite = pacingFunc_();
     if (timeUntilWrite != 0us) {
       nextPacingTime_ = Clock::now() + timeUntilWrite;
-      pacingTimer_->scheduleTimeout(this, timeUntilWrite);
-      return true;
+      if (pacingTimer_) {
+        pacingTimer_->scheduleTimeout(this, timeUntilWrite);
+        return true;
+      }
+      if (evb_) {
+        evb_->scheduleTimeoutHighRes(this, timeUntilWrite);
+        return true;
+      }
     }
   }
   return false;
@@ -93,13 +95,13 @@ void FunctionLooper::run(bool thisIteration, bool runInline) noexcept {
     return;
   }
   if (isLoopCallbackScheduled() ||
-      (!fireLoopEarly_ && pacingTimer_ && isTimerCallbackScheduled())) {
+      (!fireLoopEarly_ && pacingFunc_ && isTimerCallbackScheduled())) {
     VLOG(10) << __func__ << ": " << type_ << " already scheduled";
     return;
   }
   // If we are pacing, we're about to write again, if it's close, just write
   // now.
-  if (pacingTimer_ && isTimerCallbackScheduled()) {
+  if (pacingFunc_ && isTimerCallbackScheduled()) {
     auto n = Clock::now();
     auto timeUntilWrite = nextPacingTime_ < n
         ? 0us
@@ -122,9 +124,7 @@ void FunctionLooper::stop() noexcept {
   if (evb_) {
     cancelLoopCallback();
   }
-  if (pacingTimer_) {
-    cancelTimerCallback();
-  }
+  cancelTimerCallback();
 }
 
 bool FunctionLooper::isRunning() const {
@@ -132,7 +132,7 @@ bool FunctionLooper::isRunning() const {
 }
 
 bool FunctionLooper::isPacingScheduled() {
-  return pacingTimer_ && isTimerCallbackScheduled();
+  return pacingFunc_ && isTimerCallbackScheduled();
 }
 
 bool FunctionLooper::isLoopCallbackScheduled() {
@@ -150,9 +150,7 @@ void FunctionLooper::detachEventBase() {
   VLOG(10) << __func__ << ": " << type_;
   DCHECK(evb_ && evb_->isInEventBaseThread());
   stop();
-  if (pacingTimer_) {
-    cancelTimerCallback();
-  }
+  cancelTimerCallback();
   evb_ = nullptr;
 }
 

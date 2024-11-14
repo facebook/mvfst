@@ -43,8 +43,6 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
-  bool hasPacingTimer() const noexcept;
-
   void runLoopCallback() noexcept override;
 
   /**

@@ -2751,23 +2751,18 @@ void QuicTransportBaseLite::setTransportSettings(
       }
       return 0us;
     });
-    if (writeLooper_->hasPacingTimer()) {
-      bool usingBbr =
-          (conn_->transportSettings.defaultCongestionController ==
-               CongestionControlType::BBR ||
-           conn_->transportSettings.defaultCongestionController ==
-               CongestionControlType::BBRTesting ||
-           conn_->transportSettings.defaultCongestionController ==
-               CongestionControlType::BBR2);
-      auto minCwnd = usingBbr ? kMinCwndInMssForBbr
-                              : conn_->transportSettings.minCwndInMss;
-      conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
-      conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
-      conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
-    } else {
-      LOG(ERROR) << "Pacing cannot be enabled without a timer";
-      conn_->transportSettings.pacingEnabled = false;
-    }
+    bool usingBbr =
+        (conn_->transportSettings.defaultCongestionController ==
+             CongestionControlType::BBR ||
+         conn_->transportSettings.defaultCongestionController ==
+             CongestionControlType::BBRTesting ||
+         conn_->transportSettings.defaultCongestionController ==
+             CongestionControlType::BBR2);
+    auto minCwnd =
+        usingBbr ? kMinCwndInMssForBbr : conn_->transportSettings.minCwndInMss;
+    conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
+    conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
+    conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
   }
   setCongestionControl(conn_->transportSettings.defaultCongestionController);
   if (conn_->transportSettings.datagramConfig.enabled) {
@@ -2840,8 +2835,7 @@ void QuicTransportBaseLite::validateCongestionAndPacing(
   if ((type == CongestionControlType::BBR ||
        type == CongestionControlType::BBRTesting ||
        type == CongestionControlType::BBR2) &&
-      (!conn_->transportSettings.pacingEnabled ||
-       !writeLooper_->hasPacingTimer())) {
+      !conn_->transportSettings.pacingEnabled) {
     LOG(ERROR) << "Unpaced BBR isn't supported";
     type = CongestionControlType::Cubic;
   }

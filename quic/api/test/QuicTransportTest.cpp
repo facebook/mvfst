@@ -3916,12 +3916,12 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))));
 }
 
-TEST_F(QuicTransportTest, NoPacingTimerNoPacing) {
+TEST_F(QuicTransportTest, NoPacingTimerStillPaced) {
   TransportSettings transportSettings;
   transportSettings.pacingEnabled = true;
   transport_->setTransportSettings(transportSettings);
   transport_->getConnectionState().canBePaced = true;
-  EXPECT_FALSE(isConnectionPaced(transport_->getConnectionState()));
+  EXPECT_TRUE(isConnectionPaced(transport_->getConnectionState()));
 }
 
 TEST_F(QuicTransportTest, SetPacingTimerThenEnablesPacing) {
