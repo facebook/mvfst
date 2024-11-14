@@ -104,15 +104,6 @@ Optional<ConnectionId> QuicTransportBase::getClientChosenDestConnectionId()
   return conn_->clientChosenDestConnectionId;
 }
 
-const folly::SocketAddress& QuicTransportBase::getOriginalPeerAddress() const {
-  return conn_->originalPeerAddress;
-}
-
-const folly::SocketAddress& QuicTransportBase::getLocalAddress() const {
-  return socket_ && socket_->isBound() ? socket_->address()
-                                       : localFallbackAddress;
-}
-
 QuicTransportBase::~QuicTransportBase() {
   resetConnectionCallbacks();
   // Just in case this ended up hanging around.
@@ -202,81 +193,6 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
   }
-}
-
-/**
- * Getters for details from the transport/security layers such as
- * RTT, rxmit, cwnd, mss, app protocol, handshake latency,
- * client proposed ciphers, etc.
- */
-
-QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
-  CongestionControlType congestionControlType = CongestionControlType::None;
-  uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
-  uint64_t congestionWindow = std::numeric_limits<uint64_t>::max();
-  Optional<CongestionController::State> maybeCCState;
-  uint64_t burstSize = 0;
-  std::chrono::microseconds pacingInterval = 0ms;
-  if (conn_->congestionController) {
-    congestionControlType = conn_->congestionController->type();
-    writableBytes = conn_->congestionController->getWritableBytes();
-    congestionWindow = conn_->congestionController->getCongestionWindow();
-    maybeCCState = conn_->congestionController->getState();
-    if (isConnectionPaced(*conn_)) {
-      burstSize = conn_->pacer->getCachedWriteBatchSize();
-      pacingInterval = conn_->pacer->getTimeUntilNextWrite();
-    }
-  }
-  TransportInfo transportInfo;
-  transportInfo.connectionTime = conn_->connectionTime;
-  transportInfo.srtt = conn_->lossState.srtt;
-  transportInfo.rttvar = conn_->lossState.rttvar;
-  transportInfo.lrtt = conn_->lossState.lrtt;
-  transportInfo.maybeLrtt = conn_->lossState.maybeLrtt;
-  transportInfo.maybeLrttAckDelay = conn_->lossState.maybeLrttAckDelay;
-  if (conn_->lossState.mrtt != kDefaultMinRtt) {
-    transportInfo.maybeMinRtt = conn_->lossState.mrtt;
-  }
-  transportInfo.maybeMinRttNoAckDelay = conn_->lossState.maybeMrttNoAckDelay;
-  transportInfo.mss = conn_->udpSendPacketLen;
-  transportInfo.congestionControlType = congestionControlType;
-  transportInfo.writableBytes = writableBytes;
-  transportInfo.congestionWindow = congestionWindow;
-  transportInfo.pacingBurstSize = burstSize;
-  transportInfo.pacingInterval = pacingInterval;
-  transportInfo.packetsRetransmitted = conn_->lossState.rtxCount;
-  transportInfo.totalPacketsSent = conn_->lossState.totalPacketsSent;
-  transportInfo.totalAckElicitingPacketsSent =
-      conn_->lossState.totalAckElicitingPacketsSent;
-  transportInfo.totalPacketsMarkedLost =
-      conn_->lossState.totalPacketsMarkedLost;
-  transportInfo.totalPacketsMarkedLostByTimeout =
-      conn_->lossState.totalPacketsMarkedLostByTimeout;
-  transportInfo.totalPacketsMarkedLostByReorderingThreshold =
-      conn_->lossState.totalPacketsMarkedLostByReorderingThreshold;
-  transportInfo.totalPacketsSpuriouslyMarkedLost =
-      conn_->lossState.totalPacketsSpuriouslyMarkedLost;
-  transportInfo.timeoutBasedLoss = conn_->lossState.timeoutBasedRtxCount;
-  transportInfo.totalBytesRetransmitted =
-      conn_->lossState.totalBytesRetransmitted;
-  transportInfo.pto = calculatePTO(*conn_);
-  transportInfo.bytesSent = conn_->lossState.totalBytesSent;
-  transportInfo.bytesAcked = conn_->lossState.totalBytesAcked;
-  transportInfo.bytesRecvd = conn_->lossState.totalBytesRecvd;
-  transportInfo.bytesInFlight = conn_->lossState.inflightBytes;
-  transportInfo.bodyBytesSent = conn_->lossState.totalBodyBytesSent;
-  transportInfo.bodyBytesAcked = conn_->lossState.totalBodyBytesAcked;
-  transportInfo.totalStreamBytesSent = conn_->lossState.totalStreamBytesSent;
-  transportInfo.totalNewStreamBytesSent =
-      conn_->lossState.totalNewStreamBytesSent;
-  transportInfo.ptoCount = conn_->lossState.ptoCount;
-  transportInfo.totalPTOCount = conn_->lossState.totalPTOCount;
-  transportInfo.largestPacketAckedByPeer =
-      conn_->ackStates.appDataAckState.largestAckedByPeer;
-  transportInfo.largestPacketSent = conn_->lossState.largestSent;
-  transportInfo.usedZeroRtt = conn_->usedZeroRtt;
-  transportInfo.maybeCCState = maybeCCState;
-  return transportInfo;
 }
 
 folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
@@ -791,19 +707,6 @@ QuicTransportBase::readDatagramBufs(size_t atMost) {
   return retDatagrams;
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
-  if (conn_->pacer) {
-    conn_->pacer->setMaxPacingRate(maxRateBytesPerSec);
-    return folly::unit;
-  } else {
-    LOG(WARNING)
-        << "Cannot set max pacing rate without a pacer. Pacing Enabled = "
-        << conn_->transportSettings.pacingEnabled;
-    return folly::makeUnexpected(LocalErrorCode::PACER_NOT_AVAILABLE);
-  }
-}
-
 folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
     StreamId id) {
   if (closeState_ != CloseState::OPEN) {
@@ -813,12 +716,6 @@ folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
     return stream->priority;
   }
   return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-}
-
-void QuicTransportBase::setThrottlingSignalProvider(
-    std::shared_ptr<ThrottlingSignalProvider> throttlingSignalProvider) {
-  DCHECK(conn_);
-  conn_->throttlingSignalProvider = throttlingSignalProvider;
 }
 
 bool QuicTransportBase::isDetachable() {

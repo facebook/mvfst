@@ -293,109 +293,117 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD(void, onSuspiciousReadLoops, (uint64_t, NoReadReason));
 };
 
-class MockObserver : public QuicSocket::ManagedObserver {
+class MockObserver : public QuicSocketLite::ManagedObserver {
  public:
-  using QuicSocket::ManagedObserver::ManagedObserver;
-  MOCK_METHOD((void), attached, (QuicSocket*), (noexcept));
-  MOCK_METHOD((void), detached, (QuicSocket*), (noexcept));
+  using QuicSocketLite::ManagedObserver::ManagedObserver;
+  MOCK_METHOD((void), attached, (QuicSocketLite*), (noexcept));
+  MOCK_METHOD((void), detached, (QuicSocketLite*), (noexcept));
   MOCK_METHOD(
       (void),
       packetsReceived,
-      (QuicSocket*, const SocketObserverInterface::PacketsReceivedEvent&));
+      (QuicSocketLite*, const SocketObserverInterface::PacketsReceivedEvent&));
   MOCK_METHOD(
       (void),
       destroyed,
-      (QuicSocket*, QuicSocket::Observer::DestroyContext* ctx),
+      (QuicSocketLite*, QuicSocket::Observer::DestroyContext* ctx),
       (noexcept));
   MOCK_METHOD(
       (void),
       closeStarted,
-      (QuicSocket*, const CloseStartedEvent&),
+      (QuicSocketLite*, const CloseStartedEvent&),
       (noexcept));
-  MOCK_METHOD((void), closing, (QuicSocket*, const ClosingEvent&), (noexcept));
+  MOCK_METHOD(
+      (void),
+      closing,
+      (QuicSocketLite*, const ClosingEvent&),
+      (noexcept));
 };
 
 class MockLegacyObserver : public LegacyObserver {
  public:
   using LegacyObserver::LegacyObserver;
-  MOCK_METHOD((void), observerAttach, (QuicSocket*), (noexcept));
-  MOCK_METHOD((void), observerDetach, (QuicSocket*), (noexcept));
-  MOCK_METHOD((void), destroy, (QuicSocket*), (noexcept));
+  MOCK_METHOD((void), observerAttach, (QuicSocketLite*), (noexcept));
+  MOCK_METHOD((void), observerDetach, (QuicSocketLite*), (noexcept));
+  MOCK_METHOD((void), destroy, (QuicSocketLite*), (noexcept));
   MOCK_METHOD(
       (void),
       closeStarted,
-      (QuicSocket*, const CloseStartedEvent&),
+      (QuicSocketLite*, const CloseStartedEvent&),
       (noexcept));
-  MOCK_METHOD((void), closing, (QuicSocket*, const ClosingEvent&), (noexcept));
+  MOCK_METHOD(
+      (void),
+      closing,
+      (QuicSocketLite*, const ClosingEvent&),
+      (noexcept));
   MOCK_METHOD(
       (void),
       evbAttach,
-      (QuicSocket*, quic::QuicEventBase*),
+      (QuicSocketLite*, quic::QuicEventBase*),
       (noexcept));
   MOCK_METHOD(
       (void),
       evbDetach,
-      (QuicSocket*, quic::QuicEventBase*),
+      (QuicSocketLite*, quic::QuicEventBase*),
       (noexcept));
   MOCK_METHOD(
       (void),
       startWritingFromAppLimited,
-      (QuicSocket*, const AppLimitedEvent&),
+      (QuicSocketLite*, const AppLimitedEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       packetsWritten,
-      (QuicSocket*, const PacketsWrittenEvent&),
+      (QuicSocketLite*, const PacketsWrittenEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       appRateLimited,
-      (QuicSocket*, const AppLimitedEvent&),
+      (QuicSocketLite*, const AppLimitedEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       packetsReceived,
-      (QuicSocket*, const PacketsReceivedEvent&),
+      (QuicSocketLite*, const PacketsReceivedEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       acksProcessed,
-      (QuicSocket*, const AcksProcessedEvent&),
+      (QuicSocketLite*, const AcksProcessedEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       packetLossDetected,
-      (QuicSocket*, const LossEvent&),
+      (QuicSocketLite*, const LossEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       rttSampleGenerated,
-      (QuicSocket*, const PacketRTT&),
+      (QuicSocketLite*, const PacketRTT&),
       (noexcept));
   MOCK_METHOD(
       (void),
       spuriousLossDetected,
-      (QuicSocket*, const SpuriousLossEvent&),
+      (QuicSocketLite*, const SpuriousLossEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       knobFrameReceived,
-      (QuicSocket*, const KnobFrameEvent&),
+      (QuicSocketLite*, const KnobFrameEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       streamOpened,
-      (QuicSocket*, const StreamOpenEvent&),
+      (QuicSocketLite*, const StreamOpenEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       streamClosed,
-      (QuicSocket*, const StreamCloseEvent&),
+      (QuicSocketLite*, const StreamCloseEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       l4sWeightUpdated,
-      (QuicSocket*, const L4sWeightUpdateEvent&),
+      (QuicSocketLite*, const L4sWeightUpdateEvent&),
       (noexcept));
 
   static auto getLossPacketNum(PacketNum packetNum) {

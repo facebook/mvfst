@@ -230,6 +230,16 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       Priority priority) override;
 
+  /**
+   * Sets the maximum pacing rate in Bytes per second to be used
+   * if pacing is enabled.
+   */
+  folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
+      uint64_t maxRateBytesPerSec) override;
+
+  void setThrottlingSignalProvider(
+      std::shared_ptr<ThrottlingSignalProvider>) override;
+
   uint64_t maxWritableOnStream(const QuicStreamState&) const;
 
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
@@ -242,6 +252,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   }
 
   const folly::SocketAddress& getPeerAddress() const override;
+
+  const folly::SocketAddress& getOriginalPeerAddress() const override;
 
   Optional<std::string> getAppProtocol() const override;
 
@@ -483,6 +495,108 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void createBufAccessor(size_t /* capacity */) {}
 
+  TransportInfo getTransportInfo() const override;
+
+  const folly::SocketAddress& getLocalAddress() const override;
+
+  using Observer = SocketObserverContainer::Observer;
+  using ManagedObserver = SocketObserverContainer::ManagedObserver;
+
+  /**
+   * Adds an observer.
+   *
+   * If the observer is already added, this is a no-op.
+   *
+   * @param observer     Observer to add.
+   * @return             Whether the observer was added (fails if no list).
+   */
+  bool addObserver(Observer* observer) {
+    if (auto list = getSocketObserverContainer()) {
+      list->addObserver(observer);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Adds an observer.
+   *
+   * If the observer is already added, this is a no-op.
+   *
+   * @param observer     Observer to add.
+   * @return             Whether the observer was added (fails if no list).
+   */
+  bool addObserver(std::shared_ptr<Observer> observer) {
+    if (auto list = getSocketObserverContainer()) {
+      list->addObserver(std::move(observer));
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Removes an observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether the observer was found and removed.
+   */
+  bool removeObserver(Observer* observer) {
+    if (auto list = getSocketObserverContainer()) {
+      return list->removeObserver(observer);
+    }
+    return false;
+  }
+
+  /**
+   * Removes an observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether the observer was found and removed.
+   */
+  bool removeObserver(std::shared_ptr<Observer> observer) {
+    if (auto list = getSocketObserverContainer()) {
+      return list->removeObserver(std::move(observer));
+    }
+    return false;
+  }
+
+  /**
+   * Get number of observers.
+   *
+   * @return             Number of observers.
+   */
+  [[nodiscard]] size_t numObservers() const {
+    if (auto list = getSocketObserverContainer()) {
+      return list->numObservers();
+    }
+    return 0;
+  }
+
+  /**
+   * Returns list of attached observers.
+   *
+   * @return             List of observers.
+   */
+  std::vector<Observer*> getObservers() {
+    if (auto list = getSocketObserverContainer()) {
+      return list->getObservers();
+    }
+    return {};
+  }
+
+  /**
+   * Returns list of attached observers that are of type T.
+   *
+   * @return             Attached observers of type T.
+   */
+  template <typename T = Observer>
+  std::vector<T*> findObservers() {
+    if (auto list = getSocketObserverContainer()) {
+      return list->findObservers<T>();
+    }
+    return {};
+  }
+
  protected:
   void setConnectionCallbackFromCtor(
       folly::MaybeManagedPtr<ConnectionCallback> callback);
@@ -663,6 +777,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
 
+  // TODO: This is silly. We need a better solution.
+  // Uninitialied local address as a fallback answer when socket isn't bound.
+  folly::SocketAddress localFallbackAddress;
+
   CloseState closeState_{CloseState::OPEN};
 
   folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
@@ -773,7 +891,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   class WrappedSocketObserverContainer {
    public:
-    explicit WrappedSocketObserverContainer(QuicSocket* socket)
+    explicit WrappedSocketObserverContainer(QuicSocketLite* socket)
         : observerContainer_(
               std::make_shared<SocketObserverContainer>(socket)) {}
 

@@ -52,10 +52,6 @@ class QuicTransportBase : public QuicSocket,
 
   Optional<ConnectionId> getClientChosenDestConnectionId() const override;
 
-  const folly::SocketAddress& getOriginalPeerAddress() const override;
-
-  const folly::SocketAddress& getLocalAddress() const override;
-
   const std::shared_ptr<QLogger> getQLogger() const;
 
   // QuicSocket interface
@@ -69,8 +65,6 @@ class QuicTransportBase : public QuicSocket,
       StreamId id) const override;
   folly::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
       StreamId id) const override;
-
-  TransportInfo getTransportInfo() const override;
 
   folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const override;
@@ -149,13 +143,6 @@ class QuicTransportBase : public QuicSocket,
 
   void attachEventBase(std::shared_ptr<QuicEventBase> evb) override;
 
-  /**
-   * Sets the maximum pacing rate in Bytes per second to be used
-   * if pacing is enabled.
-   */
-  folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
-      uint64_t maxRateBytesPerSec) override;
-
   // Subclass API.
 
   folly::Expected<Priority, LocalErrorCode> getStreamPriority(
@@ -199,9 +186,6 @@ class QuicTransportBase : public QuicSocket,
    * Disable background mode by clearing all related parameters.
    */
   void clearBackgroundModeParameters();
-
-  void setThrottlingSignalProvider(
-      std::shared_ptr<ThrottlingSignalProvider>) override;
 
   virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
 
@@ -295,10 +279,6 @@ class QuicTransportBase : public QuicSocket,
       std::chrono::milliseconds pingTimeout);
 
   bool handshakeDoneNotified_{false};
-
-  // TODO: This is silly. We need a better solution.
-  // Uninitialied local address as a fallback answer when socket isn't bound.
-  folly::SocketAddress localFallbackAddress;
 
   uint64_t qlogRefcnt_{0};
 

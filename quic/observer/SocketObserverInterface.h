@@ -20,7 +20,7 @@ class QuicEventBase;
 }
 
 namespace quic {
-class QuicSocket;
+class QuicSocketLite;
 class QuicTransportBase;
 
 /**
@@ -451,7 +451,7 @@ class SocketObserverInterface {
    * @param event    CloseStartedEvent with details.
    */
   virtual void closeStarted(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const CloseStartedEvent& /* event */) noexcept {}
 
   /**
@@ -469,7 +469,7 @@ class SocketObserverInterface {
    * @param event    ClosingEvent with details.
    */
   virtual void closing(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const ClosingEvent& /* event */) noexcept {}
 
   /**
@@ -480,7 +480,7 @@ class SocketObserverInterface {
    * @param evb       The new event base that is getting attached.
    */
   virtual void evbAttach(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       QuicEventBase* /* evb */) noexcept {}
 
   /**
@@ -491,7 +491,7 @@ class SocketObserverInterface {
    * @param evb       The existing event base that is getting detached.
    */
   virtual void evbDetach(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       QuicEventBase* /* evb */) noexcept {}
 
   /**
@@ -502,7 +502,7 @@ class SocketObserverInterface {
    * @param event    AppLimitedEvent with details.
    */
   virtual void startWritingFromAppLimited(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const AppLimitedEvent& /* event */) {}
 
   /**
@@ -512,7 +512,7 @@ class SocketObserverInterface {
    * @param event    PacketsWrittenEvent with details.
    */
   virtual void packetsWritten(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const PacketsWrittenEvent& /* event */) {}
 
   /**
@@ -522,7 +522,7 @@ class SocketObserverInterface {
    * @param event    AppLimitedEvent with details.
    */
   virtual void appRateLimited(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const AppLimitedEvent& /* event */) {}
 
   /**
@@ -532,7 +532,7 @@ class SocketObserverInterface {
    * @param event    PacketsReceivedEvent with details.
    */
   virtual void packetsReceived(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const PacketsReceivedEvent& /* event */) {}
 
   /**
@@ -542,7 +542,7 @@ class SocketObserverInterface {
    * @param event    Event with information about ACKs processed.
    */
   virtual void acksProcessed(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const struct AcksProcessedEvent& /* event */) {}
 
   /**
@@ -552,7 +552,7 @@ class SocketObserverInterface {
    * @param event    LossEvent with details.
    */
   virtual void packetLossDetected(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const LossEvent& /* event */) {}
 
   /**
@@ -562,7 +562,7 @@ class SocketObserverInterface {
    * @param event    PacketRTTEvent with details.
    */
   virtual void rttSampleGenerated(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const PacketRTT& /* event */) {}
 
   /**
@@ -573,7 +573,7 @@ class SocketObserverInterface {
    * @param packet   const reference to the lost packet.
    */
   virtual void spuriousLossDetected(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const SpuriousLossEvent& /* event */) {}
 
   /**
@@ -583,7 +583,7 @@ class SocketObserverInterface {
    * @param event    const reference to the KnobFrameEvent.
    */
   virtual void knobFrameReceived(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const KnobFrameEvent& /* event */) {}
 
   /**
@@ -593,7 +593,7 @@ class SocketObserverInterface {
    * @param event    Event containing details.
    */
   virtual void streamOpened(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const StreamOpenEvent& /* event */) {}
 
   /**
@@ -603,7 +603,7 @@ class SocketObserverInterface {
    * @param event    Event containing details.
    */
   virtual void streamClosed(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const StreamCloseEvent& /* event */) {}
 
   /**
@@ -614,7 +614,7 @@ class SocketObserverInterface {
    * @param event    Event with the new weight and received ECN marks
    */
   virtual void l4sWeightUpdated(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const L4sWeightUpdateEvent& /* event */) noexcept {}
 };
 

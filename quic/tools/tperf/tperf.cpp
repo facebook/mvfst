@@ -118,7 +118,7 @@ class TPerfObserver : public LegacyObserver {
   using LegacyObserver::LegacyObserver;
 
   void appRateLimited(
-      QuicSocket* /* socket */,
+      QuicSocketLite* /* socket */,
       const quic::SocketObserverInterface::
           AppLimitedEvent& /* appLimitedEvent */) override {
     if (FLAGS_log_app_rate_limited) {
@@ -127,7 +127,7 @@ class TPerfObserver : public LegacyObserver {
   }
 
   void packetLossDetected(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const struct LossEvent& /* lossEvent */) override {
     if (FLAGS_log_loss) {
       LOG(INFO) << "packetLoss detected";
@@ -135,7 +135,7 @@ class TPerfObserver : public LegacyObserver {
   }
 
   void rttSampleGenerated(
-      QuicSocket*, /* socket */
+      QuicSocketLite*, /* socket */
       const PacketRTT& /* RTT sample */) override {
     if (FLAGS_log_rtt_sample) {
       LOG(INFO) << "rttSample generated";

@@ -11,11 +11,11 @@
 #include <quic/observer/SocketObserverInterface.h>
 
 namespace quic {
-class QuicSocket;
+class QuicSocketLite;
 
 using SocketObserverContainerBaseT = folly::ObserverContainer<
     SocketObserverInterface,
-    QuicSocket,
+    QuicSocketLite,
     folly::ObserverContainerBasePolicyDefault<
         SocketObserverInterface::Events /* EventEnum */,
         32 /* BitsetSize (max number of interface events) */>>;
@@ -40,7 +40,7 @@ class SocketObserverContainer : public SocketObserverContainerBaseT {
      *
      * @param socket      Socket where observer was installed.
      */
-    virtual void observerAttach(QuicSocket* /* socket */) noexcept {}
+    virtual void observerAttach(QuicSocketLite* /* socket */) noexcept {}
 
     /**
      * observerDetach() will be invoked if the observer is uninstalled prior
@@ -50,25 +50,26 @@ class SocketObserverContainer : public SocketObserverContainerBaseT {
      *
      * @param socket      Socket where observer was uninstalled.
      */
-    virtual void observerDetach(QuicSocket* /* socket */) noexcept {}
+    virtual void observerDetach(QuicSocketLite* /* socket */) noexcept {}
 
     /**
-     * destroy() will be invoked when the QuicSocket's destructor is invoked.
+     * destroy() will be invoked when the QuicSocketLite's destructor is
+     * invoked.
      *
      * No further callbacks will be invoked after destroy().
      *
      * @param socket      Socket being destroyed.
      */
-    virtual void destroy(QuicSocket* /* socket */) noexcept {}
+    virtual void destroy(QuicSocketLite* /* socket */) noexcept {}
 
    private:
-    void attached(QuicSocket* obj) noexcept override {
+    void attached(QuicSocketLite* obj) noexcept override {
       observerAttach(obj);
     }
-    void detached(QuicSocket* obj) noexcept override {
+    void detached(QuicSocketLite* obj) noexcept override {
       observerDetach(obj);
     }
-    void destroyed(QuicSocket* obj, DestroyContext* /* ctx */) noexcept
+    void destroyed(QuicSocketLite* obj, DestroyContext* /* ctx */) noexcept
         override {
       destroy(obj);
     }
