@@ -2097,7 +2097,7 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
   auto& resultRstStreamFrame = *regularPacket.frames[0].asRstStreamFrame();
   EXPECT_EQ(errorCode, resultRstStreamFrame.errorCode);
   EXPECT_EQ(id, resultRstStreamFrame.streamId);
-  EXPECT_EQ(offset, resultRstStreamFrame.offset);
+  EXPECT_EQ(offset, resultRstStreamFrame.finalSize);
 
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
@@ -2106,7 +2106,7 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
   auto& wireRstStreamFrame = *decodedFrame.asRstStreamFrame();
   EXPECT_EQ(errorCode, wireRstStreamFrame.errorCode);
   EXPECT_EQ(id, wireRstStreamFrame.streamId);
-  EXPECT_EQ(offset, wireRstStreamFrame.offset);
+  EXPECT_EQ(offset, wireRstStreamFrame.finalSize);
   // At last, verify there is nothing left in the wire format bytes:
   EXPECT_EQ(queue.chainLength(), 0);
 }

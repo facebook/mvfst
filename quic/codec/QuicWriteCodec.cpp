@@ -816,7 +816,7 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       RstStreamFrame& rstStreamFrame = *frame.asRstStreamFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::RST_STREAM));
       QuicInteger streamId(rstStreamFrame.streamId);
-      QuicInteger offset(rstStreamFrame.offset);
+      QuicInteger offset(rstStreamFrame.finalSize);
       QuicInteger errorCode(static_cast<uint64_t>(rstStreamFrame.errorCode));
       size_t errorSize = errorCode.getSize();
       auto rstStreamFrameSize = intFrameType.getSize() + errorSize +

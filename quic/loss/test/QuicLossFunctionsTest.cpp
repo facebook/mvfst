@@ -944,7 +944,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
   auto& retxRstFrame = conn->pendingEvents.resets.at(stream->id);
   EXPECT_EQ(stream->id, retxRstFrame.streamId);
   EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, retxRstFrame.errorCode);
-  EXPECT_EQ(currentOffset, retxRstFrame.offset);
+  EXPECT_EQ(currentOffset, retxRstFrame.finalSize);
 
   // write again:
   writeQuicDataToSocket(
@@ -967,7 +967,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
     }
     EXPECT_EQ(stream->id, resetFrame->streamId);
     EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, resetFrame->errorCode);
-    EXPECT_EQ(currentOffset, resetFrame->offset);
+    EXPECT_EQ(currentOffset, resetFrame->finalSize);
     rstFound = true;
   }
   EXPECT_TRUE(rstFound);

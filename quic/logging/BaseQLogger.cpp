@@ -115,7 +115,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       case QuicFrame::Type::RstStreamFrame: {
         const auto& frame = *quicFrame.asRstStreamFrame();
         event->frames.push_back(std::make_unique<RstStreamFrameLog>(
-            frame.streamId, frame.errorCode, frame.offset));
+            frame.streamId, frame.errorCode, frame.finalSize));
         break;
       }
       case QuicFrame::Type::ConnectionCloseFrame: {
@@ -242,7 +242,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       case QuicWriteFrame::Type::RstStreamFrame: {
         const RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
         event->frames.push_back(std::make_unique<RstStreamFrameLog>(
-            frame.streamId, frame.errorCode, frame.offset));
+            frame.streamId, frame.errorCode, frame.finalSize));
         break;
       }
       case QuicWriteFrame::Type::ConnectionCloseFrame: {

@@ -3318,7 +3318,7 @@ TEST_F(QuicServerTransportTest, ResetDSRStream) {
       continue;
     }
     EXPECT_EQ(streamId, rstStream->streamId);
-    EXPECT_GT(rstStream->offset, 200);
+    EXPECT_GT(rstStream->finalSize, 200);
     EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstStream->errorCode);
     foundReset = true;
   }

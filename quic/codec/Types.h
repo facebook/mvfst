@@ -298,17 +298,17 @@ struct WriteAckFrameResult {
 struct RstStreamFrame {
   StreamId streamId;
   ApplicationErrorCode errorCode;
-  uint64_t offset;
+  uint64_t finalSize;
 
   RstStreamFrame(
       StreamId streamIdIn,
       ApplicationErrorCode errorCodeIn,
-      uint64_t offsetIn)
-      : streamId(streamIdIn), errorCode(errorCodeIn), offset(offsetIn) {}
+      uint64_t finalSizeIn)
+      : streamId(streamIdIn), errorCode(errorCodeIn), finalSize(finalSizeIn) {}
 
   bool operator==(const RstStreamFrame& rhs) const {
     return streamId == rhs.streamId && errorCode == rhs.errorCode &&
-        offset == rhs.offset;
+        finalSize == rhs.finalSize;
   }
 };
 

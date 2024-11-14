@@ -32,23 +32,24 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
 
 void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
   if (stream.finalReadOffset &&
-      stream.finalReadOffset.value() != frame.offset) {
+      stream.finalReadOffset.value() != frame.finalSize) {
     throw QuicTransportException(
         "Read offset mismatch, " +
             folly::to<std::string>(stream.finalReadOffset.value()) +
-            " != " + folly::to<std::string>(frame.offset),
+            " != " + folly::to<std::string>(frame.finalSize),
         TransportErrorCode::FINAL_SIZE_ERROR);
   }
   // Mark eofoffset:
-  if (stream.maxOffsetObserved > frame.offset) {
+  if (stream.maxOffsetObserved > frame.finalSize) {
     throw QuicTransportException(
         "Reset in middle of stream", TransportErrorCode::FINAL_SIZE_ERROR);
   }
   // Verify that the flow control is consistent.
-  updateFlowControlOnStreamData(stream, stream.maxOffsetObserved, frame.offset);
+  updateFlowControlOnStreamData(
+      stream, stream.maxOffsetObserved, frame.finalSize);
   // Drop read buffer:
   stream.readBuffer.clear();
-  stream.finalReadOffset = frame.offset;
+  stream.finalReadOffset = frame.finalSize;
   stream.streamReadError = frame.errorCode;
   bool appReadAllBytes = stream.currentReadOffset > *stream.finalReadOffset;
   if (!appReadAllBytes) {
@@ -56,8 +57,8 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
     // all the bytes until FIN, so we don't need to do anything for the read
     // side of the flow controller.
     auto lastReadOffset = stream.currentReadOffset;
-    stream.currentReadOffset = frame.offset;
-    stream.maxOffsetObserved = frame.offset;
+    stream.currentReadOffset = frame.finalSize;
+    stream.maxOffsetObserved = frame.finalSize;
     updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
   }
   stream.conn.streamManager->updateReadableStreams(stream);

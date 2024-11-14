@@ -2135,7 +2135,7 @@ TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamResetAllData) {
   appendPendingStreamReset(conn, stream, GenericApplicationErrorCode::UNKNOWN);
   auto rst = conn.pendingEvents.resets.at(id);
   EXPECT_EQ(rst.errorCode, GenericApplicationErrorCode::UNKNOWN);
-  EXPECT_EQ(rst.offset, len);
+  EXPECT_EQ(rst.finalSize, len);
 }
 
 TEST_F(
@@ -2154,7 +2154,7 @@ TEST_F(
   appendPendingStreamReset(conn, stream, GenericApplicationErrorCode::UNKNOWN);
   auto rst = conn.pendingEvents.resets.at(id);
   EXPECT_EQ(rst.errorCode, GenericApplicationErrorCode::UNKNOWN);
-  EXPECT_EQ(rst.offset, len);
+  EXPECT_EQ(rst.finalSize, len);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, LargestWriteOffsetSeenFIN) {

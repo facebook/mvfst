@@ -2103,7 +2103,7 @@ TEST_F(QuicTransportTest, RstStream) {
       continue;
     }
     EXPECT_EQ(streamId, rstFrame->streamId);
-    EXPECT_EQ(0, rstFrame->offset);
+    EXPECT_EQ(0, rstFrame->finalSize);
     EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstFrame->errorCode);
     rstFound = true;
   }
@@ -2870,7 +2870,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
       continue;
     }
     EXPECT_EQ(streamId, rstStream->streamId);
-    EXPECT_EQ(currentWriteOffset, rstStream->offset);
+    EXPECT_EQ(currentWriteOffset, rstStream->finalSize);
     EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstStream->errorCode);
     foundReset = true;
   }
@@ -2975,7 +2975,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
       continue;
     }
     EXPECT_EQ(streamId, rstFrame->streamId);
-    EXPECT_EQ(currentWriteOffset, rstFrame->offset);
+    EXPECT_EQ(currentWriteOffset, rstFrame->finalSize);
     EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstFrame->errorCode);
     foundReset = true;
   }

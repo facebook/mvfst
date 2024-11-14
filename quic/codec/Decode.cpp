@@ -376,15 +376,15 @@ RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::RST_STREAM);
   }
-  auto offset = decodeQuicInteger(cursor);
-  if (!offset) {
+  auto finalSize = decodeQuicInteger(cursor);
+  if (!finalSize) {
     throw QuicTransportException(
         "Bad offset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::RST_STREAM);
   }
   return RstStreamFrame(
-      folly::to<StreamId>(streamId->first), errorCode, offset->first);
+      folly::to<StreamId>(streamId->first), errorCode, finalSize->first);
 }
 
 StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
