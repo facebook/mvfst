@@ -48,6 +48,10 @@ class FizzClientHandshake : public ClientHandshake {
     return state_;
   }
 
+  const FizzClientQuicHandshakeContext& getFizzContext() const {
+    return *fizzContext_;
+  }
+
   void setECHRetryCallback(fizz::client::ECHRetryCallback* cb) {
     echRetryCallback_ = cb;
   }
