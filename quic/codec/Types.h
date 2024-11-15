@@ -295,20 +295,27 @@ struct WriteAckFrameResult {
         timestampsWritten(timestampsWrittenIn) {}
 };
 
+// Can represent either a simple RESET_STREAM frame or a RESET_STREAM_AT
+// frame, depending on whether reliableSize is set.
 struct RstStreamFrame {
   StreamId streamId;
   ApplicationErrorCode errorCode;
   uint64_t finalSize;
+  folly::Optional<uint64_t> reliableSize;
 
   RstStreamFrame(
       StreamId streamIdIn,
       ApplicationErrorCode errorCodeIn,
-      uint64_t finalSizeIn)
-      : streamId(streamIdIn), errorCode(errorCodeIn), finalSize(finalSizeIn) {}
+      uint64_t finalSizeIn,
+      folly::Optional<uint64_t> reliableSizeIn = folly::none)
+      : streamId(streamIdIn),
+        errorCode(errorCodeIn),
+        finalSize(finalSizeIn),
+        reliableSize(reliableSizeIn) {}
 
   bool operator==(const RstStreamFrame& rhs) const {
     return streamId == rhs.streamId && errorCode == rhs.errorCode &&
-        finalSize == rhs.finalSize;
+        finalSize == rhs.finalSize && reliableSize == rhs.reliableSize;
   }
 };
 

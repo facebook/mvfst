@@ -1112,6 +1112,10 @@ void onServerReadDataFromOpen(
         }
         case QuicFrame::Type::RstStreamFrame: {
           RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
+          if (frame.reliableSize) {
+            // We're not yet supporting the handling of RESET_STREAM_AT frames
+            break;
+          }
           VLOG(10) << "Server received reset stream=" << frame.streamId << " "
                    << conn;
           pktHasRetransmittableData = true;

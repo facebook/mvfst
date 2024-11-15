@@ -87,6 +87,43 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
   return ackFrame;
 }
 
+std::unique_ptr<folly::IOBuf> createRstStreamFrame(
+    StreamId streamId,
+    ApplicationErrorCode errorCode,
+    uint64_t finalSize,
+    folly::Optional<uint64_t> reliableSize = folly::none) {
+  std::unique_ptr<folly::IOBuf> rstStreamFrame = folly::IOBuf::create(0);
+  BufAppender wcursor(rstStreamFrame.get(), 10);
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+
+  FrameType frameType =
+      reliableSize ? FrameType::RST_STREAM_AT : FrameType::RST_STREAM;
+
+  // Write the frame type
+  QuicInteger frameTypeQuicInt(static_cast<uint8_t>(frameType));
+  frameTypeQuicInt.encode(appenderOp);
+
+  // Write the stream id
+  QuicInteger streamIdQuicInt(streamId);
+  streamIdQuicInt.encode(appenderOp);
+
+  // Write the error code
+  QuicInteger errorCodeQuicInt(static_cast<uint64_t>(errorCode));
+  errorCodeQuicInt.encode(appenderOp);
+
+  // Write the final size
+  QuicInteger finalSizeQuicInt(finalSize);
+  finalSizeQuicInt.encode(appenderOp);
+
+  if (reliableSize) {
+    // Write the reliable size
+    QuicInteger reliableSizeQuicInt(*reliableSize);
+    reliableSizeQuicInt.encode(appenderOp);
+  }
+
+  return rstStreamFrame;
+}
+
 template <class StreamIdType = StreamId>
 std::unique_ptr<folly::IOBuf> createStreamFrame(
     Optional<QuicInteger> streamId,
@@ -921,6 +958,58 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
 
   folly::io::Cursor cursor(ackFrequencyFrame.get());
   EXPECT_THROW(decodeAckFrequencyFrame(cursor), QuicTransportException);
+}
+
+TEST_F(DecodeTest, RstStreamFrame) {
+  auto buf = createRstStreamFrame(0, 0, 10);
+  BufQueue queue(std::move(buf));
+  auto frame = parseFrame(
+      queue,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  auto rstStreamFrame = frame.asRstStreamFrame();
+  EXPECT_EQ(rstStreamFrame->streamId, 0);
+  EXPECT_EQ(rstStreamFrame->errorCode, 0);
+  EXPECT_EQ(rstStreamFrame->finalSize, 10);
+  EXPECT_FALSE(rstStreamFrame->reliableSize.hasValue());
+}
+
+TEST_F(DecodeTest, RstStreamAtFrame) {
+  auto buf = createRstStreamFrame(0, 0, 10, 9);
+  BufQueue queue(std::move(buf));
+  auto frame = parseFrame(
+      queue,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  auto rstStreamFrame = frame.asRstStreamFrame();
+  EXPECT_EQ(rstStreamFrame->streamId, 0);
+  EXPECT_EQ(rstStreamFrame->errorCode, 0);
+  EXPECT_EQ(rstStreamFrame->finalSize, 10);
+  EXPECT_EQ(*rstStreamFrame->reliableSize, 9);
+}
+
+TEST_F(DecodeTest, RstStreamAtFrameRelSizeGreaterThanOffset) {
+  auto buf = createRstStreamFrame(0, 0, 10, 11);
+  BufQueue queue(std::move(buf));
+  EXPECT_THROW(
+      parseFrame(
+          queue,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, RstStreamAtTruncated) {
+  auto buf = createRstStreamFrame(0, 0, 10, 9);
+  buf->coalesce();
+  buf->trimEnd(1);
+  BufQueue queue(std::move(buf));
+  EXPECT_THROW(
+      parseFrame(
+          queue,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
+      QuicTransportException);
 }
 
 } // namespace quic::test

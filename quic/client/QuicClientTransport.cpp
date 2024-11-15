@@ -473,6 +473,10 @@ void QuicClientTransport::processUdpPacketData(
       }
       case QuicFrame::Type::RstStreamFrame: {
         RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
+        if (frame.reliableSize) {
+          // We're not yet supporting the handling of RESET_STREAM_AT frames
+          break;
+        }
         VLOG(10) << "Client received reset stream=" << frame.streamId << " "
                  << *this;
         pktHasRetransmittableData = true;

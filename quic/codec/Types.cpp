@@ -390,6 +390,8 @@ std::string_view toString(FrameType frame) {
       return "ACK_ECN";
     case FrameType::RST_STREAM:
       return "RST_STREAM";
+    case FrameType::RST_STREAM_AT:
+      return "RST_STREAM_AT";
     case FrameType::STOP_SENDING:
       return "STOP_SENDING";
     case FrameType::CRYPTO_FRAME:

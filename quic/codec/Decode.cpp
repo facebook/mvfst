@@ -358,13 +358,14 @@ ReadAckFrame decodeAckFrameWithECN(
   return readAckFrame;
 }
 
-RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
+RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor, bool reliable) {
   auto streamId = decodeQuicInteger(cursor);
+  auto frameType = reliable ? FrameType::RST_STREAM_AT : FrameType::RST_STREAM;
   if (!streamId) {
     throw QuicTransportException(
         "Bad streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::RST_STREAM);
+        frameType);
   }
   ApplicationErrorCode errorCode;
   auto varCode = decodeQuicInteger(cursor);
@@ -374,17 +375,38 @@ RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
     throw QuicTransportException(
         "Cannot decode error code",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::RST_STREAM);
+        frameType);
   }
   auto finalSize = decodeQuicInteger(cursor);
   if (!finalSize) {
     throw QuicTransportException(
         "Bad offset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::RST_STREAM);
+        frameType);
+  }
+  folly::Optional<std::pair<uint64_t, size_t>> reliableSize = folly::none;
+  if (reliable) {
+    reliableSize = decodeQuicInteger(cursor);
+    if (!reliableSize) {
+      throw QuicTransportException(
+          "Bad value of reliable size",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          frameType);
+    }
+
+    if (reliableSize->first > finalSize->first) {
+      throw QuicTransportException(
+          "Reliable size is greater than final size",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          frameType);
+    }
   }
   return RstStreamFrame(
-      folly::to<StreamId>(streamId->first), errorCode, finalSize->first);
+      folly::to<StreamId>(streamId->first),
+      errorCode,
+      finalSize->first,
+      reliableSize ? folly::Optional<uint64_t>(reliableSize->first)
+                   : folly::none);
 }
 
 StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
@@ -858,7 +880,9 @@ QuicFrame parseFrame(
       case FrameType::ACK_ECN:
         return QuicFrame(decodeAckFrameWithECN(cursor, header, params));
       case FrameType::RST_STREAM:
-        return QuicFrame(decodeRstStreamFrame(cursor));
+      case FrameType::RST_STREAM_AT:
+        return QuicFrame(decodeRstStreamFrame(
+            cursor, frameType == FrameType::RST_STREAM_AT));
       case FrameType::STOP_SENDING:
         return QuicFrame(decodeStopSendingFrame(cursor));
       case FrameType::CRYPTO_FRAME:

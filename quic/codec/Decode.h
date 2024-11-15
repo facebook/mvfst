@@ -83,7 +83,7 @@ QuicFrame parseFrame(
  */
 PaddingFrame decodePaddingFrame(folly::io::Cursor&);
 
-RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor);
+RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor, bool reliable);
 
 ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor);
 
