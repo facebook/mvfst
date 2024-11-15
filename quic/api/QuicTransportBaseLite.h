@@ -21,30 +21,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   QuicTransportBaseLite(
       std::shared_ptr<QuicEventBase> evb,
       std::unique_ptr<QuicAsyncUDPSocket> socket,
-      bool useConnectionEndWithErrorCallback)
-      : evb_(evb),
-        socket_(std::move(socket)),
-        useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),
-        lossTimeout_(this),
-        excessWriteTimeout_(this),
-        idleTimeout_(this),
-        keepaliveTimeout_(this),
-        ackTimeout_(this),
-        pathValidationTimeout_(this),
-        drainTimeout_(this),
-        pingTimeout_(this),
-        writeLooper_(new FunctionLooper(
-            evb_,
-            [this]() { pacedWriteDataToSocket(); },
-            LooperType::WriteLooper)),
-        readLooper_(new FunctionLooper(
-            evb_,
-            [this]() { invokeReadDataAndCallbacks(true); },
-            LooperType::ReadLooper)),
-        peekLooper_(new FunctionLooper(
-            evb_,
-            [this]() { invokePeekDataAndCallbacks(); },
-            LooperType::PeekLooper)) {}
+      bool useConnectionEndWithErrorCallback);
 
   /**
    * Invoked when we have to write some data to the wire.
