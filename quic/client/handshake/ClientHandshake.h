@@ -109,6 +109,14 @@ class ClientHandshake : public Handshake {
    */
   virtual const Optional<ServerTransportParameters>& getServerTransportParams();
 
+  virtual double getCertificateVerifyStartTimeMS() const {
+    return 0.0;
+  }
+
+  virtual double getCertificateVerifyEndTimeMS() const {
+    return 0.0;
+  }
+
   ~ClientHandshake() override = default;
 
  protected:

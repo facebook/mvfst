@@ -119,6 +119,14 @@ class QuicClientTransport
         label, context, keyLength);
   }
 
+  double getCertificateVerifyStartTimeMS() const {
+    return clientConn_->clientHandshakeLayer->getCertificateVerifyStartTimeMS();
+  }
+
+  double getCertificateVerifyEndTimeMS() const {
+    return clientConn_->clientHandshakeLayer->getCertificateVerifyEndTimeMS();
+  }
+
   WriteResult writeBufMeta(
       StreamId /* id */,
       const BufferMeta& /* data */,
