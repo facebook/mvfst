@@ -21,15 +21,6 @@ void libEvTimeoutCallback(
   wrapper->timeoutExpired();
 }
 
-void libEvTimeoutCallbackInternal(
-    struct ev_loop* /* loop */,
-    ev_timer* w,
-    int /* revents */) {
-  auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
-  CHECK(self != nullptr);
-  self->checkCallbacks();
-}
-
 void libEvPrepareCallback(
     struct ev_loop* /* loop */,
     ev_prepare* w,
@@ -54,9 +45,6 @@ LibevQuicEventBase::~LibevQuicEventBase() {
   // If the loop has been destroyed, skip the ev loop operations.
   if (loopWeak_->get()) {
     ev_prepare_stop(ev_loop_, &prepareWatcher_);
-    if (internalTimerInitialized_) {
-      ev_timer_stop(ev_loop_, &ev_timer_internal_);
-    }
   }
 
   struct FunctionLoopCallbackDisposer {
@@ -216,26 +204,6 @@ void LibevQuicEventBase::checkCallbacks() {
     currentLoopWrappers.front().runLoopCallback();
   }
   runOnceCallbackWrappers_ = nullptr;
-
-  if (wakeUpImmediatelyOnPendingScheduledEvents_ &&
-      !loopCallbackWrappers_.empty()) {
-    // We have newly added events for the next loop. Wake up as soon as
-    // possible.
-    if (!internalTimerInitialized_) {
-      internalTimerInitialized_ = true;
-      ev_timer_init(
-          &ev_timer_internal_,
-          libEvTimeoutCallbackInternal,
-          0.0001 /* after */,
-          0. /* repeat */);
-      ev_timer_internal_.data = this;
-      ev_timer_start(ev_loop_, &ev_timer_internal_);
-    } else {
-      ev_timer_stop(ev_loop_, &ev_timer_internal_);
-      ev_timer_set(&ev_timer_internal_, 0.0001, 0.);
-      ev_timer_start(ev_loop_, &ev_timer_internal_);
-    }
-  }
 }
 
 bool LibevQuicEventBase::isInEventBaseThread() const {

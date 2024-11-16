@@ -129,10 +129,6 @@ class LibevQuicEventBase
     return std::chrono::milliseconds(1);
   }
 
-  void wakeUpImmediatelyOnPendingScheduledEvents() override {
-    wakeUpImmediatelyOnPendingScheduledEvents_ = true;
-  }
-
   // MUST be called before any timers are scheduled.
   void useTimerFd() {
 #if defined(HAS_TIMERFD)
@@ -343,9 +339,6 @@ class LibevQuicEventBase
   // We're using it to execute delayed work given to us via runInLoop.
   ev_prepare prepareWatcher_;
   std::atomic<std::thread::id> loopThreadId_;
-  bool wakeUpImmediatelyOnPendingScheduledEvents_{false};
-  ev_timer ev_timer_internal_;
-  bool internalTimerInitialized_{false};
   bool useTimerFd_{false};
   bool prioritizeTimers_{false};
 };

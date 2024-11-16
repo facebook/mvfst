@@ -144,8 +144,6 @@ class QuicEventBase {
 
   virtual void terminateLoopSoon() = 0;
 
-  virtual void wakeUpImmediatelyOnPendingScheduledEvents() {}
-
   [[nodiscard]] virtual std::chrono::milliseconds getTimerTickInterval()
       const = 0;
 
