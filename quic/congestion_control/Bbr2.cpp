@@ -61,7 +61,15 @@ Bbr2CongestionController::Bbr2CongestionController(
           conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss) {
   resetCongestionSignals();
   resetLowerBounds();
-  // Start with the default pacing settings.
+  // If we explicitly don't want to pace the init cwnd, reset the pacing rate.
+  // Otherwise, leave it to the pacer's initial state.
+  if (!conn_.transportSettings.ccaConfig.paceInitCwnd) {
+    if (conn_.pacer) {
+      conn_.pacer->refreshPacingRate(cwndBytes_, 0us);
+    } else {
+      LOG(WARNING) << "BBR2 was initialized on a connection without a pacer";
+    }
+  }
   enterStartup();
 }
 
