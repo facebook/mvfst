@@ -2900,9 +2900,7 @@ void QuicTransportBaseLite::validateCongestionAndPacing(
     // behavior so the override is only for BBR2.
     // TODO: This should be removed once the pacer changes are adopted as
     // the defaults or the pacer is fixed in another way.
-    // TODO: the override should include setting
-    // conn_->transportSettings.experimentalPacer to true. This has been
-    // temporarily removed for testing.
+    conn_->transportSettings.experimentalPacer = true;
     conn_->transportSettings.defaultRttFactor = {1, 1};
     conn_->transportSettings.startupRttFactor = {1, 1};
     if (conn_->pacer) {
@@ -2911,7 +2909,6 @@ void QuicTransportBaseLite::validateCongestionAndPacing(
           conn_->transportSettings.defaultRttFactor.first,
           conn_->transportSettings.defaultRttFactor.second);
     }
-    writeLooper_->setFireLoopEarly(true);
   }
 }
 
