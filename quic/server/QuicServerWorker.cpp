@@ -701,8 +701,12 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
                 ? "ContinuousMemory"
                 : "ChainedMemory");
     if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
-      transportSettings.includeCwndHintsInSessionTicket = true;
-      transportSettings.useCwndHintsInSessionTicket = true;
+      // Override BBRv1 with BBRv2
+      if (transportSettings.defaultCongestionController ==
+          CongestionControlType::BBR) {
+        transportSettings.defaultCongestionController =
+            CongestionControlType::BBR2;
+      }
     }
     trans->setTransportSettings(transportSettings);
     trans->setConnectionIdAlgo(connIdAlgo_.get());
