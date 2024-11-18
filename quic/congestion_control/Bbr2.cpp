@@ -147,11 +147,11 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     // We don't expose the loss type here, so always use fast recovery for
     // non-persistent congestion
     saveCwnd();
-    inPacketConservation_ = true;
+    inRecovery_ = true;
     // Mark the connection as app-limited so bw samples during recovery are not
     // taken into account.
     setAppLimited();
-    packetConservationStartTime_ = Clock::now();
+    recoveryStartTime_ = Clock::now();
     if (lossEvent->persistentCongestion) {
       cwndBytes_ = kMinCwndInMssForBbr * conn_.udpSendPacketLen;
     } else {
@@ -176,10 +176,9 @@ void Bbr2CongestionController::onPacketAckOrLoss(
       }
     }
 
-    if (inPacketConservation_ &&
-        packetConservationStartTime_ <=
-            ackEvent->largestNewlyAckedPacketSentTime) {
-      inPacketConservation_ = false;
+    if (inRecovery_ &&
+        recoveryStartTime_ <= ackEvent->largestNewlyAckedPacketSentTime) {
+      inRecovery_ = false;
       restoreCwnd();
     }
 
@@ -305,33 +304,21 @@ void Bbr2CongestionController::setSendQuantum() {
 
 void Bbr2CongestionController::setCwnd(
     uint64_t ackedBytes,
-    uint64_t lostBytes) {
+    uint64_t /*lostBytes*/) {
   // BBRUpdateMaxInflight()
   auto inflightMax = addQuantizationBudget(
       getBDPWithGain(cwndGain_) + maxExtraAckedFilter_.GetBest());
-  // BBRModulateCwndForRecovery()
-  if (lostBytes > 0 && !conn_.transportSettings.ccaConfig.ignoreLoss) {
-    cwndBytes_ = std::max(
-        cwndBytes_ - std::min(lostBytes, cwndBytes_),
-        kMinCwndInMssForBbr * conn_.udpSendPacketLen);
-  }
-  if (inPacketConservation_) {
-    cwndBytes_ =
-        std::max(cwndBytes_, conn_.lossState.inflightBytes + ackedBytes);
-  }
 
-  if (!inPacketConservation_) {
-    if (fullBwReached_) {
-      cwndBytes_ = std::min(cwndBytes_ + ackedBytes, inflightMax);
-    } else if (
-        cwndBytes_ < inflightMax ||
-        conn_.lossState.totalBytesAcked <
-            conn_.transportSettings.initCwndInMss * conn_.udpSendPacketLen) {
-      cwndBytes_ += ackedBytes;
-    }
-    cwndBytes_ =
-        std::max(cwndBytes_, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
+  if (fullBwReached_) {
+    cwndBytes_ = std::min(cwndBytes_ + ackedBytes, inflightMax);
+  } else if (
+      cwndBytes_ < inflightMax ||
+      conn_.lossState.totalBytesAcked <
+          conn_.transportSettings.initCwndInMss * conn_.udpSendPacketLen) {
+    cwndBytes_ += ackedBytes;
   }
+  cwndBytes_ =
+      std::max(cwndBytes_, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 
   // BBRBoundCwndForProbeRTT()
   if (state_ == State::ProbeRTT) {

@@ -183,8 +183,8 @@ class Bbr2CongestionController : public CongestionController {
   bool cwndLimitedInRound_{false};
 
   bool idleRestart_{false};
-  bool inPacketConservation_{false};
-  TimePoint packetConservationStartTime_;
+  bool inRecovery_{false};
+  TimePoint recoveryStartTime_;
 
   // Round counting
   uint64_t nextRoundDelivered_{0};
