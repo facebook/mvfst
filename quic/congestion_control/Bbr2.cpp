@@ -40,10 +40,6 @@ constexpr float kBeta = 0.7;
 constexpr float kLossThreshold = 0.02;
 constexpr float kHeadroomFactor = 0.15;
 
-#ifndef CLANG_LAZY_INIT
-#define CLANG_LAZY_INIT
-#endif
-CLANG_LAZY_INIT quic::Bandwidth kMinPacingRateForSendQuantum{1200 * 1000, 1s};
 // The experimental pacer currently achieves ~99% of the target rate
 // we should not reduce the target by adding an extra margin.
 // TODO: add the margin back if the pacer performance improves further.
@@ -293,13 +289,10 @@ void Bbr2CongestionController::setPacing() {
 
 void Bbr2CongestionController::setSendQuantum() {
   auto rate = bandwidth_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
-  auto floor = 2 * conn_.udpSendPacketLen;
-  if (rate < kMinPacingRateForSendQuantum) {
-    floor = conn_.udpSendPacketLen;
-  }
-  auto rateIn1Ms = rate * 1ms;
-  sendQuantum_ = std::min(rateIn1Ms, decltype(rateIn1Ms)(64 * 1024));
-  sendQuantum_ = std::max(sendQuantum_, floor);
+  auto burstInPacerTick = rate * conn_.transportSettings.pacingTickInterval;
+  sendQuantum_ =
+      std::min(burstInPacerTick, decltype(burstInPacerTick)(64 * 1024));
+  sendQuantum_ = std::max(sendQuantum_, 2 * conn_.udpSendPacketLen);
 }
 
 void Bbr2CongestionController::setCwnd(
