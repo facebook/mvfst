@@ -11,7 +11,6 @@
 #include <sys/types.h>
 #include <chrono>
 #include <cstdint>
-#include <cstdlib>
 #include <limits>
 
 namespace quic {
@@ -24,7 +23,7 @@ constexpr uint64_t kMaxExtraAckedFilterLen =
     10; // Measured in packet-timed round trips
 
 constexpr float kStartupPacingGain = 2.89; // 2 / ln(2)
-constexpr float kDrainPacingGain = 1 / kStartupPacingGain;
+constexpr float kDrainPacingGain = 0.5;
 constexpr float kProbeBwDownPacingGain = 0.9;
 constexpr float kProbeBwCruiseRefillPacingGain = 1.0;
 constexpr float kProbeBwUpPacingGain = 1.25;
@@ -32,7 +31,8 @@ constexpr float kProbeRttPacingGain = 1.0;
 
 constexpr float kStartupCwndGain = 2.89;
 constexpr float kProbeBwCruiseRefillCwndGain = 2.0;
-constexpr float kProbeBwUpDownCwndGain = 2.0;
+constexpr float kProbeBwDownCwndGain = 2.0;
+constexpr float kProbeBwUpCwndGain = 2.25;
 constexpr float kProbeRttCwndGain = 0.5;
 
 constexpr float kBeta = 0.7;
@@ -979,11 +979,11 @@ void Bbr2CongestionController::updatePacingAndCwndGain() {
       break;
     case State::ProbeBw_Up:
       pacingGain_ = kProbeBwUpPacingGain;
-      cwndGain_ = kProbeBwUpDownCwndGain;
+      cwndGain_ = kProbeBwUpCwndGain;
       break;
     case State::ProbeBw_Down:
       pacingGain_ = kProbeBwDownPacingGain;
-      cwndGain_ = kProbeBwUpDownCwndGain;
+      cwndGain_ = kProbeBwDownCwndGain;
       break;
     case State::ProbeBw_Cruise:
     case State::ProbeBw_Refill:
