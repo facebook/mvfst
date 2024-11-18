@@ -86,8 +86,10 @@ class Bbr2CongestionController : public CongestionController {
 
   void enterStartup();
   void checkStartupDone();
-  void checkStartupFullBandwidth();
   void checkStartupHighLoss();
+
+  void checkFullBwReached();
+  void resetFullBw();
 
   void enterDrain();
   void checkDrain();
@@ -112,6 +114,7 @@ class Bbr2CongestionController : public CongestionController {
   void startProbeBwUp();
   bool checkTimeToProbeBW();
   bool checkTimeToCruise();
+  bool checkTimeToGoDown();
   bool hasElapsedInPhase(std::chrono::microseconds interval);
   bool checkInflightTooHigh(
       uint64_t inflightBytesAtLargestAckedPacket,
@@ -188,9 +191,10 @@ class Bbr2CongestionController : public CongestionController {
   bool roundStart_{false};
   uint64_t roundCount_{0};
 
-  bool filledPipe_{false};
-  Bandwidth filledPipeBandwidth_;
-  uint64_t filledPipeCount_{0};
+  bool fullBwReached_{false};
+  bool fullBwNow_{false};
+  Bandwidth fullBw_;
+  uint64_t fullBwCount_{0};
 
   float pacingGain_{1.0};
   float cwndGain_{1.0};

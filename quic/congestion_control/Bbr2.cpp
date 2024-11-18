@@ -60,6 +60,7 @@ Bbr2CongestionController::Bbr2CongestionController(
       cwndBytes_(
           conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss) {
   resetCongestionSignals();
+  resetFullBw();
   resetLowerBounds();
   // If we explicitly don't want to pace the init cwnd, reset the pacing rate.
   // Otherwise, leave it to the pacer's initial state.
@@ -193,6 +194,7 @@ void Bbr2CongestionController::onPacketAckOrLoss(
 
     updateCongestionSignals(lossEvent);
     updateAckAggregation(*ackEvent);
+    checkFullBwReached();
     checkStartupDone();
     checkDrain();
 
@@ -282,7 +284,7 @@ void Bbr2CongestionController::setPacing() {
           << " kPacingMarginPercent=" << kPacingMarginPercent
           << " units=" << pacingWindow << " interval=" << minRtt_.count();
 
-  if (state_ == State::Startup && !filledPipe_) {
+  if (state_ == State::Startup && !fullBwReached_) {
     pacingWindow = std::max(
         pacingWindow,
         conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss);
@@ -319,7 +321,7 @@ void Bbr2CongestionController::setCwnd(
   }
 
   if (!inPacketConservation_) {
-    if (filledPipe_) {
+    if (fullBwReached_) {
       cwndBytes_ = std::min(cwndBytes_ + ackedBytes, inflightMax);
     } else if (
         cwndBytes_ < inflightMax ||
@@ -371,7 +373,7 @@ void Bbr2CongestionController::restoreCwnd() {
 }
 void Bbr2CongestionController::exitProbeRtt() {
   resetLowerBounds();
-  if (filledPipe_) {
+  if (fullBwReached_) {
     startProbeBwDown();
     startProbeBwCruise();
   } else {
@@ -463,28 +465,10 @@ void Bbr2CongestionController::updateAckAggregation(const AckEvent& ackEvent) {
   maxExtraAckedFilter_.Update(extra, roundCount_);
 }
 void Bbr2CongestionController::checkStartupDone() {
-  checkStartupFullBandwidth();
   checkStartupHighLoss();
 
-  if (state_ == State::Startup && filledPipe_) {
+  if (state_ == State::Startup && fullBwReached_) {
     enterDrain();
-  }
-}
-
-void Bbr2CongestionController::checkStartupFullBandwidth() {
-  if (filledPipe_ || !roundStart_ || isAppLimited()) {
-    return; /* no need to check for a full pipe now */
-  }
-  if (maxBwFilter_.GetBest() >=
-      filledPipeBandwidth_ * 1.25) { /* still growing? */
-    filledPipeBandwidth_ =
-        maxBwFilter_.GetBest(); /* record new baseline level */
-    filledPipeCount_ = 0;
-    return;
-  }
-  filledPipeCount_++; /* another round w/o much growth */
-  if (filledPipeCount_ >= 3) {
-    filledPipe_ = true;
   }
 }
 
@@ -492,27 +476,54 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   /*
   Our implementation differs from the spec a bit here. The conditions in the
   spec are:
-  1. The connection has been in fast recovery for at least one full round trip.
+  1. The connection has been in fast recovery for at least one full packet-timed
+  round trip.
   2. The loss rate over the time scale of a single full round trip exceeds
   BBRLossThresh (2%).
-  3. There are at least BBRStartupFullLossCnt=3 noncontiguous sequence ranges
-  lost in that round trip.
+  3. There are at least BBRStartupFullLossCnt=6
+  discontiguous sequence ranges lost in that round trip.
 
   For 1,2 we use the loss pct from the last loss round which means we could exit
   before a full RTT. For 3, we check we received three separate loss events
   which servers a similar purpose to discontiguous ranges but it's not exactly
   the same.
   */
-  if (filledPipe_ || !roundStart_ || isAppLimited() ||
+  if (fullBwReached_ || !roundStart_ || isAppLimited() ||
       conn_.transportSettings.ccaConfig.ignoreLoss) {
     // TODO: the appLimited condition means we could tolerate losses in startup
     // if we haven't found the full bandwidth. This may need to be revisited.
 
     return; /* no need to check for a the loss exit condition now */
   }
-  if (lossPctInLastRound_ > kLossThreshold && lossEventsInLastRound_ >= 3) {
-    filledPipe_ = true;
+  if (lossPctInLastRound_ > kLossThreshold && lossEventsInLastRound_ >= 6) {
+    fullBwReached_ = true;
+    inflightHi_ = std::max(getBDPWithGain(), inflightLatest_);
   }
+}
+
+void Bbr2CongestionController::checkFullBwReached() {
+  if (fullBwNow_ || isAppLimited()) {
+    return; /* no need to check for a full pipe now */
+  }
+  if (maxBwFilter_.GetBest() >= fullBw_ * 1.25) {
+    resetFullBw(); // bw still growing, reset tracking
+    fullBw_ = maxBwFilter_.GetBest(); /* record new baseline level */
+    return;
+  }
+  if (!roundStart_) {
+    return;
+  }
+  fullBwCount_++; /* another round w/o much growth */
+  fullBwNow_ = (fullBwCount_ >= 3);
+  if (fullBwNow_) {
+    fullBwReached_ = true;
+  }
+}
+
+void Bbr2CongestionController::resetFullBw() {
+  fullBw_ = Bandwidth();
+  fullBwNow_ = false;
+  fullBwCount_ = 0;
 }
 
 void Bbr2CongestionController::enterDrain() {
@@ -535,7 +546,7 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
     uint64_t inflightBytesAtLargestAckedPacket,
     uint64_t lostBytes) {
   /* The core state machine logic for ProbeBW: */
-  if (!filledPipe_) {
+  if (!fullBwReached_) {
     return; /* only handling steady-state behavior here */
   }
   adaptUpperBounds(ackedBytes, inflightBytesAtLargestAckedPacket, lostBytes);
@@ -565,8 +576,7 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
       }
       break;
     case State::ProbeBw_Up:
-      if (hasElapsedInPhase(minRtt_) &&
-          conn_.lossState.inflightBytes > getTargetInflightWithGain(1.25)) {
+      if (checkTimeToGoDown()) {
         startProbeBwDown();
       }
       break;
@@ -617,6 +627,17 @@ bool Bbr2CongestionController::checkTimeToCruise() {
     return true; /* inflight <= estimated BDP */
   }
   // Neither conditions met. Do not cruise yet.
+  return false;
+}
+
+bool Bbr2CongestionController::checkTimeToGoDown() {
+  if (cwndLimitedInRound_ && inflightHi_.has_value() &&
+      cwndBytes_ >= inflightHi_.value()) {
+    resetFullBw();
+    fullBw_ = maxBwFilter_.GetBest();
+  } else if (fullBwNow_) {
+    return true;
+  }
   return false;
 }
 
@@ -885,6 +906,7 @@ void Bbr2CongestionController::startProbeBwUp() {
   state_ = State::ProbeBw_Up;
   updatePacingAndCwndGain();
   startRound();
+  resetFullBw();
   raiseInflightHiSlope();
 }
 
