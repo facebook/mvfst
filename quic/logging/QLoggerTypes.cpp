@@ -28,10 +28,14 @@ folly::dynamic NewTokenFrameLog::toDynamic() const {
 
 folly::dynamic RstStreamFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toQlogString(FrameType::RST_STREAM);
+  d["frame_type"] = toQlogString(
+      reliableOffset ? FrameType::RST_STREAM_AT : FrameType::RST_STREAM);
   d["stream_id"] = streamId;
   d["error_code"] = errorCode;
   d["offset"] = offset;
+  if (reliableOffset) {
+    d["reliable_offset"] = reliableOffset.value();
+  }
   return d;
 }
 

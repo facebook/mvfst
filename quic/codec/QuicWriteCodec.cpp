@@ -814,18 +814,28 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
     }
     case QuicWriteFrame::Type::RstStreamFrame: {
       RstStreamFrame& rstStreamFrame = *frame.asRstStreamFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::RST_STREAM));
+      QuicInteger intFrameType(static_cast<uint8_t>(
+          rstStreamFrame.reliableSize ? FrameType::RST_STREAM_AT
+                                      : FrameType::RST_STREAM));
       QuicInteger streamId(rstStreamFrame.streamId);
-      QuicInteger offset(rstStreamFrame.finalSize);
+      QuicInteger finalSize(rstStreamFrame.finalSize);
       QuicInteger errorCode(static_cast<uint64_t>(rstStreamFrame.errorCode));
+      folly::Optional<QuicInteger> maybeReliableSize = folly::none;
       size_t errorSize = errorCode.getSize();
       auto rstStreamFrameSize = intFrameType.getSize() + errorSize +
-          streamId.getSize() + offset.getSize();
+          streamId.getSize() + finalSize.getSize();
+      if (rstStreamFrame.reliableSize) {
+        maybeReliableSize = QuicInteger(*rstStreamFrame.reliableSize);
+        rstStreamFrameSize += maybeReliableSize->getSize();
+      }
       if (packetSpaceCheck(spaceLeft, rstStreamFrameSize)) {
         builder.write(intFrameType);
         builder.write(streamId);
         builder.write(errorCode);
-        builder.write(offset);
+        builder.write(finalSize);
+        if (maybeReliableSize) {
+          builder.write(*maybeReliableSize);
+        }
         builder.appendFrame(std::move(rstStreamFrame));
         return rstStreamFrameSize;
       }

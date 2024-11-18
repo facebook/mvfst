@@ -37,12 +37,17 @@ class RstStreamFrameLog : public QLogFrame {
   StreamId streamId;
   ApplicationErrorCode errorCode;
   uint64_t offset;
+  folly::Optional<uint64_t> reliableOffset;
 
   RstStreamFrameLog(
       StreamId streamIdIn,
       ApplicationErrorCode errorCodeIn,
-      uint64_t offsetIn)
-      : streamId{streamIdIn}, errorCode{errorCodeIn}, offset{offsetIn} {}
+      uint64_t offsetIn,
+      folly::Optional<uint64_t> reliableOffsetIn = folly::none)
+      : streamId{streamIdIn},
+        errorCode{errorCodeIn},
+        offset{offsetIn},
+        reliableOffset{reliableOffsetIn} {}
 
   ~RstStreamFrameLog() override = default;
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;

@@ -2122,6 +2122,38 @@ TEST_F(QuicWriteCodecTest, NoSpaceForRst) {
   EXPECT_EQ(0, writeFrame(rstStreamFrame, pktBuilder));
 }
 
+TEST_F(QuicWriteCodecTest, WriteRstStreamAt) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+  StreamId id = 0xBAAD;
+  ApplicationErrorCode errorCode = GenericApplicationErrorCode::UNKNOWN;
+  uint64_t finalSize = 0xF00D;
+  uint64_t reliableSize = 0xF00C;
+  RstStreamFrame rstStreamFrame(id, errorCode, finalSize, reliableSize);
+  auto rstStreamBytesWritten = writeFrame(rstStreamFrame, pktBuilder);
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  EXPECT_EQ(21, rstStreamBytesWritten);
+  auto& resultRstStreamFrame = *regularPacket.frames[0].asRstStreamFrame();
+  EXPECT_EQ(errorCode, resultRstStreamFrame.errorCode);
+  EXPECT_EQ(id, resultRstStreamFrame.streamId);
+  EXPECT_EQ(finalSize, resultRstStreamFrame.finalSize);
+  EXPECT_EQ(reliableSize, resultRstStreamFrame.reliableSize);
+
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame = parseQuicFrame(queue);
+  auto& wireRstStreamFrame = *decodedFrame.asRstStreamFrame();
+  EXPECT_EQ(errorCode, wireRstStreamFrame.errorCode);
+  EXPECT_EQ(id, wireRstStreamFrame.streamId);
+  EXPECT_EQ(finalSize, wireRstStreamFrame.finalSize);
+  EXPECT_EQ(reliableSize, wireRstStreamFrame.reliableSize);
+  // At last, verify there is nothing left in the wire format bytes:
+  EXPECT_EQ(queue.chainLength(), 0);
+}
+
 TEST_F(QuicWriteCodecTest, WriteBlockedFrame) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
