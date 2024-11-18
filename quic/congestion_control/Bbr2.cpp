@@ -117,9 +117,8 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     conn_.qLogger->addNetworkPathModelUpdate(
         inflightHi_.value_or(0),
         inflightLo_.value_or(0),
-        bandwidthHi_.has_value() ? bandwidthHi_->units : 0,
-        bandwidthHi_.has_value() ? bandwidthHi_->interval
-                                 : std::chrono::microseconds(1),
+        0, // bandwidthHi_ no longer available.
+        std::chrono::microseconds(1), // bandwidthHi_ no longer available.
         bandwidthLo_.has_value() ? bandwidthLo_->units : 0,
         bandwidthLo_.has_value() ? bandwidthLo_->interval
                                  : std::chrono::microseconds(1));
@@ -586,7 +585,7 @@ void Bbr2CongestionController::adaptUpperBounds(
   /* Update BBR.inflight_hi and BBR.bw_hi. */
 
   if (!checkInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
-    if (!inflightHi_.has_value() || !bandwidthHi_.has_value()) {
+    if (!inflightHi_.has_value()) {
       // No loss has occurred yet so these values are not set and do not need to
       // be raised.
       return;
@@ -595,9 +594,6 @@ void Bbr2CongestionController::adaptUpperBounds(
      * update them */
     if (inflightBytesAtLargestAckedPacket > *inflightHi_) {
       inflightHi_ = inflightBytesAtLargestAckedPacket;
-    }
-    if (bandwidthLatest_ > *bandwidthHi_) {
-      bandwidthHi_ = bandwidthLatest_;
     }
     if (state_ == State::ProbeBw_Up) {
       probeInflightHiUpward(ackedBytes);
@@ -660,7 +656,6 @@ void Bbr2CongestionController::handleInFlightTooHigh(
         inflightBytesAtLargestAckedPacket,
         static_cast<uint64_t>(
             static_cast<float>(getTargetInflightWithGain()) * kBeta));
-    bandwidthHi_ = maxBwFilter_.GetBest();
   }
   if (state_ == State::ProbeBw_Up) {
     startProbeBwDown();
@@ -789,10 +784,6 @@ void Bbr2CongestionController::boundBwForModel() {
     if (bandwidthLo_.has_value() &&
         !conn_.transportSettings.ccaConfig.ignoreLoss) {
       bandwidth_ = std::min(bandwidth_, *bandwidthLo_);
-    }
-    if (bandwidthHi_.has_value() &&
-        !conn_.transportSettings.ccaConfig.ignoreInflightHi) {
-      bandwidth_ = std::min(bandwidth_, *bandwidthHi_);
     }
   }
   if (conn_.qLogger && previousBw != bandwidth_) {

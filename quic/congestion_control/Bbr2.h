@@ -143,7 +143,7 @@ class Bbr2CongestionController : public CongestionController {
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>
       maxBwFilter_;
   Bandwidth bandwidth_;
-  Optional<Bandwidth> bandwidthHi_, bandwidthLo_;
+  Optional<Bandwidth> bandwidthLo_;
   uint64_t cycleCount_{0}; // TODO: this can be one bit
 
   // Data Volume Model Parameters
