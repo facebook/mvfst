@@ -109,9 +109,8 @@ void Cubic::onPacketSent(const OutstandingPacketWrapper& packet) {
   conn_.lossState.inflightBytes += packet.metadata.encodedSize;
 
   if (conn_.transportSettings.ccaConfig.leaveHeadroomForCwndLimited) {
-    // Consider cwndBlocked if inflight bytes >= 0.75 * cwnd
-    isCwndBlocked_ =
-        conn_.lossState.inflightBytes >= (cwndBytes_ - (cwndBytes_ >> 2));
+    // Consider cwndBlocked if inflight bytes >= 0.5 * cwnd
+    isCwndBlocked_ = conn_.lossState.inflightBytes >= (cwndBytes_ >> 1);
   } else {
     isCwndBlocked_ = conn_.lossState.inflightBytes >= cwndBytes_;
   }
