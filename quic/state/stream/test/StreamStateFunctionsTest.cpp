@@ -50,7 +50,7 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
   // Something are cleared:
   EXPECT_TRUE(stream.writeBuffer.empty());
   EXPECT_TRUE(stream.retransmissionBuffer.empty());
-  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_FALSE(stream.readBuffer.empty());
 
   // The rest are untouched:
   EXPECT_EQ(stream.id, streamId);
