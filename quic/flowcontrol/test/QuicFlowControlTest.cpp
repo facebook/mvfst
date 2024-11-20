@@ -47,6 +47,24 @@ TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdate) {
   EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
 }
 
+TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateWindowByFour) {
+  conn_.transportSettings.flowControlWindowFrequency = 4;
+  conn_.flowControlState.windowSize = 256 * 1024;
+  conn_.flowControlState.advertisedMaxOffset = 256 * 1024;
+  conn_.flowControlState.sumCurReadOffset = 64 * 1024;
+
+  // Should not send window update
+  EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(0);
+  maybeSendConnWindowUpdate(conn_, Clock::now());
+  EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
+
+  conn_.flowControlState.sumCurReadOffset += 64 * 1024 + 1;
+  // Should send window update
+  EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(1);
+  maybeSendConnWindowUpdate(conn_, Clock::now());
+  EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
+}
+
 TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateAndIncrease) {
   conn_.flowControlState.windowSize = 500;
   conn_.flowControlState.advertisedMaxOffset = 400;

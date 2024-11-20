@@ -38,9 +38,17 @@ Optional<uint64_t> calculateNewWindowUpdate(
       enoughTimeElapsed && !transportSettings.autotuneReceiveConnFlowControl) {
     return nextAdvertisedOffset;
   }
-  bool enoughWindowElapsed = (curAdvertisedOffset - curReadOffset) *
-          transportSettings.flowControlWindowFrequency <
-      windowSize;
+  // The logic here is that we want to send updates when we have read
+  // windowSize / flowControlWindowFrequency bytes.
+  auto remaining = curAdvertisedOffset - curReadOffset;
+  bool enoughWindowElapsed = [&]() {
+    if (remaining > windowSize) {
+      return false;
+    }
+    return (windowSize - remaining) *
+        transportSettings.flowControlWindowFrequency >
+        windowSize;
+  }();
   if (enoughWindowElapsed) {
     return nextAdvertisedOffset;
   }
