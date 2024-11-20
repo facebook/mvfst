@@ -147,7 +147,9 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
       }
     }
   }
-  lastWriteTime_ = currentTime;
+  if (!lastWriteTime_.hasValue() || sendBatch > 0) {
+    lastWriteTime_ = currentTime;
+  }
   return sendBatch;
 }
 
