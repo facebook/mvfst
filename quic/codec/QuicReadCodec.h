@@ -35,7 +35,12 @@ struct CipherUnavailable {
 /**
  * A type which represents no data.
  */
-struct Nothing {};
+struct Nothing {
+  PacketDropReason reason;
+
+  Nothing() : reason(PacketDropReason::UNEXPECTED_NOTHING) {}
+  explicit Nothing(PacketDropReason reasonIn) : reason(reasonIn) {}
+};
 
 struct CodecResult {
   enum class Type {

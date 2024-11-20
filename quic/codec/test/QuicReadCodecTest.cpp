@@ -63,8 +63,11 @@ std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
 TEST_F(QuicReadCodecTest, EmptyBuffer) {
   auto emptyQueue = bufToQueue(folly::IOBuf::create(0));
   AckStates ackStates;
-  EXPECT_FALSE(
-      parseSuccess(makeUnencryptedCodec()->parsePacket(emptyQueue, ackStates)));
+  auto packet = makeUnencryptedCodec()->parsePacket(emptyQueue, ackStates);
+  EXPECT_EQ(
+      packet.nothing()->reason,
+      PacketDropReason(PacketDropReason::UNEXPECTED_NOTHING));
+  EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, TooSmallBuffer) {
@@ -312,6 +315,9 @@ TEST_F(QuicReadCodecTest, PacketDecryptFail) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, std::move(aead))
                     ->parsePacket(packetQueue, ackStates);
+  EXPECT_EQ(
+      packet.nothing()->reason,
+      PacketDropReason(PacketDropReason::DECRYPTION_ERROR));
   EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
@@ -607,6 +613,9 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
+  EXPECT_EQ(
+      packet.nothing()->reason,
+      PacketDropReason(PacketDropReason::DECRYPTION_ERROR_0RTT));
   EXPECT_FALSE(isReset(std::move(packet)));
 }
 

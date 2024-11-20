@@ -85,6 +85,19 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
   return std::move(parsedLongHeader.value());
 }
 
+static PacketDropReason getDecryptErrorReason(ProtectionType protectionType) {
+  switch (protectionType) {
+    case ProtectionType::Initial:
+      return PacketDropReason::DECRYPTION_ERROR_INITIAL;
+    case ProtectionType::Handshake:
+      return PacketDropReason::DECRYPTION_ERROR_HANDSHAKE;
+    case ProtectionType::ZeroRtt:
+      return PacketDropReason::DECRYPTION_ERROR_0RTT;
+    default:
+      return PacketDropReason::DECRYPTION_ERROR;
+  }
+}
+
 CodecResult QuicReadCodec::parseLongHeaderPacket(
     BufQueue& queue,
     const AckStates& ackStates) {
@@ -236,7 +249,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
             << " packetNumLen=" << parsePacketNumberLength(initialByte)
             << " protectionType=" << toString(protectionType) << " "
             << connIdToHex();
-    return CodecResult(Nothing());
+    return CodecResult(Nothing(getDecryptErrorReason(protectionType)));
   }
   decrypted = std::move(*decryptAttempt);
 
@@ -347,7 +360,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
     VLOG(10) << "Unable to decrypt packet=" << packetNum.first
              << " protectionType=" << (int)protectionType << " "
              << connIdToHex();
-    return CodecResult(Nothing());
+    return CodecResult(Nothing(PacketDropReason::DECRYPTION_ERROR));
   }
   decrypted = std::move(*decryptAttempt);
   if (!decrypted) {
@@ -627,8 +640,9 @@ CodecResult::CodecResult(RetryPacket&& retryPacketIn)
   new (&retry) RetryPacket(std::move(retryPacketIn));
 }
 
-CodecResult::CodecResult(Nothing&&) : type_(CodecResult::Type::NOTHING) {
-  new (&none) Nothing();
+CodecResult::CodecResult(Nothing&& nothing)
+    : type_(CodecResult::Type::NOTHING) {
+  new (&none) Nothing(std::move(nothing));
 }
 
 void CodecResult::destroyCodecResult() {
