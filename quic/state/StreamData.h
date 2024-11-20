@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/container/F14Map.h>
+#include <folly/container/F14Set.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallCollections.h>
@@ -265,6 +266,61 @@ struct QuicStreamLike {
         return;
       }
     }
+  }
+
+  void removeFromLossBufAfterOffset(uint64_t removalOffset) {
+    while (!lossBuffer.empty()) {
+      auto& lastElement = lossBuffer.back();
+      if (lastElement.offset > removalOffset) {
+        lossBuffer.pop_back();
+      } else if (
+          lastElement.offset + lastElement.data.chainLength() > removalOffset) {
+        lastElement.data = lastElement.data.splitAtMost(
+            size_t(removalOffset - lastElement.offset + 1));
+        return;
+      } else {
+        return;
+      }
+    }
+  }
+
+  void removeFromRetransmissionBufAfterOffset(uint64_t removalOffset) {
+    folly::F14FastSet<uint64_t> offsetsToRemove;
+
+    for (auto& [offset, buf] : retransmissionBuffer) {
+      if (offset > removalOffset) {
+        offsetsToRemove.insert(offset);
+      } else if (offset + buf->data.chainLength() > removalOffset) {
+        buf->data = buf->data.splitAtMost(size_t(removalOffset - offset + 1));
+      }
+    }
+
+    for (auto offset : offsetsToRemove) {
+      retransmissionBuffer.erase(offset);
+    }
+  }
+
+  void removeFromWriteBufAfterOffset(uint64_t removalOffset) {
+    if (writeBuffer.empty() ||
+        writeBufferStartOffset + writeBuffer.chainLength() - 1 <=
+            removalOffset) {
+      return;
+    }
+
+    removalOffset = std::max(removalOffset, writeBufferStartOffset - 1);
+    writeBuffer = writeBuffer.splitAtMost(
+        size_t(removalOffset - writeBufferStartOffset + 1));
+  }
+
+  void removeFromPendingWritesAfterOffset(uint64_t removalOffset) {
+    if (pendingWrites.empty() ||
+        currentWriteOffset + pendingWrites.chainLength() - 1 <= removalOffset) {
+      return;
+    }
+
+    removalOffset = std::max(removalOffset, currentWriteOffset - 1);
+    pendingWrites = pendingWrites.splitAtMost(
+        size_t(removalOffset - currentWriteOffset + 1));
   }
 };
 

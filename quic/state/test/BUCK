@@ -198,3 +198,14 @@ cpp_benchmark(
         "//quic/state:quic_priority_queue",
     ],
 )
+
+cpp_unittest(
+    name = "stream_data_test",
+    srcs = [
+        "StreamDataTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//quic/state:quic_state_machine",
+    ],
+)
