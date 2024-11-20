@@ -3570,7 +3570,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 45);
-  EXPECT_EQ(event->dropReason, kCipherUnavailable);
+  EXPECT_EQ(event->dropReason, "DECRYPTION_ERROR_INITIAL");
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestBadPacketProtectionLevel) {

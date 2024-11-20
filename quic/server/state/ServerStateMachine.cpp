@@ -886,14 +886,16 @@ void onServerReadDataFromOpen(
         break;
       }
       case CodecResult::Type::NOTHING: {
-        VLOG(10) << "drop cipher unavailable, no data " << conn;
+        VLOG(10) << "drop no data, reason: "
+                 << parsedPacket.nothing()->reason._to_string() << " " << conn;
         if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
+          conn.qLogger->addPacketDrop(
+              packetSize, parsedPacket.nothing()->reason._to_string());
         }
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
-            PacketDropReason::UNEXPECTED_NOTHING);
+            parsedPacket.nothing()->reason);
         if (firstPacketFromPeer) {
           throw QuicInternalException(
               "Failed to decrypt first packet from peer",
@@ -1455,14 +1457,14 @@ void onServerReadDataFromClosed(
       break;
     }
     case CodecResult::Type::NOTHING: {
-      VLOG(10) << "drop cipher unavailable, no data " << conn;
+      VLOG(10) << "drop no data, reason: "
+               << parsedPacket.nothing()->reason._to_string() << " " << conn;
       if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
+        conn.qLogger->addPacketDrop(
+            packetSize, parsedPacket.nothing()->reason._to_string());
       }
       QUIC_STATS(
-          conn.statsCallback,
-          onPacketDropped,
-          PacketDropReason::UNEXPECTED_NOTHING);
+          conn.statsCallback, onPacketDropped, parsedPacket.nothing()->reason);
       break;
     }
     case CodecResult::Type::REGULAR_PACKET:
