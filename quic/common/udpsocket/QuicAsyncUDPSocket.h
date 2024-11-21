@@ -44,7 +44,11 @@ class QuicAsyncUDPSocket {
       using Timestamp = std::array<struct timespec, 3>;
       std::optional<Timestamp> ts;
       uint8_t tos = 0;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+#ifdef _WIN32
+      // Make control message space for ToS
+      static constexpr size_t kCmsgSpace = CMSG_SPACE(sizeof(INT));
+#elif defined(FOLLY_HAVE_MSG_ERRQUEUE)
+      // Make control message space for GRO, timestamp, and ToS
       static constexpr size_t kCmsgSpace = CMSG_SPACE(sizeof(uint16_t)) +
           CMSG_SPACE(sizeof(Timestamp)) + CMSG_SPACE(sizeof(uint8_t));
 #endif

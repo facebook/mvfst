@@ -11,6 +11,26 @@
 
 namespace quic {
 
+#if _WIN32
+// Folly netops exposes Windows control messages using the same struct field
+// names used by Linux. This defines macros to use these field names on Windows.
+
+#define FOLLY_CMSG_FIRSTHDR(msg)                 \
+  (((msg)->msg_controllen >= sizeof(WSACMSGHDR)) \
+       ? (LPWSACMSGHDR)(msg)->msg_control        \
+       : (LPWSACMSGHDR)NULL)
+
+#define FOLLY_CMSG_NXTHDR(msg, cmsg)                               \
+  (((cmsg) == NULL)                                                \
+       ? FOLLY_CMSG_FIRSTHDR(msg)                                  \
+       : ((((PUCHAR)(cmsg) + WSA_CMSGHDR_ALIGN((cmsg)->cmsg_len) + \
+            sizeof(WSACMSGHDR)) >                                  \
+           (PUCHAR)((msg)->msg_control) + (msg)->msg_controllen)   \
+              ? (LPWSACMSGHDR)NULL                                 \
+              : (LPWSACMSGHDR)((PUCHAR)(cmsg) +                    \
+                               WSA_CMSGHDR_ALIGN((cmsg)->cmsg_len))))
+#endif
+
 template <typename T, typename>
 T* QuicAsyncUDPSocket::getTypedSocket() const {
   auto sock = dynamic_cast<T*>(this);
@@ -25,7 +45,17 @@ T* QuicAsyncUDPSocket::getTypedSocket() const {
 void QuicAsyncUDPSocket::fromMsg(
     [[maybe_unused]] ReadCallback::OnDataAvailableParams& params,
     [[maybe_unused]] struct msghdr& msg) {
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+#ifdef _WIN32
+  PCMSGHDR cmsg = FOLLY_CMSG_FIRSTHDR(&msg);
+  while (cmsg != NULL) {
+    if ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
+        (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS)) {
+      params.tos = *(PINT)WSA_CMSG_DATA(cmsg);
+      break;
+    }
+    cmsg = FOLLY_CMSG_NXTHDR(&msg, cmsg);
+  }
+#elif defined(FOLLY_HAVE_MSG_ERRQUEUE)
   struct cmsghdr* cmsg;
   uint16_t* grosizeptr;
   for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr;

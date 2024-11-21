@@ -27,7 +27,7 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
   recvmmsgStorage_.resize(numPackets);
   auto& msgs = recvmmsgStorage_.msgs;
   int flags = 0;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+#if defined(FOLLY_HAVE_MSG_ERRQUEUE) || defined(_WIN32)
   bool useGRO = getGRO() > 0;
   bool checkCmsgs = useGRO || getTimestamping() > 0 || getRecvTos();
   std::vector<std::array<
@@ -59,7 +59,7 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     rawAddr->sa_family = address().getFamily();
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+#if defined(FOLLY_HAVE_MSG_ERRQUEUE) || defined(_WIN32)
     if (checkCmsgs) {
       ::memset(controlVec[i].data(), 0, controlVec[i].size());
       msg->msg_control = controlVec[i].data();
@@ -95,7 +95,7 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
       continue;
     }
     QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+#if defined(FOLLY_HAVE_MSG_ERRQUEUE) || defined(_WIN32)
     if (checkCmsgs) {
       QuicAsyncUDPSocket::fromMsg(params, msg.msg_hdr);
 
