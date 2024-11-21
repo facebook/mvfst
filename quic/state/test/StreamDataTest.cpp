@@ -7,6 +7,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <quic/state/StateData.h>
 #include <quic/state/StreamData.h>
 
 using namespace quic;
@@ -279,6 +280,309 @@ TEST(StreamDataTest, PendingWritesRemovalNoChange) {
   state.pendingWrites = ChainedByteRangeHead(buf1);
   state.removeFromPendingWritesAfterOffset(12);
   EXPECT_EQ(state.pendingWrites.chainLength(), 8);
+}
+
+TEST(StreamDataTest, LossBufferMetaRemovalAll) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.insertIntoLossBufMeta(wbm1);
+  state.insertIntoLossBufMeta(wbm2);
+  state.insertIntoLossBufMeta(wbm3);
+
+  state.removeFromLossBufMetasAfterOffset(0);
+
+  EXPECT_EQ(state.lossBufMetas.size(), 0);
+}
+
+TEST(StreamDataTest, LossBufferMetaRemovalExactMatch) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.insertIntoLossBufMeta(wbm1);
+  state.insertIntoLossBufMeta(wbm2);
+  state.insertIntoLossBufMeta(wbm3);
+
+  state.removeFromLossBufMetasAfterOffset(4);
+  EXPECT_EQ(state.lossBufMetas.size(), 1);
+  EXPECT_EQ(state.lossBufMetas[0].offset, 1);
+  EXPECT_EQ(state.lossBufMetas[0].length, 2);
+}
+
+TEST(StreamDataTest, LossBufferMetaRemovalPartialMatch) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.insertIntoLossBufMeta(wbm1);
+  state.insertIntoLossBufMeta(wbm2);
+  state.insertIntoLossBufMeta(wbm3);
+
+  state.removeFromLossBufMetasAfterOffset(5);
+  EXPECT_EQ(state.lossBufMetas.size(), 2);
+
+  EXPECT_EQ(state.lossBufMetas[0].offset, 1);
+  EXPECT_EQ(state.lossBufMetas[0].length, 2);
+
+  EXPECT_EQ(state.lossBufMetas[1].offset, 5);
+  EXPECT_EQ(state.lossBufMetas[1].length, 1);
+}
+
+TEST(StreamDataTest, LossBufferMetaRemovalNoMatch) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.insertIntoLossBufMeta(wbm1);
+  state.insertIntoLossBufMeta(wbm2);
+  state.insertIntoLossBufMeta(wbm3);
+
+  state.removeFromLossBufAfterOffset(20);
+  EXPECT_EQ(state.lossBufMetas.size(), 3);
+
+  EXPECT_EQ(state.lossBufMetas[0].offset, 1);
+  EXPECT_EQ(state.lossBufMetas[0].length, 2);
+
+  EXPECT_EQ(state.lossBufMetas[1].offset, 5);
+  EXPECT_EQ(state.lossBufMetas[1].length, 8);
+
+  EXPECT_EQ(state.lossBufMetas[2].offset, 17);
+  EXPECT_EQ(state.lossBufMetas[2].length, 3);
+}
+
+TEST(StreamDataTest, RetxBufferMetaRemovalAll) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.retransmissionBufMetas.emplace(1, wbm1);
+  state.retransmissionBufMetas.emplace(5, wbm2);
+  state.retransmissionBufMetas.emplace(17, wbm3);
+
+  state.removeFromRetransmissionBufMetasAfterOffset(0);
+  EXPECT_EQ(state.retransmissionBufMetas.size(), 0);
+}
+
+TEST(StreamDataTest, RetxBufferMetaRemovalExactMatch) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.retransmissionBufMetas.emplace(1, wbm1);
+  state.retransmissionBufMetas.emplace(5, wbm2);
+  state.retransmissionBufMetas.emplace(17, wbm3);
+
+  state.removeFromRetransmissionBufMetasAfterOffset(16);
+  EXPECT_EQ(state.retransmissionBufMetas.size(), 2);
+
+  EXPECT_EQ(state.retransmissionBufMetas[1].offset, 1);
+  EXPECT_EQ(state.retransmissionBufMetas[1].length, 2);
+
+  EXPECT_EQ(state.retransmissionBufMetas[5].offset, 5);
+  EXPECT_EQ(state.retransmissionBufMetas[5].length, 8);
+}
+
+TEST(StreamDataTest, RetxBufferMetaRemovalPartialMatch) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.retransmissionBufMetas.emplace(1, wbm1);
+  state.retransmissionBufMetas.emplace(5, wbm2);
+  state.retransmissionBufMetas.emplace(17, wbm3);
+
+  state.removeFromRetransmissionBufMetasAfterOffset(5);
+  EXPECT_EQ(state.retransmissionBufMetas.size(), 2);
+
+  EXPECT_EQ(state.retransmissionBufMetas[1].offset, 1);
+  EXPECT_EQ(state.retransmissionBufMetas[1].length, 2);
+
+  EXPECT_EQ(state.retransmissionBufMetas[5].offset, 5);
+  EXPECT_EQ(state.retransmissionBufMetas[5].length, 1);
+}
+
+TEST(StreamDataTest, RetxBufferMetaRemovalNoMatch) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [1, 2] [5, 12] [17, 19]
+  WriteBufferMeta wbm1 = WriteBufferMeta::Builder()
+                             .setOffset(1)
+                             .setLength(2)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm2 = WriteBufferMeta::Builder()
+                             .setOffset(5)
+                             .setLength(8)
+                             .setEOF(false)
+                             .build();
+  WriteBufferMeta wbm3 = WriteBufferMeta::Builder()
+                             .setOffset(17)
+                             .setLength(3)
+                             .setEOF(false)
+                             .build();
+  state.retransmissionBufMetas.emplace(1, wbm1);
+  state.retransmissionBufMetas.emplace(5, wbm2);
+  state.retransmissionBufMetas.emplace(17, wbm3);
+
+  state.removeFromRetransmissionBufMetasAfterOffset(19);
+  EXPECT_EQ(state.retransmissionBufMetas.size(), 3);
+
+  EXPECT_EQ(state.retransmissionBufMetas[1].offset, 1);
+  EXPECT_EQ(state.retransmissionBufMetas[1].length, 2);
+
+  EXPECT_EQ(state.retransmissionBufMetas[5].offset, 5);
+  EXPECT_EQ(state.retransmissionBufMetas[5].length, 8);
+
+  EXPECT_EQ(state.retransmissionBufMetas[17].offset, 17);
+  EXPECT_EQ(state.retransmissionBufMetas[17].length, 3);
+}
+
+TEST(StreamDataTest, WriteBufferMetaRemovalAll) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  // [5, 16]
+  state.writeBufMeta.offset = 5;
+  state.writeBufMeta.length = 12;
+
+  state.removeFromWriteBufMetaAfterOffset(0);
+  EXPECT_EQ(state.writeBufMeta.length, 0);
+}
+
+TEST(StreamDataTest, WriteBufferMetaRemoval) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  state.writeBufferStartOffset = 5;
+
+  // [5, 16]
+  state.writeBufMeta.offset = 5;
+  state.writeBufMeta.length = 12;
+
+  state.removeFromWriteBufMetaAfterOffset(5);
+  EXPECT_EQ(state.writeBufMeta.length, 1);
+}
+
+TEST(StreamDataTest, WriteBufferMetaRemovalNoChange) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  state.writeBufferStartOffset = 5;
+
+  // [5, 16]
+  state.writeBufMeta.offset = 5;
+  state.writeBufMeta.length = 12;
+
+  state.removeFromWriteBufMetaAfterOffset(16);
+  EXPECT_EQ(state.writeBufMeta.length, 12);
 }
 
 } // namespace quic::test

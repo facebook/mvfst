@@ -553,6 +553,53 @@ struct QuicStreamState : public QuicStreamLike {
     return readBuffer.size() > 0;
   }
 
+  void removeFromWriteBufMetaAfterOffset(uint64_t removalOffset) {
+    if (removalOffset < writeBufMeta.offset) {
+      writeBufMeta.length = 0;
+      return;
+    }
+
+    if (removalOffset >= writeBufMeta.offset &&
+        removalOffset < writeBufMeta.offset + writeBufMeta.length) {
+      writeBufMeta.length = uint32_t(removalOffset - writeBufMeta.offset + 1);
+    }
+  }
+
+  void removeFromRetransmissionBufMetasAfterOffset(uint64_t removalOffset) {
+    folly::F14FastSet<uint64_t> offsetsToRemove;
+
+    for (auto& [offset, buf] : retransmissionBufMetas) {
+      if (offset > removalOffset) {
+        offsetsToRemove.insert(offset);
+      } else if (offset + buf.length > removalOffset) {
+        buf.length = uint32_t(removalOffset - offset + 1);
+      }
+    }
+
+    for (auto offset : offsetsToRemove) {
+      retransmissionBufMetas.erase(offset);
+    }
+  }
+
+  void removeFromLossBufMetasAfterOffset(uint64_t removalOffset) {
+    if (lossBufMetas.empty()) {
+      // Nothing to do.
+      return;
+    }
+
+    while (!lossBufMetas.empty()) {
+      auto& lastElement = lossBufMetas.back();
+      if (lastElement.offset > removalOffset) {
+        lossBufMetas.pop_back();
+      } else if (lastElement.offset + lastElement.length > removalOffset) {
+        lastElement.length = uint32_t(removalOffset - lastElement.offset + 1);
+        return;
+      } else {
+        return;
+      }
+    }
+  }
+
   std::unique_ptr<DSRPacketizationRequestSender> dsrSender;
 
   // BufferMeta that has been written to the QUIC layer.
