@@ -249,6 +249,17 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       LOG(INFO) << "  * p95: "
                 << burstSendAckedLatencyHistogramMicroseconds_
                        .getPercentileEstimate(0.95);
+
+      LOG(INFO) << "Burst true (tx-based) ack latency stats, microseconds:";
+      LOG(INFO) << "  * p5: "
+                << burstSendTrueAckedLatencyHistogramMicroseconds_
+                       .getPercentileEstimate(0.05);
+      LOG(INFO) << "  * p50: "
+                << burstSendTrueAckedLatencyHistogramMicroseconds_
+                       .getPercentileEstimate(0.5);
+      LOG(INFO) << "  * p95: "
+                << burstSendTrueAckedLatencyHistogramMicroseconds_
+                       .getPercentileEstimate(0.95);
     }
   }
 
@@ -401,6 +412,12 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
     auto sendBuffer = buf_->clone();
     sendBuffer->append(blockSize_);
+    CHECK_GT(blockSize_, 0);
+    auto r = sock_->registerTxCallback(*stream, blockSize_ - 1, this);
+    if (r.hasError()) {
+      LOG(FATAL) << "Got error on registerTxCallback: "
+                 << quic::toString(r.error());
+    }
     auto res = sock_->writeChain(
         *stream,
         std::move(sendBuffer),
@@ -416,14 +433,25 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onByteEvent(QuicSocketLite::ByteEvent byteEvent) override {
-    if (byteEvent.type == QuicSocketLite::ByteEvent::Type::ACK) {
+    CHECK_EQ(byteEvent.id, streamBurstSendResult_.streamId);
+    auto now = Clock::now();
+    if (byteEvent.type == QuicSocketLite::ByteEvent::Type::TX) {
+      streamBurstSendResult_.trueTxStartTs = now;
+    } else if (byteEvent.type == QuicSocketLite::ByteEvent::Type::ACK) {
       auto ackedLatencyUs =
           std::chrono::duration_cast<std::chrono::microseconds>(
-              Clock::now() - streamBurstSendResult_.startTs);
+              now - streamBurstSendResult_.startTs);
       burstSendAckedLatencyHistogramMicroseconds_.addValue(
           ackedLatencyUs.count());
+
+      auto trueAckedLatencyUs =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              now - streamBurstSendResult_.trueTxStartTs);
+      burstSendTrueAckedLatencyHistogramMicroseconds_.addValue(
+          trueAckedLatencyUs.count());
       VLOG(4) << "got stream " << byteEvent.id << " offset " << byteEvent.offset
-              << " acked (" << ackedLatencyUs.count() << "us)";
+              << " acked (" << trueAckedLatencyUs.count() << "us)";
+
       streamBurstSendResult_.acked = true;
       ++burstSendStats_.delivered;
     }
@@ -471,12 +499,17 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     quic::StreamId streamId;
     bool acked{false};
     TimePoint startTs;
+    TimePoint trueTxStartTs;
   } streamBurstSendResult_;
   struct {
     uint64_t missedDeadline{0};
     uint64_t delivered{0};
   } burstSendStats_;
   folly::Histogram<uint64_t> burstSendAckedLatencyHistogramMicroseconds_{
+      100, /* bucket size */
+      0, /* min */
+      1000000 /* 1 sec max delay */};
+  folly::Histogram<uint64_t> burstSendTrueAckedLatencyHistogramMicroseconds_{
       100, /* bucket size */
       0, /* min */
       1000000 /* 1 sec max delay */};
