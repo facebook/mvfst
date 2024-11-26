@@ -413,7 +413,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     auto sendBuffer = buf_->clone();
     sendBuffer->append(blockSize_);
     CHECK_GT(blockSize_, 0);
-    auto r = sock_->registerTxCallback(*stream, blockSize_ - 1, this);
+    auto r = sock_->registerTxCallback(*stream, 0, this);
     if (r.hasError()) {
       LOG(FATAL) << "Got error on registerTxCallback: "
                  << quic::toString(r.error());
