@@ -186,11 +186,9 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
           .pingFrames()
           .datagramFrames()
           .immediateAckFrames();
-  // Only add ACK frames if we need to send an ACK, or if the write reason isn't
-  // just streams.
+  // Only add ACK frames if we need to send an ACK.
   if (connection.transportSettings.opportunisticAcking ||
-      toWriteAppDataAcks(connection) ||
-      (hasNonAckDataToWrite(connection) != WriteDataReason::STREAM)) {
+      toWriteAppDataAcks(connection)) {
     schedulerBuilder.ackFrames();
   }
   if (!exceptCryptoStream) {
