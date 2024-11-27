@@ -268,15 +268,16 @@ struct QuicStreamLike {
     }
   }
 
-  void removeFromLossBufAfterOffset(uint64_t removalOffset) {
+  void removeFromLossBufStartingAtOffset(uint64_t startingOffset) {
     while (!lossBuffer.empty()) {
       auto& lastElement = lossBuffer.back();
-      if (lastElement.offset > removalOffset) {
+      if (lastElement.offset >= startingOffset) {
         lossBuffer.pop_back();
       } else if (
-          lastElement.offset + lastElement.data.chainLength() > removalOffset) {
+          lastElement.offset + lastElement.data.chainLength() >=
+          startingOffset) {
         lastElement.data = lastElement.data.splitAtMost(
-            size_t(removalOffset - lastElement.offset + 1));
+            size_t(startingOffset - lastElement.offset));
         return;
       } else {
         return;
@@ -284,14 +285,14 @@ struct QuicStreamLike {
     }
   }
 
-  void removeFromRetransmissionBufAfterOffset(uint64_t removalOffset) {
+  void removeFromRetransmissionBufStartingAtOffset(uint64_t startingOffset) {
     folly::F14FastSet<uint64_t> offsetsToRemove;
 
     for (auto& [offset, buf] : retransmissionBuffer) {
-      if (offset > removalOffset) {
+      if (offset >= startingOffset) {
         offsetsToRemove.insert(offset);
-      } else if (offset + buf->data.chainLength() > removalOffset) {
-        buf->data = buf->data.splitAtMost(size_t(removalOffset - offset + 1));
+      } else if (offset + buf->data.chainLength() >= startingOffset) {
+        buf->data = buf->data.splitAtMost(size_t(startingOffset - offset));
       }
     }
 
@@ -300,27 +301,34 @@ struct QuicStreamLike {
     }
   }
 
-  void removeFromWriteBufAfterOffset(uint64_t removalOffset) {
+  void removeFromWriteBufStartingAtOffset(uint64_t startingOffset) {
     if (writeBuffer.empty() ||
-        writeBufferStartOffset + writeBuffer.chainLength() - 1 <=
-            removalOffset) {
+        writeBufferStartOffset + writeBuffer.chainLength() <= startingOffset) {
       return;
     }
 
-    removalOffset = std::max(removalOffset, writeBufferStartOffset - 1);
-    writeBuffer = writeBuffer.splitAtMost(
-        size_t(removalOffset - writeBufferStartOffset + 1));
+    if (startingOffset > writeBufferStartOffset) {
+      writeBuffer = writeBuffer.splitAtMost(
+          size_t(startingOffset - writeBufferStartOffset));
+    } else {
+      // Equivalent to clearing out the writeBuffer
+      writeBuffer.splitAtMost(writeBuffer.chainLength());
+    }
   }
 
-  void removeFromPendingWritesAfterOffset(uint64_t removalOffset) {
+  void removeFromPendingWritesStartingAtOffset(uint64_t startingOffset) {
     if (pendingWrites.empty() ||
-        currentWriteOffset + pendingWrites.chainLength() - 1 <= removalOffset) {
+        currentWriteOffset + pendingWrites.chainLength() <= startingOffset) {
       return;
     }
 
-    removalOffset = std::max(removalOffset, currentWriteOffset - 1);
-    pendingWrites = pendingWrites.splitAtMost(
-        size_t(removalOffset - currentWriteOffset + 1));
+    if (startingOffset > currentWriteOffset) {
+      pendingWrites = pendingWrites.splitAtMost(
+          size_t(startingOffset - currentWriteOffset));
+    } else {
+      // Equivalent to clearing out the pendingWrites
+      pendingWrites.splitAtMost(pendingWrites.chainLength());
+    }
   }
 };
 
@@ -553,26 +561,27 @@ struct QuicStreamState : public QuicStreamLike {
     return readBuffer.size() > 0;
   }
 
-  void removeFromWriteBufMetaAfterOffset(uint64_t removalOffset) {
-    if (removalOffset < writeBufMeta.offset) {
+  void removeFromWriteBufMetaStartingAtOffset(uint64_t startingOffset) {
+    if (startingOffset <= writeBufMeta.offset) {
       writeBufMeta.length = 0;
       return;
     }
 
-    if (removalOffset >= writeBufMeta.offset &&
-        removalOffset < writeBufMeta.offset + writeBufMeta.length) {
-      writeBufMeta.length = uint32_t(removalOffset - writeBufMeta.offset + 1);
+    if (startingOffset > writeBufMeta.offset &&
+        startingOffset <= writeBufMeta.offset + writeBufMeta.length) {
+      writeBufMeta.length = uint32_t(startingOffset - writeBufMeta.offset);
     }
   }
 
-  void removeFromRetransmissionBufMetasAfterOffset(uint64_t removalOffset) {
+  void removeFromRetransmissionBufMetasStartingAtOffset(
+      uint64_t startingOffset) {
     folly::F14FastSet<uint64_t> offsetsToRemove;
 
     for (auto& [offset, buf] : retransmissionBufMetas) {
-      if (offset > removalOffset) {
+      if (offset >= startingOffset) {
         offsetsToRemove.insert(offset);
-      } else if (offset + buf.length > removalOffset) {
-        buf.length = uint32_t(removalOffset - offset + 1);
+      } else if (offset + buf.length >= startingOffset) {
+        buf.length = size_t(startingOffset - offset);
       }
     }
 
@@ -581,7 +590,7 @@ struct QuicStreamState : public QuicStreamLike {
     }
   }
 
-  void removeFromLossBufMetasAfterOffset(uint64_t removalOffset) {
+  void removeFromLossBufMetasStartingAtOffset(uint64_t startingOffset) {
     if (lossBufMetas.empty()) {
       // Nothing to do.
       return;
@@ -589,10 +598,10 @@ struct QuicStreamState : public QuicStreamLike {
 
     while (!lossBufMetas.empty()) {
       auto& lastElement = lossBufMetas.back();
-      if (lastElement.offset > removalOffset) {
+      if (lastElement.offset >= startingOffset) {
         lossBufMetas.pop_back();
-      } else if (lastElement.offset + lastElement.length > removalOffset) {
-        lastElement.length = uint32_t(removalOffset - lastElement.offset + 1);
+      } else if (lastElement.offset + lastElement.length >= startingOffset) {
+        lastElement.length = uint32_t(startingOffset - lastElement.offset);
         return;
       } else {
         return;

@@ -43,7 +43,7 @@ TEST(StreamDataTest, LossBufferRemovalAll) {
   state.insertIntoLossBuffer(createWriteStreamBuffer(5, buf2, false));
   state.insertIntoLossBuffer(createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromLossBufAfterOffset(0);
+  state.removeFromLossBufStartingAtOffset(1);
   EXPECT_EQ(state.lossBuffer.size(), 0);
 }
 
@@ -57,7 +57,7 @@ TEST(StreamDataTest, LossBufferRemovalExactMatch) {
   state.insertIntoLossBuffer(createWriteStreamBuffer(5, buf2, false));
   state.insertIntoLossBuffer(createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromLossBufAfterOffset(4);
+  state.removeFromLossBufStartingAtOffset(5);
   EXPECT_EQ(state.lossBuffer.size(), 1);
   EXPECT_EQ(state.lossBuffer[0].offset, 1);
   EXPECT_EQ(state.lossBuffer[0].data.chainLength(), 2);
@@ -73,7 +73,7 @@ TEST(StreamDataTest, LossBufferRemovalPartialMatch) {
   state.insertIntoLossBuffer(createWriteStreamBuffer(5, buf2, false));
   state.insertIntoLossBuffer(createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromLossBufAfterOffset(5);
+  state.removeFromLossBufStartingAtOffset(6);
   EXPECT_EQ(state.lossBuffer.size(), 2);
 
   EXPECT_EQ(state.lossBuffer[0].offset, 1);
@@ -93,7 +93,7 @@ TEST(StreamDataTest, LossBufferRemovalNoMatch) {
   state.insertIntoLossBuffer(createWriteStreamBuffer(5, buf2, false));
   state.insertIntoLossBuffer(createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromLossBufAfterOffset(20);
+  state.removeFromLossBufStartingAtOffset(21);
   EXPECT_EQ(state.lossBuffer.size(), 3);
 
   EXPECT_EQ(state.lossBuffer[0].offset, 1);
@@ -119,7 +119,7 @@ TEST(StreamDataTest, RetxBufferRemovalAll) {
   state.retransmissionBuffer.emplace(
       17, createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromRetransmissionBufAfterOffset(0);
+  state.removeFromRetransmissionBufStartingAtOffset(1);
   EXPECT_EQ(state.retransmissionBuffer.size(), 0);
 }
 
@@ -136,7 +136,7 @@ TEST(StreamDataTest, RetxBufferRemovalExactMatch) {
   state.retransmissionBuffer.emplace(
       17, createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromRetransmissionBufAfterOffset(16);
+  state.removeFromRetransmissionBufStartingAtOffset(17);
   EXPECT_EQ(state.retransmissionBuffer.size(), 2);
 
   EXPECT_EQ(state.retransmissionBuffer[1]->offset, 1);
@@ -159,7 +159,7 @@ TEST(StreamDataTest, RetxBufferRemovalPartialMatch) {
   state.retransmissionBuffer.emplace(
       17, createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromRetransmissionBufAfterOffset(5);
+  state.removeFromRetransmissionBufStartingAtOffset(6);
   EXPECT_EQ(state.retransmissionBuffer.size(), 2);
 
   EXPECT_EQ(state.retransmissionBuffer[1]->offset, 1);
@@ -182,7 +182,7 @@ TEST(StreamDataTest, RetxBufferRemovalNoMatch) {
   state.retransmissionBuffer.emplace(
       17, createWriteStreamBuffer(17, buf3, false));
 
-  state.removeFromRetransmissionBufAfterOffset(19);
+  state.removeFromRetransmissionBufStartingAtOffset(20);
   EXPECT_EQ(state.retransmissionBuffer.size(), 3);
 
   EXPECT_EQ(state.retransmissionBuffer[1]->offset, 1);
@@ -204,7 +204,7 @@ TEST(StreamDataTest, WriteBufferRemovalAll) {
   addDataToBufQueue(state.writeBuffer, 2);
   addDataToBufQueue(state.writeBuffer, 7);
 
-  state.removeFromWriteBufAfterOffset(0);
+  state.removeFromWriteBufStartingAtOffset(1);
   EXPECT_EQ(state.writeBuffer.chainLength(), 0);
 }
 
@@ -217,7 +217,7 @@ TEST(StreamDataTest, WriteBufferRemoval) {
   addDataToBufQueue(state.writeBuffer, 2);
   addDataToBufQueue(state.writeBuffer, 7);
 
-  state.removeFromWriteBufAfterOffset(5);
+  state.removeFromWriteBufStartingAtOffset(6);
   EXPECT_EQ(state.writeBuffer.chainLength(), 1);
 }
 
@@ -230,7 +230,7 @@ TEST(StreamDataTest, WriteBufferRemovalNoChange) {
   addDataToBufQueue(state.writeBuffer, 2);
   addDataToBufQueue(state.writeBuffer, 7);
 
-  state.removeFromWriteBufAfterOffset(16);
+  state.removeFromWriteBufStartingAtOffset(17);
   EXPECT_EQ(state.writeBuffer.chainLength(), 12);
 }
 
@@ -246,7 +246,7 @@ TEST(StreamDataTest, PendingWritesRemovalAll) {
   buf1->appendChain(std::move(buf2));
 
   state.pendingWrites = ChainedByteRangeHead(buf1);
-  state.removeFromPendingWritesAfterOffset(0);
+  state.removeFromPendingWritesStartingAtOffset(1);
   EXPECT_EQ(state.pendingWrites.chainLength(), 0);
 }
 
@@ -262,7 +262,7 @@ TEST(StreamDataTest, PendingWritesRemoval) {
   buf1->appendChain(std::move(buf2));
 
   state.pendingWrites = ChainedByteRangeHead(buf1);
-  state.removeFromPendingWritesAfterOffset(11);
+  state.removeFromPendingWritesStartingAtOffset(12);
   EXPECT_EQ(state.pendingWrites.chainLength(), 7);
 }
 
@@ -278,7 +278,7 @@ TEST(StreamDataTest, PendingWritesRemovalNoChange) {
   buf1->appendChain(std::move(buf2));
 
   state.pendingWrites = ChainedByteRangeHead(buf1);
-  state.removeFromPendingWritesAfterOffset(12);
+  state.removeFromPendingWritesStartingAtOffset(13);
   EXPECT_EQ(state.pendingWrites.chainLength(), 8);
 }
 
@@ -306,7 +306,7 @@ TEST(StreamDataTest, LossBufferMetaRemovalAll) {
   state.insertIntoLossBufMeta(wbm2);
   state.insertIntoLossBufMeta(wbm3);
 
-  state.removeFromLossBufMetasAfterOffset(0);
+  state.removeFromLossBufMetasStartingAtOffset(1);
 
   EXPECT_EQ(state.lossBufMetas.size(), 0);
 }
@@ -335,7 +335,7 @@ TEST(StreamDataTest, LossBufferMetaRemovalExactMatch) {
   state.insertIntoLossBufMeta(wbm2);
   state.insertIntoLossBufMeta(wbm3);
 
-  state.removeFromLossBufMetasAfterOffset(4);
+  state.removeFromLossBufMetasStartingAtOffset(5);
   EXPECT_EQ(state.lossBufMetas.size(), 1);
   EXPECT_EQ(state.lossBufMetas[0].offset, 1);
   EXPECT_EQ(state.lossBufMetas[0].length, 2);
@@ -365,7 +365,7 @@ TEST(StreamDataTest, LossBufferMetaRemovalPartialMatch) {
   state.insertIntoLossBufMeta(wbm2);
   state.insertIntoLossBufMeta(wbm3);
 
-  state.removeFromLossBufMetasAfterOffset(5);
+  state.removeFromLossBufMetasStartingAtOffset(6);
   EXPECT_EQ(state.lossBufMetas.size(), 2);
 
   EXPECT_EQ(state.lossBufMetas[0].offset, 1);
@@ -399,7 +399,7 @@ TEST(StreamDataTest, LossBufferMetaRemovalNoMatch) {
   state.insertIntoLossBufMeta(wbm2);
   state.insertIntoLossBufMeta(wbm3);
 
-  state.removeFromLossBufAfterOffset(20);
+  state.removeFromLossBufStartingAtOffset(21);
   EXPECT_EQ(state.lossBufMetas.size(), 3);
 
   EXPECT_EQ(state.lossBufMetas[0].offset, 1);
@@ -436,7 +436,7 @@ TEST(StreamDataTest, RetxBufferMetaRemovalAll) {
   state.retransmissionBufMetas.emplace(5, wbm2);
   state.retransmissionBufMetas.emplace(17, wbm3);
 
-  state.removeFromRetransmissionBufMetasAfterOffset(0);
+  state.removeFromRetransmissionBufMetasStartingAtOffset(1);
   EXPECT_EQ(state.retransmissionBufMetas.size(), 0);
 }
 
@@ -464,7 +464,7 @@ TEST(StreamDataTest, RetxBufferMetaRemovalExactMatch) {
   state.retransmissionBufMetas.emplace(5, wbm2);
   state.retransmissionBufMetas.emplace(17, wbm3);
 
-  state.removeFromRetransmissionBufMetasAfterOffset(16);
+  state.removeFromRetransmissionBufMetasStartingAtOffset(17);
   EXPECT_EQ(state.retransmissionBufMetas.size(), 2);
 
   EXPECT_EQ(state.retransmissionBufMetas[1].offset, 1);
@@ -498,7 +498,7 @@ TEST(StreamDataTest, RetxBufferMetaRemovalPartialMatch) {
   state.retransmissionBufMetas.emplace(5, wbm2);
   state.retransmissionBufMetas.emplace(17, wbm3);
 
-  state.removeFromRetransmissionBufMetasAfterOffset(5);
+  state.removeFromRetransmissionBufMetasStartingAtOffset(6);
   EXPECT_EQ(state.retransmissionBufMetas.size(), 2);
 
   EXPECT_EQ(state.retransmissionBufMetas[1].offset, 1);
@@ -532,7 +532,7 @@ TEST(StreamDataTest, RetxBufferMetaRemovalNoMatch) {
   state.retransmissionBufMetas.emplace(5, wbm2);
   state.retransmissionBufMetas.emplace(17, wbm3);
 
-  state.removeFromRetransmissionBufMetasAfterOffset(19);
+  state.removeFromRetransmissionBufMetasStartingAtOffset(20);
   EXPECT_EQ(state.retransmissionBufMetas.size(), 3);
 
   EXPECT_EQ(state.retransmissionBufMetas[1].offset, 1);
@@ -553,7 +553,7 @@ TEST(StreamDataTest, WriteBufferMetaRemovalAll) {
   state.writeBufMeta.offset = 5;
   state.writeBufMeta.length = 12;
 
-  state.removeFromWriteBufMetaAfterOffset(0);
+  state.removeFromWriteBufMetaStartingAtOffset(1);
   EXPECT_EQ(state.writeBufMeta.length, 0);
 }
 
@@ -567,7 +567,7 @@ TEST(StreamDataTest, WriteBufferMetaRemoval) {
   state.writeBufMeta.offset = 5;
   state.writeBufMeta.length = 12;
 
-  state.removeFromWriteBufMetaAfterOffset(5);
+  state.removeFromWriteBufMetaStartingAtOffset(6);
   EXPECT_EQ(state.writeBufMeta.length, 1);
 }
 
@@ -581,7 +581,7 @@ TEST(StreamDataTest, WriteBufferMetaRemovalNoChange) {
   state.writeBufMeta.offset = 5;
   state.writeBufMeta.length = 12;
 
-  state.removeFromWriteBufMetaAfterOffset(16);
+  state.removeFromWriteBufMetaStartingAtOffset(17);
   EXPECT_EQ(state.writeBufMeta.length, 12);
 }
 
