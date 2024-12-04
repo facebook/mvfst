@@ -7,7 +7,7 @@
 
 #pragma once
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 #include <folly/Expected.h>
 #include <folly/IPAddress.h>

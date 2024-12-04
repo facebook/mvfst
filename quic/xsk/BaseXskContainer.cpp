@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 #include <linux/ethtool.h>
 #include <linux/sockios.h>

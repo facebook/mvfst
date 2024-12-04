@@ -7,7 +7,7 @@
 
 #pragma once
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 #include <folly/IPAddress.h>
 #include <linux/if_ether.h>

@@ -7,7 +7,7 @@
 
 #pragma once
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 #include <folly/container/F14Map.h>
 #include <quic/xsk/BaseXskContainer.h>

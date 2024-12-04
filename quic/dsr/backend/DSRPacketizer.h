@@ -25,7 +25,7 @@
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/Aead.h>
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 #include <quic/xsk/XskSender.h>
 #endif
 
@@ -207,7 +207,7 @@ class UdpSocketPacketGroupWriter : public PacketGroupWriter {
   BufQuicBatchResult result_;
 };
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 class XskPacketGroupWriter : public PacketGroupWriter {
  public:

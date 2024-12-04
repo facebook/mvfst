@@ -7,7 +7,7 @@
 
 #pragma once
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 #include <linux/if_xdp.h>
 #include <stdint.h>

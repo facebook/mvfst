@@ -207,7 +207,7 @@ BufQuicBatchResult UdpSocketPacketGroupWriter::getResult() {
   return ioBufBatch_.getResult();
 }
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(ANDROID)
 
 void XskPacketGroupWriter::flush() {
   // Leaving this blank because the XskContainer does some flushing internally
