@@ -3094,12 +3094,15 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
 
 TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   auto stream = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   NiceMock<MockWriteCallback> wcbConn;
   NiceMock<MockReadCallback> rcb;
+  NiceMock<MockReadCallback> rcb2;
   NiceMock<MockPeekCallback> pcb;
   NiceMock<MockDeliveryCallback> deliveryCb;
   NiceMock<MockByteEventCallback> txCb;
+  uint8_t resetCount = 0;
   EXPECT_CALL(
       wcb,
       onStreamWriteError(
@@ -3107,8 +3110,21 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   EXPECT_CALL(
       wcbConn,
       onConnectionWriteError(IsAppError(GenericApplicationErrorCode::UNKNOWN)));
-  EXPECT_CALL(
-      rcb, readError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
+  // The first stream to get a reset will clear the other read callback, so only
+  // one will receive a reset.
+  ON_CALL(
+      rcb, readError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)))
+      .WillByDefault(InvokeWithoutArgs([this, stream2, &resetCount] {
+        transport->setReadCallback(stream2, nullptr);
+        resetCount++;
+      }));
+  ON_CALL(
+      rcb2,
+      readError(stream2, IsAppError(GenericApplicationErrorCode::UNKNOWN)))
+      .WillByDefault(InvokeWithoutArgs([this, stream, &resetCount] {
+        transport->setReadCallback(stream, nullptr);
+        resetCount++;
+      }));
   EXPECT_CALL(
       pcb, peekError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   EXPECT_CALL(deliveryCb, onCanceled(stream, _));
@@ -3120,6 +3136,7 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   transport->notifyPendingWriteOnConnection(&wcbConn);
   transport->notifyPendingWriteOnStream(stream, &wcb);
   transport->setReadCallback(stream, &rcb);
+  transport->setReadCallback(stream2, &rcb2);
   transport->setPeekCallback(stream, &pcb);
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
@@ -3151,6 +3168,7 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   EXPECT_EQ(
       transport->transportConn->streamManager->getStream(stream), nullptr);
   qEvb->loopOnce();
+  EXPECT_EQ(resetCount, 1);
 }
 
 TEST_P(QuicTransportImplTestBase, ResetStreamUnsetWriteCallback) {

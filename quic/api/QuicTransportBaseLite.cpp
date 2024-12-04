@@ -753,7 +753,7 @@ QuicTransportBaseLite::setReadCallback(
   if (isSendingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
-  if (closeState_ != CloseState::OPEN) {
+  if (cb != nullptr && closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (!conn_->streamManager->streamExists(id)) {
@@ -2224,20 +2224,28 @@ void QuicTransportBaseLite::cancelAllAppCallbacks(
   // structure of read callbacks.
   // TODO: this approach will make the app unable to setReadCallback to
   // nullptr during the loop. Need to fix that.
-  // TODO: setReadCallback to nullptr closes the stream, so the app
-  // may just do that...
   auto readCallbacksCopy = readCallbacks_;
   for (auto& cb : readCallbacksCopy) {
-    readCallbacks_.erase(cb.first);
-    if (cb.second.readCb) {
-      auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(cb.first));
+    auto streamId = cb.first;
+    auto it = readCallbacks_.find(streamId);
+    if (it == readCallbacks_.end()) {
+      // An earlier call to readError removed the stream from readCallbacks
+      // May not be possible?
+      continue;
+    }
+    if (it->second.readCb) {
+      auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
       if (!stream->groupId) {
-        cb.second.readCb->readError(cb.first, err);
+        it->second.readCb->readError(streamId, err);
       } else {
-        cb.second.readCb->readErrorWithGroup(cb.first, *stream->groupId, err);
+        it->second.readCb->readErrorWithGroup(streamId, *stream->groupId, err);
       }
     }
+    readCallbacks_.erase(it);
   }
+  // TODO: what if a call to readError installs a new read callback?
+  LOG_IF(ERROR, !readCallbacks_.empty())
+      << readCallbacks_.size() << " read callbacks remaining to be cleared";
 
   VLOG(4) << "Clearing datagram callback";
   datagramCallback_ = nullptr;
