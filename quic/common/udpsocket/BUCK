@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode//target_determinator/macros:ci.bzl", "ci")
 
 oncall("traffic_protocols")
 
@@ -61,6 +62,7 @@ mvfst_cpp_library(
     headers = [
         "LibevQuicAsyncUDPSocket.h",
     ],
+    labels = ci.labels(ci.remove(ci.windows())),
     deps = [
         "//quic/common:optional",
     ],
