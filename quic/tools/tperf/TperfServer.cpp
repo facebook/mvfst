@@ -65,6 +65,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
   void onConnectionEnd() noexcept override {
     LOG(INFO) << "Socket closed";
+    auto srtt = sock_->getTransportInfo().srtt.count();
     sock_.reset();
     if (burstDeadlineMs_ > 0) {
       auto resultStr =
@@ -103,6 +104,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
           "  * p95: {}\n",
           burstSendTrueAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
               0.95));
+
+      resultStr += fmt::format("\nmvfst srtt: {}\n", srtt);
 
       if (doneCallback_) {
         doneCallback_->onDone(resultStr);
