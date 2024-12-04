@@ -12,6 +12,7 @@
 #include <quic/logging/QLogger.h>
 
 #include <quic/state/StreamData.h>
+#include <algorithm>
 #include <limits>
 
 namespace quic {
@@ -251,11 +252,34 @@ void updateFlowControlOnWriteToStream(
       stream.conn.flowControlState.sumCurStreamBufferLen, length);
 }
 
-void updateFlowControlOnResetStream(QuicStreamState& stream) {
+void updateFlowControlOnResetStream(
+    QuicStreamState& stream,
+    folly::Optional<uint64_t> reliableSize) {
+  uint64_t decrementAmount = 0;
+  if (reliableSize && *reliableSize > 0) {
+    // This is the amount of pending data that we are "throwing away"
+    if (stream.pendingWrites.chainLength() + stream.currentWriteOffset >
+        *reliableSize) {
+      // Non-DSR case
+      decrementAmount +=
+          (stream.pendingWrites.chainLength() + stream.currentWriteOffset -
+           std::max(*reliableSize, stream.currentWriteOffset));
+    }
+
+    if (stream.writeBufMeta.offset + stream.writeBufMeta.length >
+        *reliableSize) {
+      // DSR case
+      decrementAmount += stream.writeBufMeta.length +
+          stream.writeBufMeta.offset -
+          std::max<uint64_t>(*reliableSize, stream.writeBufMeta.offset);
+    }
+  } else {
+    decrementAmount = static_cast<uint64_t>(
+        stream.pendingWrites.chainLength() + stream.writeBufMeta.length);
+  }
+
   decrementWithOverFlowCheck(
-      stream.conn.flowControlState.sumCurStreamBufferLen,
-      static_cast<uint64_t>(
-          stream.pendingWrites.chainLength() + stream.writeBufMeta.length));
+      stream.conn.flowControlState.sumCurStreamBufferLen, decrementAmount);
 }
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
@@ -282,7 +306,10 @@ void maybeWriteDataBlockedAfterSocketWrite(QuicConnectionStateBase& conn) {
 void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
   // Only write blocked when the flow control bytes are used up and there are
   // still pending data
-  if (stream.streamWriteError) {
+  if (stream.streamWriteError && !stream.reliableSizeToPeer) {
+    // Note that we don't want to return prematurely if we've sent a reliable
+    // reset to the peer, because there could still be data that we want to
+    // write on the stream and we might be blocked on flow control.
     return;
   }
   if (stream.finalWriteOffset && stream.hasSentFIN()) {

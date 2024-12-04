@@ -53,7 +53,9 @@ void updateFlowControlOnWriteToSocket(QuicStreamState& stream, uint64_t length);
 
 void updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
 
-void updateFlowControlOnResetStream(QuicStreamState& stream);
+void updateFlowControlOnResetStream(
+    QuicStreamState& stream,
+    folly::Optional<uint64_t> reliableSize = folly::none);
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream);
 

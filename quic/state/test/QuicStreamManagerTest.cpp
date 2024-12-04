@@ -13,6 +13,7 @@
 #include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
+#include <quic/state/stream/StreamStateFunctions.h>
 #include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
@@ -823,6 +824,81 @@ TEST_P(QuicStreamManagerTest, StreamPriorityExcludesControl) {
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   manager.removeClosedStream(stream->id);
+}
+
+Buf createBuffer(uint32_t len) {
+  auto buf = folly::IOBuf::create(len);
+  buf->append(len);
+  return buf;
+}
+
+TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
+  auto& manager = *conn.streamManager;
+
+  auto maybeQuicStreamState = manager.createNextBidirectionalStream();
+  auto* quicStreamState = *maybeQuicStreamState;
+
+  // Assume we've written out 5 bytes to the wire already, and have
+  // received acknowledgements for the same.
+  quicStreamState->writeBufferStartOffset = 5;
+  quicStreamState->currentWriteOffset = 5;
+  quicStreamState->ackedIntervals.insert(0, 4);
+
+  // Assume that the application has written an additional 8 bytes to
+  // the transport layer
+  auto buf = createBuffer(8);
+  quicStreamState->pendingWrites = ChainedByteRangeHead(buf);
+  quicStreamState->writeBuffer.append(std::move(buf));
+  updateFlowControlOnWriteToStream(*quicStreamState, 8);
+
+  // A frame of length 4 has been written to the wire
+  quicStreamState->currentWriteOffset += 4;
+  ChainedByteRangeHead bufWritten1(
+      quicStreamState->pendingWrites.splitAtMost(folly::to<size_t>(4)));
+  quicStreamState->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(5),
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          std::move(bufWritten1), 5, false)));
+  updateFlowControlOnWriteToSocket(*quicStreamState, 4);
+
+  // A frame of length 2 has been written to the wire
+  quicStreamState->currentWriteOffset += 2;
+  ChainedByteRangeHead bufWritten2(
+      quicStreamState->pendingWrites.splitAtMost(folly::to<size_t>(2)));
+  quicStreamState->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(9),
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          std::move(bufWritten2), 9, false)));
+  updateFlowControlOnWriteToSocket(*quicStreamState, 2);
+
+  // The frame of length 4 has been lost
+  auto bufferItr = quicStreamState->retransmissionBuffer.find(5);
+  quicStreamState->insertIntoLossBuffer(std::move(bufferItr->second));
+  quicStreamState->retransmissionBuffer.erase(bufferItr);
+
+  // We send a reliable reset with a reliable size of 7
+  resetQuicStream(*quicStreamState, 0, 7);
+
+  EXPECT_EQ(quicStreamState->writeBuffer.chainLength(), 2);
+  EXPECT_EQ(quicStreamState->pendingWrites.chainLength(), 0);
+  EXPECT_TRUE(quicStreamState->retransmissionBuffer.empty());
+  EXPECT_EQ(quicStreamState->lossBuffer.size(), 1);
+  EXPECT_EQ(quicStreamState->lossBuffer[0].offset, 5);
+  EXPECT_EQ(quicStreamState->lossBuffer[0].data.chainLength(), 2);
+  EXPECT_EQ(quicStreamState->conn.flowControlState.sumCurStreamBufferLen, 0);
+
+  // We send a reliable reset with a reliable size of 6
+  resetQuicStream(*quicStreamState, 0, 6);
+
+  EXPECT_EQ(quicStreamState->writeBuffer.chainLength(), 1);
+  EXPECT_EQ(quicStreamState->pendingWrites.chainLength(), 0);
+  EXPECT_TRUE(quicStreamState->retransmissionBuffer.empty());
+  EXPECT_EQ(quicStreamState->lossBuffer.size(), 1);
+  EXPECT_EQ(quicStreamState->lossBuffer[0].offset, 5);
+  EXPECT_EQ(quicStreamState->lossBuffer[0].data.chainLength(), 1);
+  EXPECT_EQ(quicStreamState->conn.flowControlState.sumCurStreamBufferLen, 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -143,6 +143,7 @@ cpp_unittest(
         "//quic/state:quic_priority_queue",
         "//quic/state:quic_state_machine",
         "//quic/state:quic_stream_utilities",
+        "//quic/state/stream:stream",
     ],
 )
 

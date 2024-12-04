@@ -11,19 +11,35 @@
 
 namespace quic {
 
-void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
-  updateFlowControlOnResetStream(stream);
-  stream.retransmissionBuffer.clear();
-  stream.writeBuffer.move();
-  ChainedByteRangeHead(std::move(stream.pendingWrites)); // Will be destructed
-  stream.lossBuffer.clear();
-  stream.streamWriteError = error;
-  stream.writeBufMeta.length = 0;
-  stream.retransmissionBufMetas.clear();
-  stream.lossBufMetas.clear();
-  if (stream.dsrSender) {
-    stream.dsrSender->release();
-    stream.dsrSender.reset();
+void resetQuicStream(
+    QuicStreamState& stream,
+    ApplicationErrorCode error,
+    Optional<uint64_t> reliableSize) {
+  updateFlowControlOnResetStream(stream, reliableSize);
+  if (reliableSize && *reliableSize > 0) {
+    stream.reliableSizeToPeer = *reliableSize;
+    stream.removeFromRetransmissionBufStartingAtOffset(*reliableSize);
+    stream.removeFromWriteBufStartingAtOffset(*reliableSize);
+    stream.removeFromPendingWritesStartingAtOffset(*reliableSize);
+    stream.removeFromLossBufStartingAtOffset(*reliableSize);
+    stream.removeFromRetransmissionBufMetasStartingAtOffset(*reliableSize);
+    stream.removeFromWriteBufMetaStartingAtOffset(*reliableSize);
+    stream.removeFromLossBufMetasStartingAtOffset(*reliableSize);
+    stream.streamWriteError = error;
+  } else {
+    stream.reliableSizeToPeer = folly::none;
+    stream.retransmissionBuffer.clear();
+    stream.writeBuffer.move();
+    ChainedByteRangeHead(std::move(stream.pendingWrites)); // Will be destructed
+    stream.lossBuffer.clear();
+    stream.streamWriteError = error;
+    stream.writeBufMeta.length = 0;
+    stream.retransmissionBufMetas.clear();
+    stream.lossBufMetas.clear();
+    if (stream.dsrSender) {
+      stream.dsrSender->release();
+      stream.dsrSender.reset();
+    }
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);

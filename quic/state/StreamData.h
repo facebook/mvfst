@@ -180,6 +180,10 @@ struct QuicStreamLike {
   // Read side eof offset.
   Optional<uint64_t> finalReadOffset;
 
+  // This is set if we send a RELIABLE_RESET_STREAM frame to the peer. If we
+  // subsequently send a RESET_STREAM frame, we reset this value to none.
+  Optional<uint64_t> reliableSizeToPeer;
+
   // Current cumulative number of packets sent for this stream. It only counts
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};

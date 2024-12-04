@@ -1008,4 +1008,108 @@ TEST_F(QuicFlowControlTest, StreamFlowControlWithBufMeta) {
   EXPECT_EQ(400, getSendStreamFlowControlBytesAPI(stream));
 }
 
+// This tests the non-DSR case where
+// currentWriteOffset < reliableSize < (currentWriteOffset +
+// pendingWrites.chainLength())
+TEST_F(QuicFlowControlTest, ReliableSizeNonDsrReset1) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.currentWriteOffset = 20;
+  auto inputData = buildRandomInputData(5);
+  stream.pendingWrites.append(inputData);
+  stream.writeBuffer.append(std::move(inputData));
+  stream.conn.flowControlState.sumCurStreamBufferLen = 5;
+
+  updateFlowControlOnResetStream(stream, 22);
+
+  // We threw away 3 bytes due to the reliable reset
+  EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 2);
+}
+
+// This tests the non-DSR case where
+// reliableSize < currentWriteOffset < (currentWriteOffset +
+// pendingWrites.chainLength())
+TEST_F(QuicFlowControlTest, ReliableSizeNonDsrReset2) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.currentWriteOffset = 20;
+  auto inputData = buildRandomInputData(5);
+  stream.pendingWrites.append(inputData);
+  stream.writeBuffer.append(std::move(inputData));
+  stream.conn.flowControlState.sumCurStreamBufferLen = 5;
+
+  updateFlowControlOnResetStream(stream, 10);
+
+  // We threw away all 5 bytes due to the reliable reset
+  EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 0);
+}
+
+// This tests the non-DSR case where
+// currentWriteOffset < (currentWriteOffset +
+// pendingWrites.chainLength()) < reliableSize
+TEST_F(QuicFlowControlTest, ReliableSizeNonDsrReset3) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.currentWriteOffset = 20;
+  auto inputData = buildRandomInputData(5);
+  stream.pendingWrites.append(inputData);
+  stream.writeBuffer.append(std::move(inputData));
+  stream.conn.flowControlState.sumCurStreamBufferLen = 5;
+
+  updateFlowControlOnResetStream(stream, 30);
+
+  // We didn't throw away any bytes after the reliable reset
+  EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 5);
+}
+
+// This tests the DSR case where
+// writeBufMeta.offset < reliableSize < (writeBufMeta.offset +
+// writeBufMeta.length)
+TEST_F(QuicFlowControlTest, ReliableSizeDsrReset1) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.writeBufMeta.offset = 20;
+  stream.writeBufMeta.length = 5;
+
+  stream.conn.flowControlState.sumCurStreamBufferLen = 5;
+  updateFlowControlOnResetStream(stream, 22);
+
+  // We threw away 3 bytes due to the reliable reset
+  EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 2);
+}
+
+// This tests the DSR case where
+// reliableSize < writeBufMeta.offset < (writeBufMeta.offset +
+// writeBufMeta.length)
+TEST_F(QuicFlowControlTest, ReliableSizeDsrReset2) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.writeBufMeta.offset = 20;
+  stream.writeBufMeta.length = 5;
+
+  stream.conn.flowControlState.sumCurStreamBufferLen = 5;
+
+  updateFlowControlOnResetStream(stream, 10);
+
+  // We threw away all 5 bytes due to the reliable reset
+  EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 0);
+}
+
+// This tests the DSR case where
+// writeBufMeta.offset < (writeBufMeta.offset +
+// writeBufMeta.length) < reliableSize
+TEST_F(QuicFlowControlTest, ReliableSizeDsrReset3) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.writeBufMeta.offset = 20;
+  stream.writeBufMeta.length = 5;
+
+  stream.conn.flowControlState.sumCurStreamBufferLen = 5;
+
+  updateFlowControlOnResetStream(stream, 30);
+
+  // We didn't throw away any bytes after the reliable reset
+  EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 5);
+}
+
 } // namespace quic::test

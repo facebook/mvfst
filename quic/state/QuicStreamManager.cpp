@@ -658,7 +658,7 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
 }
 
 void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
-  if (stream.streamWriteError.has_value()) {
+  if (stream.streamWriteError.has_value() && !stream.reliableSizeToPeer) {
     CHECK(stream.lossBuffer.empty());
     CHECK(stream.lossBufMetas.empty());
     removeWritable(stream);
