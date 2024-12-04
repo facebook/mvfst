@@ -3,31 +3,62 @@ load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 
 oncall("traffic_protocols")
 
+mvfst_cpp_library(
+    name = "tperf_client",
+    srcs = [
+        "TperfClient.cpp",
+    ],
+    headers = [
+        "TperfClient.h",
+    ],
+    deps = [
+        "//fizz/crypto:utils",
+        "//folly/io/async:async_udp_socket",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+    ],
+    exported_deps = [
+        "//folly/io/async:async_base",
+        "//folly/stats:histogram",
+        "//quic/client:client",
+        "//quic/common/events:folly_eventbase",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "tperf_server",
+    srcs = [
+        "TperfServer.cpp",
+    ],
+    headers = [
+        "TperfServer.h",
+    ],
+    deps = [
+        ":tperf_dsr_sender",
+        ":tperf_qlogger",
+        "//fizz/crypto:utils",
+        "//folly/stats:histogram",
+        "//quic/common/test:test_utils",
+    ],
+    exported_deps = [
+        "//quic/observer:socket_observer_types",
+        "//quic/server:accept_observer",
+        "//quic/server:server",
+    ],
+)
+
 cpp_binary(
     name = "tperf",
     srcs = [
         "tperf.cpp",
     ],
     deps = [
-        ":pacing_observer",
-        ":tperf_dsr_sender",
-        ":tperf_qlogger",
-        "//fizz/crypto:utils",
+        ":tperf_client",
+        ":tperf_server",
         "//folly:memcpy-use",  # @manual
         "//folly/init:init",
-        "//folly/io/async:async_base",
         "//folly/portability:gflags",
-        "//folly/stats:histogram",
-        "//quic:constants",
-        "//quic/client:client",
-        "//quic/common/events:folly_eventbase",
-        "//quic/common/test:test_client_utils",
-        "//quic/common/test:test_utils",
-        "//quic/common/udpsocket:folly_async_udp_socket",
-        "//quic/congestion_control:server_congestion_controller_factory",
-        "//quic/fizz/client/handshake:fizz_client_handshake",
-        "//quic/server:accept_observer",
-        "//quic/server:server",
     ],
     external_deps = [
         "glog",

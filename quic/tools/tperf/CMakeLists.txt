@@ -11,6 +11,8 @@ add_executable(
   tperf
   tperf.cpp
   TperfDSRSender.cpp
+  TperfClient.cpp
+  TperfServer.cpp
   TperfQLogger.cpp
 )
 
