@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/QuicServer.h>
@@ -102,6 +104,12 @@ namespace quic::tperf {
 
 class TPerfServer {
  public:
+  class DoneCallback {
+   public:
+    virtual ~DoneCallback() = default;
+    virtual void onDone(const std::string& msg) = 0;
+  };
+
   explicit TPerfServer(
       const std::string& host,
       uint16_t port,
@@ -130,7 +138,8 @@ class TPerfServer {
       bool logLoss,
       bool logRttSample,
       std::string qloggerPath,
-      std::string pacingObserver);
+      const std::string& pacingObserver,
+      DoneCallback* doneCallback = nullptr);
 
   void start();
 

@@ -29,7 +29,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       folly::AsyncUDPSocket& sock,
       bool dsrEnabled,
       uint32_t burstDeadlineMs,
-      uint64_t maxPacingRate)
+      uint64_t maxPacingRate,
+      TPerfServer::DoneCallback* doneCallback)
       : evb_(std::make_shared<FollyQuicEventBase>(evbIn)),
         udpSock_(FollyQuicAsyncUDPSocket(evb_, sock)),
         blockSize_(blockSize),
@@ -37,7 +38,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
         maxBytesPerStream_(maxBytesPerStream),
         dsrEnabled_(dsrEnabled),
         burstDeadlineMs_(burstDeadlineMs),
-        maxPacingRate_(maxPacingRate) {
+        maxPacingRate_(maxPacingRate),
+        doneCallback_(doneCallback) {
     buf_ = folly::IOBuf::createCombined(blockSize_);
   }
 
@@ -65,33 +67,48 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     LOG(INFO) << "Socket closed";
     sock_.reset();
     if (burstDeadlineMs_ > 0) {
-      LOG(INFO) << "Burst send stats, burst size of " << blockSize_
-                << " bytes:";
-      LOG(INFO) << "  * total bursts sent: " << batchN_;
-      LOG(INFO) << "  * delivered: " << burstSendStats_.delivered;
-      LOG(INFO) << "  * missed deadline: " << burstSendStats_.missedDeadline;
+      auto resultStr =
+          fmt::format("Burst send stats, burst size of {}\n", blockSize_);
+      resultStr += fmt::format("  * total bursts sent: {}\n", batchN_);
+      resultStr +=
+          fmt::format("  * delivered: {}\n", burstSendStats_.delivered);
+      resultStr += fmt::format(
+          "  * missed deadline: {}\n", burstSendStats_.missedDeadline);
 
-      LOG(INFO) << "Burst ack latency stats, microseconds:";
-      LOG(INFO) << "  * p5: "
-                << burstSendAckedLatencyHistogramMicroseconds_
-                       .getPercentileEstimate(0.05);
-      LOG(INFO) << "  * p50: "
-                << burstSendAckedLatencyHistogramMicroseconds_
-                       .getPercentileEstimate(0.5);
-      LOG(INFO) << "  * p95: "
-                << burstSendAckedLatencyHistogramMicroseconds_
-                       .getPercentileEstimate(0.95);
+      resultStr += fmt::format("Burst ack latency stats, microseconds:\n");
+      resultStr += fmt::format(
+          "  * p5: {}\n",
+          burstSendAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
+              0.05));
+      resultStr += fmt::format(
+          "  * p50: {}\n",
+          burstSendAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
+              0.5));
+      resultStr += fmt::format(
+          "  * p95: {}\n",
+          burstSendAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
+              0.95));
 
-      LOG(INFO) << "Burst true (tx-based) ack latency stats, microseconds:";
-      LOG(INFO) << "  * p5: "
-                << burstSendTrueAckedLatencyHistogramMicroseconds_
-                       .getPercentileEstimate(0.05);
-      LOG(INFO) << "  * p50: "
-                << burstSendTrueAckedLatencyHistogramMicroseconds_
-                       .getPercentileEstimate(0.5);
-      LOG(INFO) << "  * p95: "
-                << burstSendTrueAckedLatencyHistogramMicroseconds_
-                       .getPercentileEstimate(0.95);
+      resultStr += fmt::format(
+          "Burst true (tx-based) ack latency stats, microseconds:\n");
+      resultStr += fmt::format(
+          "  * p5: {}\n",
+          burstSendTrueAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
+              0.05));
+      resultStr += fmt::format(
+          "  * p50: {}\n",
+          burstSendTrueAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
+              0.5));
+      resultStr += fmt::format(
+          "  * p95: {}\n",
+          burstSendTrueAckedLatencyHistogramMicroseconds_.getPercentileEstimate(
+              0.95));
+
+      if (doneCallback_) {
+        doneCallback_->onDone(resultStr);
+      } else {
+        LOG(ERROR) << resultStr;
+      }
     }
   }
 
@@ -347,6 +364,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       100, /* bucket size */
       0, /* min */
       1000000 /* 1 sec max delay */};
+  TPerfServer::DoneCallback* doneCallback_{nullptr};
 };
 
 class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
@@ -361,7 +379,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       uint32_t burstDeadlineMs,
       uint64_t maxPacingRate,
       std::string qloggerPath,
-      std::string pacingObserver)
+      std::string pacingObserver,
+      TPerfServer::DoneCallback* doneCallback)
       : blockSize_(blockSize),
         numStreams_(numStreams),
         maxBytesPerStream_(maxBytesPerStream),
@@ -369,7 +388,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         burstDeadlineMs_(burstDeadlineMs),
         maxPacingRate_(maxPacingRate),
         qloggerPath_(qloggerPath),
-        pacingObserver_(pacingObserver) {}
+        pacingObserver_(pacingObserver),
+        doneCallback_(doneCallback) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -387,7 +407,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         *sock,
         dsrEnabled_,
         burstDeadlineMs_,
-        maxPacingRate_);
+        maxPacingRate_,
+        doneCallback_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), serverHandler.get(), serverHandler.get(), ctx);
     if (!qloggerPath_.empty()) {
@@ -426,6 +447,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
   uint64_t maxPacingRate_;
   std::string qloggerPath_;
   std::string pacingObserver_;
+  TPerfServer::DoneCallback* doneCallback_{nullptr};
 };
 
 TPerfServer::TPerfServer(
@@ -456,7 +478,8 @@ TPerfServer::TPerfServer(
     bool logLoss,
     bool logRttSample,
     std::string qloggerPath,
-    std::string pacingObserver)
+    const std::string& pacingObserver,
+    DoneCallback* doneCallback)
     : host_(host),
       port_(port),
       acceptObserver_(std::make_unique<TPerfAcceptObserver>(
@@ -523,7 +546,8 @@ TPerfServer::TPerfServer(
           burstDeadlineMs_,
           maxPacingRate_,
           qloggerPath,
-          pacingObserver));
+          pacingObserver,
+          doneCallback));
   auto serverCtx = quic::test::createServerCtx();
   serverCtx->setClock(std::make_shared<fizz::SystemClock>());
   server_->setFizzContext(serverCtx);
