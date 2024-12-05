@@ -49,11 +49,12 @@ mvfst_cpp_library(
     ],
     headers = [
         "QuicSocket.h",
-        "QuicTransportBaseLite.h",
+        "QuicTransportBase.h",
     ],
     deps = [
         ":loop_detector_callback",
         ":quic_batch_writer",
+        ":transport_helpers",
         "//folly:chrono",
         "//folly:scope_guard",
         "//quic/common:time_util",
@@ -66,7 +67,6 @@ mvfst_cpp_library(
         "//quic/state:stream_functions",
     ],
     exported_deps = [
-        ":transport_helpers",
         ":transport_lite",
         "//folly:exception_wrapper",
         "//folly:maybe_managed_ptr",
@@ -75,7 +75,6 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic:exception",
         "//quic/codec:types",
-        "//quic/common:looper",
         "//quic/common:network_data",
         "//quic/common:optional",
         "//quic/common:small_collections",
