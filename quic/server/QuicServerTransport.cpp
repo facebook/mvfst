@@ -51,9 +51,15 @@ QuicServerTransport::QuicServerTransport(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory,
     bool useConnectionEndWithErrorCallback)
-    : QuicTransportBase(
-          std::move(evb),
+    : QuicTransportBaseLite(
+          evb,
           std::move(sock),
+          useConnectionEndWithErrorCallback),
+      QuicTransportBase(
+          std::move(evb),
+          nullptr /* Initialized through the QuicTransportBaseLite constructor
+                   */
+          ,
           useConnectionEndWithErrorCallback),
       ctx_(std::move(ctx)),
       wrappedObserverContainer_(this) {
@@ -476,13 +482,12 @@ void QuicServerTransport::processPendingData(bool async) {
     VLOG_IF(10, !pendingData->empty())
         << "Processing pending data size=" << pendingData->size() << " "
         << *this;
-    auto func = [pendingData = std::move(pendingData)](auto self) {
-      auto serverPtr = static_cast<QuicServerTransport*>(self.get());
+    auto func = [pendingData = std::move(pendingData), this](auto) {
       for (auto& pendingPacket : *pendingData) {
-        serverPtr->onNetworkData(
+        onNetworkData(
             pendingPacket.peer,
             NetworkData(std::move(pendingPacket.udpPacket)));
-        if (serverPtr->closeState_ == CloseState::CLOSED) {
+        if (closeState_ == CloseState::CLOSED) {
           // The pending data could potentially contain a connection close, or
           // the app could have triggered a connection close with an error. It
           // is not useful to continue the handshake.

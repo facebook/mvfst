@@ -21,7 +21,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   QuicTransportBaseLite(
       std::shared_ptr<QuicEventBase> evb,
       std::unique_ptr<QuicAsyncUDPSocket> socket,
-      bool useConnectionEndWithErrorCallback);
+      bool useConnectionEndWithErrorCallback = false);
 
   /**
    * Invoked when we have to write some data to the wire.

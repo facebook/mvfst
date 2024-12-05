@@ -150,9 +150,12 @@ class MockQuicServerTransport : public QuicServerTransport {
   MockQuicServerTransport(
       std::shared_ptr<FollyQuicEventBase> evb,
       std::unique_ptr<FollyQuicAsyncUDPSocket> sock)
-      : QuicServerTransport(
-            std::move(evb),
-            std::move(sock),
+      : QuicTransportBaseLite(evb, std::move(sock)),
+        QuicServerTransport(
+            evb,
+            nullptr /* Initialized through the QuicTransportBaseLite constructor
+                     */
+            ,
             nullptr,
             nullptr,
             nullptr) {}

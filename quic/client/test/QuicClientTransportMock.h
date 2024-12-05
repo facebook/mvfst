@@ -18,8 +18,9 @@ class QuicClientTransportMock : public QuicClientTransport {
       std::shared_ptr<QuicEventBase> evb,
       std::unique_ptr<QuicAsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory)
-      : QuicClientTransport(
-            std::move(evb),
+      : QuicTransportBaseLite(evb, std::move(socket)),
+        QuicClientTransport(
+            evb,
             std::move(socket),
             std::move(handshakeFactory)) {}
 

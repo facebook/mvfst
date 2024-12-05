@@ -22,7 +22,13 @@ class QuicClientTransportMock : public QuicClientTransport {
       std::shared_ptr<QuicEventBase> evb,
       std::unique_ptr<QuicAsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory)
-      : QuicClientTransport(evb, std::move(socket), handshakeFactory) {}
+      : QuicTransportBaseLite(evb, std::move(socket)),
+        QuicClientTransport(
+            evb,
+            nullptr /* Initialized through the QuicTransportBaseLite constructor
+                     */
+            ,
+            handshakeFactory) {}
 
   void readWithRecvmsg(
       QuicAsyncUDPSocket& sock,

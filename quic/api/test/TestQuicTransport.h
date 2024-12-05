@@ -24,8 +24,7 @@ class TestQuicTransport
       std::unique_ptr<QuicAsyncUDPSocket> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
-      : QuicTransportBase(std::move(evb), std::move(socket)),
-        observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
+      : QuicTransportBaseLite(evb, std::move(socket)), QuicTransportBase(evb, nullptr /* Initialized through the QuicTransportBaseLite constructor */), observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
     conn_.reset(new QuicServerConnectionState(
         FizzServerQuicHandshakeContext::Builder().build()));
     conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});

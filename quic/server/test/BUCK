@@ -62,7 +62,7 @@ mvfst_cpp_library(
         "fbsource//third-party/googletest:gmock",
         "fbsource//third-party/googletest:gtest",
         ":mocks",
-        "//quic/api:transport",
+        "//quic/api:transport_helpers",
         "//quic/api/test:mocks",
         "//quic/codec:types",
         "//quic/common:transport_knobs",

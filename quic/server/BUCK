@@ -71,6 +71,7 @@ mvfst_cpp_library(
         "//folly/io/async:scoped_event_base_thread",
         "//quic:constants",
         "//quic/api:transport",
+        "//quic/api:transport_helpers",
         "//quic/codec:types",
         "//quic/common:buf_accessor",
         "//quic/common:transport_knobs",

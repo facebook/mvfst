@@ -49,9 +49,15 @@ class TestingQuicClientTransport : public QuicClientTransport {
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connIdSize = kDefaultConnectionIdSize,
       bool useConnectionEndWithErrorCallback = false)
-      : QuicClientTransport(
+      : QuicTransportBaseLite(
             evb,
             std::move(socket),
+            useConnectionEndWithErrorCallback),
+        QuicClientTransport(
+            evb,
+            nullptr /* Initialized through the QuicTransportBaseLite constructor
+                     */
+            ,
             std::move(handshakeFactory),
             connIdSize,
             useConnectionEndWithErrorCallback) {}

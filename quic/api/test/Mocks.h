@@ -212,9 +212,12 @@ class MockQuicTransport : public QuicServerTransport {
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
-      : QuicServerTransport(
+      : QuicTransportBaseLite(evb, std::move(sock)),
+        QuicServerTransport(
             std::move(evb),
-            std::move(sock),
+            nullptr /* Initialized through the QuicTransportBaseLite constructor
+                     */
+            ,
             connSetupCb,
             connCb,
             ctx) {}

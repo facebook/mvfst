@@ -34,7 +34,7 @@ namespace quic {
  *    of the object that holds it to send graceful close messages to the peer.
  */
 class QuicTransportBase : public QuicSocket,
-                          public QuicTransportBaseLite,
+                          virtual public QuicTransportBaseLite,
                           QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(

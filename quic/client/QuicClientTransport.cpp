@@ -57,9 +57,15 @@ QuicClientTransport::QuicClientTransport(
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
     bool useConnectionEndWithErrorCallback)
-    : QuicTransportBase(
-          std::move(evb),
+    : QuicTransportBaseLite(
+          evb,
           std::move(socket),
+          useConnectionEndWithErrorCallback),
+      QuicTransportBase(
+          evb,
+          nullptr /* Initialized through the QuicTransportBaseLite constructor
+                   */
+          ,
           useConnectionEndWithErrorCallback),
       happyEyeballsConnAttemptDelayTimeout_(this),
       wrappedObserverContainer_(this) {
@@ -1056,10 +1062,9 @@ void QuicClientTransport::startCryptoHandshake() {
   writeSocketData();
   if (!transportReadyNotified_ && clientConn_->zeroRttWriteCipher) {
     transportReadyNotified_ = true;
-    runOnEvbAsync([](auto self) {
-      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      if (clientPtr->connSetupCallback_) {
-        clientPtr->connSetupCallback_->onTransportReady();
+    runOnEvbAsync([this](auto) {
+      if (connSetupCallback_) {
+        connSetupCallback_->onTransportReady();
       }
     });
   }
@@ -1114,12 +1119,11 @@ void QuicClientTransport::errMessage(
     auto errStr = folly::errnoStr(serr->ee_errno);
     if (!happyEyeballsState.shouldWriteToFirstSocket &&
         !happyEyeballsState.shouldWriteToSecondSocket) {
-      runOnEvbAsync([errString = std::move(errStr)](auto self) mutable {
+      runOnEvbAsync([errString = std::move(errStr), this](auto) mutable {
         auto quicError = QuicError(
             QuicErrorCode(LocalErrorCode::CONNECT_FAILED),
             std::move(errString));
-        auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-        clientPtr->closeImpl(std::move(quicError), false, false);
+        closeImpl(std::move(quicError), false, false);
       });
     }
   }
@@ -1132,9 +1136,8 @@ void QuicClientTransport::onReadError(
     // closeNow will skip draining the socket. onReadError doesn't gets
     // triggered by retriable errors. If we are here, there is no point of
     // draining the socket.
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeNow(QuicError(
+    runOnEvbAsync([ex, this](auto) {
+      closeNow(QuicError(
           QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
           std::string(ex.what())));
     });
@@ -1755,22 +1758,19 @@ void QuicClientTransport::start(
     adjustGROBuffers();
     startCryptoHandshake();
   } catch (const QuicTransportException& ex) {
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(
+    runOnEvbAsync([ex, this](auto) {
+      closeImpl(
           QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
     });
   } catch (const QuicInternalException& ex) {
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(
+    runOnEvbAsync([ex, this](auto) {
+      closeImpl(
           QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
     });
   } catch (const std::exception& ex) {
     LOG(ERROR) << "Connect failed " << ex.what();
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(QuicError(
+    runOnEvbAsync([ex, this](auto) {
+      closeImpl(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::string(ex.what())));
     });

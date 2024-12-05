@@ -15,6 +15,7 @@ mvfst_cpp_library(
         "//folly/portability:sockets",
         "//quic:constants",
         "//quic/api:loop_detector_callback",
+        "//quic/api:transport_helpers",
         "//quic/flowcontrol:flow_control",
         "//quic/handshake:handshake",
         "//quic/happyeyeballs:happyeyeballs",
