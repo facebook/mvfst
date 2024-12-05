@@ -646,11 +646,21 @@ bool RstStreamScheduler::hasPendingRsts() const {
 bool RstStreamScheduler::writeRsts(PacketBuilderInterface& builder) {
   bool rstWritten = false;
   for (const auto& resetStream : conn_.pendingEvents.resets) {
-    auto bytesWritten = writeFrame(resetStream.second, builder);
-    if (!bytesWritten) {
-      break;
+    auto streamId = resetStream.first;
+    QuicStreamState* streamState = conn_.streamManager->getStream(streamId);
+    if (streamState->pendingWrites.empty() &&
+        streamState->writeBufMeta.length == 0) {
+      //    We only write a RESET_STREAM or RESET_STREAM_AT frame for a stream
+      //    once we've written out all data that needs to be delivered reliably.
+      //    While this is not something that's mandated by the spec, we're doing
+      //    it in this implementation because it dramatically simplifies flow
+      //    control accounting.
+      auto bytesWritten = writeFrame(resetStream.second, builder);
+      if (!bytesWritten) {
+        break;
+      }
+      rstWritten = true;
     }
-    rstWritten = true;
   }
   return rstWritten;
 }

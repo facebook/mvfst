@@ -2729,4 +2729,81 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
   EXPECT_LT(packetLength, conn.udpSendPacketLen);
 }
 
+TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto buf = folly::IOBuf::copyBuffer("cupcake");
+  auto bufLen = buf->computeChainDataLength();
+  writeDataToQuicStream(*stream, buf->clone(), false);
+
+  // Reliable reset with reliableSize = bufLen
+  conn.pendingEvents.resets.emplace(
+      stream->id, RstStreamFrame(stream->id, 0, bufLen, bufLen));
+
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames()
+                                           .resetFrames())
+                                 .build();
+  auto cipherOverhead = 16;
+  PacketNum packetNum1 = 0;
+  ShortHeader header1(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum1);
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(header1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  auto packetResult1 = scheduler.scheduleFramesForPacket(
+      std::move(builder1), conn.udpSendPacketLen - cipherOverhead);
+  auto encodedSize1 = packetResult1.packet->body.computeChainDataLength() +
+      packetResult1.packet->header.computeChainDataLength() + cipherOverhead;
+  updateConnection(
+      conn,
+      none,
+      packetResult1.packet->packet,
+      Clock::now(),
+      encodedSize1,
+      0,
+      false /* isDSRPacket */);
+
+  // We shouldn't send the reliable reset just yet, because we haven't yet
+  // egressed all the stream data upto the reliable offset.
+  EXPECT_TRUE(conn.pendingEvents.resets.contains(stream->id));
+
+  PacketNum packetNum2 = 1;
+  ShortHeader header2(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum2);
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(header2),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  auto packetResult2 = scheduler.scheduleFramesForPacket(
+      std::move(builder2), conn.udpSendPacketLen - cipherOverhead);
+  auto encodedSize2 = packetResult1.packet->body.computeChainDataLength() +
+      packetResult2.packet->header.computeChainDataLength() + cipherOverhead;
+  updateConnection(
+      conn,
+      none,
+      packetResult2.packet->packet,
+      Clock::now(),
+      encodedSize2,
+      0,
+      false /* isDSRPacket */);
+
+  // Now we should have egressed all the stream data upto the reliable offset,
+  // so we should have sent the reliable reset.
+  EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
+}
+
 } // namespace quic::test
