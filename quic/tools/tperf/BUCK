@@ -56,10 +56,12 @@ cpp_binary(
     deps = [
         ":tperf_client",
         ":tperf_server",
-        "//folly:memcpy-use",  # @manual
         "//folly/init:init",
         "//folly/portability:gflags",
-    ],
+    ] + select({
+        "DEFAULT": ["//folly:memcpy-use"],
+        "ovr_config//os:windows": [],
+    }),
     external_deps = [
         "glog",
     ],
