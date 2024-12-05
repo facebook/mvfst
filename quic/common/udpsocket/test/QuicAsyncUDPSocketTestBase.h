@@ -38,12 +38,13 @@ TYPED_TEST_SUITE_P(QuicAsyncUDPSocketTest);
 // Tests start here
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
   this->udpSocket_->resumeRead(&this->readCb_);
   this->udpSocket_->setErrMessageCallback(&this->errCb_);
 
   folly::SocketAddress addr("127.0.0.1", 10000);
   bool errRecvd = false;
-#ifdef MSG_ERRQUEUE
+
   // Expect an ICMP error
   EXPECT_CALL(this->errCb_, errMessage_(testing::_))
       .WillOnce(testing::Invoke([this, &errRecvd](auto& cmsg) {
@@ -59,7 +60,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 
   // If an error is received, the read callback should not be triggered
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
-#endif // FOLLY_HAVE_MSG_ERRQUEUE
+
   auto sendBuf = folly::IOBuf::copyBuffer("hey");
   iovec vec[quic::kNumIovecBufferChains];
   size_t iovec_len =
@@ -67,9 +68,13 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
   this->udpSocket_->write(addr, vec, iovec_len);
   this->udpSocket_->getEventBase()->loopForever();
   EXPECT_TRUE(errRecvd);
+#else // !FOLLY_HAVE_MSG_ERRQUEUE
+  GTEST_SKIP();
+#endif
 }
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
   this->udpSocket_->resumeRead(&this->readCb_);
   this->udpSocket_->setErrMessageCallback(&this->errCb_);
   this->udpSocket_->setErrMessageCallback(nullptr);
@@ -99,9 +104,13 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
   auto timeout = std::make_unique<EvbTerminateTimeout>(evb.get());
   evb->scheduleTimeout(timeout.get(), std::chrono::milliseconds(30));
   evb->loopForever();
+#else // !FOLLY_HAVE_MSG_ERRQUEUE
+  GTEST_SKIP();
+#endif
 }
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
   this->udpSocket_->resumeRead(&this->readCb_);
   this->udpSocket_->setErrMessageCallback(&this->errCb_);
 
@@ -109,7 +118,6 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
   bool errRecvd = false;
   auto evb = this->udpSocket_->getEventBase();
 
-#ifdef MSG_ERRQUEUE
   // Expect an error and close the socket in it.
   EXPECT_CALL(this->errCb_, errMessage_(testing::_))
       .WillOnce(testing::Invoke([this, &errRecvd, &evb](auto&) {
@@ -121,7 +129,6 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
   // Since the socket is closed by the error callback, the read callback
   // should not be triggered
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
-#endif // FOLLY_HAVE_MSG_ERRQUEUE
   auto sendBuf = folly::IOBuf::copyBuffer("hey");
   iovec vec[quic::kNumIovecBufferChains];
   size_t iovec_len =
@@ -129,6 +136,9 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
   this->udpSocket_->write(addr, vec, iovec_len);
   this->udpSocket_->getEventBase()->loopForever();
   EXPECT_TRUE(errRecvd);
+#else // !FOLLY_HAVE_MSG_ERRQUEUE
+  GTEST_SKIP();
+#endif
 }
 
 // Tests end here
