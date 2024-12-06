@@ -15,7 +15,6 @@ mvfst_cpp_library(
     ],
     deps = [
         "//fizz/client:early_data_rejection",
-        "//fizz/client:ech_policy",
         "//fizz/protocol:exporter",
         "//fizz/protocol:protocol",
         "//quic/codec:pktbuilder",
@@ -25,6 +24,7 @@ mvfst_cpp_library(
         "//fizz/client:actions",
         "//fizz/client:async_fizz_client",
         "//fizz/client:client_extensions",
+        "//fizz/client:ech_policy",
         "//fizz/client:fizz_client_context",
         "//fizz/client:protocol",
         "//fizz/protocol:default_certificate_verifier",
