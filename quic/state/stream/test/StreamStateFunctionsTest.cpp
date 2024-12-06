@@ -59,6 +59,48 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
   EXPECT_FALSE(stream.writable());
 }
 
+TEST_F(StreamStateFunctionsTests, BasicReliableResetTest) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId streamId = 0xbaad;
+  QuicStreamState stream(streamId, conn);
+  appendDataToReadBuffer(
+      stream, StreamBuffer(folly::IOBuf::copyBuffer("It is a hotdog!"), 0));
+  appendDataToReadBuffer(
+      stream,
+      StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15));
+  writeDataToQuicStream(
+      stream, folly::IOBuf::copyBuffer("What is it then?"), false);
+
+  std::string retxBufData = "How would I know?";
+  Buf retxBuf = folly::IOBuf::copyBuffer(retxBufData);
+  stream.retransmissionBuffer.emplace(
+      34,
+      std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(retxBuf), 34));
+  auto currentWriteOffset = stream.currentWriteOffset;
+  auto currentReadOffset = stream.currentReadOffset;
+  EXPECT_TRUE(stream.writable());
+
+  sendRstSMHandler(stream, GenericApplicationErrorCode::UNKNOWN, 5);
+
+  // The writeBuffer is going to have bytes 0-4 because the reliableSize is 5.
+  EXPECT_EQ(stream.writeBuffer.chainLength(), 5);
+  EXPECT_TRUE(stream.retransmissionBuffer.empty());
+  EXPECT_FALSE(stream.readBuffer.empty());
+
+  EXPECT_EQ(stream.id, streamId);
+  EXPECT_EQ(currentReadOffset, stream.currentReadOffset);
+  EXPECT_EQ(currentWriteOffset, stream.currentWriteOffset);
+  EXPECT_FALSE(stream.writable());
+
+  // We set the finalWriteOffset to the maximum of the reliableSize (5) and the
+  // amount of data we have written to the wire (0).
+  EXPECT_EQ(conn.pendingEvents.resets.at(stream.id).finalSize, 5);
+
+  EXPECT_EQ(*stream.reliableSizeToPeer, 5);
+  EXPECT_EQ(*stream.appErrorCodeToPeer, GenericApplicationErrorCode::UNKNOWN);
+}
+
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedEmptyStream) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

@@ -184,6 +184,12 @@ struct QuicStreamLike {
   // subsequently send a RESET_STREAM frame, we reset this value to none.
   Optional<uint64_t> reliableSizeToPeer;
 
+  // This is set if we send a RESET_STREAM or RELIABLE_RESET_STREAM frame to
+  // the peer. We store this in order to ensure that we use the same value of
+  // the application error code for all resets we send to the peer, as mandated
+  // by the spec.
+  Optional<ApplicationErrorCode> appErrorCodeToPeer;
+
   // Current cumulative number of packets sent for this stream. It only counts
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};

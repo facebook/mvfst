@@ -16,7 +16,10 @@ void sendStopSendingSMHandler(
     QuicStreamState& stream,
     const StopSendingFrame& frame);
 
-void sendRstSMHandler(QuicStreamState& stream, ApplicationErrorCode errorCode);
+void sendRstSMHandler(
+    QuicStreamState& stream,
+    ApplicationErrorCode errorCode,
+    const Optional<uint64_t>& reliableResetOffset = folly::none);
 
 void sendAckSMHandler(
     QuicStreamState& stream,

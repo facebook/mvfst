@@ -422,6 +422,11 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::resetStream(
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    if (stream->appErrorCodeToPeer &&
+        *stream->appErrorCodeToPeer != errorCode) {
+      // We can't change the error code across resets for a stream
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
     // Invoke state machine
     sendRstSMHandler(*stream, errorCode);
 
