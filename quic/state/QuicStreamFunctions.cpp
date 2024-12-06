@@ -446,7 +446,8 @@ bool allBytesTillFinAcked(const QuicStreamState& stream) {
 void appendPendingStreamReset(
     QuicConnectionStateBase& conn,
     const QuicStreamState& stream,
-    ApplicationErrorCode errorCode) {
+    ApplicationErrorCode errorCode,
+    Optional<uint64_t> reliableSize) {
   /*
    * When BufMetas are written to the transport, but before they are written to
    * the network, writeBufMeta.offset would be assigned a value >
@@ -459,17 +460,40 @@ void appendPendingStreamReset(
   bool writeBufWritten = stream.writeBufMeta.offset &&
       (stream.currentWriteOffset + stream.pendingWrites.chainLength() !=
        stream.writeBufMeta.offset);
+
+  /*
+   * The spec mandates that with multiple RESET_STREAM_AT or RESET_STREAM
+   * frames, we must use the same value of finalSize. Although we don't store
+   * previous values of finalSize to ensure that we use that same value
+   * throughout, we still maintain this property, due to the following facts:
+   *
+   * 1. We only egress a RESET_STREAM_AT or RESET_STREAM frame when all data
+   * upto the reliable reset offset has been egressed.
+   * 2. The user is not allowed to increase the reliable size in subsequent
+   * calls to resetStream().
+   *
+   * Therefore, if a RESET_STREAM_AT frame has been egressed, it means that the
+   * data until the reliableSize in that frame has been egressed, so we end up
+   * with the same calculation of the finalSize in subsequent RESET_STREAM or
+   * RESET_STREAM_AT frames by virtue of the fact that it's the maxiumum of the
+   * current write offset and the new reliable size.
+   */
+  uint64_t finalSize =
+      writeBufWritten ? stream.writeBufMeta.offset : stream.currentWriteOffset;
+  if (reliableSize) {
+    // It's possible that we've queued up data at the socket, but haven't yet
+    // written it out to the wire, so stream.currentWriteOffset could be
+    // lagging behind reliableSize
+    finalSize = std::max(finalSize, *reliableSize);
+  }
+  finalSize = std::min(
+      finalSize,
+      stream.finalWriteOffset.value_or(std::numeric_limits<uint64_t>::max()));
+
   conn.pendingEvents.resets.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(stream.id),
-      std::forward_as_tuple(
-          stream.id,
-          errorCode,
-          std::min(
-              writeBufWritten ? stream.writeBufMeta.offset
-                              : stream.currentWriteOffset,
-              stream.finalWriteOffset.value_or(
-                  std::numeric_limits<uint64_t>::max()))));
+      std::forward_as_tuple(stream.id, errorCode, finalSize, reliableSize));
 }
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {

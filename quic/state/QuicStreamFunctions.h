@@ -95,7 +95,8 @@ bool allBytesTillFinAcked(const QuicStreamState& state);
 void appendPendingStreamReset(
     QuicConnectionStateBase& conn,
     const QuicStreamState& stream,
-    ApplicationErrorCode errorCode);
+    ApplicationErrorCode errorCode,
+    Optional<uint64_t> reliableSize = folly::none);
 
 /**
  * Get the largest write offset the stream has seen

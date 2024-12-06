@@ -2157,6 +2157,42 @@ TEST_F(
   EXPECT_EQ(rst.finalSize, len);
 }
 
+// This tests the scenario in which the reliable size is greater than the
+// current write offset.
+TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamReliableReset1) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  auto data = IOBuf::copyBuffer("this is data");
+  auto len = data->computeChainDataLength();
+  writeDataToQuicStream(stream, std::move(data), false);
+
+  stream.currentWriteOffset = len - 5;
+
+  appendPendingStreamReset(
+      conn, stream, GenericApplicationErrorCode::UNKNOWN, len - 3);
+  auto rst = conn.pendingEvents.resets.at(id);
+  EXPECT_EQ(rst.errorCode, GenericApplicationErrorCode::UNKNOWN);
+  EXPECT_EQ(rst.finalSize, len - 3);
+}
+
+// This tests the scenario in which the reliable size is less than the
+// current write offset.
+TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamReliableReset2) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  auto data = IOBuf::copyBuffer("this is data");
+  auto len = data->computeChainDataLength();
+  writeDataToQuicStream(stream, std::move(data), false);
+
+  stream.currentWriteOffset = len - 5;
+
+  appendPendingStreamReset(
+      conn, stream, GenericApplicationErrorCode::UNKNOWN, len - 7);
+  auto rst = conn.pendingEvents.resets.at(id);
+  EXPECT_EQ(rst.errorCode, GenericApplicationErrorCode::UNKNOWN);
+  EXPECT_EQ(rst.finalSize, len - 5);
+}
+
 TEST_P(QuicStreamFunctionsTestBase, LargestWriteOffsetSeenFIN) {
   QuicStreamState stream(3, conn);
   stream.finalWriteOffset = 100;
