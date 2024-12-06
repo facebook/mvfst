@@ -1692,14 +1692,14 @@ void QuicClientTransport::onNotifyDataAvailable(
       ? conn_->transportSettings.readCoalescingSize
       : readBufferSize;
 
-  if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
-    readWithRecvfrom(sock, readAllocSize, numPackets);
+  if (conn_->transportSettings.networkDataPerSocketRead) {
+    readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
   } else if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
     readWithRecvmmsgWrapper(sock, readAllocSize, numPackets);
   } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
     readWithRecvmmsg(sock, readAllocSize, numPackets);
-  } else if (conn_->transportSettings.networkDataPerSocketRead) {
-    readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
+  } else if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
+    readWithRecvfrom(sock, readAllocSize, numPackets);
   } else {
     readWithRecvmsg(sock, readAllocSize, numPackets);
   }
