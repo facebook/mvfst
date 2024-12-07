@@ -6,6 +6,7 @@
 load("@fbcode_macros//build_defs:autodeps_rule.bzl", "autodeps_rule")
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 load("@fbsource//tools/build_defs:buckconfig.bzl", "read_bool")
+load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load(
     "@fbsource//tools/build_defs:default_platform_defs.bzl",
     "ANDROID",
@@ -21,6 +22,7 @@ load("@fbsource//tools/build_defs:fb_xplat_cxx_library.bzl", "fb_xplat_cxx_libra
 load("@fbsource//tools/build_defs:fb_xplat_cxx_test.bzl", "fb_xplat_cxx_test")
 load("@fbsource//tools/build_defs:fbsource_utils.bzl", "is_arvr_mode")
 load("@fbsource//tools/build_defs:type_defs.bzl", "is_tuple")
+load("@fbsource//tools/build_defs/xplat:deps_map_utils.bzl", "deps_map_utils")
 load("@fbsource//xplat/pfh/Infra_Networking_Core:DEFS.bzl", "Infra_Networking_Core")
 
 CXXFLAGS = [
@@ -73,21 +75,53 @@ def _compute_header_namespace():
 def use_libev():
     return read_bool("mvfst", "use_libev", False)
 
-def mvfst_cpp_library(name, autodeps_skip = False, **kwargs):
-    preprocessor_flags = kwargs.pop("preprocessor_flags", [])
-    if use_libev():
-        preprocessor_flags += ["-DMVFST_USE_LIBEV"]
+def mvfst_cpp_library(
+        name,
+        autodeps_skip = False,
+        deps = (),
+        exported_deps = (),
+        external_deps = (),
+        exported_external_deps = (),
+        **kwargs):
+    # Convert deps, exported_deps, and external_deps
+    if get_fbsource_cell() == "fbcode":
+        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
+        if use_libev():
+            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
 
-    kwargs["preprocessor_flags"] = preprocessor_flags
-    cpp_library(name = name, autodeps_skip = True, **kwargs)
-
-    if not autodeps_skip:
-        autodeps_rule(
+        kwargs["preprocessor_flags"] = preprocessor_flags
+        cpp_library(
             name = name,
-            type = "mvfst_cpp_library",
-            attrs = kwargs,
+            autodeps_skip = True,
+            deps = deps,
+            exported_deps = exported_deps,
+            external_deps = external_deps,
+            exported_external_deps = exported_external_deps,
+            **kwargs
         )
 
+        if not autodeps_skip:
+            autodeps_rule(
+                name = name,
+                type = "mvfst_cpp_library",
+                attrs = kwargs,
+            )
+    else:
+        deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
+        exported_deps = deps_map_utils.convert_to_fbsource_fp_deps(exported_deps) + deps_map_utils.convert_to_fbsource_tp_deps(exported_external_deps)
+        headers = kwargs.pop("headers", [])
+        private_headers = kwargs.pop("private_headers", [])
+        mvfst_cxx_library(
+            name,
+            deps = deps,
+            exported_deps = exported_deps,
+            exported_headers = headers,
+            headers = private_headers,
+            visibility = ["PUBLIC"],
+            **kwargs
+        )
+
+# TODO: Turn this into an internal implementation detail
 def mvfst_cxx_library(
         name,
         srcs = (),
