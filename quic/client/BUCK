@@ -10,12 +10,27 @@ mvfst_cpp_library(
     headers = [
         "QuicClientTransport.h",
     ],
+    exported_deps = [
+        ":client_lite",
+        "//quic/api:transport",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "client_lite",
+    srcs = [
+        "QuicClientTransportLite.cpp",
+    ],
+    headers = [
+        "QuicClientTransportLite.h",
+    ],
     deps = [
         ":client_extension",
         "//folly/portability:sockets",
         "//quic:constants",
         "//quic/api:loop_detector_callback",
         "//quic/api:transport_helpers",
+        "//quic/congestion_control:congestion_controller_factory",
         "//quic/flowcontrol:flow_control",
         "//quic/handshake:handshake",
         "//quic/happyeyeballs:happyeyeballs",
@@ -33,7 +48,7 @@ mvfst_cpp_library(
         "//folly:random",
         "//folly/io:socket_option_map",
         "//folly/net:net_ops",
-        "//quic/api:transport",
+        "//quic/api:transport_lite",
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
         "//quic/common/udpsocket:quic_async_udp_socket",
