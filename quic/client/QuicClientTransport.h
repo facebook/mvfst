@@ -96,9 +96,6 @@ class QuicClientTransport : public QuicTransportBase,
   // From QuicSocket
   [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
       const override {
-    LOG(INFO)
-        << "AMSHARMA RETURNING SOMETHING FROM GETSOCKETOBSERVERCONTAINER, NUM OBSERVERS IS "
-        << wrappedObserverContainer_.getPtr()->numObservers();
     return wrappedObserverContainer_.getPtr();
   }
 
