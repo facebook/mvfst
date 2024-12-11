@@ -117,6 +117,7 @@ def mvfst_cpp_library(
             exported_deps = exported_deps,
             exported_headers = headers,
             headers = private_headers,
+            header_namespace = _compute_header_namespace(),
             visibility = ["PUBLIC"],
             **kwargs
         )
