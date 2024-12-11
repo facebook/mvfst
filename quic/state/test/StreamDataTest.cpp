@@ -585,4 +585,49 @@ TEST(StreamDataTest, WriteBufferMetaRemovalNoChange) {
   EXPECT_EQ(state.writeBufMeta.length, 12);
 }
 
+TEST(StreamDataTest, AllBytesAckedTillEmptyAck) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  EXPECT_TRUE(state.ackedIntervals.empty());
+  EXPECT_EQ(state.allBytesAckedTill(0), false);
+}
+
+TEST(StreamDataTest, AllBytesAckedTillNotStartAtZero) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  EXPECT_TRUE(state.ackedIntervals.empty());
+  state.updateAckedIntervals(1, 5, false);
+  EXPECT_EQ(state.allBytesAckedTill(5), false);
+}
+
+TEST(StreamDataTest, AllBytesAckedTillNotEnoughLength) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  EXPECT_TRUE(state.ackedIntervals.empty());
+  state.updateAckedIntervals(0, 5, false);
+  EXPECT_EQ(state.allBytesAckedTill(5), false);
+}
+
+TEST(StreamDataTest, AllBytesAckedPass) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  EXPECT_TRUE(state.ackedIntervals.empty());
+  state.updateAckedIntervals(0, 6, false);
+  EXPECT_EQ(state.allBytesAckedTill(5), true);
+}
+
+TEST(StreamDataTest, AllBytesAckedDisjointIntervals) {
+  QuicConnectionStateBase qcsb(QuicNodeType::Client);
+  QuicStreamState state(0, qcsb);
+
+  EXPECT_TRUE(state.ackedIntervals.empty());
+  state.updateAckedIntervals(0, 2, false);
+  state.updateAckedIntervals(3, 5, false);
+  EXPECT_EQ(state.allBytesAckedTill(5), false);
+}
+
 } // namespace quic::test

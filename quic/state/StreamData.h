@@ -345,6 +345,15 @@ struct QuicStreamLike {
       pendingWrites.splitAtMost(pendingWrites.chainLength());
     }
   }
+
+  [[nodiscard]] bool allBytesAckedTill(uint64_t offset) const {
+    if (ackedIntervals.empty()) {
+      return false;
+    }
+
+    return ackedIntervals.front().start == 0 &&
+        ackedIntervals.front().end >= offset;
+  }
 };
 
 struct QuicConnectionStateBase;
