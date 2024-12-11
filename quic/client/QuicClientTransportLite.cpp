@@ -419,7 +419,7 @@ void QuicClientTransportLite::processUdpPacketData(
 
             auto stream = conn_->streamManager->getStream(frame.streamId);
             if (stream) {
-              sendRstAckSMHandler(*stream);
+              sendRstAckSMHandler(*stream, frame.reliableSize);
             }
             break;
           }

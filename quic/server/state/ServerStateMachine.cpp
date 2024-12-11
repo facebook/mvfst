@@ -1060,7 +1060,7 @@ void onServerReadDataFromOpen(
                       << frame.streamId << " " << conn;
               auto stream = conn.streamManager->getStream(frame.streamId);
               if (stream) {
-                sendRstAckSMHandler(*stream);
+                sendRstAckSMHandler(*stream, frame.reliableSize);
               }
               break;
             }

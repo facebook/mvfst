@@ -184,6 +184,11 @@ struct QuicStreamLike {
   // subsequently send a RESET_STREAM frame, we reset this value to none.
   Optional<uint64_t> reliableSizeToPeer;
 
+  // This is used in order to determine whether we can transition the send state
+  // from ResetSent to Closed. Is 0 if a RESET_STREAM without a reliable size
+  // has been ACKed.
+  Optional<uint64_t> minReliableSizeAcked;
+
   // This is set if we send a RESET_STREAM or RELIABLE_RESET_STREAM frame to
   // the peer. We store this in order to ensure that we use the same value of
   // the application error code for all resets we send to the peer, as mandated

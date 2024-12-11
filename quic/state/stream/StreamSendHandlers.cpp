@@ -191,11 +191,20 @@ void sendAckSMHandler(
   }
 }
 
-void sendRstAckSMHandler(QuicStreamState& stream) {
+void sendRstAckSMHandler(
+    QuicStreamState& stream,
+    folly::Optional<uint64_t> reliableSize) {
   switch (stream.sendState) {
     case StreamSendState::ResetSent: {
       VLOG(10) << "ResetSent: Transition to closed stream=" << stream.id << " "
                << stream.conn;
+      // Note that we set minReliableSizeAcked to 0 for non-reliable resets.
+      if (!stream.minReliableSizeAcked.hasValue()) {
+        stream.minReliableSizeAcked = reliableSize.value_or(0);
+      } else {
+        stream.minReliableSizeAcked =
+            std::min(*stream.minReliableSizeAcked, reliableSize.value_or(0));
+      }
       stream.sendState = StreamSendState::Closed;
       if (stream.inTerminalStates()) {
         stream.conn.streamManager->addClosed(stream.id);

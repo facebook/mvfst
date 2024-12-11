@@ -797,7 +797,7 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   // suppose we tx a rst stream (and rx its corresponding ack), expect
   // terminal state and queued in closed streams
   transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR);
-  sendRstAckSMHandler(*stream);
+  sendRstAckSMHandler(*stream, folly::none);
   EXPECT_TRUE(stream->inTerminalStates());
   EXPECT_TRUE(streamManager.closedStreams().contains(streamID));
   transport->driveReadCallbacks();
@@ -831,7 +831,7 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
 
   // suppose we tx a rst stream (and rx its corresponding ack)
   transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR);
-  sendRstAckSMHandler(*stream);
+  sendRstAckSMHandler(*stream, folly::none);
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
   transport->driveReadCallbacks();

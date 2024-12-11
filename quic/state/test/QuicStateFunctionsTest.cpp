@@ -1059,7 +1059,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   try {
-    sendRstAckSMHandler(stream);
+    sendRstAckSMHandler(stream, folly::none);
     ADD_FAILURE();
   } catch (QuicTransportException& ex) {
     EXPECT_EQ(ex.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);

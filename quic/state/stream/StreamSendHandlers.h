@@ -25,6 +25,8 @@ void sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame);
 
-void sendRstAckSMHandler(QuicStreamState& stream);
+void sendRstAckSMHandler(
+    QuicStreamState& stream,
+    folly::Optional<uint64_t> reliableSize);
 
 } // namespace quic
