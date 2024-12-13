@@ -648,6 +648,8 @@ bool RstStreamScheduler::writeRsts(PacketBuilderInterface& builder) {
   for (const auto& resetStream : conn_.pendingEvents.resets) {
     auto streamId = resetStream.first;
     QuicStreamState* streamState = conn_.streamManager->getStream(streamId);
+    CHECK(streamState) << "Stream " << streamId
+                       << " not found when going through resets";
     if (streamState->pendingWrites.empty() &&
         streamState->writeBufMeta.length == 0) {
       //    We only write a RESET_STREAM or RESET_STREAM_AT frame for a stream

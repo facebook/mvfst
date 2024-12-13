@@ -555,6 +555,11 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   }
   VLOG(10) << "Removing closed stream=" << streamId;
   DCHECK(it->second.inTerminalStates());
+  if (conn_.pendingEvents.resets.contains(streamId)) {
+    // This can happen when we send two reliable resets, one of which is
+    // egressed and ACKed.
+    conn_.pendingEvents.resets.erase(streamId);
+  }
   if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
       isUnidirectionalStream(streamId)) {
     unidirectionalReadableStreams_.erase(streamId);

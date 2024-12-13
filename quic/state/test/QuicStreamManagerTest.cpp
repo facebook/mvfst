@@ -826,6 +826,21 @@ TEST_P(QuicStreamManagerTest, StreamPriorityExcludesControl) {
   manager.removeClosedStream(stream->id);
 }
 
+TEST_P(QuicStreamManagerTest, RemoveResetsUponClosure) {
+  MockQuicStreamPrioritiesObserver mObserver;
+
+  auto& manager = *conn.streamManager;
+  auto stream = manager.createNextBidirectionalStream().value();
+  conn.pendingEvents.resets.emplace(
+      stream->id, RstStreamFrame(stream->id, 0, 0));
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+
+  EXPECT_TRUE(conn.pendingEvents.resets.contains(stream->id));
+  manager.removeClosedStream(stream->id);
+  EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
+}
+
 Buf createBuffer(uint32_t len) {
   auto buf = folly::IOBuf::create(len);
   buf->append(len);
