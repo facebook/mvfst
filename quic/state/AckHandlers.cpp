@@ -65,8 +65,6 @@ AckEvent processAckFrame(
     const AckedFrameVisitor& ackedFrameVisitor,
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime) {
-  const auto nowTime = Clock::now();
-
   updateEcnCountEchoed(conn, pnSpace, frame);
 
   // TODO: send error if we get an ack for a packet we've not sent t18721184
@@ -159,57 +157,10 @@ AckEvent processAckFrame(
       ++dsrPacketsAcked;
     }
 
-    // Update RTT if current packet is the largestAcked in the frame
-    //
-    // An RTT sample is generated using only the largest acknowledged packet
-    // in the received ACK frame. To avoid generating multiple RTT samples
-    // for a single packet, an ACK frame SHOULD NOT be used to update RTT
-    // estimates if it does not newly acknowledge the largest acknowledged
-    // packet (RFC9002). This includes for minRTT estimates.
     if (!ack.implicit && currentPacketNum == frame.largestAcked) {
-      auto ackReceiveTimeOrNow =
-          ackReceiveTime > ackedPacketIterator->metadata.time ? ackReceiveTime
-                                                              : nowTime;
-
-      // Use ceil to round up to next microsecond during conversion.
-      //
-      // While unlikely, it's still technically possible for the RTT to be
-      // zero; ignore if this is the case.
-      auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
-          ackReceiveTimeOrNow - ackedPacketIterator->metadata.time);
-      if (rttSample != rttSample.zero()) {
-        // notify observers
-        {
-          const auto socketObserverContainer =
-              conn.getSocketObserverContainer();
-          if (socketObserverContainer &&
-              socketObserverContainer->hasObserversForEvent<
-                  SocketObserverInterface::Events::rttSamples>()) {
-            socketObserverContainer->invokeInterfaceMethod<
-                SocketObserverInterface::Events::rttSamples>(
-                [event = SocketObserverInterface::PacketRTT(
-                     ackReceiveTimeOrNow,
-                     rttSample,
-                     frame.ackDelay,
-                     *ackedPacketIterator)](auto observer, auto observed) {
-                  observer->rttSampleGenerated(observed, event);
-                });
-          }
-        }
-
-        // update AckEvent RTTs, which are used by CCA and other processing
-        CHECK(!ack.rttSample.has_value());
-        CHECK(!ack.rttSampleNoAckDelay.has_value());
-        ack.rttSample = rttSample;
-        ack.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
-            ? OptionalMicros(std::chrono::ceil<std::chrono::microseconds>(
-                  rttSample - frame.ackDelay))
-            : std::nullopt;
-
-        // update transport RTT
-        updateRtt(conn, rttSample, frame.ackDelay);
-      } // if (rttSample != rttSample.zero())
-    } // if (!ack.implicit && currentPacketNum == frame.largestAcked)
+      updateRttForLargestAckedPacket(
+          ack, conn, *ackedPacketIterator, frame, ackReceiveTime);
+    }
 
     // Remove this ClonedPacketIdentifier from the
     // outstandings.clonedPacketIdentifiers set
@@ -631,6 +582,58 @@ void commonAckVisitorForAckFrame(
       ackState.acks.withdraw({0, largestAcked - kAckPurgingThresh});
     }
   }
+}
+
+void updateRttForLargestAckedPacket(
+    AckEvent& ackEvent,
+    QuicConnectionStateBase& conn,
+    OutstandingPacketWrapper& packet,
+    const ReadAckFrame& frame,
+    const TimePoint& ackReceiveTime) {
+  CHECK_EQ(packet.packet.header.getPacketSequenceNum(), frame.largestAcked)
+      << "An RTT sample is generated using only the largest acknowledged packet "
+      << "in the received ACK frame.";
+  CHECK(!ackEvent.implicit)
+      << "An RTT sample cannot be generated for an implicit ACK.";
+
+  auto ackReceiveTimeOrNow =
+      ackReceiveTime > packet.metadata.time ? ackReceiveTime : Clock::now();
+
+  // Use ceil to round up to next microsecond during conversion.
+  //
+  // While unlikely, it's still technically possible for the RTT to be
+  // zero; ignore if this is the case.
+  auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
+      ackReceiveTimeOrNow - packet.metadata.time);
+  if (rttSample != rttSample.zero()) {
+    // notify observers
+    {
+      const auto socketObserverContainer = conn.getSocketObserverContainer();
+      if (socketObserverContainer &&
+          socketObserverContainer->hasObserversForEvent<
+              SocketObserverInterface::Events::rttSamples>()) {
+        socketObserverContainer->invokeInterfaceMethod<
+            SocketObserverInterface::Events::rttSamples>(
+            [event = SocketObserverInterface::PacketRTT(
+                 ackReceiveTimeOrNow, rttSample, frame.ackDelay, packet)](
+                auto observer, auto observed) {
+              observer->rttSampleGenerated(observed, event);
+            });
+      }
+    }
+
+    // update AckEvent RTTs, which are used by CCA and other processing
+    CHECK(!ackEvent.rttSample.has_value());
+    CHECK(!ackEvent.rttSampleNoAckDelay.has_value());
+    ackEvent.rttSample = rttSample;
+    ackEvent.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
+        ? OptionalMicros(std::chrono::ceil<std::chrono::microseconds>(
+              rttSample - frame.ackDelay))
+        : std::nullopt;
+
+    // update transport RTT
+    updateRtt(conn, rttSample, frame.ackDelay);
+  } // if (rttSample != rttSample.zero())
 }
 
 void incrementEcnCountForAckedPacket(

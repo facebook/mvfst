@@ -78,6 +78,20 @@ void parseAckReceiveTimestamps(
     Optional<PacketNum> firstPacketNum);
 
 /**
+ * An RTT sample is generated using only the largest acknowledged packet
+ * in the received ACK frame. To avoid generating multiple RTT samples
+ * for a single packet, an ACK frame SHOULD NOT be used to update RTT
+ * estimates if it does not newly acknowledge the largest acknowledged
+ * packet (RFC9002). This includes for minRTT estimates.
+ */
+void updateRttForLargestAckedPacket(
+    AckEvent& ackEvent,
+    QuicConnectionStateBase& conn,
+    OutstandingPacketWrapper& packet,
+    const ReadAckFrame& frame,
+    const TimePoint& ackReceiveTime);
+
+/**
  * Update the outgoing ECN marking count for an outstanding packet that has been
  * acked. If a packet is acked and the connection is using ECN/L4S, this
  * function updates the ackState to expect more ECN marks to be echoed by the
