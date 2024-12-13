@@ -28,14 +28,18 @@ namespace quic {
  *      | Send Stream
  *      |
  *      v
- * Send::Open ---------------+
- *      |                    |
- *      | Ack all bytes      | Send RST
- *      | ti FIN             |
- *      v                    v
- * Send::Closed <------  ResetSent
- *                RST
- *                Acked
+ * Send::Open ------------------------------+
+ *      |                                   |
+ *      | Ack all bytes                     |
+ *      | till FIN                          | Send RST
+ *      |                                   |
+ *      v                                   v
+ * Send::Closed <---------------------- ResetSent
+ *               RST ACKed and all bytes
+ *               till smallest ACKed
+ *               reliable reset offset
+ *               ACKed.
+ *
  */
 
 void sendStopSendingSMHandler(
@@ -125,7 +129,8 @@ void sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame) {
   switch (stream.sendState) {
-    case StreamSendState::Open: {
+    case StreamSendState::Open:
+    case StreamSendState::ResetSent: {
       if (!ackedFrame.fromBufMeta) {
         // Clean up the acked buffers from the retransmissionBuffer.
         auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
@@ -165,8 +170,14 @@ void sendAckSMHandler(
       // This stream may be able to invoke some deliveryCallbacks:
       stream.conn.streamManager->addDeliverable(stream.id);
 
-      // Check for whether or not we have ACKed all bytes until our FIN.
-      if (allBytesTillFinAcked(stream)) {
+      // Check for whether or not we have ACKed all bytes until our FIN or,
+      // in the case that we've sent a Reset, until the minimum reliable size of
+      // some reset acked by the peer.
+      bool allReliableDataDelivered =
+          (stream.minReliableSizeAcked &&
+           (*stream.minReliableSizeAcked == 0 ||
+            stream.allBytesAckedTill(*stream.minReliableSizeAcked - 1)));
+      if (allBytesTillFinAcked(stream) || allReliableDataDelivered) {
         stream.sendState = StreamSendState::Closed;
         if (stream.inTerminalStates()) {
           stream.conn.streamManager->addClosed(stream.id);
@@ -174,8 +185,7 @@ void sendAckSMHandler(
       }
       break;
     }
-    case StreamSendState::Closed:
-    case StreamSendState::ResetSent: {
+    case StreamSendState::Closed: {
       DCHECK(stream.retransmissionBuffer.empty());
       DCHECK(stream.pendingWrites.empty());
       break;
@@ -205,9 +215,15 @@ void sendRstAckSMHandler(
         stream.minReliableSizeAcked =
             std::min(*stream.minReliableSizeAcked, reliableSize.value_or(0));
       }
-      stream.sendState = StreamSendState::Closed;
-      if (stream.inTerminalStates()) {
-        stream.conn.streamManager->addClosed(stream.id);
+
+      if (*stream.minReliableSizeAcked == 0 ||
+          stream.allBytesAckedTill(*stream.minReliableSizeAcked - 1)) {
+        // We can only transition to Closed if we have successfully delivered
+        // all reliable data in some reset that was ACKed by the peer.
+        stream.sendState = StreamSendState::Closed;
+        if (stream.inTerminalStates()) {
+          stream.conn.streamManager->addClosed(stream.id);
+        }
       }
       break;
     }

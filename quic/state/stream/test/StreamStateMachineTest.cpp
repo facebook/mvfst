@@ -323,6 +323,7 @@ TEST_F(QuicResetSentStateTest, ReliableRstAckNoReduction) {
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
+  stream.updateAckedIntervals(0, 3, false);
   sendRstAckSMHandler(stream, 5);
 
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
@@ -346,6 +347,7 @@ TEST_F(QuicResetSentStateTest, ReliableRstAckReduction) {
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
+  stream.updateAckedIntervals(0, 1, false);
   sendRstAckSMHandler(stream, 1);
 
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
@@ -370,7 +372,7 @@ TEST_F(QuicResetSentStateTest, ReliableRstAckFirstTime) {
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
   sendRstAckSMHandler(stream, 1);
 
-  EXPECT_EQ(stream.sendState, StreamSendState::Closed);
+  EXPECT_EQ(stream.sendState, StreamSendState::ResetSent);
   EXPECT_FALSE(stream.finalReadOffset);
   EXPECT_FALSE(stream.readBuffer.empty());
   EXPECT_EQ(*stream.minReliableSizeAcked, 1);
@@ -397,6 +399,71 @@ TEST_F(QuicResetSentStateTest, RstAfterReliableRst) {
   EXPECT_FALSE(stream.finalReadOffset);
   EXPECT_FALSE(stream.readBuffer.empty());
   EXPECT_EQ(*stream.minReliableSizeAcked, 0);
+}
+
+// A reliable RESET has been ACKed, and all bytes till the reliable
+// size have been ACKed.
+TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition1) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.sendState = StreamSendState::ResetSent;
+  stream.updateAckedIntervals(0, 5, false);
+  sendRstAckSMHandler(stream, 5);
+  EXPECT_EQ(stream.sendState, StreamSendState::Closed);
+}
+
+// A reliable RESET has been ACKed, but not all bytes till the
+// reliable size have been ACKed.
+TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition2) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.sendState = StreamSendState::ResetSent;
+  stream.updateAckedIntervals(0, 4, false);
+  sendRstAckSMHandler(stream, 5);
+  EXPECT_EQ(stream.sendState, StreamSendState::ResetSent);
+}
+
+// A reliable RESET with a reliable size was ACKed previously, and
+// now we're getting an ACK for stream data until that reliable size
+TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition3) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.sendState = StreamSendState::ResetSent;
+  stream.minReliableSizeAcked = 7;
+  WriteStreamFrame streamFrame(id, 0, 7, false);
+  auto buf = folly::IOBuf::create(7);
+  buf->append(7);
+  stream.retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf), 0, false)));
+  sendAckSMHandler(stream, streamFrame);
+  EXPECT_EQ(stream.sendState, StreamSendState::Closed);
+}
+
+// A reliable RESET with a reliable size was ACKed previously, and
+// now we're getting an ACK for stream data, but not until the
+// reliable size
+TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition4) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.sendState = StreamSendState::ResetSent;
+  stream.minReliableSizeAcked = 8;
+  WriteStreamFrame streamFrame(id, 0, 7, false);
+  auto buf = folly::IOBuf::create(7);
+  buf->append(7);
+  stream.retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(buf), 0, false)));
+  sendAckSMHandler(stream, streamFrame);
+  EXPECT_EQ(stream.sendState, StreamSendState::ResetSent);
 }
 
 class QuicClosedStateTest : public Test {};
