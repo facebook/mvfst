@@ -45,7 +45,8 @@ void ClientHandshake::connect(
         cachedServerTransportParams->knobFrameSupport,
         cachedServerTransportParams->ackReceiveTimestampsEnabled,
         cachedServerTransportParams->maxReceiveTimestampsPerAck,
-        cachedServerTransportParams->receiveTimestampsExponent);
+        cachedServerTransportParams->receiveTimestampsExponent,
+        cachedServerTransportParams->reliableStreamResetSupport);
     updateTransportParamsFromCachedEarlyParams(
         *conn_, *cachedServerTransportParams);
   }

@@ -746,7 +746,8 @@ void QuicClientTransportLite::processUdpPacketData(
             conn_->maybePeerAckReceiveTimestampsConfig
                 ? conn_->maybePeerAckReceiveTimestampsConfig
                       ->receiveTimestampsExponent
-                : 3);
+                : 3,
+            conn_->peerAdvertisedReliableStreamResetSupport);
 
         if (clientConn_->zeroRttRejected.has_value() &&
             *clientConn_->zeroRttRejected) {

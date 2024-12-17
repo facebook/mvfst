@@ -235,6 +235,76 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
   EXPECT_FALSE(clientConn.peerAdvertisedKnobFrameSupport);
 }
 
+TEST_F(
+    ClientStateMachineTest,
+    TestProcessReliableStreamResetSupportedParamEnabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeEmptyParameter(TransportParameterId::reliable_stream_reset));
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_TRUE(clientConn.peerAdvertisedReliableStreamResetSupport);
+}
+
+TEST_F(
+    ClientStateMachineTest,
+    TestProcessReliableStreamResetSupportedParamDisabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_FALSE(clientConn.peerAdvertisedReliableStreamResetSupport);
+}
+
+TEST_F(ClientStateMachineTest, TestProcessReliableStreamResetNonEmptyParam) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::reliable_stream_reset, 0));
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  EXPECT_THROW(
+      processServerInitialParams(clientConn, serverTransportParams, 0),
+      QuicTransportException);
+}
+
+TEST_F(
+    ClientStateMachineTest,
+    TestEncodeReliableStreamResetSupportedParamEnabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.advertisedReliableResetStreamSupport = true;
+  auto customTransportParams = getSupportedExtTransportParams(clientConn);
+  EXPECT_THAT(
+      customTransportParams,
+      Contains(testing::Field(
+          &TransportParameter::parameter,
+          testing::Eq(TransportParameterId::reliable_stream_reset))));
+  auto it = findParameter(
+      customTransportParams, TransportParameterId::reliable_stream_reset);
+  EXPECT_TRUE(it->value->empty());
+}
+
+TEST_F(
+    ClientStateMachineTest,
+    TestEncodeReliableStreamResetSupportedParamDisabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.advertisedReliableResetStreamSupport = false;
+  auto customTransportParams = getSupportedExtTransportParams(clientConn);
+  EXPECT_THAT(
+      customTransportParams,
+      Not(Contains(testing::Field(
+          &TransportParameter::parameter,
+          testing::Eq(TransportParameterId::reliable_stream_reset)))));
+}
+
 struct maxStreamGroupsAdvertizedtestStruct {
   uint64_t peerMaxGroupsIn;
   OptionalIntegral<uint64_t> expectedTransportSettingVal;

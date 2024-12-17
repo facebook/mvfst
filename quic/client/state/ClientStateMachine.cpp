@@ -151,6 +151,21 @@ void processServerInitialParams(
       static_cast<TransportParameterId>(
           TransportParameterId::knob_frames_supported),
       serverParams.parameters);
+
+  auto reliableResetTpIter = findParameter(
+      serverParams.parameters,
+      static_cast<TransportParameterId>(
+          TransportParameterId::reliable_stream_reset));
+  if (reliableResetTpIter != serverParams.parameters.end()) {
+    if (!reliableResetTpIter->value->empty()) {
+      throw QuicTransportException(
+          "Reliable reset transport parameter must be empty",
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    }
+    conn.peerAdvertisedReliableStreamResetSupport = true;
+  } else {
+    conn.peerAdvertisedReliableStreamResetSupport = false;
+  }
   if (conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS ||
       conn.version == QuicVersion::QUIC_V1_ALIAS2) {
@@ -284,7 +299,8 @@ void cacheServerInitialParams(
     bool peerAdvertisedKnobFrameSupport,
     bool peerAdvertisedAckReceiveTimestampsEnabled,
     uint64_t peerAdvertisedMaxReceiveTimestampsPerAck,
-    uint64_t peerAdvertisedReceiveTimestampsExponent) {
+    uint64_t peerAdvertisedReceiveTimestampsExponent,
+    bool peerAdvertisedReliableStreamResetSupport) {
   conn.serverInitialParamsSet_ = true;
   conn.peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
   conn.peerAdvertisedInitialMaxStreamDataBidiLocal =
@@ -297,6 +313,8 @@ void cacheServerInitialParams(
       peerAdvertisedInitialMaxStreamsBidi;
   conn.peerAdvertisedInitialMaxStreamsUni = peerAdvertisedInitialMaxStreamUni;
   conn.peerAdvertisedKnobFrameSupport = peerAdvertisedKnobFrameSupport;
+  conn.peerAdvertisedReliableStreamResetSupport =
+      peerAdvertisedReliableStreamResetSupport;
 
   if (peerAdvertisedAckReceiveTimestampsEnabled) {
     conn.maybePeerAckReceiveTimestampsConfig.assign(
@@ -334,6 +352,8 @@ CachedServerTransportParameters getServerCachedTransportParameters(
   transportParams.knobFrameSupport = conn.peerAdvertisedKnobFrameSupport;
   transportParams.ackReceiveTimestampsEnabled =
       conn.maybePeerAckReceiveTimestampsConfig.has_value();
+  transportParams.reliableStreamResetSupport =
+      conn.peerAdvertisedReliableStreamResetSupport;
   if (conn.maybePeerAckReceiveTimestampsConfig) {
     transportParams.maxReceiveTimestampsPerAck =
         conn.maybePeerAckReceiveTimestampsConfig->maxReceiveTimestampsPerAck;
@@ -361,6 +381,8 @@ void updateTransportParamsFromCachedEarlyParams(
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       transportParams.initialMaxStreamsUni);
   conn.peerAdvertisedKnobFrameSupport = transportParams.knobFrameSupport;
+  conn.peerAdvertisedReliableStreamResetSupport =
+      transportParams.reliableStreamResetSupport;
   if (transportParams.ackReceiveTimestampsEnabled) {
     conn.maybePeerAckReceiveTimestampsConfig.assign(
         {std::min(

@@ -125,6 +125,10 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     customTps.push_back(encodeIntegerParameter(TpId::knob_frames_supported, 1));
   }
 
+  if (ts.advertisedReliableResetStreamSupport) {
+    customTps.push_back(encodeEmptyParameter(TpId::reliable_stream_reset));
+  }
+
   return customTps;
 }
 

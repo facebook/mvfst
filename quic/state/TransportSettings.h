@@ -318,6 +318,7 @@ struct TransportSettings {
   bool experimentalPacer{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
+  bool advertisedReliableResetStreamSupport{false};
   bool advertisedKnobFrameSupport{true};
   bool removeStreamAfterEomCallbackUnset{false};
   // Whether to include cwnd hint in new session tickets for 0-rtt

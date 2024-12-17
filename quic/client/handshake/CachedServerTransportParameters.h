@@ -26,6 +26,7 @@ struct CachedServerTransportParameters {
   uint64_t receiveTimestampsExponent{0};
   bool knobFrameSupport{false};
   bool ackReceiveTimestampsEnabled{false};
+  bool reliableStreamResetSupport{false};
 };
 
 } // namespace quic

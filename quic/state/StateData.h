@@ -699,6 +699,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   Optional<AckReceiveTimestampsConfig> maybePeerAckReceiveTimestampsConfig;
 
+  bool peerAdvertisedReliableStreamResetSupport{false};
+
   bool peerAdvertisedKnobFrameSupport{false};
   // Retransmission policies map.
   folly::F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>

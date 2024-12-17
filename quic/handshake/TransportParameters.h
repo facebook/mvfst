@@ -41,7 +41,8 @@ enum class TransportParameterId : uint64_t {
   receive_timestamps_exponent = 0xff0a003,
   stream_groups_enabled = 0x0000ff99,
   knob_frames_supported = 0x00005178,
-  cwnd_hint_bytes = 0x00007492
+  cwnd_hint_bytes = 0x00007492,
+  reliable_stream_reset = 0x17f7586d2cb571
 };
 
 struct TransportParameter {

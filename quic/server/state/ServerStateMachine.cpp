@@ -250,6 +250,21 @@ void processClientInitialParams(
           TransportParameterId::knob_frames_supported),
       clientParams.parameters);
 
+  auto reliableResetTpIter = findParameter(
+      clientParams.parameters,
+      static_cast<TransportParameterId>(
+          TransportParameterId::reliable_stream_reset));
+  if (reliableResetTpIter != clientParams.parameters.end()) {
+    if (!reliableResetTpIter->value->empty()) {
+      throw QuicTransportException(
+          "Reliable reset transport parameter must be empty",
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    }
+    conn.peerAdvertisedReliableStreamResetSupport = true;
+  } else {
+    conn.peerAdvertisedReliableStreamResetSupport = false;
+  }
+
   // validate that we didn't receive original connection ID, stateless
   // reset token, or preferred address.
   if (preferredAddress && *preferredAddress != 0) {
