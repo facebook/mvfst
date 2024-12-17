@@ -4,7 +4,10 @@
 """
 
 load("@fbcode_macros//build_defs:autodeps_rule.bzl", "autodeps_rule")
+load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
+load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 load("@fbsource//tools/build_defs:buckconfig.bzl", "read_bool")
 load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load(
@@ -82,6 +85,7 @@ def mvfst_cpp_library(
         exported_deps = (),
         external_deps = (),
         exported_external_deps = (),
+        modular_headers = None,
         **kwargs):
     # Convert deps, exported_deps, and external_deps
     if get_fbsource_cell() == "fbcode":
@@ -97,6 +101,7 @@ def mvfst_cpp_library(
             exported_deps = exported_deps,
             external_deps = external_deps,
             exported_external_deps = exported_external_deps,
+            modular_headers = modular_headers,
             **kwargs
         )
 
@@ -196,23 +201,100 @@ def mvfst_cxx_library(
         **kwargs
     )
 
+def mvfst_cpp_test(
+        name,
+        autodeps_skip = False,
+        deps = (),
+        external_deps = (),
+        **kwargs):
+    # Convert deps and external_deps
+    if get_fbsource_cell() == "fbcode":
+        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
+        if use_libev():
+            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
+
+        kwargs["preprocessor_flags"] = preprocessor_flags
+        cpp_unittest(
+            name = name,
+            autodeps_skip = True,
+            deps = deps,
+            external_deps = external_deps,
+            **kwargs
+        )
+
+        if not autodeps_skip:
+            autodeps_rule(
+                name = name,
+                type = "mvfst_cpp_test",
+                attrs = kwargs,
+            )
+    else:
+        deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
+        mvfst_cxx_test(
+            name,
+            deps = deps,
+            header_namespace = _compute_header_namespace(),
+            visibility = ["PUBLIC"],
+            **kwargs
+        )
+
 def mvfst_cxx_test(
         name,
         srcs,
         headers = [],
-        deps = []):
+        deps = [],
+        header_namespace = "",
+        **kwargs):
     fb_xplat_cxx_test(
         name = name,
         srcs = srcs,
         headers = headers,
-        header_namespace = _compute_header_namespace(),
+        header_namespace = header_namespace,
         deps = deps,
         # Combination of `platforms = FBCODE` and `mangled_keys = ["deps"]`
         # forces the unsuffixed target into fbcode platform
         platforms = (FBCODE,),
         mangled_keys = ["deps"],
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
+        **kwargs
     )
+
+def mvfst_cpp_binary(
+        name,
+        autodeps_skip = False,
+        deps = (),
+        external_deps = (),
+        **kwargs):
+    # Convert deps and external_deps
+    if get_fbsource_cell() == "fbcode":
+        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
+        if use_libev():
+            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
+
+        kwargs["preprocessor_flags"] = preprocessor_flags
+        cpp_binary(
+            name = name,
+            autodeps_skip = True,
+            deps = deps,
+            external_deps = external_deps,
+            **kwargs
+        )
+
+        if not autodeps_skip:
+            autodeps_rule(
+                name = name,
+                type = "mvfst_cpp_binary",
+                attrs = kwargs,
+            )
+    else:
+        deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
+        mvfst_cxx_binary(
+            name,
+            deps = deps,
+            header_namespace = _compute_header_namespace(),
+            visibility = ["PUBLIC"],
+            **kwargs
+        )
 
 def mvfst_cxx_binary(
         name,
@@ -220,18 +302,52 @@ def mvfst_cxx_binary(
         headers = [],
         compatible_with = [],
         compiler_flags = [],
-        deps = []):
+        deps = [],
+        header_namespace = "",
+        **kwargs):
     fb_xplat_cxx_binary(
         name = name,
         srcs = srcs,
         headers = headers,
-        header_namespace = _compute_header_namespace(),
+        header_namespace = header_namespace,
         compatible_with = compatible_with,
         compiler_flags = compiler_flags + CXXFLAGS,
         deps = deps,
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
         platforms = (CXX,),
+        **kwargs
     )
+
+def mvfst_cpp_benchmark(
+        name,
+        autodeps_skip = False,
+        deps = (),
+        external_deps = (),
+        **kwargs):
+    # Convert deps and external_deps
+    if get_fbsource_cell() == "fbcode":
+        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
+        if use_libev():
+            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
+
+        kwargs["preprocessor_flags"] = preprocessor_flags
+        cpp_benchmark(
+            name = name,
+            autodeps_skip = True,
+            deps = deps,
+            external_deps = external_deps,
+            **kwargs
+        )
+
+        if not autodeps_skip:
+            autodeps_rule(
+                name = name,
+                type = "mvfst_cpp_benchmark",
+                attrs = kwargs,
+            )
+    else:
+        # TODO: xplat cpp_benchmark()
+        pass
 
 def mu_cxx_library(
         name,
