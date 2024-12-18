@@ -86,6 +86,7 @@ def mvfst_cpp_library(
         external_deps = (),
         exported_external_deps = (),
         modular_headers = None,
+        header_namespace = None,
         **kwargs):
     # Convert deps, exported_deps, and external_deps
     if get_fbsource_cell() == "fbcode":
@@ -102,6 +103,7 @@ def mvfst_cpp_library(
             external_deps = external_deps,
             exported_external_deps = exported_external_deps,
             modular_headers = modular_headers,
+            header_namespace = header_namespace,
             **kwargs
         )
 
@@ -122,7 +124,7 @@ def mvfst_cpp_library(
             exported_deps = exported_deps,
             exported_headers = headers,
             headers = private_headers,
-            header_namespace = _compute_header_namespace(),
+            header_namespace = header_namespace or _compute_header_namespace(),
             visibility = ["PUBLIC"],
             **kwargs
         )
@@ -206,6 +208,7 @@ def mvfst_cpp_test(
         autodeps_skip = False,
         deps = (),
         external_deps = (),
+        header_namespace = None,
         **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
@@ -219,6 +222,7 @@ def mvfst_cpp_test(
             autodeps_skip = True,
             deps = deps,
             external_deps = external_deps,
+            header_namespace = header_namespace,
             **kwargs
         )
 
@@ -233,7 +237,7 @@ def mvfst_cpp_test(
         mvfst_cxx_test(
             name,
             deps = deps,
-            header_namespace = _compute_header_namespace(),
+            header_namespace = header_namespace or _compute_header_namespace(),
             visibility = ["PUBLIC"],
             **kwargs
         )
@@ -264,6 +268,7 @@ def mvfst_cpp_binary(
         autodeps_skip = False,
         deps = (),
         external_deps = (),
+        header_namespace = None,
         **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
@@ -277,6 +282,7 @@ def mvfst_cpp_binary(
             autodeps_skip = True,
             deps = deps,
             external_deps = external_deps,
+            header_namespace = header_namespace,
             **kwargs
         )
 
@@ -291,7 +297,7 @@ def mvfst_cpp_binary(
         mvfst_cxx_binary(
             name,
             deps = deps,
-            header_namespace = _compute_header_namespace(),
+            header_namespace = header_namespace or _compute_header_namespace(),
             visibility = ["PUBLIC"],
             **kwargs
         )
