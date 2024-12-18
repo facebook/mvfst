@@ -3091,6 +3091,29 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
           .hasError());
 }
 
+TEST_P(QuicTransportImplTestBase, TestResetRemovesDeliveryCb) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  NiceMock<MockDeliveryCallback> deliveryCb1;
+  NiceMock<MockDeliveryCallback> deliveryCb2;
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
+  transport->writeChain(stream1, IOBuf::copyBuffer("hello"), true, nullptr);
+  transport->writeChain(stream2, IOBuf::copyBuffer("hello"), true, nullptr);
+  EXPECT_FALSE(
+      transport->registerDeliveryCallback(stream1, 2, &deliveryCb1).hasError());
+  EXPECT_FALSE(
+      transport->registerDeliveryCallback(stream2, 2, &deliveryCb2).hasError());
+  EXPECT_EQ(transport->getNumByteEventCallbacksForStream(stream1), 1);
+  EXPECT_EQ(transport->getNumByteEventCallbacksForStream(stream2), 1);
+  EXPECT_FALSE(
+      transport->resetStream(stream1, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
+  EXPECT_EQ(transport->getNumByteEventCallbacksForStream(stream1), 0);
+  EXPECT_EQ(transport->getNumByteEventCallbacksForStream(stream2), 1);
+  transport->close(none);
+}
+
 TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   auto stream = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();

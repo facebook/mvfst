@@ -430,12 +430,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::resetStream(
     // Invoke state machine
     sendRstSMHandler(*stream, errorCode);
 
-    for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
-         closeState_ == CloseState::OPEN &&
-         pendingResetIt != conn_->pendingEvents.resets.end();
-         pendingResetIt++) {
-      cancelByteEventCallbacksForStream(pendingResetIt->first);
-    }
+    cancelByteEventCallbacksForStream(id);
     pendingWriteCallbacks_.erase(id);
     QUIC_STATS(conn_->statsCallback, onQuicStreamReset, errorCode);
   } catch (const QuicTransportException& ex) {
