@@ -11,7 +11,7 @@
 
 namespace quic {
 
-#if _WIN32
+#ifdef _WIN32
 #include <mmsystem.h>
 #include <timeapi.h>
 #pragma comment(lib, "winmm.lib")
@@ -102,7 +102,7 @@ getWindowsEventBaseBackend() {
 
 QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
   EventBaseBackendDetails ret;
-#if _WIN32
+#ifdef _WIN32
   ret.factory = &getWindowsEventBaseBackend;
 #else
   ret.factory = &folly::EventBase::getDefaultBackend;

@@ -11,7 +11,7 @@
 
 namespace quic {
 
-#if _WIN32
+#ifdef _WIN32
 // Folly netops exposes Windows control messages using the same struct field
 // names used by Linux. This defines macros to use these field names on Windows.
 

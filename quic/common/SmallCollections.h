@@ -12,7 +12,7 @@
 
 namespace quic {
 
-#if !FOLLY_MOBILE || _WIN32
+#if !FOLLY_MOBILE || defined(_WIN32)
 template <class T, std::size_t N, class... Policy>
 using SmallVec = folly::small_vector<T, N, Policy...>;
 #else

@@ -61,7 +61,7 @@ class SocketObserverInterface {
 #if FOLLY_CPLUSPLUS >= 202002L
     friend bool operator==(const CloseStartedEvent&, const CloseStartedEvent&) =
         default;
-#elif _WIN32
+#elif defined(_WIN32)
     friend auto operator!=(
         const CloseStartedEvent& right,
         const CloseStartedEvent& left) {
