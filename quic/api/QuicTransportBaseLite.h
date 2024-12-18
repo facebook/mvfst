@@ -614,6 +614,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void processCallbacksAfterNetworkData();
 
+  folly::Expected<folly::Unit, LocalErrorCode> resetStreamInternal(
+      StreamId id,
+      ApplicationErrorCode errorCode);
+
   void onSocketWritable() noexcept override;
 
   void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);

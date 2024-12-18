@@ -402,61 +402,7 @@ QuicTransportBaseLite::unregisterStreamWriteCallback(StreamId id) {
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::resetStream(
     StreamId id,
     ApplicationErrorCode errorCode) {
-  if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  [[maybe_unused]] auto self = sharedGuard();
-  SCOPE_EXIT {
-    checkForClosedStream();
-    updateReadLooper();
-    updatePeekLooper();
-    updateWriteLooper(true);
-  };
-  try {
-    // Check whether stream exists before calling getStream to avoid
-    // creating a peer stream if it does not exist yet.
-    if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-    }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-    if (stream->appErrorCodeToPeer &&
-        *stream->appErrorCodeToPeer != errorCode) {
-      // We can't change the error code across resets for a stream
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
-    }
-    // Invoke state machine
-    sendRstSMHandler(*stream, errorCode);
-
-    cancelByteEventCallbacksForStream(id);
-    pendingWriteCallbacks_.erase(id);
-    QUIC_STATS(conn_->statsCallback, onQuicStreamReset, errorCode);
-  } catch (const QuicTransportException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return folly::makeUnexpected(ex.errorCode());
-  } catch (const std::exception& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("resetStream() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
-  }
-  return folly::unit;
+  return resetStreamInternal(id, errorCode);
 }
 
 void QuicTransportBaseLite::cancelDeliveryCallbacksForStream(StreamId id) {
@@ -1673,6 +1619,67 @@ void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
 
   invokeStreamsAvailableCallbacks();
   cleanupAckEventState();
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::resetStreamInternal(
+    StreamId id,
+    ApplicationErrorCode errorCode) {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  [[maybe_unused]] auto self = sharedGuard();
+  SCOPE_EXIT {
+    checkForClosedStream();
+    updateReadLooper();
+    updatePeekLooper();
+    updateWriteLooper(true);
+  };
+  try {
+    // Check whether stream exists before calling getStream to avoid
+    // creating a peer stream if it does not exist yet.
+    if (!conn_->streamManager->streamExists(id)) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
+    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    if (stream->appErrorCodeToPeer &&
+        *stream->appErrorCodeToPeer != errorCode) {
+      // We can't change the error code across resets for a stream
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    // Invoke state machine
+    sendRstSMHandler(*stream, errorCode);
+
+    cancelByteEventCallbacksForStream(id);
+    pendingWriteCallbacks_.erase(id);
+    QUIC_STATS(conn_->statsCallback, onQuicStreamReset, errorCode);
+  } catch (const QuicTransportException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
+    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+  } catch (const QuicInternalException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
+    return folly::makeUnexpected(ex.errorCode());
+  } catch (const std::exception& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::string("resetStream() error")));
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  return folly::unit;
 }
 
 void QuicTransportBaseLite::onSocketWritable() noexcept {
