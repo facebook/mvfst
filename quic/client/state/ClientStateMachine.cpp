@@ -63,6 +63,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);
   newConn->happyEyeballsState = std::move(conn->happyEyeballsState);
   newConn->flowControlState = std::move(conn->flowControlState);
+  newConn->bufAccessor = conn->bufAccessor;
   newConn->pendingOneRttData.reserve(
       newConn->transportSettings.maxPacketsToBuffer);
   if (conn->congestionControllerFactory) {
