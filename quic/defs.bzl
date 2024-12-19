@@ -329,6 +329,7 @@ def mvfst_cpp_benchmark(
         autodeps_skip = False,
         deps = (),
         external_deps = (),
+        header_namespace = None,
         **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
@@ -342,6 +343,7 @@ def mvfst_cpp_benchmark(
             autodeps_skip = True,
             deps = deps,
             external_deps = external_deps,
+            header_namespace = header_namespace,
             **kwargs
         )
 
@@ -352,8 +354,14 @@ def mvfst_cpp_benchmark(
                 attrs = kwargs,
             )
     else:
-        # TODO: xplat cpp_benchmark()
-        pass
+        deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
+        mvfst_cxx_binary(
+            name,
+            deps = deps,
+            header_namespace = header_namespace or _compute_header_namespace(),
+            visibility = ["PUBLIC"],
+            **kwargs
+        )
 
 def mu_cxx_library(
         name,
