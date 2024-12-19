@@ -47,7 +47,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":qlogger",
         ":qlogger_constants",
-        "//folly/json:dynamic",
+        "//folly:dynamic",
         "//quic/codec:types",
     ],
 )
@@ -63,8 +63,8 @@ mvfst_cpp_library(
     exported_deps = [
         ":base_qlogger",
         ":qlogger_constants",
+        "//folly:dynamic",
         "//folly/compression:compression",
-        "//folly/json:dynamic",
         "//folly/logging:logging",
         "//quic/codec:types",
     ],

@@ -341,6 +341,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":transport_settings",
-        "//folly/json:dynamic",
+        "//folly:dynamic",
     ],
 )

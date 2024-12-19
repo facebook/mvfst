@@ -9,7 +9,7 @@
 
 #include <folly/FileUtil.h>
 #include <folly/Random.h>
-#include <folly/json/json.h>
+#include <folly/json/json.h> // @manual=//folly:dynamic
 #include <folly/portability/Filesystem.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>

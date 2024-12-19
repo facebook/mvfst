@@ -175,7 +175,7 @@ mvfst_cpp_library(
         "TransportKnobs.h",
     ],
     deps = [
-        "//folly/json:dynamic",
+        "//folly:dynamic",
         "//quic:constants",
     ],
     exported_deps = [

@@ -20,9 +20,9 @@ cpp_unittest(
         "QLoggerTest.cpp",
     ],
     deps = [
+        "//folly:dynamic",
         "//folly:file_util",
         "//folly:random",
-        "//folly/json:dynamic",
         "//folly/portability:filesystem",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:bbr",

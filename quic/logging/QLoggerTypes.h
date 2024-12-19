@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/json/dynamic.h>
+#include <folly/json/dynamic.h> // @manual=//folly:dynamic
 #include <quic/codec/Types.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <memory>
