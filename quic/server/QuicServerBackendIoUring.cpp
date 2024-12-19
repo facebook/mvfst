@@ -7,7 +7,7 @@
 
 #include <quic/server/QuicServer.h>
 
-#include <folly/experimental/io/IoUringBackend.h>
+#include <folly/io/async/IoUringBackend.h>
 
 #if !FOLLY_MOBILE && __has_include(<liburing.h>)
 

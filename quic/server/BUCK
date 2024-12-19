@@ -34,9 +34,9 @@ mvfst_cpp_library(
         "//common/network:mvfst_hooks",  # @manual
         "//folly:conv",
         "//folly/chrono:conv",
-        "//folly/experimental/io:io_uring_backend",
         "//folly/io:iobuf",
         "//folly/io/async:event_base_manager",
+        "//folly/io/async:io_uring_backend",
         "//folly/portability:gflags",
         "//folly/system:thread_id",
         "//quic/codec:header_codec",
