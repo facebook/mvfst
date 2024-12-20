@@ -354,14 +354,8 @@ def mvfst_cpp_benchmark(
                 attrs = kwargs,
             )
     else:
-        deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
-        mvfst_cxx_binary(
-            name,
-            deps = deps,
-            header_namespace = header_namespace or _compute_header_namespace(),
-            visibility = ["PUBLIC"],
-            **kwargs
-        )
+        # Don't generate xplat benchmark targets
+        pass
 
 def mu_cxx_library(
         name,
