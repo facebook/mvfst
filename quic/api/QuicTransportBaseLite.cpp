@@ -417,69 +417,21 @@ void QuicTransportBaseLite::cancelDeliveryCallbacksForStream(
 
 void QuicTransportBaseLite::cancelByteEventCallbacksForStream(
     const StreamId id,
-    const Optional<uint64_t>& offset) {
-  invokeForEachByteEventType(([this, id, &offset](const ByteEvent::Type type) {
-    cancelByteEventCallbacksForStream(type, id, offset);
-  }));
+    const Optional<uint64_t>& offsetUpperBound) {
+  invokeForEachByteEventType(
+      ([this, id, &offsetUpperBound](const ByteEvent::Type type) {
+        cancelByteEventCallbacksForStream(type, id, offsetUpperBound);
+      }));
 }
 
 void QuicTransportBaseLite::cancelByteEventCallbacksForStream(
     const ByteEvent::Type type,
     const StreamId id,
-    const Optional<uint64_t>& offset) {
-  if (isReceivingStream(conn_->nodeType, id)) {
-    return;
-  }
-
-  auto& byteEventMap = getByteEventMap(type);
-  auto byteEventMapIt = byteEventMap.find(id);
-  if (byteEventMapIt == byteEventMap.end()) {
-    switch (type) {
-      case ByteEvent::Type::ACK:
-        conn_->streamManager->removeDeliverable(id);
-        break;
-      case ByteEvent::Type::TX:
-        conn_->streamManager->removeTx(id);
-        break;
-    }
-    return;
-  }
-  auto& streamByteEvents = byteEventMapIt->second;
-
-  // Callbacks are kept sorted by offset, so we can just walk the queue and
-  // invoke those with offset below provided offset.
-  while (!streamByteEvents.empty()) {
-    // decomposition not supported for xplat
-    const auto cbOffset = streamByteEvents.front().offset;
-    const auto callback = streamByteEvents.front().callback;
-    if (!offset.has_value() || cbOffset < *offset) {
-      streamByteEvents.pop_front();
-      ByteEventCancellation cancellation{id, cbOffset, type};
-      callback->onByteEventCanceled(cancellation);
-      if (closeState_ != CloseState::OPEN) {
-        // socket got closed - we can't use streamByteEvents anymore,
-        // closeImpl should take care of cleaning up any remaining callbacks
-        return;
-      }
-    } else {
-      // Only larger or equal offsets left, exit the loop.
-      break;
-    }
-  }
-
-  // Clean up state for this stream if no callbacks left to invoke.
-  if (streamByteEvents.empty()) {
-    switch (type) {
-      case ByteEvent::Type::ACK:
-        conn_->streamManager->removeDeliverable(id);
-        break;
-      case ByteEvent::Type::TX:
-        conn_->streamManager->removeTx(id);
-        break;
-    }
-    // The callback could have changed the map so erase by id.
-    byteEventMap.erase(id);
-  }
+    const Optional<uint64_t>& offsetUpperBound) {
+  cancelByteEventCallbacksForStreamInternal(
+      type, id, [&offsetUpperBound](uint64_t cbOffset) {
+        return !offsetUpperBound || cbOffset < *offsetUpperBound;
+      });
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -1680,6 +1632,65 @@ QuicTransportBaseLite::resetStreamInternal(
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
   }
   return folly::unit;
+}
+
+void QuicTransportBaseLite::cancelByteEventCallbacksForStreamInternal(
+    const ByteEvent::Type type,
+    const StreamId id,
+    const std::function<bool(uint64_t)>& offsetFilter) {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return;
+  }
+
+  auto& byteEventMap = getByteEventMap(type);
+  auto byteEventMapIt = byteEventMap.find(id);
+  if (byteEventMapIt == byteEventMap.end()) {
+    switch (type) {
+      case ByteEvent::Type::ACK:
+        conn_->streamManager->removeDeliverable(id);
+        break;
+      case ByteEvent::Type::TX:
+        conn_->streamManager->removeTx(id);
+        break;
+    }
+    return;
+  }
+  auto& streamByteEvents = byteEventMapIt->second;
+
+  // Callbacks are kept sorted by offset, so we can just walk the queue and
+  // invoke those with offset below provided offset.
+  while (!streamByteEvents.empty()) {
+    // decomposition not supported for xplat
+    const auto cbOffset = streamByteEvents.front().offset;
+    const auto callback = streamByteEvents.front().callback;
+    if (offsetFilter(cbOffset)) {
+      streamByteEvents.pop_front();
+      ByteEventCancellation cancellation{id, cbOffset, type};
+      callback->onByteEventCanceled(cancellation);
+      if (closeState_ != CloseState::OPEN) {
+        // socket got closed - we can't use streamByteEvents anymore,
+        // closeImpl should take care of cleaning up any remaining callbacks
+        return;
+      }
+    } else {
+      // Only larger or equal offsets left, exit the loop.
+      break;
+    }
+  }
+
+  // Clean up state for this stream if no callbacks left to invoke.
+  if (streamByteEvents.empty()) {
+    switch (type) {
+      case ByteEvent::Type::ACK:
+        conn_->streamManager->removeDeliverable(id);
+        break;
+      case ByteEvent::Type::TX:
+        conn_->streamManager->removeTx(id);
+        break;
+    }
+    // The callback could have changed the map so erase by id.
+    byteEventMap.erase(id);
+  }
 }
 
 void QuicTransportBaseLite::onSocketWritable() noexcept {

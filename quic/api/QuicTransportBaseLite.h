@@ -106,22 +106,22 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * Cancel byte event callbacks for given stream.
    *
    * If an offset is provided, cancels only callbacks with an offset less than
-   * or equal to the provided offset, otherwise cancels all callbacks.
+   * the provided offset, otherwise cancels all callbacks.
    */
   void cancelByteEventCallbacksForStream(
       const StreamId id,
-      const Optional<uint64_t>& offset = none) override;
+      const Optional<uint64_t>& offsetUpperBound = none) override;
 
   /**
    * Cancel byte event callbacks for given type and stream.
    *
    * If an offset is provided, cancels only callbacks with an offset less than
-   * or equal to the provided offset, otherwise cancels all callbacks.
+   * the provided offset, otherwise cancels all callbacks.
    */
   void cancelByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id,
-      const Optional<uint64_t>& offset = none) override;
+      const Optional<uint64_t>& offsetUpperBound = none) override;
 
   /**
    * Register a byte event to be triggered when specified event type occurs for
@@ -617,6 +617,12 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   folly::Expected<folly::Unit, LocalErrorCode> resetStreamInternal(
       StreamId id,
       ApplicationErrorCode errorCode);
+
+  // Only remove byte event callbacks if offsetFilter returns true.
+  void cancelByteEventCallbacksForStreamInternal(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const std::function<bool(uint64_t)>& offsetFilter);
 
   void onSocketWritable() noexcept override;
 
