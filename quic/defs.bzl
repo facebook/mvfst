@@ -114,14 +114,18 @@ def mvfst_cpp_library(
                 attrs = kwargs,
             )
     else:
-        deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
-        exported_deps = deps_map_utils.convert_to_fbsource_fp_deps(exported_deps) + deps_map_utils.convert_to_fbsource_tp_deps(exported_external_deps)
+        converted_deps = deps_map_utils.convert_all_to_fbsource_deps(
+            deps = deps,
+            exported_deps = exported_deps,
+            external_deps = external_deps,
+            exported_external_deps = exported_external_deps,
+        )
         headers = kwargs.pop("headers", [])
         private_headers = kwargs.pop("private_headers", [])
         mvfst_cxx_library(
             name,
-            deps = deps,
-            exported_deps = exported_deps,
+            deps = converted_deps.deps,
+            exported_deps = converted_deps.exported_deps,
             exported_headers = headers,
             headers = private_headers,
             header_namespace = header_namespace or _compute_header_namespace(),
