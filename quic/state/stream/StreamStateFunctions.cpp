@@ -54,6 +54,17 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
             " != " + folly::to<std::string>(frame.finalSize),
         TransportErrorCode::FINAL_SIZE_ERROR);
   }
+  if (stream.reliableSizeFromPeer && frame.reliableSize &&
+      *frame.reliableSize > *stream.reliableSizeFromPeer) {
+    // It is legal to send a RESET_STREAM_AT frame with a lower offset
+    // than before, but not to send one with a higher offset than before. Due
+    // to reordering, we may receive a RESET_STREAM_AT frame with a higher
+    // offset than before. In this case, we should ignore the frame.
+    return;
+  }
+
+  stream.reliableSizeFromPeer =
+      frame.reliableSize.hasValue() ? *frame.reliableSize : 0;
   // Mark eofoffset:
   if (stream.maxOffsetObserved > frame.finalSize) {
     throw QuicTransportException(
