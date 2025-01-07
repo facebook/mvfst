@@ -73,8 +73,8 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
   // Verify that the flow control is consistent.
   updateFlowControlOnStreamData(
       stream, stream.maxOffsetObserved, frame.finalSize);
-  // Drop read buffer:
-  stream.readBuffer.clear();
+  // Drop non-reliable data:
+  stream.removeFromReadBufferStartingAtOffset(*stream.reliableSizeFromPeer);
   stream.finalReadOffset = frame.finalSize;
   stream.streamReadError = frame.errorCode;
   bool appReadAllBytes = stream.currentReadOffset > *stream.finalReadOffset;

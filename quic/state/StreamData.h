@@ -638,6 +638,23 @@ struct QuicStreamState : public QuicStreamLike {
     }
   }
 
+  void removeFromReadBufferStartingAtOffset(uint64_t startingOffset) {
+    while (!readBuffer.empty()) {
+      auto& lastElement = readBuffer.back();
+      if (lastElement.offset >= startingOffset) {
+        readBuffer.pop_back();
+      } else if (
+          lastElement.offset + lastElement.data.chainLength() >=
+          startingOffset) {
+        lastElement.data = lastElement.data.splitAtMost(
+            size_t(startingOffset - lastElement.offset));
+        return;
+      } else {
+        return;
+      }
+    }
+  }
+
   std::unique_ptr<DSRPacketizationRequestSender> dsrSender;
 
   // BufferMeta that has been written to the QUIC layer.
