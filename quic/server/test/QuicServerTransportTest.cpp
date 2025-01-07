@@ -862,6 +862,31 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   EXPECT_TRUE(updatedStream->writable());
 }
 
+TEST_F(QuicServerTransportTest, RecvReliableRstStreamFrame) {
+  clientNextAppDataPacketNum = 3;
+
+  StreamId streamId = 0x00;
+  server->getNonConstConn().streamManager->getStream(streamId);
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 5, 5);
+  ASSERT_TRUE(builder.canBuildPacket());
+  writeFrame(std::move(rstFrame), builder);
+  auto packet = std::move(builder).buildPacket();
+  deliverDataWithoutErrorCheck(packetToBuf(packet));
+  EXPECT_EQ(
+      server->getConn().localConnectionError->code,
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION));
+}
+
 TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   server->getNonConstConn().ackStates.appDataAckState.nextPacketNum = 3;
   std::array<std::string, 4> words = {

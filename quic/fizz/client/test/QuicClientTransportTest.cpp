@@ -3604,6 +3604,27 @@ TEST_F(
   EXPECT_THROW(deliverData(packet->coalesce()), std::runtime_error);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, ReceiveReliableRst) {
+  auto streamId =
+      client->createBidirectionalStream(false /* replaySafe */).value();
+  client->setReadCallback(streamId, &readCb);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 5, 5);
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  ASSERT_TRUE(builder.canBuildPacket());
+  writeFrame(rstFrame, builder);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  deliverDataWithoutErrorCheck(packet->coalesce());
+  EXPECT_EQ(
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION),
+      client->getConn().localConnectionError->code);
+}
+
 TEST_F(
     QuicClientTransportAfterStartTest,
     ReceiveRstStreamNonExistentAndOtherFrame) {

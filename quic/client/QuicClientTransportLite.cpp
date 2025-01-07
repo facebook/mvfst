@@ -474,6 +474,12 @@ void QuicClientTransportLite::processUdpPacketData(
         RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
         VLOG(10) << "Client received reset stream=" << frame.streamId << " "
                  << *this;
+        if (frame.reliableSize.hasValue()) {
+          // We're not yet supporting the handling of RESET_STREAM_AT frames
+          throw QuicTransportException(
+              "Reliable resets not supported",
+              TransportErrorCode::PROTOCOL_VIOLATION);
+        }
         pktHasRetransmittableData = true;
         auto streamId = frame.streamId;
         auto stream = conn_->streamManager->getStream(streamId);

@@ -1125,9 +1125,11 @@ void onServerReadDataFromOpen(
         }
         case QuicFrame::Type::RstStreamFrame: {
           RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
-          if (frame.reliableSize) {
+          if (frame.reliableSize.hasValue()) {
             // We're not yet supporting the handling of RESET_STREAM_AT frames
-            break;
+            throw QuicTransportException(
+                "Reliable resets not supported",
+                TransportErrorCode::PROTOCOL_VIOLATION);
           }
           VLOG(10) << "Server received reset stream=" << frame.streamId << " "
                    << conn;
