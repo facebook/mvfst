@@ -82,10 +82,8 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
     // If the currentReadOffset > finalReadOffset we have already processed
     // all the bytes until FIN, so we don't need to do anything for the read
     // side of the flow controller.
-    auto lastReadOffset = stream.currentReadOffset;
-    stream.currentReadOffset = frame.finalSize;
     stream.maxOffsetObserved = frame.finalSize;
-    updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
+    updateFlowControlOnReceiveReset(stream, Clock::now());
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);

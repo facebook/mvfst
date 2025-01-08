@@ -211,7 +211,18 @@ void updateFlowControlOnRead(
     uint64_t lastReadOffset,
     TimePoint readTime) {
   DCHECK_GE(stream.currentReadOffset, lastReadOffset);
-  auto diff = stream.currentReadOffset - lastReadOffset;
+  uint64_t diff = 0;
+  if (stream.reliableSizeFromPeer &&
+      stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
+    CHECK(stream.finalReadOffset.hasValue())
+        << "We got a reset from the peer, but the finalReadOffset is not set.";
+    // We've read all reliable bytes, so we can advance the currentReadOffset
+    // to the final size.
+    diff = *stream.finalReadOffset - lastReadOffset;
+    stream.currentReadOffset = *stream.finalReadOffset;
+  } else {
+    diff = stream.currentReadOffset - lastReadOffset;
+  }
   incrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurReadOffset, diff);
   if (maybeSendConnWindowUpdate(stream.conn, readTime)) {
@@ -225,6 +236,33 @@ void updateFlowControlOnRead(
             << " readOffset=" << stream.currentReadOffset
             << " maxOffset=" << stream.flowControlState.advertisedMaxOffset
             << " window=" << stream.flowControlState.windowSize;
+  }
+}
+
+void updateFlowControlOnReceiveReset(
+    QuicStreamState& stream,
+    TimePoint resetTime) {
+  CHECK(stream.reliableSizeFromPeer.hasValue())
+      << "updateFlowControlOnReceiveReset has been called, "
+      << "but reliableSizeFromPeer has not been set";
+  CHECK(stream.finalReadOffset.hasValue())
+      << "updateFlowControlOnReceiveReset has been called, "
+      << "but finalReadOffset has not been set";
+  if (stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
+    // We only advance the currentReadOffset to the final size if the
+    // application has read all of the reliable bytes. We don't do this
+    // earlier because we'll buffer additional data that arrives.
+    auto diff = *stream.finalReadOffset - stream.currentReadOffset;
+    stream.currentReadOffset = *stream.finalReadOffset;
+    incrementWithOverFlowCheck(
+        stream.conn.flowControlState.sumCurReadOffset, diff);
+    if (maybeSendConnWindowUpdate(stream.conn, resetTime)) {
+      VLOG(4) << "Reset trigger conn window update "
+              << " readOffset=" << stream.conn.flowControlState.sumCurReadOffset
+              << " maxOffset="
+              << stream.conn.flowControlState.advertisedMaxOffset
+              << " window=" << stream.conn.flowControlState.windowSize;
+    }
   }
 }
 

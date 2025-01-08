@@ -49,6 +49,10 @@ void updateFlowControlOnRead(
     uint64_t lastReadOffset,
     TimePoint readTime);
 
+void updateFlowControlOnReceiveReset(
+    QuicStreamState& stream,
+    TimePoint resetTime);
+
 void updateFlowControlOnWriteToSocket(QuicStreamState& stream, uint64_t length);
 
 void updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);

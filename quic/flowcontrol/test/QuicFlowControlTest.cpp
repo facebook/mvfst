@@ -712,7 +712,7 @@ TEST_F(QuicFlowControlTest, UpdateBadFlowControlOnStreamData) {
   EXPECT_EQ(conn_.flowControlState.sumMaxObservedOffset, 600);
 }
 
-TEST_F(QuicFlowControlTest, UpdateFlowControlOnRead) {
+TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadBasic) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn_.qLogger = qLogger;
 
@@ -739,6 +739,113 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnRead) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->update, getFlowControlEvent(700));
+}
+
+// We've received a reliable reset. Now, we're receiving additional data,
+// but we haven't yet received all of the reliable data.
+TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadReliableReset1) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.reliableSizeFromPeer = 100;
+  stream.finalReadOffset = 150;
+  stream.currentReadOffset = 10;
+  stream.flowControlState.windowSize = 20;
+  stream.flowControlState.advertisedMaxOffset = 10000;
+
+  conn_.flowControlState.windowSize = 1000;
+  conn_.flowControlState.advertisedMaxOffset = 10000;
+  conn_.flowControlState.sumCurReadOffset = 40;
+
+  // Simulate the reading of 10 bytes
+  stream.currentReadOffset = 20;
+  updateFlowControlOnRead(stream, 10, Clock::now());
+  EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 50);
+  EXPECT_EQ(stream.currentReadOffset, 20);
+}
+
+// We've received a reliable reset. Now, we're receiving additional data,
+// and we've received all of the reliable data.
+TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadReliableReset2) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.reliableSizeFromPeer = 100;
+  stream.finalReadOffset = 150;
+  stream.currentReadOffset = 10;
+  stream.flowControlState.windowSize = 20;
+  stream.flowControlState.advertisedMaxOffset = 10000;
+
+  conn_.flowControlState.windowSize = 1000;
+  conn_.flowControlState.advertisedMaxOffset = 10000;
+  conn_.flowControlState.sumCurReadOffset = 40;
+
+  // Simulate the reading of 90 bytes
+  stream.currentReadOffset = 100;
+  updateFlowControlOnRead(stream, 10, Clock::now());
+
+  EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
+  EXPECT_EQ(stream.currentReadOffset, 150);
+}
+
+// We're receiving a reliable reset with a reliable size > the amount
+// of data we've read so far.
+TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset1) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.currentReadOffset = 10;
+  stream.flowControlState.windowSize = 20;
+  stream.flowControlState.advertisedMaxOffset = 10000;
+
+  conn_.flowControlState.windowSize = 1000;
+  conn_.flowControlState.advertisedMaxOffset = 10000;
+  conn_.flowControlState.sumCurReadOffset = 40;
+
+  // Simulate the receiving of a reliable reset
+  stream.reliableSizeFromPeer = 100;
+  stream.finalReadOffset = 150;
+  updateFlowControlOnReceiveReset(stream, Clock::now());
+  EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 40);
+  EXPECT_EQ(stream.currentReadOffset, 10);
+}
+
+// We're receiving a reliable reset with a reliable size <= the amount
+// of data we've read so far.
+TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset2) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.currentReadOffset = 10;
+  stream.flowControlState.windowSize = 20;
+  stream.flowControlState.advertisedMaxOffset = 10000;
+
+  conn_.flowControlState.windowSize = 1000;
+  conn_.flowControlState.advertisedMaxOffset = 10000;
+  conn_.flowControlState.sumCurReadOffset = 40;
+
+  // Simulate the receiving of a reliable reset
+  stream.reliableSizeFromPeer = 10;
+  stream.finalReadOffset = 150;
+  updateFlowControlOnReceiveReset(stream, Clock::now());
+  EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
+  EXPECT_EQ(stream.currentReadOffset, 150);
+}
+
+// We're receiving a non-reliable reset
+TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset3) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.currentReadOffset = 10;
+  stream.flowControlState.windowSize = 20;
+  stream.flowControlState.advertisedMaxOffset = 10000;
+
+  conn_.flowControlState.windowSize = 1000;
+  conn_.flowControlState.advertisedMaxOffset = 10000;
+  conn_.flowControlState.sumCurReadOffset = 40;
+
+  // Simulate the receiving of a non-reliable reset
+  stream.reliableSizeFromPeer = 0;
+  stream.finalReadOffset = 150;
+  updateFlowControlOnReceiveReset(stream, Clock::now());
+  EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
+  EXPECT_EQ(stream.currentReadOffset, 150);
 }
 
 TEST_F(QuicFlowControlTest, UpdateFlowControlOnWrite) {
