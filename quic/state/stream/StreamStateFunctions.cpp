@@ -109,4 +109,24 @@ bool isAllDataReceived(const QuicStreamState& stream) {
   }
   return receivedDataTillFin;
 }
+
+bool isAllDataReceivedUntil(const QuicStreamState& stream, uint64_t offset) {
+  if (stream.currentReadOffset > offset) {
+    // The application has already read all the data until offset.
+    return true;
+  }
+
+  if (!stream.readBuffer.empty() &&
+      stream.currentReadOffset == stream.readBuffer.front().offset &&
+      stream.readBuffer.front().offset +
+              stream.readBuffer.front().data.chainLength() >
+          offset) {
+    // The application hasn't read all of the data until offset, but the
+    // data that hasn't been read yet by the application has been
+    // buffered by the QUIC layer.
+    return true;
+  }
+
+  return false;
+}
 } // namespace quic

@@ -21,4 +21,9 @@ void resetQuicStream(
 void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame);
 
 bool isAllDataReceived(const QuicStreamState& stream);
+
+// Returns true if the QUIC layer has read all data up to and including the
+// given offset. This function can still return true even if the application has
+// not read all of it.
+bool isAllDataReceivedUntil(const QuicStreamState& stream, uint64_t offset);
 } // namespace quic

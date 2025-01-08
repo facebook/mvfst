@@ -387,4 +387,53 @@ TEST_F(StreamStateFunctionsTests, ResetAfterReadingAllBytesTillFin) {
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
   EXPECT_FALSE(conn.pendingEvents.connWindowUpdate);
 }
+
+// The application has already read all data until the specified
+// offset.
+TEST_F(StreamStateFunctionsTests, isAllDataReceivedUntil1) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.currentReadOffset = 1;
+  EXPECT_TRUE(isAllDataReceivedUntil(stream, 0));
+}
+
+// The application has not read all data until the specified
+// offset, and the data isn't available in the read buffer either.
+TEST_F(StreamStateFunctionsTests, isAllDataReceivedUntil2) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.currentReadOffset = 1;
+  stream.readBuffer.emplace_back(
+      StreamBuffer(folly::IOBuf::copyBuffer("1"), 1, false));
+  EXPECT_FALSE(isAllDataReceivedUntil(stream, 2));
+}
+
+// The application has not read all data until the specified
+// offset, but the data is available in the read buffer.
+TEST_F(StreamStateFunctionsTests, isAllDataReceivedUntil3) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.currentReadOffset = 1;
+  stream.readBuffer.emplace_back(
+      StreamBuffer(folly::IOBuf::copyBuffer("1"), 1, false));
+  EXPECT_TRUE(isAllDataReceivedUntil(stream, 1));
+}
+
+// There's a "hole" in the data received.
+TEST_F(StreamStateFunctionsTests, isAllDataReceivedUntil4) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.currentReadOffset = 1;
+  stream.readBuffer.emplace_back(
+      StreamBuffer(folly::IOBuf::copyBuffer("1"), 2, false));
+  EXPECT_FALSE(isAllDataReceivedUntil(stream, 2));
+}
 } // namespace quic::test
