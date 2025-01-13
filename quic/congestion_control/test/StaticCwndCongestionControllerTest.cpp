@@ -22,8 +22,9 @@ class StaticCwndCongestionControllerTest : public Test {};
 
 TEST_F(StaticCwndCongestionControllerTest, Basics) {
   const uint64_t cwndInBytes = 1000;
+  QuicConnectionStateBase conn(QuicNodeType::Client);
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
@@ -34,9 +35,10 @@ TEST_F(StaticCwndCongestionControllerTest, RemoveBytesFromInflight) {
   const auto pktSeqNum = 1;
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = 1;
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
   cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(cwndInBytes - bytesSent, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
@@ -51,9 +53,10 @@ TEST_F(StaticCwndCongestionControllerTest, RemoveBytesFromInflightFullCwnd) {
   const auto pktSeqNum = 1;
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = cwndInBytes; // full CWND
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
   cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
@@ -70,9 +73,10 @@ TEST_F(
   const auto pktSeqNum = 1;
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = cwndInBytes + 1000; // overshoot
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
@@ -88,9 +92,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAcked) {
   const auto pktSeqNum = 1;
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = 1;
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(cwndInBytes - bytesSent, cca.getWritableBytes());
@@ -108,9 +113,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAckedFullCwnd) {
   const auto pktSeqNum = 1;
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = cwndInBytes; // full CWND
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
@@ -128,9 +134,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAckedOvershoot) {
   const auto pktSeqNum = 1;
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = cwndInBytes + 1000; // overshoot
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
@@ -149,9 +156,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenAcked) {
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSentPkt1 = 1;
   const uint64_t bytesSentPkt2 = 1;
+  QuicConnectionStateBase conn(QuicNodeType::Client);
 
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   cca.onPacketSent(
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1));
@@ -185,8 +193,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenAckedOvershoot) {
   const uint64_t bytesSentPkt1 = 1;
   const uint64_t bytesSentPkt2 = cwndInBytes + 1;
 
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   cca.onPacketSent(
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1));
@@ -218,8 +228,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLost) {
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = 1;
 
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt = makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent);
   cca.onPacketSent(pkt);
@@ -239,8 +251,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostFullCwnd) {
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = cwndInBytes; // full CWND
 
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt = makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent);
   cca.onPacketSent(pkt);
@@ -260,8 +274,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostOvershoot) {
   const uint64_t cwndInBytes = 1000;
   const uint64_t bytesSent = cwndInBytes + 1000; // overshoot
 
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt = makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent);
   cca.onPacketSent(pkt);
@@ -282,8 +298,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLost) {
   const uint64_t bytesSentPkt1 = 1;
   const uint64_t bytesSentPkt2 = 1;
 
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt1 =
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1);
@@ -323,8 +341,10 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLostOvershoot) {
   const uint64_t bytesSentPkt1 = 1;
   const uint64_t bytesSentPkt2 = cwndInBytes + 1;
 
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+
   StaticCwndCongestionController cca(
-      (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
+      conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt1 =
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1);

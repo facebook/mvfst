@@ -10,8 +10,13 @@
 
 namespace quic {
 
-StaticCwndCongestionController::StaticCwndCongestionController(CwndInBytes cwnd)
-    : congestionWindowInBytes_(cwnd.bytes) {}
+StaticCwndCongestionController::StaticCwndCongestionController(
+    QuicConnectionStateBase& conn,
+    CwndInBytes cwnd,
+    PacerIntervalSource pacerIntervalSource)
+    : conn_(conn),
+      congestionWindowInBytes_(cwnd.bytes),
+      pacerIntervalSource_(pacerIntervalSource) {}
 
 void StaticCwndCongestionController::onRemoveBytesFromInflight(
     uint64_t bytesToRemove) {
@@ -29,6 +34,25 @@ void StaticCwndCongestionController::onPacketAckOrLoss(
     const LossEvent* FOLLY_NULLABLE lossEvent) {
   if (ackEvent) {
     subtractAndCheckUnderflow(inflightBytes_, ackEvent->ackedBytes);
+
+    if (conn_.pacer && ackEvent->rttSample) {
+      switch (pacerIntervalSource_) {
+        case PacerIntervalSource::MinRtt:
+          conn_.pacer->refreshPacingRate(
+              congestionWindowInBytes_, conn_.lossState.mrtt);
+          break;
+        case PacerIntervalSource::SmoothedRtt:
+          conn_.pacer->refreshPacingRate(
+              congestionWindowInBytes_, conn_.lossState.srtt);
+          break;
+        case PacerIntervalSource::LatestRtt:
+          conn_.pacer->refreshPacingRate(
+              congestionWindowInBytes_, conn_.lossState.lrtt);
+          break;
+        case PacerIntervalSource::NoPacing:
+          break;
+      }
+    }
   }
   if (lossEvent) {
     subtractAndCheckUnderflow(inflightBytes_, lossEvent->lostBytes);
@@ -42,7 +66,13 @@ uint64_t StaticCwndCongestionController::getWritableBytes() const noexcept {
 }
 
 uint64_t StaticCwndCongestionController::getCongestionWindow() const noexcept {
-  return congestionWindowInBytes_;
+  if (pacerIntervalSource_ == PacerIntervalSource::NoPacing) {
+    return congestionWindowInBytes_;
+  } else {
+    // Leave enough room for the pacer to send a burst.
+    return congestionWindowInBytes_ +
+        conn_.transportSettings.minBurstPackets * conn_.udpSendPacketLen;
+  }
 }
 
 CongestionControlType StaticCwndCongestionController::type() const noexcept {

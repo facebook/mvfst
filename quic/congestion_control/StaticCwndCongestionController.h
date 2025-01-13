@@ -9,6 +9,7 @@
 
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/state/AckEvent.h>
+#include <quic/state/StateData.h>
 #include <quic/state/TransportSettings.h>
 
 namespace quic {
@@ -31,7 +32,17 @@ struct StaticCwndCongestionController : public CongestionController {
     const uint64_t bytes;
   };
 
-  explicit StaticCwndCongestionController(CwndInBytes cwnd);
+  enum class PacerIntervalSource {
+    NoPacing,
+    MinRtt,
+    SmoothedRtt,
+    LatestRtt,
+  };
+
+  explicit StaticCwndCongestionController(
+      QuicConnectionStateBase& conn,
+      CwndInBytes cwnd,
+      PacerIntervalSource pacerIntervalSource = PacerIntervalSource::NoPacing);
 
   void onRemoveBytesFromInflight(uint64_t bytesToRemove) override;
 
@@ -60,9 +71,11 @@ struct StaticCwndCongestionController : public CongestionController {
   void getStats(CongestionControllerStats&) const override {}
 
  private:
+  QuicConnectionStateBase& conn_;
   uint64_t inflightBytes_{0}; // initially zero bytes inflight
   bool isAppLimited_{true}; // initially starts true
   const uint64_t congestionWindowInBytes_;
+  PacerIntervalSource pacerIntervalSource_;
 };
 
 } // namespace quic

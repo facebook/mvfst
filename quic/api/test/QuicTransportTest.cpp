@@ -1154,7 +1154,7 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
   // install StaticCwndCongestionController
   const auto cwndInBytes = 10000;
   conn.congestionController = std::make_unique<StaticCwndCongestionController>(
-      StaticCwndCongestionController::CwndInBytes(cwndInBytes));
+      conn, StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
   // update writeNum and upperBoundCurrentBytesWritable after each write/ACK
   uint64_t writeNum = 1;

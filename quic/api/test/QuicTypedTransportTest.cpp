@@ -747,6 +747,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
   const auto cwndInBytes = 7000;
   this->getNonConstConn().congestionController =
       std::make_unique<StaticCwndCongestionController>(
+          this->getNonConstConn(),
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
   // install PacketProcessor
@@ -2951,6 +2952,7 @@ TYPED_TEST(
   const auto cwndInBytes = 10000;
   this->getNonConstConn().congestionController =
       std::make_unique<StaticCwndCongestionController>(
+          this->getNonConstConn(),
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
   LegacyObserver::EventSet eventSet;
@@ -3398,6 +3400,7 @@ TYPED_TEST(
   const auto cwndInBytes = 800;
   this->getNonConstConn().congestionController =
       std::make_unique<StaticCwndCongestionController>(
+          this->getNonConstConn(),
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
   LegacyObserver::EventSet eventSet;
@@ -3543,6 +3546,7 @@ TYPED_TEST(
   const auto cwndInBytes = 7000;
   this->getNonConstConn().congestionController =
       std::make_unique<StaticCwndCongestionController>(
+          this->getNonConstConn(),
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
   LegacyObserver::EventSet eventSet;
