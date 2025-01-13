@@ -114,6 +114,13 @@ bool isAllDataReceivedUntil(const QuicStreamState& stream, uint64_t offset) {
     return true;
   }
 
+  // stream.currentReadOffset - 1 represents the offset that the application
+  // has read until. stream.readBuffer.front().offset represents the lowest
+  // offset of the data buffered by the QUIC layer. If
+  // stream.currentReadOffset < stream.readBuffer.front().offset, then that
+  // means that there is a "gap" in the data. i.e. the application hasn't read
+  // the data within the gap AND the QUIC layer doesn't have the gap data
+  // buffered either, so we should return false.
   if (!stream.readBuffer.empty() &&
       stream.currentReadOffset == stream.readBuffer.front().offset &&
       stream.readBuffer.front().offset +
