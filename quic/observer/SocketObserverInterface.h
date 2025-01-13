@@ -40,6 +40,7 @@ class SocketObserverInterface {
     acksProcessedEvents = 10,
     packetsReceivedEvents = 11,
     l4sWeightUpdatedEvents = 12,
+    pacingRateUpdatedEvents = 13,
   };
   virtual ~SocketObserverInterface() = default;
 
@@ -438,6 +439,15 @@ class SocketObserverInterface {
     uint32_t newCEEchoed;
   };
 
+  struct PacingRateUpdateEvent {
+    explicit PacingRateUpdateEvent(
+        uint64_t packetsPerInterval,
+        std::chrono::microseconds interval)
+        : packetsPerInterval(packetsPerInterval), interval(interval) {}
+    uint64_t packetsPerInterval;
+    std::chrono::microseconds interval;
+  };
+
   /**
    * Events.
    */
@@ -616,6 +626,17 @@ class SocketObserverInterface {
   virtual void l4sWeightUpdated(
       QuicSocketLite* /* socket */,
       const L4sWeightUpdateEvent& /* event */) noexcept {}
+
+  /**
+    pacingRateUpdated() is invoked when a pacer is enabled and its rate is
+    updated by the transport
+    @param socket   Socket associated with the event
+    @param event    Event with the number of packets and the interval over which
+                    to pace them
+   */
+  virtual void pacingRateUpdated(
+      QuicSocketLite* /* socket */,
+      const PacingRateUpdateEvent& /* event */) noexcept {}
 };
 
 } // namespace quic
