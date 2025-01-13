@@ -1312,9 +1312,6 @@ void QuicClientTransportLite::recvFrom(
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
     Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
-    struct iovec vec;
-    vec.iov_base = readBuffer->writableData();
-    vec.iov_len = readBufferSize;
 
     sockaddr* rawAddr{nullptr};
     struct sockaddr_storage addrStorage {};
