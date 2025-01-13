@@ -58,13 +58,12 @@ class BucketedPacingObserver : public QuicSocketLite::ManagedObserver {
           : 1.0;
 
       auto message = fmt::format(
-          "Pacing {} expected. Ratio={:.2f}",
+          "Pacing {} expected. Expected=({}) Actual=({}) Ratio={:.2f}",
           (actualSendRate > avgPacingRate ? "above" : "below"),
+          avgPacingRate.normalizedDescribe(),
+          actualSendRate.normalizedDescribe(),
           ratio);
-
-      if (ratio < 0.99 || ratio > 1.01) {
-        VLOG(2) << message;
-      }
+      VLOG(2) << message;
 
       if (logger) {
         logger->addPacingObservation(

@@ -422,8 +422,11 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
           qloggerPath_,
           true /* prettyJson*/,
           false /* streaming */);
-      setPacingObserver(qlogger, transport.get(), pacingObserver_);
       transport->setQLogger(std::move(qlogger));
+      setPacingObserver(qlogger, transport.get(), pacingObserver_);
+    } else {
+      std::shared_ptr<FileQLogger> qlogger = nullptr;
+      setPacingObserver(qlogger, transport.get(), pacingObserver_);
     }
     serverHandler->setQuicSocket(transport);
     handlers_.push_back(std::move(serverHandler));
