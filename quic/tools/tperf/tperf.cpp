@@ -95,6 +95,15 @@ DEFINE_uint32(
     burst_deadline_ms,
     0,
     "If > 0, server will send bursts of data of size=block_size with a deadline of burst_deadline_ms milliseconds");
+DEFINE_uint64(
+    static_cwnd_bytes,
+    quic::kInitCwndInMss* quic::kDefaultUDPSendPacketLen,
+    "If the StaticCwnd congestion controller is used, this is the static cwnd in bytes");
+DEFINE_string(
+    pacer_interval_source,
+    "none",
+    "If the StaticCwnd congestion controller is used with a pacer, this is the rtt that will be used to updated the pacer. (mrtt, lrtt, srtt, none)");
+DEFINE_bool(experimental_pacer, false, "Whether to use the experimental pacer");
 
 namespace quic::tperf {
 
@@ -133,6 +142,7 @@ int main(int argc, char* argv[]) {
         FLAGS_gso,
         FLAGS_max_cwnd_mss,
         FLAGS_pacing,
+        FLAGS_experimental_pacer,
         FLAGS_num_streams,
         FLAGS_bytes_per_stream,
         FLAGS_max_receive_packet_size,
@@ -152,7 +162,10 @@ int main(int argc, char* argv[]) {
         FLAGS_log_loss,
         FLAGS_log_rtt_sample,
         FLAGS_server_qlogger_path,
-        FLAGS_pacing_observer);
+        FLAGS_pacing_observer,
+        nullptr, // DoneCallback
+        TPerfServer::StaticCwndConfig(
+            FLAGS_static_cwnd_bytes, FLAGS_pacer_interval_source));
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_num_streams != 1) {

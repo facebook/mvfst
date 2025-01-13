@@ -111,6 +111,20 @@ class TPerfServer {
     virtual void onDone(const std::string& msg) = 0;
   };
 
+  // Configuration for the StaticCwndCongestionController if it's the chosed
+  // CongestionController type.
+  struct StaticCwndConfig {
+    StaticCwndConfig(
+        uint64_t staticCwndInBytes = quic::kInitCwndInMss *
+            quic::kDefaultUDPSendPacketLen,
+        const std::string& pacerIntervalSource = "mrtt")
+        : staticCwndInBytes(staticCwndInBytes),
+          pacerIntervalSource(pacerIntervalSource) {}
+
+    uint64_t staticCwndInBytes;
+    const std::string& pacerIntervalSource;
+  };
+
   explicit TPerfServer(
       const std::string& host,
       uint16_t port,
@@ -120,6 +134,7 @@ class TPerfServer {
       bool gso,
       uint32_t maxCwndInMss,
       bool pacing,
+      bool experimentalPacer,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
       uint32_t maxReceivePacketSize,
@@ -140,7 +155,8 @@ class TPerfServer {
       bool logRttSample,
       std::string qloggerPath,
       const std::string& pacingObserver,
-      DoneCallback* doneCallback = nullptr);
+      DoneCallback* doneCallback = nullptr,
+      StaticCwndConfig staticCwndConfig = StaticCwndConfig());
 
   void start();
 

@@ -8,6 +8,7 @@
 #include <fizz/crypto/Utils.h>
 #include <folly/stats/Histogram.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfDSRSender.h>
@@ -371,6 +372,49 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   TPerfServer::DoneCallback* doneCallback_{nullptr};
 };
 
+// A factory that creates StaticCwnd congestion controllers with a preset
+// config for cwnd value and the rtt source for updating the pacing rate
+class TperfStaticCwndCongestionControllerFactory
+    : public CongestionControllerFactory {
+ public:
+  ~TperfStaticCwndCongestionControllerFactory() override = default;
+  explicit TperfStaticCwndCongestionControllerFactory(
+      uint64_t cwndInBytes,
+      const std::string& pacerIntervalSource)
+      : cwndInBytes_(cwndInBytes) {
+    if (pacerIntervalSource == "mrtt") {
+      pacerIntervalSource_ =
+          StaticCwndCongestionController::PacerIntervalSource::MinRtt;
+    } else if (pacerIntervalSource == "srtt") {
+      pacerIntervalSource_ =
+          StaticCwndCongestionController::PacerIntervalSource::SmoothedRtt;
+    } else if (pacerIntervalSource == "lrtt") {
+      pacerIntervalSource_ =
+          StaticCwndCongestionController::PacerIntervalSource::LatestRtt;
+    } else if (pacerIntervalSource != "none") {
+      throw std::runtime_error(fmt::format(
+          "Invalid pacer interval source: {}. Valid values are mrtt, srtt, lrtt, none for min rtt, smoothed rtt, latest rtt, and no pacing respectively.",
+          pacerIntervalSource));
+    }
+  }
+
+  std::unique_ptr<CongestionController> makeCongestionController(
+      QuicConnectionStateBase& conn,
+      CongestionControlType type) override {
+    if (type != CongestionControlType::StaticCwnd) {
+      throw std::runtime_error(fmt::format(
+          "TperfStaticCwndCongestionControllerFactory cannot construct a congestion controller of type {}",
+          congestionControlTypeToString(type)));
+    }
+    return std::make_unique<StaticCwndCongestionController>(
+        conn, cwndInBytes_, pacerIntervalSource_);
+  }
+
+ private:
+  StaticCwndCongestionController::CwndInBytes cwndInBytes_;
+  StaticCwndCongestionController::PacerIntervalSource pacerIntervalSource_;
+};
+
 class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
  public:
   ~TPerfServerTransportFactory() override = default;
@@ -440,7 +484,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       const std::string& pacingObserverType) {
     if (pacingObserverType == "time") {
       transport->addObserver(
-          std::make_shared<FixedBucketPacingObserver>(qlogger, 3ms));
+          std::make_shared<FixedBucketPacingObserver>(qlogger, 300ms));
     } else if (pacingObserverType == "rtt") {
       transport->addObserver(std::make_shared<RttBucketPacingObserver>(
           qlogger, *transport->getState()));
@@ -471,6 +515,7 @@ TPerfServer::TPerfServer(
     bool gso,
     uint32_t maxCwndInMss,
     bool pacing,
+    bool experimentalPacer,
     uint32_t numStreams,
     uint64_t maxBytesPerStream,
     uint32_t maxReceivePacketSize,
@@ -491,7 +536,8 @@ TPerfServer::TPerfServer(
     bool logRttSample,
     std::string qloggerPath,
     const std::string& pacingObserver,
-    DoneCallback* doneCallback)
+    DoneCallback* doneCallback,
+    StaticCwndConfig staticCwndConfig)
     : host_(host),
       port_(port),
       acceptObserver_(std::make_unique<TPerfAcceptObserver>(
@@ -523,6 +569,8 @@ TPerfServer::TPerfServer(
     settings.pacingTickInterval = 200us;
     settings.writeLimitRttFraction = 0;
   }
+  settings.experimentalPacer = experimentalPacer;
+
   if (gso) {
     settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
     settings.maxBatchSize = writesPerLoop;
@@ -564,8 +612,15 @@ TPerfServer::TPerfServer(
   serverCtx->setClock(std::make_shared<fizz::SystemClock>());
   server_->setFizzContext(serverCtx);
 
-  server_->setCongestionControllerFactory(
-      std::make_shared<ServerCongestionControllerFactory>());
+  if (congestionControlType == quic::CongestionControlType::StaticCwnd) {
+    server_->setCongestionControllerFactory(
+        std::make_shared<TperfStaticCwndCongestionControllerFactory>(
+            staticCwndConfig.staticCwndInBytes,
+            staticCwndConfig.pacerIntervalSource));
+  } else {
+    server_->setCongestionControllerFactory(
+        std::make_shared<ServerCongestionControllerFactory>());
+  }
 }
 
 void TPerfServer::start() {
