@@ -13,7 +13,6 @@ add_executable(
   TperfDSRSender.cpp
   TperfClient.cpp
   TperfServer.cpp
-  TperfQLogger.cpp
 )
 
 target_compile_options(

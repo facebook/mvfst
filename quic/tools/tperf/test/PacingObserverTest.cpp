@@ -27,9 +27,17 @@ class QLogPacingObserverTest : public Test {
 };
 
 TEST_F(QLogPacingObserverTest, Basic) {
-  QLogPacingObserver pacingObserver(qlogger_);
+  PerUpdatePacingObserver pacingObserver(qlogger_);
   for (size_t i = 0; i < 20; i++) {
-    pacingObserver.onPacketSent();
+    auto event =
+        quic::SocketObserverInterface::PacketsWrittenEvent::Builder()
+            .setOutstandingPackets(std::deque<OutstandingPacketWrapper>())
+            .setWriteCount(i + 1)
+            .setNumAckElicitingPacketsWritten(i + 1)
+            .setNumBytesWritten(1024)
+            .setNumPacketsWritten(1)
+            .build();
+    pacingObserver.packetsWritten(nullptr /*socket*/, event);
   }
   EXPECT_CALL(*mockQLogger_, addPacingObservation(_, _, _))
       .Times(1)
@@ -42,7 +50,8 @@ TEST_F(QLogPacingObserverTest, Basic) {
             expect);
         EXPECT_NE(std::string::npos, conclusion.find("Pacing above expect"));
       }));
-  pacingObserver.onNewPacingRate(10, 10s);
+  pacingObserver.pacingRateUpdated(
+      nullptr, quic::SocketObserverInterface::PacingRateUpdateEvent(10, 10s));
 
   EXPECT_CALL(*mockQLogger_, addPacingObservation(_, _, _))
       .Times(1)
@@ -55,7 +64,8 @@ TEST_F(QLogPacingObserverTest, Basic) {
             expect);
         EXPECT_NE(std::string::npos, conclusion.find("Pacing below expect"));
       }));
-  pacingObserver.onNewPacingRate(20, 10s);
+  pacingObserver.pacingRateUpdated(
+      nullptr, quic::SocketObserverInterface::PacingRateUpdateEvent(20, 10s));
 }
 
 class RttBucketTest : public Test {

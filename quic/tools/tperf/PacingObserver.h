@@ -8,34 +8,40 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
+#include <quic/api/QuicSocket.h>
 #include <quic/congestion_control/Bandwidth.h>
-#include <quic/logging/QLogger.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
 
 template <typename BucketEndPredicate>
-class BucketedQLogPacingObserver : public PacingObserver {
+class BucketedPacingObserver : public QuicSocketLite::ManagedObserver {
  public:
-  explicit BucketedQLogPacingObserver(
+  explicit BucketedPacingObserver(
       const std::shared_ptr<QLogger>& logger,
       BucketEndPredicate predicate)
       : logger_(logger),
         bucketEndPredicate_(std::move(predicate)),
         lastSampledTime_(Clock::now()) {}
 
-  explicit BucketedQLogPacingObserver(const std::shared_ptr<QLogger>& logger)
+  explicit BucketedPacingObserver(const std::shared_ptr<QLogger>& logger)
       : logger_(logger), lastSampledTime_(Clock::now()) {}
 
   template <typename... Args>
-  explicit BucketedQLogPacingObserver(
+  explicit BucketedPacingObserver(
       const std::shared_ptr<QLogger>& logger,
       Args&&... args)
-      : logger_(logger), bucketEndPredicate_(std::forward<Args>(args)...) {}
+      : QuicSocketLite::ManagedObserver(
+            EventSetBuilder()
+                .enable(Events::packetsWrittenEvents)
+                .enable(Events::pacingRateUpdatedEvents)
+                .build()),
+        logger_(logger),
+        bucketEndPredicate_(std::forward<Args>(args)...) {}
 
-  void onNewPacingRate(
-      uint64_t packetsPerInterval,
-      std::chrono::microseconds interval) override {
+  void pacingRateUpdated(
+      QuicSocketLite* /* socket */,
+      const PacingRateUpdateEvent& event) noexcept override {
     if (bucketEndPredicate_()) {
       auto avgPacingRate = runningExpectedPacingRateCount_
           ? (runningExpectedPacingRateSum_ / runningExpectedPacingRateCount_)
@@ -46,18 +52,25 @@ class BucketedQLogPacingObserver : public PacingObserver {
               Clock::now() - lastSampledTime_),
           Bandwidth::UnitType::PACKETS);
       auto logger = logger_.lock();
+
+      double ratio = avgPacingRate
+          ? ((double)actualSendRate.normalize() / avgPacingRate.normalize())
+          : 1.0;
+
+      auto message = fmt::format(
+          "Pacing {} expected. Ratio={:.2f}",
+          (actualSendRate > avgPacingRate ? "above" : "below"),
+          ratio);
+
+      if (ratio < 0.99 || ratio > 1.01) {
+        VLOG(2) << message;
+      }
+
       if (logger) {
-        double ratio = avgPacingRate
-            ? ((double)actualSendRate.normalize() / avgPacingRate.normalize())
-            : 1.0;
         logger->addPacingObservation(
             actualSendRate.normalizedDescribe(),
             avgPacingRate.normalizedDescribe(),
-            folly::to<std::string>(
-                (actualSendRate > avgPacingRate ? "Pacing above expect"
-                                                : "Pacing below expect"),
-                "ratio=",
-                ratio));
+            message);
       }
       packetsSentSinceLastUpdate_ = 0;
       lastSampledTime_ = Clock::now();
@@ -66,13 +79,15 @@ class BucketedQLogPacingObserver : public PacingObserver {
           Bandwidth(0, 0us, Bandwidth::UnitType::PACKETS);
     }
     Bandwidth expectedPacingRate(
-        packetsPerInterval, interval, Bandwidth::UnitType::PACKETS);
+        event.packetsPerInterval, event.interval, Bandwidth::UnitType::PACKETS);
     runningExpectedPacingRateSum_ += expectedPacingRate;
     ++runningExpectedPacingRateCount_;
   }
 
-  void onPacketSent() override {
-    ++packetsSentSinceLastUpdate_;
+  void packetsWritten(
+      QuicSocketLite* /* socket */,
+      const PacketsWrittenEvent& event) override {
+    packetsSentSinceLastUpdate_ += event.numPacketsWritten;
   }
 
  private:
@@ -135,10 +150,9 @@ using RealClockRttBucket = RttBucket<Clock>;
 using RealClockFixedTimeBucket = FixedTimeBucket<Clock>;
 } // namespace
 
-using QLogPacingObserver = BucketedQLogPacingObserver<PerUpdateBucket>;
-using RttBucketQLogPacingObserver =
-    BucketedQLogPacingObserver<RealClockRttBucket>;
-using FixedBucketQLogPacingObserver =
-    BucketedQLogPacingObserver<RealClockFixedTimeBucket>;
+using PerUpdatePacingObserver = BucketedPacingObserver<PerUpdateBucket>;
+using RttBucketPacingObserver = BucketedPacingObserver<RealClockRttBucket>;
+using FixedBucketPacingObserver =
+    BucketedPacingObserver<RealClockFixedTimeBucket>;
 
 } // namespace quic

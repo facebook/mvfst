@@ -9,6 +9,7 @@
 
 #include <string>
 
+#include <quic/logging/FileQLogger.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/QuicServer.h>

@@ -8,8 +8,8 @@
 #include <fizz/crypto/Utils.h>
 #include <folly/stats/Histogram.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfDSRSender.h>
-#include <quic/tools/tperf/TperfQLogger.h>
 #include <quic/tools/tperf/TperfServer.h>
 
 namespace quic::tperf {
@@ -415,8 +415,12 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), serverHandler.get(), serverHandler.get(), ctx);
     if (!qloggerPath_.empty()) {
-      auto qlogger =
-          std::make_shared<TperfQLogger>(VantagePoint::Server, qloggerPath_);
+      auto qlogger = std::make_shared<FileQLogger>(
+          VantagePoint::Server,
+          kHTTP3ProtocolType,
+          qloggerPath_,
+          true /* prettyJson*/,
+          false /* streaming */);
       setPacingObserver(qlogger, transport.get(), pacingObserver_);
       transport->setQLogger(std::move(qlogger));
     }
@@ -427,17 +431,18 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
 
  private:
   void setPacingObserver(
-      std::shared_ptr<TperfQLogger>& qlogger,
+      std::shared_ptr<FileQLogger>& qlogger,
       quic::QuicServerTransport* transport,
       const std::string& pacingObserverType) {
     if (pacingObserverType == "time") {
-      qlogger->setPacingObserver(
-          std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 3ms));
+      transport->addObserver(
+          std::make_shared<FixedBucketPacingObserver>(qlogger, 3ms));
     } else if (pacingObserverType == "rtt") {
-      qlogger->setPacingObserver(std::make_unique<RttBucketQLogPacingObserver>(
+      transport->addObserver(std::make_shared<RttBucketPacingObserver>(
           qlogger, *transport->getState()));
     } else if (pacingObserverType == "ack") {
-      qlogger->setPacingObserver(std::make_unique<QLogPacingObserver>(qlogger));
+      transport->addObserver(
+          std::make_shared<PerUpdatePacingObserver>(qlogger));
     }
   }
 

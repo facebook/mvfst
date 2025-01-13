@@ -13,15 +13,6 @@
 
 namespace quic {
 
-struct PacingObserver {
-  PacingObserver() = default;
-  virtual ~PacingObserver() = default;
-  virtual void onNewPacingRate(
-      uint64_t packetsPerInterval,
-      std::chrono::microseconds interval) = 0;
-  virtual void onPacketSent() = 0;
-};
-
 class QLogger {
  public:
   explicit QLogger(VantagePoint vantagePointIn, std::string protocolTypeIn)
