@@ -8,6 +8,7 @@
 #include <fizz/crypto/Utils.h>
 #include <folly/stats/Histogram.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/logging/FileQLogger.h>
 #include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfDSRSender.h>
 #include <quic/tools/tperf/TperfServer.h>

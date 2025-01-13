@@ -49,6 +49,11 @@ class TokenlessPacer : public Pacer {
   void setExperimental(bool experimental) override;
 
  private:
+  static void maybeNotifyObservers(
+      const QuicConnectionStateBase& conn,
+      uint64_t batchSize,
+      std::chrono::microseconds writeInterval);
+
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
   uint64_t batchSize_;

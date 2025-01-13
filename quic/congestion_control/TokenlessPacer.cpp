@@ -42,6 +42,7 @@ void TokenlessPacer::refreshPacingRate(
     writeInterval_ = pacingRate.interval;
     batchSize_ = pacingRate.burstSize;
   }
+  maybeNotifyObservers(conn_, batchSize_, writeInterval_);
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
   }
@@ -68,9 +69,12 @@ void TokenlessPacer::setPacingRate(uint64_t rateBps) {
         conn_.transportSettings.pacingTickInterval);
   }
 
+  maybeNotifyObservers(conn_, batchSize_, writeInterval_);
+
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
   }
+
   if (!experimental_) {
     lastWriteTime_.reset();
   }
@@ -80,7 +84,8 @@ void TokenlessPacer::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
   maxPacingRateBytesPerSec_ = maxRateBytesPerSec;
   // Current rate in bytes per sec =
   //         batchSize * packetLen * (1 second / writeInterval)
-  // if writeInterval = 0, current rate is std::numeric_limits<uint64_t>::max()
+  // if writeInterval = 0, current rate is
+  // std::numeric_limits<uint64_t>::max()
   uint64_t currentRateBytesPerSec = (writeInterval_ == 0us)
       ? std::numeric_limits<uint64_t>::max()
       : (batchSize_ * conn_.udpSendPacketLen * std::chrono::seconds(1)) /
@@ -92,7 +97,8 @@ void TokenlessPacer::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
 }
 
 void TokenlessPacer::reset() {
-  // We call this after idle, so we actually want to start writing immediately.
+  // We call this after idle, so we actually want to start writing
+  // immediately.
   lastWriteTime_.reset();
 }
 
@@ -164,5 +170,24 @@ void TokenlessPacer::setPacingRateCalculator(
 
 void TokenlessPacer::setExperimental(bool experimental) {
   experimental_ = experimental;
+}
+
+// Static
+void TokenlessPacer::maybeNotifyObservers(
+    const QuicConnectionStateBase& conn,
+    uint64_t batchSize,
+    std::chrono::microseconds writeInterval) {
+  // Inform observers
+  auto observerContainer = conn.getSocketObserverContainer();
+  if (observerContainer &&
+      observerContainer->hasObserversForEvent<
+          SocketObserverInterface::Events::pacingRateUpdatedEvents>()) {
+    observerContainer->invokeInterfaceMethod<
+        SocketObserverInterface::Events::pacingRateUpdatedEvents>(
+        [event = quic::SocketObserverInterface::PacingRateUpdateEvent(
+             batchSize, writeInterval)](auto observer, auto observed) {
+          observer->pacingRateUpdated(observed, event);
+        });
+  }
 }
 } // namespace quic
