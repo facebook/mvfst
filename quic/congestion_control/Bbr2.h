@@ -203,7 +203,7 @@ class Bbr2CongestionController : public CongestionController {
   TimePoint probeBWCycleStart_;
   uint64_t roundsSinceBwProbe_;
   std::chrono::milliseconds bwProbeWait_;
-  bool bwProbeShouldHandleLoss_{false};
+  bool canUpdateLongtermLossModel_{false};
   uint64_t probeUpRounds_{0};
   uint64_t probeUpAcks_{0};
 };

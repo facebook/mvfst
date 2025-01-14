@@ -40,10 +40,7 @@ constexpr float kBeta = 0.7;
 constexpr float kLossThreshold = 0.02;
 constexpr float kHeadroomFactor = 0.15;
 
-// The experimental pacer currently achieves ~99% of the target rate
-// we should not reduce the target by adding an extra margin.
-// TODO: add the margin back if the pacer performance improves further.
-constexpr uint8_t kPacingMarginPercent = 0;
+constexpr uint8_t kPacingMarginPercent = 1;
 
 Bbr2CongestionController::Bbr2CongestionController(
     QuicConnectionStateBase& conn)
@@ -551,12 +548,13 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
       /* After one round of REFILL, start UP */
       if (roundStart_) {
         // Enable one reaction to loss per probe bw cycle.
-        bwProbeShouldHandleLoss_ = true;
+        canUpdateLongtermLossModel_ = true;
         startProbeBwUp();
       }
       break;
     case State::ProbeBw_Up:
       if (checkTimeToGoDown()) {
+        canUpdateLongtermLossModel_ = false;
         startProbeBwDown();
       }
       break;
@@ -631,7 +629,7 @@ bool Bbr2CongestionController::checkInflightTooHigh(
     uint64_t inflightBytesAtLargestAckedPacket,
     uint64_t lostBytes) {
   if (isInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
-    if (bwProbeShouldHandleLoss_) {
+    if (canUpdateLongtermLossModel_) {
       handleInFlightTooHigh(inflightBytesAtLargestAckedPacket);
     }
     return true;
@@ -649,7 +647,7 @@ bool Bbr2CongestionController::isInflightTooHigh(
 
 void Bbr2CongestionController::handleInFlightTooHigh(
     uint64_t inflightBytesAtLargestAckedPacket) {
-  bwProbeShouldHandleLoss_ = false;
+  canUpdateLongtermLossModel_ = false;
   // TODO: Should this be the app limited state of the largest acknowledged
   // packet?
   if (!isAppLimited()) {
@@ -736,6 +734,7 @@ void Bbr2CongestionController::checkProbeRtt(uint64_t ackedBytes) {
 
 void Bbr2CongestionController::enterProbeRtt() {
   state_ = State::ProbeRTT;
+  canUpdateLongtermLossModel_ = false;
   updatePacingAndCwndGain();
 }
 
