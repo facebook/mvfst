@@ -115,7 +115,7 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.enableRenoCoexistence, false);
   EXPECT_EQ(config.overrideCruisePacingGain, -1.0f);
   EXPECT_EQ(config.overrideCruiseCwndGain, -1.0f);
-  EXPECT_EQ(config.overrideStartupPacingGain, 4.33f);
+  EXPECT_EQ(config.overrideStartupPacingGain, -1.0f);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(

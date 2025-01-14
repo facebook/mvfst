@@ -97,7 +97,7 @@ struct CongestionControlConfig {
   // Used by: BBR2
   // Use a different pacing gain during Startup.
   // If value < 0, use the default pacing gain.
-  float overrideStartupPacingGain{4.33f};
+  float overrideStartupPacingGain{-1.0};
 
   // Used by: Cubic
   // The target fraction of packets to be marked with CE per-RTT when l4s is
