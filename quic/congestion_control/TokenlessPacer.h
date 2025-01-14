@@ -64,6 +64,8 @@ class TokenlessPacer : public Pacer {
   uint8_t rttFactorNumerator_{1};
   uint8_t rttFactorDenominator_{1};
   bool experimental_{false};
+  // This is not a raw delay value. It's scaled by the batchSize
+  std::chrono::microseconds pendingDelayAdjustment_{0us};
 
   // Experimental
   // Maximum factor the batchSize can be multiplied by to account for pacer

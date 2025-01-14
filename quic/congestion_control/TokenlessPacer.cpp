@@ -142,14 +142,56 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
       QUIC_STATS(conn_.statsCallback, onPacerTimerLagged);
     }
     if (experimental_) {
+      // Experimental logic:
+      // 1. If the timer is delayed, we attempt to scale up the burstSize to
+      //    compensate for the delay.
+      // 2. When the delay compensation results in a fractional number of
+      //    packets, we round up to the nearest packet, and keep track of the
+      //    difference to try and accommodate for it if the timer is delayed in
+      //    the next write as well.
+      // 3. The maximum factor we can use for scaling up the burst is
+      //    maxBurstIntervals.
+      // 4. If the write happens earlier than expected (for example due to a
+      //    network read), we do not scale the burst size down. It's better to
+      //    err on being a bit more aggressive than missing potential
+      //    opportunities to send packets.
+
       if (timeSinceLastWrite / writeInterval_ >= maxBurstIntervals) {
+        // The delay is too long. Just use the maximum burst factor allowed.
         sendBatch = batchSize_ * maxBurstIntervals;
+        // Reset any record of pending delay for packets we already sent and are
+        // trying to scale down for.
+        pendingDelayAdjustment_ = 0us;
+      } else if (timeSinceLastWrite > writeInterval_) {
+        // Adjust batch size to compensate for a delayed write, taking the
+        // any pending delay adjustment into consideration.
+        // Keep track of any delay adjustment carried over
+
+        auto targetPackets = batchSize_ * timeSinceLastWrite;
+
+        // Subtract pendingDelayAdjustment_ from targetPackets but avoid an
+        // underflow
+        if (targetPackets >= pendingDelayAdjustment_) {
+          targetPackets -= pendingDelayAdjustment_;
+          pendingDelayAdjustment_ = 0us;
+        } else if (targetPackets < pendingDelayAdjustment_) {
+          // If the pending delay adjustment is more than the target packets, it
+          // means the sending rate has changed significantly. We should drop
+          // the adjustment and start a new burst.
+          pendingDelayAdjustment_ = 0us;
+        }
+
+        sendBatch = targetPackets / writeInterval_;
+        pendingDelayAdjustment_ = targetPackets % writeInterval_;
+        if (pendingDelayAdjustment_ > 0us) {
+          sendBatch += 1;
+          pendingDelayAdjustment_ = writeInterval_ - pendingDelayAdjustment_;
+        }
       } else {
-        // Scale the batch size and round it to the closest integer
-        auto numerator = batchSize_ * timeSinceLastWrite;
-        auto& denominator = writeInterval_;
-        sendBatch = numerator / denominator +
-            (numerator % denominator >= denominator / 2 ? 1 : 0);
+        // The write function happened at exactly the time we expected.
+        // Reset any record of pending delay for packets we already sent and are
+        // trying to scale down for.
+        pendingDelayAdjustment_ = 0us;
       }
     }
   }

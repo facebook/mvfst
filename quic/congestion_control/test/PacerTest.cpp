@@ -85,6 +85,146 @@ TEST_F(TokenlessPacerTest, CompensateTimerDriftForExperimental) {
   EXPECT_EQ(50, pacer.updateAndGetWriteBatchSize(currentTime + 9000us));
 }
 
+TEST_F(TokenlessPacerTest, CompensatePartialTimerDriftForExperimental) {
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, isAppLimited())
+      .WillRepeatedly(Return(false));
+
+  auto mockStats = std::make_shared<MockQuicStats>();
+  conn.statsCallback = mockStats.get();
+
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+
+  pacer.setExperimental(true);
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(20, 100us); // These two values do not matter here
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+
+  // 1.05 intervals later, the pacer should round up to send 11 packets but keep
+  // track of delay adjustment for the extra half packet; 11 instead of 10.5
+  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 2050us));
+
+  // Another 1.05 intervals later, the pacer should send 10 packets to account
+  // for the pending delay adjustment. The pending delay is now zero.
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 3100us));
+
+  // Another 1.05 intervals later, the pacer will round up to 11 packets again
+  // since there is no pending delay adjustment.
+  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 4150us));
+}
+
+TEST_F(TokenlessPacerTest, PendingCompensationDelayResetForExperimental) {
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, isAppLimited())
+      .WillRepeatedly(Return(false));
+
+  auto mockStats = std::make_shared<MockQuicStats>();
+  conn.statsCallback = mockStats.get();
+
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+
+  pacer.setExperimental(true);
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(20, 100us); // These two values do not matter here
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+
+  // 1.05 intervals later, the pacer should round up to send 11 packets but keep
+  // track of delay adjustment for the extra half packet; 11 instead of 10.5
+  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 2050us));
+
+  // 0.5 interval later, the pacer should sent a full burst and reset the
+  // pending delay adjustment.
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 2550us));
+
+  // Another 1.05 intervals later, the pacer will round up to 11 packets again
+  // since there is no pending delay adjustment.
+  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 3600us));
+}
+
+TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDown) {
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, isAppLimited())
+      .WillRepeatedly(Return(false));
+
+  auto mockStats = std::make_shared<MockQuicStats>();
+  conn.statsCallback = mockStats.get();
+
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+
+  pacer.setExperimental(true);
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(20, 100us); // These two values do not matter here
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+
+  // 0.5 intervals later should return the full batchSize.
+  // Reads earlier than the pacing rate interval are not triggered by the timer
+  // and should be allowed to use the full batchSize.
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1500us));
+}
+
+TEST_F(TokenlessPacerTest, ExperimentalDelayCompensationDoesNotUnderflow) {
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, isAppLimited())
+      .WillRepeatedly(Return(false));
+
+  auto mockStats = std::make_shared<MockQuicStats>();
+  conn.statsCallback = mockStats.get();
+
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t packets, // This is bytes in the
+                                                     // actual implementation
+                                   uint64_t,
+                                   std::chrono::microseconds interval) {
+    return PacingRate::Builder()
+        .setInterval(interval)
+        .setBurstSize(packets)
+        .build();
+  });
+
+  pacer.setExperimental(true);
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(10, 10000us); // burstSize = 10, interval = 10000us
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 10000us));
+
+  // 1.005 intervals later, the pacer should round up to send 11 packets but
+  // keep track of delay adjustment for the extra 0.95 packet; 11 instead
+  // of 10.05
+  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 20050us));
+
+  pacer.refreshPacingRate(2, 100us); // burstSize = 2, interval = 100us
+  // The pending delay adjustment is 0.95 packets * 10000us (the old interval),
+  // which is more than the new burstSize * interval. The pacer should not
+  // underflow. The pending delay adjustment should be cleared only the new
+  // pacer rate should be considered.
+
+  // 1.5 intervals later, the pacer should send 3 packets to account for the
+  // delay according to the new rate. The pending delay should be cleared.
+  EXPECT_EQ(3, pacer.updateAndGetWriteBatchSize(currentTime + 20200us));
+}
+
 TEST_F(TokenlessPacerTest, NextWriteTime) {
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
 
