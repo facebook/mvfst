@@ -70,18 +70,22 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
     throw QuicTransportException(
         "Reset in middle of stream", TransportErrorCode::FINAL_SIZE_ERROR);
   }
-  // Verify that the flow control is consistent.
-  updateFlowControlOnStreamData(
-      stream, stream.maxOffsetObserved, frame.finalSize);
   // Drop non-reliable data:
   stream.removeFromReadBufferStartingAtOffset(*stream.reliableSizeFromPeer);
   stream.finalReadOffset = frame.finalSize;
   stream.streamReadError = frame.errorCode;
+  // If the currentReadOffset > finalReadOffset we have already processed
+  // all the bytes until FIN, so we don't need to do anything for the read
+  // side of the flow controller.
   bool appReadAllBytes = stream.currentReadOffset > *stream.finalReadOffset;
-  if (!appReadAllBytes) {
-    // If the currentReadOffset > finalReadOffset we have already processed
-    // all the bytes until FIN, so we don't need to do anything for the read
-    // side of the flow controller.
+  // We don't grant flow control until we've received all reliable bytes,
+  // because we could still buffer additional data in the QUIC layer.
+  bool allReliableBytesReceived = !frame.reliableSize ||
+      *frame.reliableSize == 0 ||
+      isAllDataReceivedUntil(stream, *frame.reliableSize - 1);
+  if (!appReadAllBytes && allReliableBytesReceived) {
+    updateFlowControlOnStreamData(
+        stream, stream.maxOffsetObserved, frame.finalSize);
     stream.maxOffsetObserved = frame.finalSize;
     updateFlowControlOnReceiveReset(stream, Clock::now());
   }

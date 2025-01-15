@@ -801,6 +801,58 @@ TEST_F(QuicRecvResetTest, FromClosedOffsetMismatch) {
       QuicTransportException);
 }
 
+class QuicReliableResetTransitionTest : public Test {};
+
+TEST_F(QuicReliableResetTransitionTest, FromOpenReliableDataNotYetReceived) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100, 10);
+  stream.currentReadOffset = 9;
+  receiveRstStreamSMHandler(stream, rst);
+
+  EXPECT_EQ(stream.sendState, StreamSendState::Open);
+  EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+}
+
+TEST_F(QuicReliableResetTransitionTest, FromOpenReliableDataReceived) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100, 10);
+  stream.currentReadOffset = 10;
+  receiveRstStreamSMHandler(stream, rst);
+
+  EXPECT_EQ(stream.sendState, StreamSendState::Open);
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+}
+
+TEST_F(QuicReliableResetTransitionTest, DataReceivedTillReliableSize) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.reliableSizeFromPeer = 10;
+  stream.currentReadOffset = 1;
+  receiveReadStreamFrameSMHandler(
+      stream,
+      ReadStreamFrame(id, 1, folly::IOBuf::copyBuffer("999999999"), false));
+  EXPECT_EQ(stream.sendState, StreamSendState::Open);
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+}
+
+TEST_F(QuicReliableResetTransitionTest, DataNotReceivedTillReliableSize) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.reliableSizeFromPeer = 10;
+  stream.currentReadOffset = 1;
+  receiveReadStreamFrameSMHandler(
+      stream,
+      ReadStreamFrame(id, 1, folly::IOBuf::copyBuffer("99999999"), false));
+  EXPECT_EQ(stream.sendState, StreamSendState::Open);
+  EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+}
+
 class QuicUnidirectionalStreamTest : public Test {};
 
 TEST_F(QuicUnidirectionalStreamTest, OpenInvalidReadStream) {

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamStateFunctions.h>
 
@@ -26,8 +27,9 @@ namespace quic {
  *      v
  * Receive::Open  -----------+
  *      |                    |
- *      | Receive all        | Receive RST
- *      | bytes til FIN      |
+ *      | Receive all        | Receive RST, and
+ *      | bytes till FIN     | all reliable bytes
+ *      | or reliable size   | have been received
  *      v                    |
  * Receive::Closed <---------+
  *
@@ -42,7 +44,10 @@ void receiveReadStreamFrameSMHandler(
                              << " stream=" << stream.id << " " << stream.conn;
       appendDataToReadBuffer(
           stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
-      if (isAllDataReceived(stream)) {
+      bool allDataTillReliableSizeReceived = stream.reliableSizeFromPeer &&
+          (*stream.reliableSizeFromPeer == 0 ||
+           isAllDataReceivedUntil(stream, *stream.reliableSizeFromPeer - 1));
+      if (isAllDataReceived(stream) || allDataTillReliableSizeReceived) {
         VLOG(10) << "Open: Transition to Closed" << " stream=" << stream.id
                  << " " << stream.conn;
         stream.recvState = StreamRecvState::Closed;
@@ -76,7 +81,8 @@ void receiveRstStreamSMHandler(
     const RstStreamFrame& rst) {
   switch (stream.recvState) {
     case StreamRecvState::Closed: {
-      // This will check whether the reset is still consistent with the stream.
+      // This will check whether the reset is still consistent with the
+      // stream.
       onResetQuicStream(stream, rst);
       break;
     }
@@ -84,9 +90,15 @@ void receiveRstStreamSMHandler(
       // We transit the receive state machine to Closed before invoking
       // onResetQuicStream because it will check the state of the stream for
       // flow control.
-      stream.recvState = StreamRecvState::Closed;
-      if (stream.inTerminalStates()) {
-        stream.conn.streamManager->addClosed(stream.id);
+      if (!rst.reliableSize || *rst.reliableSize == 0 ||
+          isAllDataReceivedUntil(stream, *rst.reliableSize - 1)) {
+        // We can only transition to Closed if all of the reliable data has
+        // been received, otherwise we are going to ignore incoming stream
+        // frames.
+        stream.recvState = StreamRecvState::Closed;
+        if (stream.inTerminalStates()) {
+          stream.conn.streamManager->addClosed(stream.id);
+        }
       }
       onResetQuicStream(stream, rst);
       break;
