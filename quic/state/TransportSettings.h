@@ -413,6 +413,7 @@ struct TransportSettings {
   // receiving and then processing.
   bool networkDataPerSocketRead{false};
   bool cloneAllPacketsWithCryptoFrame{false};
+  bool cloneCryptoPacketsAtMostOnce{false};
   // Use a reordering threshold heuristic of inflight / 2.
   bool useInflightReorderingThreshold{false};
   // Raise read callbacks for all unidirectional streams first on data

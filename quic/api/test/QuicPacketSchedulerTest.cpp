@@ -630,14 +630,18 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   EXPECT_EQ(expected, result.clonedPacketIdentifier->packetNumber);
 }
 
-class CloneAllPacketsWithCryptoFrameTest : public QuicPacketSchedulerTest,
-                                           public WithParamInterface<bool> {};
+class CloneAllPacketsWithCryptoFrameTest
+    : public QuicPacketSchedulerTest,
+      public WithParamInterface<std::tuple<bool, bool>> {};
 TEST_P(
     CloneAllPacketsWithCryptoFrameTest,
     TestCloneAllPacketsWithCryptoFrameTrueFalse) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn.transportSettings.cloneAllPacketsWithCryptoFrame = GetParam();
+  auto testParams = GetParam();
+  conn.transportSettings.cloneAllPacketsWithCryptoFrame =
+      std::get<0>(testParams);
+  conn.transportSettings.cloneCryptoPacketsAtMostOnce = std::get<1>(testParams);
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
 
@@ -671,7 +675,7 @@ TEST_P(
         MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   }
 
-  // Add a third outstanding packet, which is a clone of the first packet
+  // Add a third outstanding packet, which is a re-clone of the first packet
   {
     addInitialOutstandingPacket(conn);
     conn.outstandings.packets.back().packet.frames.push_back(
@@ -687,6 +691,7 @@ TEST_P(
         MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   }
 
+  // Schedule a fourth packet
   std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
   ConnectionId srcConnId(zeroConnIdData);
   LongHeader header(
@@ -701,18 +706,25 @@ TEST_P(
       conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(
-      result.clonedPacketIdentifier.has_value() && result.packet.has_value());
-  EXPECT_EQ(
-      conn.transportSettings.cloneAllPacketsWithCryptoFrame ? secondPacketNum
-                                                            : firstPacketNum,
-      result.clonedPacketIdentifier->packetNumber);
+  if (conn.transportSettings.cloneAllPacketsWithCryptoFrame &&
+      conn.transportSettings.cloneCryptoPacketsAtMostOnce) {
+    // First and second packets already cloned, skip all and schedule no packet
+    EXPECT_FALSE(result.clonedPacketIdentifier.has_value());
+    EXPECT_FALSE(result.packet.has_value());
+  } else {
+    EXPECT_TRUE(
+        result.clonedPacketIdentifier.has_value() && result.packet.has_value());
+    EXPECT_EQ(
+        conn.transportSettings.cloneAllPacketsWithCryptoFrame ? secondPacketNum
+                                                              : firstPacketNum,
+        result.clonedPacketIdentifier->packetNumber);
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(
     CloneAllPacketsWithCryptoFrameTest,
     CloneAllPacketsWithCryptoFrameTest,
-    Bool());
+    Combine(Bool(), Bool()));
 
 TEST_F(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   QuicClientConnectionState conn(

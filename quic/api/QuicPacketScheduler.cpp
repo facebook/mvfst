@@ -938,6 +938,9 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
         if (std::find_if(frames.begin(), frames.end(), [](const auto& frame) {
               return frame.type() == QuicWriteFrame::Type::WriteCryptoFrame;
             }) != frames.end()) {
+          if (conn_.transportSettings.cloneCryptoPacketsAtMostOnce) {
+            continue;
+          }
           auto mostRecentOutstandingPacketIdentifier =
               conn_.outstandings.packets.back().maybeClonedPacketIdentifier;
           if (mostRecentOutstandingPacketIdentifier ==
