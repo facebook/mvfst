@@ -12,8 +12,8 @@
 namespace quic {
 
 #ifdef _WIN32
-#include <mmsystem.h>
-#include <timeapi.h>
+#include <mmsystem.h> // @manual
+#include <timeapi.h> // @manual
 #pragma comment(lib, "winmm.lib")
 
 struct GetBetterWindowsTimers {
