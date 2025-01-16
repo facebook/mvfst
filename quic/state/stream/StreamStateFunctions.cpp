@@ -52,7 +52,17 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
         "Read offset mismatch, " +
             folly::to<std::string>(stream.finalReadOffset.value()) +
             " != " + folly::to<std::string>(frame.finalSize),
-        TransportErrorCode::FINAL_SIZE_ERROR);
+        TransportErrorCode::STREAM_STATE_ERROR);
+  }
+  if (stream.streamReadError &&
+      stream.streamReadError.value().asApplicationErrorCode() &&
+      *stream.streamReadError.value().asApplicationErrorCode() !=
+          frame.errorCode) {
+    throw QuicTransportException(
+        "Reset error code mismatch, " +
+            toString(stream.streamReadError.value()) +
+            " != " + toString(frame.errorCode),
+        TransportErrorCode::STREAM_STATE_ERROR);
   }
   if (stream.reliableSizeFromPeer && frame.reliableSize &&
       *frame.reliableSize > *stream.reliableSizeFromPeer) {

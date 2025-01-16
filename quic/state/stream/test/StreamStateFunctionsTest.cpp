@@ -326,6 +326,38 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {
       onResetQuicStream(stream, std::move(rst)), QuicTransportException);
 }
 
+TEST_F(StreamStateFunctionsTests, ResetFinalSizeChange) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.finalReadOffset = 11;
+  stream.streamReadError = GenericApplicationErrorCode::UNKNOWN;
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 10);
+  try {
+    onResetQuicStream(stream, rst);
+    FAIL() << "Should throw QuicTransportException";
+  } catch (QuicTransportException& exc) {
+    EXPECT_EQ(exc.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
+  }
+}
+
+TEST_F(StreamStateFunctionsTests, ResetErrorCodeChange) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.finalReadOffset = 10;
+  stream.streamReadError = GenericApplicationErrorCode::UNKNOWN + 1;
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 10);
+  try {
+    onResetQuicStream(stream, rst);
+    FAIL() << "Should throw QuicTransportException";
+  } catch (QuicTransportException& exc) {
+    EXPECT_EQ(exc.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
+  }
+}
+
 TEST_F(StreamStateFunctionsTests, ResetOffsetLessThanMaxObserved) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
