@@ -667,15 +667,6 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
     CHECK(stream.lossBuffer.empty());
     CHECK(stream.lossBufMetas.empty());
     removeWritable(stream);
-    writableStreams_.erase(stream.id);
-    writableDSRStreams_.erase(stream.id);
-    lossStreams_.erase(stream.id);
-    lossDSRStreams_.erase(stream.id);
-    if (stream.isControl) {
-      controlWriteQueue_.erase(stream.id);
-    } else {
-      writeQueue_.erase(stream.id);
-    }
     return;
   }
   if (stream.hasWritableData()) {
