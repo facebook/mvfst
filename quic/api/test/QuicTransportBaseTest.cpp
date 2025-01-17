@@ -975,6 +975,39 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailable) {
   transport.reset();
 }
 
+TEST_P(QuicTransportImplTestBase, ReliableResetReadCallback) {
+  auto stream = transport->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+
+  transport->setReadCallback(stream, &readCb);
+  transport->addDataToStream(
+      stream,
+      StreamBuffer(
+          folly::IOBuf::copyBuffer("this string has 29 characters"), 0));
+  EXPECT_CALL(readCb, readAvailable(stream));
+  transport->driveReadCallbacks();
+
+  // Simulate receiving a reliable reset with a reliableSize of 29
+  receiveRstStreamSMHandler(
+      *transport->getStream(stream),
+      RstStreamFrame(stream, GenericApplicationErrorCode::UNKNOWN, 100, 29));
+
+  // The application hasn't yet read all of the reliable data, so we
+  // shouldn't fire the readError callback yet.
+  EXPECT_CALL(readCb, readAvailable(stream));
+  transport->driveReadCallbacks();
+
+  transport->read(stream, 29);
+
+  // The application has yet read all of the reliable data, so we should fire
+  // the readError callback.
+  EXPECT_CALL(
+      readCb, readError(stream, IsError(GenericApplicationErrorCode::UNKNOWN)));
+  transport->driveReadCallbacks();
+
+  transport.reset();
+}
+
 TEST_P(
     QuicTransportImplTestBase,
     ReadCallbackDataAvailableWithUnidirPrioritized) {

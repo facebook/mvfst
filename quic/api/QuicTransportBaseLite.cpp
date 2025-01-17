@@ -2456,7 +2456,11 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
     }
     auto readCb = callback->second.readCb;
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
-    if (readCb && stream->streamReadError) {
+    if (readCb && stream->streamReadError &&
+        (!stream->reliableSizeFromPeer ||
+         *stream->reliableSizeFromPeer <= stream->currentReadOffset)) {
+      // If we got a reliable reset from the peer, we don't fire the readError
+      // callback and remove it until we've read all of the reliable data.
       if (self->conn_->transportSettings
               .unidirectionalStreamsReadCallbacksFirst &&
           isUnidirectionalStream(streamId)) {
