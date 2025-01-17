@@ -9,6 +9,11 @@
 
 #include <folly/io/async/IoUringBackend.h>
 
+#ifdef _WIN32
+#error \
+    "This file should not be included on Windows. Use QuicServerBackend.cpp to get more accurate timers on Windows."
+#endif
+
 #if !FOLLY_MOBILE && __has_include(<liburing.h>)
 
 DEFINE_int32(
