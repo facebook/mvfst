@@ -4829,7 +4829,6 @@ TEST_P(
   stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
-  conn->streamManager->addWritable(*stream);
   conn->streamManager->updateWritableStreams(*stream);
 
   // Write looper is running.
@@ -4893,7 +4892,6 @@ TEST_P(
   stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
-  conn->streamManager->addWritable(*stream);
   conn->streamManager->updateWritableStreams(*stream);
 
   // Write looper is stopped.
@@ -4929,7 +4927,6 @@ TEST_P(
   stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
-  conn->streamManager->addWritable(*stream);
   conn->streamManager->updateWritableStreams(*stream);
 
   // Write looper is running.
@@ -4969,7 +4966,6 @@ TEST_P(
   stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
-  conn->streamManager->addWritable(*stream);
   conn->streamManager->updateWritableStreams(*stream);
 
   // Write looper is running.
@@ -5038,7 +5034,6 @@ TEST_P(
   conn->flowControlState.sumCurStreamBufferLen = testString.length();
 
   // Insert streamId into the list.
-  conn->streamManager->addWritable(*stream);
   conn->streamManager->updateWritableStreams(*stream);
 
   // Mock arming the write callback
@@ -5108,7 +5103,6 @@ TEST_P(
   stream->writeBuffer.append(std::move(dataBuf));
 
   // Insert streamId into the list.
-  conn->streamManager->addWritable(*stream);
   conn->streamManager->updateWritableStreams(*stream);
 
   // Write looper is running.

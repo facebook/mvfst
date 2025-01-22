@@ -493,32 +493,6 @@ class QuicStreamManager {
   }
 
   /*
-   * Add a writable stream id.
-   */
-  void addWritable(const QuicStreamState& stream) {
-    if (stream.isControl) {
-      // Control streams get their own queue.
-      CHECK(stream.hasSchedulableData());
-      controlWriteQueue_.insert(stream.id);
-    } else {
-      CHECK(stream.hasSchedulableData() || stream.hasSchedulableDsr());
-      writeQueue_.insertOrUpdate(stream.id, stream.priority);
-    }
-    if (stream.hasWritableData()) {
-      writableStreams_.insert(stream.id);
-    }
-    if (stream.hasWritableBufMeta()) {
-      writableDSRStreams_.insert(stream.id);
-    }
-    if (!stream.lossBuffer.empty()) {
-      lossStreams_.insert(stream.id);
-    }
-    if (!stream.lossBufMetas.empty()) {
-      lossDSRStreams_.insert(stream.id);
-    }
-  }
-
-  /*
    * Remove a writable stream id.
    */
   void removeWritable(const QuicStreamState& stream) {
