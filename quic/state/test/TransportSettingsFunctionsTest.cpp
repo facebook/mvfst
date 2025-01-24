@@ -66,6 +66,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "},"
       "\"ignoreInflightHi\": true, "
       "\"ignoreLoss\": true, "
+      "\"exitStartupOnLoss\": false, "
       "\"enableRenoCoexistence\": true, "
       "\"paceInitCwnd\": false, "
       "\"overrideCruisePacingGain\": 7.9, "
@@ -83,6 +84,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.leaveHeadroomForCwndLimited, true);
   EXPECT_EQ(config.ignoreInflightHi, true);
   EXPECT_EQ(config.ignoreLoss, true);
+  EXPECT_EQ(config.exitStartupOnLoss, false);
   EXPECT_EQ(config.enableRenoCoexistence, true);
   EXPECT_EQ(config.paceInitCwnd, false);
   EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
@@ -112,6 +114,7 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.drainToTarget, false);
   EXPECT_EQ(config.ignoreInflightHi, false);
   EXPECT_EQ(config.ignoreLoss, false);
+  EXPECT_EQ(config.exitStartupOnLoss, true);
   EXPECT_EQ(config.enableRenoCoexistence, false);
   EXPECT_EQ(config.overrideCruisePacingGain, -1.0f);
   EXPECT_EQ(config.overrideCruiseCwndGain, -1.0f);

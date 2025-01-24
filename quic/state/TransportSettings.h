@@ -77,6 +77,10 @@ struct CongestionControlConfig {
   bool ignoreLoss{false};
 
   // Used by: BBR2
+  // Whether BBR2 should check packet loss to exit startup
+  bool exitStartupOnLoss{true};
+
+  // Used by: BBR2
   // Whether BBR2 should enable reno coexistence.
   bool enableRenoCoexistence{false};
 

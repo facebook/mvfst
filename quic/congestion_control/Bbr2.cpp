@@ -466,7 +466,7 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   the same.
   */
   if (fullBwReached_ || !roundStart_ || isAppLimited() ||
-      conn_.transportSettings.ccaConfig.ignoreLoss) {
+      !conn_.transportSettings.ccaConfig.exitStartupOnLoss) {
     // TODO: the appLimited condition means we could tolerate losses in startup
     // if we haven't found the full bandwidth. This may need to be revisited.
 
