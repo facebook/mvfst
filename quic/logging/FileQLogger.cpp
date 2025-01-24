@@ -44,7 +44,8 @@ void FileQLogger::setupStream() {
     return;
   }
   if (compress_) {
-    compressionCodec_ = folly::io::getStreamCodec(folly::io::CodecType::GZIP);
+    compressionCodec_ =
+        folly::compression::getStreamCodec(folly::io::CodecType::GZIP);
     compressionBuffer_ = folly::IOBuf::createCombined(kCompressionBufferSize);
   }
 
