@@ -41,14 +41,15 @@ using OrderedStreamSet = std::set<OrderedStream, ordered_stream_cmp>;
 struct Priority {
   uint8_t level : 3;
   bool incremental : 1;
-  OrderId orderId : 58;
+  OrderId orderId : 57;
+  bool paused : 1;
 
-  Priority(uint8_t l, bool i, OrderId o = 0)
-      : level(l), incremental(i), orderId(o) {}
+  Priority(uint8_t l, bool i, OrderId o = 0, bool p = false)
+      : level(l), incremental(i), orderId(o), paused(p) {}
 
   bool operator==(Priority other) const noexcept {
     return level == other.level && incremental == other.incremental &&
-        orderId == other.orderId;
+        orderId == other.orderId && paused == other.paused;
   }
 };
 
@@ -212,11 +213,13 @@ struct PriorityQueue {
   void updateIfExist(StreamId id, Priority priority) {
     auto iter = writableStreamsToLevel_.find(id);
     if (iter != writableStreamsToLevel_.end()) {
+      CHECK(!priority.paused);
       updateExistingStreamPriority(iter, priority);
     }
   }
 
   void insertOrUpdate(StreamId id, Priority pri) {
+    CHECK(!pri.paused);
     auto it = writableStreamsToLevel_.find(id);
     auto index = priority2index(pri);
     if (it != writableStreamsToLevel_.end()) {

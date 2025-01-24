@@ -239,6 +239,7 @@ bool QuicStreamManager::setStreamPriority(StreamId id, Priority newPriority) {
       }
       notifyStreamPriorityChanges();
     }
+    updateWritableStreams(*stream);
     writeQueue_.updateIfExist(id, stream->priority);
     return true;
   }
@@ -666,6 +667,10 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   if (stream.streamWriteError.has_value() && !stream.reliableSizeToPeer) {
     CHECK(stream.lossBuffer.empty());
     CHECK(stream.lossBufMetas.empty());
+    removeWritable(stream);
+    return;
+  }
+  if (stream.priority.paused) {
     removeWritable(stream);
     return;
   }

@@ -2818,4 +2818,58 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
 }
 
+TEST_F(QuicPacketSchedulerTest, PausedPriorityInitial) {
+  static const auto kSequentialPriority = Priority(3, false);
+  static const auto kPausedPriority = Priority(0, false, 0, true /* paused */);
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto pausedStreamId =
+      (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto regularStreamId =
+      (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto pausedStream = conn.streamManager->findStream(pausedStreamId);
+  auto regularStream = conn.streamManager->findStream(regularStreamId);
+  pausedStream->priority = kPausedPriority;
+  regularStream->priority = kSequentialPriority;
+
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(pausedStream->id),
+      folly::IOBuf::copyBuffer("paused_data"),
+      false);
+  writeDataToQuicStream(
+      *conn.streamManager->findStream(regularStream->id),
+      folly::IOBuf::copyBuffer("regular_data"),
+      false);
+
+  // Should write frames for only regular stream.
+  StreamFrameScheduler scheduler(conn);
+  NiceMock<MockQuicPacketBuilder> mockBuilder;
+  EXPECT_CALL(mockBuilder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(mockBuilder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    mockBuilder.frames_.push_back(f);
+  }));
+  scheduler.writeStreams(mockBuilder);
+  auto& frames = mockBuilder.frames_;
+  ASSERT_EQ(frames.size(), 1);
+  WriteStreamFrame regularFrame(regularStream->id, 0, 12, false);
+  ASSERT_TRUE(frames[0].asWriteStreamFrame());
+  EXPECT_EQ(*frames[0].asWriteStreamFrame(), regularFrame);
+  conn.streamManager->removeWritable(*regularStream);
+
+  // Unpause the stream. Expect the scheduleor to write the data.
+  conn.streamManager->setStreamPriority(pausedStreamId, kSequentialPriority);
+  scheduler.writeStreams(mockBuilder);
+  ASSERT_EQ(frames.size(), 2);
+  WriteStreamFrame pausedFrame(pausedStream->id, 0, 11, false);
+  ASSERT_TRUE(frames[1].asWriteStreamFrame());
+  EXPECT_EQ(*frames[1].asWriteStreamFrame(), pausedFrame);
+
+  // Pause the stream again. Expect no more data writable.
+  conn.streamManager->setStreamPriority(pausedStreamId, kPausedPriority);
+  ASSERT_FALSE(conn.streamManager->hasWritable());
+}
+
 } // namespace quic::test
