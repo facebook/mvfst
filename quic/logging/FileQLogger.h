@@ -138,7 +138,7 @@ class FileQLogger : public BaseQLogger {
   void handleEvent(std::unique_ptr<QLogEvent> event);
 
   std::unique_ptr<folly::AsyncFileWriter> writer_;
-  std::unique_ptr<folly::io::StreamCodec> compressionCodec_;
+  std::unique_ptr<folly::compression::StreamCodec> compressionCodec_;
   std::unique_ptr<folly::IOBuf> compressionBuffer_;
 
   std::string path_;

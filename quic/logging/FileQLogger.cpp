@@ -151,7 +151,9 @@ void FileQLogger::finishStream() {
       auto outputRange = folly::MutableByteRange(
           compressionBuffer_->writableData(), compressionBuffer_->capacity());
       ended = compressionCodec_->compressStream(
-          inputRange, outputRange, folly::io::StreamCodec::FlushOp::END);
+          inputRange,
+          outputRange,
+          folly::compression::StreamCodec::FlushOp::END);
       auto outputLen = compressionBuffer_->capacity() - outputRange.size();
       writer_->writeMessage(folly::StringPiece(
           (const char*)compressionBuffer_->data(), outputLen));
