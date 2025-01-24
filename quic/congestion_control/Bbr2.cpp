@@ -179,11 +179,6 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     updateLatestDeliverySignals(*ackEvent);
     updateRound(*ackEvent);
 
-    // Update cwndLimited state
-    if (roundStart_) {
-      cwndLimitedInRound_ = false;
-    }
-
     updateCongestionSignals(lossEvent);
     updateAckAggregation(*ackEvent);
     checkFullBwReached();
@@ -207,6 +202,11 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     setPacing();
     setSendQuantum();
     setCwnd(ackEvent->ackedBytes, lostBytes);
+
+    // Update cwndLimited state before the next ack
+    if (roundStart_) {
+      cwndLimitedInRound_ = false;
+    }
   }
 }
 
