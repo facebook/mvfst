@@ -1,14 +1,8 @@
-"""
-[mvfst]
-    use_libev = {False|[True]}
-"""
-
 load("@fbcode_macros//build_defs:autodeps_rule.bzl", "autodeps_rule")
 load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
 load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
-load("@fbsource//tools/build_defs:buckconfig.bzl", "read_bool")
 load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load(
     "@fbsource//tools/build_defs:default_platform_defs.bzl",
@@ -75,9 +69,6 @@ def _compute_header_namespace():
     base_path = native.package_name()
     return base_path[6:]
 
-def use_libev():
-    return read_bool("mvfst", "use_libev", False)
-
 def mvfst_cpp_library(
         name,
         autodeps_skip = False,
@@ -90,11 +81,6 @@ def mvfst_cpp_library(
         **kwargs):
     # Convert deps, exported_deps, and external_deps
     if get_fbsource_cell() == "fbcode":
-        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
-        if use_libev():
-            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
-
-        kwargs["preprocessor_flags"] = preprocessor_flags
         cpp_library(
             name = name,
             autodeps_skip = True,
@@ -170,9 +156,6 @@ def mvfst_cxx_library(
 
     if is_tuple(exported_deps):
         exported_deps = list(exported_deps)
-    exported_preprocessor_flags = kwargs.pop("exported_preprocessor_flags", [])
-    if use_libev():
-        exported_preprocessor_flags += ["-DMVFST_USE_LIBEV"]
 
     fb_xplat_cxx_library(
         name = name,
@@ -192,7 +175,6 @@ def mvfst_cxx_library(
         fbandroid_labels = list(fbandroid_labels),
         fbobjc_labels = list(fbobjc_labels),
         compiler_flags = kwargs.pop("compiler_flags", []) + CXXFLAGS,
-        exported_preprocessor_flags = exported_preprocessor_flags,
         windows_compiler_flags = kwargs.pop("windows_compiler_flags", []) + CXXFLAGS + WINDOWS_CLANG_CXX_FLAGS,
         fbobjc_compiler_flags = kwargs.pop("fbobjc_compiler_flags", []) +
                                 FBOBJC_CXXFLAGS,
@@ -216,11 +198,6 @@ def mvfst_cpp_test(
         **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
-        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
-        if use_libev():
-            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
-
-        kwargs["preprocessor_flags"] = preprocessor_flags
         cpp_unittest(
             name = name,
             autodeps_skip = True,
@@ -276,11 +253,6 @@ def mvfst_cpp_binary(
         **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
-        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
-        if use_libev():
-            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
-
-        kwargs["preprocessor_flags"] = preprocessor_flags
         cpp_binary(
             name = name,
             autodeps_skip = True,
@@ -337,11 +309,6 @@ def mvfst_cpp_benchmark(
         **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
-        preprocessor_flags = kwargs.pop("preprocessor_flags", [])
-        if use_libev():
-            preprocessor_flags += ["-DMVFST_USE_LIBEV"]
-
-        kwargs["preprocessor_flags"] = preprocessor_flags
         cpp_benchmark(
             name = name,
             autodeps_skip = True,

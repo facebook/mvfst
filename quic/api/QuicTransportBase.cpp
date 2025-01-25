@@ -743,7 +743,6 @@ void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
   updatePeekLooper();
   updateWriteLooper(false);
 
-#ifndef MVFST_USE_LIBEV
   if (getSocketObserverContainer() &&
       getSocketObserverContainer()
           ->hasObserversForEvent<
@@ -754,7 +753,6 @@ void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
               observer->evbAttach(observed, evb_.get());
             });
   }
-#endif
 }
 
 void QuicTransportBase::detachEventBase() {
