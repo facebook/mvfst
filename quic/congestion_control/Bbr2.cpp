@@ -610,7 +610,7 @@ bool Bbr2CongestionController::checkTimeToCruise() {
 
 bool Bbr2CongestionController::checkTimeToGoDown() {
   if (cwndLimitedInRound_ && inflightHi_.has_value() &&
-      cwndBytes_ >= inflightHi_.value()) {
+      getTargetInflightWithGain(1.25) >= inflightHi_.value()) {
     resetFullBw();
     fullBw_ = maxBwFilter_.GetBest();
   } else if (fullBwNow_) {
