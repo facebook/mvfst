@@ -103,6 +103,126 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
   return nextPacketNum;
 }
 
+using namespace quic::test;
+
+std::unique_ptr<QuicClientConnectionState>
+createConn(uint32_t maxStreams, uint64_t maxOffset, uint64_t initialMaxOffset) {
+  auto conn = std::make_unique<QuicClientConnectionState>(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn->streamManager->setMaxLocalBidirectionalStreams(maxStreams);
+  conn->flowControlState.peerAdvertisedMaxOffset = maxOffset;
+  conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+      initialMaxOffset;
+  return conn;
+}
+
+auto createStream(
+    QuicClientConnectionState& conn,
+    std::optional<Priority> priority = std::nullopt) {
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  if (priority) {
+    stream->priority = *priority;
+  }
+  return stream->id;
+}
+
+RegularQuicPacketBuilder createPacketBuilder(QuicClientConnectionState& conn) {
+  auto connId = getTestConnectionId();
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder.encodePacketHeader();
+  return builder;
+}
+
+std::unique_ptr<folly::IOBuf> createLargeBuffer(size_t size) {
+  auto largeBuf = folly::IOBuf::createChain(size, 4096);
+  auto curBuf = largeBuf.get();
+  do {
+    curBuf->append(curBuf->capacity());
+    curBuf = curBuf->next();
+  } while (curBuf != largeBuf.get());
+  return largeBuf;
+}
+
+WriteStreamFrame writeDataToStream(
+    QuicClientConnectionState& conn,
+    StreamId streamId,
+    const std::string& data) {
+  auto stream = conn.streamManager->findStream(streamId);
+  auto length = data.size();
+  CHECK(stream);
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(data), false);
+  return {streamId, 0, length, false};
+}
+
+// Helper function to write data to a stream
+WriteStreamFrame writeDataToStream(
+    QuicClientConnectionState& conn,
+    StreamId streamId,
+    std::unique_ptr<folly::IOBuf> buf) {
+  auto stream = conn.streamManager->findStream(streamId);
+  auto length = buf->computeChainDataLength();
+  writeDataToQuicStream(*stream, std::move(buf), false);
+  return {streamId, 0, length, false};
+}
+
+std::unique_ptr<MockQuicPacketBuilder> setupMockPacketBuilder() {
+  auto builder = std::make_unique<NiceMock<MockQuicPacketBuilder>>();
+  EXPECT_CALL(*builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(*builder, appendFrame(_))
+      .WillRepeatedly(Invoke([builder = builder.get()](auto f) {
+        builder->frames_.push_back(f);
+      }));
+  return builder;
+}
+
+std::unique_ptr<MockQuicPacketBuilder> setupMockPacketBuilder(
+    std::vector<size_t> expectedRemaining) {
+  auto builder = std::make_unique<NiceMock<MockQuicPacketBuilder>>();
+  builder->setExpectedSpaceRemaining(std::move(expectedRemaining));
+  return builder;
+}
+
+void verifyStreamFrames(
+    MockQuicPacketBuilder& builder,
+    const std::vector<WriteStreamFrame>& expectedFrames) {
+  ASSERT_EQ(builder.frames_.size(), expectedFrames.size());
+  for (size_t i = 0; i < expectedFrames.size(); ++i) {
+    ASSERT_TRUE(builder.frames_[i].asWriteStreamFrame());
+    EXPECT_EQ(*builder.frames_[i].asWriteStreamFrame(), expectedFrames[i]);
+  }
+  if (expectedFrames.size() == builder.frames_.size()) {
+    builder.frames_.clear();
+  } else {
+    builder.frames_.erase(
+        builder.frames_.begin(),
+        builder.frames_.begin() + expectedFrames.size());
+  }
+}
+
+void verifyStreamFrames(
+    MockQuicPacketBuilder& builder,
+    const std::vector<StreamId>& expectedIds) {
+  ASSERT_EQ(builder.frames_.size(), expectedIds.size());
+  for (size_t i = 0; i < expectedIds.size(); ++i) {
+    ASSERT_TRUE(builder.frames_[i].asWriteStreamFrame());
+    EXPECT_EQ(
+        builder.frames_[i].asWriteStreamFrame()->streamId, expectedIds[i]);
+  }
+  if (expectedIds.size() == builder.frames_.size()) {
+    builder.frames_.clear();
+  } else {
+    builder.frames_.erase(
+        builder.frames_.begin(), builder.frames_.begin() + expectedIds.size());
+  }
+}
+
 } // namespace
 
 namespace quic::test {
@@ -1324,318 +1444,143 @@ TEST_F(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto connId = getTestConnectionId();
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  builder.encodePacketHeader();
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  scheduler.writeStreams(builder);
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+
+  auto f1 = writeDataToStream(conn, stream1, "some data");
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
+  auto builder = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder);
+  verifyStreamFrames(*builder, {f1, f2, f3});
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       0);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto connId = getTestConnectionId();
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  builder.encodePacketHeader();
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  auto chainLen = largeBuf->computeChainDataLength();
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  // Force the wraparound initially.
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
+  auto builder = createPacketBuilder(conn);
   scheduler.writeStreams(builder);
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      4);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-  }));
-  scheduler.writeStreams(builder2);
-  auto& frames = builder2.frames_;
-  ASSERT_EQ(frames.size(), 3);
-  WriteStreamFrame f1(stream2, 0, 9, false);
-  WriteStreamFrame f2(stream3, 0, 9, false);
-  WriteStreamFrame f3(stream1, 0, chainLen, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
-  ASSERT_TRUE(frames[2].asWriteStreamFrame());
-  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
+  auto builder2 = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder2);
+  verifyStreamFrames(*builder2, {f2, f3, f1});
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   conn.streamManager->writeQueue().setMaxNextsPerStream(2);
-  conn.transportSettings.defaultPriority = Priority(0, true);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto connId = getTestConnectionId();
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  builder.encodePacketHeader();
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  // Should write frames for stream1, stream1, stream2, stream3, followed by
-  // stream1 again.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  std::vector<uint64_t> remainingRet = {1500, 0, 1400, 0, 1300, 1100, 1000, 0};
-  auto remainingItr = remainingRet.begin();
 
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-    remainingItr++;
-  }));
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
-    return *remainingItr;
-  }));
-  scheduler.writeStreams(builder2);
-  remainingItr++;
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
+  // Should write frames for stream1, stream1, stream2, stream3, followed >
+  // stream1 again.
+  auto builder2 =
+      setupMockPacketBuilder({1500, 0, 1400, 0, 1300, 1100, 1000, 0});
+  scheduler.writeStreams(*builder2);
+  builder2->advanceRemaining();
   ASSERT_EQ(conn.streamManager->writeQueue().getNextScheduledStream(), stream1);
-  ASSERT_EQ(builder2.frames_.size(), 1);
-  ASSERT_EQ(*remainingItr, 1400);
-  scheduler.writeStreams(builder2);
-  ASSERT_EQ(builder2.frames_.size(), 2);
+  ASSERT_EQ(builder2->frames_.size(), 1);
+  scheduler.writeStreams(*builder2);
+  ASSERT_EQ(builder2->frames_.size(), 2);
   ASSERT_EQ(conn.streamManager->writeQueue().getNextScheduledStream(), stream2);
-  ASSERT_EQ(*remainingItr, 0);
-  remainingItr++;
-  scheduler.writeStreams(builder2);
-  scheduler.writeStreams(builder2);
-  auto& frames = builder2.frames_;
-  ASSERT_EQ(frames.size(), 5);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(frames[0].asWriteStreamFrame()->streamId, stream1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(frames[1].asWriteStreamFrame()->streamId, stream1);
-  ASSERT_TRUE(frames[2].asWriteStreamFrame());
-  EXPECT_EQ(frames[2].asWriteStreamFrame()->streamId, stream2);
-  ASSERT_TRUE(frames[3].asWriteStreamFrame());
-  EXPECT_EQ(frames[3].asWriteStreamFrame()->streamId, stream3);
-  ASSERT_TRUE(frames[4].asWriteStreamFrame());
-  EXPECT_EQ(frames[4].asWriteStreamFrame()->streamId, stream1);
+  builder2->advanceRemaining();
+  scheduler.writeStreams(*builder2);
+  scheduler.writeStreams(*builder2);
+  verifyStreamFrames(*builder2, {stream1, stream1, stream2, stream3, stream1});
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   conn.transportSettings.streamFramePerPacket = true;
-  auto connId = getTestConnectionId();
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  auto chainLen = largeBuf->computeChainDataLength();
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  // The default is to wraparound initially.
-  scheduler.writeStreams(builder1);
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
+  auto builder = createPacketBuilder(conn);
+  scheduler.writeStreams(builder);
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       stream2);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-  }));
-  auto& frames = builder2.frames_;
-  scheduler.writeStreams(builder2);
-  ASSERT_EQ(frames.size(), 1);
-  scheduler.writeStreams(builder2);
-  ASSERT_EQ(frames.size(), 2);
-  scheduler.writeStreams(builder2);
-  ASSERT_EQ(frames.size(), 3);
-  WriteStreamFrame f1(stream2, 0, 9, false);
-  WriteStreamFrame f2(stream3, 0, 9, false);
-  WriteStreamFrame f3(stream1, 0, chainLen, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
-  ASSERT_TRUE(frames[2].asWriteStreamFrame());
-  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
+  auto builder2 = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder2);
+  verifyStreamFrames(*builder2, {f2});
+  scheduler.writeStreams(*builder2);
+  verifyStreamFrames(*builder2, {f3});
+  scheduler.writeStreams(*builder2);
+  verifyStreamFrames(*builder2, {f1});
 }
 
 TEST_F(
     QuicPacketSchedulerTest,
     StreamFrameSchedulerRoundRobinStreamPerPacketHitsDsr) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   conn.transportSettings.streamFramePerPacket = true;
-  auto connId = getTestConnectionId();
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream4 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+  auto stream4 = createStream(conn);
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
+  // Set up DSR
   auto sender = std::make_unique<MockDSRPacketizationRequestSender>();
   ON_CALL(*sender, addSendInstruction(testing::_))
       .WillByDefault(testing::Return(true));
   ON_CALL(*sender, flush()).WillByDefault(testing::Return(true));
   auto dsrStream = conn.streamManager->findStream(stream4);
   dsrStream->dsrSender = std::move(sender);
+
   BufferMeta bufMeta(20);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream4),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
+  writeDataToStream(conn, stream4, "some data");
   writeBufMetaToQuicStream(
       *conn.streamManager->findStream(stream4), bufMeta, true /* eof */);
+
   // Pretend we sent the non DSR data
   dsrStream->ackedIntervals.insert(0, dsrStream->writeBuffer.chainLength() - 1);
   dsrStream->currentWriteOffset = dsrStream->writeBuffer.chainLength();
@@ -1645,248 +1590,121 @@ TEST_F(
   conn.streamManager->updateWritableStreams(*dsrStream);
 
   // The default is to wraparound initially.
+  auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
+
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       stream2);
 
   // Should write frames for stream2, stream3, followed by an empty write.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-  }));
-  auto& frames = builder2.frames_;
+  auto builder2 = setupMockPacketBuilder();
   ASSERT_TRUE(scheduler.hasPendingData());
-  scheduler.writeStreams(builder2);
-  ASSERT_EQ(frames.size(), 1);
+  scheduler.writeStreams(*builder2);
+  ASSERT_EQ(builder2->frames_.size(), 1);
   ASSERT_TRUE(scheduler.hasPendingData());
-  scheduler.writeStreams(builder2);
-  ASSERT_EQ(frames.size(), 2);
+  scheduler.writeStreams(*builder2);
+  ASSERT_EQ(builder2->frames_.size(), 2);
   EXPECT_FALSE(scheduler.hasPendingData());
-  scheduler.writeStreams(builder2);
-  WriteStreamFrame f1(stream2, 0, 9, false);
-  WriteStreamFrame f2(stream3, 0, 9, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
+  scheduler.writeStreams(*builder2);
+
+  verifyStreamFrames(*builder2, {f2, f3});
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto connId = getTestConnectionId();
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  conn.streamManager->findStream(stream1)->priority = Priority(0, false);
-  conn.streamManager->findStream(stream2)->priority = Priority(0, false);
-  conn.streamManager->findStream(stream3)->priority = Priority(0, false);
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  auto chainLen = largeBuf->computeChainDataLength();
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
+
+  auto stream1 = createStream(conn, Priority(0, false));
+  auto stream2 = createStream(conn, Priority(0, false));
+  auto stream3 = createStream(conn, Priority(0, false));
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
   // The default is to wraparound initially.
+  auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
+
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(
           Priority(0, false)),
       stream1);
 
   // Should write frames for stream1, stream2, stream3, in that order.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-  }));
-  scheduler.writeStreams(builder2);
-  auto& frames = builder2.frames_;
-  ASSERT_EQ(frames.size(), 3);
-  WriteStreamFrame f1(stream1, 0, chainLen, false);
-  WriteStreamFrame f2(stream2, 0, 9, false);
-  WriteStreamFrame f3(stream3, 0, 9, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
-  ASSERT_TRUE(frames[2].asWriteStreamFrame());
-  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
+  auto builder2 = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder2);
+
+  verifyStreamFrames(*builder2, {f1, f2, f3});
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   conn.transportSettings.defaultPriority = Priority(0, false);
-  auto connId = getTestConnectionId();
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  auto chainLen = largeBuf->computeChainDataLength();
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  // The default is to wraparound initially.
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+
+  auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
+
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(
           Priority(0, false)),
       stream1);
 
   // Should write frames for stream1, stream2, stream3, in that order.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-  }));
-  scheduler.writeStreams(builder2);
-  auto& frames = builder2.frames_;
-  ASSERT_EQ(frames.size(), 3);
-  WriteStreamFrame f1(stream1, 0, chainLen, false);
-  WriteStreamFrame f2(stream2, 0, 9, false);
-  WriteStreamFrame f3(stream3, 0, 9, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
-  ASSERT_TRUE(frames[2].asWriteStreamFrame());
-  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
+  auto builder2 = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder2);
+
+  verifyStreamFrames(*builder2, {f1, f2, f3});
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto connId = getTestConnectionId();
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  builder.encodePacketHeader();
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream3 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream4 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+  auto stream3 = createStream(conn);
+  auto stream4 = createStream(conn);
+
   conn.streamManager->setStreamAsControl(
       *conn.streamManager->findStream(stream2));
   conn.streamManager->setStreamAsControl(
       *conn.streamManager->findStream(stream4));
-  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
-  auto curBuf = largeBuf.get();
-  do {
-    curBuf->append(curBuf->capacity());
-    curBuf = curBuf->next();
-  } while (curBuf != largeBuf.get());
-  auto chainLen = largeBuf->computeChainDataLength();
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1), std::move(largeBuf), false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream3),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream4),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  // The default is to wraparound initially.
-  scheduler.writeStreams(builder);
+
+  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
+  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+  auto f3 = writeDataToStream(conn, stream3, "some data");
+  auto f4 = writeDataToStream(conn, stream4, "some data");
+
+  auto builder1 = createPacketBuilder(conn);
+  scheduler.writeStreams(builder1);
+
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
   // Should write frames for stream2, stream4, followed by stream 3 then 1.
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
-  }));
-  scheduler.writeStreams(builder2);
-  auto& frames = builder2.frames_;
-  ASSERT_EQ(frames.size(), 4);
-  WriteStreamFrame f1(stream2, 0, 9, false);
-  WriteStreamFrame f2(stream4, 0, 9, false);
-  WriteStreamFrame f3(stream3, 0, 9, false);
-  WriteStreamFrame f4(stream1, 0, chainLen, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
-  ASSERT_TRUE(frames[2].asWriteStreamFrame());
-  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
-  ASSERT_TRUE(frames[3].asWriteStreamFrame());
-  EXPECT_EQ(*frames[3].asWriteStreamFrame(), f4);
+  auto builder2 = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder2);
+
+  verifyStreamFrames(*builder2, {f2, f4, f3, f1});
 
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
@@ -1895,70 +1713,43 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto connId = getTestConnectionId();
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader(
-      ProtectionType::KeyPhaseZero,
-      connId,
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  builder.encodePacketHeader();
-  auto stream1 = conn.streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream1, folly::IOBuf::copyBuffer("some data"), false);
-  scheduler.writeStreams(builder);
+
+  auto stream1 = createStream(conn);
+  writeDataToStream(conn, stream1, "some data");
+
+  auto builder1 = createPacketBuilder(conn);
+  scheduler.writeStreams(builder1);
+
   EXPECT_EQ(
       conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
       0);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  NiceMock<MockQuicPacketBuilder> builder;
-  auto stream1 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  auto stream2 =
-      conn.streamManager->createNextBidirectionalStream().value()->id;
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream1),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(stream2),
-      folly::IOBuf::copyBuffer("some data"),
-      false);
-  EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder.frames_.push_back(f);
-  }));
-  scheduler.writeStreams(builder);
-  WriteStreamFrame f1(stream1, 0, 9, false);
-  WriteStreamFrame f2(stream2, 0, 9, false);
-  ASSERT_TRUE(builder.frames_[0].asWriteStreamFrame());
-  EXPECT_EQ(*builder.frames_[0].asWriteStreamFrame(), f1);
-  ASSERT_TRUE(builder.frames_[1].asWriteStreamFrame());
-  EXPECT_EQ(*builder.frames_[1].asWriteStreamFrame(), f2);
+
+  auto stream1 = createStream(conn);
+  auto stream2 = createStream(conn);
+
+  auto f1 = writeDataToStream(conn, stream1, "some data");
+  auto f2 = writeDataToStream(conn, stream2, "some data");
+
+  auto builder = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder);
+  verifyStreamFrames(*builder, {f1, f2});
 
   // Manually remove a stream and set the next scheduled to that stream.
-  builder.frames_.clear();
   conn.streamManager->writeQueue().setNextScheduledStream(stream2);
   conn.streamManager->removeWritable(*conn.streamManager->findStream(stream2));
-  scheduler.writeStreams(builder);
-  ASSERT_EQ(builder.frames_.size(), 1);
-  ASSERT_TRUE(builder.frames_[0].asWriteStreamFrame());
-  EXPECT_EQ(*builder.frames_[0].asWriteStreamFrame(), f1);
+
+  scheduler.writeStreams(*builder);
+  ASSERT_EQ(builder->frames_.size(), 1);
+  verifyStreamFrames(*builder, {f1});
 }
 
 TEST_F(
@@ -2046,47 +1837,24 @@ TEST_F(
 }
 
 TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto lowPriStreamId =
-      (*conn.streamManager->createNextBidirectionalStream())->id;
-  auto highPriStreamId =
-      (*conn.streamManager->createNextBidirectionalStream())->id;
-  auto lowPriStream = conn.streamManager->findStream(lowPriStreamId);
-  auto highPriStream = conn.streamManager->findStream(highPriStreamId);
-
-  Buf lossBuffer = folly::IOBuf::copyBuffer("Onegin");
-  ChainedByteRangeHead lossBufferRch(lossBuffer);
-
-  lowPriStream->lossBuffer.push_back(
-      WriteStreamBuffer(std::move(lossBufferRch), 0, false));
-  conn.streamManager->updateWritableStreams(*lowPriStream);
-  conn.streamManager->setStreamPriority(lowPriStream->id, Priority(5, false));
-
-  auto inBuf = buildRandomInputData(conn.udpSendPacketLen * 10);
-  writeDataToQuicStream(*highPriStream, inBuf->clone(), false);
-  conn.streamManager->updateWritableStreams(*highPriStream);
-  conn.streamManager->setStreamPriority(highPriStream->id, Priority(0, false));
-
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
-  ShortHeader shortHeader(
-      ProtectionType::KeyPhaseZero,
-      getTestConnectionId(),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  builder.encodePacketHeader();
-  scheduler.writeStreams(builder);
-  auto packet = std::move(builder).buildPacket().packet;
+
+  auto lowPriStreamId = createStream(conn, Priority(5, false));
+  auto highPriStreamId = createStream(conn, Priority(0, false));
+
+  writeDataToStream(conn, lowPriStreamId, "Onegin");
+  writeDataToStream(
+      conn, highPriStreamId, buildRandomInputData(conn.udpSendPacketLen * 10));
+
+  auto builder1 = createPacketBuilder(conn);
+  scheduler.writeStreams(builder1);
+
+  auto packet = std::move(builder1).buildPacket().packet;
   EXPECT_EQ(1, packet.frames.size());
   auto& writeStreamFrame = *packet.frames[0].asWriteStreamFrame();
-  EXPECT_EQ(highPriStream->id, writeStreamFrame.streamId);
-  EXPECT_FALSE(lowPriStream->lossBuffer.empty());
+  EXPECT_EQ(highPriStreamId, writeStreamFrame.streamId);
 }
 
 TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
@@ -2821,51 +2589,31 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
 TEST_F(QuicPacketSchedulerTest, PausedPriorityInitial) {
   static const auto kSequentialPriority = Priority(3, false);
   static const auto kPausedPriority = Priority(0, false, 0, true /* paused */);
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
-  auto pausedStreamId =
-      (*conn.streamManager->createNextBidirectionalStream())->id;
-  auto regularStreamId =
-      (*conn.streamManager->createNextBidirectionalStream())->id;
-  auto pausedStream = conn.streamManager->findStream(pausedStreamId);
-  auto regularStream = conn.streamManager->findStream(regularStreamId);
-  pausedStream->priority = kPausedPriority;
-  regularStream->priority = kSequentialPriority;
 
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(pausedStream->id),
-      folly::IOBuf::copyBuffer("paused_data"),
-      false);
-  writeDataToQuicStream(
-      *conn.streamManager->findStream(regularStream->id),
-      folly::IOBuf::copyBuffer("regular_data"),
-      false);
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
+  StreamFrameScheduler scheduler(conn);
+
+  auto pausedStreamId = createStream(conn, kPausedPriority);
+  auto regularStreamId = createStream(conn, kSequentialPriority);
+
+  auto pausedFrame = writeDataToStream(conn, pausedStreamId, "paused_data");
+  auto regularFrame = writeDataToStream(conn, regularStreamId, "regular_data");
 
   // Should write frames for only regular stream.
-  StreamFrameScheduler scheduler(conn);
-  NiceMock<MockQuicPacketBuilder> mockBuilder;
-  EXPECT_CALL(mockBuilder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(mockBuilder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    mockBuilder.frames_.push_back(f);
-  }));
-  scheduler.writeStreams(mockBuilder);
-  auto& frames = mockBuilder.frames_;
-  ASSERT_EQ(frames.size(), 1);
-  WriteStreamFrame regularFrame(regularStream->id, 0, 12, false);
-  ASSERT_TRUE(frames[0].asWriteStreamFrame());
-  EXPECT_EQ(*frames[0].asWriteStreamFrame(), regularFrame);
-  conn.streamManager->removeWritable(*regularStream);
+  auto builder = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder);
+
+  verifyStreamFrames(*builder, {regularFrame});
+
+  conn.streamManager->removeWritable(
+      *conn.streamManager->findStream(regularStreamId));
 
   // Unpause the stream. Expect the scheduleor to write the data.
   conn.streamManager->setStreamPriority(pausedStreamId, kSequentialPriority);
-  scheduler.writeStreams(mockBuilder);
-  ASSERT_EQ(frames.size(), 2);
-  WriteStreamFrame pausedFrame(pausedStream->id, 0, 11, false);
-  ASSERT_TRUE(frames[1].asWriteStreamFrame());
-  EXPECT_EQ(*frames[1].asWriteStreamFrame(), pausedFrame);
+  scheduler.writeStreams(*builder);
+
+  verifyStreamFrames(*builder, {pausedFrame});
 
   // Pause the stream again. Expect no more data writable.
   conn.streamManager->setStreamPriority(pausedStreamId, kPausedPriority);

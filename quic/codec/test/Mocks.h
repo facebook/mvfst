@@ -35,6 +35,25 @@ class MockConnectionIdAlgo : public ConnectionIdAlgo {
 
 class MockQuicPacketBuilder : public PacketBuilderInterface {
  public:
+  std::vector<size_t> remainingVec_;
+  std::vector<size_t>::iterator remainingIt_;
+
+  void setExpectedSpaceRemaining(std::vector<size_t> remainingVec) {
+    remainingVec_ = std::move(remainingVec);
+    remainingIt_ = remainingVec_.begin();
+    EXPECT_CALL(*this, appendFrame(testing::_))
+        .WillRepeatedly(testing::Invoke([this](auto f) {
+          frames_.push_back(f);
+          remainingIt_++;
+        }));
+    EXPECT_CALL(*this, remainingSpaceInPkt())
+        .WillRepeatedly(testing::Invoke([&]() { return *remainingIt_; }));
+  }
+
+  void advanceRemaining() {
+    remainingIt_++;
+  }
+
   // override method with unique_ptr since gmock doesn't support it
   void insert(std::unique_ptr<folly::IOBuf> buf) override {
     _insert(buf);
