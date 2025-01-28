@@ -40,7 +40,8 @@ constexpr float kBeta = 0.7;
 constexpr float kLossThreshold = 0.02;
 constexpr float kHeadroomFactor = 0.15;
 
-constexpr uint8_t kPacingMarginPercent = 1;
+// TODO: Restore this margin
+constexpr uint8_t kPacingMarginPercent = 0;
 
 Bbr2CongestionController::Bbr2CongestionController(
     QuicConnectionStateBase& conn)
@@ -389,9 +390,18 @@ void Bbr2CongestionController::updateCongestionSignals(
   }
 
   // Update loss signal
-  if (lossEvent && lossEvent->lostBytes > 0) {
+  if (lossEvent && lossEvent->lostBytes > 0 &&
+      !lossEvent->lostPacketNumbers.empty()) {
     lossBytesInRound_ += lossEvent->lostBytes;
-    lossEventsInRound_ += 1;
+    if (*lossEvent->lostPacketNumbers.begin() >
+        largestLostPacketNumInRound_ + 1) {
+      // Only count non-contiguous loss ranges
+      lossEventsInRound_ += 1;
+    }
+    // lossEvent->largestLostPacketNum should always be set if we have losses.
+    largestLostPacketNumInRound_ = std::max(
+        lossEvent->largestLostPacketNum.value_or(0),
+        largestLostPacketNumInRound_);
   }
 
   if (!lossRoundStart_) {
@@ -418,6 +428,7 @@ void Bbr2CongestionController::updateCongestionSignals(
 
   lossBytesInRound_ = 0;
   lossEventsInRound_ = 0;
+  largestLostPacketNumInRound_ = 0;
 }
 
 void Bbr2CongestionController::updateAckAggregation(const AckEvent& ackEvent) {
@@ -457,15 +468,10 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   discontiguous sequence ranges lost in that round trip.
 
   For 1,2 we use the loss pct from the last loss round which means we could exit
-  before a full RTT. For 3, we check we received three separate loss events
-  which servers a similar purpose to discontiguous ranges but it's not exactly
-  the same.
+  before a full RTT.
   */
   if (fullBwReached_ || !roundStart_ || isAppLimited() ||
       !conn_.transportSettings.ccaConfig.exitStartupOnLoss) {
-    // TODO: the appLimited condition means we could tolerate losses in startup
-    // if we haven't found the full bandwidth. This may need to be revisited.
-
     return; /* no need to check for a the loss exit condition now */
   }
   if (lossPctInLastRound_ > kLossThreshold && lossEventsInLastRound_ >= 6) {

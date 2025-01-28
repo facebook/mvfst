@@ -171,6 +171,7 @@ class Bbr2CongestionController : public CongestionController {
   uint64_t lossRoundEndBytesSent_{0};
   float lossPctInLastRound_{0.0f};
   uint64_t lossEventsInLastRound_{0};
+  PacketNum largestLostPacketNumInRound_{0};
   bool inLossRecovery_{false};
 
   // Cwnd
