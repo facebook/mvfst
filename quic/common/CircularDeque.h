@@ -145,18 +145,11 @@ struct CircularDeque {
       } else {
         backward = index_ > other.index_;
       }
-      difference_type counter = 0;
-      auto iter = *this;
       if (backward) {
-        while (iter-- != other) {
-          --counter;
-        }
+        return -deque_->wrappedDistance(other, *this);
       } else {
-        while (iter++ != other) {
-          ++counter;
-        }
+        return deque_->wrappedDistance(*this, other);
       }
-      return counter;
     }
 
    private:
@@ -360,9 +353,8 @@ struct CircularDeque {
     new (&storage_[dest.index_]) T(*source);
   }
 
-  size_type wrappedDistance(
-      const_iterator first,
-      const_iterator last) noexcept {
+  size_type wrappedDistance(const_iterator first, const_iterator last)
+      const noexcept {
     if (last.index_ >= first.index_) {
       return last.index_ - first.index_;
     }
