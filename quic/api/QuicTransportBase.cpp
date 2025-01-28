@@ -824,48 +824,6 @@ void QuicTransportBase::appendCmsgs(const folly::SocketCmsgMap& options) {
   socket_->appendCmsgs(options);
 }
 
-void QuicTransportBase::setBackgroundModeParameters(
-    PriorityLevel maxBackgroundPriority,
-    float backgroundUtilizationFactor) {
-  backgroundPriorityThreshold_.assign(maxBackgroundPriority);
-  backgroundUtilizationFactor_.assign(backgroundUtilizationFactor);
-  conn_->streamManager->setPriorityChangesObserver(this);
-  onStreamPrioritiesChange();
-}
-
-void QuicTransportBase::clearBackgroundModeParameters() {
-  backgroundPriorityThreshold_.clear();
-  backgroundUtilizationFactor_.clear();
-  conn_->streamManager->resetPriorityChangesObserver();
-  onStreamPrioritiesChange();
-}
-
-// If backgroundPriorityThreshold_ and backgroundUtilizationFactor_ are set
-// and all streams have equal or lower priority than the threshold (value >=
-// threshold), set the connection's congestion controller to use background
-// mode with the set utilization factor. In all other cases, turn off the
-// congestion controller's background mode.
-void QuicTransportBase::onStreamPrioritiesChange() {
-  if (conn_->congestionController == nullptr) {
-    return;
-  }
-  if (!backgroundPriorityThreshold_.hasValue() ||
-      !backgroundUtilizationFactor_.hasValue()) {
-    conn_->congestionController->setBandwidthUtilizationFactor(1.0);
-    return;
-  }
-  bool allStreamsBackground = conn_->streamManager->getHighestPriorityLevel() >=
-      backgroundPriorityThreshold_.value();
-  float targetUtilization =
-      allStreamsBackground ? backgroundUtilizationFactor_.value() : 1.0f;
-  VLOG(10) << fmt::format(
-      "Updating transport background mode. Highest Priority={} Threshold={} TargetUtilization={}",
-      conn_->streamManager->getHighestPriorityLevel(),
-      backgroundPriorityThreshold_.value(),
-      targetUtilization);
-  conn_->congestionController->setBandwidthUtilizationFactor(targetUtilization);
-}
-
 bool QuicTransportBase::checkCustomRetransmissionProfilesEnabled() const {
   return quic::checkCustomRetransmissionProfilesEnabled(*conn_);
 }

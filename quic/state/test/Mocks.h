@@ -112,8 +112,4 @@ class MockPendingPathRateLimiter : public PendingPathRateLimiter {
       (noexcept));
 };
 
-class MockQuicStreamPrioritiesObserver : public QuicStreamPrioritiesObserver {
- public:
-  MOCK_METHOD(void, onStreamPrioritiesChange, ());
-};
 } // namespace quic::test

@@ -11,7 +11,6 @@
 #include <folly/container/F14Set.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
-#include <quic/state/QuicStreamPrioritiesObserver.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 #include <numeric>
@@ -197,7 +196,6 @@ class QuicStreamManager {
     newGroupedPeerStreams_ = std::move(other.newGroupedPeerStreams_);
     blockedStreams_ = std::move(other.blockedStreams_);
     stopSendingStreams_ = std::move(other.stopSendingStreams_);
-    streamPriorityLevelsNoCtrl_ = std::move(other.streamPriorityLevelsNoCtrl_);
     windowUpdates_ = std::move(other.windowUpdates_);
     flowControlUpdated_ = std::move(other.flowControlUpdated_);
     lossStreams_ = std::move(other.lossStreams_);
@@ -989,23 +987,6 @@ class QuicStreamManager {
   bool isAppIdle() const;
 
   /*
-   * Sets an observer that will be notified whenever the set of stream
-   * priorities changes
-   */
-  void setPriorityChangesObserver(QuicStreamPrioritiesObserver* observer);
-
-  /*
-   * Stops notifications for changes to the set of stream priorities
-   */
-  void resetPriorityChangesObserver();
-
-  /*
-   * Returns the highest priority level used by any stream
-   * (Highest priority is lowest value)
-   */
-  [[nodiscard]] PriorityLevel getHighestPriorityLevel() const;
-
-  /*
    * Returns number of bidirectional groups.
    */
   [[nodiscard]] bool getNumBidirectionalGroups() const {
@@ -1050,9 +1031,6 @@ class QuicStreamManager {
   void setMaxRemoteUnidirectionalStreamsInternal(
       uint64_t maxStreams,
       bool force);
-
-  void addToStreamPriorityMap(const QuicStreamState& streamState);
-  void notifyStreamPriorityChanges();
 
   // helper to create a new peer stream.
   QuicStreamState* FOLLY_NULLABLE instantiatePeerStream(
@@ -1167,9 +1145,6 @@ class QuicStreamManager {
   // Map of streams where the peer was asked to stop sending
   folly::F14FastMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
 
-  // Map of non-control stream priority levels
-  folly::F14FastMap<StreamId, PriorityLevel> streamPriorityLevelsNoCtrl_;
-
   // Streams that had their stream window change and potentially need a window
   // update sent
   folly::F14FastSet<StreamId> windowUpdates_;
@@ -1212,9 +1187,6 @@ class QuicStreamManager {
 
   // Streams that are closed but we still have state for
   folly::F14FastSet<StreamId> closedStreams_;
-
-  // Observer to notify on changes in the streamPriorityLevels_ map
-  QuicStreamPrioritiesObserver* priorityChangesObserver_{nullptr};
 
   // Record whether or not we are app-idle.
   bool isAppIdle_{false};

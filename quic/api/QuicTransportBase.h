@@ -34,8 +34,7 @@ namespace quic {
  *    of the object that holds it to send graceful close messages to the peer.
  */
 class QuicTransportBase : public QuicSocket,
-                          virtual public QuicTransportBaseLite,
-                          QuicStreamPrioritiesObserver {
+                          virtual public QuicTransportBaseLite {
  public:
   QuicTransportBase(
       std::shared_ptr<QuicEventBase> evb,
@@ -170,23 +169,6 @@ class QuicTransportBase : public QuicSocket,
       ApplicationErrorCode error,
       folly::StringPiece errorMsg) override;
 
-  /*
-   * Set the background mode priority threshold and the target bw utilization
-   * factor to use when in background mode.
-   *
-   * If all streams have equal or lower priority compares to the threshold
-   * (value >= threshold), the connection is considered to be in background
-   * mode.
-   */
-  void setBackgroundModeParameters(
-      PriorityLevel maxBackgroundPriority,
-      float backgroundUtilizationFactor);
-
-  /*
-   * Disable background mode by clearing all related parameters.
-   */
-  void clearBackgroundModeParameters();
-
   virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
 
   void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
@@ -257,13 +239,6 @@ class QuicTransportBase : public QuicSocket,
   }
 
  protected:
-  /*
-   * Observe changes in stream priorities and handle background mode.
-   *
-   * Implements the QuicStreamPrioritiesObserver interface
-   */
-  void onStreamPrioritiesChange() override;
-
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
       bool resume);
@@ -281,13 +256,6 @@ class QuicTransportBase : public QuicSocket,
   bool handshakeDoneNotified_{false};
 
   uint64_t qlogRefcnt_{0};
-
-  // Priority level threshold for background streams
-  // If all streams have equal or lower priority to the threshold
-  // (value >= threshold), the connection is considered to be in background
-  // mode.
-  Optional<PriorityLevel> backgroundPriorityThreshold_;
-  Optional<float> backgroundUtilizationFactor_;
 
  private:
   /**
