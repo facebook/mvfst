@@ -78,7 +78,7 @@ void sendStopSendingSMHandler(
 void sendRstSMHandler(
     QuicStreamState& stream,
     ApplicationErrorCode errorCode,
-    const Optional<uint64_t>& reliableResetOffset) {
+    const Optional<uint64_t>& reliableSize) {
   switch (stream.sendState) {
     // TODO: Allow the sending of multiple RESET_STREAM OR RESET_STREAM_AT
     // frames.
@@ -86,8 +86,8 @@ void sendRstSMHandler(
       // We're assuming that higher-level functions perform the necessary
       // error checks before calling this function, which is why we're doing
       // CHECKs here.
-      if (reliableResetOffset && stream.reliableSizeToPeer) {
-        CHECK_LE(*reliableResetOffset, *stream.reliableSizeToPeer)
+      if (reliableSize && stream.reliableSizeToPeer) {
+        CHECK_LE(*reliableSize, *stream.reliableSizeToPeer)
             << "It is illegal to increase the reliable size";
       }
       if (stream.appErrorCodeToPeer) {
@@ -96,14 +96,13 @@ void sendRstSMHandler(
       }
       if (!stream.reliableSizeToPeer &&
           stream.sendState == StreamSendState::ResetSent) {
-        CHECK(!reliableResetOffset || *reliableResetOffset == 0)
+        CHECK(!reliableSize || *reliableSize == 0)
             << "RESET_STREAM frame was previously sent, and we "
             << "are increasing the reliable size";
       }
       stream.appErrorCodeToPeer = errorCode;
-      resetQuicStream(stream, errorCode, reliableResetOffset);
-      appendPendingStreamReset(
-          stream.conn, stream, errorCode, reliableResetOffset);
+      resetQuicStream(stream, errorCode, reliableSize);
+      appendPendingStreamReset(stream.conn, stream, errorCode, reliableSize);
       stream.sendState = StreamSendState::ResetSent;
       break;
     }
