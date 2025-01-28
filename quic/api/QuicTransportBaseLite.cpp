@@ -234,7 +234,8 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::stopSending(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto* stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto* stream = conn_->streamManager->getStream(id);
+  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   if (stream->recvState == StreamRecvState::Closed) {
     // skip STOP_SENDING if ingress is already closed
     return folly::unit;
@@ -293,7 +294,8 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     if (!conn_->streamManager->streamExists(id)) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream = conn_->streamManager->getStream(id);
+    CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     if (!stream->writable()) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
@@ -475,7 +477,8 @@ QuicTransportBaseLite::notifyPendingWriteOnStream(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
+  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   if (!stream->writable()) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
   }
@@ -574,7 +577,8 @@ QuicTransportBaseLite::registerByteEventCallback(
     }
     byteEventMapIt->second.emplace(pos, offset, cb);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
+  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
 
   // Notify recipients that the registration was successful.
   cb->onByteEventRegistered(ByteEvent{id, offset, type});
@@ -666,7 +670,8 @@ Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
   if (!conn_->streamManager->streamExists(id)) {
     return LocalErrorCode::STREAM_NOT_EXISTS;
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
+  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   conn_->streamManager->setStreamAsControl(*stream);
   return none;
 }
@@ -706,7 +711,8 @@ QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
     if (!conn_->streamManager->streamExists(id)) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream = conn_->streamManager->getStream(id);
+    CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     auto result = readDataFromQuicStream(*stream, maxLen);
     if (result.second) {
       VLOG(10) << "Delivered eof to app for stream=" << stream->id << " "
@@ -874,7 +880,8 @@ QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
+  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   auto packets = getNumPacketsTxWithNewData(*stream);
   return StreamTransportInfo{
       stream->totalHolbTime,
@@ -914,7 +921,8 @@ QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
+  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   return QuicSocketLite::FlowControlState(
       getSendStreamFlowControlBytesAPI(*stream),
       stream->flowControlState.peerAdvertisedMaxOffset,
@@ -1625,7 +1633,8 @@ QuicTransportBaseLite::resetStreamInternal(
     if (!conn_->streamManager->streamExists(id)) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream = conn_->streamManager->getStream(id);
+    CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     if (stream->appErrorCodeToPeer &&
         *stream->appErrorCodeToPeer != errorCode) {
       // We can't change the error code across resets for a stream
