@@ -28,6 +28,7 @@
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace folly;
@@ -2274,6 +2275,69 @@ TEST_F(QuicTransportTest, CheckpointAfterSendingReset) {
   auto checkpointResult =
       transport_->updateReliableDeliveryCheckpoint(streamId);
   EXPECT_TRUE(checkpointResult.hasError());
+}
+
+TEST_F(QuicTransportTest, RstStreamReliably) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.advertisedReliableResetStreamSupport = true;
+  conn.peerAdvertisedReliableStreamResetSupport = true;
+
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto stream =
+      transport_->getConnectionState().streamManager->findStream(streamId);
+
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
+  // Write 10 bytes to the transport
+  auto buf1 = IOBuf::create(10);
+  buf1->append(10);
+  transport_->writeChain(streamId, std::move(buf1), false);
+  // Egress the 10 bytes
+  loopForWrites();
+  // Write 2 bytes to the transport
+  auto buf2 = IOBuf::create(2);
+  buf2->append(2);
+  transport_->writeChain(streamId, std::move(buf2), false);
+  // Make a checkpoint, so that we set the reliable size to 12 bytes
+  transport_->updateReliableDeliveryCheckpoint(streamId);
+  // Write 3 bytes to the transport
+  auto buf3 = IOBuf::create(3);
+  buf3->append(3);
+  transport_->writeChain(streamId, std::move(buf3), false);
+  EXPECT_EQ(stream->pendingWrites.chainLength(), 5);
+
+  auto resetResult = transport_->resetStreamReliably(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
+  EXPECT_FALSE(resetResult.hasError());
+
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
+  // We should discard the data that doesn't have to be reliably sent, so
+  // we should just have 2 bytes of write data pending.
+  EXPECT_EQ(stream->pendingWrites.chainLength(), 2);
+  EXPECT_FALSE(stream->writable());
+  // Egress the 2 bytes that are pending
+  loopForWrites();
+
+  // ACK all frames in all packets
+  for (auto& packet : conn.outstandings.packets) {
+    for (auto& frame : packet.packet.frames) {
+      auto maybeWriteStreamFrame = frame.asWriteStreamFrame();
+      if (maybeWriteStreamFrame) {
+        sendAckSMHandler(*stream, *maybeWriteStreamFrame);
+      }
+    }
+  }
+
+  // We shouldn't yet transition to Closed because the peer hasn't ACKed
+  // the reliable reset.
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
+
+  // ACK the reliable reset
+  sendRstAckSMHandler(*stream, 12);
+
+  // We should transition to Closed because the peer has ACKed the reliable
+  // reset, and has also ACKed all of the reliable bytes.
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
 }
 
 TEST_F(QuicTransportTest, StopSending) {

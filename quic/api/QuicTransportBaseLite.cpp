@@ -402,7 +402,7 @@ QuicTransportBaseLite::unregisterStreamWriteCallback(StreamId id) {
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::resetStream(
     StreamId id,
     ApplicationErrorCode errorCode) {
-  return resetStreamInternal(id, errorCode);
+  return resetStreamInternal(id, errorCode, false /* reliable */);
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -420,6 +420,17 @@ QuicTransportBaseLite::updateReliableDeliveryCheckpoint(StreamId id) {
   stream->reliableResetCheckpoint =
       stream->currentWriteOffset + stream->pendingWrites.chainLength();
   return folly::Unit();
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::resetStreamReliably(
+    StreamId id,
+    ApplicationErrorCode errorCode) {
+  if (!conn_->transportSettings.advertisedReliableResetStreamSupport ||
+      !conn_->peerAdvertisedReliableStreamResetSupport) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  return resetStreamInternal(id, errorCode, true /* reliable */);
 }
 
 void QuicTransportBaseLite::cancelDeliveryCallbacksForStream(StreamId id) {
@@ -1593,7 +1604,8 @@ void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBaseLite::resetStreamInternal(
     StreamId id,
-    ApplicationErrorCode errorCode) {
+    ApplicationErrorCode errorCode,
+    bool reliable) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
@@ -1619,10 +1631,34 @@ QuicTransportBaseLite::resetStreamInternal(
       // We can't change the error code across resets for a stream
       return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
+    folly::Optional<uint64_t> maybeReliableSize = folly::none;
+    if (reliable) {
+      maybeReliableSize = stream->reliableResetCheckpoint;
+    }
+    if (stream->reliableSizeToPeer && maybeReliableSize &&
+        *maybeReliableSize > *stream->reliableSizeToPeer) {
+      // We can't increase the reliable size in a reset
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    if (maybeReliableSize && *maybeReliableSize > 0 &&
+        (stream->sendState == StreamSendState::ResetSent)) {
+      // We can't send a reliable reset with a non-zero reliable size if
+      // we've already sent a non-reliable reset
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
     // Invoke state machine
-    sendRstSMHandler(*stream, errorCode);
+    sendRstSMHandler(*stream, errorCode, maybeReliableSize);
 
-    cancelByteEventCallbacksForStream(id);
+    // Cancel all byte events for this stream which have offsets that don't
+    // need to be reliably delivered.
+    invokeForEachByteEventType(
+        ([this, id, &maybeReliableSize](const ByteEvent::Type type) {
+          cancelByteEventCallbacksForStreamInternal(
+              type, id, [&maybeReliableSize](uint64_t offset) {
+                return !maybeReliableSize || offset >= *maybeReliableSize;
+              });
+        }));
+
     pendingWriteCallbacks_.erase(id);
     QUIC_STATS(conn_->statsCallback, onQuicStreamReset, errorCode);
   } catch (const QuicTransportException& ex) {

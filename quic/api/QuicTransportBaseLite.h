@@ -94,6 +94,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   folly::Expected<folly::Unit, LocalErrorCode> updateReliableDeliveryCheckpoint(
       StreamId id) override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> resetStreamReliably(
+      StreamId id,
+      ApplicationErrorCode errorCode) override;
+
   /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */
@@ -619,7 +623,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   folly::Expected<folly::Unit, LocalErrorCode> resetStreamInternal(
       StreamId id,
-      ApplicationErrorCode errorCode);
+      ApplicationErrorCode errorCode,
+      bool reliable);
 
   // Only remove byte event callbacks if offsetFilter returns true.
   void cancelByteEventCallbacksForStreamInternal(

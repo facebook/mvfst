@@ -686,6 +686,14 @@ class QuicSocketLite {
   updateReliableDeliveryCheckpoint(StreamId id) = 0;
 
   /**
+   * Send a reliable reset to the peer. The reliable size sent to the peer is
+   * determined by when checkpoint(streamId) was last called.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> resetStreamReliably(
+      StreamId id,
+      ApplicationErrorCode error) = 0;
+
+  /**
    * Determine if transport is open and ready to read or write.
    *
    * return true iff the transport is open and ready, false otherwise.
