@@ -184,6 +184,12 @@ struct QuicStreamLike {
   // subsequently send a RESET_STREAM frame, we reset this value to none.
   Optional<uint64_t> reliableSizeToPeer;
 
+  // When the application calls updateReliableDeliveryCheckpoint() on the
+  // QuicSocket, this is set to the size of the data written to the QuicSocket
+  // so far. This includes data buffered in the QUIC layer that hasn't yet been
+  // written out to the wire.
+  uint64_t reliableResetCheckpoint{0};
+
   // This is set if we get a RESET_STREAM_AT or RESET_STREAM frame from the
   // peer. If we get a RESET_STREAM_AT frame, we set this value to the reliable
   // size in that frame. If we get a RESET_STREAM frame, we set this value to 0.

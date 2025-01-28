@@ -270,6 +270,10 @@ class MockQuicSocket : public QuicSocket {
       (StreamId, ApplicationErrorCode));
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
+      updateReliableDeliveryCheckpoint,
+      (StreamId));
+  MOCK_METHOD(
+      (folly::Expected<folly::Unit, LocalErrorCode>),
       maybeResetStreamFromReadError,
       (StreamId, QuicErrorCode));
   MOCK_METHOD(

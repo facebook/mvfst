@@ -405,6 +405,23 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::resetStream(
   return resetStreamInternal(id, errorCode);
 }
 
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::updateReliableDeliveryCheckpoint(StreamId id) {
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  if (stream->sendState == StreamSendState::ResetSent) {
+    // We already sent a reset, so there's really no reason why we should be
+    // doing any more checkpointing, especially since we cannot
+    // increase the reliable size in subsequent resets.
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  stream->reliableResetCheckpoint =
+      stream->currentWriteOffset + stream->pendingWrites.chainLength();
+  return folly::Unit();
+}
+
 void QuicTransportBaseLite::cancelDeliveryCallbacksForStream(StreamId id) {
   cancelByteEventCallbacksForStream(ByteEvent::Type::ACK, id);
 }

@@ -676,6 +676,16 @@ class QuicSocketLite {
       ApplicationErrorCode error) = 0;
 
   /**
+   * This is used in conjunction with reliable resets. When we send data on a
+   * stream and want to mark which offset will constitute the reliable size in a
+   * future call to resetStreamReliably, we call this function. This function
+   * can potentially be called multiple times on a stream to advance the offset,
+   * but it is an error to call it after sending a reset.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  updateReliableDeliveryCheckpoint(StreamId id) = 0;
+
+  /**
    * Determine if transport is open and ready to read or write.
    *
    * return true iff the transport is open and ready, false otherwise.

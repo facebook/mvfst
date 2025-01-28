@@ -2159,6 +2159,123 @@ TEST_F(QuicTransportTest, RstStream) {
       *transport_->getConnectionState().streamManager, stream->id));
 }
 
+TEST_F(QuicTransportTest, CheckpointBeforeAnyWrites) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto streamState =
+      transport_->getConnectionState().streamManager->findStream(streamId);
+
+  auto checkpointResult =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult.hasError());
+
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 0);
+}
+
+TEST_F(QuicTransportTest, CheckpointAfterWriteBuffered) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto streamState =
+      transport_->getConnectionState().streamManager->findStream(streamId);
+
+  auto buf1 = IOBuf::create(10);
+  buf1->append(10);
+  transport_->writeChain(streamId, std::move(buf1), false);
+  EXPECT_EQ(streamState->pendingWrites.chainLength(), 10);
+
+  auto checkpointResult =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult.hasError());
+
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 10);
+}
+
+TEST_F(QuicTransportTest, CheckpointAfterWriteWrittenToWire) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto streamState =
+      transport_->getConnectionState().streamManager->findStream(streamId);
+
+  auto buf1 = IOBuf::create(10);
+  buf1->append(10);
+  transport_->writeChain(streamId, std::move(buf1), false);
+  EXPECT_EQ(streamState->pendingWrites.chainLength(), 10);
+
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
+  loopForWrites();
+
+  EXPECT_TRUE(streamState->pendingWrites.empty());
+
+  auto checkpointResult =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult.hasError());
+
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 10);
+}
+
+TEST_F(QuicTransportTest, CheckpointAfterWritePartiallyWrittenToWire) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto streamState =
+      transport_->getConnectionState().streamManager->findStream(streamId);
+
+  auto buf1 = IOBuf::create(10);
+  buf1->append(10);
+  transport_->writeChain(streamId, std::move(buf1), false);
+  EXPECT_EQ(streamState->pendingWrites.chainLength(), 10);
+
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
+  loopForWrites();
+  EXPECT_TRUE(streamState->pendingWrites.empty());
+
+  auto buf2 = IOBuf::create(5);
+  buf2->append(5);
+  transport_->writeChain(streamId, std::move(buf2), false);
+  EXPECT_EQ(streamState->pendingWrites.chainLength(), 5);
+
+  auto checkpointResult =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult.hasError());
+
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 15);
+}
+
+TEST_F(QuicTransportTest, CheckpointMultipleTimes) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto streamState =
+      transport_->getConnectionState().streamManager->findStream(streamId);
+
+  auto buf1 = IOBuf::create(10);
+  buf1->append(10);
+  transport_->writeChain(streamId, std::move(buf1), false);
+  auto checkpointResult1 =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult1.hasError());
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 10);
+
+  auto buf2 = IOBuf::create(7);
+  buf2->append(7);
+  transport_->writeChain(streamId, std::move(buf2), false);
+  auto checkpointResult2 =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult2.hasError());
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 17);
+
+  auto buf3 = IOBuf::create(2);
+  buf3->append(2);
+  transport_->writeChain(streamId, std::move(buf3), false);
+  auto checkpointResult3 =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_FALSE(checkpointResult3.hasError());
+  EXPECT_EQ(streamState->reliableResetCheckpoint, 19);
+}
+
+TEST_F(QuicTransportTest, CheckpointAfterSendingReset) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto checkpointResult =
+      transport_->updateReliableDeliveryCheckpoint(streamId);
+  EXPECT_TRUE(checkpointResult.hasError());
+}
+
 TEST_F(QuicTransportTest, StopSending) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _, _))

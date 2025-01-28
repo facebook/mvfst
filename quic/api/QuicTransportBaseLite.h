@@ -91,6 +91,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       ApplicationErrorCode errorCode) override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> updateReliableDeliveryCheckpoint(
+      StreamId id) override;
+
   /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */
