@@ -84,6 +84,7 @@ struct CircularDeque {
                                     U,
                                     boost::random_access_traversal_tag> {
    public:
+    CircularDequeIterator() : deque_(nullptr), index_(0) {}
     CircularDequeIterator(const CircularDeque<U>* deque, size_type index)
         : deque_(deque), index_(index) {}
 
