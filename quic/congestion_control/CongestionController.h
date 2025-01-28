@@ -143,23 +143,6 @@ struct CongestionController {
   FOLLY_NODISCARD virtual CongestionControlType type() const = 0;
 
   /**
-   * Set the congestion controller to use only a fraction of the available
-   * bandwidth (best-effort for implementations that support it)
-   * bandwidthUtilizationFactor:
-   *   < 1.0 indicates backgrounded flow
-   *   = 1.0 indicates normal operation.
-   *   > 1.0 maps to =1.0
-   */
-  virtual void setBandwidthUtilizationFactor(
-      float bandwidthUtilizationFactor) noexcept = 0;
-
-  /**
-   * Whether the congestion controller is making use of all of the available
-   * bandwidth. Returns true if bandwidthUtilizationFactor < 1.0.
-   */
-  FOLLY_NODISCARD virtual bool isInBackgroundMode() const = 0;
-
-  /**
    * Whether the congestion controller thinks it's currently in app-limited
    * state.
    */

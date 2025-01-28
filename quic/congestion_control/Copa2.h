@@ -38,13 +38,6 @@ class Copa2 : public CongestionController {
   void setAppLimited() override;
   FOLLY_NODISCARD bool isAppLimited() const noexcept override;
 
-  void setBandwidthUtilizationFactor(
-      float /*bandwidthUtilizationFactor*/) noexcept override {}
-
-  bool isInBackgroundMode() const noexcept override {
-    return false;
-  }
-
   FOLLY_NODISCARD bool inLossyMode() const noexcept;
   FOLLY_NODISCARD bool inProbeRtt() const noexcept;
   FOLLY_NODISCARD uint64_t getBytesInFlight() const noexcept;

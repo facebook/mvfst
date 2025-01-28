@@ -358,7 +358,7 @@ void BbrCongestionController::handleAckInProbeBw(
   // If in background mode, pacingGain_ < 1.0
   // means BBR is intentionally underutilizing the link bandiwdth. The cycle
   // should not be advanced prematurely.
-  if (!isInBackgroundMode() && pacingGain_ < 1.0) {
+  if (pacingGain_ < 1.0) {
     targetCwndCache = calculateTargetCwnd(1.0);
     if (conn_.lossState.inflightBytes <= *targetCwndCache) {
       shouldAdvancePacingGainCycle = true;
@@ -368,8 +368,7 @@ void BbrCongestionController::handleAckInProbeBw(
   if (shouldAdvancePacingGainCycle) {
     pacingCycleIndex_ = (pacingCycleIndex_ + 1) % numOfCycles_;
     cycleStart_ = ackTime;
-    if (!isInBackgroundMode() &&
-        conn_.transportSettings.ccaConfig.drainToTarget && pacingGain_ < 1.0 &&
+    if (conn_.transportSettings.ccaConfig.drainToTarget && pacingGain_ < 1.0 &&
         pacingGainCycles_[pacingCycleIndex_] == 1.0) {
       auto drainTarget =
           targetCwndCache ? *targetCwndCache : calculateTargetCwnd(1.0);
@@ -446,13 +445,8 @@ void BbrCongestionController::handleAckInProbeRtt(
 
 void BbrCongestionController::transitToStartup() noexcept {
   state_ = BbrState::Startup;
-  if (isInBackgroundMode()) {
-    pacingGain_ = kStartupGain / 2;
-    cwndGain_ = kStartupGain / 2;
-  } else {
-    pacingGain_ = kStartupGain;
-    cwndGain_ = kStartupGain;
-  }
+  pacingGain_ = kStartupGain;
+  cwndGain_ = kStartupGain;
 }
 
 void BbrCongestionController::transitToProbeRtt() noexcept {
@@ -468,13 +462,8 @@ void BbrCongestionController::transitToProbeRtt() noexcept {
 
 void BbrCongestionController::transitToDrain() noexcept {
   state_ = BbrState::Drain;
-  if (isInBackgroundMode()) {
-    pacingGain_ = 1.0f / 2 * kStartupGain;
-    cwndGain_ = kStartupGain / 2;
-  } else {
-    pacingGain_ = 1.0f / kStartupGain;
-    cwndGain_ = kStartupGain;
-  }
+  pacingGain_ = 1.0f / kStartupGain;
+  cwndGain_ = kStartupGain;
 }
 
 void BbrCongestionController::transitToProbeBw(TimePoint congestionEventTime) {
@@ -609,49 +598,6 @@ void BbrCongestionController::setAppLimited() {
 
 bool BbrCongestionController::isAppLimited() const noexcept {
   return bandwidthSampler_ ? bandwidthSampler_->isAppLimited() : false;
-}
-
-void BbrCongestionController::setBandwidthUtilizationFactor(
-    float bandwidthUtilizationFactor) noexcept {
-  // Limit the range to [0.25,1.0]
-  if (bandwidthUtilizationFactor >= 1.0) {
-    bandwidthUtilizationFactor = 1.0;
-  } else if (bandwidthUtilizationFactor < 0.25) {
-    bandwidthUtilizationFactor = 0.25;
-  }
-  // Avoid making spurious changes to the pacingGainCycles_ and numOfCycles_
-  if (bandwidthUtilizationFactor_ == bandwidthUtilizationFactor) {
-    return;
-  }
-  bandwidthUtilizationFactor_ = bandwidthUtilizationFactor;
-  if (bandwidthUtilizationFactor_ < 1.0) {
-    numOfCycles_ = kBGNumOfCycles;
-    pacingGainCycles_.clear();
-    pacingGainCycles_.assign(numOfCycles_, bandwidthUtilizationFactor_);
-    pacingGainCycles_[0] = 1.25;
-    pacingGainCycles_[1] = 0.75;
-    if (state_ == BbrState::Startup) {
-      pacingGain_ = kStartupGain / 2;
-      cwndGain_ = kStartupGain / 2;
-    }
-  } else {
-    numOfCycles_ = kNumOfCycles;
-    pacingGainCycles_.clear();
-    pacingGainCycles_.assign(
-        kPacingGainCycles.begin(), kPacingGainCycles.end());
-    if (state_ == BbrState::Startup) {
-      pacingGain_ = kStartupGain;
-      cwndGain_ = kStartupGain;
-    }
-  }
-  maxAckHeightFilter_.SetWindowLength(bandwidthWindowLength(numOfCycles_));
-  if (bandwidthSampler_) {
-    bandwidthSampler_->setWindowLength(bandwidthWindowLength(numOfCycles_));
-  }
-}
-
-bool BbrCongestionController::isInBackgroundMode() const noexcept {
-  return bandwidthUtilizationFactor_ < 1.0;
 }
 
 void BbrCongestionController::setExperimental(bool experimental) {

@@ -778,47 +778,6 @@ TEST_F(BbrTest, ProbeRttSetsAppLimited) {
   EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
 }
 
-TEST_F(BbrTest, BackgroundMode) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController bbr(conn);
-  auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
-  auto rawBandwidthSampler = mockBandwidthSampler.get();
-  auto mockRttSampler = std::make_unique<MockMinRttSampler>();
-  bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
-  bbr.setRttSampler(std::move(mockRttSampler));
-
-  EXPECT_FALSE(bbr.isInBackgroundMode());
-
-  // Set bbr to background mode. The bandwidth sampler window should change to
-  // use kBGNumOfCycles
-  EXPECT_CALL(
-      *rawBandwidthSampler,
-      setWindowLength(bandwidthWindowLength(kBGNumOfCycles)))
-      .Times(1)
-      .RetiresOnSaturation();
-  bbr.setBandwidthUtilizationFactor(0.75);
-  EXPECT_TRUE(bbr.isInBackgroundMode());
-
-  // Call to re-enable backdground mode should not change the window length
-  // again.
-  EXPECT_CALL(
-      *rawBandwidthSampler,
-      setWindowLength(bandwidthWindowLength(kBGNumOfCycles)))
-      .Times(0);
-  bbr.setBandwidthUtilizationFactor(0.75);
-  EXPECT_TRUE(bbr.isInBackgroundMode());
-
-  // Call to disable background mode should cause the bw sampler window
-  // length to be restored to use kNumofCycles
-  EXPECT_CALL(
-      *rawBandwidthSampler,
-      setWindowLength(bandwidthWindowLength(kNumOfCycles)))
-      .Times(1)
-      .RetiresOnSaturation();
-  bbr.setBandwidthUtilizationFactor(1.0);
-  EXPECT_FALSE(bbr.isInBackgroundMode());
-}
-
 TEST_F(BbrTest, GetBandwidthSample) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);

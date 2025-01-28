@@ -79,10 +79,6 @@ CongestionControlType StaticCwndCongestionController::type() const noexcept {
   return CongestionControlType::StaticCwnd;
 }
 
-bool StaticCwndCongestionController::isInBackgroundMode() const {
-  return false;
-}
-
 bool StaticCwndCongestionController::isAppLimited() const {
   return isAppLimited_;
 }

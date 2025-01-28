@@ -224,10 +224,6 @@ CongestionControlType Bbr2CongestionController::type() const noexcept {
   return CongestionControlType::BBR2;
 }
 
-bool Bbr2CongestionController::isInBackgroundMode() const {
-  return false;
-}
-
 Optional<Bandwidth> Bbr2CongestionController::getBandwidth() const {
   return bandwidth_;
 }

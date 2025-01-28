@@ -30,9 +30,6 @@ constexpr uint8_t kNumOfCycles = 8;
 // Default pacing cycles
 constexpr std::array<float, kNumOfCycles> kPacingGainCycles =
     {1.25, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
-// Background mode number of pacing cycles. Probe for the available BW less
-// frequently (once every 32 cycles).
-constexpr uint8_t kBGNumOfCycles = 32;
 // During ProbeRtt, we need to stay in low inflight condition for at least
 // kProbeRttDuration.
 constexpr std::chrono::milliseconds kProbeRttDuration{200};
@@ -144,26 +141,6 @@ class BbrCongestionController : public CongestionController {
 
   void setExperimental(bool experimental) override;
 
-  /**
-   * Sets a factor of the measured bottleneck BW that the congestion controller
-   * should make use of. Can be used to leave headroom for other flows and to
-   * reduce the risk of queuing in the case of network condition changes.
-   *
-   * A factor less than 1.0 makes BBR less aggressive:
-   *   - During startup, BBR will grow its pacing rate and congestion window
-   *     more slowly, and StartupGain is halved.
-   *   - After exiting the startup phase:
-   *      - ProbeBW NumberOfCycles is set to 32 instead of 8. This causes BBR
-   *        to probe for bandwidth less frequently.
-   *      - ProbeBW PacingGainCycles values=factor after probing. If factor < 1,
-   *.       then BBR will only use a fraction of the measured bandwidth.
-   *
-   * If bandwidthUtilizationFactor >= 1.0, background mode is disabled.
-   * If bandwidthUtilizationFactor < 0.25, a value of 0.25 is used instead.
-   */
-  void setBandwidthUtilizationFactor(
-      float bandwidthUtilizationFactor) noexcept override;
-
   bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
@@ -171,7 +148,6 @@ class BbrCongestionController : public CongestionController {
   // TODO: some of these do not have to be in public API.
   bool inRecovery() const noexcept;
   BbrState state() const noexcept;
-  [[nodiscard]] bool isInBackgroundMode() const noexcept override;
 
  protected:
   [[nodiscard]] virtual Bandwidth bandwidth() const noexcept;
@@ -268,7 +244,6 @@ class BbrCongestionController : public CongestionController {
   // ProbeBw parameters
   uint64_t numOfCycles_{kNumOfCycles};
   std::vector<float> pacingGainCycles_;
-  float bandwidthUtilizationFactor_{1.0};
 
   uint64_t sendQuantum_{0};
 

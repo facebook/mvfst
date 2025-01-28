@@ -58,15 +58,11 @@ struct StaticCwndCongestionController : public CongestionController {
 
   FOLLY_NODISCARD CongestionControlType type() const noexcept override;
 
-  FOLLY_NODISCARD bool isInBackgroundMode() const override;
-
   FOLLY_NODISCARD bool isAppLimited() const override;
 
   void setAppLimited() noexcept override;
 
   void setAppIdle(bool, TimePoint) noexcept override {}
-
-  void setBandwidthUtilizationFactor(float) noexcept override {}
 
   void getStats(CongestionControllerStats&) const override {}
 

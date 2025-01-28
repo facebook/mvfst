@@ -38,8 +38,6 @@ class MockCongestionController : public CongestionController {
   MOCK_METHOD(CongestionControlType, type, (), (const));
   MOCK_METHOD(void, setAppIdle, (bool, TimePoint));
   MOCK_METHOD(void, setAppLimited, ());
-  MOCK_METHOD(void, setBandwidthUtilizationFactor, (float), (noexcept));
-  MOCK_METHOD(bool, isInBackgroundMode, (), (const));
   MOCK_METHOD(bool, isAppLimited, (), (const));
   MOCK_METHOD(void, getStats, (CongestionControllerStats&), (const));
   MOCK_METHOD(void, setExperimental, (bool));

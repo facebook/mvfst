@@ -46,8 +46,6 @@ class Bbr2CongestionController : public CongestionController {
 
   FOLLY_NODISCARD CongestionControlType type() const noexcept override;
 
-  FOLLY_NODISCARD bool isInBackgroundMode() const override;
-
   FOLLY_NODISCARD bool isAppLimited() const override;
 
   FOLLY_NODISCARD Optional<Bandwidth> getBandwidth() const override;
@@ -57,8 +55,6 @@ class Bbr2CongestionController : public CongestionController {
   void getStats(CongestionControllerStats& /*stats*/) const override;
 
   void setAppIdle(bool, TimePoint) noexcept override {}
-
-  void setBandwidthUtilizationFactor(float) noexcept override {}
 
   [[nodiscard]] State getState() const noexcept;
 

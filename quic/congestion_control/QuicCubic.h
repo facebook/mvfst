@@ -90,13 +90,6 @@ class Cubic : public CongestionController {
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
-  void setBandwidthUtilizationFactor(
-      float /*bandwidthUtilizationFactor*/) noexcept override {}
-
-  bool isInBackgroundMode() const noexcept override {
-    return false;
-  }
-
   bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
