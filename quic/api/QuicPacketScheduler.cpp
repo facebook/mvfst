@@ -606,10 +606,14 @@ Optional<PacketNum> AckScheduler::writeNextAcks(
             .maxReceiveTimestampsPerAck
       : 0;
 
-  if (conn_.transportSettings.readEcnOnIngress) {
-    // If ECN is enabled and we can use it, this will currently take
-    // priority over sending receive timestamps. There is currently no provision
-    // for a frame time that includes both ECN counts and receive timestamps.
+  if (conn_.transportSettings.readEcnOnIngress &&
+      (meta.ackState.ecnECT0CountReceived ||
+       meta.ackState.ecnECT1CountReceived ||
+       meta.ackState.ecnCECountReceived)) {
+    // If echoing ECN is enabled and we have seen marked packets, this will
+    // currently take priority over sending receive timestamps. There is
+    // currently no provision for a frame time that includes both ECN counts and
+    // receive timestamps.
     // TODO: explore design changes for an ACK frame that supports both ECN and
     // receive timestamps
     ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK_ECN);
