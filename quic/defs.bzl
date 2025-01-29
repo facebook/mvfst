@@ -132,9 +132,8 @@ def mvfst_cxx_library(
         apple_sdks = None,
         platforms = None,
         enable_static_variant = False,
+        compiler_flags = [],
         labels = (),
-        fbandroid_labels = (),
-        fbobjc_labels = (),
         header_namespace = "",
         **kwargs):
     """Translate a simpler declartion into the more complete library target"""
@@ -172,16 +171,16 @@ def mvfst_cxx_library(
         platforms = platforms,
         enable_static_variant = enable_static_variant,
         labels = list(labels),
-        fbandroid_labels = list(fbandroid_labels),
-        fbobjc_labels = list(fbobjc_labels),
-        compiler_flags = kwargs.pop("compiler_flags", []) + CXXFLAGS,
-        windows_compiler_flags = kwargs.pop("windows_compiler_flags", []) + CXXFLAGS + WINDOWS_CLANG_CXX_FLAGS,
-        fbobjc_compiler_flags = kwargs.pop("fbobjc_compiler_flags", []) +
-                                FBOBJC_CXXFLAGS,
-        fbcode_compiler_flags_override = kwargs.pop("fbcode_compiler_flags", []),
-        fbandroid_compiler_flags = kwargs.pop("fbandroid_compiler_flags", []) +
-                                   FBANDROID_CXXFLAGS,
-        windows_msvc_compiler_flags_override = kwargs.pop("windows_msvc_compiler_flags_override", WINDOWS_MSVC_CXXFLAGS),
+        compiler_flags = select({
+            "DEFAULT": compiler_flags + CXXFLAGS + select({
+                "DEFAULT": [],
+                "ovr_config//os:android": FBANDROID_CXXFLAGS,
+                "ovr_config//os:iphoneos": FBOBJC_CXXFLAGS,
+                "ovr_config//os:macos": FBOBJC_CXXFLAGS,
+                "ovr_config//os:windows": WINDOWS_CLANG_CXX_FLAGS,
+            }),
+            "ovr_config//compiler:msvc": WINDOWS_MSVC_CXXFLAGS,
+        }),
         windows_preferred_linkage = "static",
         visibility = kwargs.pop("visibility", ["PUBLIC"]),
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
