@@ -134,6 +134,10 @@ void QuicServerWorker::bind(
   socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
   socket_->setTXTime({CLOCK_MONOTONIC, /*deadline=*/false});
 
+  socket_->setMaxReadsPerEvent(transportSettings_.maxServerRecvPacketsPerLoop);
+  VLOG(3) << "Socket max reads per event set to "
+          << socket_->getMaxReadsPerEvent();
+
   if (mvfst_hook_on_socket_create) {
     mvfst_hook_on_socket_create(socket_->getNetworkSocket().toFd());
   }

@@ -253,7 +253,7 @@ struct TransportSettings {
   // The active_connection_id_limit that is sent to the peer.
   uint64_t selfActiveConnectionIdLimit{kMaxActiveConnectionIdLimit};
   // Maximum size of the batch that should be used when receiving packets from
-  // the kernel in one event loop.
+  // the kernel in one event loop. This is only used in clients.
   uint16_t maxRecvBatchSize{5};
   // Whether to use new receive path for recvmmsg.
   bool shouldUseWrapperRecvmmsgForBatchRecv{false};
@@ -428,6 +428,10 @@ struct TransportSettings {
   // which will be applied. i.e. when used the underlying IOBufs in the read
   // buffer will mostly be in chunks of this size.
   uint32_t readCoalescingSize{0};
+
+  // Ceiling of packets to receive from signaled socket per evb loop on the
+  // server side.
+  uint16_t maxServerRecvPacketsPerLoop{1};
 };
 
 } // namespace quic
