@@ -47,7 +47,6 @@ _modes = extend_build_modes(
     c_flags = _extra_cflags,
     clang_flags = _extra_clang_flags,
     gcc_flags = _extra_gcc_flags,
-    cxx_modular_headers = True,
 )
 
 def get_modes():
