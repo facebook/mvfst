@@ -245,6 +245,7 @@ void Bbr2CongestionController::setAppLimited() noexcept {
 void Bbr2CongestionController::resetCongestionSignals() {
   lossBytesInRound_ = 0;
   lossEventsInRound_ = 0;
+  largestLostPacketNumInRound_ = 0;
   bandwidthLatest_ = Bandwidth();
   inflightLatest_ = 0;
 }
@@ -407,11 +408,7 @@ void Bbr2CongestionController::updateCongestionSignals(
   if (!lossRoundStart_) {
     return; // we're still within the same round
   }
-  // AdaptLowerBoundsFromCongestion - once per round-trip
-  if (state_ == State::ProbeBw_Up) {
-    return;
-  }
-  if (lossBytesInRound_ > 0) {
+  if (lossBytesInRound_ > 0 && !isProbingBandwidth(state_)) {
     // InitLowerBounds
     if (!bandwidthLo_.has_value()) {
       bandwidthLo_ = maxBwFilter_.GetBest();
@@ -906,6 +903,14 @@ bool Bbr2CongestionController::isProbeBwState(
       state == Bbr2CongestionController::State::ProbeBw_Cruise ||
       state == Bbr2CongestionController::State::ProbeBw_Refill ||
       state == Bbr2CongestionController::State::ProbeBw_Up);
+}
+
+bool Bbr2CongestionController::isProbingBandwidth(
+    const Bbr2CongestionController::State state) {
+  return (
+      state == Bbr2CongestionController::State::ProbeBw_Up ||
+      state == Bbr2CongestionController::State::ProbeBw_Refill ||
+      state == Bbr2CongestionController::State::Startup);
 }
 
 Bandwidth Bbr2CongestionController::getBandwidthSampleFromAck(

@@ -130,6 +130,7 @@ class Bbr2CongestionController : public CongestionController {
   [[nodiscard]] uint64_t addQuantizationBudget(uint64_t input) const;
 
   bool isProbeBwState(const Bbr2CongestionController::State state);
+  bool isProbingBandwidth(const Bbr2CongestionController::State state);
   Bandwidth getBandwidthSampleFromAck(const AckEvent& ackEvent);
   bool isRenoCoexistenceProbeTime();
 
