@@ -1,7 +1,6 @@
 load("@fbcode_macros//build_defs:autodeps_rule.bzl", "autodeps_rule")
 load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
 load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
-load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
 load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load(
@@ -18,7 +17,7 @@ load("@fbsource//tools/build_defs:fb_xplat_cxx_binary.bzl", "fb_xplat_cxx_binary
 load("@fbsource//tools/build_defs:fb_xplat_cxx_library.bzl", "fb_xplat_cxx_library")
 load("@fbsource//tools/build_defs:fb_xplat_cxx_test.bzl", "fb_xplat_cxx_test")
 load("@fbsource//tools/build_defs:fbsource_utils.bzl", "is_arvr_mode")
-load("@fbsource//tools/build_defs:type_defs.bzl", "is_tuple")
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
 load("@fbsource//tools/build_defs/xplat:deps_map_utils.bzl", "deps_map_utils")
 load("@fbsource//xplat/pfh/Infra_Networking_Core:DEFS.bzl", "Infra_Networking_Core")
 
@@ -72,51 +71,29 @@ def _compute_header_namespace():
 def mvfst_cpp_library(
         name,
         autodeps_skip = False,
-        deps = (),
-        exported_deps = (),
-        external_deps = (),
-        exported_external_deps = (),
-        modular_headers = None,
-        header_namespace = None,
+        compiler_flags = [],
         **kwargs):
-    # Convert deps, exported_deps, and external_deps
-    if get_fbsource_cell() == "fbcode":
-        cpp_library(
-            name = name,
-            autodeps_skip = True,
-            deps = deps,
-            exported_deps = exported_deps,
-            external_deps = external_deps,
-            exported_external_deps = exported_external_deps,
-            modular_headers = modular_headers,
-            header_namespace = header_namespace,
-            **kwargs
-        )
+    fb_dirsync_cpp_library(
+        name = name,
+        compiler_flags = select({
+            "DEFAULT": compiler_flags + CXXFLAGS + select({
+                "DEFAULT": [],
+                "ovr_config//os:android": FBANDROID_CXXFLAGS,
+                "ovr_config//os:iphoneos": FBOBJC_CXXFLAGS,
+                "ovr_config//os:macos": FBOBJC_CXXFLAGS,
+                "ovr_config//os:windows": WINDOWS_CLANG_CXX_FLAGS,
+            }),
+            "ovr_config//compiler:msvc": WINDOWS_MSVC_CXXFLAGS,
+        }),
+        feature = Infra_Networking_Core,
+        **kwargs
+    )
 
-        if not autodeps_skip:
-            autodeps_rule(
-                name = name,
-                type = "mvfst_cpp_library",
-                attrs = kwargs,
-            )
-    else:
-        converted_deps = deps_map_utils.convert_all_to_fbsource_deps(
-            deps = deps,
-            exported_deps = exported_deps,
-            external_deps = external_deps,
-            exported_external_deps = exported_external_deps,
-        )
-        headers = kwargs.pop("headers", [])
-        private_headers = kwargs.pop("private_headers", [])
-        mvfst_cxx_library(
-            name,
-            deps = converted_deps.deps,
-            exported_deps = converted_deps.exported_deps,
-            exported_headers = headers,
-            headers = private_headers,
-            header_namespace = header_namespace or _compute_header_namespace(),
-            visibility = ["PUBLIC"],
-            **kwargs
+    if not autodeps_skip:
+        autodeps_rule(
+            name = name,
+            type = "mvfst_cpp_library",
+            attrs = kwargs,
         )
 
 # TODO: Turn this into an internal implementation detail
@@ -152,9 +129,6 @@ def mvfst_cxx_library(
             "DEFAULT": force_static,
             "ovr_config//runtime:fbcode": False,
         })
-
-    if is_tuple(exported_deps):
-        exported_deps = list(exported_deps)
 
     fb_xplat_cxx_library(
         name = name,
