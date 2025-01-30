@@ -91,6 +91,14 @@ PacketNum rstStreamAndSendPacket(
   return 0;
 }
 
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    Buf writeBuffer,
+    uint64_t dataLen) {
+  ChainedByteRangeHead dataHead(writeBuffer);
+  writeStreamFrameData(builder, dataHead, dataLen);
+}
+
 RegularQuicPacketBuilder::Packet createAckPacket(
     QuicConnectionStateBase& dstConn,
     PacketNum pn,
@@ -304,9 +312,10 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
       data.computeChainDataLength(),
       eof,
       none /* skipLenHint */);
+  auto dataBuf = data.clone();
   writeStreamFrameData(
       *builder,
-      data.clone(),
+      std::move(dataBuf),
       std::min(folly::to<size_t>(dataLen), data.computeChainDataLength()));
   return std::move(*builder).buildPacket();
 }

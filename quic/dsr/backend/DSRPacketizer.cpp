@@ -52,8 +52,8 @@ bool PacketGroupWriter::writeSingleQuicPacket(
       true /* skip length field in stream header */,
       std::nullopt, /* stream group id */
       false /* don't append frame to builder */);
-  BufQueue bufQueue(std::move(buf));
-  writeStreamFrameData(builder, bufQueue, *dataLen);
+  ChainedByteRangeHead chainedByteRangeHead(buf);
+  writeStreamFrameData(builder, chainedByteRangeHead, *dataLen);
   auto packet = std::move(builder).buildPacket();
   CHECK(accessor.ownsBuffer());
 

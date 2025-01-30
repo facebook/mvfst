@@ -66,28 +66,6 @@ void writeStreamFrameData(
     uint64_t dataLen);
 
 /**
- * Write stream frama data into builder
- * This writes dataLen worth of bytes from the parameter writeBuffer into the
- * parameter builder. This should only be called after a complete stream header
- * has been written by writeStreamFrameHeader.
- */
-void writeStreamFrameData(
-    PacketBuilderInterface& builder,
-    const BufQueue& writeBuffer,
-    uint64_t dataLen);
-
-/**
- * Write stream frama data into builder
- * This writes dataLen worth of bytes from the parameter writeBuffer into the
- * parameter builder. This should only be called after a complete stream header
- * has been written by writeStreamFrameHeader.
- */
-void writeStreamFrameData(
-    PacketBuilderInterface& builder,
-    Buf writeBuffer,
-    uint64_t dataLen);
-
-/**
  * Write a CryptoFrame into builder. The builder may not be able to accept all
  * the bytes that are supplied to writeCryptoFrame.
  *

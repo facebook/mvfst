@@ -120,6 +120,19 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
         pktBuilder.appender_.insert(std::move(cloneBuf));
       })));
 
+  EXPECT_CALL(pktBuilder, _insertRch(_, _))
+      .WillRepeatedly(WithArgs<0, 1>(
+          Invoke([&](const ChainedByteRangeHead& rch, size_t limit) {
+            auto curr = rch.getHead();
+            while (limit > 0 && curr) {
+              size_t amount = std::min(curr->length(), limit);
+              pktBuilder.remaining_ -= amount;
+              pktBuilder.appender_.push(curr->getRange().begin(), amount);
+              curr = curr->getNext();
+              limit -= amount;
+            }
+          })));
+
   EXPECT_CALL(pktBuilder, insert(_, _))
       .WillRepeatedly(
           WithArgs<0, 1>(Invoke([&](const BufQueue& buf, size_t limit) {

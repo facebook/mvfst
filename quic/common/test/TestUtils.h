@@ -69,6 +69,11 @@ PacketNum rstStreamAndSendPacket(
     QuicStreamState& stream,
     ApplicationErrorCode errorCode);
 
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    Buf writeBuffer,
+    uint64_t dataLen);
+
 // TODO: this is a really horrible API. User can easily pass srcConnId and
 // destConnId wrong and won't realize it. All the other createXXXPacket are also
 // horrible.

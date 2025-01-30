@@ -176,24 +176,6 @@ void writeStreamFrameData(
   }
 }
 
-void writeStreamFrameData(
-    PacketBuilderInterface& builder,
-    const BufQueue& writeBuffer,
-    uint64_t dataLen) {
-  if (dataLen > 0) {
-    builder.insert(writeBuffer, dataLen);
-  }
-}
-
-void writeStreamFrameData(
-    PacketBuilderInterface& builder,
-    Buf writeBuffer,
-    uint64_t dataLen) {
-  if (dataLen > 0) {
-    builder.insert(std::move(writeBuffer), dataLen);
-  }
-}
-
 Optional<WriteCryptoFrame> writeCryptoFrame(
     uint64_t offsetIn,
     const ChainedByteRangeHead& data,
