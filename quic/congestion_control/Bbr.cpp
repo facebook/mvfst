@@ -251,6 +251,7 @@ void BbrCongestionController::onPacketAcked(
   }
 
   if (shouldExitStartup()) {
+    QUIC_STATS(conn_.statsCallback, onBBR1ExitStartup);
     transitToDrain();
   }
 

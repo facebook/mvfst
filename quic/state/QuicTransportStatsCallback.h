@@ -195,6 +195,10 @@ class QuicTransportStatsCallback {
 
   virtual void onKeyUpdateAttemptSucceeded() = 0;
 
+  virtual void onBBR1ExitStartup() = 0;
+
+  virtual void onBBR2ExitStartup() = 0;
+
   static const char* toString(SocketErrorType errorType) {
     switch (errorType) {
       case SocketErrorType::AGAIN:
