@@ -66,9 +66,10 @@ ssize_t FollyQuicAsyncUDPSocket::write(
 
 int FollyQuicAsyncUDPSocket::writem(
     folly::Range<folly::SocketAddress const*> addrs,
-    const std::unique_ptr<folly::IOBuf>* bufs,
+    iovec* iov,
+    size_t* numIovecsInBuffer,
     size_t count) {
-  return follySocket_.writem(addrs, bufs, count);
+  return follySocket_.writemv(addrs, iov, numIovecsInBuffer, count);
 }
 
 ssize_t FollyQuicAsyncUDPSocket::writeGSO(

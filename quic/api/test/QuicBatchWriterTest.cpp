@@ -249,6 +249,147 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsg) {
   }
 }
 
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgInplaceIovecMatches) {
+  // In this test case, we don't surpass the kNumIovecBufferChains limit
+  // (i.e. the number of contiguous buffers we are sending)
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG,
+      kBatchNum,
+      false, /* enable backpressure */
+      DataPathType::ChainedMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+
+  std::vector<std::string> messages{"It", "is", "sunny!"};
+
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+  size_t size = 0;
+  for (auto& message : messages) {
+    auto buf = folly::IOBuf::copyBuffer(
+        folly::ByteRange((unsigned char*)message.data(), message.size()));
+    batchWriter->append(
+        std::move(buf), message.size(), folly::SocketAddress(), nullptr);
+    size += message.size();
+    CHECK_EQ(batchWriter->size(), size);
+  }
+
+  EXPECT_CALL(sock, writem(_, _, _, _))
+      .Times(1)
+      .WillOnce(Invoke([&](folly::Range<folly::SocketAddress const*> addrs,
+                           iovec* iovecs,
+                           size_t* messageSizes,
+                           size_t count) {
+        EXPECT_EQ(addrs.size(), 1);
+        EXPECT_EQ(count, messages.size());
+
+        size_t currentIovIndex = 0;
+        for (size_t i = 0; i < count; i++) {
+          auto wrappedIovBuffer =
+              folly::IOBuf::wrapIov(iovecs + currentIovIndex, messageSizes[i]);
+          currentIovIndex += messageSizes[i];
+
+          folly::IOBufEqualTo eq;
+          EXPECT_TRUE(
+              eq(wrappedIovBuffer,
+                 folly::IOBuf::copyBuffer(folly::ByteRange(
+                     (unsigned char*)messages[i].data(), messages[i].size()))));
+        }
+
+        return 0;
+      }));
+
+  batchWriter->write(sock, folly::SocketAddress());
+}
+
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgNewlyAllocatedIovecMatches) {
+  // In this test case, we surpass the kNumIovecBufferChains limit
+  // (i.e. the number of contiguous buffers we are sending)
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG,
+      kBatchNum,
+      false, /* enable backpressure */
+      DataPathType::ChainedMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+
+  std::vector<std::vector<std::string>> messages{
+      {"It", "is", "sunny!"},
+      {"but", "it", "is", "so", "cold"},
+      {"my",
+       "jacket",
+       "isn't",
+       "warm",
+       "enough",
+       "and",
+       "my",
+       "hands",
+       "are",
+       "freezing"}};
+
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+
+  std::vector<Buf> buffers;
+
+  size_t size = 0;
+  for (auto& message : messages) {
+    auto buf = std::make_unique<folly::IOBuf>();
+    for (size_t j = 0; j < message.size(); j++) {
+      auto partBuf = folly::IOBuf::copyBuffer(folly::ByteRange(
+          (unsigned char*)message[j].data(), message[j].size()));
+      buf->appendToChain(std::move(partBuf));
+    }
+    buffers.emplace_back(std::move(buf));
+  }
+
+  for (size_t i = 0; i < messages.size(); i++) {
+    batchWriter->append(
+        buffers[i]->clone(),
+        buffers[i]->computeChainDataLength(),
+        folly::SocketAddress(),
+        nullptr);
+    size += buffers[i]->computeChainDataLength();
+    CHECK_EQ(batchWriter->size(), size);
+  }
+
+  EXPECT_CALL(sock, writem(_, _, _, _))
+      .Times(1)
+      .WillOnce(Invoke([&](folly::Range<folly::SocketAddress const*> addrs,
+                           iovec* iovecs,
+                           size_t* messageSizes,
+                           size_t count) {
+        EXPECT_EQ(addrs.size(), 1);
+        EXPECT_EQ(count, messages.size());
+
+        size_t currentIovIndex = 0;
+        for (size_t i = 0; i < count; i++) {
+          auto wrappedIovBuffer =
+              folly::IOBuf::wrapIov(iovecs + currentIovIndex, messageSizes[i]);
+          currentIovIndex += messageSizes[i];
+
+          folly::IOBufEqualTo eq;
+          EXPECT_TRUE(eq(wrappedIovBuffer, buffers[i]));
+        }
+
+        return 0;
+      }));
+
+  batchWriter->write(sock, folly::SocketAddress());
+}
+
 TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   folly::EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb =

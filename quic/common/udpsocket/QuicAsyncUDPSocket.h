@@ -166,13 +166,15 @@ class QuicAsyncUDPSocket {
   /**
    * Send the data in buffers to destination. Returns the return code from
    * ::sendmmsg.
-   * bufs is an array of std::unique_ptr<folly::IOBuf>
-   * of size num
+   * iov is an array of iovecs, which is composed of "count" messages that
+   * need to be sent. Each message can have multiple iovecs. The number of
+   * iovecs per message is specified in numIovecsInBuffer.
    */
   virtual int writem(
-      folly::Range<folly::SocketAddress const*> /* addrs */,
-      const std::unique_ptr<folly::IOBuf>* /* bufs */,
-      size_t /* count */) = 0;
+      folly::Range<folly::SocketAddress const*> addrs,
+      iovec* iov,
+      size_t* numIovecsInBuffer,
+      size_t count) = 0;
 
   struct WriteOptions {
     WriteOptions() = default;

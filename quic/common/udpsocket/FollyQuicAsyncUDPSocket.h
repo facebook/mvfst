@@ -75,7 +75,8 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   int writem(
       folly::Range<folly::SocketAddress const*> addrs,
-      const std::unique_ptr<folly::IOBuf>* bufs,
+      iovec* iov,
+      size_t* numIovecsInBuffer,
       size_t count) override;
 
   ssize_t writeGSO(

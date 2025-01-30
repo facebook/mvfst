@@ -147,6 +147,9 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
       override;
 
  private:
+  void
+  fillIovecAndMessageSizes(iovec* vec, size_t* messageSizes, size_t iovecLen);
+
   // max number of buffer chains we can accumulate before we need to flush
   size_t maxBufs_{1};
   // size of data in all the buffers

@@ -161,8 +161,31 @@ ssize_t SendmmsgPacketBatchWriter::write(
     return sock.write(address, vec, iovec_len);
   }
 
-  int ret = sock.writem(
-      folly::range(&address, &address + 1), bufs_.data(), bufs_.size());
+  size_t numChainedBuffers = 0;
+  for (auto& buf : bufs_) {
+    numChainedBuffers += buf->countChainElements();
+  }
+
+  int ret = 0;
+  if (numChainedBuffers <= kNumIovecBufferChains &&
+      bufs_.size() < kNumIovecBufferChains) {
+    // We don't allocate arrays on the heap
+    iovec vec[kNumIovecBufferChains];
+    size_t messageSizes[kNumIovecBufferChains];
+    fillIovecAndMessageSizes(vec, messageSizes, kNumIovecBufferChains);
+    sock.writem(
+        folly::range(&address, &address + 1), vec, messageSizes, bufs_.size());
+  } else {
+    // We allocate the arrays on the heap
+    std::unique_ptr<iovec[]> vec(new iovec[numChainedBuffers]);
+    std::unique_ptr<size_t[]> messageSizes(new size_t[bufs_.size()]);
+    fillIovecAndMessageSizes(vec.get(), messageSizes.get(), numChainedBuffers);
+    sock.writem(
+        folly::range(&address, &address + 1),
+        vec.get(),
+        messageSizes.get(),
+        bufs_.size());
+  }
 
   if (ret <= 0) {
     return ret;
@@ -175,6 +198,21 @@ ssize_t SendmmsgPacketBatchWriter::write(
   // this is a partial write - we just need to
   // return a different number than currSize_
   return 0;
+}
+
+void SendmmsgPacketBatchWriter::fillIovecAndMessageSizes(
+    iovec* vec,
+    size_t* messageSizes,
+    size_t iovecLen) {
+  size_t currentIovecIndex = 0;
+  for (uint32_t i = 0; i < bufs_.size(); i++) {
+    size_t numIovecs =
+        bufs_.at(i)
+            ->fillIov(vec + currentIovecIndex, iovecLen - currentIovecIndex)
+            .numIovecs;
+    messageSizes[i] = numIovecs;
+    currentIovecIndex += numIovecs;
+  }
 }
 
 bool useSinglePacketInplaceBatchWriter(

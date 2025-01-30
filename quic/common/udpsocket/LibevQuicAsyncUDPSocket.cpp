@@ -113,9 +113,10 @@ int LibevQuicAsyncUDPSocket::getGSO() {
 }
 
 int LibevQuicAsyncUDPSocket::writem(
-    folly::Range<folly::SocketAddress const*> /* addrs */,
-    const std::unique_ptr<folly::IOBuf>* /* bufs */,
-    size_t /* count */) {
+    folly::Range<folly::SocketAddress const*>,
+    iovec*,
+    size_t*,
+    size_t) {
   LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
   return -1;
 }
