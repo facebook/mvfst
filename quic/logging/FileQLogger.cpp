@@ -550,7 +550,8 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
                            : folly::toJson(toDynamic());
     if (compress_) {
       try {
-        auto gzipCodec = folly::io::getCodec(folly::io::CodecType::GZIP);
+        auto gzipCodec =
+            folly::compression::getCodec(folly::io::CodecType::GZIP);
         auto compressed = gzipCodec->compress(qLog);
         fileObj << compressed;
       } catch (std::invalid_argument& ex) {

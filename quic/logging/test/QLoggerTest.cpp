@@ -1547,7 +1547,7 @@ TEST_F(QLoggerTest, CompressedStream) {
   auto success = folly::readFile(outputPath.c_str(), compressedData);
   ASSERT_TRUE(success);
 
-  std::string str = folly::io::getCodec(folly::io::CodecType::GZIP)
+  std::string str = folly::compression::getCodec(folly::io::CodecType::GZIP)
                         ->uncompress(compressedData);
   folly::dynamic parsed = folly::parseJson(str);
 
@@ -1591,7 +1591,7 @@ TEST_F(QLoggerTest, CompressedNonStream) {
   auto success = folly::readFile(outputPath.c_str(), compressedData);
   ASSERT_TRUE(success);
 
-  std::string str = folly::io::getCodec(folly::io::CodecType::GZIP)
+  std::string str = folly::compression::getCodec(folly::io::CodecType::GZIP)
                         ->uncompress(compressedData);
   folly::dynamic parsed = folly::parseJson(str);
 
