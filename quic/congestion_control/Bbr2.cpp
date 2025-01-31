@@ -394,11 +394,16 @@ void Bbr2CongestionController::updateCongestionSignals(
   if (lossEvent && lossEvent->lostBytes > 0 &&
       !lossEvent->lostPacketNumbers.empty()) {
     lossBytesInRound_ += lossEvent->lostBytes;
-    if (*lossEvent->lostPacketNumbers.begin() >
-        largestLostPacketNumInRound_ + 1) {
-      // Only count non-contiguous loss ranges
-      lossEventsInRound_ += 1;
+
+    // Only count non-contiguous losses as lossEvents
+    auto lastLossPn = largestLostPacketNumInRound_;
+    for (auto& pn : lossEvent->lostPacketNumbers) {
+      if (pn > lastLossPn + 1) {
+        lossEventsInRound_ += 1;
+      }
+      lastLossPn = pn;
     }
+
     // lossEvent->largestLostPacketNum should always be set if we have losses.
     largestLostPacketNumInRound_ = std::max(
         lossEvent->largestLostPacketNum.value_or(0),
