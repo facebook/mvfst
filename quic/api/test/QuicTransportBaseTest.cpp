@@ -411,14 +411,6 @@ class TestQuicTransport
     return readLooper_;
   }
 
-  void runCheckIdleTimer(TimePoint now) {
-    checkIdleTimer(now);
-  }
-
-  const IdleTimeoutCheck& getIdleTimeoutCheck() {
-    return idleTimeoutCheck_;
-  }
-
   void unbindConnection() {}
 
   void onReadError(const folly::AsyncSocketException&) noexcept {}
@@ -5037,47 +5029,6 @@ TEST_P(
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
       std::string("writeSocketDataAndCatch()  error"))));
   transport->maybeStopWriteLooperAndArmSocketWritableEvent();
-
-  transport.reset();
-}
-
-TEST_P(QuicTransportImplTestBase, TestCheckIdleTimerTimerActiveConnNotExpired) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.checkIdleTimerOnWrite = true;
-  transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
-
-  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
-  EXPECT_FALSE(transport->isClosed());
-
-  transport->setIdleTimeout();
-  transport->runCheckIdleTimer(Clock::now());
-  qEvb->loopOnce();
-
-  EXPECT_FALSE(transport->isClosed());
-
-  transport.reset();
-}
-
-TEST_P(QuicTransportImplTestBase, TestCheckIdleTimerTimerActiveConnExpired) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.checkIdleTimerOnWrite = true;
-  transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
-
-  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
-  EXPECT_FALSE(transport->isClosed());
-
-  transport->setIdleTimeout();
-  const auto& idleTimerCheck = transport->getIdleTimeoutCheck();
-  TimePoint fakeFutureTs = Clock::now() +
-      std::chrono::milliseconds(idleTimerCheck.idleTimeoutMs.count() + 1000);
-  transport->runCheckIdleTimer(fakeFutureTs);
-  qEvb->loopOnce();
-
-  EXPECT_TRUE(transport->isClosed());
 
   transport.reset();
 }

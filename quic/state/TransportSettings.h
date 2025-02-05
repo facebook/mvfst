@@ -406,8 +406,6 @@ struct TransportSettings {
   // If flow control updates should be sent based on time passed since last
   // update.
   bool disableFlowControlTimeBasedUpdates{false};
-  // Check if idle timer needs to be triggered manually.
-  bool checkIdleTimerOnWrite{false};
   // Whether to process callbacks per received packet.
   bool processCallbacksPerPacket{false};
   // Whether to trigger an inline write loop after we've read packets, rather
