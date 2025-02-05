@@ -1646,7 +1646,7 @@ void QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
   processCallbacksAfterNetworkData();
   checkForClosedStream();
   updateReadLooper();
-  updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
+  updateWriteLooper(true);
 }
 
 void QuicClientTransportLite::readWithRecvmsg(

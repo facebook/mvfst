@@ -668,7 +668,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
 
-  void updateWriteLooper(bool thisIteration, bool runInline = false);
+  void updateWriteLooper(bool thisIteration);
   void updateReadLooper();
   void updatePeekLooper();
 

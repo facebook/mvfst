@@ -408,9 +408,6 @@ struct TransportSettings {
   bool disableFlowControlTimeBasedUpdates{false};
   // Whether to process callbacks per received packet.
   bool processCallbacksPerPacket{false};
-  // Whether to trigger an inline write loop after we've read packets, rather
-  // than deferring to a loop callback.
-  bool inlineWriteAfterRead{false};
   // Whether to trigger packet processing per socket read rather than batch
   // receiving and then processing.
   bool networkDataPerSocketRead{false};

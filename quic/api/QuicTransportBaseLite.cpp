@@ -84,7 +84,7 @@ void QuicTransportBaseLite::onNetworkData(
       checkForClosedStream();
       updateReadLooper();
       updatePeekLooper();
-      updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
+      updateWriteLooper(true);
     }
   };
   try {
@@ -917,9 +917,7 @@ void QuicTransportBaseLite::runOnEvbAsync(
       true);
 }
 
-void QuicTransportBaseLite::updateWriteLooper(
-    bool thisIteration,
-    bool runInline) {
+void QuicTransportBaseLite::updateWriteLooper(bool thisIteration) {
   if (closeState_ == CloseState::CLOSED) {
     VLOG(10) << nodeToString(conn_->nodeType)
              << " stopping write looper because conn closed " << *this;
@@ -939,7 +937,7 @@ void QuicTransportBaseLite::updateWriteLooper(
     VLOG(10) << nodeToString(conn_->nodeType)
              << " running write looper thisIteration=" << thisIteration << " "
              << *this;
-    writeLooper_->run(thisIteration, runInline);
+    writeLooper_->run(thisIteration);
     if (conn_->loopDetectorCallback) {
       conn_->writeDebugState.needsWriteLoopDetect =
           (conn_->loopDetectorCallback != nullptr);
@@ -2177,7 +2175,7 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
 void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   conn_->pendingEvents.sendPing = true;
-  updateWriteLooper(true, conn_->transportSettings.inlineWriteAfterRead);
+  updateWriteLooper(true);
 }
 
 void QuicTransportBaseLite::ackTimeoutExpired() noexcept {

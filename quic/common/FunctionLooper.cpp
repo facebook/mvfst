@@ -77,7 +77,7 @@ void FunctionLooper::runLoopCallback() noexcept {
   commonLoopBody();
 }
 
-void FunctionLooper::run(bool thisIteration, bool runInline) noexcept {
+void FunctionLooper::run(bool thisIteration) noexcept {
   VLOG(10) << __func__ << ": " << type_;
   running_ = true;
   // Caller can call run() in func_. But if we are in pacing mode, we should
@@ -85,13 +85,6 @@ void FunctionLooper::run(bool thisIteration, bool runInline) noexcept {
   if (pacingTimer_ && inLoopBody_) {
     VLOG(4) << __func__ << ": " << type_
             << " in loop body and using pacing - not rescheduling";
-    return;
-  }
-  if (runInline) {
-    // Running inline, manually trigger a loop body and cancel the loop
-    // callback if it was scheduled.
-    cancelLoopCallback();
-    commonLoopBody();
     return;
   }
   if (isLoopCallbackScheduled() ||
