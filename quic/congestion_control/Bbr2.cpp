@@ -16,9 +16,9 @@
 namespace quic {
 
 constexpr uint64_t kMaxBwFilterLen = 2; // Measured in number of ProbeBW cycles
-constexpr std::chrono::microseconds kMinRttFilterLen = 10s;
-constexpr std::chrono::microseconds kProbeRTTInterval = 5s;
+constexpr std::chrono::microseconds kProbeRTTInterval = 10s;
 constexpr std::chrono::microseconds kProbeRttDuration = 200ms;
+constexpr std::chrono::microseconds kMinRttFilterLen = 10s + kProbeRttDuration;
 constexpr uint64_t kMaxExtraAckedFilterLen =
     10; // Measured in packet-timed round trips
 
