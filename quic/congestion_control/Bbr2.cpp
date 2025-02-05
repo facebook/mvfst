@@ -192,8 +192,13 @@ void Bbr2CongestionController::onPacketAckOrLoss(
               ->outstandingPacketMetadata.inflightBytes
         : conn_.lossState.inflightBytes;
     auto lostBytes = lossEvent ? lossEvent->lostBytes : 0;
+
+    // TODO: The last parameter should ideally be the bytes lost since the
+    // largestAckedPacket was sent, but we don't track that.
     updateProbeBwCyclePhase(
-        ackEvent->ackedBytes, inflightBytesAtLargestAckedPacket, lostBytes);
+        ackEvent->ackedBytes,
+        inflightBytesAtLargestAckedPacket,
+        lossBytesInRound_);
     updateMinRtt();
     checkProbeRtt(ackEvent->ackedBytes);
     advanceLatestDeliverySignals(*ackEvent);
