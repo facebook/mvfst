@@ -39,9 +39,9 @@ using namespace folly;
 using OnDataAvailableParams =
     quic::FollyAsyncUDPSocketAlias::ReadCallback::OnDataAvailableParams;
 
-const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
-const folly::SocketAddress kClientAddr2("1.2.3.5", 1235);
-const folly::SocketAddress kClientAddr3("1.2.3.6", 1236);
+const folly::SocketAddress kClientAddr(folly::IPAddress("1.2.3.4"), 1234);
+const folly::SocketAddress kClientAddr2(folly::IPAddress("1.2.3.5"), 1235);
+const folly::SocketAddress kClientAddr3(folly::IPAddress("1.2.3.6"), 1236);
 
 namespace quic::test {
 
