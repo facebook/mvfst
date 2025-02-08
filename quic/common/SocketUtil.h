@@ -38,8 +38,10 @@ void applySocketOptions(
         (option.first.level == IPPROTO_IP &&
          option.first.optname == IP_BIND_ADDRESS_NO_PORT) ||
 #endif
-        option.first.level == IPPROTO_UDP || option.first.level == SOL_SOCKET ||
-        option.first.level == SOL_UDP) {
+#ifndef _WIN32
+        option.first.level == SOL_UDP ||
+#endif
+        option.first.level == IPPROTO_UDP || option.first.level == SOL_SOCKET) {
       validOptions.insert(option);
     }
   }
