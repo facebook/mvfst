@@ -4949,7 +4949,18 @@ TYPED_TEST(
       this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(100));
   const auto pkt1RecvTime = TimePoint::clock::now();
   const auto pkt1NumBytes = pkt1->computeChainDataLength();
+
+#ifndef _WIN32
   const uint8_t packetTosValue = kEcnECT0;
+#else
+  uint8_t packetTosValue = kEcnECT0;
+  if constexpr (std::is_base_of_v<TypeParam, QuicClientTransportTestBase>) {
+    // QuicClientTransport does not support reading ECN bits using the default
+    // recvmsg read path.
+    packetTosValue = 0;
+  }
+#endif
+
   {
     const auto matcher = testing::AllOf(
         testing::Field(
