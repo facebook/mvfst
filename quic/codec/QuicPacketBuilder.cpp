@@ -760,16 +760,24 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
       (bodyStart_ > headerStart_ && bodyStart_ <= bufWriter_.tail()));
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
   // for encryption.
-  PacketBuilderInterface::Packet builtPacket(
-      std::move(packet_),
-      (bodyStart_ ? folly::IOBuf::wrapBufferAsValue(
-                        headerStart_, (bodyStart_ - headerStart_))
-                  : folly::IOBuf()),
-      (bodyStart_ ? folly::IOBuf::wrapBufferAsValue(
-                        bodyStart_, bufWriter_.tail() - bodyStart_)
-                  : folly::IOBuf()));
-  releaseOutputBufferInternal();
-  return builtPacket;
+  if (bodyStart_) {
+    folly::IOBuf bodyBuf = folly::IOBuf::wrapBufferAsValue(
+        bodyStart_, bufWriter_.tail() - bodyStart_ + cipherOverhead_);
+    bodyBuf.trimEnd(cipherOverhead_);
+
+    PacketBuilderInterface::Packet builtPacket(
+        std::move(packet_),
+        folly::IOBuf::wrapBufferAsValue(
+            headerStart_, (bodyStart_ - headerStart_)),
+        std::move(bodyBuf));
+    releaseOutputBufferInternal();
+    return builtPacket;
+  } else {
+    PacketBuilderInterface::Packet builtPacket(
+        std::move(packet_), folly::IOBuf(), folly::IOBuf());
+    releaseOutputBufferInternal();
+    return builtPacket;
+  }
 }
 
 void InplaceQuicPacketBuilder::accountForCipherOverhead(
