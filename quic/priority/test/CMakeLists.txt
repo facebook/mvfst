@@ -13,7 +13,9 @@ endif()
 quic_add_test(TARGET PriorityQueueTest
   SOURCES
   PriorityQueueTest.cpp
+  RoundRobinTests.cpp
   DEPENDS
   Folly::folly
   mvfst_constants
+  mvfst_round_robin
 )
