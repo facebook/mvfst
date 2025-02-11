@@ -1255,10 +1255,13 @@ void writeCloseCommon(
   PacketNumberSpace pnSpace = header.getPacketNumberSpace();
   HeaderForm headerForm = header.getHeaderForm();
   PacketNum packetNum = header.getPacketSequenceNum();
-  // TODO: This too needs to be switchable between regular and inplace builder.
-  RegularQuicPacketBuilder packetBuilder(
-      kDefaultUDPSendPacketLen,
-      std::move(header),
+
+  // Create a buffer onto which we write the connection close.
+  BufAccessor bufAccessor(connection.udpSendPacketLen);
+  InplaceQuicPacketBuilder packetBuilder(
+      bufAccessor,
+      connection.udpSendPacketLen,
+      header,
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   packetBuilder.encodePacketHeader();
   packetBuilder.accountForCipherOverhead(aead.getCipherOverhead());
@@ -1308,8 +1311,6 @@ void writeCloseCommon(
     return;
   }
   auto packet = std::move(packetBuilder).buildPacket();
-  packet.header.coalesce();
-  packet.body.reserve(0, aead.getCipherOverhead());
   CHECK_GE(packet.body.tailroom(), aead.getCipherOverhead());
   auto bufUniquePtr = packet.body.clone();
   bufUniquePtr =
