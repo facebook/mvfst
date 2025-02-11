@@ -56,7 +56,13 @@ class BatchWriterFactory {
       }
         [[fallthrough]];
       case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
-        return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
+        switch (dataPathType) {
+          case DataPathType::ChainedMemory:
+            return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
+          case DataPathType::ContinuousMemory:
+            return BatchWriterPtr(
+                new SendmmsgInplacePacketBatchWriter(conn, batchSize));
+        }
       case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {
         if (gsoSupported) {
           return makeSendmmsgGsoBatchWriter(batchSize);

@@ -222,4 +222,85 @@ bool useSinglePacketInplaceBatchWriter(
       dataPathType == quic::DataPathType::ContinuousMemory;
 }
 
+SendmmsgInplacePacketBatchWriter::SendmmsgInplacePacketBatchWriter(
+    QuicConnectionStateBase& conn,
+    size_t maxBufs)
+    : conn_(conn), maxBufs_(maxBufs) {
+  CHECK_LT(maxBufs, kMaxIovecs) << "maxBufs must be less than " << kMaxIovecs;
+}
+
+bool SendmmsgInplacePacketBatchWriter::empty() const {
+  return currSize_ == 0;
+}
+
+size_t SendmmsgInplacePacketBatchWriter::size() const {
+  return currSize_;
+}
+
+void SendmmsgInplacePacketBatchWriter::reset() {
+  currSize_ = 0;
+  numPacketsBuffered_ = 0;
+}
+
+bool SendmmsgInplacePacketBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& /* buf */,
+    size_t size,
+    const folly::SocketAddress& /*unused*/,
+    QuicAsyncUDPSocket* /*unused*/) {
+  CHECK_LT(numPacketsBuffered_, maxBufs_);
+
+  auto& buf = conn_.bufAccessor->buf();
+  CHECK(!buf->isChained() && buf->length() >= size);
+  iovecs_[numPacketsBuffered_].iov_base = (void*)(buf->tail() - size);
+  iovecs_[numPacketsBuffered_].iov_len = size;
+
+  ++numPacketsBuffered_;
+  currSize_ += size;
+
+  // reached max buffers
+  if (FOLLY_UNLIKELY(numPacketsBuffered_ == maxBufs_)) {
+    return true;
+  }
+
+  // does not need to be flushed yet
+  return false;
+}
+
+ssize_t SendmmsgInplacePacketBatchWriter::write(
+    QuicAsyncUDPSocket& sock,
+    const folly::SocketAddress& address) {
+  CHECK_GT(numPacketsBuffered_, 0);
+
+  auto& buf = conn_.bufAccessor->buf();
+  buf->clear();
+
+  if (numPacketsBuffered_ == 1) {
+    return sock.write(address, &iovecs_[0], 1);
+  }
+
+  int ret = 0;
+  std::array<size_t, kMaxIovecs> messageSizes{};
+
+  for (size_t i = 0; i < numPacketsBuffered_; i++) {
+    messageSizes[i] = iovecs_[i].iov_len;
+  }
+
+  sock.writem(
+      folly::range(&address, &address + 1),
+      &iovecs_[0],
+      &messageSizes[0],
+      numPacketsBuffered_);
+  if (ret <= 0) {
+    return ret;
+  }
+
+  if (static_cast<size_t>(ret) == numPacketsBuffered_) {
+    return currSize_;
+  }
+
+  // this is a partial write - we just need to
+  // return a different number than currSize_
+  return 0;
+}
+
 } // namespace quic

@@ -158,6 +158,39 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
 };
 
+class SendmmsgInplacePacketBatchWriter : public BatchWriter {
+ public:
+  explicit SendmmsgInplacePacketBatchWriter(
+      QuicConnectionStateBase& conn,
+      size_t maxBufs);
+  ~SendmmsgInplacePacketBatchWriter() override = default;
+
+  [[nodiscard]] bool empty() const override;
+
+  [[nodiscard]] size_t size() const override;
+
+  void reset() override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& /* buf */,
+      size_t size,
+      const folly::SocketAddress& /*unused*/,
+      QuicAsyncUDPSocket* /*unused*/) override;
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override;
+
+ private:
+  static const size_t kMaxIovecs = 64;
+
+  QuicConnectionStateBase& conn_;
+  // Max number of packets we can accumulate before we need to flush
+  size_t maxBufs_{1};
+  // size of data in all the buffers
+  size_t currSize_{0};
+  // Number of packets that have been written to iovec_
+  size_t numPacketsBuffered_{0};
+  std::array<iovec, kMaxIovecs> iovecs_{};
+};
+
 struct BatchWriterDeleter {
   void operator()(BatchWriter* batchWriter);
 };
