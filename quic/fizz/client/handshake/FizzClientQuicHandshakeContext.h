@@ -53,6 +53,10 @@ class FizzClientQuicHandshakeContext
     echRetryCallback_ = callback;
   }
 
+  uint16_t getChloPaddingBytes() const {
+    return chloPaddingBytes_;
+  }
+
  private:
   /**
    * We make the constructor private so that users have to use the Builder
@@ -67,7 +71,8 @@ class FizzClientQuicHandshakeContext
       std::shared_ptr<const fizz::CertificateVerifier> verifier,
       std::shared_ptr<QuicPskCache> pskCache,
       std::shared_ptr<fizz::client::ECHPolicy> echPolicy,
-      std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback);
+      std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback,
+      uint16_t chloPaddingBytes);
 
   FizzClientQuicHandshakeContext(
       std::shared_ptr<const fizz::client::FizzClientContext> context,
@@ -75,7 +80,8 @@ class FizzClientQuicHandshakeContext
       std::shared_ptr<QuicPskCache> pskCache,
       std::unique_ptr<FizzCryptoFactory> cryptoFactory,
       std::shared_ptr<fizz::client::ECHPolicy> echPolicy,
-      std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback);
+      std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback,
+      uint16_t chloPaddingBytes);
 
   std::shared_ptr<const fizz::client::FizzClientContext> context_;
   std::shared_ptr<const fizz::CertificateVerifier> verifier_;
@@ -83,6 +89,7 @@ class FizzClientQuicHandshakeContext
   std::shared_ptr<fizz::client::ECHPolicy> echPolicy_;
   std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback_;
   std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
+  uint16_t chloPaddingBytes_{0};
 
  public:
   class Builder {
@@ -121,6 +128,11 @@ class FizzClientQuicHandshakeContext
       return std::move(*this);
     }
 
+    Builder&& setChloPaddingBytes(uint16_t chloPaddingBytes) && {
+      chloPaddingBytes_ = chloPaddingBytes;
+      return std::move(*this);
+    }
+
     std::shared_ptr<FizzClientQuicHandshakeContext> build() &&;
 
    private:
@@ -130,6 +142,7 @@ class FizzClientQuicHandshakeContext
     std::shared_ptr<fizz::client::ECHPolicy> echPolicy_;
     std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback_;
     std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
+    uint16_t chloPaddingBytes_{0};
   };
 };
 

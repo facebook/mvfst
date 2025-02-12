@@ -63,7 +63,8 @@ Optional<CachedServerTransportParameters> FizzClientHandshake::connectImpl(
       fizzContext_->getCertificateVerifier(),
       std::move(hostname),
       std::move(cachedPsk),
-      std::make_shared<FizzClientExtensions>(getClientTransportParameters()),
+      std::make_shared<FizzClientExtensions>(
+          getClientTransportParameters(), fizzContext_->getChloPaddingBytes()),
       std::move(echConfigs)));
 
   return transportParams;

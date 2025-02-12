@@ -8,6 +8,7 @@
 #pragma once
 
 #include <fizz/client/ClientExtensions.h>
+#include <fizz/extensions/clientpadding/Types.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/fizz/handshake/FizzTransportParameters.h>
 
@@ -16,8 +17,10 @@ namespace quic {
 class FizzClientExtensions : public fizz::ClientExtensions {
  public:
   FizzClientExtensions(
-      std::shared_ptr<ClientTransportParametersExtension> clientParameters)
-      : clientParameters_(std::move(clientParameters)) {}
+      std::shared_ptr<ClientTransportParametersExtension> clientParameters,
+      uint16_t chloPaddingBytes)
+      : clientParameters_(std::move(clientParameters)),
+        chloPaddingBytes_(chloPaddingBytes) {}
 
   ~FizzClientExtensions() override = default;
 
@@ -29,6 +32,11 @@ class FizzClientExtensions : public fizz::ClientExtensions {
 
     exts.push_back(
         encodeExtension(params, clientParameters_->encodingVersion_));
+
+    if (chloPaddingBytes_ > 0) {
+      fizz::extensions::Padding padding{chloPaddingBytes_};
+      exts.push_back(fizz::encodeExtension(padding));
+    }
     return exts;
   }
 
@@ -48,5 +56,6 @@ class FizzClientExtensions : public fizz::ClientExtensions {
 
  private:
   std::shared_ptr<ClientTransportParametersExtension> clientParameters_;
+  uint16_t chloPaddingBytes_{0};
 };
 } // namespace quic

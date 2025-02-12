@@ -25,19 +25,21 @@ static EncryptedExtensions getEncryptedExtensions() {
 }
 
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::MVFST,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::MVFST,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      0);
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -48,19 +50,21 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
 }
 
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::QUIC_V1,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::QUIC_V1,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      0);
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -70,19 +74,21 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
 }
 
 TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::QUIC_V1_ALIAS,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::QUIC_V1_ALIAS,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      0);
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -93,37 +99,41 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
 }
 
 TEST(FizzClientHandshakeTest, TestOnEE) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::MVFST,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::MVFST,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      0);
   ext.getClientHelloExtensions();
   ext.onEncryptedExtensions(getEncryptedExtensions().extensions);
 }
 
 TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::QUIC_V1,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::QUIC_V1,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      0);
   ext.getClientHelloExtensions();
 
   auto ee = TestMessages::encryptedExt();
@@ -141,19 +151,21 @@ TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
 }
 
 TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::MVFST,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>())));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::MVFST,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      0);
   ext.getClientHelloExtensions();
   EXPECT_THROW(
       ext.onEncryptedExtensions(TestMessages::encryptedExt().extensions),
@@ -168,20 +180,22 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   customTransportParameters.push_back(
       encodeIntegerParameter(static_cast<TransportParameterId>(0x4000), 12));
 
-  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      QuicVersion::QUIC_V1,
-      kDefaultConnectionFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultStreamFlowControlWindow,
-      kDefaultMaxStreamsBidirectional,
-      kDefaultMaxStreamsUnidirectional,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit,
-      ConnectionId(std::vector<uint8_t>()),
-      customTransportParameters));
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::QUIC_V1,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>()),
+          customTransportParameters),
+      0);
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -202,5 +216,38 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   folly::io::Cursor cursor1 = folly::io::Cursor(it1->value.get());
   auto val = decodeQuicInteger(cursor1);
   EXPECT_EQ(val->first, 12);
+}
+
+TEST(FizzClientHandshakeTest, TestGetChloExtensionsChloPadding) {
+  uint16_t chloPaddingBytes = 1234;
+  FizzClientExtensions ext(
+      std::make_shared<ClientTransportParametersExtension>(
+          QuicVersion::MVFST,
+          kDefaultConnectionFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultStreamFlowControlWindow,
+          kDefaultMaxStreamsBidirectional,
+          kDefaultMaxStreamsUnidirectional,
+          kDefaultIdleTimeout,
+          kDefaultAckDelayExponent,
+          kDefaultUDPSendPacketLen,
+          kDefaultActiveConnectionIdLimit,
+          ConnectionId(std::vector<uint8_t>())),
+      chloPaddingBytes);
+  auto extensions = ext.getClientHelloExtensions();
+
+  EXPECT_EQ(extensions.size(), 2);
+  auto clientParams = getClientExtension(extensions, QuicVersion::MVFST);
+  ASSERT_TRUE(clientParams.has_value());
+  // Size == 10 to check that initial_source_connection_id is not included
+  EXPECT_EQ(clientParams->parameters.size(), 10);
+
+  auto paddingIt = findExtension(extensions, ExtensionType::padding);
+  EXPECT_NE(paddingIt, extensions.end());
+  EXPECT_EQ(paddingIt->extension_type, ExtensionType::padding);
+  EXPECT_EQ(
+      paddingIt->extension_data->computeChainDataLength(),
+      chloPaddingBytes - 4);
 }
 } // namespace quic::test

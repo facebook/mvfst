@@ -18,12 +18,14 @@ FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::CertificateVerifier> verifier,
     std::shared_ptr<QuicPskCache> pskCache,
     std::shared_ptr<fizz::client::ECHPolicy> echPolicy,
-    std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback_)
+    std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback_,
+    uint16_t chloPaddingBytes)
     : context_(std::move(context)),
       verifier_(std::move(verifier)),
       pskCache_(std::move(pskCache)),
       echPolicy_(std::move(echPolicy)),
-      echRetryCallback_(std::move(echRetryCallback_)) {}
+      echRetryCallback_(std::move(echRetryCallback_)),
+      chloPaddingBytes_(chloPaddingBytes) {}
 
 FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
@@ -31,13 +33,15 @@ FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<QuicPskCache> pskCache,
     std::unique_ptr<FizzCryptoFactory> cryptoFactory,
     std::shared_ptr<fizz::client::ECHPolicy> echPolicy,
-    std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback)
+    std::shared_ptr<fizz::client::ECHRetryCallback> echRetryCallback,
+    uint16_t chloPaddingBytes)
     : context_(std::move(context)),
       verifier_(std::move(verifier)),
       pskCache_(std::move(pskCache)),
       echPolicy_(std::move(echPolicy)),
       echRetryCallback_(std::move(echRetryCallback)),
-      cryptoFactory_(std::move(cryptoFactory)) {}
+      cryptoFactory_(std::move(cryptoFactory)),
+      chloPaddingBytes_(chloPaddingBytes) {}
 
 std::unique_ptr<ClientHandshake>
 FizzClientQuicHandshakeContext::makeClientHandshake(
@@ -102,7 +106,8 @@ FizzClientQuicHandshakeContext::Builder::build() && {
           std::move(pskCache_),
           std::move(cryptoFactory_),
           std::move(echPolicy_),
-          std::move(echRetryCallback_)));
+          std::move(echRetryCallback_),
+          chloPaddingBytes_));
 }
 
 } // namespace quic

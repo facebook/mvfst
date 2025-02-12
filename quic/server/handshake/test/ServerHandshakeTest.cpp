@@ -143,7 +143,7 @@ class ServerHandshakeTest : public Test {
         hostname,
         cachedPsk,
         Optional<std::vector<fizz::ech::ECHConfig>>(none),
-        std::make_shared<FizzClientExtensions>(clientExtensions));
+        std::make_shared<FizzClientExtensions>(clientExtensions, 0));
   }
 
   void processCryptoEvents() {
