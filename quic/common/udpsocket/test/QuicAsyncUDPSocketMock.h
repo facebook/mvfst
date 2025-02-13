@@ -43,6 +43,14 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
        const std::unique_ptr<folly::IOBuf>*,
        size_t,
        const WriteOptions*));
+  MOCK_METHOD(
+      (int),
+      writemGSO,
+      (folly::Range<folly::SocketAddress const*>,
+       iovec*,
+       size_t*,
+       size_t,
+       const WriteOptions*));
   MOCK_METHOD((ssize_t), recvmsg, (struct msghdr*, int));
   MOCK_METHOD(
       (int),

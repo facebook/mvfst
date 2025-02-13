@@ -70,6 +70,15 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
     LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
   }
 
+  int writemGSO(
+      folly::Range<folly::SocketAddress const*> /* addrs */,
+      iovec* /* iov */,
+      size_t* /* numIovecsInBuffer */,
+      size_t /* count */,
+      const WriteOptions* /* options */) override {
+    LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+  }
+
   ssize_t recvfrom(
       uint8_t* buf,
       size_t bufSize,

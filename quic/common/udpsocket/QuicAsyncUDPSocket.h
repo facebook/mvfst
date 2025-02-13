@@ -215,6 +215,23 @@ class QuicAsyncUDPSocket {
       size_t count,
       const WriteOptions* options) = 0;
 
+  /**
+   * Send the data in buffers to destination. Returns the return code from
+   * ::sendmmsg.
+   * iov is an array of iovecs, which is composed of "count" messages that
+   * need to be sent. Each message can have multiple iovecs. The number of
+   * iovecs per message is specified in numIovecsInBuffer.
+   * options is an array of WriteOptions or nullptr
+   * Before calling writeGSO with a positive value
+   * verify GSO is supported on this platform by calling getGSO
+   */
+  virtual int writemGSO(
+      folly::Range<folly::SocketAddress const*> addrs,
+      iovec* iov,
+      size_t* numIovecsInBuffer,
+      size_t count,
+      const WriteOptions* options) = 0;
+
   virtual ssize_t recvfrom(
       uint8_t* /* buf */,
       size_t /* bufSize */,

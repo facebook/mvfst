@@ -50,6 +50,14 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
        size_t count,
        const WriteOptions* options));
   MOCK_METHOD(
+      int,
+      writemGSO,
+      (folly::Range<folly::SocketAddress const*> addrs,
+       iovec* iov,
+       size_t* numIovecsInBuffer,
+       size_t count,
+       const WriteOptions* options));
+  MOCK_METHOD(
       RecvResult,
       recvmmsgNetworkData,
       (uint64_t readBufferSize,

@@ -97,6 +97,22 @@ int FollyQuicAsyncUDPSocket::writemGSO(
   return follySocket_.writemGSO(addrs, bufs, count, follyOptions.data());
 }
 
+int FollyQuicAsyncUDPSocket::writemGSO(
+    folly::Range<folly::SocketAddress const*> addrs,
+    iovec* iov,
+    size_t* numIovecsInBuffer,
+    size_t count,
+    const WriteOptions* options) {
+  std::vector<folly::AsyncUDPSocket::WriteOptions> follyOptions(count);
+  for (size_t i = 0; i < count; ++i) {
+    follyOptions[i].gso = options[i].gso;
+    follyOptions[i].zerocopy = options[i].zerocopy;
+    follyOptions[i].txTime = options[i].txTime;
+  }
+  return follySocket_.writemGSOv(
+      addrs, iov, numIovecsInBuffer, count, follyOptions.data());
+}
+
 ssize_t FollyQuicAsyncUDPSocket::recvmsg(struct msghdr* msg, int flags) {
   return follySocket_.recvmsg(msg, flags);
 }

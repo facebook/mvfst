@@ -100,6 +100,13 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       size_t count,
       const WriteOptions* options) override;
 
+  int writemGSO(
+      folly::Range<folly::SocketAddress const*> addrs,
+      iovec* iov,
+      size_t* numIovecsInBuffer,
+      size_t count,
+      const WriteOptions* options) override;
+
   ssize_t recvmsg(struct msghdr* msg, int flags) override;
 
   int recvmmsg(
