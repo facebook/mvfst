@@ -91,6 +91,7 @@ struct OutstandingsInfo {
     packetCount = {};
     clonedPacketCount = {};
     declaredLostCount = 0;
+    scheduledForDestructionCount = 0;
     dsrCount = 0;
   }
 };
