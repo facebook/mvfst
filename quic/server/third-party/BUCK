@@ -1,0 +1,8 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "siphash",
+    headers = ["siphash.h"],
+)

@@ -1,0 +1,17 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/codec:packet_number_cipher",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/handshake:aead",
+        "//quic/handshake:handshake",
+    ],
+)

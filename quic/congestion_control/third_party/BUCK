@@ -1,0 +1,10 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "chromium_windowed_filter",
+    headers = [
+        "windowed_filter.h",
+    ],
+)

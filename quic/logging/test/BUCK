@@ -1,0 +1,31 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/logging:qlogger",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "QLoggerTest",
+    srcs = [
+        "QLoggerTest.cpp",
+    ],
+    deps = [
+        "//folly:dynamic",
+        "//folly:file_util",
+        "//folly:random",
+        "//folly/portability:filesystem",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr",
+        "//quic/logging:file_qlogger",
+        "//quic/logging:qlogger",
+    ],
+)

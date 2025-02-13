@@ -1,0 +1,27 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+# Common library
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "priority_queue_test",
+    srcs = ["PriorityQueueTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/priority:priority_queue",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "round_robin_test",
+    srcs = ["RoundRobinTests.cpp"],
+    headers = [],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/priority:round_robin",
+    ],
+)

@@ -1,0 +1,103 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_binary", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "tperf_client",
+    srcs = [
+        "TperfClient.cpp",
+    ],
+    headers = [
+        "TperfClient.h",
+    ],
+    deps = [
+        "//fizz/crypto:utils",
+        "//folly/io/async:async_udp_socket",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+    ],
+    exported_deps = [
+        "//folly/io/async:async_base",
+        "//folly/stats:histogram",
+        "//quic/client:client",
+        "//quic/common/events:folly_eventbase",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "tperf_server",
+    srcs = [
+        "TperfServer.cpp",
+    ],
+    headers = [
+        "TperfServer.h",
+    ],
+    deps = [
+        ":pacing_observer",
+        ":tperf_dsr_sender",
+        "//fizz/crypto:utils",
+        "//folly/stats:histogram",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:static_cwnd_congestion_controller",
+    ],
+    exported_deps = [
+        "//quic/logging:file_qlogger",
+        "//quic/observer:socket_observer_types",
+        "//quic/server:accept_observer",
+        "//quic/server:server",
+    ],
+)
+
+mvfst_cpp_binary(
+    name = "tperf",
+    srcs = [
+        "tperf.cpp",
+    ],
+    deps = [
+        ":tperf_client",
+        ":tperf_server",
+        "//folly/init:init",
+        "//folly/portability:gflags",
+    ] + select({
+        "DEFAULT": ["//folly:memcpy-use"],
+        "ovr_config//os:windows": [],
+    }),
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "tperf_dsr_sender",
+    srcs = [
+        "TperfDSRSender.cpp",
+    ],
+    headers = [
+        "TperfDSRSender.h",
+    ],
+    deps = [
+        "//quic/dsr/backend/test:test_utils",
+    ],
+    exported_deps = [
+        "//folly:network_address",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/dsr:dsr_packetization_request_sender",
+        "//quic/dsr:types",
+        "//quic/dsr/backend:dsr_packetizer",
+        "//quic/server:server",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "pacing_observer",
+    headers = [
+        "PacingObserver.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic/api:transport",
+        "//quic/congestion_control:bandwidth",
+        "//quic/state:quic_state_machine",
+    ],
+)

@@ -1,0 +1,17 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "QuicFlowControlTest",
+    srcs = [
+        "QuicFlowControlTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//quic/client:state_and_handshake",
+        "//quic/common/test:test_utils",
+        "//quic/flowcontrol:flow_control",
+        "//quic/state/test:mocks",
+    ],
+)

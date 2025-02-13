@@ -1,0 +1,203 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_benchmark", "mvfst_cpp_library", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "IntervalSetTest",
+    srcs = [
+        "IntervalSetTest.cpp",
+    ],
+    deps = [
+        "//quic/common:interval_set",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "FunctionLooperTest",
+    srcs = [
+        "FunctionLooperTest.cpp",
+    ],
+    deps = [
+        "//quic/common:looper",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/events:highres_quic_timer",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "VariantTest",
+    srcs = [
+        "VariantTest.cpp",
+    ],
+    deps = [
+        "//quic/common:variant",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "BufAccessorTest",
+    srcs = [
+        "BufAccessorTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/common:buf_accessor",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "BufUtilTest",
+    srcs = [
+        "BufUtilTest.cpp",
+    ],
+    deps = [
+        "//folly:string",
+        "//folly/io:iobuf",
+        "//quic/common:buf_util",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "ChainedByteRangeTest",
+    srcs = [
+        "ChainedByteRangeTest.cpp",
+    ],
+    deps = [
+        "//folly:string",
+        "//folly/io:iobuf",
+        "//quic/common:buf_util",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "test_client_utils",
+    headers = [
+        "TestClientUtils.h",
+    ],
+    exported_deps = [
+        "//fizz/protocol:certificate_verifier",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "test_packet_builders",
+    srcs = [
+        "TestPacketBuilders.cpp",
+    ],
+    headers = [
+        "TestPacketBuilders.h",
+    ],
+    deps = [
+        "//quic/state:state_functions",
+    ],
+    exported_deps = [
+        "//quic/api:quic_batch_writer",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:types",
+        "//quic/state:ack_states",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "test_utils",
+    srcs = [
+        "TestUtils.cpp",
+    ],
+    headers = [
+        "TestUtils.h",
+    ],
+    deps = [
+        "//fizz/backend:openssl",
+        "//fizz/crypto/test:TestUtil",
+        "//fizz/protocol/clock/test:mock_clock",
+        "//fizz/protocol/test:mocks",
+        "//quic/api:transport_helpers",
+        "//quic/fizz/server/handshake:handshake_app_token",
+        "//quic/server/handshake:stateless_reset_generator",
+        "//quic/state:ack_event",
+        "//quic/state:loss_state",
+        "//quic/state:outstanding_packet",
+        "//quic/state/stream:stream",
+    ],
+    exported_deps = [
+        ":test_packet_builders",
+        "//fizz/client:fizz_client_context",
+        "//fizz/server:fizz_server_context",
+        "//quic/api:quic_batch_writer",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:types",
+        "//quic/common:buf_util",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/fizz/client/handshake:psk_cache",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/handshake/test:mocks",
+        "//quic/logging:file_qlogger",
+        "//quic/server/state:server",
+        "//quic/state:ack_states",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "TimeUtilTest",
+    srcs = [
+        "TimeUtilTest.cpp",
+    ],
+    deps = [
+        "//quic/common:time_util",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "TransportKnobsTest",
+    srcs = [
+        "TransportKnobsTest.cpp",
+    ],
+    deps = [
+        "//folly:format",
+        "//folly/portability:gtest",
+        "//quic:constants",
+        "//quic/common:transport_knobs",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "CircularDequeTest",
+    srcs = [
+        "CircularDequeTest.cpp",
+    ],
+    deps = [
+        ":test_utils",
+        "//folly:random",
+        "//quic/common:circular_deque",
+    ],
+)
+
+mvfst_cpp_benchmark(
+    name = "CircularDequeBench",
+    srcs = [
+        "CircularDequeBench.cpp",
+    ],
+    headers = [],
+    deps = [
+        "//folly:benchmark",
+        "//quic/common:circular_deque",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "SocketUtilTest",
+    srcs = [
+        "SocketUtilTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//folly/portability:gtest",
+        "//quic/common:socket_util",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+    ],
+)

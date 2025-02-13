@@ -1,0 +1,56 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
+load("@fbsource//tools/target_determinator/macros:ci.bzl", "ci")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "QuicEventBaseTestBase",
+    headers = [
+        "QuicEventBaseTestBase.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gtest",
+        "//quic/common/events:eventbase",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "FollyQuicEventBaseTest",
+    srcs = [
+        "FollyQuicEventBaseTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":QuicEventBaseTestBase",
+        "//folly/portability:gtest",
+        "//quic/common/events:folly_eventbase",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "LibevQuicEventBaseTest",
+    srcs = [
+        "LibevQuicEventBaseTest.cpp",
+    ],
+    labels = ci.labels(ci.remove(ci.windows())),
+    supports_static_listing = False,
+    deps = [
+        ":QuicEventBaseTestBase",
+        "//folly/portability:gtest",
+        "//quic/common/events:libev_eventbase",
+    ],
+    external_deps = [
+        "libev",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "QuicEventBaseMock",
+    headers = [
+        "QuicEventBaseMock.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/common/events:eventbase",
+    ],
+)

@@ -1,0 +1,15 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "PacingObserverTest",
+    srcs = [
+        "PacingObserverTest.cpp",
+    ],
+    deps = [
+        "//quic/common/test:test_utils",
+        "//quic/logging/test:mocks",
+        "//quic/tools/tperf:pacing_observer",
+    ],
+)
