@@ -1,0 +1,25 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "stream",
+    srcs = [
+        "StreamReceiveHandlers.cpp",
+        "StreamSendHandlers.cpp",
+        "StreamStateFunctions.cpp",
+    ],
+    headers = [
+        "StreamReceiveHandlers.h",
+        "StreamSendHandlers.h",
+        "StreamStateFunctions.h",
+    ],
+    deps = [
+        "//quic/flowcontrol:flow_control",
+    ],
+    exported_deps = [
+        "//quic/state:quic_state_machine",
+        "//quic/state:quic_stream_utilities",
+        "//quic/state:stream_functions",
+    ],
+)

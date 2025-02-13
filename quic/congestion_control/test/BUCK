@@ -1,0 +1,228 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/congestion_control:bbr",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "TestingCubic",
+    headers = [
+        "TestingCubic.h",
+    ],
+    exported_deps = [
+        "//quic/congestion_control:cubic",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "CongestionControlFunctionsTest",
+    srcs = [
+        "CongestionControlFunctionsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic:constants",
+        "//quic/congestion_control:congestion_control_functions",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "CubicStateTest",
+    srcs = [
+        "CubicStateTest.cpp",
+    ],
+    deps = [
+        ":TestingCubic",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "CubicTest",
+    srcs = [
+        "CubicHystartTest.cpp",
+        "CubicRecoveryTest.cpp",
+        "CubicSteadyTest.cpp",
+        "CubicTest.cpp",
+    ],
+    deps = [
+        ":TestingCubic",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:cubic",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "NewRenoTest",
+    srcs = [
+        "NewRenoTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:newreno",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "CopaTest",
+    srcs = [
+        "CopaTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:copa",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "BbrTest",
+    srcs = [
+        "BbrTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr",
+        "//quic/congestion_control:bbr_bandwidth_sampler",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "BbrRttSamplerTest",
+    srcs = [
+        "BbrRttSamplerTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/congestion_control:bbr_rtt_sampler",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "BbrBandwidthSamplerTest",
+    srcs = [
+        "BbrBandwidthSamplerTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr_bandwidth_sampler",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "BandwidthTest",
+    srcs = [
+        "BandwidthTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/congestion_control:bandwidth",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "PacerTest",
+    srcs = [
+        "PacerTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/congestion_control:pacer",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "StaticCwndCongestionControllerTest",
+    srcs = [
+        "StaticCwndCongestionControllerTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr",
+        "//quic/congestion_control:static_cwnd_congestion_controller",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "SimulatedTBFTest",
+    srcs = [
+        "SimulatedTBFTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/congestion_control:simulated_tbf",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "ThrottlingSignalProviderTest",
+    srcs = [
+        "ThrottlingSignalProviderTest.cpp",
+    ],
+    deps = [
+        "//quic/api:transport",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr",
+        "//quic/congestion_control:bbr_bandwidth_sampler",
+        "//quic/congestion_control:simulated_tbf",
+        "//quic/congestion_control:throttling_signal_provider",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "Bbr2Test",
+    srcs = [
+        "Bbr2Test.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr2",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "EcnL4sTrackerTest",
+    srcs = [
+        "EcnL4sTrackerTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/congestion_control:ecn_l4s_tracker",
+    ],
+)

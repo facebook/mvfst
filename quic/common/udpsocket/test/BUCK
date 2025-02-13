@@ -1,0 +1,56 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
+load("@fbsource//tools/target_determinator/macros:ci.bzl", "ci")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "QuicAsyncUDPSocketMock",
+    headers = [
+        "QuicAsyncUDPSocketMock.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "QuicAsyncUDPSocketTestBase",
+    headers = [
+        "QuicAsyncUDPSocketTestBase.h",
+    ],
+    exported_deps = [
+        ":QuicAsyncUDPSocketMock",
+        "//folly/portability:gtest",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "FollyQuicAsyncUDPSocketTest",
+    srcs = [
+        "FollyQuicAsyncUDPSocketTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        ":QuicAsyncUDPSocketTestBase",
+        "//folly/portability:gtest",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "LibevQuicAsyncUDPSocketTest",
+    srcs = [
+        "LibevQuicAsyncUDPSocketTest.cpp",
+    ],
+    labels = ci.labels(ci.remove(ci.windows())),
+    supports_static_listing = False,
+    deps = [
+        ":QuicAsyncUDPSocketTestBase",
+        "//folly/portability:gtest",
+        "//quic/common/udpsocket:libev_async_udp_socket",
+    ],
+    external_deps = [
+        "libev",
+    ],
+)

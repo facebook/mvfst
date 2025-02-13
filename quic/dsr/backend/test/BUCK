@@ -1,0 +1,32 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "test_utils",
+    headers = [
+        "TestUtils.h",
+    ],
+    exported_deps = [
+        "//quic/dsr:types",
+        "//quic/dsr/backend:dsr_packetizer",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "dsr_packetizer_test",
+    srcs = [
+        "DSRPacketizerTest.cpp",
+    ],
+    deps = [
+        ":test_utils",
+        "//folly/portability:gtest",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/test:test_utils",
+        "//quic/common/testutil:mock_async_udp_socket",
+        "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/dsr/backend:dsr_packetizer",
+        "//quic/dsr/frontend:write_functions",
+        "//quic/dsr/test:test_common",
+    ],
+)

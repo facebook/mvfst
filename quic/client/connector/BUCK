@@ -1,0 +1,31 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "connector",
+    srcs = [
+        "QuicConnector.cpp",
+    ],
+    headers = [
+        "QuicConnector.h",
+    ],
+    deps = [
+        "//folly/io/async:async_ssl_socket",
+        "//folly/io/async:async_udp_socket",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+    ],
+    exported_deps = [
+        "//fizz/client:async_fizz_client",
+        "//folly/io:socket_option_map",
+        "//quic/api:loop_detector_callback",
+        "//quic/api:transport",
+        "//quic/client:client",
+        "//quic/common:time_util",
+        "//quic/common/events:folly_eventbase",
+        "//quic/fizz/client/handshake:psk_cache",
+        "//quic/logging:qlogger",
+    ],
+)

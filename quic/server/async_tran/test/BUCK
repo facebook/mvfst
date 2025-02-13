@@ -1,0 +1,26 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("traffic_protocols")
+
+fb_dirsync_cpp_unittest(
+    name = "QuicAsyncTransportServerTest",
+    srcs = [
+        "QuicAsyncTransportServerTest.cpp",
+    ],
+    deps = [
+        "//folly/futures:core",
+        "//folly/io/async:async_transport",
+        "//folly/io/async/test:mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api/test:mocks",
+        "//quic/client:client",
+        "//quic/client:client_async_transport",
+        "//quic/common/test:test_client_utils",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/server:server",
+        "//quic/server/async_tran:server_async_transport",
+        "//quic/server/test:mocks",
+    ],
+)

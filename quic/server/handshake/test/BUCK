@@ -1,0 +1,103 @@
+load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+
+oncall("traffic_protocols")
+
+fb_dirsync_cpp_unittest(
+    name = "ServerHandshakeTest",
+    srcs = [
+        "ServerHandshakeTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//fizz/client/test:mocks",
+        "//fizz/crypto/test:TestUtil",
+        "//fizz/protocol/clock/test:mock_clock",
+        "//fizz/protocol/test:mocks",
+        "//fizz/server/test:mocks",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:ssl_context",
+        "//folly/io/async/test:mocks",
+        "//quic:constants",
+        "//quic/common/test:test_utils",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/fizz/server/handshake:handshake_app_token",
+        "//quic/handshake:handshake",
+        "//quic/server/handshake:app_token",
+        "//quic/server/handshake:server_handshake",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "ServerTransportParametersTest",
+    srcs = [
+        "ServerTransportParametersTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//fizz/protocol/test:test_util",
+        "//quic:constants",
+        "//quic/common/test:test_utils",
+        "//quic/server/handshake:server_extension",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "AppTokenTest",
+    srcs = [
+        "AppTokenTest.cpp",
+    ],
+    deps = [
+        "//fizz/server:resumption_state",
+        "//quic:constants",
+        "//quic/common:optional",
+        "//quic/fizz/server/handshake:handshake_app_token",
+        "//quic/server/state:server",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "DefaultAppTokenValidatorTest",
+    srcs = [
+        "DefaultAppTokenValidatorTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//fizz/server:resumption_state",
+        "//quic:constants",
+        "//quic/api/test:mocks",
+        "//quic/common:optional",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/fizz/server/handshake:handshake_app_token",
+        "//quic/server/handshake:default_app_token_validator",
+        "//quic/server/state:server",
+        "//quic/state/test:mocks",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "StatelessResetGeneratorTest",
+    srcs = [
+        "StatelessResetGeneratorTest.cpp",
+    ],
+    deps = [
+        "//folly:network_address",
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//quic/server/handshake:stateless_reset_generator",
+    ],
+)
+
+fb_dirsync_cpp_unittest(
+    name = "RetryTokenGeneratorTest",
+    srcs = [
+        "RetryTokenGeneratorTest.cpp",
+    ],
+    deps = [
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//quic/server/handshake:token_generator",
+    ],
+)

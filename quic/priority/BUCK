@@ -1,0 +1,33 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+# Common library
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "priority_queue",
+    headers = [
+        "PriorityQueue.h",
+    ],
+    exported_deps = [
+        "//quic/common:optional",
+    ],
+    exported_external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "round_robin",
+    srcs = [
+        "RoundRobin.cpp",
+    ],
+    headers = [
+        "RoundRobin.h",
+    ],
+    exported_deps = [
+        ":priority_queue",
+        "//folly/container:f14_hash",
+        "//quic/common:optional",
+    ],
+)

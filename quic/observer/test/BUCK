@@ -1,0 +1,16 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "SocketObserverInterfaceTest",
+    srcs = [
+        "SocketObserverInterfaceTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//quic/common/test:test_packet_builders",
+        "//quic/common/test:test_utils",
+        "//quic/observer:socket_observer_interface",
+    ],
+)

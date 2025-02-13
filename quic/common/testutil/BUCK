@@ -1,0 +1,15 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "mock_async_udp_socket",
+    headers = [
+        "MockAsyncUDPSocket.h",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/udpsocket:folly_async_udp_socket",
+    ],
+)
