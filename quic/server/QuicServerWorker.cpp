@@ -1262,7 +1262,9 @@ void QuicServerWorker::setFizzContext(
 }
 TransportSettings QuicServerWorker::validateTransportSettings(
     TransportSettings transportSettings) {
-  if (transportSettings.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO) {
+  if (transportSettings.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO &&
+      transportSettings.batchingMode !=
+          QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO) {
     if (transportSettings.dataPathType == DataPathType::ContinuousMemory) {
       LOG(ERROR) << "Unsupported data path type and batching mode combination";
     }

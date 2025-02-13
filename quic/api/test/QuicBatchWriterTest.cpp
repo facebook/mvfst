@@ -564,6 +564,374 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   }
 }
 
+// Test the case where we send 5 packets, all of the same size, to the
+// same address.
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOInplaceSameSizeAll) {
+  gsoSupported_ = true;
+  size_t batchSize = 5;
+  size_t packetSize = 100;
+
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto bufAccessor =
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
+  conn_.bufAccessor = bufAccessor.get();
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
+      batchSize,
+      false, /* enable backpressure */
+      DataPathType::ContinuousMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+  size_t size = 0;
+  for (size_t j = 0; j < batchSize - 1; j++) {
+    bufAccessor->append(packetSize);
+    EXPECT_FALSE(batchWriter->append(
+        nullptr, packetSize, folly::SocketAddress(), nullptr));
+    size += packetSize;
+    EXPECT_EQ(batchWriter->size(), size);
+  }
+  bufAccessor->append(packetSize);
+  EXPECT_TRUE(batchWriter->append(
+      nullptr, packetSize, folly::SocketAddress(), nullptr));
+  size += packetSize;
+  EXPECT_EQ(batchWriter->size(), size);
+
+  EXPECT_CALL(sock, writeGSO(_, _, _, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const folly::SocketAddress&,
+                           const struct iovec* iovecs,
+                           size_t iovec_len,
+                           QuicAsyncUDPSocket::WriteOptions writeOptions) {
+        EXPECT_EQ(iovec_len, 5);
+        EXPECT_EQ(writeOptions.gso, packetSize);
+
+        for (uint32_t i = 0; i < 5; i++) {
+          EXPECT_EQ(
+              iovecs[i].iov_base,
+              (uint8_t*)bufAccessor->buf()->buffer() + packetSize * i);
+          EXPECT_EQ(iovecs[i].iov_len, packetSize);
+        }
+
+        return 1;
+      }));
+  batchWriter->write(sock, folly::SocketAddress());
+  EXPECT_TRUE(bufAccessor->buf()->empty());
+}
+
+// Test the case where we do the following for the same address, in order:
+// (1) Send 3 packets of the same size
+// (2) Send 1 packet that's smaller than the previous 3
+// (3) Send 1 packet of the same size as the 3 initial ones
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOInplaceSmallerSizeInMiddle) {
+  gsoSupported_ = true;
+  size_t batchSize = 5;
+
+  std::vector<size_t> packetSizes = {100, 100, 100, 70, 100};
+
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto bufAccessor =
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
+  conn_.bufAccessor = bufAccessor.get();
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
+      batchSize,
+      false, /* enable backpressure */
+      DataPathType::ContinuousMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+  size_t size = 0;
+  for (size_t j = 0; j < batchSize - 1; j++) {
+    bufAccessor->append(packetSizes[j]);
+    EXPECT_FALSE(batchWriter->append(
+        nullptr, packetSizes[j], folly::SocketAddress(), nullptr));
+    size += packetSizes[j];
+    EXPECT_EQ(batchWriter->size(), size);
+  }
+  bufAccessor->append(packetSizes[batchSize - 1]);
+  EXPECT_TRUE(batchWriter->append(
+      nullptr, packetSizes[batchSize - 1], folly::SocketAddress(), nullptr));
+  size += packetSizes[batchSize - 1];
+  EXPECT_EQ(batchWriter->size(), size);
+
+  EXPECT_CALL(sock, writemGSO(_, _, _, _, _))
+      .Times(1)
+      .WillOnce(
+          Invoke([&](folly::Range<folly::SocketAddress const*> /* addrs */,
+                     iovec* iov,
+                     size_t* numIovecsInBuffer,
+                     size_t count,
+                     const QuicAsyncUDPSocket::WriteOptions* options) {
+            EXPECT_EQ(count, 2);
+            EXPECT_EQ(numIovecsInBuffer[0], 4);
+            EXPECT_EQ(numIovecsInBuffer[1], 1);
+            EXPECT_EQ(options[0].gso, 100);
+            // There's just one packet in the second series, so we don't use GSO
+            // there.
+            EXPECT_EQ(options[1].gso, 0);
+
+            auto* currBufferAddr = (uint8_t*)bufAccessor->buf()->buffer();
+            for (uint32_t i = 0; i < batchSize; i++) {
+              EXPECT_EQ(iov[i].iov_base, currBufferAddr);
+              EXPECT_EQ(iov[i].iov_len, packetSizes[i]);
+
+              currBufferAddr += packetSizes[i];
+            }
+
+            return 2;
+          }));
+  batchWriter->write(sock, folly::SocketAddress());
+  EXPECT_TRUE(bufAccessor->buf()->empty());
+}
+
+// Test the case where we do the following for the same address, in order:
+// (1) Send 3 packets of the same size
+// (2) Send 1 packet that's larger than the previous 3
+// (3) Send 1 packet of the same size as the 3 initial ones
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOInplaceLargerSizeInMiddle) {
+  gsoSupported_ = true;
+  size_t batchSize = 5;
+
+  std::vector<size_t> packetSizes = {100, 100, 100, 120, 100};
+
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto bufAccessor =
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
+  conn_.bufAccessor = bufAccessor.get();
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
+      batchSize,
+      false, /* enable backpressure */
+      DataPathType::ContinuousMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+  size_t size = 0;
+  for (size_t j = 0; j < batchSize - 1; j++) {
+    bufAccessor->append(packetSizes[j]);
+    EXPECT_FALSE(batchWriter->append(
+        nullptr, packetSizes[j], folly::SocketAddress(), nullptr));
+    size += packetSizes[j];
+    EXPECT_EQ(batchWriter->size(), size);
+  }
+  bufAccessor->append(packetSizes[batchSize - 1]);
+  EXPECT_TRUE(batchWriter->append(
+      nullptr, packetSizes[batchSize - 1], folly::SocketAddress(), nullptr));
+  size += packetSizes[batchSize - 1];
+  EXPECT_EQ(batchWriter->size(), size);
+
+  EXPECT_CALL(sock, writemGSO(_, _, _, _, _))
+      .Times(1)
+      .WillOnce(
+          Invoke([&](folly::Range<folly::SocketAddress const*> /* addrs */,
+                     iovec* iov,
+                     size_t* numIovecsInBuffer,
+                     size_t count,
+                     const QuicAsyncUDPSocket::WriteOptions* options) {
+            EXPECT_EQ(count, 2);
+            EXPECT_EQ(numIovecsInBuffer[0], 3);
+            EXPECT_EQ(numIovecsInBuffer[1], 2);
+            EXPECT_EQ(options[0].gso, 100);
+            EXPECT_EQ(options[1].gso, 120);
+
+            auto* currBufferAddr = (uint8_t*)bufAccessor->buf()->buffer();
+            for (uint32_t i = 0; i < batchSize; i++) {
+              EXPECT_EQ(iov[i].iov_base, currBufferAddr);
+              EXPECT_EQ(iov[i].iov_len, packetSizes[i]);
+
+              currBufferAddr += packetSizes[i];
+            }
+
+            return 2;
+          }));
+  batchWriter->write(sock, folly::SocketAddress());
+  EXPECT_TRUE(bufAccessor->buf()->empty());
+}
+
+// Send 5 packets of the same length.
+// Packets 1, 2, and 5 are to address A.
+// Packets 3 and 4 are to address B.
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOInplaceDifferentAddrs) {
+  folly::SocketAddress addrA("127.0.0.1", 80);
+  folly::SocketAddress addrB("127.0.0.1", 443);
+
+  std::vector<folly::SocketAddress> addrs = {addrA, addrA, addrB, addrB, addrA};
+
+  gsoSupported_ = true;
+  size_t batchSize = 5;
+  size_t packetSize = 100;
+
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto bufAccessor =
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
+  conn_.bufAccessor = bufAccessor.get();
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
+      batchSize,
+      false, /* enable backpressure */
+      DataPathType::ContinuousMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+  size_t size = 0;
+  for (size_t j = 0; j < batchSize - 1; j++) {
+    bufAccessor->append(packetSize);
+    EXPECT_FALSE(batchWriter->append(nullptr, packetSize, addrs[j], nullptr));
+    size += packetSize;
+    EXPECT_EQ(batchWriter->size(), size);
+  }
+  bufAccessor->append(packetSize);
+  EXPECT_TRUE(
+      batchWriter->append(nullptr, packetSize, addrs[batchSize - 1], nullptr));
+  size += packetSize;
+  EXPECT_EQ(batchWriter->size(), size);
+
+  EXPECT_CALL(sock, writemGSO(_, _, _, _, _))
+      .Times(1)
+      .WillOnce(Invoke([&](folly::Range<folly::SocketAddress const*> addrs,
+                           iovec* iov,
+                           size_t* numIovecsInBuffer,
+                           size_t count,
+                           const QuicAsyncUDPSocket::WriteOptions* options) {
+        EXPECT_EQ(count, 2);
+        EXPECT_EQ(numIovecsInBuffer[0], 3);
+        EXPECT_EQ(numIovecsInBuffer[1], 2);
+
+        EXPECT_EQ(options[0].gso, packetSize);
+        EXPECT_EQ(options[1].gso, packetSize);
+
+        // All packets are of size packetSize
+        for (uint32_t i = 0; i < batchSize; i++) {
+          EXPECT_EQ(iov[i].iov_len, packetSize);
+        }
+
+        // If the shared buffer looks like this:
+        // [slot1, slot2, slot3, slot4, slot5]
+        // Then iov should look like
+        // [slot1, slot2, slot5, slot3, slot4]
+        auto* bufferStart = (uint8_t*)bufAccessor->buf()->buffer();
+        std::vector<uint8_t*> expectedBufferStartPositions = {
+            bufferStart,
+            bufferStart + packetSize,
+            bufferStart + 4 * packetSize,
+            bufferStart + 2 * packetSize,
+            bufferStart + 3 * packetSize};
+        for (uint32_t i = 0; i < batchSize; i++) {
+          EXPECT_EQ(iov[i].iov_base, expectedBufferStartPositions[i]);
+        }
+
+        EXPECT_EQ(addrs[0], addrA);
+        EXPECT_EQ(addrs[1], addrB);
+
+        return 2;
+      }));
+
+  batchWriter->write(sock, folly::SocketAddress());
+  EXPECT_TRUE(bufAccessor->buf()->empty());
+}
+
+// Test the case where we send 5 packets, all of the same size, to the
+// same address, with an external writer writing data to the shared buffer right
+// before we write the batch.
+TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOInplaceExternalDataWritten) {
+  gsoSupported_ = true;
+  size_t batchSize = 5;
+  size_t packetSize = 100;
+
+  folly::EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket sock(qEvb);
+
+  auto bufAccessor =
+      std::make_unique<BufAccessor>(conn_.udpSendPacketLen * batchSize);
+  conn_.bufAccessor = bufAccessor.get();
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
+      batchSize,
+      false, /* enable backpressure */
+      DataPathType::ContinuousMemory,
+      conn_,
+      gsoSupported_);
+  CHECK(batchWriter);
+  CHECK(batchWriter->empty());
+  CHECK_EQ(batchWriter->size(), 0);
+  size_t size = 0;
+  for (size_t j = 0; j < batchSize - 1; j++) {
+    bufAccessor->append(packetSize);
+    EXPECT_FALSE(batchWriter->append(
+        nullptr, packetSize, folly::SocketAddress(), nullptr));
+    size += packetSize;
+    EXPECT_EQ(batchWriter->size(), size);
+  }
+  bufAccessor->append(packetSize);
+  EXPECT_TRUE(batchWriter->append(
+      nullptr, packetSize, folly::SocketAddress(), nullptr));
+  size += packetSize;
+  EXPECT_EQ(batchWriter->size(), size);
+
+  EXPECT_CALL(sock, writeGSO(_, _, _, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const folly::SocketAddress&,
+                           const struct iovec* iovecs,
+                           size_t iovec_len,
+                           QuicAsyncUDPSocket::WriteOptions writeOptions) {
+        EXPECT_EQ(iovec_len, 5);
+        EXPECT_EQ(writeOptions.gso, packetSize);
+
+        for (uint32_t i = 0; i < 5; i++) {
+          EXPECT_EQ(
+              iovecs[i].iov_base,
+              (uint8_t*)bufAccessor->buf()->buffer() + packetSize * i);
+          EXPECT_EQ(iovecs[i].iov_len, packetSize);
+        }
+
+        return 1;
+      }));
+  std::string externalData = "external data";
+  memcpy(
+      bufAccessor->buf()->writableTail(),
+      externalData.data(),
+      externalData.size());
+  bufAccessor->buf()->append(externalData.size());
+  batchWriter->write(sock, folly::SocketAddress());
+  EXPECT_EQ(bufAccessor->buf()->length(), externalData.size());
+  EXPECT_EQ(
+      memcmp(
+          externalData.data(), bufAccessor->buf()->data(), externalData.size()),
+      0);
+}
+
 TEST_F(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   gsoSupported_ = true;
   uint32_t batchSize = 20;

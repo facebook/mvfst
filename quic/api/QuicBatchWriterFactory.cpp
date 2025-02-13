@@ -29,6 +29,13 @@ BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t batchSize) {
   return BatchWriterPtr(new SendmmsgGSOPacketBatchWriter(batchSize));
 }
 
+BatchWriterPtr makeSendmmsgInplaceGsoInplaceBatchWriter(
+    uint32_t batchSize,
+    QuicConnectionStateBase& conn) {
+  return BatchWriterPtr(
+      new SendmmsgGSOInplacePacketBatchWriter(conn, batchSize));
+}
+
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,

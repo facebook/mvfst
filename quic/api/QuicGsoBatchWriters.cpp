@@ -311,4 +311,149 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
   return 0;
 }
 
+SendmmsgGSOInplacePacketBatchWriter::SendmmsgGSOInplacePacketBatchWriter(
+    QuicConnectionStateBase& conn,
+    size_t maxBufs)
+    : conn_(conn), maxBufs_(maxBufs) {
+  CHECK_LE(maxBufs_, kMaxIovecs) << "maxBufs provided is too high";
+}
+
+bool SendmmsgGSOInplacePacketBatchWriter::empty() const {
+  return (currSize_ == 0);
+}
+
+size_t SendmmsgGSOInplacePacketBatchWriter::size() const {
+  return currSize_;
+}
+
+void SendmmsgGSOInplacePacketBatchWriter::reset() {
+  buffers_.clear();
+  indexToOptions_.clear();
+  indexToAddr_.clear();
+  addrToMostRecentIndex_.clear();
+
+  currBufs_ = 0;
+  currSize_ = 0;
+}
+
+bool SendmmsgGSOInplacePacketBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& /* buf */,
+    size_t size,
+    const folly::SocketAddress& addr,
+    QuicAsyncUDPSocket* /*unused*/) {
+  auto& buf = conn_.bufAccessor->buf();
+
+  lastPacketEnd_ = buf->tail();
+
+  iovec vec{};
+  vec.iov_base = (void*)(buf->tail() - size);
+  vec.iov_len = size;
+
+  currBufs_++;
+  currSize_ += size;
+
+  if (addrToMostRecentIndex_.contains(addr)) {
+    uint32_t index = addrToMostRecentIndex_[addr];
+    /*
+     * In order to use GSO, it MUST be the case that all packets except
+     * potentially the last are of the same size. The last packet, if it
+     * has a different size, MUST be smaller than the other packets. It
+     * CANNOT be larger.
+     */
+    if (size <= buffers_[index].back().iov_len) {
+      /*
+       * It's okay for the last packet to be smaller, but we need to
+       * check if the packets preceding it are all of the same size.
+       * It suffices to check the size equality of just the first and last
+       * packets in the series.
+       */
+      if (buffers_[index].front().iov_len == buffers_[index].back().iov_len) {
+        indexToOptions_[index].gso = buffers_[index].front().iov_len;
+        buffers_[index].push_back(vec);
+        // Flush if we reach maxBufs_
+        return (currBufs_ == maxBufs_);
+      }
+    }
+  }
+
+  /*
+   * If we've hit this point, then we need to create new entries in
+   * buffers_, indexToAddr_, indexToOptions_, and addrToMostRecentIndex_.
+   */
+  uint32_t index = buffers_.size();
+  addrToMostRecentIndex_[addr] = index;
+  indexToAddr_.push_back(addr);
+  // For now, set GSO to 0. We'll set it to a non-zero value if we append
+  // to this series
+  indexToOptions_.emplace_back(0, false);
+  buffers_.push_back({vec});
+
+  // Flush if we reach maxBufs_
+  return (currBufs_ == maxBufs_);
+}
+
+ssize_t SendmmsgGSOInplacePacketBatchWriter::write(
+    QuicAsyncUDPSocket& sock,
+    const folly::SocketAddress& /*unused*/) {
+  CHECK_GT(buffers_.size(), 0);
+
+  int ret = 0;
+
+  if (buffers_.size() == 1) {
+    ret = (currBufs_ > 1) ? sock.writeGSO(
+                                indexToAddr_[0],
+                                buffers_[0].data(),
+                                buffers_[0].size(),
+                                indexToOptions_[0])
+                          : sock.write(indexToAddr_[0], buffers_[0].data(), 1);
+  } else {
+    std::array<iovec, kMaxIovecs> iovecs{};
+    std::array<size_t, kMaxIovecs> messageSizes{};
+
+    uint32_t currentIovecIndex = 0;
+    for (uint32_t i = 0; i < buffers_.size(); i++) {
+      messageSizes[i] = buffers_[i].size();
+      for (auto j : buffers_[i]) {
+        iovecs[currentIovecIndex] = j;
+        currentIovecIndex++;
+      }
+    }
+
+    ret = sock.writemGSO(
+        folly::range(
+            indexToAddr_.data(), indexToAddr_.data() + indexToAddr_.size()),
+        &iovecs[0],
+        &messageSizes[0],
+        buffers_.size(),
+        indexToOptions_.data());
+
+    if (ret > 0) {
+      if (static_cast<size_t>(ret) == buffers_.size()) {
+        ret = currSize_;
+      } else {
+        // this is a partial write - we just need to
+        // return a different number than currSize_
+        ret = 0;
+      }
+    }
+  }
+
+  uint32_t diffToStart = lastPacketEnd_ - conn_.bufAccessor->data();
+  // diffToEnd is non-zero when some entity other than this BatchWriter
+  // wrote some data to the shared buffer.
+  uint32_t diffToEnd = conn_.bufAccessor->tail() - lastPacketEnd_;
+
+  auto& buf = conn_.bufAccessor->buf();
+  if (diffToEnd == 0) {
+    buf->clear();
+  } else {
+    // We need to shift the data in the buffer that is after the data that
+    // this BatchWriter wrote to the beginning of the buffer.
+    buf->trimStart(diffToStart);
+    buf->retreat(diffToStart);
+  }
+
+  return ret;
+}
+
 } // namespace quic

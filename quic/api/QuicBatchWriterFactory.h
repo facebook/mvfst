@@ -17,6 +17,9 @@ BatchWriterPtr makeGsoInPlaceBatchWriter(
     uint32_t batchSize,
     QuicConnectionStateBase& conn);
 BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t batchSize);
+BatchWriterPtr makeSendmmsgInplaceGsoInplaceBatchWriter(
+    uint32_t batchSize,
+    QuicConnectionStateBase& conn);
 
 class BatchWriterFactory {
  public:
@@ -65,7 +68,11 @@ class BatchWriterFactory {
         }
       case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {
         if (gsoSupported) {
-          return makeSendmmsgGsoBatchWriter(batchSize);
+          if (dataPathType == DataPathType::ChainedMemory) {
+            return makeSendmmsgGsoBatchWriter(batchSize);
+          } else if (dataPathType == DataPathType::ContinuousMemory) {
+            return makeSendmmsgInplaceGsoInplaceBatchWriter(batchSize, conn);
+          }
         }
 
         return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
