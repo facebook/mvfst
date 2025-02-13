@@ -236,6 +236,11 @@ void FizzClientHandshake::echRetryAvailable(
   }
 }
 
+const std::shared_ptr<const folly::AsyncTransportCertificate>
+FizzClientHandshake::getPeerCertificate() const {
+  return state_.serverCert();
+}
+
 class FizzClientHandshake::ActionMoveVisitor {
  public:
   explicit ActionMoveVisitor(FizzClientHandshake& client) : client_(client) {}

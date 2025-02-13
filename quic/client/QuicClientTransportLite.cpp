@@ -1994,4 +1994,13 @@ uint64_t QuicClientTransportLite::getPacketsSentCount() const {
   return conn_->lossState.totalPacketsSent;
 }
 
+const std::shared_ptr<const folly::AsyncTransportCertificate>
+QuicClientTransportLite::getPeerCertificate() const {
+  const auto clientHandshakeLayer = clientConn_->clientHandshakeLayer;
+  if (clientHandshakeLayer) {
+    return clientHandshakeLayer->getPeerCertificate();
+  }
+  return nullptr;
+}
+
 } // namespace quic

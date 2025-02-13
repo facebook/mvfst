@@ -89,6 +89,11 @@ class MockClientHandshake : public ClientHandshake {
       getApplicationProtocol,
       (),
       (const));
+  MOCK_METHOD(
+      const std::shared_ptr<const folly::AsyncTransportCertificate>,
+      getPeerCertificate,
+      (),
+      (const));
 };
 
 class MockQuicConnectorCallback : public quic::QuicConnector::Callback {

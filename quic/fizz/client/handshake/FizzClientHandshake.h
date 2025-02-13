@@ -56,6 +56,9 @@ class FizzClientHandshake : public ClientHandshake {
     echRetryCallback_ = cb;
   }
 
+  const std::shared_ptr<const folly::AsyncTransportCertificate>
+  getPeerCertificate() const override;
+
  protected:
   Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname) const;
 

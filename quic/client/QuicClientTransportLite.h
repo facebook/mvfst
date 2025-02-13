@@ -239,6 +239,9 @@ class QuicClientTransportLite
   uint64_t getPtoCount() const;
   uint64_t getPacketsSentCount() const;
 
+  const std::shared_ptr<const folly::AsyncTransportCertificate>
+  getPeerCertificate() const override;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(
