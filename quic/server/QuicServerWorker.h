@@ -155,9 +155,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
  public:
   using TransportSettingsOverrideFn =
-      std::function<Optional<quic::TransportSettings>(
-          const quic::TransportSettings&,
-          const folly::IPAddress&)>;
+      std::function<void(quic::TransportSettings&, const folly::IPAddress&)>;
 
   class WorkerCallback {
    public:

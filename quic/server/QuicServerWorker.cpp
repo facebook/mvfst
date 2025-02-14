@@ -692,27 +692,30 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->setCongestionControllerFactory(ccFactory_);
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
 
-    auto transportSettings = transportSettingsOverrideFn_
-        ? transportSettingsOverrideFn_(
-              transportSettings_, client.getIPAddress())
-              .value_or(transportSettings_)
-        : transportSettings_;
-    LOG_IF(
-        ERROR,
-        transportSettings.dataPathType != transportSettings_.dataPathType)
-        << "Overriding DataPathType isn't supported. Requested datapath="
-        << (transportSettings.dataPathType == DataPathType::ContinuousMemory
-                ? "ContinuousMemory"
-                : "ChainedMemory");
+    auto transportSettingsCopy = transportSettings_;
     if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
       // Override BBRv1 with BBRv2
-      if (transportSettings.defaultCongestionController ==
+      if (transportSettingsCopy.defaultCongestionController ==
           CongestionControlType::BBR) {
-        transportSettings.defaultCongestionController =
+        transportSettingsCopy.defaultCongestionController =
             CongestionControlType::BBR2;
       }
     }
-    trans->setTransportSettings(transportSettings);
+
+    // Call the override function last so it can override any previous config.
+    if (transportSettingsOverrideFn_) {
+      transportSettingsOverrideFn_(
+          transportSettingsCopy, client.getIPAddress());
+    }
+    LOG_IF(
+        ERROR,
+        transportSettingsCopy.dataPathType != transportSettings_.dataPathType)
+        << "Overriding DataPathType isn't supported. Requested datapath="
+        << (transportSettingsCopy.dataPathType == DataPathType::ContinuousMemory
+                ? "ContinuousMemory"
+                : "ChainedMemory");
+
+    trans->setTransportSettings(transportSettingsCopy);
     trans->setConnectionIdAlgo(connIdAlgo_.get());
     trans->setServerConnectionIdRejector(this);
     if (srcConnId) {
