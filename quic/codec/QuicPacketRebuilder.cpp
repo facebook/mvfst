@@ -256,9 +256,10 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
     if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
       writeAckFrame(meta, builder_, FrameType::ACK);
     } else {
-      writeAckFrameWithReceivedTimestamps(
+      writeAckFrame(
           meta,
           builder_,
+          FrameType::ACK_RECEIVE_TIMESTAMPS,
           conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
               .value(),
           peerRequestedTimestampsCount);

@@ -274,7 +274,7 @@ size_t computeSizeUsedByRecvdTimestamps(WriteAckFrame& ackFrame) {
   return usedSize;
 }
 
-static size_t fillPacketReceiveTimestamps(
+static size_t fillFrameWithPacketReceiveTimestamps(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     WriteAckFrame& ackFrame,
     uint64_t largestAckedPacketNum,
@@ -369,39 +369,18 @@ static size_t fillPacketReceiveTimestamps(
   return ackFrame.recvdPacketsTimestampRanges.size();
 }
 
-Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
+static Optional<WriteAckFrame> maybeWriteAckBaseFields(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
-    FrameType frameType) {
-  if (ackFrameMetaData.ackState.acks.empty()) {
-    return none;
-  }
+    FrameType frameType,
+    uint64_t maxSpaceToUse) {
+  auto spaceLeft = maxSpaceToUse;
   const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
   // The last block must be the largest block.
   auto largestAckedPacket = ackState.acks.back().end;
   // ackBlocks are already an interval set so each value is naturally
   // non-overlapping.
   auto firstAckBlockLength = largestAckedPacket - ackState.acks.back().start;
-
-  WriteAckFrame ackFrame;
-  ackFrame.frameType = frameType;
-  uint64_t spaceLeft = builder.remainingSpaceInPkt();
-
-  // Reserve space for ECN counts if enabled
-  QuicInteger ecnECT0Count(ackFrameMetaData.ackState.ecnECT0CountReceived);
-  QuicInteger ecnECT1Count(ackFrameMetaData.ackState.ecnECT1CountReceived);
-  QuicInteger ecnCECount(ackFrameMetaData.ackState.ecnCECountReceived);
-  if (frameType == FrameType::ACK_ECN) {
-    ackFrame.ecnECT0Count = ackFrameMetaData.ackState.ecnECT0CountReceived;
-    ackFrame.ecnECT1Count = ackFrameMetaData.ackState.ecnECT1CountReceived;
-    ackFrame.ecnCECount = ackFrameMetaData.ackState.ecnCECountReceived;
-    spaceLeft -=
-        (ecnECT0Count.getSize() + ecnECT1Count.getSize() +
-         ecnCECount.getSize());
-  }
-
-  ackFrame.ackBlocks.reserve(spaceLeft / 4);
-
   // We could technically split the range if the size of the representation of
   // the integer is too large, but that gets super tricky and is of dubious
   // value.
@@ -417,43 +396,25 @@ Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
   // Required fields are Type, LargestAcked, AckDelay, AckBlockCount,
   // firstAckBlockLength
   QuicInteger encodedintFrameType(static_cast<uint8_t>(frameType));
-  auto headerSize = encodedintFrameType.getSize() +
+  uint64_t headerSize = encodedintFrameType.getSize() +
       largestAckedPacketInt.getSize() + ackDelayInt.getSize() +
       minAdditionalAckBlockCount.getSize() + firstAckBlockLengthInt.getSize();
 
-  size_t minAdditionalAckReceiveTimestampsFieldsSize = 0;
-  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-    // Compute minimum size requirements for 3 fields that must be sent
-    // in every ACK_RECEIVE_TIMESTAMPS frame
-    uint64_t countTimestampRanges = 0;
-    uint64_t maybeLastPktNum = 0;
-    std::chrono::microseconds maybeLastPktTsDelta = 0us;
-    if (ackState.lastRecvdPacketInfo)
-      maybeLastPktNum = ackState.lastRecvdPacketInfo.value().pktNum;
-
-    maybeLastPktTsDelta =
-        (ackState.lastRecvdPacketInfo.value().timings.receiveTimePoint >
-                 ackFrameMetaData.connTime
-             ? std::chrono::duration_cast<std::chrono::microseconds>(
-                   ackState.lastRecvdPacketInfo.value()
-                       .timings.receiveTimePoint -
-                   ackFrameMetaData.connTime)
-             : 0us);
-
-    minAdditionalAckReceiveTimestampsFieldsSize =
-        getQuicIntegerSize(countTimestampRanges).value_or(0) +
-        getQuicIntegerSize(maybeLastPktNum).value_or(0) +
-        getQuicIntegerSize(maybeLastPktTsDelta.count()).value_or(0);
-  }
-  if (spaceLeft < (headerSize + minAdditionalAckReceiveTimestampsFieldsSize)) {
+  if (spaceLeft < headerSize) {
     return none;
   }
-  spaceLeft -= (headerSize + minAdditionalAckReceiveTimestampsFieldsSize);
+  WriteAckFrame ackFrame;
+  ackFrame.frameType = frameType;
+
+  // Reserve the number of ack blocks we could fit in the remaining space.
+  ackFrame.ackBlocks.reserve(spaceLeft / 4);
+
+  // Account for the header size
+  spaceLeft -= headerSize;
 
   ackFrame.ackBlocks.push_back(ackState.acks.back());
   auto numAdditionalAckBlocks =
       fillFrameWithAckBlocks(ackState.acks, ackFrame, spaceLeft);
-
   QuicInteger numAdditionalAckBlocksInt(numAdditionalAckBlocks);
   builder.write(encodedintFrameType);
   builder.write(largestAckedPacketInt);
@@ -475,45 +436,72 @@ Optional<WriteAckFrame> writeAckFrameToPacketBuilder(
     currentSeqNum = it->start;
   }
   ackFrame.ackDelay = ackFrameMetaData.ackDelay;
-  if (frameType == FrameType::ACK_ECN) {
-    builder.write(ecnECT0Count);
-    builder.write(ecnECT1Count);
-    builder.write(ecnCECount);
-  }
+
   return ackFrame;
 }
 
-Optional<WriteAckFrameResult> writeAckFrame(
-    const quic::WriteAckFrameMetaData& ackFrameMetaData,
-    PacketBuilderInterface& builder,
-    FrameType frameType) {
-  uint64_t beginningSpace = builder.remainingSpaceInPkt();
-  auto maybeWriteAckFrame =
-      writeAckFrameToPacketBuilder(ackFrameMetaData, builder, frameType);
-
-  if (maybeWriteAckFrame.has_value()) {
-    builder.appendFrame(std::move(maybeWriteAckFrame.value()));
-    return WriteAckFrameResult(
-        beginningSpace - builder.remainingSpaceInPkt(),
-        maybeWriteAckFrame.value(),
-        maybeWriteAckFrame.value().ackBlocks.size());
-  } else {
-    return none;
-  }
+static uint64_t computeEcnRequiredSpace(
+    const quic::WriteAckFrameMetaData& ackFrameMetaData) {
+  QuicInteger ecnECT0Count(ackFrameMetaData.ackState.ecnECT0CountReceived);
+  QuicInteger ecnECT1Count(ackFrameMetaData.ackState.ecnECT1CountReceived);
+  QuicInteger ecnCECount(ackFrameMetaData.ackState.ecnCECountReceived);
+  return ecnECT0Count.getSize() + ecnECT1Count.getSize() + ecnCECount.getSize();
 }
 
-Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
+static uint64_t computeReceiveTimestampsMinimumSpace(
+    const quic::WriteAckFrameMetaData& ackFrameMetaData) {
+  // Compute minimum size requirements for 3 fields that must be sent
+  // in every ACK_RECEIVE_TIMESTAMPS frame
+  const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
+  uint64_t countTimestampRanges = 0;
+  uint64_t maybeLastPktNum = 0;
+  std::chrono::microseconds maybeLastPktTsDelta = 0us;
+  if (ackState.lastRecvdPacketInfo) {
+    maybeLastPktNum = ackState.lastRecvdPacketInfo.value().pktNum;
+
+    maybeLastPktTsDelta =
+        (ackState.lastRecvdPacketInfo.value().timings.receiveTimePoint >
+                 ackFrameMetaData.connTime
+             ? std::chrono::duration_cast<std::chrono::microseconds>(
+                   ackState.lastRecvdPacketInfo.value()
+                       .timings.receiveTimePoint -
+                   ackFrameMetaData.connTime)
+             : 0us);
+  }
+
+  return getQuicIntegerSize(countTimestampRanges).value_or(0) +
+      getQuicIntegerSize(maybeLastPktNum).value_or(0) +
+      getQuicIntegerSize(maybeLastPktTsDelta.count()).value_or(0);
+}
+
+static void writeECNFieldsToAck(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
+    WriteAckFrame& ackFrame,
+    PacketBuilderInterface& builder) {
+  ackFrame.ecnECT0Count = ackFrameMetaData.ackState.ecnECT0CountReceived;
+  ackFrame.ecnECT1Count = ackFrameMetaData.ackState.ecnECT1CountReceived;
+  ackFrame.ecnCECount = ackFrameMetaData.ackState.ecnCECountReceived;
+  QuicInteger ecnECT0Count(ackFrameMetaData.ackState.ecnECT0CountReceived);
+  QuicInteger ecnECT1Count(ackFrameMetaData.ackState.ecnECT1CountReceived);
+  QuicInteger ecnCECount(ackFrameMetaData.ackState.ecnCECountReceived);
+  builder.write(ecnECT0Count);
+  builder.write(ecnECT1Count);
+  builder.write(ecnCECount);
+}
+
+namespace {
+struct AckReceiveTimesStampsWritten {
+  size_t TimestampRangesWritten{0};
+  size_t TimestampWritten{0};
+};
+} // namespace
+
+AckReceiveTimesStampsWritten writeReceiveTimestampFieldsToAck(
+    const quic::WriteAckFrameMetaData& ackFrameMetaData,
+    WriteAckFrame& ackFrame,
     PacketBuilderInterface& builder,
     const AckReceiveTimestampsConfig& recvTimestampsConfig,
     uint64_t maxRecvTimestampsToSend) {
-  auto beginningSpace = builder.remainingSpaceInPkt();
-  auto maybeAckFrame = writeAckFrameToPacketBuilder(
-      ackFrameMetaData, builder, FrameType::ACK_RECEIVE_TIMESTAMPS);
-  if (!maybeAckFrame.has_value()) {
-    return none;
-  }
-  auto ackFrame = maybeAckFrame.value();
   const WriteAckFrameState& ackState = ackFrameMetaData.ackState;
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
   uint64_t lastPktNum = 0;
@@ -544,7 +532,7 @@ Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
     auto largestAckedPacket = ackState.acks.back().end;
     uint64_t receiveTimestampsExponentToUse =
         recvTimestampsConfig.receiveTimestampsExponent;
-    countTimestampRanges = fillPacketReceiveTimestamps(
+    countTimestampRanges = fillFrameWithPacketReceiveTimestamps(
         ackFrameMetaData,
         ackFrame,
         largestAckedPacket,
@@ -573,12 +561,72 @@ Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
       builder.write(timeStampRangeCountInt);
     }
   }
+  return AckReceiveTimesStampsWritten{countTimestampRanges, countTimestamps};
+}
+
+Optional<WriteAckFrameResult> writeAckFrame(
+    const quic::WriteAckFrameMetaData& ackFrameMetaData,
+    PacketBuilderInterface& builder,
+    FrameType frameType,
+    const AckReceiveTimestampsConfig& recvTimestampsConfig,
+    uint64_t maxRecvTimestampsToSend) {
+  if (ackFrameMetaData.ackState.acks.empty()) {
+    return none;
+  }
+  uint64_t beginningSpace = builder.remainingSpaceInPkt();
+  uint64_t spaceLeft = beginningSpace;
+
+  // Reserve space for ECN counts if enabled
+  if (frameType == FrameType::ACK_ECN) {
+    auto ecnRequiredSpace = computeEcnRequiredSpace(ackFrameMetaData);
+    if (spaceLeft < ecnRequiredSpace) {
+      return none;
+    }
+    spaceLeft -= ecnRequiredSpace;
+  }
+
+  // Reserve space for receive timestamps if enabled
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    auto receiveTimestampsMinimumSpace =
+        computeReceiveTimestampsMinimumSpace(ackFrameMetaData);
+    if (spaceLeft < receiveTimestampsMinimumSpace) {
+      return none;
+    }
+    spaceLeft -= receiveTimestampsMinimumSpace;
+  }
+
+  // Start writing fields to the builder
+
+  // 1. Write the base ack fields (ACK packet type)
+  auto maybeAckFrame =
+      maybeWriteAckBaseFields(ackFrameMetaData, builder, frameType, spaceLeft);
+  if (!maybeAckFrame.has_value()) {
+    return none;
+  }
+  auto& ackFrame = maybeAckFrame.value();
+
+  // 2. Write ECN fields if enabled
+  if (frameType == FrameType::ACK_ECN) {
+    writeECNFieldsToAck(ackFrameMetaData, ackFrame, builder);
+  }
+
+  // 3. Write receive timestamp fields if enabled
+  AckReceiveTimesStampsWritten receiveTimestampsWritten;
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+    receiveTimestampsWritten = writeReceiveTimestampFieldsToAck(
+        ackFrameMetaData,
+        ackFrame,
+        builder,
+        recvTimestampsConfig,
+        maxRecvTimestampsToSend);
+  }
+  // Everything written
   auto ackFrameWriteResult = WriteAckFrameResult(
       beginningSpace - builder.remainingSpaceInPkt(),
       ackFrame,
       ackFrame.ackBlocks.size(),
-      countTimestampRanges,
-      countTimestamps);
+      receiveTimestampsWritten.TimestampRangesWritten,
+      receiveTimestampsWritten.TimestampWritten);
 
   builder.appendFrame(std::move(ackFrame));
   return ackFrameWriteResult;

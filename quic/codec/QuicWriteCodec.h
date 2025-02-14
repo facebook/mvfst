@@ -100,23 +100,15 @@ Optional<WriteCryptoFrame> writeCryptoFrame(
 Optional<WriteAckFrameResult> writeAckFrame(
     const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
-    FrameType frameType = FrameType::ACK);
+    FrameType frameType = FrameType::ACK,
+    const AckReceiveTimestampsConfig& recvTimestampsConfig =
+        AckReceiveTimestampsConfig(),
+    uint64_t maxRecvTimestampsToSend = 0);
 
 /**
  * Helper functions to write the fields for ACK_RECEIVE_TIMESTAMPS frame
  */
 size_t computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
-
-Optional<WriteAckFrameResult> writeAckFrameWithReceivedTimestamps(
-    const WriteAckFrameMetaData& ackFrameMetaData,
-    PacketBuilderInterface& builder,
-    const AckReceiveTimestampsConfig& recvTimestampsConfig,
-    uint64_t maxRecvTimestampsToSend);
-
-Optional<quic::WriteAckFrame> writeAckFrameToPacketBuilder(
-    const WriteAckFrameMetaData& ackFrameMetaData,
-    quic::PacketBuilderInterface& builder,
-    quic::FrameType frameType);
 
 } // namespace quic
 // namespace quic

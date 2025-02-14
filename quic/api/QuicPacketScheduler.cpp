@@ -621,9 +621,10 @@ Optional<PacketNum> AckScheduler::writeNextAcks(
       isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0)) {
     // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the peer
     // requests at least 1 timestamp
-    ackWriteResult = writeAckFrameWithReceivedTimestamps(
+    ackWriteResult = writeAckFrame(
         meta,
         builder,
+        FrameType::ACK_RECEIVE_TIMESTAMPS,
         conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
             .value(),
         peerRequestedTimestampsCount);
