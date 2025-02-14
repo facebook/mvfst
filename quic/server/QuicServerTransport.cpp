@@ -938,6 +938,18 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
             val);
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        serverTransport->serverConn_->transportSettings
+            .fixedShortHeaderPadding = val;
+        VLOG(3) << fmt::format(
+            "FIXED_SHORT_HEADER_PADDING_KNOB KnobParam received, setting fixedShortHeaderPadding={}",
+            val);
+      });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::ADAPTIVE_LOSS_DETECTION),

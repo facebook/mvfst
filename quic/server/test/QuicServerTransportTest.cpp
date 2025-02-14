@@ -5580,6 +5580,17 @@ TEST_F(
   EXPECT_EQ(server->getConn().udpSendPacketLen, 1452);
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    TestHandleTransportKnobParamFixedShortHeaderPadding) {
+  EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 0);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
+        uint64_t{42}}});
+  EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 42);
+}
+
 TEST_F(QuicServerTransportTest, WriteDSR) {
   EXPECT_EQ(server->getConn().dsrPacketCount, 0);
   // Make sure we are post-handshake

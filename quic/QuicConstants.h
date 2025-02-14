@@ -180,6 +180,8 @@ BETTER_ENUM(
     PACER_EXPERIMENTAL = 0x5557,
     // Set short header padding modulo size
     SHORT_HEADER_PADDING_KNOB = 0x6666,
+    // Set fixed short header padding size
+    FIXED_SHORT_HEADER_PADDING_KNOB = 0x6667,
     // Keepalive timer enabled
     KEEPALIVE_ENABLED = 0x7777,
     // Remove from loss buffer on spurious loss

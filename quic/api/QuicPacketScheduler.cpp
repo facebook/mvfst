@@ -241,7 +241,19 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
   size_t shortHeaderPadding = 0;
+  const ShortHeader* shortHeader = builder.getPacketHeader().asShort();
+  const LongHeader* longHeader = builder.getPacketHeader().asLong();
+  bool initialPacket =
+      longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
   builder.encodePacketHeader();
+  // Add fixed padding at start of short header packets if configured
+  if (shortHeader && conn_.transportSettings.fixedShortHeaderPadding > 0) {
+    for (size_t i = 0; i < conn_.transportSettings.fixedShortHeaderPadding;
+         i++) {
+      writeFrame(PaddingFrame(), builder);
+    }
+    shortHeaderPadding = conn_.transportSettings.fixedShortHeaderPadding;
+  }
   // We need to keep track of writable bytes after writing header.
   writableBytes = writableBytes > builder.getHeaderBytes()
       ? writableBytes - builder.getHeaderBytes()
@@ -307,16 +319,12 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   }
 
   if (builder.hasFramesPending()) {
-    const LongHeader* longHeader = builder.getPacketHeader().asLong();
-    bool initialPacket =
-        longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
     if (initialPacket) {
       // This is the initial packet, we need to fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
         writeFrame(PaddingFrame(), builder);
       }
     }
-    const ShortHeader* shortHeader = builder.getPacketHeader().asShort();
     if (shortHeader) {
       size_t paddingModulo = conn_.transportSettings.paddingModulo;
       if (paddingModulo > 0) {
@@ -324,7 +332,7 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
         for (size_t i = 0; i < paddingIncrement; i++) {
           writeFrame(PaddingFrame(), builder);
         }
-        shortHeaderPadding = paddingIncrement;
+        shortHeaderPadding += paddingIncrement;
       }
     }
   }
@@ -879,6 +887,9 @@ bool CloningScheduler::hasData() const {
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
+  // Store header type information before any moves
+  auto builderPnSpace = builder.getPacketHeader().getPacketNumberSpace();
+  auto header = builder.getPacketHeader();
   // The writableBytes in this function shouldn't be limited by cwnd, since
   // we only use CloningScheduler for the cases that we want to bypass cwnd for
   // now.
@@ -896,7 +907,6 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   }
   // TODO: We can avoid the copy & rebuild of the header by creating an
   // independent header builder.
-  auto header = builder.getPacketHeader();
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
   for (auto& outstandingPacket : conn_.outstandings.packets) {
@@ -909,7 +919,6 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // clone packet. So re-create a RegularQuicPacketBuilder every time.
     // TODO: We can avoid the copy & rebuild of the header by creating an
     // independent header builder.
-    auto builderPnSpace = builder.getPacketHeader().getPacketNumberSpace();
     if (opPnSpace != builderPnSpace) {
       continue;
     }

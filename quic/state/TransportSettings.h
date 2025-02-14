@@ -291,6 +291,9 @@ struct TransportSettings {
   // packet size from packet analysis.
   // Padding Modulo of 0 turns off padding for short header packets.
   size_t paddingModulo{kShortHeaderPaddingModulo};
+  // Number of padding frames to add at the start of short header packets.
+  // A value of 0 means no fixed padding is added.
+  size_t fixedShortHeaderPadding{0};
   // Whether to use adaptive loss thresholds for reodering and timeout
   bool useAdaptiveLossReorderingThresholds{false};
   bool useAdaptiveLossTimeThresholds{false};

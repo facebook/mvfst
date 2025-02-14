@@ -444,7 +444,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
   ChainedByteRangeHead clientHelloData(helloBuf);
   conn.cryptoState->initialStream.lossBuffer.push_back(
       WriteStreamBuffer{std::move(clientHelloData), 0, false});
-  auto result = scheduler.scheduleFramesForPacket(
+  auto result = std::move(scheduler).scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
   auto packetLength = result.packet->header.computeChainDataLength() +
       result.packet->body.computeChainDataLength();
@@ -2334,6 +2334,53 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   EXPECT_EQ(packetLength1, packetLength2);
 }
 
+TEST_F(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.transportSettings.fixedShortHeaderPadding = 2;
+  conn.transportSettings.paddingModulo = 16;
+  conn.flowControlState.peerAdvertisedMaxOffset = 1000000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+      1000000;
+
+  // Create stream and write data
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto data = buildRandomInputData(50); // Small enough to fit in one packet
+  writeDataToQuicStream(*stream, std::move(data), false);
+
+  // Set up scheduler and builder
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  // Schedule frames
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+
+  // Verify padding frames were added at start
+  EXPECT_TRUE(result.packet.hasValue());
+  const auto& frames = result.packet->packet.frames;
+  ASSERT_EQ(frames.size(), 3);
+  EXPECT_TRUE(frames[0].asPaddingFrame());
+  EXPECT_TRUE(frames[1].asWriteStreamFrame());
+  EXPECT_TRUE(frames[2].asPaddingFrame());
+}
+
 TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -2464,8 +2511,9 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerOnRequest) {
               .immediateAckFrames())
           .build();
 
-  auto result = immediateAckOnlyScheduler.scheduleFramesForPacket(
-      std::move(builder), conn.udpSendPacketLen);
+  auto result =
+      std::move(immediateAckOnlyScheduler)
+          .scheduleFramesForPacket(std::move(builder), conn.udpSendPacketLen);
   auto packetLength = result.packet->header.computeChainDataLength() +
       result.packet->body.computeChainDataLength();
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
@@ -2500,12 +2548,13 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
               .immediateAckFrames())
           .build();
 
-  auto result = immediateAckOnlyScheduler.scheduleFramesForPacket(
-      std::move(builder), conn.udpSendPacketLen);
+  auto result =
+      std::move(immediateAckOnlyScheduler)
+          .scheduleFramesForPacket(std::move(builder), conn.udpSendPacketLen);
   auto packetLength = result.packet->header.computeChainDataLength() +
       result.packet->body.computeChainDataLength();
-  // The immediate ACK scheduler was not triggered. This packet has no frames
-  // and it shouldn't get padded.
+  // The immediate ACK scheduler was not triggered. This packet has no
+  // frames and it shouldn't get padded.
   EXPECT_LT(packetLength, conn.udpSendPacketLen);
 }
 
@@ -2618,6 +2667,54 @@ TEST_F(QuicPacketSchedulerTest, PausedPriorityInitial) {
   // Pause the stream again. Expect no more data writable.
   conn.streamManager->setStreamPriority(pausedStreamId, kPausedPriority);
   ASSERT_FALSE(conn.streamManager->hasWritable());
+}
+
+TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.transportSettings.fixedShortHeaderPadding = 2;
+  conn.transportSettings.paddingModulo = 0;
+  conn.flowControlState.peerAdvertisedMaxOffset = 1000000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+      1000000;
+
+  // Create stream and write data
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto data = buildRandomInputData(50); // Small enough to fit in one packet
+  writeDataToQuicStream(*stream, std::move(data), false);
+  conn.streamManager->updateWritableStreams(*stream);
+
+  // Set up scheduler and builder
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  // Schedule frames
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+
+  // Verify padding frames were added
+  // at start
+  EXPECT_TRUE(result.packet.hasValue());
+  const auto& frames = result.packet->packet.frames;
+  ASSERT_EQ(frames.size(), 2);
+  EXPECT_TRUE(frames[0].asPaddingFrame());
+  EXPECT_TRUE(frames[1].asWriteStreamFrame());
 }
 
 } // namespace quic::test
