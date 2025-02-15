@@ -299,8 +299,13 @@ void Bbr2CongestionController::setCwnd(
     uint64_t ackedBytes,
     uint64_t /*lostBytes*/) {
   // BBRUpdateMaxInflight()
-  auto inflightMax = addQuantizationBudget(
-      getBDPWithGain(cwndGain_) + maxExtraAckedFilter_.GetBest());
+  auto targetBDP = getBDPWithGain(cwndGain_);
+  if (fullBwReached_) {
+    targetBDP += maxExtraAckedFilter_.GetBest();
+  } else if (conn_.transportSettings.ccaConfig.enableAckAggregationInStartup) {
+    targetBDP += latestExtraAcked_;
+  }
+  auto inflightMax = addQuantizationBudget(targetBDP);
 
   if (fullBwReached_) {
     cwndBytes_ = std::min(cwndBytes_ + ackedBytes, inflightMax);
@@ -441,7 +446,7 @@ void Bbr2CongestionController::updateCongestionSignals(
 void Bbr2CongestionController::updateAckAggregation(const AckEvent& ackEvent) {
   /* Find excess ACKed beyond expected amount over this interval */
   auto interval =
-      Clock::now() - extraAckedStartTimestamp_.value_or(TimePoint());
+      Clock::now() - extraAckedStartTimestamp_.value_or(conn_.connectionTime);
   auto expectedDelivered = bandwidth_ *
       std::chrono::duration_cast<std::chrono::microseconds>(interval);
   /* Reset interval if ACK rate is below expected rate: */
@@ -451,9 +456,9 @@ void Bbr2CongestionController::updateAckAggregation(const AckEvent& ackEvent) {
     expectedDelivered = 0;
   }
   extraAckedDelivered_ += ackEvent.ackedBytes;
-  auto extra = extraAckedDelivered_ - expectedDelivered;
-  extra = std::min(extra, cwndBytes_);
-  maxExtraAckedFilter_.Update(extra, roundCount_);
+  latestExtraAcked_ = extraAckedDelivered_ - expectedDelivered;
+  latestExtraAcked_ = std::min(latestExtraAcked_, cwndBytes_);
+  maxExtraAckedFilter_.Update(latestExtraAcked_, roundCount_);
 }
 void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();

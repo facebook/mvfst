@@ -162,6 +162,7 @@ class Bbr2CongestionController : public CongestionController {
   uint64_t extraAckedDelivered_{0};
   WindowedFilter<uint64_t, MaxFilter<uint64_t>, uint64_t, uint64_t>
       maxExtraAckedFilter_;
+  uint64_t latestExtraAcked_{0};
 
   // Responding to congestion
   Bandwidth bandwidthLatest_;
