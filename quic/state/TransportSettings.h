@@ -81,6 +81,14 @@ struct CongestionControlConfig {
   bool exitStartupOnLoss{true};
 
   // Used by: BBR2
+  // Enabled cwnd modulation using loss recovery in Startup
+  bool enableRecoveryInStartup{true};
+
+  // Used by: BBR2
+  // Enabled cwnd modulation using loss recovery in ProbeBW/ProbeRTT states
+  bool enableRecoveryInProbeStates{true};
+
+  // Used by: BBR2
   // Whether BBR2 should enable reno coexistence.
   bool enableRenoCoexistence{false};
 

@@ -22,14 +22,14 @@ constexpr std::chrono::microseconds kMinRttFilterLen = 10s + kProbeRttDuration;
 constexpr uint64_t kMaxExtraAckedFilterLen =
     10; // Measured in packet-timed round trips
 
-constexpr float kStartupPacingGain = 2.89; // 2 / ln(2)
+constexpr float kStartupPacingGain = 2.885; // 2 / ln(2)
 constexpr float kDrainPacingGain = 0.5;
 constexpr float kProbeBwDownPacingGain = 0.9;
 constexpr float kProbeBwCruiseRefillPacingGain = 1.0;
 constexpr float kProbeBwUpPacingGain = 1.25;
 constexpr float kProbeRttPacingGain = 1.0;
 
-constexpr float kStartupCwndGain = 2.89;
+constexpr float kStartupCwndGain = 2.885;
 constexpr float kProbeBwCruiseRefillCwndGain = 2.0;
 constexpr float kProbeBwDownCwndGain = 2.0;
 constexpr float kProbeBwUpCwndGain = 2.25;
@@ -133,26 +133,9 @@ void Bbr2CongestionController::onPacketAckOrLoss(
             << ")";
   };
 
-  if (lossEvent && lossEvent->lostPackets > 0 &&
-      conn_.transportSettings.ccaConfig.conservativeRecovery) {
-    // The pseudo code in BBRHandleLostPacket is included in
-    // updateProbeBwCyclePhase. No need to repeat it here.
-
-    // We don't expose the loss type here, so always use fast recovery for
-    // non-persistent congestion
-    saveCwnd();
-    inRecovery_ = true;
-    // Mark the connection as app-limited so bw samples during recovery are not
-    // taken into account.
-    setAppLimited();
-    recoveryStartTime_ = Clock::now();
-    if (lossEvent->persistentCongestion) {
-      cwndBytes_ = kMinCwndInMssForBbr * conn_.udpSendPacketLen;
-    } else {
-      auto newlyAcked = ackEvent ? ackEvent->ackedBytes : 0;
-      cwndBytes_ = conn_.lossState.inflightBytes +
-          std::max(newlyAcked, conn_.udpSendPacketLen);
-    }
+  if (lossEvent && lossEvent->lostPackets > 0) {
+    auto ackedBytes = ackEvent ? ackEvent->ackedBytes : 0;
+    onPacketLoss(*lossEvent, ackedBytes);
   }
 
   if (ackEvent) {
@@ -172,12 +155,6 @@ void Bbr2CongestionController::onPacketAckOrLoss(
       }
     }
 
-    if (inRecovery_ &&
-        recoveryStartTime_ <= ackEvent->largestNewlyAckedPacketSentTime) {
-      inRecovery_ = false;
-      restoreCwnd();
-    }
-
     currentBwSample_ = getBandwidthSampleFromAck(*ackEvent);
     auto lastAckedPacket = currentAckEvent_->getLargestNewlyAckedPacket();
     inflightBytesAtLastAckedPacket_ = lastAckedPacket
@@ -189,6 +166,8 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     // UpdateModelAndState
     updateLatestDeliverySignals();
     updateRound();
+
+    updateRecoveryOnAck();
 
     updateCongestionSignals(lossEvent);
     updateAckAggregation();
@@ -245,6 +224,78 @@ void Bbr2CongestionController::setAppLimited() noexcept {
 }
 
 // Internals
+
+void Bbr2CongestionController::onPacketLoss(
+    const LossEvent& lossEvent,
+    uint64_t ackedBytes) {
+  if ((state_ == State::Startup || state_ == State::Drain) &&
+      !conn_.transportSettings.ccaConfig.enableRecoveryInStartup) {
+    // Recovery is not enabled in Startup.
+    return;
+  }
+  if ((isProbeBwState(state_) || state_ == State::ProbeRTT) &&
+      !conn_.transportSettings.ccaConfig.enableRecoveryInProbeStates) {
+    // Recovery is not enabled in Probe states.
+    return;
+  }
+
+  saveCwnd();
+  recoveryStartTime_ = Clock::now();
+  if (!isInRecovery()) {
+    recoveryState_ = RecoveryState::CONSERVATIVE;
+    recoveryWindow_ = conn_.lossState.inflightBytes + ackedBytes;
+
+    // Ensure conservative recovery lasts for at least a whole round trip.
+    nextRoundDelivered_ = conn_.lossState.totalBytesAcked;
+  }
+
+  if (lossEvent.persistentCongestion) {
+    recoveryWindow_ = kMinCwndInMssForBbr * conn_.udpSendPacketLen;
+  } else {
+    recoveryWindow_ =
+        (recoveryWindow_ > kMinCwndInMssForBbr * conn_.udpSendPacketLen)
+        ? recoveryWindow_ - lossEvent.lostBytes
+        : kMinCwndInMssForBbr * conn_.udpSendPacketLen;
+  }
+
+  recoveryWindow_ = boundedCwnd(
+      recoveryWindow_,
+      conn_.udpSendPacketLen,
+      conn_.transportSettings.maxCwndInMss,
+      kMinCwndInMssForBbr);
+}
+
+void Bbr2CongestionController::updateRecoveryOnAck() {
+  if (!isInRecovery()) {
+    return;
+  }
+
+  if (roundStart_ && recoveryState_ != RecoveryState::GROWTH) {
+    recoveryState_ = RecoveryState::GROWTH;
+  }
+
+  if (recoveryStartTime_ <= currentAckEvent_->largestNewlyAckedPacketSentTime) {
+    recoveryState_ = RecoveryState::NOT_RECOVERY;
+    restoreCwnd();
+  } else {
+    if (recoveryState_ == RecoveryState::GROWTH) {
+      recoveryWindow_ += currentAckEvent_->ackedBytes;
+    }
+
+    uint64_t recoveryIncrease =
+        conn_.transportSettings.ccaConfig.conservativeRecovery
+        ? conn_.udpSendPacketLen
+        : currentAckEvent_->ackedBytes;
+    recoveryWindow_ = std::max(
+        recoveryWindow_, conn_.lossState.inflightBytes + recoveryIncrease);
+    recoveryWindow_ = boundedCwnd(
+        recoveryWindow_,
+        conn_.udpSendPacketLen,
+        conn_.transportSettings.maxCwndInMss,
+        kMinCwndInMssForBbr);
+  }
+}
+
 void Bbr2CongestionController::resetCongestionSignals() {
   lossBytesInRound_ = 0;
   lossEventsInRound_ = 0;
@@ -312,6 +363,11 @@ void Bbr2CongestionController::setCwnd() {
           conn_.transportSettings.initCwndInMss * conn_.udpSendPacketLen) {
     cwndBytes_ += ackedBytes;
   }
+
+  if (isInRecovery()) {
+    cwndBytes_ = std::min(cwndBytes_, recoveryWindow_);
+  }
+
   cwndBytes_ =
       std::max(cwndBytes_, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 
@@ -334,8 +390,13 @@ void Bbr2CongestionController::setCwnd() {
       !conn_.transportSettings.ccaConfig.ignoreLoss) {
     cap = std::min(cap, *inflightLo_);
   }
-  cap = std::max(cap, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
   cwndBytes_ = std::min(cwndBytes_, cap);
+
+  cwndBytes_ = boundedCwnd(
+      cwndBytes_,
+      conn_.udpSendPacketLen,
+      conn_.transportSettings.maxCwndInMss,
+      kMinCwndInMssForBbr);
 }
 
 void Bbr2CongestionController::checkProbeRttDone() {
@@ -803,7 +864,7 @@ uint64_t Bbr2CongestionController::addQuantizationBudget(uint64_t input) const {
 }
 
 void Bbr2CongestionController::saveCwnd() {
-  if (!inLossRecovery_ && state_ != State::ProbeRTT) {
+  if (!isInRecovery() && state_ != State::ProbeRTT) {
     previousCwndBytes_ = cwndBytes_;
   } else {
     previousCwndBytes_ = std::max(cwndBytes_, previousCwndBytes_);
@@ -957,6 +1018,10 @@ bool Bbr2CongestionController::isRenoCoexistenceProbeTime() {
   auto roundsBeforeRenoProbe =
       std::min(renoBdpInPackets, decltype(renoBdpInPackets)(63));
   return roundsSinceBwProbe_ >= roundsBeforeRenoProbe;
+}
+
+bool Bbr2CongestionController::isInRecovery() const {
+  return recoveryState_ != RecoveryState::NOT_RECOVERY;
 }
 
 Bbr2CongestionController::State Bbr2CongestionController::getState()

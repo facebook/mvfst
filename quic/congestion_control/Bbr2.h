@@ -15,8 +15,6 @@
 #include <sys/types.h>
 #include <chrono>
 #include <cstdint>
-#include <optional>
-#include <ratio>
 
 namespace quic {
 class Bbr2CongestionController : public CongestionController {
@@ -114,6 +112,9 @@ class Bbr2CongestionController : public CongestionController {
 
   void updatePacingAndCwndGain();
 
+  void updateRecoveryOnAck();
+  void onPacketLoss(const LossEvent& lossEvent, uint64_t ackedBytes);
+
   [[nodiscard]] uint64_t getTargetInflightWithGain(float gain = 1.0) const;
   [[nodiscard]] uint64_t getTargetInflightWithHeadroom() const;
   [[nodiscard]] uint64_t getBDPWithGain(float gain = 1.0) const;
@@ -123,6 +124,14 @@ class Bbr2CongestionController : public CongestionController {
   bool isProbingBandwidth(const Bbr2CongestionController::State state);
   Bandwidth getBandwidthSampleFromAck(const AckEvent& ackEvent);
   bool isRenoCoexistenceProbeTime();
+
+  [[nodiscard]] bool isInRecovery() const;
+
+  enum class RecoveryState : uint8_t {
+    NOT_RECOVERY = 0,
+    CONSERVATIVE = 1,
+    GROWTH = 2,
+  };
 
   QuicConnectionStateBase& conn_;
   bool appLimited_{false};
@@ -164,7 +173,6 @@ class Bbr2CongestionController : public CongestionController {
   float lossPctInLastRound_{0.0f};
   uint64_t lossEventsInLastRound_{0};
   PacketNum largestLostPacketNumInRound_{0};
-  bool inLossRecovery_{false};
 
   // Cwnd
   uint64_t cwndBytes_;
@@ -172,7 +180,9 @@ class Bbr2CongestionController : public CongestionController {
   bool cwndLimitedInRound_{false};
 
   bool idleRestart_{false};
-  bool inRecovery_{false};
+
+  RecoveryState recoveryState_{RecoveryState::NOT_RECOVERY};
+  uint64_t recoveryWindow_{0};
   TimePoint recoveryStartTime_;
 
   // Round counting
