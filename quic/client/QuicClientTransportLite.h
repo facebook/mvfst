@@ -307,7 +307,7 @@ class QuicClientTransportLite
    * @param peer              The address of the remote peer.
    * @param networkData       UDP packet.
    */
-  void processUdpPacket(
+  folly::Expected<folly::Unit, QuicError> processUdpPacket(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket);
 

@@ -117,7 +117,8 @@ QuicClientTransportLite::~QuicClientTransportLite() {
   }
 }
 
-void QuicClientTransportLite::processUdpPacket(
+folly::Expected<folly::Unit, QuicError>
+QuicClientTransportLite::processUdpPacket(
     const folly::SocketAddress& peer,
     ReceivedUdpPacket&& udpPacket) {
   // Process the arriving UDP packet, which may have coalesced QUIC packets.
@@ -174,6 +175,7 @@ void QuicClientTransportLite::processUdpPacket(
     }
     clientConn_->pendingHandshakeData.clear();
   }
+  return folly::unit;
 }
 
 void QuicClientTransportLite::processUdpPacketData(
@@ -848,7 +850,10 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::onReadData(
     return folly::unit;
   }
   bool waitingForFirstPacket = !hasReceivedUdpPackets(*conn_);
-  processUdpPacket(peer, std::move(udpPacket));
+  auto res = processUdpPacket(peer, std::move(udpPacket));
+  if (res.hasError()) {
+    return res;
+  }
   if (connSetupCallback_ && waitingForFirstPacket &&
       hasReceivedUdpPackets(*conn_)) {
     connSetupCallback_->onFirstPeerPacketProcessed();
