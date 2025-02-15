@@ -135,9 +135,9 @@ QuicClientTransportLite::processUdpPacket(
                 << " versions=" << std::hex << versionNegotiation->versions
                 << " " << *this;
 
-        throw QuicInternalException(
-            "Received version negotiation packet",
-            LocalErrorCode::NEW_VERSION_NEGOTIATED);
+        return folly::makeUnexpected(QuicError(
+            LocalErrorCode::NEW_VERSION_NEGOTIATED,
+            "Received version negotiation packet"));
       }
     }
 
