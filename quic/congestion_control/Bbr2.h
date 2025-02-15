@@ -61,21 +61,18 @@ class Bbr2CongestionController : public CongestionController {
  private:
   void resetCongestionSignals();
   void resetLowerBounds();
-  void updateLatestDeliverySignals(const AckEvent& ackEvent);
+  void updateLatestDeliverySignals();
   void updateCongestionSignals(const LossEvent* FOLLY_NULLABLE lossEvent);
-  void updateAckAggregation(const AckEvent& ackEvent);
-  void advanceLatestDeliverySignals(const AckEvent& ackEvent);
+  void updateAckAggregation();
+  void advanceLatestDeliverySignals();
   void boundBwForModel();
-  void adaptUpperBounds(
-      uint64_t ackedBytes,
-      uint64_t inflightBytesAtLargestAckedPacket,
-      uint64_t lostBytes);
+  void adaptUpperBounds();
 
   void startRound();
-  void updateRound(const AckEvent& ackEvent);
+  void updateRound();
 
   void setPacing();
-  void setCwnd(uint64_t ackedBytes, uint64_t lostBytes);
+  void setCwnd();
   void saveCwnd();
   void restoreCwnd();
   void setSendQuantum();
@@ -92,7 +89,7 @@ class Bbr2CongestionController : public CongestionController {
 
   void enterProbeRtt();
   void handleProbeRtt();
-  void checkProbeRtt(uint64_t ackedBytes);
+  void checkProbeRtt();
   void checkProbeRttDone();
   void exitProbeRtt();
   void updateMinRtt();
@@ -102,25 +99,18 @@ class Bbr2CongestionController : public CongestionController {
   void enterProbeBW();
   void startProbeBwDown();
   void startProbeBwCruise();
-  void updateProbeBwCyclePhase(
-      uint64_t ackedBytes,
-      uint64_t inflightBytesAtLargestAckedPacket,
-      uint64_t lostBytes);
+  void updateProbeBwCyclePhase();
   void startProbeBwRefill();
   void startProbeBwUp();
   bool checkTimeToProbeBW();
   bool checkTimeToCruise();
   bool checkTimeToGoDown();
   bool hasElapsedInPhase(std::chrono::microseconds interval);
-  bool checkInflightTooHigh(
-      uint64_t inflightBytesAtLargestAckedPacket,
-      uint64_t lostBytes);
-  bool isInflightTooHigh(
-      uint64_t inflightBytesAtLargestAckedPacket,
-      uint64_t lostBytes);
-  void handleInFlightTooHigh(uint64_t inflightBytesAtLargestAckedPacket);
+  bool checkInflightTooHigh();
+  bool isInflightTooHigh();
+  void handleInFlightTooHigh();
   void raiseInflightHiSlope();
-  void probeInflightHiUpward(uint64_t ackedBytes);
+  void probeInflightHiUpward();
 
   void updatePacingAndCwndGain();
 
@@ -205,6 +195,12 @@ class Bbr2CongestionController : public CongestionController {
   bool canUpdateLongtermLossModel_{false};
   uint64_t probeUpRounds_{0};
   uint64_t probeUpAcks_{0};
+
+  // State used in processing the current ack
+  const AckEvent* currentAckEvent_{nullptr};
+  Bandwidth currentBwSample_;
+  uint64_t inflightBytesAtLastAckedPacket_{0};
+  bool lastAckedPacketAppLimited_{false};
 };
 
 std::string bbr2StateToString(Bbr2CongestionController::State state);

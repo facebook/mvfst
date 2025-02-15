@@ -156,9 +156,11 @@ void Bbr2CongestionController::onPacketAckOrLoss(
   }
 
   if (ackEvent) {
-    if (ackEvent->implicit) {
+    currentAckEvent_ = ackEvent;
+
+    if (currentAckEvent_->implicit) {
       // Implicit acks should not be used for bandwidth or rtt estimation
-      setCwnd(ackEvent->ackedBytes, 0);
+      setCwnd();
       return;
     }
 
@@ -176,38 +178,34 @@ void Bbr2CongestionController::onPacketAckOrLoss(
       restoreCwnd();
     }
 
+    currentBwSample_ = getBandwidthSampleFromAck(*ackEvent);
+    auto lastAckedPacket = currentAckEvent_->getLargestNewlyAckedPacket();
+    inflightBytesAtLastAckedPacket_ = lastAckedPacket
+        ? lastAckedPacket->outstandingPacketMetadata.inflightBytes
+        : conn_.lossState.inflightBytes;
+    lastAckedPacketAppLimited_ =
+        lastAckedPacket ? lastAckedPacket->isAppLimited : true;
+
     // UpdateModelAndState
-    updateLatestDeliverySignals(*ackEvent);
-    updateRound(*ackEvent);
+    updateLatestDeliverySignals();
+    updateRound();
 
     updateCongestionSignals(lossEvent);
-    updateAckAggregation(*ackEvent);
+    updateAckAggregation();
     checkFullBwReached();
     checkStartupDone();
     checkDrain();
 
-    auto inflightBytesAtLargestAckedPacket =
-        ackEvent->getLargestNewlyAckedPacket()
-        ? ackEvent->getLargestNewlyAckedPacket()
-              ->outstandingPacketMetadata.inflightBytes
-        : conn_.lossState.inflightBytes;
-    auto lostBytes = lossEvent ? lossEvent->lostBytes : 0;
-
-    // TODO: The last parameter should ideally be the bytes lost since the
-    // largestAckedPacket was sent, but we don't track that.
-    updateProbeBwCyclePhase(
-        ackEvent->ackedBytes,
-        inflightBytesAtLargestAckedPacket,
-        lossBytesInRound_);
+    updateProbeBwCyclePhase();
     updateMinRtt();
-    checkProbeRtt(ackEvent->ackedBytes);
-    advanceLatestDeliverySignals(*ackEvent);
+    checkProbeRtt();
+    advanceLatestDeliverySignals();
     boundBwForModel();
 
     // UpdateControlParameters
     setPacing();
     setSendQuantum();
-    setCwnd(ackEvent->ackedBytes, lostBytes);
+    setCwnd();
 
     // Update cwndLimited state before the next ack
     if (roundStart_) {
@@ -295,10 +293,9 @@ void Bbr2CongestionController::setSendQuantum() {
   sendQuantum_ = std::max(sendQuantum_, 2 * conn_.udpSendPacketLen);
 }
 
-void Bbr2CongestionController::setCwnd(
-    uint64_t ackedBytes,
-    uint64_t /*lostBytes*/) {
+void Bbr2CongestionController::setCwnd() {
   // BBRUpdateMaxInflight()
+  const auto& ackedBytes = currentAckEvent_->ackedBytes;
   auto targetBDP = getBDPWithGain(cwndGain_);
   if (fullBwReached_) {
     targetBDP += maxExtraAckedFilter_.GetBest();
@@ -366,17 +363,15 @@ void Bbr2CongestionController::exitProbeRtt() {
   }
 }
 
-void Bbr2CongestionController::updateLatestDeliverySignals(
-    const AckEvent& ackEvent) {
+void Bbr2CongestionController::updateLatestDeliverySignals() {
   lossRoundStart_ = false;
 
-  bandwidthLatest_ =
-      std::max(bandwidthLatest_, getBandwidthSampleFromAck(ackEvent));
+  bandwidthLatest_ = std::max(bandwidthLatest_, currentBwSample_);
   VLOG(6) << "Bandwidth latest=" << bandwidthLatest_.normalizedDescribe()
           << "  AppLimited=" << bandwidthLatest_.isAppLimited;
   inflightLatest_ = std::max(inflightLatest_, bandwidthLatest_.units);
 
-  auto pkt = ackEvent.getLargestNewlyAckedPacket();
+  auto pkt = currentAckEvent_->getLargestNewlyAckedPacket();
   if (pkt &&
       pkt->outstandingPacketMetadata.totalBytesSent > lossRoundEndBytesSent_) {
     // Uses bytes sent instead of ACKed in the spec. This doesn't affect the
@@ -443,7 +438,7 @@ void Bbr2CongestionController::updateCongestionSignals(
   largestLostPacketNumInRound_ = 0;
 }
 
-void Bbr2CongestionController::updateAckAggregation(const AckEvent& ackEvent) {
+void Bbr2CongestionController::updateAckAggregation() {
   /* Find excess ACKed beyond expected amount over this interval */
   auto interval =
       Clock::now() - extraAckedStartTimestamp_.value_or(conn_.connectionTime);
@@ -455,7 +450,7 @@ void Bbr2CongestionController::updateAckAggregation(const AckEvent& ackEvent) {
     extraAckedStartTimestamp_ = Clock::now();
     expectedDelivered = 0;
   }
-  extraAckedDelivered_ += ackEvent.ackedBytes;
+  extraAckedDelivered_ += currentAckEvent_->ackedBytes;
   latestExtraAcked_ = extraAckedDelivered_ - expectedDelivered;
   latestExtraAcked_ = std::min(latestExtraAcked_, cwndBytes_);
   maxExtraAckedFilter_.Update(latestExtraAcked_, roundCount_);
@@ -483,7 +478,7 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   For 1,2 we use the loss pct from the last loss round which means we could exit
   before a full RTT.
   */
-  if (fullBwReached_ || !roundStart_ || isAppLimited() ||
+  if (fullBwReached_ || !roundStart_ || lastAckedPacketAppLimited_ ||
       !conn_.transportSettings.ccaConfig.exitStartupOnLoss) {
     return; /* no need to check for a the loss exit condition now */
   }
@@ -494,7 +489,7 @@ void Bbr2CongestionController::checkStartupHighLoss() {
 }
 
 void Bbr2CongestionController::checkFullBwReached() {
-  if (fullBwNow_ || isAppLimited()) {
+  if (fullBwNow_ || lastAckedPacketAppLimited_) {
     return; /* no need to check for a full pipe now */
   }
   if (maxBwFilter_.GetBest() >= fullBw_ * 1.25) {
@@ -533,15 +528,12 @@ void Bbr2CongestionController::checkDrain() {
     enterProbeBW(); /* BBR estimates the queue was drained */
   }
 }
-void Bbr2CongestionController::updateProbeBwCyclePhase(
-    uint64_t ackedBytes,
-    uint64_t inflightBytesAtLargestAckedPacket,
-    uint64_t lostBytes) {
+void Bbr2CongestionController::updateProbeBwCyclePhase() {
   /* The core state machine logic for ProbeBW: */
   if (!fullBwReached_) {
     return; /* only handling steady-state behavior here */
   }
-  adaptUpperBounds(ackedBytes, inflightBytesAtLargestAckedPacket, lostBytes);
+  adaptUpperBounds();
   if (!isProbeBwState(state_)) {
     return; /* only handling ProbeBW states here: */
   }
@@ -581,13 +573,10 @@ void Bbr2CongestionController::updateProbeBwCyclePhase(
   }
 }
 
-void Bbr2CongestionController::adaptUpperBounds(
-    uint64_t ackedBytes,
-    uint64_t inflightBytesAtLargestAckedPacket,
-    uint64_t lostBytes) {
+void Bbr2CongestionController::adaptUpperBounds() {
   /* Update BBR.inflight_hi and BBR.bw_hi. */
 
-  if (!checkInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
+  if (!checkInflightTooHigh()) {
     if (!inflightHi_.has_value()) {
       // No loss has occurred yet so these values are not set and do not need to
       // be raised.
@@ -595,11 +584,11 @@ void Bbr2CongestionController::adaptUpperBounds(
     }
     /* There is loss but it's at safe levels. The limits are populated so we
      * update them */
-    if (inflightBytesAtLargestAckedPacket > *inflightHi_) {
-      inflightHi_ = inflightBytesAtLargestAckedPacket;
+    if (inflightBytesAtLastAckedPacket_ > *inflightHi_) {
+      inflightHi_ = inflightBytesAtLastAckedPacket_;
     }
     if (state_ == State::ProbeBw_Up) {
-      probeInflightHiUpward(ackedBytes);
+      probeInflightHiUpward();
     }
   }
 }
@@ -640,12 +629,10 @@ bool Bbr2CongestionController::hasElapsedInPhase(
 }
 
 // Was the loss percent too high for the last ack received?
-bool Bbr2CongestionController::checkInflightTooHigh(
-    uint64_t inflightBytesAtLargestAckedPacket,
-    uint64_t lostBytes) {
-  if (isInflightTooHigh(inflightBytesAtLargestAckedPacket, lostBytes)) {
+bool Bbr2CongestionController::checkInflightTooHigh() {
+  if (isInflightTooHigh()) {
     if (canUpdateLongtermLossModel_) {
-      handleInFlightTooHigh(inflightBytesAtLargestAckedPacket);
+      handleInFlightTooHigh();
     }
     return true;
   } else {
@@ -653,21 +640,18 @@ bool Bbr2CongestionController::checkInflightTooHigh(
   }
 }
 
-bool Bbr2CongestionController::isInflightTooHigh(
-    uint64_t inflightBytesAtLargestAckedPacket,
-    uint64_t lostBytes) {
-  return static_cast<float>(lostBytes) >
-      static_cast<float>(inflightBytesAtLargestAckedPacket) * kLossThreshold;
+bool Bbr2CongestionController::isInflightTooHigh() {
+  // TODO: The comparison should ideally use the  bytes lost since the
+  // largestAckedPacket was sent, but we don't track that.
+  return static_cast<float>(lossBytesInRound_) >
+      static_cast<float>(inflightBytesAtLastAckedPacket_) * kLossThreshold;
 }
 
-void Bbr2CongestionController::handleInFlightTooHigh(
-    uint64_t inflightBytesAtLargestAckedPacket) {
+void Bbr2CongestionController::handleInFlightTooHigh() {
   canUpdateLongtermLossModel_ = false;
-  // TODO: Should this be the app limited state of the largest acknowledged
-  // packet?
-  if (!isAppLimited()) {
+  if (!lastAckedPacketAppLimited_) {
     inflightHi_ = std::max(
-        inflightBytesAtLargestAckedPacket,
+        inflightBytesAtLastAckedPacket_,
         static_cast<uint64_t>(
             static_cast<float>(getTargetInflightWithGain()) * kBeta));
   }
@@ -692,13 +676,13 @@ uint64_t Bbr2CongestionController::getTargetInflightWithHeadroom() const {
   }
 }
 
-void Bbr2CongestionController::probeInflightHiUpward(uint64_t ackedBytes) {
+void Bbr2CongestionController::probeInflightHiUpward() {
   if (!inflightHi_.has_value() || !cwndLimitedInRound_ ||
       cwndBytes_ < *inflightHi_) {
     return; /* no inflight_hi set or not fully using inflight_hi, so don't grow
                it */
   }
-  probeUpAcks_ += ackedBytes;
+  probeUpAcks_ += currentAckEvent_->ackedBytes;
   if (probeUpAcks_ >= probeUpCount_) {
     auto delta = probeUpAcks_ / probeUpCount_;
     probeUpAcks_ -= delta * probeUpCount_;
@@ -732,7 +716,7 @@ void Bbr2CongestionController::updateMinRtt() {
   }
 }
 
-void Bbr2CongestionController::checkProbeRtt(uint64_t ackedBytes) {
+void Bbr2CongestionController::checkProbeRtt() {
   if (state_ != State::ProbeRTT && probeRttExpired_ && !idleRestart_) {
     enterProbeRtt();
     saveCwnd();
@@ -742,7 +726,7 @@ void Bbr2CongestionController::checkProbeRtt(uint64_t ackedBytes) {
   if (state_ == State::ProbeRTT) {
     handleProbeRtt();
   }
-  if (ackedBytes > 0) {
+  if (currentAckEvent_->ackedBytes > 0) {
     idleRestart_ = false;
   }
 }
@@ -773,10 +757,9 @@ void Bbr2CongestionController::handleProbeRtt() {
   }
 }
 
-void Bbr2CongestionController::advanceLatestDeliverySignals(
-    const AckEvent& ackEvent) {
+void Bbr2CongestionController::advanceLatestDeliverySignals() {
   if (lossRoundStart_) {
-    bandwidthLatest_ = getBandwidthSampleFromAck(ackEvent);
+    bandwidthLatest_ = currentBwSample_;
     inflightLatest_ = bandwidthLatest_.units;
   }
 }
@@ -848,8 +831,8 @@ void Bbr2CongestionController::enterProbeBW() {
 void Bbr2CongestionController::startRound() {
   nextRoundDelivered_ = conn_.lossState.totalBytesAcked;
 }
-void Bbr2CongestionController::updateRound(const AckEvent& ackEvent) {
-  auto pkt = ackEvent.getLargestNewlyAckedPacket();
+void Bbr2CongestionController::updateRound() {
+  auto pkt = currentAckEvent_->getLargestNewlyAckedPacket();
   if (pkt && pkt->lastAckedPacketInfo &&
       pkt->lastAckedPacketInfo->totalBytesAcked >= nextRoundDelivered_) {
     startRound();
@@ -878,7 +861,7 @@ void Bbr2CongestionController::startProbeBwDown() {
 
   // This is a new ProbeBW cycle. Advance the max bw filter if we're not app
   // limited
-  if (!isAppLimited()) {
+  if (!lastAckedPacketAppLimited_) {
     cycleCount_++;
   }
 }
