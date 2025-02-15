@@ -156,7 +156,7 @@ class QuicClientTransportLite
   bool hasZeroRttWriteCipher() const;
 
   // From QuicTransportBase
-  void onReadData(
+  folly::Expected<folly::Unit, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) override;
   void writeData() override;

@@ -156,7 +156,7 @@ void QuicServerTransport::setServerConnectionIdRejector(
   }
 }
 
-void QuicServerTransport::onReadData(
+folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
     const folly::SocketAddress& peer,
     ReceivedUdpPacket&& udpPacket) {
   ServerEvents::ReadData readData;
@@ -170,7 +170,7 @@ void QuicServerTransport::onReadData(
   processPendingData(true);
 
   if (closeState_ == CloseState::CLOSED) {
-    return;
+    return folly::unit;
   }
   if (!notifiedRouting_ && routingCb_ && conn_->serverConnectionId) {
     notifiedRouting_ = true;
@@ -202,6 +202,8 @@ void QuicServerTransport::onReadData(
   maybeIssueConnectionIds();
   maybeNotifyTransportReady();
   maybeUpdateCongestionControllerFromTicket();
+
+  return folly::unit;
 }
 
 void QuicServerTransport::accept() {

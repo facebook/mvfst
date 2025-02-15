@@ -283,10 +283,11 @@ class TestQuicTransport
     return lossTimeout_.getTimerCallbackTimeRemaining();
   }
 
-  void onReadData(const folly::SocketAddress&, ReceivedUdpPacket&& udpPacket)
-      override {
+  folly::Expected<folly::Unit, QuicError> onReadData(
+      const folly::SocketAddress&,
+      ReceivedUdpPacket&& udpPacket) override {
     if (udpPacket.buf.empty()) {
-      return;
+      return folly::unit;
     }
     folly::io::Cursor cursor(udpPacket.buf.front());
     while (!cursor.isAtEnd()) {
@@ -332,6 +333,7 @@ class TestQuicTransport
         conn_->streamManager->updatePeekableStreams(*stream);
       }
     }
+    return folly::unit;
   }
 
   void writeData() override {

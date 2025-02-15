@@ -126,7 +126,12 @@ void QuicTransportBaseLite::onNetworkData(
 
     auto packets = std::move(networkData).movePackets();
     for (auto& packet : packets) {
-      onReadData(peer, std::move(packet));
+      auto res = onReadData(peer, std::move(packet));
+      if (res.hasError()) {
+        VLOG(4) << __func__ << " " << res.error().message << " " << *this;
+        exceptionCloseWhat_ = res.error().message;
+        return closeImpl(res.error());
+      }
       if (conn_->peerConnectionError) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));

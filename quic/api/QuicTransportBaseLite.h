@@ -43,7 +43,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * The sub-class may throw an exception if there was an error in processing
    * the packet in which case the connection will be closed.
    */
-  virtual void onReadData(
+  virtual folly::Expected<folly::Unit, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) = 0;
 

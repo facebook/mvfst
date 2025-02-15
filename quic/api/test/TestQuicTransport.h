@@ -85,9 +85,11 @@ class TestQuicTransport
     return writeLooper_->isPacingScheduled();
   }
 
-  void onReadData(
+  folly::Expected<folly::Unit, QuicError> onReadData(
       const folly::SocketAddress& /* peer */,
-      ReceivedUdpPacket&& /* udpPacket */) noexcept override {}
+      ReceivedUdpPacket&& /* udpPacket */) noexcept override {
+    return folly::unit;
+  }
 
   void writeData() override {
     if (closed) {

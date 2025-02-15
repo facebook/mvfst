@@ -835,7 +835,7 @@ void QuicClientTransportLite::processUdpPacketData(
   }
 }
 
-void QuicClientTransportLite::onReadData(
+folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::onReadData(
     const folly::SocketAddress& peer,
     ReceivedUdpPacket&& udpPacket) {
   if (closeState_ == CloseState::CLOSED) {
@@ -845,7 +845,7 @@ void QuicClientTransportLite::onReadData(
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(0, kAlreadyClosed);
     }
-    return;
+    return folly::unit;
   }
   bool waitingForFirstPacket = !hasReceivedUdpPackets(*conn_);
   processUdpPacket(peer, std::move(udpPacket));
@@ -873,6 +873,7 @@ void QuicClientTransportLite::onReadData(
   }
 
   maybeSendTransportKnobs();
+  return folly::unit;
 }
 
 QuicSocketLite::WriteResult QuicClientTransportLite::writeBufMeta(
