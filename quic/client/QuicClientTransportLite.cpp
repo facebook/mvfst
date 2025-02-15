@@ -638,8 +638,7 @@ void QuicClientTransportLite::processUdpPacketData(
           // violation.
           throw QuicTransportException(
               "Received IMMEDIATE_ACK frame without announcing min_ack_delay",
-              TransportErrorCode::PROTOCOL_VIOLATION,
-              FrameType::IMMEDIATE_ACK);
+              TransportErrorCode::PROTOCOL_VIOLATION);
         }
         // Send an ACK from any packet number space.
         if (conn_->ackStates.initialAckState) {

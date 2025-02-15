@@ -45,27 +45,12 @@ class QuicTransportException : public std::runtime_error {
 
   explicit QuicTransportException(const char* msg, TransportErrorCode errCode);
 
-  explicit QuicTransportException(
-      const std::string& msg,
-      TransportErrorCode errCode,
-      FrameType frameType);
-
-  explicit QuicTransportException(
-      const char* msg,
-      TransportErrorCode errCode,
-      FrameType frameType);
-
   TransportErrorCode errorCode() const noexcept {
     return errCode_;
   }
 
-  Optional<FrameType> frameType() const noexcept {
-    return frameType_;
-  }
-
  private:
   TransportErrorCode errCode_;
-  Optional<FrameType> frameType_;
 };
 
 class QuicInternalException : public std::runtime_error {

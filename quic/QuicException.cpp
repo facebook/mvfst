@@ -24,18 +24,6 @@ QuicTransportException::QuicTransportException(
     TransportErrorCode errCode)
     : std::runtime_error(msg), errCode_(errCode) {}
 
-QuicTransportException::QuicTransportException(
-    const std::string& msg,
-    TransportErrorCode errCode,
-    FrameType frameType)
-    : std::runtime_error(msg), errCode_(errCode), frameType_(frameType) {}
-
-QuicTransportException::QuicTransportException(
-    const char* msg,
-    TransportErrorCode errCode,
-    FrameType frameType)
-    : std::runtime_error(msg), errCode_(errCode), frameType_(frameType) {}
-
 QuicInternalException::QuicInternalException(
     const std::string& msg,
     LocalErrorCode errCode)

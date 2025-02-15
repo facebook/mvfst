@@ -266,8 +266,7 @@ bool updateSimpleFrameOnPacketReceived(
       if (conn.nodeType == QuicNodeType::Server) {
         throw QuicTransportException(
             "Received HANDSHAKE_DONE from client.",
-            TransportErrorCode::PROTOCOL_VIOLATION,
-            FrameType::HANDSHAKE_DONE);
+            TransportErrorCode::PROTOCOL_VIOLATION);
       }
       // Mark the handshake confirmed in the handshake layer before doing
       // any dropping, as this gives us a chance to process ACKs in this
@@ -287,8 +286,7 @@ bool updateSimpleFrameOnPacketReceived(
         // violation.
         throw QuicTransportException(
             "Received ACK_FREQUENCY frame without announcing min_ack_delay",
-            TransportErrorCode::PROTOCOL_VIOLATION,
-            FrameType::ACK_FREQUENCY);
+            TransportErrorCode::PROTOCOL_VIOLATION);
       }
       const auto ackFrequencyFrame = frame.asAckFrequencyFrame();
       auto& ackState = conn.ackStates.appDataAckState;

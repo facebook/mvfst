@@ -232,7 +232,6 @@ folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     size_t dstConnIdSize = kDefaultConnectionIdSize);
 
 uint64_t convertEncodedDurationToMicroseconds(
-    FrameType frameType,
     uint8_t exponentToUse,
     uint64_t delay);
 } // namespace quic
