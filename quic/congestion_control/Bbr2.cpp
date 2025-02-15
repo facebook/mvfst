@@ -553,12 +553,12 @@ void Bbr2CongestionController::checkFullBwReached() {
   if (fullBwNow_ || lastAckedPacketAppLimited_) {
     return; /* no need to check for a full pipe now */
   }
+  if (!roundStart_) {
+    return;
+  }
   if (maxBwFilter_.GetBest() >= fullBw_ * 1.25) {
     resetFullBw(); // bw still growing, reset tracking
     fullBw_ = maxBwFilter_.GetBest(); /* record new baseline level */
-    return;
-  }
-  if (!roundStart_) {
     return;
   }
   fullBwCount_++; /* another round w/o much growth */
