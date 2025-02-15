@@ -14,7 +14,6 @@
 #include <quic/codec/QuicInteger.h>
 #include <chrono>
 #include <cstdint>
-#include <sstream>
 
 namespace {
 
