@@ -45,7 +45,7 @@ void FileQLogger::setupStream() {
   }
   if (compress_) {
     compressionCodec_ =
-        folly::compression::getStreamCodec(folly::io::CodecType::GZIP);
+        folly::compression::getStreamCodec(folly::compression::CodecType::GZIP);
     compressionBuffer_ = folly::IOBuf::createCombined(kCompressionBufferSize);
   }
 
@@ -551,7 +551,7 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
     if (compress_) {
       try {
         auto gzipCodec =
-            folly::compression::getCodec(folly::io::CodecType::GZIP);
+            folly::compression::getCodec(folly::compression::CodecType::GZIP);
         auto compressed = gzipCodec->compress(qLog);
         fileObj << compressed;
       } catch (std::invalid_argument& ex) {

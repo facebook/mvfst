@@ -1547,8 +1547,9 @@ TEST_F(QLoggerTest, CompressedStream) {
   auto success = folly::readFile(outputPath.c_str(), compressedData);
   ASSERT_TRUE(success);
 
-  std::string str = folly::compression::getCodec(folly::io::CodecType::GZIP)
-                        ->uncompress(compressedData);
+  std::string str =
+      folly::compression::getCodec(folly::compression::CodecType::GZIP)
+          ->uncompress(compressedData);
   folly::dynamic parsed = folly::parseJson(str);
 
   parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
@@ -1591,8 +1592,9 @@ TEST_F(QLoggerTest, CompressedNonStream) {
   auto success = folly::readFile(outputPath.c_str(), compressedData);
   ASSERT_TRUE(success);
 
-  std::string str = folly::compression::getCodec(folly::io::CodecType::GZIP)
-                        ->uncompress(compressedData);
+  std::string str =
+      folly::compression::getCodec(folly::compression::CodecType::GZIP)
+          ->uncompress(compressedData);
   folly::dynamic parsed = folly::parseJson(str);
 
   parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
