@@ -7,7 +7,6 @@
 
 #include <quic/codec/Decode.h>
 
-#include <folly/String.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>

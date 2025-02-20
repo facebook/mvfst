@@ -12,13 +12,10 @@
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/logging/test/Mocks.h>
 #include <quic/state/OutstandingPacket.h>
-#include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
 
 #include <memory>
-#include <numeric>
 using namespace testing;
 
 namespace quic::test {

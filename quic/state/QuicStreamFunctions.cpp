@@ -10,9 +10,6 @@
 #include <quic/QuicException.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 
-#include <quic/state/QuicStreamUtilities.h>
-
-#include <folly/io/Cursor.h>
 #include <algorithm>
 
 namespace {

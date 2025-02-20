@@ -7,8 +7,6 @@
 
 #include <quic/state/PendingPathRateLimiter.h>
 
-#include <glog/logging.h>
-
 namespace quic {
 
 void PendingPathRateLimiter::onPacketSent(uint64_t sentBytes) {

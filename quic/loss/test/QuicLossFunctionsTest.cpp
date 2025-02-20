@@ -19,7 +19,6 @@
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
-#include <quic/dsr/Types.h>
 #include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>

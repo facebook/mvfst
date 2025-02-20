@@ -21,7 +21,6 @@
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/AckEventTestUtil.h>
 #include <quic/state/test/Mocks.h>
-#include <sys/types.h>
 
 #include <numeric>
 

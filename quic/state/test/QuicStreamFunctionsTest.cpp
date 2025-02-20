@@ -10,7 +10,6 @@
 #include <quic/state/QuicStreamUtilities.h>
 
 #include <quic/state/QuicStreamFunctions.h>
-#include <quic/state/QuicStreamUtilities.h>
 
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>

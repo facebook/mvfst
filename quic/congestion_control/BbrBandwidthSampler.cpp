@@ -6,7 +6,6 @@
  */
 
 #include <quic/congestion_control/BbrBandwidthSampler.h>
-#include <quic/logging/QLoggerConstants.h>
 
 namespace quic {
 

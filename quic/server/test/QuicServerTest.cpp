@@ -20,15 +20,12 @@
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/events/FollyQuicEventBase.h>
-#include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
-#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
-#include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>

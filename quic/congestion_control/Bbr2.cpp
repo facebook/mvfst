@@ -8,7 +8,6 @@
 #include <quic/congestion_control/Bbr2.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
-#include <sys/types.h>
 #include <chrono>
 #include <cstdint>
 #include <limits>

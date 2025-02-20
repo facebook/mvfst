@@ -10,7 +10,6 @@
 #include <quic/dsr/frontend/test/Mocks.h>
 #include <quic/dsr/test/Mocks.h>
 #include <quic/dsr/test/TestCommon.h>
-#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 
 using namespace testing;

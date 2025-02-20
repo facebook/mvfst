@@ -6,7 +6,6 @@
  */
 
 #include <quic/api/QuicBatchWriterFactory.h>
-#include <quic/common/events/QuicEventBase.h>
 
 namespace quic {
 

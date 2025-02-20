@@ -12,7 +12,6 @@
 #include <quic/dsr/Types.h>
 #include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
-#include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/QuicStreamFunctions.h>

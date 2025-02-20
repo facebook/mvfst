@@ -7,8 +7,6 @@
 
 #include <quic/codec/QuicConnectionId.h>
 
-#include <quic/QuicConstants.h>
-
 #include <folly/Random.h>
 #include <glog/logging.h>
 

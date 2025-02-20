@@ -13,7 +13,6 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
-#include <quic/state/StateData.h>
 
 constexpr const auto kNumLoops = 64;
 constexpr const auto kMaxBufs = 10;

@@ -19,9 +19,7 @@
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
-#include <quic/server/QuicServerTransport.h>
 #include <quic/server/async_tran/QuicAsyncTransportServer.h>
-#include <quic/server/async_tran/QuicServerAsyncTransport.h>
 #include <quic/server/test/Mocks.h>
 
 using namespace testing;

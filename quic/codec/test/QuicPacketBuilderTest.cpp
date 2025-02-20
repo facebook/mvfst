@@ -17,7 +17,6 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
-#include <quic/handshake/HandshakeLayer.h>
 
 using namespace quic;
 using namespace quic::test;

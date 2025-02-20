@@ -10,9 +10,6 @@
 #include <quic/dsr/Types.h>
 #include <quic/dsr/frontend/PacketBuilder.h>
 #include <quic/dsr/test/TestCommon.h>
-#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
-#include <quic/handshake/test/Mocks.h>
-#include <quic/server/state/ServerStateMachine.h>
 
 namespace quic::test {
 

@@ -16,7 +16,6 @@
 #include <quic/congestion_control/Copa2.h>
 #include <quic/congestion_control/NewReno.h>
 #include <quic/congestion_control/QuicCubic.h>
-#include <quic/congestion_control/StaticCwndCongestionController.h>
 
 #include <memory>
 

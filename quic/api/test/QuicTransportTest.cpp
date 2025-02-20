@@ -21,8 +21,6 @@
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
-#include <quic/dsr/Types.h>
-#include <quic/dsr/test/Mocks.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>

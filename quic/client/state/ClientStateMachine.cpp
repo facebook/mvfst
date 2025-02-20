@@ -14,7 +14,6 @@
 #include <quic/codec/Decode.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
-#include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/state/QuicStateFunctions.h>

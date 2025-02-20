@@ -10,9 +10,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <condition_variable>
-#include <mutex>
-
 #include <fizz/backend/openssl/OpenSSL.h>
 #include <fizz/client/test/Mocks.h>
 #include <fizz/crypto/test/TestUtil.h>
@@ -23,7 +20,6 @@
 
 #include <folly/io/async/SSLContext.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
-#include <folly/io/async/test/MockAsyncTransport.h>
 
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/state/ClientStateMachine.h>
@@ -33,7 +29,6 @@
 #include <quic/fizz/client/handshake/test/MockQuicPskCache.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
-#include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/StateData.h>
 
 using namespace testing;

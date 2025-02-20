@@ -7,7 +7,6 @@
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
 
-#include <quic/QuicConstants.h>
 #include <quic/common/TimeUtil.h>
 #include <algorithm>
 

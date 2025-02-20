@@ -7,11 +7,9 @@
 
 #include <quic/codec/Types.h>
 
-#include <folly/String.h>
 #include <folly/container/Array.h>
 #include <folly/io/IOBuf.h>
 #include <folly/portability/GTest.h>
-#include <quic/QuicException.h>
 #include <quic/codec/Decode.h>
 #include <quic/common/test/TestUtils.h>
 

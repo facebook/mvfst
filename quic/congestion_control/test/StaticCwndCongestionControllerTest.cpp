@@ -11,7 +11,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
-#include <quic/congestion_control/test/Mocks.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;

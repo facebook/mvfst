@@ -8,7 +8,6 @@
 #include <quic/server/handshake/ServerHandshake.h>
 
 #include <quic/fizz/handshake/FizzBridge.h>
-#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <cstdint>
 

@@ -8,18 +8,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <condition_variable>
-#include <mutex>
-
 #include <fizz/client/test/Mocks.h>
 #include <fizz/crypto/test/TestUtil.h>
-#include <fizz/protocol/clock/test/Mocks.h>
 #include <fizz/protocol/test/Mocks.h>
 #include <fizz/server/test/Mocks.h>
 
 #include <folly/io/async/SSLContext.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
-#include <folly/io/async/test/MockAsyncTransport.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
@@ -29,7 +24,6 @@
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
-#include <quic/handshake/HandshakeLayer.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/StateData.h>

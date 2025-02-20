@@ -14,7 +14,6 @@
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
-#include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 
 using namespace ::testing;

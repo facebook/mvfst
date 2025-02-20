@@ -12,7 +12,6 @@
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
-#include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/TransportSettingsFunctions.h>
 
