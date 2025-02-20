@@ -1,4 +1,4 @@
-load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_benchmark", "mvfst_cpp_test")
 
 # Common library
 
@@ -33,6 +33,16 @@ mvfst_cpp_test(
     deps = [
         "//folly/portability:gmock",
         "//folly/portability:gtest",
+        "//quic/priority:http_priority_queue",
+    ],
+)
+
+mvfst_cpp_benchmark(
+    name = "priority_queue_benchmark",
+    srcs = ["QuicPriorityQueueBenchmark.cpp"],
+    deps = [
+        "//common/init:init",
+        "//folly:benchmark",
         "//quic/priority:http_priority_queue",
     ],
 )

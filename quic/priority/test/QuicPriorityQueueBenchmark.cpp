@@ -7,32 +7,26 @@
 
 #include <common/init/Init.h>
 #include <folly/Benchmark.h>
-#include <quic/state/QuicPriorityQueue.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <vector>
 
 using namespace std;
 using namespace folly;
 
-static inline uint8_t findNonemptyLevel(quic::PriorityQueue& pq) {
-  for (auto i = 0; i < 16; i++) {
-    quic::Priority pri(i / 2, i % 2);
-    if (!pq.levels[quic::PriorityQueue::priority2index(pri)].empty()) {
-      return i;
-    }
-  }
-  return 16;
-}
-
-static inline void
-insert(quic::PriorityQueue& pq, size_t numConcurrentStreams, bool incremental) {
+static inline void insert(
+    quic::HTTPPriorityQueue& pq,
+    size_t numConcurrentStreams,
+    bool incremental) {
   // insert streams at various priorities
   for (size_t i = 0; i < numConcurrentStreams; i++) {
-    pq.insertOrUpdate(i, quic::Priority(i % 8, incremental));
+    pq.insertOrUpdate(
+        quic::PriorityQueue::Identifier::fromStreamID(i),
+        quic::HTTPPriorityQueue::Priority(i % 8, incremental));
   }
 }
 
 static inline void processQueueIncremental(
-    quic::PriorityQueue& pq,
+    quic::HTTPPriorityQueue& pq,
     size_t numConcurrentStreams,
     size_t packetsPerStream,
     uint8_t shift) {
@@ -40,36 +34,29 @@ static inline void processQueueIncremental(
   CHECK_EQ(numConcurrentStreams % 8, 0) << "requires equal streams per urgency";
 
   for (uint8_t urgency = 0; urgency < 8; urgency++) {
-    auto levelIndex = findNonemptyLevel(pq);
-    CHECK_EQ(urgency, levelIndex / 2);
-    auto& level = pq.levels[levelIndex];
-    level.iterator->begin();
     for (size_t i = 0;
-         i < (numConcurrentStreams / 8 + shift) * packetsPerStream;
+         i < (numConcurrentStreams / 8 + shift) * (packetsPerStream - 1);
          i++) {
-      (void)level.iterator->current();
-      level.iterator->next();
+      (void)pq.getNextScheduledID(quic::none);
     }
     for (size_t i = 0; i < (numConcurrentStreams / 8); i++) {
-      auto id = level.iterator->current();
-      level.iterator->next();
+      auto id = pq.getNextScheduledID(quic::none);
+      // LOG(INFO) << id.asStreamID();
       pq.erase(id);
     }
   }
 }
 
 static inline void processQueueSequential(
-    quic::PriorityQueue& pq,
+    quic::HTTPPriorityQueue& pq,
     size_t numConcurrentStreams,
     size_t packetsPerStream) {
   CHECK_GT(packetsPerStream, 0);
   for (size_t i = 0; i < numConcurrentStreams; i++) {
-    uint64_t id = 0;
+    quic::PriorityQueue::Identifier id;
     for (size_t p = 0; p < packetsPerStream; p++) {
-      auto& level = pq.levels[findNonemptyLevel(pq)];
-      level.iterator->begin();
-      id = level.iterator->current();
-      // LOG(INFO) << id;
+      id = pq.getNextScheduledID(quic::none);
+      // LOG(INFO) << id.asStreamID();
     }
     pq.erase(id);
   }
@@ -78,7 +65,7 @@ static inline void processQueueSequential(
 static inline void benchmarkPriority(
     size_t numConcurrentStreams,
     bool incremental) {
-  quic::PriorityQueue pq;
+  quic::HTTPPriorityQueue pq;
   insert(pq, numConcurrentStreams, incremental);
 
   size_t packetsPerStream = 4;
@@ -107,7 +94,6 @@ BENCHMARK(incremental, n) {
     benchmarkPriority(96, true);
   }
 }
-
 BENCHMARK(sequential8, n) {
   for (size_t i = 0; i < n; i++) {
     benchmarkPriority(8, false);
@@ -123,7 +109,7 @@ BENCHMARK(incremental8, n) {
 BENCHMARK(insertSequential, n) {
   // insert streams at various priorities
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    quic::HTTPPriorityQueue pq;
     insert(pq, 100, false);
     pq.clear();
   }
@@ -132,7 +118,7 @@ BENCHMARK(insertSequential, n) {
 BENCHMARK(insertIncremental, n) {
   // insert streams at various priorities
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    quic::HTTPPriorityQueue pq;
     insert(pq, 100, true);
     pq.clear();
   }
@@ -142,7 +128,7 @@ BENCHMARK(processSequential, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    quic::HTTPPriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, false);
     }
@@ -154,7 +140,7 @@ BENCHMARK(processIncremental, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    quic::HTTPPriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, true);
     }
@@ -166,15 +152,12 @@ BENCHMARK(eraseSequential, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    quic::HTTPPriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, false);
     }
     while (!pq.empty()) {
-      auto& level = pq.levels[findNonemptyLevel(pq)];
-      level.iterator->begin();
-      auto id = level.iterator->current();
-      pq.erase(id);
+      pq.erase(pq.getNextScheduledID(quic::none));
     }
   }
 }
@@ -183,15 +166,12 @@ BENCHMARK(eraseIncremental, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    quic::HTTPPriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, true);
     }
     while (!pq.empty()) {
-      auto& level = pq.levels[findNonemptyLevel(pq)];
-      level.iterator->begin();
-      auto id = level.iterator->current();
-      pq.erase(id);
+      pq.erase(pq.getNextScheduledID(quic::none));
     }
   }
 }
