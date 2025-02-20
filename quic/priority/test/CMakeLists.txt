@@ -14,8 +14,9 @@ quic_add_test(TARGET PriorityQueueTest
   SOURCES
   PriorityQueueTest.cpp
   RoundRobinTests.cpp
+  HTTPPriorityQueueTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_constants
   mvfst_round_robin
+  mvfst_http_priority_queue
 )

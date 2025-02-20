@@ -25,3 +25,14 @@ mvfst_cpp_test(
         "//quic/priority:round_robin",
     ],
 )
+
+mvfst_cpp_test(
+    name = "http_priority_queue_test",
+    srcs = ["HTTPPriorityQueueTest.cpp"],
+    headers = [],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/priority:http_priority_queue",
+    ],
+)

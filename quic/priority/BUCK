@@ -31,3 +31,18 @@ mvfst_cpp_library(
         "//quic/common:optional",
     ],
 )
+
+mvfst_cpp_library(
+    name = "http_priority_queue",
+    srcs = [
+        "HTTPPriorityQueue.cpp",
+    ],
+    headers = [
+        "HTTPPriorityQueue.h",
+    ],
+    exported_deps = [
+        ":priority_queue",
+        ":round_robin",
+        "//folly/container:f14_hash",
+    ],
+)
