@@ -102,21 +102,23 @@ void Bbr2CongestionController::onPacketSent(
 void Bbr2CongestionController::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
-  if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        conn_.lossState.inflightBytes,
-        getCongestionWindow(),
-        kCongestionPacketAck,
-        bbr2StateToString(state_));
-    conn_.qLogger->addNetworkPathModelUpdate(
-        inflightHi_.value_or(0),
-        inflightLo_.value_or(0),
-        0, // bandwidthHi_ no longer available.
-        std::chrono::microseconds(1), // bandwidthHi_ no longer available.
-        bandwidthLo_.has_value() ? bandwidthLo_->units : 0,
-        bandwidthLo_.has_value() ? bandwidthLo_->interval
-                                 : std::chrono::microseconds(1));
-  }
+  SCOPE_EXIT {
+    if (conn_.qLogger) {
+      conn_.qLogger->addCongestionMetricUpdate(
+          conn_.lossState.inflightBytes,
+          getCongestionWindow(),
+          kCongestionPacketAck,
+          bbr2StateToString(state_));
+      conn_.qLogger->addNetworkPathModelUpdate(
+          inflightHi_.value_or(0),
+          inflightLo_.value_or(0),
+          0, // bandwidthHi_ no longer available.
+          std::chrono::microseconds(1), // bandwidthHi_ no longer available.
+          bandwidthLo_.has_value() ? bandwidthLo_->units : 0,
+          bandwidthLo_.has_value() ? bandwidthLo_->interval
+                                   : std::chrono::microseconds(1));
+    }
+  };
   if (ackEvent) {
     subtractAndCheckUnderflow(
         conn_.lossState.inflightBytes, ackEvent->ackedBytes);
