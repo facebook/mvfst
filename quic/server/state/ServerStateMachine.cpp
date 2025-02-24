@@ -857,7 +857,8 @@ void onServerReadDataFromOpen(
     conn.readCodec->setCodecParameters(CodecParameters(
         conn.peerAckDelayExponent,
         version,
-        conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer));
+        conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
+        conn.transportSettings.advertisedExtendedAckFeatures));
     conn.initialWriteCipher = cryptoFactory.getServerInitialCipher(
         initialDestinationConnectionId, version);
 

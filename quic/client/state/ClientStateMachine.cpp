@@ -56,7 +56,8 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->readCodec->setCodecParameters(CodecParameters(
       conn->peerAckDelayExponent,
       conn->originalVersion.value(),
-      conn->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer));
+      conn->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
+      conn->transportSettings.advertisedExtendedAckFeatures));
   newConn->earlyDataAppParamsValidator =
       std::move(conn->earlyDataAppParamsValidator);
   newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);

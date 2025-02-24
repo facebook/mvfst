@@ -48,7 +48,8 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
     std::vector<NormalizedAckBlock> ackBlocks = {},
     bool useRealValuesForLargestAcked = false,
     bool useRealValuesForAckDelay = false,
-    bool addEcnCounts = false) {
+    bool addEcnCounts = false,
+    bool useExtendedAck = false) {
   std::unique_ptr<folly::IOBuf> ackFrame = folly::IOBuf::create(0);
   BufAppender wcursor(ackFrame.get(), 10);
   auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
@@ -75,6 +76,14 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
   for (size_t i = 0; i < ackBlocks.size(); ++i) {
     ackBlocks[i].gap.encode(appenderOp);
     ackBlocks[i].blockLen.encode(appenderOp);
+  }
+  if (useExtendedAck) {
+    // Write extended ack with ECN if enabled.
+    QuicInteger extendedAckFeatures(
+        addEcnCounts ? static_cast<ExtendedAckFeatureMaskType>(
+                           ExtendedAckFeatureMask::ECN_COUNTS)
+                     : 0);
+    extendedAckFeatures.encode(appenderOp);
   }
   if (addEcnCounts) {
     QuicInteger ect0(1); // ECT-0 count
@@ -328,6 +337,119 @@ TEST_F(DecodeTest, AckEcnFrame) {
   EXPECT_EQ(ackFrame.ecnECT0Count, 1);
   EXPECT_EQ(ackFrame.ecnECT1Count, 2);
   EXPECT_EQ(ackFrame.ecnCECount, 3);
+}
+
+TEST_F(DecodeTest, AckExtendedFrameWithECN) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(1);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks,
+      false, // useRealValuesForLargestAcked
+      false, // useRealValuesForAckDelay
+      true, // addEcnCounts
+      true); // useExtendedAck
+  folly::io::Cursor cursor(result.get());
+  auto ackFrame = decodeAckExtendedFrame(
+      cursor,
+      makeHeader(),
+      CodecParameters(
+          kDefaultAckDelayExponent,
+          QuicVersion::MVFST,
+          none,
+          static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::ECN_COUNTS)));
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
+  EXPECT_EQ(ackFrame.largestAcked, 1000);
+  // Since 100 is the encoded value, we use the decoded value.
+  EXPECT_EQ(ackFrame.ackDelay.count(), 100 << kDefaultAckDelayExponent);
+
+  EXPECT_EQ(ackFrame.frameType, FrameType::ACK_EXTENDED);
+
+  // These values are hardcoded in the createAckFrame function
+  EXPECT_EQ(ackFrame.ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame.ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame.ecnCECount, 3);
+}
+
+TEST_F(DecodeTest, AckExtendedFrameWithNoFeatures) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(1);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks,
+      false, // useRealValuesForLargestAcked
+      false, // useRealValuesForAckDelay
+      false, // addEcnCounts
+      true); // useExtendedAck
+  folly::io::Cursor cursor(result.get());
+  auto ackFrame = decodeAckExtendedFrame(
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
+  EXPECT_EQ(ackFrame.largestAcked, 1000);
+  // Since 100 is the encoded value, we use the decoded value.
+  EXPECT_EQ(ackFrame.ackDelay.count(), 100 << kDefaultAckDelayExponent);
+
+  EXPECT_EQ(ackFrame.frameType, FrameType::ACK_EXTENDED);
+
+  EXPECT_EQ(ackFrame.ecnECT0Count, 0);
+  EXPECT_EQ(ackFrame.ecnECT1Count, 0);
+  EXPECT_EQ(ackFrame.ecnCECount, 0);
+}
+
+TEST_F(DecodeTest, AckExtendedFrameThrowsWithUnsupportedFeatures) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(1);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks,
+      false, // useRealValuesForLargestAcked
+      false, // useRealValuesForAckDelay
+      true, // addEcnCounts
+      true); // useExtendedAck
+  folly::io::Cursor cursor(result.get());
+
+  // Try to decode extended ack with ECN but we only support Timestamps
+  EXPECT_THROW(
+      decodeAckExtendedFrame(
+          cursor,
+          makeHeader(),
+          CodecParameters(
+              kDefaultAckDelayExponent,
+              QuicVersion::MVFST,
+              none,
+              static_cast<ExtendedAckFeatureMaskType>(
+                  ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS))),
+      quic::QuicTransportException);
 }
 
 TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {

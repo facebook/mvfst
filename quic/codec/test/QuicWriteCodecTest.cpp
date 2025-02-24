@@ -49,7 +49,8 @@ QuicFrame parseQuicFrame(
       CodecParameters(
           kDefaultAckDelayExponent,
           QuicVersion::MVFST,
-          receiveTimeStampsConfig));
+          receiveTimeStampsConfig,
+          0 /* extendedAckSupport */));
 }
 
 namespace quic::test {

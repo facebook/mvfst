@@ -91,7 +91,8 @@ QuicClientTransportLite::QuicClientTransportLite(
   conn_->readCodec->setCodecParameters(CodecParameters(
       conn_->peerAckDelayExponent,
       conn_->originalVersion.value(),
-      conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer));
+      conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
+      conn_->transportSettings.advertisedExtendedAckFeatures));
 
   VLOG(10) << "client created " << *conn_;
 }

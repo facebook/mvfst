@@ -24,16 +24,20 @@ struct CodecParameters {
   uint8_t peerAckDelayExponent{kDefaultAckDelayExponent};
   QuicVersion version{QuicVersion::MVFST};
   Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig = none;
+  ExtendedAckFeatureMaskType extendedAckFeatures{0};
 
   CodecParameters() = default;
 
   CodecParameters(
       uint8_t peerAckDelayExponentIn,
       QuicVersion versionIn,
-      Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfigIn)
+      Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfigIn,
+      ExtendedAckFeatureMaskType extendedAckFeaturesIn)
       : peerAckDelayExponent(peerAckDelayExponentIn),
         version(versionIn),
-        maybeAckReceiveTimestampsConfig(maybeAckReceiveTimestampsConfigIn) {}
+        maybeAckReceiveTimestampsConfig(
+            std::move(maybeAckReceiveTimestampsConfigIn)),
+        extendedAckFeatures(extendedAckFeaturesIn) {}
 
   CodecParameters(uint8_t peerAckDelayExponentIn, QuicVersion versionIn)
       : peerAckDelayExponent(peerAckDelayExponentIn), version(versionIn) {}
@@ -129,6 +133,11 @@ ReadAckFrame decodeAckFrame(
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType = FrameType::ACK);
+
+ReadAckFrame decodeAckExtendedFrame(
+    folly::io::Cursor& cursor,
+    const PacketHeader& header,
+    const CodecParameters& params);
 
 ReadAckFrame decodeAckFrameWithReceivedTimestamps(
     folly::io::Cursor& cursor,

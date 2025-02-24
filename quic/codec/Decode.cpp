@@ -308,6 +308,38 @@ static void decodeEcnCountsInAck(
   frame.ecnCECount = ce->first;
 }
 
+ReadAckFrame decodeAckExtendedFrame(
+    folly::io::Cursor& cursor,
+    const PacketHeader& header,
+    const CodecParameters& params) {
+  ReadAckFrame frame;
+  frame = decodeAckFrame(cursor, header, params, FrameType::ACK_EXTENDED);
+  auto extendedAckFeatures = decodeQuicInteger(cursor);
+  if (!extendedAckFeatures) {
+    throw QuicTransportException(
+        "Bad extended ACK features field",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  auto includedFeatures = extendedAckFeatures->first;
+  if ((includedFeatures | params.extendedAckFeatures) !=
+      params.extendedAckFeatures) {
+    throw QuicTransportException(
+        "Extended ACK has unexpected features",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  if (includedFeatures &
+      static_cast<ExtendedAckFeatureMaskType>(
+          ExtendedAckFeatureMask::ECN_COUNTS)) {
+    decodeEcnCountsInAck(frame, cursor);
+  }
+  if (includedFeatures &
+      static_cast<ExtendedAckFeatureMaskType>(
+          ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS)) {
+    decodeReceiveTimestampsInAck(frame, cursor, params);
+  }
+  return frame;
+}
+
 ReadAckFrame decodeAckFrameWithReceivedTimestamps(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
@@ -871,10 +903,8 @@ QuicFrame parseFrame(
         return frame;
       }
       case FrameType::ACK_EXTENDED:
-        throw QuicTransportException(
-            folly::to<std::string>(
-                "ACK_EXTENDED not yet supported, type=", frameTypeInt->first),
-            TransportErrorCode::FRAME_ENCODING_ERROR);
+        auto frame = QuicFrame(decodeAckExtendedFrame(cursor, header, params));
+        return frame;
     }
   } catch (const std::exception& e) {
     error = true;
