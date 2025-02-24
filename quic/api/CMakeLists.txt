@@ -42,6 +42,38 @@ target_link_libraries(
 )
 
 add_library(
+  mvfst_ack_scheduler
+  QuicAckScheduler.cpp
+)
+
+set_property(TARGET mvfst_ack_scheduler PROPERTY VERSION ${PACKAGE_VERSION})
+
+target_include_directories(
+  mvfst_ack_scheduler PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_ack_scheduler
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+add_dependencies(
+  mvfst_ack_scheduler
+  mvfst_constants
+  mvfst_state_machine
+)
+
+target_link_libraries(
+  mvfst_ack_scheduler PUBLIC
+  Folly::folly
+  mvfst_constants
+  mvfst_state_machine
+)
+
+add_library(
   mvfst_transport
   IoBufQuicBatch.cpp
   QuicPacketScheduler.cpp
@@ -67,6 +99,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_transport
+  mvfst_ack_scheduler
   mvfst_async_udp_socket
   mvfst_batch_writer
   mvfst_buf_accessor
@@ -98,6 +131,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_transport PUBLIC
   Folly::folly
+  mvfst_ack_scheduler
   mvfst_batch_writer
   mvfst_buf_accessor
   mvfst_bufutil
@@ -146,6 +180,12 @@ install(
 
 install(
   TARGETS mvfst_batch_writer
+  EXPORT mvfst-exports
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(
+  TARGETS mvfst_ack_scheduler
   EXPORT mvfst-exports
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

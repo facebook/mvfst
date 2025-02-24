@@ -2717,4 +2717,392 @@ TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
   EXPECT_TRUE(frames[1].asWriteStreamFrame());
 }
 
+// This test class sets up a connection with all the fields that can be included
+// in an ACK. The fixtures for this class confirm that the scheduler writes the
+// correct frame type and fields enabled by the connection state.
+class QuicAckSchedulerTest : public Test {
+ protected:
+  QuicAckSchedulerTest()
+      : conn_(createConn(10, 100000, 100000)),
+        ackState_(getAckState(*conn_, PacketNumberSpace::AppData)),
+        builder_(setupMockPacketBuilder()) {}
+
+  void SetUp() override {
+    // One ack block
+    ackState_.acks.insert(1, 10);
+
+    // One receive timestamps
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = 10;
+    rpi.timings.receiveTimePoint = Clock::now();
+    ackState_.recvdPacketInfos.emplace_back(rpi);
+    ackState_.largestRecvdPacketNum = 10;
+    ackState_.largestRecvdPacketTime = rpi.timings.receiveTimePoint;
+
+    // Non-zero ECN values
+    ackState_.ecnECT0CountReceived = 1;
+    ackState_.ecnECT1CountReceived = 2;
+    ackState_.ecnCECountReceived = 3;
+
+    auto connId = getTestConnectionId();
+    mockPacketHeader_ = std::make_unique<PacketHeader>(ShortHeader(
+        ProtectionType::KeyPhaseZero,
+        connId,
+        getNextPacketNum(*conn_, PacketNumberSpace::AppData)));
+
+    EXPECT_CALL(*builder_, getPacketHeader())
+        .WillRepeatedly(ReturnRef(*mockPacketHeader_));
+  }
+
+  std::unique_ptr<QuicClientConnectionState> conn_;
+  AckState ackState_;
+  std::unique_ptr<MockQuicPacketBuilder> builder_;
+  std::unique_ptr<PacketHeader> mockPacketHeader_;
+};
+
+TEST_F(QuicAckSchedulerTest, DefaultAckFrame) {
+  // Default config writes ACK frame.
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 0);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 0);
+  EXPECT_EQ(ackFrame->ecnCECount, 0);
+}
+
+TEST_F(QuicAckSchedulerTest, WriteAckEcnWhenReadingEcnOnEgress) {
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_ECN);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(QuicAckSchedulerTest, WriteAckReceiveTimestampsWhenEnabled) {
+  conn_->transportSettings.readEcnOnIngress = false;
+
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  ASSERT_EQ(ackFrame->recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(ackFrame->recvdPacketsTimestampRanges[0].timestamp_delta_count, 1);
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 0);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 0);
+  EXPECT_EQ(ackFrame->ecnCECount, 0);
+}
+
+TEST_F(QuicAckSchedulerTest, AckEcnTakesPrecedenceOverReceiveTimestamps) {
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_ECN);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfNotSupported) {
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures = 0;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_ECN);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfNotEnabled) {
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  conn_->transportSettings.enableExtendedAckFeatures = 0;
+  conn_->peerAdvertisedExtendedAckFeatures = 3; // ECN + ReceiveTimestamps;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_ECN);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(
+    QuicAckSchedulerTest,
+    AckExtendedNotSentIfReceiveTimestampFeatureNotSupported) {
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // We support ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures =
+      2; // Peer supports ReceiveTimestamps but not ECN in extended ack
+  // Peer sent ART config
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  // We don't have an ART config (i.e. we can't sent ART)
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer = none;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_ECN);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfECNFeatureNotSupported) {
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // We support ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures =
+      1; // Peer supports ECN but not ReceiveTimestamps in extended ack
+
+  // ART support negotiated
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  ASSERT_EQ(ackFrame->recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(ackFrame->recvdPacketsTimestampRanges[0].timestamp_delta_count, 1);
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 0);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 0);
+  EXPECT_EQ(ackFrame->ecnCECount, 0);
+}
+
+TEST_F(QuicAckSchedulerTest, AckExtendedWithAllFeatures) {
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // We support ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures =
+      3; // Peer supports ECN + ReceiveTimestamps
+
+  // ART support negotiated
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  // We can read ECN
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_EXTENDED);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  ASSERT_EQ(ackFrame->recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(ackFrame->recvdPacketsTimestampRanges[0].timestamp_delta_count, 1);
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverECN) {
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // We support ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures =
+      2; // Peer supports extended ack with only ReceiveTimestamps
+
+  // ART support negotiated
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  // We can read ECN
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_EXTENDED);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  ASSERT_EQ(ackFrame->recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(ackFrame->recvdPacketsTimestampRanges[0].timestamp_delta_count, 1);
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 0);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 0);
+  EXPECT_EQ(ackFrame->ecnCECount, 0);
+}
+
+TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // We support ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures =
+      1; // Peer supports extended ack with only ECN
+
+  // ART support negotiated
+  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  // We can read ECN
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  ASSERT_TRUE(ackScheduler.writeNextAcks(*builder_) != none);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_EXTENDED);
+
+  EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].start, 1);
+  EXPECT_EQ(ackFrame->ackBlocks[0].end, 10);
+
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
 } // namespace quic::test

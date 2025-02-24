@@ -141,6 +141,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":codec",
+        "//quic/api:ack_scheduler",
         "//quic/flowcontrol:flow_control",
         "//quic/state:simple_frame_functions",
         "//quic/state:state_functions",

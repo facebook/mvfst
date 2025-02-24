@@ -28,6 +28,7 @@ if(NOT TARGET mvfst::mvfst_transport)
 endif()
 
 set(mvfst_LIBRARIES
+  mvfst::mvfst_ack_scheduler
   mvfst::mvfst_constants
   mvfst::mvfst_exception
   mvfst::mvfst_transport

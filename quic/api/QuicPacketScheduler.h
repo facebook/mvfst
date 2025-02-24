@@ -10,6 +10,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/api/QuicAckScheduler.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
@@ -125,30 +126,6 @@ class StreamFrameScheduler {
   QuicConnectionStateBase& conn_;
   bool nextStreamDsr_{false};
 };
-
-class AckScheduler {
- public:
-  AckScheduler(const QuicConnectionStateBase& conn, const AckState& ackState);
-
-  Optional<PacketNum> writeNextAcks(PacketBuilderInterface& builder);
-
-  bool hasPendingAcks() const;
-
- private:
-  const QuicConnectionStateBase& conn_;
-  const AckState& ackState_;
-};
-
-/**
- * Returns whether or not the Ack scheduler has acks to schedule. This does not
- * tell you when the ACKs can be written.
- */
-bool hasAcksToSchedule(const AckState& ackState);
-
-/**
- * Returns the largest packet received which needs to be acked.
- */
-Optional<PacketNum> largestAckToSend(const AckState& ackState);
 
 class RstStreamScheduler {
  public:

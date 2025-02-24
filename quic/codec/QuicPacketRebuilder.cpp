@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/api/QuicAckScheduler.h>
 #include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/flowcontrol/QuicFlowController.h>
@@ -216,96 +217,11 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
   // cloned packet.
   if (shouldRebuildWriteAckFrame) {
     auto& packetHeader = builder_.getPacketHeader();
-    uint64_t ackDelayExponent =
-        (packetHeader.getHeaderForm() == HeaderForm::Long)
-        ? kDefaultAckDelayExponent
-        : conn_.transportSettings.ackDelayExponent;
-    const AckState& ackState_ = getAckState(
+    const AckState& ackState = getAckState(
         conn_,
         protectionTypeToPacketNumberSpace(packetHeader.getProtectionType()));
-    auto ackingTime = Clock::now();
-    DCHECK(ackState_.largestRecvdPacketTime.hasValue())
-        << "Missing received time for the largest acked packet";
-    auto receivedTime = *ackState_.largestRecvdPacketTime;
-    std::chrono::microseconds ackDelay =
-        (ackingTime > receivedTime
-             ? std::chrono::duration_cast<std::chrono::microseconds>(
-                   ackingTime - receivedTime)
-             : 0us);
-
-    WriteAckFrameMetaData meta = {
-        ackState_, /* ackState*/
-        ackDelay, /* ackDelay */
-        static_cast<uint8_t>(ackDelayExponent), /* ackDelayExponent */
-        conn_.connectionTime, /* connect timestamp */
-    };
-
-    // TODO: This code needs refactoring. The logic below duplicated from
-    // PacketScheduler::writeNextAcks().
-
-    // Write the AckFrame ignoring the result. This is best-effort.
-    Optional<WriteAckFrameResult> ackWriteResult;
-
-    uint64_t peerRequestedTimestampsCount =
-        conn_.maybePeerAckReceiveTimestampsConfig.has_value()
-        ? conn_.maybePeerAckReceiveTimestampsConfig.value()
-              .maxReceiveTimestampsPerAck
-        : 0;
-
-    bool isAckReceiveTimestampsSupported =
-        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
-        conn_.maybePeerAckReceiveTimestampsConfig;
-
-    uint64_t extendedAckSupportedAndEnabled =
-        conn_.peerAdvertisedExtendedAckFeatures &
-        conn_.transportSettings.enableExtendedAckFeatures;
-    // Disable the ECN fields if we are not reading them
-    if (!conn_.transportSettings.readEcnOnIngress) {
-      extendedAckSupportedAndEnabled &=
-          ~static_cast<ExtendedAckFeatureMaskType>(
-              ExtendedAckFeatureMask::ECN_COUNTS);
-    }
-    // Disable the receive timestamps fields if we have not regoatiated receive
-    // timestamps support
-    if (!isAckReceiveTimestampsSupported ||
-        (peerRequestedTimestampsCount == 0)) {
-      extendedAckSupportedAndEnabled &=
-          ~static_cast<ExtendedAckFeatureMaskType>(
-              ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
-    }
-
-    if (extendedAckSupportedAndEnabled > 0) {
-      // The peer supports extended ACKs and we have them enabled.
-      ackWriteResult = writeAckFrame(
-          meta,
-          builder_,
-          FrameType::ACK_EXTENDED,
-          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-              .value_or(AckReceiveTimestampsConfig()),
-          peerRequestedTimestampsCount,
-          extendedAckSupportedAndEnabled);
-    } else if (
-        conn_.transportSettings.readEcnOnIngress &&
-        (meta.ackState.ecnECT0CountReceived ||
-         meta.ackState.ecnECT1CountReceived ||
-         meta.ackState.ecnCECountReceived)) {
-      // We have to report ECN counts, but we can't use the extended ACK frame.
-      // In this case, we give ACK_ECN precedence over ACK_RECEIVE_TIMESTAMPS.
-      ackWriteResult = writeAckFrame(meta, builder_, FrameType::ACK_ECN);
-    } else if (
-        isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0)) {
-      // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the
-      // peer requests at least 1 timestamp
-      ackWriteResult = writeAckFrame(
-          meta,
-          builder_,
-          FrameType::ACK_RECEIVE_TIMESTAMPS,
-          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-              .value(),
-          peerRequestedTimestampsCount);
-    } else {
-      ackWriteResult = writeAckFrame(meta, builder_, FrameType::ACK);
-    }
+    AckScheduler ackScheduler(conn_, ackState);
+    ackScheduler.writeNextAcks(builder_);
   }
   // We shouldn't clone if:
   // (1) we only end up cloning only acks, ping, or paddings.

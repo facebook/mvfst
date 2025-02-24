@@ -131,6 +131,20 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "ack_scheduler",
+    srcs = [
+        "QuicAckScheduler.cpp",
+    ],
+    headers = [
+        "QuicAckScheduler.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
     name = "transport_helpers",
     srcs = [
         "IoBufQuicBatch.cpp",
@@ -152,6 +166,7 @@ mvfst_cpp_library(
         "//quic/state:simple_frame_functions",
     ],
     exported_deps = [
+        ":ack_scheduler",
         ":quic_batch_writer",
         "//folly:expected",
         "//folly/lang:assume",

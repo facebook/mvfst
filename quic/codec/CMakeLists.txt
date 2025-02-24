@@ -159,6 +159,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_codec_pktrebuilder
+  mvfst_ack_scheduler
   mvfst_codec
   mvfst_codec_pktbuilder
   mvfst_flowcontrol
@@ -170,6 +171,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_codec_pktrebuilder PUBLIC
   Folly::folly
+  mvfst_ack_scheduler
   mvfst_codec
   mvfst_codec_pktbuilder
   mvfst_flowcontrol
