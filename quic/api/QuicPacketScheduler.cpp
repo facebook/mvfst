@@ -614,16 +614,38 @@ Optional<PacketNum> AckScheduler::writeNextAcks(
             .maxReceiveTimestampsPerAck
       : 0;
 
-  if (conn_.transportSettings.readEcnOnIngress &&
+  uint64_t extendedAckSupportedAndEnabled =
+      conn_.peerAdvertisedExtendedAckFeatures &
+      conn_.transportSettings.enableExtendedAckFeatures;
+  // Disable the ECN fields if we are not reading them
+  if (!conn_.transportSettings.readEcnOnIngress) {
+    extendedAckSupportedAndEnabled &= ~static_cast<ExtendedAckFeatureMaskType>(
+        ExtendedAckFeatureMask::ECN_COUNTS);
+  }
+  // Disable the receive timestamps fields if we have not regoatiated receive
+  // timestamps support
+  if (!isAckReceiveTimestampsSupported || (peerRequestedTimestampsCount == 0)) {
+    extendedAckSupportedAndEnabled &= ~static_cast<ExtendedAckFeatureMaskType>(
+        ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
+  }
+
+  if (extendedAckSupportedAndEnabled > 0) {
+    // The peer supports extended ACKs and we have them enabled.
+    ackWriteResult = writeAckFrame(
+        meta,
+        builder,
+        FrameType::ACK_EXTENDED,
+        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+            .value_or(AckReceiveTimestampsConfig()),
+        peerRequestedTimestampsCount,
+        extendedAckSupportedAndEnabled);
+  } else if (
+      conn_.transportSettings.readEcnOnIngress &&
       (meta.ackState.ecnECT0CountReceived ||
        meta.ackState.ecnECT1CountReceived ||
        meta.ackState.ecnCECountReceived)) {
-    // If echoing ECN is enabled and we have seen marked packets, this will
-    // currently take priority over sending receive timestamps. There is
-    // currently no provision for a frame time that includes both ECN counts and
-    // receive timestamps.
-    // TODO: explore design changes for an ACK frame that supports both ECN and
-    // receive timestamps
+    // We have to report ECN counts, but we can't use the extended ACK frame. In
+    // this case, we give ACK_ECN precedence over ACK_RECEIVE_TIMESTAMPS.
     ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK_ECN);
   } else if (
       isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0)) {

@@ -240,6 +240,10 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
         conn_.connectionTime, /* connect timestamp */
     };
 
+    // TODO: This code needs refactoring. The logic below duplicated from
+    // PacketScheduler::writeNextAcks().
+
+    // Write the AckFrame ignoring the result. This is best-effort.
     Optional<WriteAckFrameResult> ackWriteResult;
 
     uint64_t peerRequestedTimestampsCount =
@@ -248,21 +252,59 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
               .maxReceiveTimestampsPerAck
         : 0;
 
-    // Write the AckFrame ignoring the result. This is best-effort.
     bool isAckReceiveTimestampsSupported =
         conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
         conn_.maybePeerAckReceiveTimestampsConfig;
 
-    if (!isAckReceiveTimestampsSupported || !peerRequestedTimestampsCount) {
-      writeAckFrame(meta, builder_, FrameType::ACK);
-    } else {
-      writeAckFrame(
+    uint64_t extendedAckSupportedAndEnabled =
+        conn_.peerAdvertisedExtendedAckFeatures &
+        conn_.transportSettings.enableExtendedAckFeatures;
+    // Disable the ECN fields if we are not reading them
+    if (!conn_.transportSettings.readEcnOnIngress) {
+      extendedAckSupportedAndEnabled &=
+          ~static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::ECN_COUNTS);
+    }
+    // Disable the receive timestamps fields if we have not regoatiated receive
+    // timestamps support
+    if (!isAckReceiveTimestampsSupported ||
+        (peerRequestedTimestampsCount == 0)) {
+      extendedAckSupportedAndEnabled &=
+          ~static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
+    }
+
+    if (extendedAckSupportedAndEnabled > 0) {
+      // The peer supports extended ACKs and we have them enabled.
+      ackWriteResult = writeAckFrame(
+          meta,
+          builder_,
+          FrameType::ACK_EXTENDED,
+          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+              .value_or(AckReceiveTimestampsConfig()),
+          peerRequestedTimestampsCount,
+          extendedAckSupportedAndEnabled);
+    } else if (
+        conn_.transportSettings.readEcnOnIngress &&
+        (meta.ackState.ecnECT0CountReceived ||
+         meta.ackState.ecnECT1CountReceived ||
+         meta.ackState.ecnCECountReceived)) {
+      // We have to report ECN counts, but we can't use the extended ACK frame.
+      // In this case, we give ACK_ECN precedence over ACK_RECEIVE_TIMESTAMPS.
+      ackWriteResult = writeAckFrame(meta, builder_, FrameType::ACK_ECN);
+    } else if (
+        isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0)) {
+      // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the
+      // peer requests at least 1 timestamp
+      ackWriteResult = writeAckFrame(
           meta,
           builder_,
           FrameType::ACK_RECEIVE_TIMESTAMPS,
           conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
               .value(),
           peerRequestedTimestampsCount);
+    } else {
+      ackWriteResult = writeAckFrame(meta, builder_, FrameType::ACK);
     }
   }
   // We shouldn't clone if:

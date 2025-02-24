@@ -345,6 +345,12 @@ struct TransportSettings {
   // The list of features corresponds to ExtendedAckFeatures in QuicConstants
   ExtendedAckFeatureMaskType advertisedExtendedAckFeatures{0};
 
+  // Send ACK_EXTENDED frames if supported by the peer. The integer is treated
+  // in the same way as the one advertised to the peer. If the value is
+  // not-zero, the transport will send ACK_EXTENDED frames with the fields that
+  // are enabled both in this field and supported by the peer.
+  uint64_t enableExtendedAckFeatures{0};
+
   bool removeStreamAfterEomCallbackUnset{false};
   // Whether to include cwnd hint in new session tickets for 0-rtt
   bool includeCwndHintsInSessionTicket{false};

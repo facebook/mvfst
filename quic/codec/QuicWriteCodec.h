@@ -103,7 +103,8 @@ Optional<WriteAckFrameResult> writeAckFrame(
     FrameType frameType = FrameType::ACK,
     const AckReceiveTimestampsConfig& recvTimestampsConfig =
         AckReceiveTimestampsConfig(),
-    uint64_t maxRecvTimestampsToSend = 0);
+    uint64_t maxRecvTimestampsToSend = 0,
+    ExtendedAckFeatureMaskType extendedAckSupport = 0);
 
 /**
  * Helper functions to write the fields for ACK_RECEIVE_TIMESTAMPS frame

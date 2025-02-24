@@ -282,17 +282,20 @@ struct WriteAckFrameResult {
   size_t ackBlocksWritten;
   size_t timestampRangesWritten;
   size_t timestampsWritten;
+  uint64_t extendedAckFeaturesEnabled;
   WriteAckFrameResult(
       uint64_t bytesWrittenIn,
       WriteAckFrame writeAckFrameIn,
       size_t ackBlocksWrittenIn,
       size_t timestampRangesWrittenIn = 0,
-      size_t timestampsWrittenIn = 0)
+      size_t timestampsWrittenIn = 0,
+      uint64_t extendedAckFeaturesEnabledIn = 0)
       : bytesWritten(bytesWrittenIn),
         writeAckFrame(std::move(writeAckFrameIn)),
         ackBlocksWritten(ackBlocksWrittenIn),
         timestampRangesWritten(timestampRangesWrittenIn),
-        timestampsWritten(timestampsWrittenIn) {}
+        timestampsWritten(timestampsWrittenIn),
+        extendedAckFeaturesEnabled(extendedAckFeaturesEnabledIn) {}
 };
 
 // Can represent either a simple RESET_STREAM frame or a RESET_STREAM_AT

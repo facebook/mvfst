@@ -569,15 +569,36 @@ Optional<WriteAckFrameResult> writeAckFrame(
     PacketBuilderInterface& builder,
     FrameType frameType,
     const AckReceiveTimestampsConfig& recvTimestampsConfig,
-    uint64_t maxRecvTimestampsToSend) {
+    uint64_t maxRecvTimestampsToSend,
+    ExtendedAckFeatureMaskType extendedAckFeatures) {
   if (ackFrameMetaData.ackState.acks.empty()) {
     return none;
   }
   uint64_t beginningSpace = builder.remainingSpaceInPkt();
   uint64_t spaceLeft = beginningSpace;
 
+  bool ecnEnabled = (frameType == FrameType::ACK_ECN) ||
+      (extendedAckFeatures &
+       static_cast<ExtendedAckFeatureMaskType>(
+           ExtendedAckFeatureMask::ECN_COUNTS));
+
+  bool receiveTimestampsEnabled =
+      (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) ||
+      (extendedAckFeatures &
+       static_cast<ExtendedAckFeatureMaskType>(
+           ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS));
+
+  // Reserve space for ACK_EXTENDED header
+  if (frameType == FrameType::ACK_EXTENDED) {
+    auto extendedAckRequiredSpace = QuicInteger(extendedAckFeatures).getSize();
+    if (spaceLeft < extendedAckRequiredSpace) {
+      return none;
+    }
+    spaceLeft -= extendedAckRequiredSpace;
+  }
+
   // Reserve space for ECN counts if enabled
-  if (frameType == FrameType::ACK_ECN) {
+  if (ecnEnabled) {
     auto ecnRequiredSpace = computeEcnRequiredSpace(ackFrameMetaData);
     if (spaceLeft < ecnRequiredSpace) {
       return none;
@@ -586,7 +607,7 @@ Optional<WriteAckFrameResult> writeAckFrame(
   }
 
   // Reserve space for receive timestamps if enabled
-  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+  if (receiveTimestampsEnabled) {
     auto receiveTimestampsMinimumSpace =
         computeReceiveTimestampsMinimumSpace(ackFrameMetaData);
     if (spaceLeft < receiveTimestampsMinimumSpace) {
@@ -597,7 +618,7 @@ Optional<WriteAckFrameResult> writeAckFrame(
 
   // Start writing fields to the builder
 
-  // 1. Write the base ack fields (ACK packet type)
+  // 1. Write the base ack fields
   auto maybeAckFrame =
       maybeWriteAckBaseFields(ackFrameMetaData, builder, frameType, spaceLeft);
   if (!maybeAckFrame.has_value()) {
@@ -605,14 +626,20 @@ Optional<WriteAckFrameResult> writeAckFrame(
   }
   auto& ackFrame = maybeAckFrame.value();
 
-  // 2. Write ECN fields if enabled
-  if (frameType == FrameType::ACK_ECN) {
+  // 2. Write extended ack header if enabled
+  if (frameType == FrameType::ACK_EXTENDED) {
+    QuicInteger quicExtendedAckFeatures(extendedAckFeatures);
+    builder.write(quicExtendedAckFeatures);
+  }
+
+  // 3. Write ECN fields if enabled
+  if (ecnEnabled) {
     writeECNFieldsToAck(ackFrameMetaData, ackFrame, builder);
   }
 
-  // 3. Write receive timestamp fields if enabled
+  // 4. Write receive timestamp fields if enabled
   AckReceiveTimesStampsWritten receiveTimestampsWritten;
-  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
+  if (receiveTimestampsEnabled) {
     receiveTimestampsWritten = writeReceiveTimestampFieldsToAck(
         ackFrameMetaData,
         ackFrame,
@@ -626,7 +653,8 @@ Optional<WriteAckFrameResult> writeAckFrame(
       ackFrame,
       ackFrame.ackBlocks.size(),
       receiveTimestampsWritten.TimestampRangesWritten,
-      receiveTimestampsWritten.TimestampWritten);
+      receiveTimestampsWritten.TimestampWritten,
+      extendedAckFeatures);
 
   builder.appendFrame(std::move(ackFrame));
   return ackFrameWriteResult;
