@@ -798,6 +798,8 @@ void QuicClientTransportLite::processUdpPacketData(
           }
         }
       }
+      updateNegotiatedAckFeatures(*conn_);
+
       // TODO This sucks, but manually update the max packet size until we fix
       // 0-rtt transport parameters.
       if (conn_->transportSettings.canIgnorePathMTU &&

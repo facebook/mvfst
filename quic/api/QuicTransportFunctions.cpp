@@ -2131,4 +2131,35 @@ void maybeScheduleAckForCongestionFeedback(
   }
 }
 
+void updateNegotiatedAckFeatures(QuicConnectionStateBase& conn) {
+  bool isAckReceiveTimestampsSupported =
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
+      conn.maybePeerAckReceiveTimestampsConfig;
+
+  uint64_t peerRequestedTimestampsCount =
+      conn.maybePeerAckReceiveTimestampsConfig.has_value()
+      ? conn.maybePeerAckReceiveTimestampsConfig.value()
+            .maxReceiveTimestampsPerAck
+      : 0;
+
+  conn.negotiatedAckReceiveTimestampSupport =
+      isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0);
+
+  conn.negotiatedExtendedAckFeatures = conn.peerAdvertisedExtendedAckFeatures &
+      conn.transportSettings.enableExtendedAckFeatures;
+  // Disable the ECN fields if we are not reading them
+  if (!conn.transportSettings.readEcnOnIngress) {
+    conn.negotiatedExtendedAckFeatures &=
+        ~static_cast<ExtendedAckFeatureMaskType>(
+            ExtendedAckFeatureMask::ECN_COUNTS);
+  }
+  // Disable the receive timestamps fields if we have not regoatiated receive
+  // timestamps support
+  if (!conn.negotiatedAckReceiveTimestampSupport) {
+    conn.negotiatedExtendedAckFeatures &=
+        ~static_cast<ExtendedAckFeatureMaskType>(
+            ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
+  }
+}
+
 } // namespace quic

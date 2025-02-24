@@ -445,6 +445,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
     }
     processClientInitialParams(conn, std::move(*clientParams));
+    updateNegotiatedAckFeatures(conn);
   }
   if (oneRttReadCipher) {
     if (conn.qLogger) {

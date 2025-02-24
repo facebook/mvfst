@@ -705,6 +705,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   bool peerAdvertisedKnobFrameSupport{false};
 
   ExtendedAckFeatureMaskType peerAdvertisedExtendedAckFeatures{0};
+
+  // Negotiated ACK related config. These don't change throughout the connection
+  // so cache them once we've receive the relevant transport parameters.
+  bool negotiatedAckReceiveTimestampSupport{false};
+  ExtendedAckFeatureMaskType negotiatedExtendedAckFeatures{0};
+
   // Retransmission policies map.
   folly::F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
       retransmissionPolicies;

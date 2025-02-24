@@ -2816,6 +2816,7 @@ TEST_F(QuicAckSchedulerTest, WriteAckReceiveTimestampsWhenEnabled) {
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
+  updateNegotiatedAckFeatures(*conn_);
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
 
@@ -2874,6 +2875,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfNotSupported) {
   conn_->transportSettings.enableExtendedAckFeatures =
       3; // ECN + ReceiveTimestamps
   conn_->peerAdvertisedExtendedAckFeatures = 0;
+  updateNegotiatedAckFeatures(*conn_);
 
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
@@ -2902,6 +2904,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfNotEnabled) {
 
   conn_->transportSettings.enableExtendedAckFeatures = 0;
   conn_->peerAdvertisedExtendedAckFeatures = 3; // ECN + ReceiveTimestamps;
+  updateNegotiatedAckFeatures(*conn_);
 
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
@@ -2938,6 +2941,7 @@ TEST_F(
   conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
   // We don't have an ART config (i.e. we can't sent ART)
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer = none;
+  updateNegotiatedAckFeatures(*conn_);
 
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
@@ -2971,6 +2975,8 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfECNFeatureNotSupported) {
   conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
+
+  updateNegotiatedAckFeatures(*conn_);
 
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
@@ -3009,6 +3015,8 @@ TEST_F(QuicAckSchedulerTest, AckExtendedWithAllFeatures) {
   // We can read ECN
   conn_->transportSettings.readEcnOnIngress = true;
 
+  updateNegotiatedAckFeatures(*conn_);
+
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
 
@@ -3046,6 +3054,8 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverECN) {
   // We can read ECN
   conn_->transportSettings.readEcnOnIngress = true;
 
+  updateNegotiatedAckFeatures(*conn_);
+
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());
 
@@ -3082,6 +3092,8 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
 
   // We can read ECN
   conn_->transportSettings.readEcnOnIngress = true;
+
+  updateNegotiatedAckFeatures(*conn_);
 
   AckScheduler ackScheduler(*conn_, ackState_);
   ASSERT_TRUE(ackScheduler.hasPendingAcks());

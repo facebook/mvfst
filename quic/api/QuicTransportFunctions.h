@@ -345,4 +345,5 @@ void maybeAddPacketMark(
 void maybeScheduleAckForCongestionFeedback(
     const ReceivedUdpPacket& receivedPacket,
     AckState& ackState);
+void updateNegotiatedAckFeatures(QuicConnectionStateBase& conn);
 } // namespace quic
