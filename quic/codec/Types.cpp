@@ -457,6 +457,8 @@ std::string_view toString(FrameType frame) {
       return "GROUP_STREAM";
     case FrameType::ACK_RECEIVE_TIMESTAMPS:
       return "ACK_RECEIVE_TIMESTAMPS";
+    case quic::FrameType::ACK_EXTENDED:
+      return "ACK_EXTENDED";
   }
   LOG(WARNING) << "toString has unhandled frame type";
   return "UNKNOWN";

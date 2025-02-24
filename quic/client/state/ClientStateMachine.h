@@ -158,7 +158,8 @@ void cacheServerInitialParams(
     bool peerAdvertisedAckReceiveTimestampsEnabled,
     uint64_t peerAdvertisedMaxRecvTimestampsPerAck,
     uint64_t peerAdvertisedReceiveTimestampsExponent,
-    bool peerAdvertisedReliableStreamResetSupport);
+    bool peerAdvertisedReliableStreamResetSupport,
+    ExtendedAckFeatureMaskType peerAdvertisedExtendedAckSupport);
 
 CachedServerTransportParameters getServerCachedTransportParameters(
     const QuicClientConnectionState& conn);

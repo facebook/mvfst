@@ -335,6 +335,16 @@ struct TransportSettings {
   bool dropIngressOnStopSending{false};
   bool advertisedReliableResetStreamSupport{false};
   bool advertisedKnobFrameSupport{true};
+
+  // Extended ACK support to advertise to the peer. This is what we expect to
+  // receive from the peer inside ACK_EXTENDED frames.
+  // 0 means no support.
+  // Otherwise the bits of the integer indicate the following:
+  // - Bit 0: support for ACK_EXTENDED frame with ECN fields
+  // - Bit 1: support for ACK_EXTENDED frame with receive timestamp fields
+  // The list of features corresponds to ExtendedAckFeatures in QuicConstants
+  ExtendedAckFeatureMaskType advertisedExtendedAckFeatures{0};
+
   bool removeStreamAfterEomCallbackUnset{false};
   // Whether to include cwnd hint in new session tickets for 0-rtt
   bool includeCwndHintsInSessionTicket{false};

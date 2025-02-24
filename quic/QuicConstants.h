@@ -262,12 +262,22 @@ enum class FrameType : uint64_t {
   GROUP_STREAM_OFF_FIN = 0x37,
   GROUP_STREAM_OFF_LEN = 0x38,
   GROUP_STREAM_OFF_LEN_FIN = 0x39,
-  ACK_RECEIVE_TIMESTAMPS = 0xB0
+  ACK_RECEIVE_TIMESTAMPS = 0xB0,
+  ACK_EXTENDED = 0xB1
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {
   return 0x0100 | static_cast<uint8_t>(frame);
 }
+
+enum class ExtendedAckFeatureMask : uint8_t {
+  // These should use mutually exclusive bits.
+  ECN_COUNTS = 0x01,
+  RECEIVE_TIMESTAMPS = 0x02,
+};
+
+using ExtendedAckFeatureMaskType =
+    std::underlying_type<ExtendedAckFeatureMask>::type;
 
 enum class TransportErrorCode : uint64_t {
   NO_ERROR = 0x0000,

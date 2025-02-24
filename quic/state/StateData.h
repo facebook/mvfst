@@ -703,6 +703,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   bool peerAdvertisedReliableStreamResetSupport{false};
 
   bool peerAdvertisedKnobFrameSupport{false};
+
+  ExtendedAckFeatureMaskType peerAdvertisedExtendedAckFeatures{0};
   // Retransmission policies map.
   folly::F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
       retransmissionPolicies;

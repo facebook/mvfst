@@ -78,6 +78,14 @@ void expectAppTokenEqual(
       appToken.transportParams.parameters);
   EXPECT_EQ(cwndHintBytes, expectedCwndHintBytes);
 
+  auto extendedAckSupport = getIntegerParameter(
+      TransportParameterId::extended_ack_features,
+      decodedAppToken->transportParams.parameters);
+  auto expectedExtendedAckSupport = getIntegerParameter(
+      TransportParameterId::extended_ack_features,
+      appToken.transportParams.parameters);
+  EXPECT_EQ(extendedAckSupport, expectedExtendedAckSupport);
+
   EXPECT_EQ(
       decodedAppToken->sourceAddresses.size(), appToken.sourceAddresses.size());
   for (size_t ii = 0; ii < appToken.sourceAddresses.size(); ++ii) {
@@ -104,7 +112,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
@@ -121,7 +130,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0")};
   appToken.version = QuicVersion::MVFST;
@@ -140,7 +150,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("2401:db00:2111:7283:face::46:1"),
@@ -161,7 +172,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.sourceAddresses = {folly::IPAddress("1.2.3.4")};
   appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
@@ -179,7 +191,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.sourceAddresses = {
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("1.2.3.5"),
@@ -200,7 +213,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),
@@ -221,7 +235,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
   appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
@@ -239,7 +254,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
       kDefaultStreamFlowControlWindow,
       kDefaultStreamFlowControlWindow,
       std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max());
+      std::numeric_limits<uint32_t>::max(),
+      2 /* extendedAckSupport */);
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),

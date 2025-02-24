@@ -94,6 +94,8 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "group_stream";
     case FrameType::ACK_RECEIVE_TIMESTAMPS:
       return "ack_receive_timestamps";
+    case FrameType::ACK_EXTENDED:
+      return "ack_extended";
   }
   folly::assume_unreachable();
 }

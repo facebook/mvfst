@@ -865,10 +865,16 @@ QuicFrame parseFrame(
         return QuicFrame(decodeAckFrequencyFrame(cursor));
       case FrameType::IMMEDIATE_ACK:
         return QuicFrame(decodeImmediateAckFrame(cursor));
-      case FrameType::ACK_RECEIVE_TIMESTAMPS:
+      case FrameType::ACK_RECEIVE_TIMESTAMPS: {
         auto frame = QuicFrame(decodeAckFrameWithReceivedTimestamps(
             cursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS));
         return frame;
+      }
+      case FrameType::ACK_EXTENDED:
+        throw QuicTransportException(
+            folly::to<std::string>(
+                "ACK_EXTENDED not yet supported, type=", frameTypeInt->first),
+            TransportErrorCode::FRAME_ENCODING_ERROR);
     }
   } catch (const std::exception& e) {
     error = true;

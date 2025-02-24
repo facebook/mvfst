@@ -250,6 +250,11 @@ void processClientInitialParams(
           TransportParameterId::knob_frames_supported),
       clientParams.parameters);
 
+  auto extendedAckFeatures = getIntegerParameter(
+      static_cast<TransportParameterId>(
+          TransportParameterId::extended_ack_features),
+      clientParams.parameters);
+
   auto reliableResetTpIter = findParameter(
       clientParams.parameters,
       static_cast<TransportParameterId>(
@@ -381,6 +386,7 @@ void processClientInitialParams(
   }
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
+  conn.peerAdvertisedExtendedAckFeatures = extendedAckFeatures.value_or(0);
 }
 
 void updateHandshakeState(QuicServerConnectionState& conn) {
@@ -1113,6 +1119,21 @@ void onServerReadDataFromOpen(
                    << conn;
           isNonProbingPacket = true;
           ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
+
+          if (ackFrame.frameType == FrameType::ACK_EXTENDED &&
+              !conn.transportSettings.advertisedExtendedAckFeatures) {
+            throw QuicTransportException(
+                "Received unexpected ACK_EXTENDED frame",
+                TransportErrorCode::PROTOCOL_VIOLATION);
+          } else if (
+              ackFrame.frameType == FrameType::ACK_RECEIVE_TIMESTAMPS &&
+              !conn.transportSettings
+                   .maybeAckReceiveTimestampsConfigSentToPeer) {
+            throw QuicTransportException(
+                "Received unexpected ACK_RECEIVE_TIMESTAMPS frame",
+                TransportErrorCode::PROTOCOL_VIOLATION);
+          }
+
           conn.lastProcessedAckEvents.emplace_back(processAckFrame(
               conn,
               packetNumberSpace,

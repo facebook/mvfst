@@ -129,6 +129,11 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     customTps.push_back(encodeEmptyParameter(TpId::reliable_stream_reset));
   }
 
+  if (ts.advertisedExtendedAckFeatures) {
+    customTps.push_back(encodeIntegerParameter(
+        TpId::extended_ack_features, ts.advertisedExtendedAckFeatures));
+  }
+
   return customTps;
 }
 

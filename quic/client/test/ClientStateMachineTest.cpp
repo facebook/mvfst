@@ -32,6 +32,7 @@ constexpr auto initialMaxStreamDataUni = kDefaultStreamFlowControlWindow + 5;
 constexpr auto initialMaxStreamsBidi = kDefaultMaxStreamsBidirectional + 6;
 constexpr auto initialMaxStreamsUni = kDefaultMaxStreamsUnidirectional + 7;
 constexpr auto knobFrameSupport = true;
+constexpr auto extendedAckSupport = 3;
 constexpr auto ackReceiveTimestampsEnabled = true;
 constexpr auto maxReceiveTimestampsPerAck = 10;
 constexpr auto ackReceiveTimestampsExponent = 0;
@@ -46,6 +47,7 @@ const CachedServerTransportParameters kParams{
     initialMaxStreamsUni,
     maxReceiveTimestampsPerAck,
     ackReceiveTimestampsExponent,
+    extendedAckSupport,
     knobFrameSupport,
     ackReceiveTimestampsEnabled};
 } // namespace
@@ -78,6 +80,7 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsNotIgnorePathMTU) {
 TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   client_->transportSettings.canIgnorePathMTU = true;
   client_->peerAdvertisedKnobFrameSupport = false;
+  client_->peerAdvertisedExtendedAckFeatures = 0;
   client_->maybePeerAckReceiveTimestampsConfig.assign(
       {.maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0});
 
@@ -95,6 +98,7 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
       client_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
       initialMaxStreamDataUni);
   EXPECT_EQ(client_->peerAdvertisedKnobFrameSupport, knobFrameSupport);
+  EXPECT_EQ(client_->peerAdvertisedExtendedAckFeatures, extendedAckSupport);
   ASSERT_TRUE(client_->maybePeerAckReceiveTimestampsConfig.has_value());
   EXPECT_EQ(
       client_->maybePeerAckReceiveTimestampsConfig.value()
@@ -232,6 +236,28 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
       std::move(transportParams)};
   processServerInitialParams(clientConn, serverTransportParams, 0);
   EXPECT_FALSE(clientConn.peerAdvertisedKnobFrameSupport);
+}
+
+TEST_F(ClientStateMachineTest, TestProcessExtendedAckSupportedParam) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::extended_ack_features, 3));
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_EQ(clientConn.peerAdvertisedExtendedAckFeatures, 3);
+}
+
+TEST_F(ClientStateMachineTest, TestProcessExtendedAckSupportedParamDefault) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_EQ(clientConn.peerAdvertisedExtendedAckFeatures, 0);
 }
 
 TEST_F(

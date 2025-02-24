@@ -336,6 +336,28 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
           testing::Eq(TransportParameterId::knob_frames_supported)))));
 }
 
+TEST(ServerStateMachineTest, TestProcessExtendedAckSupportParam) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::extended_ack_features, 7));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_EQ(serverConn.peerAdvertisedExtendedAckFeatures, 7);
+}
+
+TEST(ServerStateMachineTest, TestProcessExtendedAckSupportParamNotSent) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_EQ(serverConn.peerAdvertisedExtendedAckFeatures, 0);
+}
+
 TEST(
     ServerStateMachineTest,
     TestProcessReliableStreamResetSupportedParamEnabled) {

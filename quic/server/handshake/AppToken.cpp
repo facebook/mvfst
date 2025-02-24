@@ -18,6 +18,7 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamDataUni,
     uint64_t initialMaxStreamsBidi,
     uint64_t initialMaxStreamsUni,
+    ExtendedAckFeatureMaskType extendedAckFeatures,
     Optional<uint64_t> cwndHintBytes) {
   TicketTransportParameters params;
   params.parameters.push_back(
@@ -39,6 +40,8 @@ TicketTransportParameters createTicketTransportParameters(
       TransportParameterId::initial_max_streams_bidi, initialMaxStreamsBidi));
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::initial_max_streams_uni, initialMaxStreamsUni));
+  params.parameters.push_back(encodeIntegerParameter(
+      TransportParameterId::extended_ack_features, extendedAckFeatures));
   if (cwndHintBytes) {
     params.parameters.push_back((encodeIntegerParameter(
         TransportParameterId::cwnd_hint_bytes, *cwndHintBytes)));

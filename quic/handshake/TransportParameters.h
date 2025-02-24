@@ -39,6 +39,7 @@ enum class TransportParameterId : uint64_t {
   ack_receive_timestamps_enabled = 0xff0a001,
   max_receive_timestamps_per_ack = 0xff0a002,
   receive_timestamps_exponent = 0xff0a003,
+  extended_ack_features = 0xff0a004,
   stream_groups_enabled = 0x0000ff99,
   knob_frames_supported = 0x00005178,
   cwnd_hint_bytes = 0x00007492,

@@ -564,6 +564,7 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
         conn_->transportSettings.advertisedInitialUniStreamFlowControlWindow,
         conn_->transportSettings.advertisedInitialMaxStreamsBidi,
         conn_->transportSettings.advertisedInitialMaxStreamsUni,
+        conn_->transportSettings.advertisedExtendedAckFeatures,
         cwndHint);
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
     appToken.version = conn_->version.value();

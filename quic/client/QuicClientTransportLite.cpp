@@ -462,6 +462,21 @@ void QuicClientTransportLite::processUdpPacketData(
         VLOG(10) << "Client received ack frame in packet=" << packetNum << " "
                  << *this;
         ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
+
+        if (ackFrame.frameType == FrameType::ACK_EXTENDED &&
+            !conn_->transportSettings.advertisedExtendedAckFeatures) {
+          throw QuicTransportException(
+              "Received unexpected ACK_EXTENDED frame",
+              TransportErrorCode::PROTOCOL_VIOLATION);
+        } else if (
+            ackFrame.frameType == FrameType::ACK_RECEIVE_TIMESTAMPS &&
+            !conn_->transportSettings
+                 .maybeAckReceiveTimestampsConfigSentToPeer) {
+          throw QuicTransportException(
+              "Received unexpected ACK_RECEIVE_TIMESTAMPS frame",
+              TransportErrorCode::PROTOCOL_VIOLATION);
+        }
+
         conn_->lastProcessedAckEvents.emplace_back(processAckFrame(
             *conn_,
             pnSpace,
@@ -754,7 +769,8 @@ void QuicClientTransportLite::processUdpPacketData(
                 ? conn_->maybePeerAckReceiveTimestampsConfig
                       ->receiveTimestampsExponent
                 : 3,
-            conn_->peerAdvertisedReliableStreamResetSupport);
+            conn_->peerAdvertisedReliableStreamResetSupport,
+            conn_->peerAdvertisedExtendedAckFeatures);
 
         if (clientConn_->zeroRttRejected.has_value() &&
             *clientConn_->zeroRttRejected) {

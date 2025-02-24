@@ -36,6 +36,7 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamDataUni,
     uint64_t initialMaxStreamsBidi,
     uint64_t initialMaxStreamsUni,
+    ExtendedAckFeatureMaskType extendedAckSupport,
     Optional<uint64_t> cwndHintBytes = none);
 
 } // namespace quic

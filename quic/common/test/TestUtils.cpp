@@ -183,7 +183,8 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
         kDefaultStreamFlowControlWindow,
         kDefaultStreamFlowControlWindow,
         kDefaultMaxStreamsBidirectional,
-        kDefaultMaxStreamsUnidirectional);
+        kDefaultMaxStreamsUnidirectional,
+        0 /*extendedAckSupport*/);
     appToken.version = QuicVersion::MVFST;
     resState.appToken = encodeAppToken(appToken);
     return resState;

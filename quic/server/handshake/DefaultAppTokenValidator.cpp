@@ -129,6 +129,16 @@ bool DefaultAppTokenValidator::validate(
     VLOG(10) << "Decreased max streams";
     return validated = false;
   }
+
+  auto ticketExtendedAckFeatures =
+      getIntegerParameter(TransportParameterId::extended_ack_features, params)
+          .value_or(0);
+  if (conn_->transportSettings.advertisedExtendedAckFeatures !=
+      ticketExtendedAckFeatures) {
+    VLOG(10) << "Extended ack support changed";
+    return validated = false;
+  }
+
   conn_->transportParamsMatching = true;
 
   if (!validateAndUpdateSourceToken(

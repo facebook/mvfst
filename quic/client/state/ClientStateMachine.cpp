@@ -151,6 +151,10 @@ void processServerInitialParams(
       static_cast<TransportParameterId>(
           TransportParameterId::knob_frames_supported),
       serverParams.parameters);
+  auto extendedAckFeatures = getIntegerParameter(
+      static_cast<TransportParameterId>(
+          TransportParameterId::extended_ack_features),
+      serverParams.parameters);
 
   auto reliableResetTpIter = findParameter(
       serverParams.parameters,
@@ -286,6 +290,7 @@ void processServerInitialParams(
   }
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
+  conn.peerAdvertisedExtendedAckFeatures = extendedAckFeatures.value_or(0);
 }
 
 void cacheServerInitialParams(
@@ -300,7 +305,8 @@ void cacheServerInitialParams(
     bool peerAdvertisedAckReceiveTimestampsEnabled,
     uint64_t peerAdvertisedMaxReceiveTimestampsPerAck,
     uint64_t peerAdvertisedReceiveTimestampsExponent,
-    bool peerAdvertisedReliableStreamResetSupport) {
+    bool peerAdvertisedReliableStreamResetSupport,
+    ExtendedAckFeatureMaskType peerAdvertisedExtendedAckFeatures) {
   conn.serverInitialParamsSet_ = true;
   conn.peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
   conn.peerAdvertisedInitialMaxStreamDataBidiLocal =
@@ -328,6 +334,7 @@ void cacheServerInitialParams(
   } else {
     conn.maybePeerAckReceiveTimestampsConfig.clear();
   }
+  conn.peerAdvertisedExtendedAckFeatures = peerAdvertisedExtendedAckFeatures;
 }
 
 CachedServerTransportParameters getServerCachedTransportParameters(
@@ -360,6 +367,7 @@ CachedServerTransportParameters getServerCachedTransportParameters(
     transportParams.receiveTimestampsExponent =
         conn.maybePeerAckReceiveTimestampsConfig->receiveTimestampsExponent;
   }
+  transportParams.extendedAckFeatures = conn.peerAdvertisedExtendedAckFeatures;
 
   return transportParams;
 }
@@ -395,5 +403,6 @@ void updateTransportParamsFromCachedEarlyParams(
   } else {
     conn.maybePeerAckReceiveTimestampsConfig.clear();
   }
+  conn.peerAdvertisedExtendedAckFeatures = transportParams.extendedAckFeatures;
 }
 } // namespace quic

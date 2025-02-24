@@ -24,6 +24,8 @@ struct CachedServerTransportParameters {
   uint64_t initialMaxStreamsUni{0};
   uint64_t maxReceiveTimestampsPerAck{0};
   uint64_t receiveTimestampsExponent{0};
+  // Underlying type is currently uint8_t so this struct is still packed
+  ExtendedAckFeatureMaskType extendedAckFeatures{0};
   bool knobFrameSupport{false};
   bool ackReceiveTimestampsEnabled{false};
   bool reliableStreamResetSupport{false};
