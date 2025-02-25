@@ -42,7 +42,7 @@ bool PacketGroupWriter::writeSingleQuicPacket(
   builder.accountForCipherOverhead(aead.getCipherOverhead());
   // frontend has already limited the length to flow control, thus
   // flowControlLen == length
-  auto dataLen = writeStreamFrameHeader(
+  auto res = writeStreamFrameHeader(
       builder,
       streamId,
       offset,
@@ -52,6 +52,11 @@ bool PacketGroupWriter::writeSingleQuicPacket(
       true /* skip length field in stream header */,
       std::nullopt, /* stream group id */
       false /* don't append frame to builder */);
+  if (res.hasError()) {
+    throw QuicInternalException(
+        res.error().message, *res.error().code.asLocalErrorCode());
+  }
+  auto dataLen = *res;
   ChainedByteRangeHead chainedByteRangeHead(buf);
   writeStreamFrameData(builder, chainedByteRangeHead, *dataLen);
   auto packet = std::move(builder).buildPacket();

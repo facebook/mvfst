@@ -91,7 +91,7 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
         if (stream && retransmittable(*stream)) {
           auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
           auto bufferLen = streamData ? streamData->chainLength() : 0;
-          auto dataLen = writeStreamFrameHeader(
+          auto res = writeStreamFrameHeader(
               builder_,
               streamFrame.streamId,
               streamFrame.offset,
@@ -103,6 +103,11 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
               // frame last we need to end the stream frame in that case.
               lastFrame && bufferLen && !hasAckFrame,
               streamFrame.streamGroupId);
+          if (res.hasError()) {
+            throw QuicInternalException(
+                res.error().message, *res.error().code.asLocalErrorCode());
+          }
+          auto dataLen = *res;
           bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
             // Writing 0 byte for stream data is legit if the stream frame has

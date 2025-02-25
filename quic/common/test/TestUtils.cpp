@@ -305,7 +305,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
   }
   builder->encodePacketHeader();
   builder->accountForCipherOverhead(cipherOverhead);
-  auto dataLen = *writeStreamFrameHeader(
+  auto res = *writeStreamFrameHeader(
       *builder,
       streamId,
       offset,
@@ -313,6 +313,8 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
       data.computeChainDataLength(),
       eof,
       none /* skipLenHint */);
+  CHECK(res.hasValue()) << "failed to write stream frame header";
+  auto dataLen = *res;
   auto dataBuf = data.clone();
   writeStreamFrameData(
       *builder,

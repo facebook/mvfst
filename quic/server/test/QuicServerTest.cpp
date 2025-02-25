@@ -1461,7 +1461,7 @@ auto createInitialStream(
       0 /* largestAcked */);
   builder.encodePacketHeader();
   auto streamData = data.clone();
-  auto dataLen = writeStreamFrameHeader(
+  auto res = writeStreamFrameHeader(
       builder,
       streamId,
       0,
@@ -1469,6 +1469,8 @@ auto createInitialStream(
       streamData->computeChainDataLength(),
       true,
       none /* skipLenHint */);
+  EXPECT_TRUE(res.hasValue());
+  auto dataLen = *res;
   EXPECT_TRUE(dataLen);
   writeStreamFrameData(builder, std::move(streamData), *dataLen);
   return packetToBuf(std::move(builder).buildPacket());

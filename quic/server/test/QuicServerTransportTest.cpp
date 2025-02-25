@@ -87,7 +87,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   auto buf1 = IOBuf::copyBuffer("Aloha");
   auto buf2 = IOBuf::copyBuffer("Hello");
 
-  auto dataLen = writeStreamFrameHeader(
+  auto res = writeStreamFrameHeader(
       builder,
       0x08,
       0,
@@ -95,11 +95,13 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       true,
       none /* skipLenHint */);
+  ASSERT_TRUE(res.hasValue());
+  auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
   writeStreamFrameData(builder, buf1->clone(), buf1->computeChainDataLength());
 
-  dataLen = writeStreamFrameHeader(
+  res = writeStreamFrameHeader(
       builder,
       0x0C,
       0,
@@ -107,6 +109,8 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       true,
       none /* skipLenHint */);
+  ASSERT_TRUE(res.hasValue());
+  dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
   writeStreamFrameData(builder, buf2->clone(), buf2->computeChainDataLength());
@@ -1058,7 +1062,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  auto dataLen = writeStreamFrameHeader(
+  auto res = writeStreamFrameHeader(
       builder,
       0x00,
       stream->currentReadOffset,
@@ -1066,6 +1070,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       10,
       true,
       none /* skipLenHint */);
+  ASSERT_TRUE(res.hasValue());
+  auto dataLen = *res;
   ASSERT_TRUE(dataLen.has_value());
   ASSERT_EQ(*dataLen, 0);
   writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
@@ -3789,7 +3795,7 @@ TEST_F(
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
-  auto dataLen = *writeStreamFrameHeader(
+  auto res = *writeStreamFrameHeader(
       builder,
       /*id=*/4,
       /*offset=*/0,
@@ -3797,6 +3803,8 @@ TEST_F(
       data->computeChainDataLength(),
       /*fin=*/true,
       /*skipLenHint=*/none);
+  ASSERT_TRUE(res.hasValue());
+  auto dataLen = *res;
   writeStreamFrameData(
       builder,
       data->clone(),
@@ -3830,7 +3838,7 @@ TEST_F(
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
-  auto dataLen = *writeStreamFrameHeader(
+  auto res = *writeStreamFrameHeader(
       builder,
       /*id=*/4,
       /*offset=*/0,
@@ -3838,6 +3846,8 @@ TEST_F(
       data->computeChainDataLength(),
       /*eof=*/true,
       /*skipLenHint=*/none);
+  ASSERT_TRUE(res.hasValue());
+  auto dataLen = *res;
   writeStreamFrameData(
       builder,
       data->clone(),
@@ -3871,7 +3881,7 @@ TEST_F(
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
-  auto dataLen = *writeStreamFrameHeader(
+  auto res = *writeStreamFrameHeader(
       builder,
       /*id=*/4,
       /*offset=*/0,
@@ -3879,6 +3889,8 @@ TEST_F(
       data->computeChainDataLength(),
       /*eof=*/true,
       /*skipLenHint=*/none);
+  ASSERT_TRUE(res.hasValue());
+  auto dataLen = *res;
   writeStreamFrameData(
       builder,
       data->clone(),

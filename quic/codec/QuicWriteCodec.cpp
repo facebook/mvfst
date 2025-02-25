@@ -28,7 +28,7 @@ bool packetSpaceCheck(uint64_t limit, size_t require) {
 
 namespace quic {
 
-Optional<uint64_t> writeStreamFrameHeader(
+folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
     uint64_t offset,
@@ -42,9 +42,9 @@ Optional<uint64_t> writeStreamFrameHeader(
     return none;
   }
   if (writeBufferLen == 0 && !fin) {
-    throw QuicInternalException(
-        "No data or fin supplied when writing stream.",
-        LocalErrorCode::INTERNAL_ERROR);
+    return folly::makeUnexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "No data or fin supplied when writing stream."));
   }
   StreamTypeField::Builder streamTypeBuilder;
   if (streamGroupId) {

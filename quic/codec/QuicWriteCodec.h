@@ -49,7 +49,7 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder);
  *   to decide it. When skipLenHint is true, the field is skipped. When it's
  *   false, it will be encoded into the header.
  */
-Optional<uint64_t> writeStreamFrameHeader(
+folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
     uint64_t offset,

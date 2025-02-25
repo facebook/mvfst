@@ -94,7 +94,6 @@ mvfst_cpp_library(
         "-fstrict-aliasing",
     ],
     deps = [
-        "//folly:string",
         "//quic:exception",
     ],
     exported_deps = [
@@ -163,7 +162,6 @@ mvfst_cpp_library(
     ],
     deps = [
         ":decode",
-        "//quic:exception",
     ],
     exported_deps = [
         ":packet_number",

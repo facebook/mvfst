@@ -358,7 +358,7 @@ bool StreamFrameScheduler::writeStreamLossBuffers(
        buffer != stream.lossBuffer.cend();
        ++buffer) {
     auto bufferLen = buffer->data.chainLength();
-    auto dataLen = writeStreamFrameHeader(
+    auto res = writeStreamFrameHeader(
         builder,
         stream.id,
         buffer->offset,
@@ -367,6 +367,11 @@ bool StreamFrameScheduler::writeStreamLossBuffers(
         buffer->eof,
         none /* skipLenHint */,
         stream.groupId);
+    if (res.hasError()) {
+      throw QuicInternalException(
+          res.error().message, *res.error().code.asLocalErrorCode());
+    }
+    auto dataLen = *res;
     if (dataLen) {
       wroteStreamFrame = true;
       writeStreamFrameData(builder, buffer->data, *dataLen);
@@ -528,7 +533,7 @@ bool StreamFrameScheduler::writeStreamFrame(
   bool canWriteFin = stream.finalWriteOffset.has_value() &&
       bufferLen <= flowControlLen && stream.writeBufMeta.offset == 0;
   auto writeOffset = stream.currentWriteOffset;
-  auto dataLen = writeStreamFrameHeader(
+  auto res = writeStreamFrameHeader(
       builder,
       stream.id,
       writeOffset,
@@ -537,6 +542,11 @@ bool StreamFrameScheduler::writeStreamFrame(
       canWriteFin,
       none /* skipLenHint */,
       stream.groupId);
+  if (res.hasError()) {
+    throw QuicInternalException(
+        res.error().message, *res.error().code.asLocalErrorCode());
+  }
+  auto dataLen = *res;
   if (!dataLen) {
     return false;
   }
