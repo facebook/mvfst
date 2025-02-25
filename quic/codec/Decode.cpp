@@ -71,25 +71,27 @@ PingFrame decodePingFrame(folly::io::Cursor&) {
   return PingFrame();
 }
 
-KnobFrame decodeKnobFrame(folly::io::Cursor& cursor) {
+folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
+    folly::io::Cursor& cursor) {
   auto knobSpace = decodeQuicInteger(cursor);
   if (!knobSpace) {
-    throw QuicTransportException(
-        "Bad knob space", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob space"));
   }
   auto knobId = decodeQuicInteger(cursor);
   if (!knobId) {
-    throw QuicTransportException(
-        "Bad knob id", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob id"));
   }
   auto knobLen = decodeQuicInteger(cursor);
   if (!knobLen) {
-    throw QuicTransportException(
-        "Bad knob len", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob len"));
   }
   Buf knobBlob;
   cursor.cloneAtMost(knobBlob, knobLen->first);
-  return KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob));
+  return QuicFrame(
+      KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob)));
 }
 
 AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor) {
@@ -844,7 +846,8 @@ QuicFrame parseFrame(
   try
 
   {
-    folly::Expected<ReadAckFrame, QuicError> res = ReadAckFrame{};
+    folly::Expected<QuicFrame, QuicError> res = folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, "unintialized frame"));
     switch (frameType) {
       case FrameType::PADDING:
         return QuicFrame(decodePaddingFrame(cursor));
@@ -934,7 +937,12 @@ QuicFrame parseFrame(
         return QuicFrame(decodeDatagramFrame(queue, true /* hasLen */));
       }
       case FrameType::KNOB:
-        return QuicFrame(decodeKnobFrame(cursor));
+        res = decodeKnobFrame(cursor);
+        if (res.hasError()) {
+          throw QuicTransportException(
+              res.error().message, *res.error().code.asTransportErrorCode());
+        }
+        return QuicFrame(*res);
       case FrameType::ACK_FREQUENCY:
         return QuicFrame(decodeAckFrequencyFrame(cursor));
       case FrameType::IMMEDIATE_ACK:

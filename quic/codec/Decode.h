@@ -103,7 +103,8 @@ MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor);
 
 PingFrame decodePingFrame(folly::io::Cursor& cursor);
 
-KnobFrame decodeKnobFrame(folly::io::Cursor& cursor);
+folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
+    folly::io::Cursor& cursor);
 
 AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor);
 
