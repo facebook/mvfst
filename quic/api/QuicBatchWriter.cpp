@@ -282,7 +282,7 @@ ssize_t SendmmsgInplacePacketBatchWriter::write(
   std::array<size_t, kMaxIovecs> messageSizes{};
 
   for (size_t i = 0; i < numPacketsBuffered_; i++) {
-    messageSizes[i] = iovecs_[i].iov_len;
+    messageSizes[i] = 1;
   }
 
   sock.writem(

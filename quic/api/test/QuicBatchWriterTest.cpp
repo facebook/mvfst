@@ -400,6 +400,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgInplace) {
       std::make_shared<FollyQuicEventBase>(&evb);
   quic::test::MockAsyncUDPSocket sock(qEvb);
 
+  gsoSupported_ = false;
+
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG,
       kBatchNum,
@@ -452,7 +454,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgInplace) {
           EXPECT_EQ(count, kBatchNum);
 
           for (size_t k = 0; k < count; k++) {
-            EXPECT_EQ(messageSizes[k], expectedIovecs[k].iov_len);
+            EXPECT_EQ(messageSizes[k], 1);
             EXPECT_EQ(expectedIovecs[k].iov_base, iovecs[k].iov_base);
             EXPECT_EQ(expectedIovecs[k].iov_len, iovecs[k].iov_len);
           }
