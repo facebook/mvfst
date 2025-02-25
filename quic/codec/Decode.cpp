@@ -94,28 +94,30 @@ folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
       KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob)));
 }
 
-AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor) {
+folly::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
+    folly::io::Cursor& cursor) {
   auto sequenceNumber = decodeQuicInteger(cursor);
   if (!sequenceNumber) {
-    throw QuicTransportException(
-        "Bad sequence number", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence number"));
   }
   auto packetTolerance = decodeQuicInteger(cursor);
   if (!packetTolerance) {
-    throw QuicTransportException(
-        "Bad packet tolerance", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad packet tolerance"));
   }
   auto updateMaxAckDelay = decodeQuicInteger(cursor);
   if (!updateMaxAckDelay) {
-    throw QuicTransportException(
-        "Bad update max ack delay",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad update max ack delay"));
   }
   auto reorderThreshold = decodeQuicInteger(cursor);
   if (!reorderThreshold) {
-    throw QuicTransportException(
-        "Bad reorder threshold",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad reorder threshold"));
   }
 
   AckFrequencyFrame frame;
@@ -123,7 +125,7 @@ AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor) {
   frame.packetTolerance = packetTolerance->first;
   frame.updateMaxAckDelay = updateMaxAckDelay->first;
   frame.reorderThreshold = reorderThreshold->first;
-  return frame;
+  return QuicSimpleFrame(frame);
 }
 
 ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor&) {
@@ -944,7 +946,12 @@ QuicFrame parseFrame(
         }
         return QuicFrame(*res);
       case FrameType::ACK_FREQUENCY:
-        return QuicFrame(decodeAckFrequencyFrame(cursor));
+        res = decodeAckFrequencyFrame(cursor);
+        if (res.hasError()) {
+          throw QuicTransportException(
+              res.error().message, *res.error().code.asTransportErrorCode());
+        }
+        return *res;
       case FrameType::IMMEDIATE_ACK:
         return QuicFrame(decodeImmediateAckFrame(cursor));
       case FrameType::ACK_RECEIVE_TIMESTAMPS: {

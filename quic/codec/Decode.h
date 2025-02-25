@@ -106,7 +106,8 @@ PingFrame decodePingFrame(folly::io::Cursor& cursor);
 folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
     folly::io::Cursor& cursor);
 
-AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor);
+folly::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
+    folly::io::Cursor& cursor);
 
 ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor& cursor);
 

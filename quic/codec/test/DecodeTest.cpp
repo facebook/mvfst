@@ -1069,7 +1069,9 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeValid) {
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
   folly::io::Cursor cursor(ackFrequencyFrame.get());
-  auto decodedFrame = decodeAckFrequencyFrame(cursor);
+  auto res = decodeAckFrequencyFrame(cursor);
+  EXPECT_TRUE(res.hasValue());
+  auto decodedFrame = *res->asAckFrequencyFrame();
   EXPECT_EQ(decodedFrame.sequenceNumber, 1);
   EXPECT_EQ(decodedFrame.packetTolerance, 100);
   EXPECT_EQ(decodedFrame.updateMaxAckDelay, 100000);
@@ -1085,7 +1087,9 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
   folly::io::Cursor cursor(ackFrequencyFrame.get());
-  EXPECT_THROW(decodeAckFrequencyFrame(cursor), QuicTransportException);
+  auto res = decodeAckFrequencyFrame(cursor);
+  EXPECT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, RstStreamFrame) {
