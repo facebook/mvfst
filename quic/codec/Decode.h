@@ -147,7 +147,7 @@ folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
     const CodecParameters& params,
     FrameType frameType);
 
-ReadAckFrame decodeAckFrameWithECN(
+folly::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params);

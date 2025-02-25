@@ -318,19 +318,20 @@ static folly::Expected<folly::Unit, QuicError> decodeReceiveTimestampsInAck(
   return folly::unit;
 }
 
-static void decodeEcnCountsInAck(
+static folly::Expected<folly::Unit, QuicError> decodeEcnCountsInAck(
     ReadAckFrame& frame,
     folly::io::Cursor& cursor) {
   auto ect_0 = decodeQuicInteger(cursor);
   auto ect_1 = decodeQuicInteger(cursor);
   auto ce = decodeQuicInteger(cursor);
   if (!ect_0 || !ect_1 || !ce) {
-    throw QuicTransportException(
-        "Bad ECN value", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ECN value"));
   }
   frame.ecnECT0Count = ect_0->first;
   frame.ecnECT1Count = ect_1->first;
   frame.ecnCECount = ce->first;
+  return folly::unit;
 }
 
 ReadAckFrame decodeAckExtendedFrame(
@@ -393,19 +394,25 @@ folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
   return QuicFrame(frame);
 }
 
-ReadAckFrame decodeAckFrameWithECN(
+folly::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
-  auto res = decodeAckFrame(cursor, header, params);
-  if (res.hasError()) {
-    throw QuicTransportException(
-        res.error().message, *res.error().code.asTransportErrorCode());
+  ReadAckFrame readAckFrame;
+
+  auto ack = decodeAckFrame(cursor, header, params);
+  if (ack.hasError()) {
+    return folly::makeUnexpected(ack.error());
   }
-  auto readAckFrame = *res;
+  readAckFrame = *ack;
   readAckFrame.frameType = FrameType::ACK_ECN;
-  decodeEcnCountsInAck(readAckFrame, cursor);
-  return readAckFrame;
+
+  auto ecn = decodeEcnCountsInAck(readAckFrame, cursor);
+  if (ecn.hasError()) {
+    return folly::makeUnexpected(ecn.error());
+  }
+
+  return QuicFrame(readAckFrame);
 }
 
 RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor, bool reliable) {
@@ -867,7 +874,12 @@ QuicFrame parseFrame(
         }
         return *res;
       case FrameType::ACK_ECN:
-        return QuicFrame(decodeAckFrameWithECN(cursor, header, params));
+        res = decodeAckFrameWithECN(cursor, header, params);
+        if (res.hasError()) {
+          throw QuicTransportException(
+              res.error().message, *res.error().code.asTransportErrorCode());
+        }
+        return *res;
       case FrameType::RST_STREAM:
       case FrameType::RST_STREAM_AT:
         return QuicFrame(decodeRstStreamFrame(

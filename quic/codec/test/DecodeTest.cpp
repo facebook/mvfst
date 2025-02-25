@@ -326,10 +326,12 @@ TEST_F(DecodeTest, AckEcnFrame) {
       false, // useRealValuesForAckDelay
       true); // addEcnCounts
   folly::io::Cursor cursor(result.get());
-  auto ackFrame = decodeAckFrameWithECN(
+  auto res = decodeAckFrameWithECN(
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  EXPECT_TRUE(res.hasValue());
+  auto ackFrame = *res->asReadAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
   // Since 100 is the encoded value, we use the decoded value.
