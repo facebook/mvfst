@@ -141,7 +141,7 @@ ReadAckFrame decodeAckExtendedFrame(
     const PacketHeader& header,
     const CodecParameters& params);
 
-ReadAckFrame decodeAckFrameWithReceivedTimestamps(
+folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,

@@ -248,48 +248,48 @@ folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
   return frame;
 }
 
-static void decodeReceiveTimestampsInAck(
+static folly::Expected<folly::Unit, QuicError> decodeReceiveTimestampsInAck(
     ReadAckFrame& frame,
     folly::io::Cursor& cursor,
     const CodecParameters& params) {
   auto latestRecvdPacketNum = decodeQuicInteger(cursor);
   if (!latestRecvdPacketNum) {
-    throw QuicTransportException(
-        "Bad latest received packet number",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad latest received packet number"));
   }
   frame.maybeLatestRecvdPacketNum = latestRecvdPacketNum->first;
 
   auto latestRecvdPacketTimeDelta = decodeQuicInteger(cursor);
   if (!latestRecvdPacketTimeDelta) {
-    throw QuicTransportException(
-        "Bad receive packet timestamp delta",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad receive packet timestamp delta"));
   }
   frame.maybeLatestRecvdPacketTime =
       std::chrono::microseconds(latestRecvdPacketTimeDelta->first);
 
   auto timeStampRangeCount = decodeQuicInteger(cursor);
   if (!timeStampRangeCount) {
-    throw QuicTransportException(
-        "Bad receive timestamps range count",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad receive timestamps range count"));
   }
   for (uint64_t numRanges = 0; numRanges < timeStampRangeCount->first;
        numRanges++) {
     RecvdPacketsTimestampsRange timeStampRange;
     auto receiveTimeStampsGap = decodeQuicInteger(cursor);
     if (!receiveTimeStampsGap) {
-      throw QuicTransportException(
-          "Bad receive timestamps gap",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Bad receive timestamps gap"));
     }
     timeStampRange.gap = receiveTimeStampsGap->first;
     auto receiveTimeStampsLen = decodeQuicInteger(cursor);
     if (!receiveTimeStampsLen) {
-      throw QuicTransportException(
-          "Bad receive timestamps block length",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Bad receive timestamps block length"));
     }
     timeStampRange.timestamp_delta_count = receiveTimeStampsLen->first;
     uint8_t receiveTimestampsExponentToUse =
@@ -300,22 +300,22 @@ static void decodeReceiveTimestampsInAck(
     for (uint64_t i = 0; i < receiveTimeStampsLen->first; i++) {
       auto delta = decodeQuicInteger(cursor);
       if (!delta) {
-        throw QuicTransportException(
-            "Bad receive timestamps delta",
-            quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+        return folly::makeUnexpected(QuicError(
+            quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+            "Bad receive timestamps delta"));
       }
       DCHECK_LT(receiveTimestampsExponentToUse, sizeof(delta->first) * 8);
       auto res = convertEncodedDurationToMicroseconds(
           receiveTimestampsExponentToUse, delta->first);
       if (res.hasError()) {
-        throw QuicTransportException(
-            res.error().message, *res.error().code.asTransportErrorCode());
+        return folly::makeUnexpected(res.error());
       }
       auto adjustedDelta = *res;
       timeStampRange.deltas.push_back(adjustedDelta);
     }
     frame.recvdPacketsTimestampRanges.emplace_back(timeStampRange);
   }
+  return folly::unit;
 }
 
 static void decodeEcnCountsInAck(
@@ -370,23 +370,27 @@ ReadAckFrame decodeAckExtendedFrame(
   return frame;
 }
 
-ReadAckFrame decodeAckFrameWithReceivedTimestamps(
+folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType) {
   ReadAckFrame frame;
 
-  auto res = decodeAckFrame(cursor, header, params, frameType);
-  if (res.hasError()) {
+  auto ack = decodeAckFrame(cursor, header, params, frameType);
+  if (ack.hasError()) {
     throw QuicTransportException(
-        res.error().message, *res.error().code.asTransportErrorCode());
+        ack.error().message, *ack.error().code.asTransportErrorCode());
   }
-  frame = *res;
+  frame = *ack;
   frame.frameType = frameType;
-  decodeReceiveTimestampsInAck(frame, cursor, params);
 
-  return frame;
+  auto ts = decodeReceiveTimestampsInAck(frame, cursor, params);
+  if (ts.hasError()) {
+    return folly::makeUnexpected(ts.error());
+  }
+
+  return QuicFrame(frame);
 }
 
 ReadAckFrame decodeAckFrameWithECN(
@@ -955,8 +959,13 @@ QuicFrame parseFrame(
       case FrameType::IMMEDIATE_ACK:
         return QuicFrame(decodeImmediateAckFrame(cursor));
       case FrameType::ACK_RECEIVE_TIMESTAMPS: {
-        auto frame = QuicFrame(decodeAckFrameWithReceivedTimestamps(
-            cursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS));
+        res = decodeAckFrameWithReceivedTimestamps(
+            cursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);
+        if (res.hasError()) {
+          throw QuicTransportException(
+              res.error().message, *res.error().code.asTransportErrorCode());
+        }
+        auto frame = *res;
         return frame;
       }
       case FrameType::ACK_EXTENDED:
