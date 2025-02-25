@@ -16,24 +16,26 @@
 
 namespace {
 
-quic::PacketNum nextAckedPacketGap(quic::PacketNum packetNum, uint64_t gap) {
+folly::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketGap(
+    quic::PacketNum packetNum,
+    uint64_t gap) noexcept {
   // Gap cannot overflow because of the definition of quic integer encoding, so
   // we can just add to gap.
   uint64_t adjustedGap = gap + 2;
   if (packetNum < adjustedGap) {
-    throw quic::QuicTransportException(
-        "Bad gap", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(quic::QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad gap"));
   }
   return packetNum - adjustedGap;
 }
 
-quic::PacketNum nextAckedPacketLen(
+folly::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketLen(
     quic::PacketNum packetNum,
-    uint64_t ackBlockLen) {
+    uint64_t ackBlockLen) noexcept {
   // Going to allow 0 as a valid value.
   if (packetNum < ackBlockLen) {
-    throw quic::QuicTransportException(
-        "Bad block len", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(quic::QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad block len"));
   }
   return packetNum - ackBlockLen;
 }
@@ -126,9 +128,9 @@ ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor&) {
   return ImmediateAckFrame();
 }
 
-uint64_t convertEncodedDurationToMicroseconds(
+folly::Expected<uint64_t, QuicError> convertEncodedDurationToMicroseconds(
     uint8_t exponentToUse,
-    uint64_t delay) {
+    uint64_t delay) noexcept {
   // ackDelayExponentToUse is guaranteed to be less than the size of uint64_t
   uint64_t delayOverflowMask = 0xFFFFFFFFFFFFFFFF;
 
@@ -139,21 +141,21 @@ uint64_t convertEncodedDurationToMicroseconds(
   uint8_t leftShift = (delayValWidth - exponentToUse);
   delayOverflowMask = delayOverflowMask << leftShift;
   if ((delay & delayOverflowMask) != 0) {
-    throw QuicTransportException(
-        "Decoded delay overflows",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Decoded delay overflows"));
   }
   uint64_t adjustedDelay = delay << exponentToUse;
   if (adjustedDelay >
       static_cast<uint64_t>(
           std::numeric_limits<std::chrono::microseconds::rep>::max())) {
-    throw QuicTransportException(
-        "Bad delay", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(
+        QuicError(quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad delay"));
   }
   return adjustedDelay;
 }
 
-ReadAckFrame decodeAckFrame(
+folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
@@ -162,24 +164,24 @@ ReadAckFrame decodeAckFrame(
   frame.frameType = frameType;
   auto largestAckedInt = decodeQuicInteger(cursor);
   if (!largestAckedInt) {
-    throw QuicTransportException(
-        "Bad largest acked", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad largest acked"));
   }
   auto largestAcked = folly::to<PacketNum>(largestAckedInt->first);
   auto ackDelay = decodeQuicInteger(cursor);
   if (!ackDelay) {
-    throw QuicTransportException(
-        "Bad ack delay", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack delay"));
   }
   auto additionalAckBlocks = decodeQuicInteger(cursor);
   if (!additionalAckBlocks) {
-    throw QuicTransportException(
-        "Bad ack block count", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack block count"));
   }
   auto firstAckBlockLen = decodeQuicInteger(cursor);
   if (!firstAckBlockLen) {
-    throw QuicTransportException(
-        "Bad first block", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad first block"));
   }
   // Using default ack delay for long header packets. Before negotiating
   // and ack delay, the sender has to use something, so they use the default
@@ -190,12 +192,19 @@ ReadAckFrame decodeAckFrame(
       : params.peerAckDelayExponent;
   DCHECK_LT(ackDelayExponentToUse, sizeof(ackDelay->first) * 8);
 
-  PacketNum currentPacketNum =
-      nextAckedPacketLen(largestAcked, firstAckBlockLen->first);
+  auto res = nextAckedPacketLen(largestAcked, firstAckBlockLen->first);
+  if (res.hasError()) {
+    return folly::makeUnexpected(res.error());
+  }
+  PacketNum currentPacketNum = *res;
   frame.largestAcked = largestAcked;
 
-  auto adjustedDelay = convertEncodedDurationToMicroseconds(
+  auto delayRes = convertEncodedDurationToMicroseconds(
       ackDelayExponentToUse, ackDelay->first);
+  if (delayRes.hasError()) {
+    return folly::makeUnexpected(delayRes.error());
+  }
+  auto adjustedDelay = *delayRes;
 
   if (UNLIKELY(adjustedDelay > 1000 * 1000 * 1000 /* 1000s */)) {
     LOG(ERROR) << "Quic recvd long ack delay=" << adjustedDelay
@@ -209,17 +218,24 @@ ReadAckFrame decodeAckFrame(
        ++numBlocks) {
     auto currentGap = decodeQuicInteger(cursor);
     if (!currentGap) {
-      throw QuicTransportException(
-          "Bad gap", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(
+          QuicError(quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad gap"));
     }
     auto blockLen = decodeQuicInteger(cursor);
     if (!blockLen) {
-      throw QuicTransportException(
-          "Bad block len", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad block len"));
     }
-    PacketNum nextEndPacket =
-        nextAckedPacketGap(currentPacketNum, currentGap->first);
-    currentPacketNum = nextAckedPacketLen(nextEndPacket, blockLen->first);
+    res = nextAckedPacketGap(currentPacketNum, currentGap->first);
+    if (res.hasError()) {
+      return folly::makeUnexpected(res.error());
+    }
+    PacketNum nextEndPacket = *res;
+    res = nextAckedPacketLen(nextEndPacket, blockLen->first);
+    if (res.hasError()) {
+      return folly::makeUnexpected(res.error());
+    }
+    currentPacketNum = *res;
     // We don't need to add the entry when the block length is zero since we
     // already would have processed it in the previous iteration.
     frame.ackBlocks.emplace_back(currentPacketNum, nextEndPacket);
@@ -285,8 +301,13 @@ static void decodeReceiveTimestampsInAck(
             quic::TransportErrorCode::FRAME_ENCODING_ERROR);
       }
       DCHECK_LT(receiveTimestampsExponentToUse, sizeof(delta->first) * 8);
-      auto adjustedDelta = convertEncodedDurationToMicroseconds(
+      auto res = convertEncodedDurationToMicroseconds(
           receiveTimestampsExponentToUse, delta->first);
+      if (res.hasError()) {
+        throw QuicTransportException(
+            res.error().message, *res.error().code.asTransportErrorCode());
+      }
+      auto adjustedDelta = *res;
       timeStampRange.deltas.push_back(adjustedDelta);
     }
     frame.recvdPacketsTimestampRanges.emplace_back(timeStampRange);
@@ -313,7 +334,12 @@ ReadAckFrame decodeAckExtendedFrame(
     const PacketHeader& header,
     const CodecParameters& params) {
   ReadAckFrame frame;
-  frame = decodeAckFrame(cursor, header, params, FrameType::ACK_EXTENDED);
+  auto res = decodeAckFrame(cursor, header, params, FrameType::ACK_EXTENDED);
+  if (res.hasError()) {
+    throw QuicTransportException(
+        res.error().message, *res.error().code.asTransportErrorCode());
+  }
+  frame = *res;
   auto extendedAckFeatures = decodeQuicInteger(cursor);
   if (!extendedAckFeatures) {
     throw QuicTransportException(
@@ -347,7 +373,12 @@ ReadAckFrame decodeAckFrameWithReceivedTimestamps(
     FrameType frameType) {
   ReadAckFrame frame;
 
-  frame = decodeAckFrame(cursor, header, params, frameType);
+  auto res = decodeAckFrame(cursor, header, params, frameType);
+  if (res.hasError()) {
+    throw QuicTransportException(
+        res.error().message, *res.error().code.asTransportErrorCode());
+  }
+  frame = *res;
   frame.frameType = frameType;
   decodeReceiveTimestampsInAck(frame, cursor, params);
 
@@ -358,7 +389,12 @@ ReadAckFrame decodeAckFrameWithECN(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
-  auto readAckFrame = decodeAckFrame(cursor, header, params);
+  auto res = decodeAckFrame(cursor, header, params);
+  if (res.hasError()) {
+    throw QuicTransportException(
+        res.error().message, *res.error().code.asTransportErrorCode());
+  }
+  auto readAckFrame = *res;
   readAckFrame.frameType = FrameType::ACK_ECN;
   decodeEcnCountsInAck(readAckFrame, cursor);
   return readAckFrame;
@@ -808,13 +844,19 @@ QuicFrame parseFrame(
   try
 
   {
+    folly::Expected<ReadAckFrame, QuicError> res = ReadAckFrame{};
     switch (frameType) {
       case FrameType::PADDING:
         return QuicFrame(decodePaddingFrame(cursor));
       case FrameType::PING:
         return QuicFrame(decodePingFrame(cursor));
       case FrameType::ACK:
-        return QuicFrame(decodeAckFrame(cursor, header, params));
+        res = decodeAckFrame(cursor, header, params);
+        if (res.hasError()) {
+          throw QuicTransportException(
+              res.error().message, *res.error().code.asTransportErrorCode());
+        }
+        return *res;
       case FrameType::ACK_ECN:
         return QuicFrame(decodeAckFrameWithECN(cursor, header, params));
       case FrameType::RST_STREAM:

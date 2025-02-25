@@ -128,7 +128,7 @@ PathChallengeFrame decodePathChallengeFrame(folly::io::Cursor& cursor);
 
 PathResponseFrame decodePathResponseFrame(folly::io::Cursor& cursor);
 
-ReadAckFrame decodeAckFrame(
+folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
@@ -240,7 +240,7 @@ folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     folly::io::Cursor& cursor,
     size_t dstConnIdSize = kDefaultConnectionIdSize);
 
-uint64_t convertEncodedDurationToMicroseconds(
+folly::Expected<uint64_t, QuicError> convertEncodedDurationToMicroseconds(
     uint8_t exponentToUse,
-    uint64_t delay);
+    uint64_t delay) noexcept;
 } // namespace quic
