@@ -162,7 +162,9 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
         // Reset any record of pending delay for packets we already sent and are
         // trying to scale down for.
         pendingDelayAdjustment_ = 0us;
-      } else if (timeSinceLastWrite > writeInterval_) {
+      } else if (
+          timeSinceLastWrite > writeInterval_ ||
+          conn_.transportSettings.ccaConfig.scaleDownPacerEarlyBurst) {
         // Adjust batch size to compensate for a delayed write, taking the
         // any pending delay adjustment into consideration.
         // Keep track of any delay adjustment carried over

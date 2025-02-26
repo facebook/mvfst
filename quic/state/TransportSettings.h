@@ -116,6 +116,10 @@ struct CongestionControlConfig {
   // used This helps accommodate minor packet bursts that can be caused by pacer
   // bursts
   float l4sCETarget{0.0f};
+
+  // Used by: TokenlessPacer
+  // Whether an early write should scale down the pacer burst or not.
+  bool scaleDownPacerEarlyBurst{false};
 };
 
 struct DatagramConfig {
