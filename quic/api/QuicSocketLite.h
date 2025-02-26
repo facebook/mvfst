@@ -441,58 +441,6 @@ class QuicSocketLite {
   };
 
   /**
-   * Structure used to communicate TX and ACK/Delivery notifications.
-   */
-  struct ByteEvent {
-    enum class Type { ACK = 1, TX = 2 };
-    static constexpr std::array<Type, 2> kByteEventTypes = {
-        {Type::ACK, Type::TX}};
-
-    StreamId id{0};
-    uint64_t offset{0};
-    Type type;
-
-    // sRTT at time of event
-    // TODO(bschlinker): Deprecate, caller can fetch transport state if
-    // desired.
-    std::chrono::microseconds srtt{0us};
-  };
-
-  /**
-   * Structure used to communicate cancellation of a ByteEvent.
-   *
-   * According to Dictionary.com, cancellation is more frequent in American
-   * English than cancellation. Yet in American English, the preferred style is
-   * typically not to double the final L, so cancel generally becomes canceled.
-   */
-  using ByteEventCancellation = ByteEvent;
-
-  /**
-   * Callback class for receiving byte event (TX/ACK) notifications.
-   */
-  class ByteEventCallback {
-   public:
-    virtual ~ByteEventCallback() = default;
-
-    /**
-     * Invoked when a byte event has been successfully registered.
-     * Since this is a convenience notification and not a mandatory callback,
-     * not marking this as pure virtual.
-     */
-    virtual void onByteEventRegistered(ByteEvent /* byteEvent */) {}
-
-    /**
-     * Invoked when the byte event has occurred.
-     */
-    virtual void onByteEvent(ByteEvent byteEvent) = 0;
-
-    /**
-     * Invoked if byte event is canceled due to reset, shutdown, or other error.
-     */
-    virtual void onByteEventCanceled(ByteEventCancellation cancellation) = 0;
-  };
-
-  /**
    * Callback class for receiving ack notifications
    */
   class DeliveryCallback : public ByteEventCallback {

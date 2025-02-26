@@ -4834,7 +4834,7 @@ TEST_F(QuicTransportTest, GetStreamPackestTxedSingleByte) {
   // one
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+      .WillOnce(Invoke([&](ByteEvent /* event */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 1);
       }));
@@ -4867,13 +4867,13 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultipleBytes) {
   // be 1
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+      .WillOnce(Invoke([&](ByteEvent /* event */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 1);
       }));
   EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+      .WillOnce(Invoke([&](ByteEvent /* event */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 1);
       }));
@@ -4939,7 +4939,7 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
   // first byte and first packet last bytes get Txed on first loopForWrites
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+      .WillOnce(Invoke([&](ByteEvent /* event */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 1);
       }));
@@ -4947,7 +4947,7 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
       firstPacketNearTailByteTxCb,
       onByteEvent(getTxMatcher(stream, firstPacketNearTailByte)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* even */) {
+      .WillOnce(Invoke([&](ByteEvent /* even */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 1);
       }));
@@ -4960,7 +4960,7 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
       secondPacketNearHeadByteTxCb,
       onByteEvent(getTxMatcher(stream, secondPacketNearHeadByte)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* even */) {
+      .WillOnce(Invoke([&](ByteEvent /* even */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 2);
       }));
@@ -4968,7 +4968,7 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
       secondPacketNearTailByteTxCb,
       onByteEvent(getTxMatcher(stream, secondPacketNearTailByte)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* even */) {
+      .WillOnce(Invoke([&](ByteEvent /* even */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 2);
       }));
@@ -4979,7 +4979,7 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
   // last byte will be sent on the fifth loopForWrites
   EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
       .Times(1)
-      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+      .WillOnce(Invoke([&](ByteEvent /* event */) {
         auto info = *transport_->getStreamTransportInfo(stream);
         EXPECT_EQ(info.numPacketsTxWithNewData, 5);
       }));

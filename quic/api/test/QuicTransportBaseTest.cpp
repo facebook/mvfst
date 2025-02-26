@@ -34,8 +34,6 @@ using namespace folly;
 namespace quic::test {
 
 constexpr uint8_t kStreamIncrement = 0x04;
-using ByteEvent = QuicTransportBase::ByteEvent;
-using ByteEventCancellation = QuicTransportBase::ByteEventCancellation;
 
 enum class TestFrameType : uint8_t {
   STREAM,
@@ -166,7 +164,7 @@ class TestPingCallback : public QuicSocket::PingCallback {
   void onPing() noexcept override {}
 };
 
-class TestByteEventCallback : public QuicSocket::ByteEventCallback {
+class TestByteEventCallback : public ByteEventCallback {
  public:
   using HashFn = std::function<size_t(const ByteEvent&)>;
   using ComparatorFn = std::function<bool(const ByteEvent&, const ByteEvent&)>;

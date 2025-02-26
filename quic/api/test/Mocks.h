@@ -11,6 +11,7 @@
 
 #include <quic/QuicException.h>
 #include <quic/api/LoopDetectorCallback.h>
+#include <quic/api/QuicCallbacks.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/NetworkData.h>
@@ -155,29 +156,25 @@ class MockDeliveryCallback : public QuicSocket::DeliveryCallback {
   MOCK_METHOD(void, onCanceled, (StreamId, uint64_t));
 };
 
-class MockByteEventCallback : public QuicSocket::ByteEventCallback {
+class MockByteEventCallback : public ByteEventCallback {
  public:
   ~MockByteEventCallback() override = default;
-  MOCK_METHOD(void, onByteEventRegistered, (QuicSocket::ByteEvent));
-  MOCK_METHOD(void, onByteEvent, (QuicSocket::ByteEvent));
-  MOCK_METHOD(void, onByteEventCanceled, (QuicSocket::ByteEvent));
+  MOCK_METHOD(void, onByteEventRegistered, (ByteEvent));
+  MOCK_METHOD(void, onByteEvent, (ByteEvent));
+  MOCK_METHOD(void, onByteEventCanceled, (ByteEvent));
 
   static auto getTxMatcher(StreamId id, uint64_t offset) {
     return AllOf(
-        testing::Field(
-            &QuicSocket::ByteEvent::type,
-            testing::Eq(QuicSocket::ByteEvent::Type::TX)),
-        testing::Field(&QuicSocket::ByteEvent::id, testing::Eq(id)),
-        testing::Field(&QuicSocket::ByteEvent::offset, testing::Eq(offset)));
+        testing::Field(&ByteEvent::type, testing::Eq(ByteEvent::Type::TX)),
+        testing::Field(&ByteEvent::id, testing::Eq(id)),
+        testing::Field(&ByteEvent::offset, testing::Eq(offset)));
   }
 
   static auto getAckMatcher(StreamId id, uint64_t offset) {
     return AllOf(
-        testing::Field(
-            &QuicSocket::ByteEvent::type,
-            testing::Eq(QuicSocket::ByteEvent::Type::ACK)),
-        testing::Field(&QuicSocket::ByteEvent::id, testing::Eq(id)),
-        testing::Field(&QuicSocket::ByteEvent::offset, testing::Eq(offset)));
+        testing::Field(&ByteEvent::type, testing::Eq(ByteEvent::Type::ACK)),
+        testing::Field(&ByteEvent::id, testing::Eq(id)),
+        testing::Field(&ByteEvent::offset, testing::Eq(offset)));
   }
 };
 

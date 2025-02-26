@@ -21,7 +21,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
                             public quic::QuicSocket::ReadCallback,
                             public quic::QuicSocket::WriteCallback,
                             public quic::QuicTimerCallback,
-                            public QuicSocketLite::ByteEventCallback {
+                            public ByteEventCallback {
  public:
   explicit ServerStreamHandler(
       folly::EventBase* evbIn,
@@ -286,12 +286,12 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
         this, std::chrono::milliseconds(burstDeadlineMs_));
   }
 
-  void onByteEvent(QuicSocketLite::ByteEvent byteEvent) override {
+  void onByteEvent(ByteEvent byteEvent) override {
     CHECK_EQ(byteEvent.id, streamBurstSendResult_.streamId);
     auto now = Clock::now();
-    if (byteEvent.type == QuicSocketLite::ByteEvent::Type::TX) {
+    if (byteEvent.type == ByteEvent::Type::TX) {
       streamBurstSendResult_.trueTxStartTs = now;
-    } else if (byteEvent.type == QuicSocketLite::ByteEvent::Type::ACK) {
+    } else if (byteEvent.type == ByteEvent::Type::ACK) {
       auto ackedLatencyUs =
           std::chrono::duration_cast<std::chrono::microseconds>(
               now - streamBurstSendResult_.startTs);
@@ -311,8 +311,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     }
   }
 
-  void onByteEventCanceled(
-      QuicSocketLite::ByteEventCancellation cancellation) override {
+  void onByteEventCanceled(ByteEventCancellation cancellation) override {
     VLOG(4) << "got stream " << cancellation.id << " offset "
             << cancellation.offset << " cancelled";
   }

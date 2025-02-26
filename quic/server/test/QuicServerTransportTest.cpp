@@ -23,7 +23,6 @@ using namespace folly;
 namespace quic::test {
 
 namespace {
-using ByteEvent = QuicTransportBase::ByteEvent;
 auto constexpr kTestMaxPacingRate = std::numeric_limits<uint64_t>::max();
 } // namespace
 

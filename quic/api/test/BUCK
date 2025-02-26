@@ -12,6 +12,7 @@ mvfst_cpp_library(
         "//folly/portability:gmock",
         "//quic:exception",
         "//quic/api:loop_detector_callback",
+        "//quic/api:quic_callbacks",
         "//quic/api:transport",
         "//quic/codec:types",
         "//quic/common:network_data",
