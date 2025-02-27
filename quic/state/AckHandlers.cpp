@@ -446,17 +446,11 @@ void parseAckReceiveTimestamps(
     const quic::ReadAckFrame& frame,
     folly::F14FastMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
     Optional<PacketNum> firstPacketNum) {
-  if (frame.frameType != FrameType::ACK_RECEIVE_TIMESTAMPS) {
-    return;
-  }
-
   // Ignore if we didn't request packet receive timestamps from the peer.
   if (!conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
            .has_value()) {
     return;
   }
-
-  DCHECK(frame.maybeLatestRecvdPacketNum.has_value());
 
   // Confirm there is at least one timestamp range and one timestamp delta
   // within that range.
@@ -464,6 +458,8 @@ void parseAckReceiveTimestamps(
       frame.recvdPacketsTimestampRanges[0].deltas.empty()) {
     return;
   }
+  DCHECK(frame.maybeLatestRecvdPacketNum.has_value());
+
   auto receivedPacketNum = frame.maybeLatestRecvdPacketNum.value();
 
   // Don't parse for packets already ACKed.
