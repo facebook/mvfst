@@ -122,7 +122,7 @@ class Bbr2CongestionController : public CongestionController {
 
   bool isProbeBwState(const Bbr2CongestionController::State state);
   bool isProbingBandwidth(const Bbr2CongestionController::State state);
-  Bandwidth getBandwidthSampleFromAck(const AckEvent& ackEvent);
+  void updateBandwidthSampleFromAck(const AckEvent& ackEvent);
   bool isRenoCoexistenceProbeTime();
 
   [[nodiscard]] bool isInRecovery() const;
@@ -209,6 +209,7 @@ class Bbr2CongestionController : public CongestionController {
   // State used in processing the current ack
   const AckEvent* currentAckEvent_{nullptr};
   Bandwidth currentBwSample_;
+  uint64_t currentAckMaxInflightBytes_{0};
   uint64_t inflightBytesAtLastAckedPacket_{0};
   bool lastAckedPacketAppLimited_{false};
 };

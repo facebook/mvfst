@@ -156,7 +156,7 @@ void Bbr2CongestionController::onPacketAckOrLoss(
       }
     }
 
-    currentBwSample_ = getBandwidthSampleFromAck(*ackEvent);
+    updateBandwidthSampleFromAck(*ackEvent);
     auto lastAckedPacket = currentAckEvent_->getLargestNewlyAckedPacket();
     inflightBytesAtLastAckedPacket_ = lastAckedPacket
         ? lastAckedPacket->outstandingPacketMetadata.inflightBytes
@@ -431,7 +431,7 @@ void Bbr2CongestionController::updateLatestDeliverySignals() {
   bandwidthLatest_ = std::max(bandwidthLatest_, currentBwSample_);
   VLOG(6) << "Bandwidth latest=" << bandwidthLatest_.normalizedDescribe()
           << "  AppLimited=" << bandwidthLatest_.isAppLimited;
-  inflightLatest_ = std::max(inflightLatest_, bandwidthLatest_.units);
+  inflightLatest_ = std::max(inflightLatest_, currentAckMaxInflightBytes_);
 
   auto pkt = currentAckEvent_->getLargestNewlyAckedPacket();
   if (pkt &&
@@ -822,7 +822,7 @@ void Bbr2CongestionController::handleProbeRtt() {
 void Bbr2CongestionController::advanceLatestDeliverySignals() {
   if (lossRoundStart_) {
     bandwidthLatest_ = currentBwSample_;
-    inflightLatest_ = bandwidthLatest_.units;
+    inflightLatest_ = currentAckMaxInflightBytes_;
   }
 }
 
@@ -974,10 +974,11 @@ bool Bbr2CongestionController::isProbingBandwidth(
       state == Bbr2CongestionController::State::Startup);
 }
 
-Bandwidth Bbr2CongestionController::getBandwidthSampleFromAck(
+void Bbr2CongestionController::updateBandwidthSampleFromAck(
     const AckEvent& ackEvent) {
   auto ackTime = ackEvent.adjustedAckTime;
-  auto bwSample = Bandwidth();
+  currentBwSample_ = Bandwidth();
+  currentAckMaxInflightBytes_ = 0;
   for (auto const& ackedPacket : ackEvent.ackedPackets) {
     auto pkt = &ackedPacket;
     if (ackedPacket.outstandingPacketMetadata.encodedSize == 0) {
@@ -994,20 +995,21 @@ Bandwidth Bbr2CongestionController::getBandwidthSampleFromAck(
     auto ackElapsed = ackTime - lastAckTime;
     auto interval = std::max(ackElapsed, sendElapsed);
     if (interval == 0us) {
-      return Bandwidth();
+      continue;
     }
     auto lastBytesDelivered =
         lastAckedPacket ? lastAckedPacket->totalBytesAcked : 0;
     auto bytesDelivered = ackEvent.totalBytesAcked - lastBytesDelivered;
+    currentAckMaxInflightBytes_ =
+        std::max(currentAckMaxInflightBytes_, bytesDelivered);
     Bandwidth bw(
         bytesDelivered,
         std::chrono::duration_cast<std::chrono::microseconds>(interval),
         pkt->isAppLimited || lastSentTime < appLimitedLastSendTime_);
-    if (bw > bwSample) {
-      bwSample = bw;
+    if (bw > currentBwSample_) {
+      currentBwSample_ = bw;
     }
   }
-  return bwSample;
 }
 
 bool Bbr2CongestionController::isRenoCoexistenceProbeTime() {
