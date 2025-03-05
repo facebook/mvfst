@@ -2234,7 +2234,10 @@ class QuicServerTest : public Test {
     size_t tries = 0;
     if (!calledOnNetworkData && tries < 3) {
       tries++;
-      auto ret = client.write(serverAddr, data->clone());
+      size_t ret = 0;
+      evbThread_.getEventBase()->runInEventBaseThreadAndWait([&] { //
+        ret = client.write(serverAddr, data->clone());
+      });
       CHECK_EQ(ret, data->computeChainDataLength());
       cv.wait_until(lg, std::chrono::system_clock::now() + 1s, [&] {
         return calledOnNetworkData;
@@ -2257,7 +2260,7 @@ class QuicServerTest : public Test {
 
   void closeUdpClient(std::unique_ptr<FollyAsyncUDPSocketAlias> client) {
     evbThread_.getEventBase()->runInEventBaseThreadAndWait(
-        [&] { client->close(); });
+        [&] { std::exchange(client, {})->close(); });
   }
 
   void runTest(std::vector<folly::EventBase*> evbs) {
