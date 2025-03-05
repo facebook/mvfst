@@ -458,6 +458,10 @@ struct TransportSettings {
   // Ceiling of packets to receive from signaled socket per evb loop on the
   // server side.
   uint16_t maxServerRecvPacketsPerLoop{1};
+
+  // Support "paused" requests which buffer on the server without streaming back
+  // to the client.
+  bool disablePausedPriority{false};
 };
 
 } // namespace quic

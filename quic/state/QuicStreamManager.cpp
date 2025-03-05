@@ -646,7 +646,7 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
     removeWritable(stream);
     return;
   }
-  if (stream.priority.paused) {
+  if (stream.priority.paused && !transportSettings_->disablePausedPriority) {
     removeWritable(stream);
     return;
   }

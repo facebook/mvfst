@@ -2635,7 +2635,7 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
 }
 
-TEST_F(QuicPacketSchedulerTest, PausedPriorityInitial) {
+TEST_F(QuicPacketSchedulerTest, PausedPriorityEnabled) {
   static const auto kSequentialPriority = Priority(3, false);
   static const auto kPausedPriority = Priority(0, false, 0, true /* paused */);
 
@@ -2667,6 +2667,26 @@ TEST_F(QuicPacketSchedulerTest, PausedPriorityInitial) {
   // Pause the stream again. Expect no more data writable.
   conn.streamManager->setStreamPriority(pausedStreamId, kPausedPriority);
   ASSERT_FALSE(conn.streamManager->hasWritable());
+}
+
+TEST_F(QuicPacketSchedulerTest, PausedPriorityDisabled) {
+  static const auto kSequentialPriority = Priority(3, false);
+  static const auto kPausedPriority = Priority(0, false, 0, true /* paused */);
+
+  auto connPtr = createConn(10, 100000, 100000);
+  auto& conn = *connPtr;
+  conn.transportSettings.disablePausedPriority = true;
+  StreamFrameScheduler scheduler(conn);
+
+  auto pausedStreamId = createStream(conn, kPausedPriority);
+  auto regularStreamId = createStream(conn, kSequentialPriority);
+
+  auto pausedFrame = writeDataToStream(conn, pausedStreamId, "paused_data");
+  auto regularFrame = writeDataToStream(conn, regularStreamId, "regular_data");
+
+  auto builder = setupMockPacketBuilder();
+  scheduler.writeStreams(*builder);
+  verifyStreamFrames(*builder, {pausedFrame, regularFrame});
 }
 
 TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {

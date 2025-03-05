@@ -213,13 +213,11 @@ struct PriorityQueue {
   void updateIfExist(StreamId id, Priority priority) {
     auto iter = writableStreamsToLevel_.find(id);
     if (iter != writableStreamsToLevel_.end()) {
-      CHECK(!priority.paused);
       updateExistingStreamPriority(iter, priority);
     }
   }
 
   void insertOrUpdate(StreamId id, Priority pri) {
-    CHECK(!pri.paused);
     auto it = writableStreamsToLevel_.find(id);
     auto index = priority2index(pri);
     if (it != writableStreamsToLevel_.end()) {
