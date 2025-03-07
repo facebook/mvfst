@@ -120,6 +120,11 @@ struct CongestionControlConfig {
   // Used by: TokenlessPacer
   // Whether an early write should scale down the pacer burst or not.
   bool scaleDownPacerEarlyBurst{false};
+
+  // Used by: BBR2
+  // If 0.5 <= values <= 1.0, use this value to scale down bandwidthLo in the
+  // short-term model. Otherwise, use the default kBeta
+  float overrideBwShortBeta{0.0f};
 };
 
 struct DatagramConfig {

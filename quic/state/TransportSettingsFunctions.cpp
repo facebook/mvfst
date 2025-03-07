@@ -90,10 +90,11 @@ quic::CongestionControlConfig parseCongestionControlConfig(
   }
 
   // Parse optional float fields
-  const std::array<std::pair<std::string_view, float&>, 3> floatFields = {
+  const std::array<std::pair<std::string_view, float&>, 4> floatFields = {
       {{"overrideCruisePacingGain", ccaConfig.overrideCruisePacingGain},
        {"overrideCruiseCwndGain", ccaConfig.overrideCruiseCwndGain},
-       {"overrideStartupPacingGain", ccaConfig.overrideStartupPacingGain}}};
+       {"overrideStartupPacingGain", ccaConfig.overrideStartupPacingGain},
+       {"overrideBwShortBeta", ccaConfig.overrideBwShortBeta}}};
 
   for (const auto& [name, field] : floatFields) {
     if (auto val = ccaConfigDyn.get_ptr(name)) {

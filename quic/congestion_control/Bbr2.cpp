@@ -490,7 +490,12 @@ void Bbr2CongestionController::updateCongestionSignals(
     }
 
     // LossLowerBounds
-    bandwidthLo_ = std::max(bandwidthLatest_, *bandwidthLo_ * kBeta);
+    auto bwLoBeta =
+        (conn_.transportSettings.ccaConfig.overrideBwShortBeta < 0.5 ||
+         conn_.transportSettings.ccaConfig.overrideBwShortBeta > 1.0)
+        ? kBeta
+        : conn_.transportSettings.ccaConfig.overrideBwShortBeta;
+    bandwidthLo_ = std::max(bandwidthLatest_, *bandwidthLo_ * bwLoBeta);
     inflightLo_ =
         std::max(inflightLatest_, static_cast<uint64_t>(*inflightLo_ * kBeta));
   }

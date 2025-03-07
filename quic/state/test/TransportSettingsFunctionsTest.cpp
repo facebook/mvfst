@@ -74,7 +74,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"overrideCruisePacingGain\": 7.9, "
       "\"overrideCruiseCwndGain\": -0.1, "
       "\"overrideStartupPacingGain\": -0.5, "
-      "\"scaleDownPacerEarlyBurst\": true "
+      "\"scaleDownPacerEarlyBurst\": true, "
+      "\"overrideBwShortBeta\": 0.8 "
       "}";
   auto config = parseCongestionControlConfig(testString);
   EXPECT_EQ(config.conservativeRecovery, true);
@@ -96,6 +97,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.overrideCruiseCwndGain, -0.1f);
   EXPECT_EQ(config.overrideStartupPacingGain, -0.5f);
   EXPECT_EQ(config.scaleDownPacerEarlyBurst, true);
+  EXPECT_EQ(config.overrideBwShortBeta, 0.8f);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(config.ackFrequencyConfig->ackElicitingThreshold, 99);
@@ -128,6 +130,7 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.overrideCruiseCwndGain, -1.0f);
   EXPECT_EQ(config.overrideStartupPacingGain, -1.0f);
   EXPECT_EQ(config.scaleDownPacerEarlyBurst, false);
+  EXPECT_EQ(config.overrideBwShortBeta, 0.0f);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());
   EXPECT_EQ(
