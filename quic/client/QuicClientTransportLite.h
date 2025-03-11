@@ -119,11 +119,11 @@ class QuicClientTransportLite
         label, context, keyLength);
   }
 
-  double getCertificateVerifyStartTimeMS() const {
+  int64_t getCertificateVerifyStartTimeMS() const {
     return clientConn_->clientHandshakeLayer->getCertificateVerifyStartTimeMS();
   }
 
-  double getCertificateVerifyEndTimeMS() const {
+  int64_t getCertificateVerifyEndTimeMS() const {
     return clientConn_->clientHandshakeLayer->getCertificateVerifyEndTimeMS();
   }
 

@@ -110,12 +110,12 @@ class ClientHandshake : public Handshake {
    */
   virtual const Optional<ServerTransportParameters>& getServerTransportParams();
 
-  virtual double getCertificateVerifyStartTimeMS() const {
-    return 0.0;
+  virtual int64_t getCertificateVerifyStartTimeMS() const {
+    return 0;
   }
 
-  virtual double getCertificateVerifyEndTimeMS() const {
-    return 0.0;
+  virtual int64_t getCertificateVerifyEndTimeMS() const {
+    return 0;
   }
 
   virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
