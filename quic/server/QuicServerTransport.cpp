@@ -1183,6 +1183,29 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "INFLIGHT_REORDERING_THRESHOLD KnobParam received: "
                 << inflightReorderingThreshold;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::PACER_MIN_BURST_PACKETS),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.minBurstPackets = val;
+        VLOG(3) << "PACER_MIN_BURST_PACKETS KnobParam received: " << val;
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.writeConnectionDataPacketsLimit =
+            val <= kMaxWriteConnectionDataPacketLimit
+            ? val
+            : kMaxWriteConnectionDataPacketLimit;
+        serverConn->transportSettings.maxBatchSize =
+            val <= kQuicMaxBatchSizeLimit ? val : kQuicMaxBatchSizeLimit;
+        VLOG(3) << "MAX_BATCH_PACKETS KnobParam received: " << val;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

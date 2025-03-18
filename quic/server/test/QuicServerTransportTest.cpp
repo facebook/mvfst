@@ -5601,6 +5601,36 @@ TEST_F(
   EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 42);
 }
 
+TEST_F(QuicServerTransportTest, TestBurstSizeKnobHandlers) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  ASSERT_EQ(transportSettings.minBurstPackets, kDefaultMinBurstPackets);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_MIN_BURST_PACKETS),
+        uint64_t(25)}});
+  EXPECT_EQ(transportSettings.minBurstPackets, 25);
+
+  ASSERT_EQ(
+      transportSettings.writeConnectionDataPacketsLimit,
+      kDefaultWriteConnectionDataPacketLimit);
+  ASSERT_EQ(transportSettings.maxBatchSize, kDefaultQuicMaxBatchSize);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+        uint64_t(25)}});
+  EXPECT_EQ(transportSettings.writeConnectionDataPacketsLimit, 25);
+  EXPECT_EQ(transportSettings.maxBatchSize, 25);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+        uint64_t(kQuicMaxBatchSizeLimit) + 1}});
+  EXPECT_EQ(transportSettings.maxBatchSize, kQuicMaxBatchSizeLimit);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+        uint64_t(kMaxWriteConnectionDataPacketLimit) + 1}});
+  EXPECT_EQ(
+      transportSettings.writeConnectionDataPacketsLimit,
+      kMaxWriteConnectionDataPacketLimit);
+}
+
 TEST_F(QuicServerTransportTest, WriteDSR) {
   EXPECT_EQ(server->getConn().dsrPacketCount, 0);
   // Make sure we are post-handshake

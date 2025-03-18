@@ -209,7 +209,11 @@ BETTER_ENUM(
     // Controls autotune flow control on streams.
     AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009,
     // Controls whether to use the inflight reordering heuristic.
-    INFLIGHT_REORDERING_THRESHOLD = 0x1000A)
+    INFLIGHT_REORDERING_THRESHOLD = 0x1000A,
+    // Controls pacer's min burst size.
+    PACER_MIN_BURST_PACKETS = 0x1000B,
+    // Controls max batch size and write connection data packets limit.
+    MAX_BATCH_PACKETS = 0x1000C)
 FOLLY_POP_WARNING
 
 enum class FrameType : uint64_t {
@@ -403,6 +407,7 @@ QuicBatchingMode getQuicBatchingMode(uint32_t val);
 // default QUIC batching size - currently used only
 // by BATCHING_MODE_GSO
 constexpr uint32_t kDefaultQuicMaxBatchSize = 16;
+constexpr uint32_t kQuicMaxBatchSizeLimit = 64;
 
 // rfc6298:
 constexpr int kRttAlpha = 8;
@@ -428,6 +433,7 @@ constexpr auto kPacketToSendForPTO = 2;
 
 // Maximum number of packets to write per writeConnectionDataToSocket call.
 constexpr uint64_t kDefaultWriteConnectionDataPacketLimit = 5;
+constexpr uint64_t kMaxWriteConnectionDataPacketLimit = 64;
 // Minimum number of packets to write per burst in pacing
 constexpr uint64_t kDefaultMinBurstPackets = 5;
 
