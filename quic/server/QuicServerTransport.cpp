@@ -200,7 +200,6 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
   maybeNotifyConnectionIdRetired();
   maybeIssueConnectionIds();
   maybeNotifyTransportReady();
-  maybeUpdateCongestionControllerFromTicket();
 
   return folly::unit;
 }
@@ -659,43 +658,6 @@ void QuicServerTransport::maybeNotifyTransportReady() {
 
     // This is a new connection. Update QUIC Stats
     QUIC_STATS(conn_->statsCallback, onNewConnection);
-  }
-}
-
-namespace {
-uint64_t determineCwndFromHint(const TransportSettings& tp, uint64_t cwndHint) {
-  if (cwndHint <= tp.cwndModerateJumpstart) {
-    // Weak Connectivity History
-    return tp.cwndWeakJumpstart;
-  } else if (cwndHint <= tp.cwndStrongJumpstart) {
-    // Moderate Connectivity History
-    return tp.cwndModerateJumpstart;
-  } else {
-    // Strong Connectivity History
-    return tp.cwndStrongJumpstart;
-  }
-}
-} // namespace
-
-void QuicServerTransport::maybeUpdateCongestionControllerFromTicket() {
-  if (serverConn_->transportSettings.useCwndHintsInSessionTicket &&
-      serverConn_->maybeCwndHintBytes.has_value() &&
-      serverConn_->lossState.maybeLrtt.has_value()) {
-    auto newCwnd = determineCwndFromHint(
-        serverConn_->transportSettings,
-        serverConn_->maybeCwndHintBytes.value());
-    serverConn_->maybeCwndHintBytes.reset();
-    if (newCwnd > conn_->congestionController->getCongestionWindow()) {
-      conn_->transportSettings.initCwndInMss =
-          newCwnd / conn_->udpSendPacketLen;
-      if (conn_->pacer) {
-        conn_->pacer.get()->refreshPacingRate(
-            newCwnd, serverConn_->lossState.lrtt);
-      }
-      conn_->congestionController =
-          conn_->congestionControllerFactory.get()->makeCongestionController(
-              *conn_, conn_->congestionController.get()->type());
-    }
   }
 }
 
