@@ -48,6 +48,8 @@ class Bbr2CongestionController : public CongestionController {
 
   FOLLY_NODISCARD Optional<Bandwidth> getBandwidth() const override;
 
+  FOLLY_NODISCARD uint64_t getBDP() const override;
+
   void setAppLimited() noexcept override;
 
   void getStats(CongestionControllerStats& /*stats*/) const override;

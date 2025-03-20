@@ -126,6 +126,16 @@ struct CongestionController {
   }
 
   /**
+   * Return the congestion controller's BDP estimate. Returns the congestion
+   * window unless overridden by the congestion controller.
+   *
+   * Unit is bytes.
+   */
+  FOLLY_NODISCARD virtual uint64_t getBDP() const {
+    return getCongestionWindow();
+  }
+
+  /**
    * Notify congestion controller that the connection has become idle or active
    * in the sense that there are active non-control streams.
    * idle: true if the connection has become app-idle, false if the

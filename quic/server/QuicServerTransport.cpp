@@ -514,22 +514,21 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
   }
   // Conditions for writing more session tickets after the first one:
   // 1. includeCwndHintsInSessionTicket transport setting is set
-  // 2. The current congestion window is either smaller than or more than twice
+  // 2. The current BDP is either smaller than or more than twice
   // the last one we sent in a session ticket
   // 3. We haven't sent any session ticket in the last
   // kMinIntervalBetweenSessionTickets
 
-  if (serverConn_->congestionController &&
-      conn_->transportSettings.includeCwndHintsInSessionTicket &&
+  if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
+      conn_->congestionController &&
       Clock::now() - newSessionTicketWrittenTimestamp_.value() >
           kMinIntervalBetweenSessionTickets) {
-    bool cwndChangedSinceLastHint =
+    const auto& targetBDP = conn_->congestionController->getBDP();
+    bool bdpChangedSinceLastHint =
         !newSessionTicketWrittenCwndHint_.has_value() ||
-        conn_->congestionController->getCongestionWindow() / 2 >
-            *newSessionTicketWrittenCwndHint_ ||
-        conn_->congestionController->getCongestionWindow() <
-            *newSessionTicketWrittenCwndHint_;
-    if (cwndChangedSinceLastHint) {
+        targetBDP / 2 > *newSessionTicketWrittenCwndHint_ ||
+        targetBDP < *newSessionTicketWrittenCwndHint_;
+    if (bdpChangedSinceLastHint) {
       return true;
     }
   }
@@ -546,9 +545,9 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     Optional<uint64_t> cwndHint = none;
     if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
         conn_->congestionController) {
-      VLOG(7) << "Writing a new session ticket with cwnd="
-              << conn_->congestionController->getCongestionWindow();
-      cwndHint = conn_->congestionController->getCongestionWindow();
+      const auto& bdp = conn_->congestionController->getBDP();
+      VLOG(7) << "Writing a new session ticket with cwnd hint=" << bdp;
+      cwndHint = bdp;
       newSessionTicketWrittenCwndHint_ = cwndHint;
     }
     AppToken appToken;

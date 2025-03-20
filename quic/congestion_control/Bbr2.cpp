@@ -212,6 +212,10 @@ Optional<Bandwidth> Bbr2CongestionController::getBandwidth() const {
   return bandwidth_;
 }
 
+uint64_t Bbr2CongestionController::getBDP() const {
+  return getBDPWithGain(1.0);
+}
+
 bool Bbr2CongestionController::isAppLimited() const {
   return appLimited_;
 }
