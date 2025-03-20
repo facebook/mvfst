@@ -92,12 +92,34 @@ class QuicClientTransport : public QuicTransportBase,
     return client;
   }
 
+  void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
+
  protected:
   // From QuicSocket
   [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
       const override {
     return wrappedObserverContainer_.getPtr();
   }
+
+  void readWithRecvmmsgWrapper(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
+
+  void readWithRecvmmsg(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
+
+  void readWithRecvfrom(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
+
+  void readWithRecvmsg(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets);
 
  private:
   // Container of observers for the socket / transport.

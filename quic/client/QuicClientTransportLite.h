@@ -346,36 +346,24 @@ class QuicClientTransportLite
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server);
 
-  void readWithRecvfrom(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      uint16_t numPackets);
-
-  void readWithRecvmmsgWrapper(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      uint16_t numPackets);
-
-  void readWithRecvmmsg(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      uint16_t numPackets);
-
   void readWithRecvmsgSinglePacketLoop(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize);
-
-  void readWithRecvmsg(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      uint16_t numPackets);
 
   Optional<std::string> hostname_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
   QuicClientConnectionState* clientConn_;
 
- private:
+ protected:
+  void maybeQlogDatagram(size_t len);
+
+  void trackDatagramsReceived(uint32_t totalPackets, uint32_t totalPacketLen);
+
+  // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
+  // supports GRO. otherwise kDefaultNumGROBuffers
+  uint32_t numGROBuffers_{kDefaultNumGROBuffers};
+
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   struct RecvmmsgStorage {
     struct impl_ {
@@ -391,9 +379,11 @@ class QuicClientTransportLite
     void resize(size_t numPackets);
   };
 
+  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
+  RecvmmsgStorage recvmmsgStorage_;
+
+ private:
   void adjustGROBuffers();
-  void maybeQlogDatagram(size_t len);
-  void trackDatagramsReceived(uint32_t totalPackets, uint32_t totalPacketLen);
 
   /**
    * Send quic transport knobs defined by transportSettings.knobs to peer. This
@@ -410,11 +400,6 @@ class QuicClientTransportLite
   std::vector<TransportParameter> customTransportParameters_;
   folly::SocketOptionMap socketOptions_;
   std::shared_ptr<QuicTransportStatsCallback> statsCallback_;
-  // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
-  // supports GRO. otherwise kDefaultNumGROBuffers
-  uint32_t numGROBuffers_{kDefaultNumGROBuffers};
-  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
-  RecvmmsgStorage recvmmsgStorage_;
   // We will only send transport knobs once, this flag keeps track of it
   bool transportKnobsSent_{false};
   // Callback function to invoke when the client receives a new token
