@@ -106,8 +106,7 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     } else {
       // This should never really happen as dataLen is bounded by the remaining
       // space in the packet which should be << kEightByteLimit.
-      throw QuicInternalException(
-          "Stream frame length too large.", LocalErrorCode::INTERNAL_ERROR);
+      LOG(FATAL) << "Stream frame length too large.";
     }
   }
   if (dataLenLen > 0) {
@@ -198,11 +197,8 @@ Optional<WriteCryptoFrame> writeCryptoFrame(
   size_t writableData = std::min(dataLength, spaceRemaining);
   QuicInteger lengthVarInt(writableData);
 
-  if (lengthVarInt.getSize() > lengthBytes) {
-    throw QuicInternalException(
-        std::string("Length bytes representation"),
-        LocalErrorCode::CODEC_ERROR);
-  }
+  CHECK(lengthVarInt.getSize() <= lengthBytes)
+      << "Length bytes representation exceeds allocated space";
   builder.write(intFrameType);
   builder.write(offsetInteger);
   builder.write(lengthVarInt);
@@ -1070,11 +1066,7 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       return size_t(0);
     }
     default: {
-      auto errorStr = folly::to<std::string>(
-          "Unknown / unsupported frame type received at ", __func__);
-      VLOG(2) << errorStr;
-      throw QuicTransportException(
-          errorStr, TransportErrorCode::FRAME_ENCODING_ERROR);
+      LOG(FATAL) << "Unknown / unsupported frame type received";
     }
   }
 }

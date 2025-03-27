@@ -11,7 +11,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
-#include <string>
 
 namespace quic {
 
@@ -29,15 +28,8 @@ PacketNumEncodingResult encodePacketNumber(
   size_t lengthInBits = folly::findLastSet(twiceDistance);
   // Round up to bytes
   size_t lengthInBytes = lengthInBits == 0 ? 1 : (lengthInBits + 7) >> 3;
-  if (lengthInBytes > 4) {
-    throw QuicInternalException(
-        folly::to<std::string>(
-            "Impossible to encode PacketNum=",
-            packetNum,
-            ", largestAcked=",
-            largestAckedPacketNum),
-        LocalErrorCode::PACKET_NUMBER_ENCODING);
-  }
+  CHECK(lengthInBytes <= 4) << "Impossible to encode PacketNum=" << packetNum
+                            << ", largestAcked=" << largestAckedPacketNum;
   // We need a mask that's all 1 for lengthInBytes bytes. Left shift a 1 by that
   // many bits and then -1 will give us that. Or if lengthInBytes is 8, then ~0
   // will just do it.

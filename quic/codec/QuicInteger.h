@@ -136,22 +136,14 @@ class QuicInteger {
   template <typename BufOp>
   size_t encode(BufOp appender) const {
     auto size = encodeQuicInteger(value_, std::move(appender));
-    if (size.hasError()) {
-      LOG(ERROR) << "Value too large value=" << value_;
-      throw QuicTransportException(
-          folly::to<std::string>("Value too large ", value_), size.error());
-    }
+    CHECK(!size.hasError()) << "Value too large value=" << value_;
     return size.value();
   }
 
   template <typename BufOp>
   size_t encode(BufOp appender, int outputSize) const {
     auto size = encodeQuicInteger(value_, std::move(appender), outputSize);
-    if (size.hasError()) {
-      LOG(ERROR) << "Value too large value=" << value_;
-      throw QuicTransportException(
-          folly::to<std::string>("Value too large ", value_), size.error());
-    }
+    CHECK(!size.hasError()) << "Value too large value=" << value_;
     return size.value();
   }
 

@@ -255,21 +255,19 @@ ShortHeader::ShortHeader(
     ConnectionId connId,
     PacketNum packetNum)
     : protectionType_(protectionType), connectionId_(std::move(connId)) {
-  if (protectionType_ != ProtectionType::KeyPhaseZero &&
-      protectionType_ != ProtectionType::KeyPhaseOne) {
-    throw QuicInternalException(
-        "bad short header protection type", LocalErrorCode::CODEC_ERROR);
-  }
+  CHECK(
+      protectionType_ == ProtectionType::KeyPhaseZero ||
+      protectionType_ == ProtectionType::KeyPhaseOne)
+      << "bad short header protection type";
   setPacketNumber(packetNum);
 }
 
 ShortHeader::ShortHeader(ProtectionType protectionType, ConnectionId connId)
     : protectionType_(protectionType), connectionId_(std::move(connId)) {
-  if (protectionType_ != ProtectionType::KeyPhaseZero &&
-      protectionType_ != ProtectionType::KeyPhaseOne) {
-    throw QuicInternalException(
-        "bad short header protection type", LocalErrorCode::CODEC_ERROR);
-  }
+  CHECK(
+      protectionType_ == ProtectionType::KeyPhaseZero ||
+      protectionType_ == ProtectionType::KeyPhaseOne)
+      << "bad short header protection type";
 }
 
 ProtectionType ShortHeader::getProtectionType() const {
