@@ -42,13 +42,19 @@ struct Nothing {
   explicit Nothing(PacketDropReason reasonIn) : reason(reasonIn) {}
 };
 
+struct CodecError {
+  QuicError error;
+  explicit CodecError(QuicError errorIn) : error(std::move(errorIn)) {}
+};
+
 struct CodecResult {
   enum class Type {
     REGULAR_PACKET,
     RETRY,
     CIPHER_UNAVAILABLE,
     STATELESS_RESET,
-    NOTHING
+    NOTHING,
+    CODEC_ERROR
   };
 
   ~CodecResult();
@@ -61,6 +67,7 @@ struct CodecResult {
   /* implicit */ CodecResult(StatelessReset&& statelessReset);
   /* implicit */ CodecResult(RetryPacket&& retryPacket);
   /* implicit */ CodecResult(Nothing&& nothing);
+  /* implicit */ CodecResult(CodecError&& codecErrorIn);
 
   Type type();
   RegularQuicPacket* regularPacket();
@@ -68,6 +75,7 @@ struct CodecResult {
   StatelessReset* statelessReset();
   RetryPacket* retryPacket();
   Nothing* nothing();
+  CodecError* codecError();
 
  private:
   void destroyCodecResult();
@@ -78,6 +86,7 @@ struct CodecResult {
     CipherUnavailable cipher;
     StatelessReset reset;
     Nothing none;
+    CodecError error;
   };
 
   Type type_;

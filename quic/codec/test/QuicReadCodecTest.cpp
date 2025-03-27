@@ -810,25 +810,25 @@ TEST_F(QuicReadCodecTest, TestZeroRttPacketsAfterHandshakeDone) {
 TEST_F(QuicReadCodecTest, parseEmptyStreamFrame) {
   auto buf = folly::IOBuf::copyBuffer("\x08");
   auto bufQueue = quic::BufQueue(std::move(buf));
-  EXPECT_THROW(
-      parseFrame(
-          bufQueue,
-          PacketHeader(ShortHeader(
-              ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
-          CodecParameters()),
-      QuicTransportException);
+  auto result = parseFrame(
+      bufQueue,
+      PacketHeader(ShortHeader(
+          ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
+      CodecParameters());
+  EXPECT_FALSE(result.hasValue());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(QuicReadCodecTest, parseEmptyDatagramFrame) {
   auto buf = folly::IOBuf::copyBuffer("\x31");
   auto bufQueue = quic::BufQueue(std::move(buf));
-  EXPECT_THROW(
-      parseFrame(
-          bufQueue,
-          PacketHeader(ShortHeader(
-              ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
-          CodecParameters()),
-      QuicTransportException);
+  auto result = parseFrame(
+      bufQueue,
+      PacketHeader(ShortHeader(
+          ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
+      CodecParameters());
+  EXPECT_FALSE(result.hasValue());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {

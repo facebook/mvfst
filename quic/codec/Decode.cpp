@@ -44,7 +44,8 @@ folly::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketLen(
 
 namespace quic {
 
-PaddingFrame decodePaddingFrame(folly::io::Cursor& cursor) {
+folly::Expected<PaddingFrame, QuicError> decodePaddingFrame(
+    folly::io::Cursor& cursor) {
   // we might have multiple padding frames in sequence in the common case.
   // Let's consume all the padding and return 1 padding frame for everything.
   static_assert(
@@ -67,7 +68,7 @@ PaddingFrame decodePaddingFrame(folly::io::Cursor& cursor) {
   return PaddingFrame();
 }
 
-PingFrame decodePingFrame(folly::io::Cursor&) {
+folly::Expected<PingFrame, QuicError> decodePingFrame(folly::io::Cursor&) {
   return PingFrame();
 }
 
@@ -128,7 +129,8 @@ folly::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
   return QuicSimpleFrame(frame);
 }
 
-ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor&) {
+folly::Expected<ImmediateAckFrame, QuicError> decodeImmediateAckFrame(
+    folly::io::Cursor&) {
   return ImmediateAckFrame();
 }
 
@@ -334,39 +336,44 @@ static folly::Expected<folly::Unit, QuicError> decodeEcnCountsInAck(
   return folly::unit;
 }
 
-ReadAckFrame decodeAckExtendedFrame(
+folly::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
   ReadAckFrame frame;
   auto res = decodeAckFrame(cursor, header, params, FrameType::ACK_EXTENDED);
   if (res.hasError()) {
-    throw QuicTransportException(
-        res.error().message, *res.error().code.asTransportErrorCode());
+    return folly::makeUnexpected(res.error());
   }
   frame = *res;
   auto extendedAckFeatures = decodeQuicInteger(cursor);
   if (!extendedAckFeatures) {
-    throw QuicTransportException(
-        "Bad extended ACK features field",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad extended ACK features field"));
   }
   auto includedFeatures = extendedAckFeatures->first;
   if ((includedFeatures | params.extendedAckFeatures) !=
       params.extendedAckFeatures) {
-    throw QuicTransportException(
-        "Extended ACK has unexpected features",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Extended ACK has unexpected features"));
   }
   if (includedFeatures &
       static_cast<ExtendedAckFeatureMaskType>(
           ExtendedAckFeatureMask::ECN_COUNTS)) {
-    decodeEcnCountsInAck(frame, cursor);
+    auto ecnResult = decodeEcnCountsInAck(frame, cursor);
+    if (ecnResult.hasError()) {
+      return folly::makeUnexpected(ecnResult.error());
+    }
   }
   if (includedFeatures &
       static_cast<ExtendedAckFeatureMaskType>(
           ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS)) {
-    decodeReceiveTimestampsInAck(frame, cursor, params);
+    auto tsResult = decodeReceiveTimestampsInAck(frame, cursor, params);
+    if (tsResult.hasError()) {
+      return folly::makeUnexpected(tsResult.error());
+    }
   }
   return frame;
 }
@@ -380,8 +387,7 @@ folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
 
   auto ack = decodeAckFrame(cursor, header, params, frameType);
   if (ack.hasError()) {
-    throw QuicTransportException(
-        ack.error().message, *ack.error().code.asTransportErrorCode());
+    return folly::makeUnexpected(ack.error());
   }
   frame = *ack;
   frame.frameType = frameType;
@@ -415,39 +421,41 @@ folly::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
   return QuicFrame(readAckFrame);
 }
 
-RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor, bool reliable) {
+folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
+    folly::io::Cursor& cursor,
+    bool reliable) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Bad streamId", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   ApplicationErrorCode errorCode;
   auto varCode = decodeQuicInteger(cursor);
   if (varCode) {
     errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
-    throw QuicTransportException(
-        "Cannot decode error code",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Cannot decode error code"));
   }
   auto finalSize = decodeQuicInteger(cursor);
   if (!finalSize) {
-    throw QuicTransportException(
-        "Bad offset", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
   folly::Optional<std::pair<uint64_t, size_t>> reliableSize = folly::none;
   if (reliable) {
     reliableSize = decodeQuicInteger(cursor);
     if (!reliableSize) {
-      throw QuicTransportException(
-          "Bad value of reliable size",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Bad value of reliable size"));
     }
 
     if (reliableSize->first > finalSize->first) {
-      throw QuicTransportException(
-          "Reliable size is greater than final size",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Reliable size is greater than final size"));
     }
   }
   return RstStreamFrame(
@@ -458,64 +466,79 @@ RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor, bool reliable) {
                    : folly::none);
 }
 
-StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
+folly::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
+    folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Bad streamId", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   ApplicationErrorCode errorCode;
   auto varCode = decodeQuicInteger(cursor);
   if (varCode) {
     errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
-    throw QuicTransportException(
-        "Cannot decode error code",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Cannot decode error code"));
   }
   return StopSendingFrame(folly::to<StreamId>(streamId->first), errorCode);
 }
 
-ReadCryptoFrame decodeCryptoFrame(folly::io::Cursor& cursor) {
+folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
+    folly::io::Cursor& cursor) {
   auto optionalOffset = decodeQuicInteger(cursor);
   if (!optionalOffset) {
-    throw QuicTransportException(
-        "Invalid offset", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
   }
   uint64_t offset = optionalOffset->first;
 
   auto dataLength = decodeQuicInteger(cursor);
   if (!dataLength) {
-    throw QuicTransportException(
-        "Invalid length", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
   }
   Buf data;
   if (cursor.totalLength() < dataLength->first) {
-    throw QuicTransportException(
-        "Length mismatch", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
   }
-  // If dataLength > data's actual length then the cursor will throw.
-  cursor.clone(data, dataLength->first);
+
+  size_t cloned = cursor.cloneAtMost(data, dataLength->first);
+  if (cloned < dataLength->first) {
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Failed to clone complete data"));
+  }
+
   return ReadCryptoFrame(offset, std::move(data));
 }
 
-ReadNewTokenFrame decodeNewTokenFrame(folly::io::Cursor& cursor) {
+folly::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
+    folly::io::Cursor& cursor) {
   auto tokenLength = decodeQuicInteger(cursor);
   if (!tokenLength) {
-    throw QuicTransportException(
-        "Invalid length", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
   }
   Buf token;
   if (cursor.totalLength() < tokenLength->first) {
-    throw QuicTransportException(
-        "Length mismatch", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
   }
-  // If tokenLength > token's actual length then the cursor will throw.
-  cursor.clone(token, tokenLength->first);
+
+  size_t cloned = cursor.cloneAtMost(token, tokenLength->first);
+  if (cloned < tokenLength->first) {
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Failed to clone token"));
+  }
+
   return ReadNewTokenFrame(std::move(token));
 }
 
-ReadStreamFrame decodeStreamFrame(
+folly::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     BufQueue& queue,
     StreamTypeField frameTypeField,
     bool isGroupFrame) {
@@ -523,17 +546,17 @@ ReadStreamFrame decodeStreamFrame(
 
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Invalid stream id", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid stream id"));
   }
 
   OptionalIntegral<StreamGroupId> groupId;
   if (isGroupFrame) {
     auto gId = decodeQuicInteger(cursor);
     if (!gId) {
-      throw QuicTransportException(
-          "Invalid group stream id",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Invalid group stream id"));
     }
     groupId = gId->first;
   }
@@ -542,8 +565,8 @@ ReadStreamFrame decodeStreamFrame(
   if (frameTypeField.hasOffset()) {
     auto optionalOffset = decodeQuicInteger(cursor);
     if (!optionalOffset) {
-      throw QuicTransportException(
-          "Invalid offset", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
     }
     offset = optionalOffset->first;
   }
@@ -552,24 +575,43 @@ ReadStreamFrame decodeStreamFrame(
   if (frameTypeField.hasDataLength()) {
     dataLength = decodeQuicInteger(cursor);
     if (!dataLength) {
-      throw QuicTransportException(
-          "Invalid length", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
     }
   }
   Buf data;
-  if (dataLength.has_value()) {
-    if (cursor.totalLength() < dataLength->first) {
-      throw QuicTransportException(
-          "Length mismatch", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+
+  // Calculate how much to trim from the start of the queue
+  size_t trimAmount = cursor - queue.front();
+  if (trimAmount > 0) {
+    size_t trimmed = queue.trimStartAtMost(trimAmount);
+    if (trimmed < trimAmount) {
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Failed to trim queue"));
     }
-    // If dataLength > data's actual length then the cursor will throw.
-    queue.trimStart(cursor - queue.front());
+  }
+
+  if (dataLength.has_value()) {
+    if (queue.chainLength() < dataLength->first) {
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
+    }
     data = queue.splitAtMost(dataLength->first);
+    if (!data || data->computeChainDataLength() < dataLength->first) {
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Failed to extract data"));
+    }
   } else {
     // Missing Data Length field doesn't mean no data. It means the rest of the
     // frame are all data.
-    queue.trimStart(cursor - queue.front());
     data = queue.move();
+    if (!data) {
+      return folly::makeUnexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Failed to extract data"));
+    }
   }
   return ReadStreamFrame(
       folly::to<StreamId>(streamId->first),
@@ -579,125 +621,143 @@ ReadStreamFrame decodeStreamFrame(
       groupId);
 }
 
-MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor) {
+folly::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
+    folly::io::Cursor& cursor) {
   auto maximumData = decodeQuicInteger(cursor);
   if (!maximumData) {
-    throw QuicTransportException(
-        "Bad Max Data", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad Max Data"));
   }
   return MaxDataFrame(maximumData->first);
 }
 
-MaxStreamDataFrame decodeMaxStreamDataFrame(folly::io::Cursor& cursor) {
+folly::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
+    folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Invalid streamId", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid streamId"));
   }
   auto offset = decodeQuicInteger(cursor);
   if (!offset) {
-    throw QuicTransportException(
-        "Invalid offset", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
   }
   return MaxStreamDataFrame(
       folly::to<StreamId>(streamId->first), offset->first);
 }
 
-MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor) {
+folly::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
+    folly::io::Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
-    throw QuicTransportException(
-        "Invalid Bi-directional streamId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Invalid Bi-directional streamId"));
   }
   return MaxStreamsFrame(streamCount->first, true /* isBidirectional*/);
 }
 
-MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor) {
+folly::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
+    folly::io::Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
-    throw QuicTransportException(
-        "Invalid Uni-directional streamId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Invalid Uni-directional streamId"));
   }
   return MaxStreamsFrame(streamCount->first, false /* isUnidirectional */);
 }
 
-DataBlockedFrame decodeDataBlockedFrame(folly::io::Cursor& cursor) {
+folly::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
+    folly::io::Cursor& cursor) {
   auto dataLimit = decodeQuicInteger(cursor);
   if (!dataLimit) {
-    throw QuicTransportException(
-        "Bad offset", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
   return DataBlockedFrame(dataLimit->first);
 }
 
-StreamDataBlockedFrame decodeStreamDataBlockedFrame(folly::io::Cursor& cursor) {
+folly::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
+    folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Bad streamId", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   auto dataLimit = decodeQuicInteger(cursor);
   if (!dataLimit) {
-    throw QuicTransportException(
-        "Bad offset", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
   return StreamDataBlockedFrame(
       folly::to<StreamId>(streamId->first), dataLimit->first);
 }
 
-StreamsBlockedFrame decodeBiDiStreamsBlockedFrame(folly::io::Cursor& cursor) {
+folly::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
+    folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Bad Bi-Directional streamId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad Bi-Directional streamId"));
   }
   return StreamsBlockedFrame(
       folly::to<StreamId>(streamId->first), true /* isBidirectional */);
 }
 
-StreamsBlockedFrame decodeUniStreamsBlockedFrame(folly::io::Cursor& cursor) {
+folly::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
+    folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
-    throw QuicTransportException(
-        "Bad Uni-direcitonal streamId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad Uni-direcitonal streamId"));
   }
   return StreamsBlockedFrame(
       folly::to<StreamId>(streamId->first), false /* isBidirectional */);
 }
 
-NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
+folly::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
+    folly::io::Cursor& cursor) {
   auto sequenceNumber = decodeQuicInteger(cursor);
   if (!sequenceNumber) {
-    throw QuicTransportException(
-        "Bad sequence", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence"));
   }
   auto retirePriorTo = decodeQuicInteger(cursor);
   if (!retirePriorTo) {
-    throw QuicTransportException(
-        "Bad retire prior to", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad retire prior to"));
   }
   if (!cursor.canAdvance(sizeof(uint8_t))) {
-    throw QuicTransportException(
-        "Not enough input bytes to read Dest. ConnectionId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Not enough input bytes to read Dest. ConnectionId"));
   }
   auto connIdLen = cursor.readBE<uint8_t>();
   if (cursor.totalLength() < connIdLen) {
-    throw QuicTransportException(
-        "Bad connid", quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad connid"));
   }
   if (connIdLen > kMaxConnectionIdSize) {
-    throw QuicTransportException(
-        "ConnectionId invalid length",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "ConnectionId invalid length"));
   }
+
   ConnectionId connId(cursor, connIdLen);
+
   StatelessResetToken statelessResetToken;
-  cursor.pull(statelessResetToken.data(), statelessResetToken.size());
+  size_t bytesRead =
+      cursor.pullAtMost(statelessResetToken.data(), statelessResetToken.size());
+  if (bytesRead < statelessResetToken.size()) {
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Failed to read StatelessResetToken"));
+  }
+
   return NewConnectionIdFrame(
       sequenceNumber->first,
       retirePriorTo->first,
@@ -705,98 +765,108 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
       std::move(statelessResetToken));
 }
 
-RetireConnectionIdFrame decodeRetireConnectionIdFrame(
-    folly::io::Cursor& cursor) {
+folly::Expected<RetireConnectionIdFrame, QuicError>
+decodeRetireConnectionIdFrame(folly::io::Cursor& cursor) {
   auto sequenceNum = decodeQuicInteger(cursor);
   if (!sequenceNum) {
-    throw QuicTransportException(
-        // TODO change the error code
-        "Bad sequence num",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence num"));
   }
   return RetireConnectionIdFrame(sequenceNum->first);
 }
 
-PathChallengeFrame decodePathChallengeFrame(folly::io::Cursor& cursor) {
-  // just parse and ignore expected data
-  // A PATH_CHALLENGE frame contains 8 bytes
+folly::Expected<PathChallengeFrame, QuicError> decodePathChallengeFrame(
+    folly::io::Cursor& cursor) {
   if (!cursor.canAdvance(sizeof(uint64_t))) {
-    throw QuicTransportException(
-        "Not enough input bytes to read path challenge frame.",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Not enough input bytes to read path challenge frame."));
   }
   auto pathData = cursor.readBE<uint64_t>();
   return PathChallengeFrame(pathData);
 }
 
-PathResponseFrame decodePathResponseFrame(folly::io::Cursor& cursor) {
-  // just parse and ignore expected data
-  // Its format is identical to the PATH_CHALLENGE frame
+folly::Expected<PathResponseFrame, QuicError> decodePathResponseFrame(
+    folly::io::Cursor& cursor) {
   if (!cursor.canAdvance(sizeof(uint64_t))) {
-    throw QuicTransportException(
-        "Not enough input bytes to read path response frame.",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Not enough input bytes to read path response frame."));
   }
   auto pathData = cursor.readBE<uint64_t>();
   return PathResponseFrame(pathData);
 }
 
-ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor) {
+folly::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
+    folly::io::Cursor& cursor) {
   TransportErrorCode errorCode{};
   auto varCode = decodeQuicInteger(cursor);
-  if (varCode) {
-    errorCode = static_cast<TransportErrorCode>(varCode->first);
-  } else {
-    throw QuicTransportException(
-        "Failed to parse error code.",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+  if (!varCode) {
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Failed to parse error code."));
   }
+  errorCode = static_cast<TransportErrorCode>(varCode->first);
+
   auto frameTypeField = decodeQuicInteger(cursor);
   if (!frameTypeField || frameTypeField->second != sizeof(uint8_t)) {
-    throw QuicTransportException(
-        "Bad connection close triggering frame type value",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad connection close triggering frame type value"));
   }
   FrameType triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
+
   auto reasonPhraseLength = decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
       reasonPhraseLength->first > kMaxReasonPhraseLength) {
-    throw QuicTransportException(
-        "Bad reason phrase length",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad reason phrase length"));
   }
-  auto reasonPhrase =
-      cursor.readFixedString(folly::to<size_t>(reasonPhraseLength->first));
+
+  std::string reasonPhrase;
+  size_t len = static_cast<size_t>(reasonPhraseLength->first);
+  auto bytes = cursor.peekBytes();
+  size_t available = std::min(bytes.size(), len);
+  reasonPhrase.append(reinterpret_cast<const char*>(bytes.data()), available);
+  cursor.skip(available);
+
   return ConnectionCloseFrame(
       QuicErrorCode(errorCode), std::move(reasonPhrase), triggeringFrameType);
 }
 
-ConnectionCloseFrame decodeApplicationClose(folly::io::Cursor& cursor) {
+folly::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
+    folly::io::Cursor& cursor) {
   ApplicationErrorCode errorCode{};
   auto varCode = decodeQuicInteger(cursor);
-  if (varCode) {
-    errorCode = static_cast<ApplicationErrorCode>(varCode->first);
-  } else {
-    throw QuicTransportException(
-        "Failed to parse error code.",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+  if (!varCode) {
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Failed to parse error code."));
   }
+  errorCode = static_cast<ApplicationErrorCode>(varCode->first);
 
   auto reasonPhraseLength = decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
       reasonPhraseLength->first > kMaxReasonPhraseLength) {
-    throw QuicTransportException(
-        "Bad reason phrase length",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad reason phrase length"));
   }
 
-  auto reasonPhrase =
-      cursor.readFixedString(folly::to<size_t>(reasonPhraseLength->first));
+  std::string reasonPhrase;
+  size_t len = static_cast<size_t>(reasonPhraseLength->first);
+  auto bytes = cursor.peekBytes();
+  size_t available = std::min(bytes.size(), len);
+  reasonPhrase.append(reinterpret_cast<const char*>(bytes.data()), available);
+  cursor.skip(available);
+
   return ConnectionCloseFrame(
       QuicErrorCode(errorCode), std::move(reasonPhrase));
 }
 
-HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& /*cursor*/) {
+folly::Expected<HandshakeDoneFrame, QuicError> decodeHandshakeDoneFrame(
+    folly::io::Cursor& /*cursor*/) {
   return HandshakeDoneFrame();
 }
 
@@ -816,192 +886,326 @@ folly::Expected<uint64_t, TransportErrorCode> parsePlaintextRetryOrNewToken(
   return timestampInMs;
 }
 
-DatagramFrame decodeDatagramFrame(BufQueue& queue, bool hasLen) {
+folly::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
+    BufQueue& queue,
+    bool hasLen) {
   folly::io::Cursor cursor(queue.front());
   size_t length = cursor.length();
   if (hasLen) {
     auto decodeLength = decodeQuicInteger(cursor);
     if (!decodeLength) {
-      throw QuicTransportException(
-          "Invalid datagram len", TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid datagram len"));
     }
     length = decodeLength->first;
     if (cursor.length() < length) {
-      throw QuicTransportException(
-          "Invalid datagram frame", TransportErrorCode::FRAME_ENCODING_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid datagram frame"));
     }
     queue.trimStart(decodeLength->second);
   }
   return DatagramFrame(length, queue.splitAtMost(length));
 }
 
-QuicFrame parseFrame(
+folly::Expected<QuicFrame, QuicError> parseFrame(
     BufQueue& queue,
     const PacketHeader& header,
     const CodecParameters& params) {
   folly::io::Cursor cursor(queue.front());
   auto frameTypeInt = decodeQuicInteger(cursor);
   if (!frameTypeInt) {
-    throw QuicTransportException(
-        "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid frame-type field"));
   }
   queue.trimStart(cursor - queue.front());
-  bool consumedQueue = false;
-  bool error = false;
-  SCOPE_EXIT {
-    if (consumedQueue || error) {
-      return;
-    }
-    queue.trimStart(cursor - queue.front());
-  };
   cursor.reset(queue.front());
   FrameType frameType = static_cast<FrameType>(frameTypeInt->first);
-  try
 
-  {
-    folly::Expected<QuicFrame, QuicError> res = folly::makeUnexpected(
-        QuicError(TransportErrorCode::INTERNAL_ERROR, "unintialized frame"));
-    switch (frameType) {
-      case FrameType::PADDING:
-        return QuicFrame(decodePaddingFrame(cursor));
-      case FrameType::PING:
-        return QuicFrame(decodePingFrame(cursor));
-      case FrameType::ACK:
-        res = decodeAckFrame(cursor, header, params);
-        if (res.hasError()) {
-          throw QuicTransportException(
-              res.error().message, *res.error().code.asTransportErrorCode());
-        }
-        return *res;
-      case FrameType::ACK_ECN:
-        res = decodeAckFrameWithECN(cursor, header, params);
-        if (res.hasError()) {
-          throw QuicTransportException(
-              res.error().message, *res.error().code.asTransportErrorCode());
-        }
-        return *res;
-      case FrameType::RST_STREAM:
-      case FrameType::RST_STREAM_AT:
-        return QuicFrame(decodeRstStreamFrame(
-            cursor, frameType == FrameType::RST_STREAM_AT));
-      case FrameType::STOP_SENDING:
-        return QuicFrame(decodeStopSendingFrame(cursor));
-      case FrameType::CRYPTO_FRAME:
-        return QuicFrame(decodeCryptoFrame(cursor));
-      case FrameType::NEW_TOKEN:
-        return QuicFrame(decodeNewTokenFrame(cursor));
-      case FrameType::STREAM:
-      case FrameType::STREAM_FIN:
-      case FrameType::STREAM_LEN:
-      case FrameType::STREAM_LEN_FIN:
-      case FrameType::STREAM_OFF:
-      case FrameType::STREAM_OFF_FIN:
-      case FrameType::STREAM_OFF_LEN:
-      case FrameType::STREAM_OFF_LEN_FIN:
-        consumedQueue = true;
-        return QuicFrame(decodeStreamFrame(
-            queue,
-            StreamTypeField(frameTypeInt->first),
-            false /* isGroupFrame */));
-      case FrameType::GROUP_STREAM:
-      case FrameType::GROUP_STREAM_FIN:
-      case FrameType::GROUP_STREAM_LEN:
-      case FrameType::GROUP_STREAM_LEN_FIN:
-      case FrameType::GROUP_STREAM_OFF:
-      case FrameType::GROUP_STREAM_OFF_FIN:
-      case FrameType::GROUP_STREAM_OFF_LEN:
-      case FrameType::GROUP_STREAM_OFF_LEN_FIN:
-        consumedQueue = true;
-        return QuicFrame(decodeStreamFrame(
-            queue,
-            StreamTypeField(frameTypeInt->first),
-            true /* isGroupFrame */));
-      case FrameType::MAX_DATA:
-        return QuicFrame(decodeMaxDataFrame(cursor));
-      case FrameType::MAX_STREAM_DATA:
-        return QuicFrame(decodeMaxStreamDataFrame(cursor));
-      case FrameType::MAX_STREAMS_BIDI:
-        return QuicFrame(decodeBiDiMaxStreamsFrame(cursor));
-      case FrameType::MAX_STREAMS_UNI:
-        return QuicFrame(decodeUniMaxStreamsFrame(cursor));
-      case FrameType::DATA_BLOCKED:
-        return QuicFrame(decodeDataBlockedFrame(cursor));
-      case FrameType::STREAM_DATA_BLOCKED:
-        return QuicFrame(decodeStreamDataBlockedFrame(cursor));
-      case FrameType::STREAMS_BLOCKED_BIDI:
-        return QuicFrame(decodeBiDiStreamsBlockedFrame(cursor));
-      case FrameType::STREAMS_BLOCKED_UNI:
-        return QuicFrame(decodeUniStreamsBlockedFrame(cursor));
-      case FrameType::NEW_CONNECTION_ID:
-        return QuicFrame(decodeNewConnectionIdFrame(cursor));
-      case FrameType::RETIRE_CONNECTION_ID:
-        return QuicFrame(decodeRetireConnectionIdFrame(cursor));
-      case FrameType::PATH_CHALLENGE:
-        return QuicFrame(decodePathChallengeFrame(cursor));
-      case FrameType::PATH_RESPONSE:
-        return QuicFrame(decodePathResponseFrame(cursor));
-      case FrameType::CONNECTION_CLOSE:
-        return QuicFrame(decodeConnectionCloseFrame(cursor));
-      case FrameType::CONNECTION_CLOSE_APP_ERR:
-        return QuicFrame(decodeApplicationClose(cursor));
-      case FrameType::HANDSHAKE_DONE:
-        return QuicFrame(decodeHandshakeDoneFrame(cursor));
-      case FrameType::DATAGRAM: {
-        consumedQueue = true;
-        return QuicFrame(decodeDatagramFrame(queue, false /* hasLen */));
+  // No more try/catch, just use Expected/makeUnexpected pattern
+  switch (frameType) {
+    case FrameType::PADDING: {
+      auto paddingRes = decodePaddingFrame(cursor);
+      if (!paddingRes.hasValue()) {
+        return folly::makeUnexpected(paddingRes.error());
       }
-      case FrameType::DATAGRAM_LEN: {
-        consumedQueue = true;
-        return QuicFrame(decodeDatagramFrame(queue, true /* hasLen */));
-      }
-      case FrameType::KNOB:
-        res = decodeKnobFrame(cursor);
-        if (res.hasError()) {
-          throw QuicTransportException(
-              res.error().message, *res.error().code.asTransportErrorCode());
-        }
-        return QuicFrame(*res);
-      case FrameType::ACK_FREQUENCY:
-        res = decodeAckFrequencyFrame(cursor);
-        if (res.hasError()) {
-          throw QuicTransportException(
-              res.error().message, *res.error().code.asTransportErrorCode());
-        }
-        return *res;
-      case FrameType::IMMEDIATE_ACK:
-        return QuicFrame(decodeImmediateAckFrame(cursor));
-      case FrameType::ACK_RECEIVE_TIMESTAMPS: {
-        res = decodeAckFrameWithReceivedTimestamps(
-            cursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);
-        if (res.hasError()) {
-          throw QuicTransportException(
-              res.error().message, *res.error().code.asTransportErrorCode());
-        }
-        auto frame = *res;
-        return frame;
-      }
-      case FrameType::ACK_EXTENDED:
-        auto frame = QuicFrame(decodeAckExtendedFrame(cursor, header, params));
-        return frame;
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*paddingRes);
     }
-  } catch (const std::exception& e) {
-    error = true;
-    throw QuicTransportException(
-        fmt::format(
-            "Frame format invalid, type={}, error={}",
-            frameTypeInt->first,
-            e.what()),
-        TransportErrorCode::FRAME_ENCODING_ERROR);
+    case FrameType::PING: {
+      auto pingRes = decodePingFrame(cursor);
+      if (!pingRes.hasValue()) {
+        return folly::makeUnexpected(pingRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*pingRes);
+    }
+    case FrameType::ACK: {
+      auto ackFrameRes = decodeAckFrame(cursor, header, params);
+      if (ackFrameRes.hasError()) {
+        return ackFrameRes;
+      }
+      queue.trimStart(cursor - queue.front());
+      return ackFrameRes;
+    }
+    case FrameType::ACK_ECN: {
+      auto ackFrameWithEcnRes = decodeAckFrameWithECN(cursor, header, params);
+      if (ackFrameWithEcnRes.hasError()) {
+        return ackFrameWithEcnRes;
+      }
+      queue.trimStart(cursor - queue.front());
+      return ackFrameWithEcnRes;
+    }
+    case FrameType::RST_STREAM:
+    case FrameType::RST_STREAM_AT: {
+      auto rstRes =
+          decodeRstStreamFrame(cursor, frameType == FrameType::RST_STREAM_AT);
+      if (!rstRes.hasValue()) {
+        return folly::makeUnexpected(rstRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*rstRes);
+    }
+    case FrameType::STOP_SENDING: {
+      auto stopRes = decodeStopSendingFrame(cursor);
+      if (!stopRes.hasValue()) {
+        return folly::makeUnexpected(stopRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*stopRes);
+    }
+    case FrameType::CRYPTO_FRAME: {
+      auto cryptoRes = decodeCryptoFrame(cursor);
+      if (!cryptoRes.hasValue()) {
+        return folly::makeUnexpected(cryptoRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*cryptoRes);
+    }
+    case FrameType::NEW_TOKEN: {
+      auto tokenRes = decodeNewTokenFrame(cursor);
+      if (!tokenRes.hasValue()) {
+        return folly::makeUnexpected(tokenRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*tokenRes);
+    }
+    case FrameType::STREAM:
+    case FrameType::STREAM_FIN:
+    case FrameType::STREAM_LEN:
+    case FrameType::STREAM_LEN_FIN:
+    case FrameType::STREAM_OFF:
+    case FrameType::STREAM_OFF_FIN:
+    case FrameType::STREAM_OFF_LEN:
+    case FrameType::STREAM_OFF_LEN_FIN: {
+      auto streamRes = decodeStreamFrame(
+          queue,
+          StreamTypeField(frameTypeInt->first),
+          false /* isGroupFrame */);
+      if (!streamRes.hasValue()) {
+        return folly::makeUnexpected(streamRes.error());
+      }
+      return QuicFrame(*streamRes);
+    }
+    case FrameType::GROUP_STREAM:
+    case FrameType::GROUP_STREAM_FIN:
+    case FrameType::GROUP_STREAM_LEN:
+    case FrameType::GROUP_STREAM_LEN_FIN:
+    case FrameType::GROUP_STREAM_OFF:
+    case FrameType::GROUP_STREAM_OFF_FIN:
+    case FrameType::GROUP_STREAM_OFF_LEN:
+    case FrameType::GROUP_STREAM_OFF_LEN_FIN: {
+      auto streamRes = decodeStreamFrame(
+          queue, StreamTypeField(frameTypeInt->first), true /* isGroupFrame */);
+      if (!streamRes.hasValue()) {
+        return folly::makeUnexpected(streamRes.error());
+      }
+      return QuicFrame(*streamRes);
+    }
+    case FrameType::MAX_DATA: {
+      auto maxDataRes = decodeMaxDataFrame(cursor);
+      if (!maxDataRes.hasValue()) {
+        return folly::makeUnexpected(maxDataRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*maxDataRes);
+    }
+    case FrameType::MAX_STREAM_DATA: {
+      auto maxStreamRes = decodeMaxStreamDataFrame(cursor);
+      if (!maxStreamRes.hasValue()) {
+        return folly::makeUnexpected(maxStreamRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*maxStreamRes);
+    }
+    case FrameType::MAX_STREAMS_BIDI: {
+      auto streamsBidiRes = decodeBiDiMaxStreamsFrame(cursor);
+      if (!streamsBidiRes.hasValue()) {
+        return folly::makeUnexpected(streamsBidiRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*streamsBidiRes);
+    }
+    case FrameType::MAX_STREAMS_UNI: {
+      auto streamsUniRes = decodeUniMaxStreamsFrame(cursor);
+      if (!streamsUniRes.hasValue()) {
+        return folly::makeUnexpected(streamsUniRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*streamsUniRes);
+    }
+    case FrameType::DATA_BLOCKED: {
+      auto blockedRes = decodeDataBlockedFrame(cursor);
+      if (!blockedRes.hasValue()) {
+        return folly::makeUnexpected(blockedRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*blockedRes);
+    }
+    case FrameType::STREAM_DATA_BLOCKED: {
+      auto streamBlockedRes = decodeStreamDataBlockedFrame(cursor);
+      if (!streamBlockedRes.hasValue()) {
+        return folly::makeUnexpected(streamBlockedRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*streamBlockedRes);
+    }
+    case FrameType::STREAMS_BLOCKED_BIDI: {
+      auto streamsBidiBlockedRes = decodeBiDiStreamsBlockedFrame(cursor);
+      if (!streamsBidiBlockedRes.hasValue()) {
+        return folly::makeUnexpected(streamsBidiBlockedRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*streamsBidiBlockedRes);
+    }
+    case FrameType::STREAMS_BLOCKED_UNI: {
+      auto streamsUniBlockedRes = decodeUniStreamsBlockedFrame(cursor);
+      if (!streamsUniBlockedRes.hasValue()) {
+        return folly::makeUnexpected(streamsUniBlockedRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*streamsUniBlockedRes);
+    }
+    case FrameType::NEW_CONNECTION_ID: {
+      auto newConnIdRes = decodeNewConnectionIdFrame(cursor);
+      if (!newConnIdRes.hasValue()) {
+        return folly::makeUnexpected(newConnIdRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*newConnIdRes);
+    }
+    case FrameType::RETIRE_CONNECTION_ID: {
+      auto retireConnIdRes = decodeRetireConnectionIdFrame(cursor);
+      if (!retireConnIdRes.hasValue()) {
+        return folly::makeUnexpected(retireConnIdRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*retireConnIdRes);
+    }
+    case FrameType::PATH_CHALLENGE: {
+      auto pathChallengeRes = decodePathChallengeFrame(cursor);
+      if (!pathChallengeRes.hasValue()) {
+        return folly::makeUnexpected(pathChallengeRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*pathChallengeRes);
+    }
+    case FrameType::PATH_RESPONSE: {
+      auto pathResponseRes = decodePathResponseFrame(cursor);
+      if (!pathResponseRes.hasValue()) {
+        return folly::makeUnexpected(pathResponseRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*pathResponseRes);
+    }
+    case FrameType::CONNECTION_CLOSE: {
+      auto connCloseRes = decodeConnectionCloseFrame(cursor);
+      if (!connCloseRes.hasValue()) {
+        return folly::makeUnexpected(connCloseRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*connCloseRes);
+    }
+    case FrameType::CONNECTION_CLOSE_APP_ERR: {
+      auto appCloseRes = decodeApplicationClose(cursor);
+      if (!appCloseRes.hasValue()) {
+        return folly::makeUnexpected(appCloseRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*appCloseRes);
+    }
+    case FrameType::HANDSHAKE_DONE: {
+      auto handshakeDoneRes = decodeHandshakeDoneFrame(cursor);
+      if (!handshakeDoneRes.hasValue()) {
+        return folly::makeUnexpected(handshakeDoneRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*handshakeDoneRes);
+    }
+    case FrameType::DATAGRAM: {
+      auto datagramRes = decodeDatagramFrame(queue, false /* hasLen */);
+      if (!datagramRes.hasValue()) {
+        return folly::makeUnexpected(datagramRes.error());
+      }
+      return QuicFrame(*datagramRes);
+    }
+    case FrameType::DATAGRAM_LEN: {
+      auto datagramRes = decodeDatagramFrame(queue, true /* hasLen */);
+      if (!datagramRes.hasValue()) {
+        return folly::makeUnexpected(datagramRes.error());
+      }
+      return QuicFrame(*datagramRes);
+    }
+    case FrameType::KNOB: {
+      auto knobRes = decodeKnobFrame(cursor);
+      if (knobRes.hasError()) {
+        return knobRes;
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*knobRes);
+    }
+    case FrameType::ACK_FREQUENCY: {
+      auto ackFreqRes = decodeAckFrequencyFrame(cursor);
+      if (!ackFreqRes.hasValue()) {
+        return folly::makeUnexpected(ackFreqRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*ackFreqRes);
+    }
+    case FrameType::IMMEDIATE_ACK: {
+      auto immediateAckRes = decodeImmediateAckFrame(cursor);
+      if (!immediateAckRes.hasValue()) {
+        return folly::makeUnexpected(immediateAckRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*immediateAckRes);
+    }
+    case FrameType::ACK_RECEIVE_TIMESTAMPS: {
+      auto ackWithReceiveTiemstampsRes = decodeAckFrameWithReceivedTimestamps(
+          cursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);
+      if (ackWithReceiveTiemstampsRes.hasError()) {
+        return ackWithReceiveTiemstampsRes;
+      }
+      queue.trimStart(cursor - queue.front());
+      return ackWithReceiveTiemstampsRes;
+    }
+    case FrameType::ACK_EXTENDED: {
+      auto ackExtRes = decodeAckExtendedFrame(cursor, header, params);
+      if (!ackExtRes.hasValue()) {
+        return folly::makeUnexpected(ackExtRes.error());
+      }
+      queue.trimStart(cursor - queue.front());
+      return QuicFrame(*ackExtRes);
+    }
   }
-  error = true;
-  throw QuicTransportException(
-      folly::to<std::string>("Unknown frame, type=", frameTypeInt->first),
-      TransportErrorCode::FRAME_ENCODING_ERROR);
+
+  return folly::makeUnexpected(QuicError(
+      TransportErrorCode::FRAME_ENCODING_ERROR,
+      folly::to<std::string>("Unknown frame, type=", frameTypeInt->first)));
 }
 
 // Parse packet
 
-RegularQuicPacket decodeRegularPacket(
+folly::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
     std::unique_ptr<folly::IOBuf> packetData) {
@@ -1012,13 +1216,21 @@ RegularQuicPacket decodeRegularPacket(
     return packet;
   }
   // Parse out one packet before any conditionals.
-  packet.frames.push_back(parseFrame(queue, packet.header, params));
+  auto frameRes = parseFrame(queue, packet.header, params);
+  if (!frameRes.hasValue()) {
+    return folly::makeUnexpected(frameRes.error());
+  }
+  packet.frames.push_back(std::move(*frameRes));
+
   while (queue.chainLength() > 0) {
-    auto f = parseFrame(queue, packet.header, params);
-    if (packet.frames.back().asPaddingFrame() && f.asPaddingFrame()) {
+    auto fRes = parseFrame(queue, packet.header, params);
+    if (!fRes.hasValue()) {
+      return folly::makeUnexpected(fRes.error());
+    }
+    if (packet.frames.back().asPaddingFrame() && fRes->asPaddingFrame()) {
       packet.frames.back().asPaddingFrame()->numFrames++;
     } else {
-      packet.frames.push_back(std::move(f));
+      packet.frames.push_back(std::move(*fRes));
     }
   }
   return packet;

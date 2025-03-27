@@ -258,8 +258,14 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     decrypted = folly::IOBuf::create(0);
   }
 
-  return decodeRegularPacket(
-      std::move(longHeader), params_, std::move(decrypted));
+  auto packetRes =
+      decodeRegularPacket(std::move(longHeader), params_, std::move(decrypted));
+
+  if (!packetRes.hasValue()) {
+    return CodecResult(CodecError(std::move(packetRes.error())));
+  }
+
+  return CodecResult(std::move(*packetRes));
 }
 
 CodecResult QuicReadCodec::tryParseShortHeaderPacket(
@@ -391,8 +397,13 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
   // around avoids the timing signals mentioned in the spec, but we could also
   // drop it after 3 * PTO.
 
-  return decodeRegularPacket(
+  auto packetRes = decodeRegularPacket(
       std::move(*shortHeader), params_, std::move(decrypted));
+
+  if (!packetRes.hasValue()) {
+    return CodecResult(CodecError(std::move(packetRes.error())));
+  }
+  return CodecResult(std::move(*packetRes));
 }
 
 CodecResult QuicReadCodec::parsePacket(
@@ -431,9 +442,9 @@ CodecResult QuicReadCodec::parsePacket(
       const uint8_t* tokenSource =
           data->data() + (dataLength - sizeof(StatelessResetToken));
       if (!cryptoEqual_) {
-        throw QuicInternalException(
-            "crypto constant time comparison function is not set.",
-            LocalErrorCode::INTERNAL_ERROR);
+        return CodecResult(CodecError(QuicError(
+            QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
+            "crypto constant time comparison function is not set.")));
       }
       // Only allocate & copy the token if it matches the token we have
       if (cryptoEqual_(
@@ -511,10 +522,8 @@ void QuicReadCodec::setNextOneRttReadCipher(
 
 void QuicReadCodec::setZeroRttReadCipher(
     std::unique_ptr<Aead> zeroRttReadCipher) {
-  if (nodeType_ == QuicNodeType::Client) {
-    throw QuicTransportException(
-        "Invalid cipher", TransportErrorCode::INTERNAL_ERROR);
-  }
+  CHECK(nodeType_ == QuicNodeType::Server)
+      << "Setting zero rtt read cipher on client.";
   zeroRttReadCipher_ = std::move(zeroRttReadCipher);
 }
 
@@ -645,6 +654,18 @@ CodecResult::CodecResult(Nothing&& nothing)
   new (&none) Nothing(std::move(nothing));
 }
 
+CodecResult::CodecResult(CodecError&& codecErrorIn)
+    : type_(CodecResult::Type::CODEC_ERROR) {
+  new (&error) CodecError(std::move(codecErrorIn));
+}
+
+CodecError* CodecResult::codecError() {
+  if (type_ == CodecResult::Type::CODEC_ERROR) {
+    return &error;
+  }
+  return nullptr;
+}
+
 void CodecResult::destroyCodecResult() {
   switch (type_) {
     case CodecResult::Type::REGULAR_PACKET:
@@ -661,6 +682,9 @@ void CodecResult::destroyCodecResult() {
       break;
     case CodecResult::Type::NOTHING:
       none.~Nothing();
+      break;
+    case CodecResult::Type::CODEC_ERROR:
+      error.~CodecError();
       break;
   }
 }
@@ -686,6 +710,9 @@ CodecResult::CodecResult(CodecResult&& other) noexcept {
     case CodecResult::Type::NOTHING:
       new (&none) Nothing(std::move(other.none));
       break;
+    case CodecResult::Type::CODEC_ERROR:
+      new (&error) CodecError(std::move(other.error));
+      break;
   }
   type_ = other.type_;
 }
@@ -707,6 +734,9 @@ CodecResult& CodecResult::operator=(CodecResult&& other) noexcept {
       break;
     case CodecResult::Type::NOTHING:
       new (&none) Nothing(std::move(other.none));
+      break;
+    case CodecResult::Type::CODEC_ERROR:
+      new (&error) CodecError(std::move(other.error));
       break;
   }
   type_ = other.type_;

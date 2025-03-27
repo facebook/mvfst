@@ -281,6 +281,14 @@ void QuicClientTransportLite::processUdpPacketData(
     return;
   }
 
+  auto codecError = parsedPacket.codecError();
+  if (codecError) {
+    throw QuicTransportException(
+        codecError->error.message,
+        *codecError->error.code.asTransportErrorCode());
+    return;
+  }
+
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
     VLOG(4) << "Packet parse error for " << *this;

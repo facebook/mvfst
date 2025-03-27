@@ -44,7 +44,7 @@ QuicFrame parseQuicFrame(
         {.maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3});
   }
 
-  return quic::parseFrame(
+  auto result = quic::parseFrame(
       queue,
       buildTestShortHeader(),
       CodecParameters(
@@ -52,6 +52,13 @@ QuicFrame parseQuicFrame(
           QuicVersion::MVFST,
           receiveTimeStampsConfig,
           extendedAckSupport));
+
+  if (!result.hasValue()) {
+    throw QuicTransportException(
+        result.error().message, *result.error().code.asTransportErrorCode());
+  }
+
+  return std::move(*result);
 }
 
 namespace quic::test {
@@ -659,21 +666,23 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame streamFrameDecoded1 = quic::parseFrame(
+  auto streamFrameDecoded1 = quic::parseFrame(
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto& decodedStreamFrame1 = *streamFrameDecoded1.asReadStreamFrame();
+  ASSERT_TRUE(streamFrameDecoded1.hasValue());
+  auto& decodedStreamFrame1 = *streamFrameDecoded1->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame1.streamId, streamId1);
   EXPECT_EQ(decodedStreamFrame1.offset, offset1);
   EXPECT_EQ(decodedStreamFrame1.data->computeChainDataLength(), 30);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, decodedStreamFrame1.data));
   // Read another one from wire output:
-  QuicFrame streamFrameDecoded2 = quic::parseFrame(
+  auto streamFrameDecoded2 = quic::parseFrame(
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto& decodedStreamFrame2 = *streamFrameDecoded2.asReadStreamFrame();
+  ASSERT_TRUE(streamFrameDecoded2.hasValue());
+  auto& decodedStreamFrame2 = *streamFrameDecoded2->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame2.streamId, streamId2);
   EXPECT_EQ(decodedStreamFrame2.offset, offset2);
   EXPECT_EQ(
@@ -805,11 +814,12 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame decodedFrame = quic::parseFrame(
+  auto decodedFrame = quic::parseFrame(
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto decodedStreamFrame = *decodedFrame.asReadStreamFrame();
+  ASSERT_TRUE(decodedFrame.hasValue());
+  auto& decodedStreamFrame = *decodedFrame->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
   EXPECT_EQ(decodedStreamFrame.data->computeChainDataLength(), 1);
@@ -854,11 +864,12 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   folly::io::Cursor cursor(wireBuf.get());
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame decodedFrame = quic::parseFrame(
+  auto decodedFrame = quic::parseFrame(
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto& decodedStreamFrame = *decodedFrame.asReadStreamFrame();
+  ASSERT_TRUE(decodedFrame.hasValue());
+  auto& decodedStreamFrame = *decodedFrame->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
   EXPECT_EQ(
@@ -1485,21 +1496,23 @@ TEST_P(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
       .connTime = connTime,
   };
 
-  writeAckFrame(
+  auto ackFrameWriteResult = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  EXPECT_TRUE(ackFrameWriteResult.hasValue());
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame decodedFrame = quic::parseFrame(
+  auto decodedFrameResult = quic::parseFrame(
       queue,
       builtOut.first.header,
       CodecParameters(ackDelayExponent, QuicVersion::MVFST));
-  auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+  EXPECT_TRUE(decodedFrameResult.hasValue());
+  auto& decodedAckFrame = *decodedFrameResult.value().asReadAckFrame();
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
       computeExpectedDelay(ackFrameMetaData.ackDelay, ackDelayExponent));
@@ -1522,22 +1535,24 @@ TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
       .connTime = connTime,
   };
 
-  *writeAckFrame(
+  auto ackFrameWriteResult = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  EXPECT_TRUE(ackFrameWriteResult.hasValue());
   auto builtOut = std::move(pktBuilder).buildLongHeaderPacket();
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame decodedFrame = quic::parseFrame(
+  auto decodedFrameResult = quic::parseFrame(
       queue,
       builtOut.first.header,
       CodecParameters(ackDelayExponent, QuicVersion::MVFST));
-  auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+  EXPECT_TRUE(decodedFrameResult.hasValue());
+  auto& decodedAckFrame = *decodedFrameResult.value().asReadAckFrame();
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
       (uint64_t(ackFrameMetaData.ackDelay.count()) >> ackDelayExponent)
@@ -2658,11 +2673,12 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameWithGroup) {
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame streamFrameDecoded = quic::parseFrame(
+  auto streamFrameDecodedExpected = quic::parseFrame(
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto& decodedStreamFrame = *streamFrameDecoded.asReadStreamFrame();
+  ASSERT_TRUE(streamFrameDecodedExpected.hasValue());
+  auto& decodedStreamFrame = *streamFrameDecodedExpected->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.streamGroupId, groupId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
@@ -2703,12 +2719,13 @@ TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
-  QuicFrame parsedFrame = quic::parseFrame(
+  auto parsedFrameExpected = quic::parseFrame(
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(parsedFrame.asQuicSimpleFrame());
-  auto decodedFrame = parsedFrame.asQuicSimpleFrame()->asAckFrequencyFrame();
+  ASSERT_TRUE(parsedFrameExpected.hasValue());
+  auto decodedFrame =
+      parsedFrameExpected->asQuicSimpleFrame()->asAckFrequencyFrame();
   ASSERT_TRUE(decodedFrame);
   EXPECT_EQ(decodedFrame->sequenceNumber, frame.sequenceNumber);
   EXPECT_EQ(decodedFrame->packetTolerance, frame.packetTolerance);

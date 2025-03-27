@@ -926,6 +926,11 @@ void onServerReadDataFromOpen(
         }
         break;
       }
+      case CodecResult::Type::CODEC_ERROR: {
+        throw QuicTransportException(
+            parsedPacket.codecError()->error.message,
+            *parsedPacket.codecError()->error.code.asTransportErrorCode());
+      }
       case CodecResult::Type::REGULAR_PACKET:
         break;
     }
@@ -1505,6 +1510,11 @@ void onServerReadDataFromClosed(
       QUIC_STATS(
           conn.statsCallback, onPacketDropped, parsedPacket.nothing()->reason);
       break;
+    }
+    case CodecResult::Type::CODEC_ERROR: {
+      throw QuicTransportException(
+          parsedPacket.codecError()->error.message,
+          *parsedPacket.codecError()->error.code.asTransportErrorCode());
     }
     case CodecResult::Type::REGULAR_PACKET:
       break;

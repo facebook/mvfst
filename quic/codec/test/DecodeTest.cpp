@@ -363,7 +363,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithECN) {
       true, // addEcnCounts
       true); // useExtendedAck
   folly::io::Cursor cursor(result.get());
-  auto ackFrame = decodeAckExtendedFrame(
+  auto ackFrameRes = decodeAckExtendedFrame(
       cursor,
       makeHeader(),
       CodecParameters(
@@ -372,6 +372,8 @@ TEST_F(DecodeTest, AckExtendedFrameWithECN) {
           none,
           static_cast<ExtendedAckFeatureMaskType>(
               ExtendedAckFeatureMask::ECN_COUNTS)));
+  ASSERT_TRUE(ackFrameRes.hasValue());
+  auto ackFrame = *ackFrameRes;
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
   // Since 100 is the encoded value, we use the decoded value.
@@ -405,10 +407,12 @@ TEST_F(DecodeTest, AckExtendedFrameWithNoFeatures) {
       false, // addEcnCounts
       true); // useExtendedAck
   folly::io::Cursor cursor(result.get());
-  auto ackFrame = decodeAckExtendedFrame(
+  auto ackFrameRes = decodeAckExtendedFrame(
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  ASSERT_TRUE(ackFrameRes.hasValue());
+  auto ackFrame = *ackFrameRes;
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
   // Since 100 is the encoded value, we use the decoded value.
@@ -443,17 +447,18 @@ TEST_F(DecodeTest, AckExtendedFrameThrowsWithUnsupportedFeatures) {
   folly::io::Cursor cursor(result.get());
 
   // Try to decode extended ack with ECN but we only support Timestamps
-  EXPECT_THROW(
-      decodeAckExtendedFrame(
-          cursor,
-          makeHeader(),
-          CodecParameters(
-              kDefaultAckDelayExponent,
-              QuicVersion::MVFST,
-              none,
-              static_cast<ExtendedAckFeatureMaskType>(
-                  ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS))),
-      quic::QuicTransportException);
+  auto decodeResult = decodeAckExtendedFrame(
+      cursor,
+      makeHeader(),
+      CodecParameters(
+          kDefaultAckDelayExponent,
+          QuicVersion::MVFST,
+          none,
+          static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS)));
+  EXPECT_TRUE(decodeResult.hasError());
+  EXPECT_EQ(
+      decodeResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {
@@ -764,7 +769,9 @@ TEST_F(DecodeTest, StreamDecodeSuccess) {
       streamId, offset, length, folly::IOBuf::copyBuffer("a"));
   BufQueue queue;
   queue.append(streamFrame->clone());
-  auto decodedFrame = decodeStreamFrame(queue, streamType);
+  auto decodedFrameRes = decodeStreamFrame(queue, streamType);
+  ASSERT_TRUE(decodedFrameRes.hasValue());
+  auto decodedFrame = decodedFrameRes.value();
   EXPECT_EQ(decodedFrame.offset, 10);
   EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
   EXPECT_EQ(decodedFrame.streamId, 10);
@@ -779,7 +786,9 @@ TEST_F(DecodeTest, StreamLengthStreamIdInvalid) {
       createStreamFrame<uint8_t>(streamId, none, none, nullptr, true);
   BufQueue queue;
   queue.append(streamFrame->clone());
-  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
+  auto result = decodeStreamFrame(queue, streamType);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, StreamOffsetNotPresent) {
@@ -791,7 +800,9 @@ TEST_F(DecodeTest, StreamOffsetNotPresent) {
       createStreamFrame(streamId, none, length, folly::IOBuf::copyBuffer("a"));
   BufQueue queue;
   queue.append(streamFrame->clone());
-  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
+  auto result = decodeStreamFrame(queue, streamType);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, StreamIncorrectDataLength) {
@@ -804,7 +815,9 @@ TEST_F(DecodeTest, StreamIncorrectDataLength) {
       streamId, offset, length, folly::IOBuf::copyBuffer("a"));
   BufQueue queue;
   queue.append(streamFrame->clone());
-  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
+  auto result = decodeStreamFrame(queue, streamType);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, StreamNoRemainingData) {
@@ -816,7 +829,9 @@ TEST_F(DecodeTest, StreamNoRemainingData) {
 
   const auto streamType =
       StreamTypeField(static_cast<uint8_t>(FrameType::STREAM));
-  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
+  auto result = decodeStreamFrame(queue, streamType);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, DatagramNoRemainingData) {
@@ -827,7 +842,9 @@ TEST_F(DecodeTest, DatagramNoRemainingData) {
   queue.trimStartAtMost(4);
 
   // invalid len
-  EXPECT_THROW(decodeDatagramFrame(queue, true), QuicTransportException);
+  auto result = decodeDatagramFrame(queue, true);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 std::unique_ptr<folly::IOBuf> CreateMaxStreamsIdFrame(
@@ -845,12 +862,14 @@ void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
 
   folly::io::Cursor cursorBiDi(buf.get());
-  MaxStreamsFrame maxStreamsBiDiFrame = decodeBiDiMaxStreamsFrame(cursorBiDi);
-  EXPECT_EQ(maxStreamsBiDiFrame.maxStreams, maxStreamsId);
+  auto maxStreamsBiDiFrameRes = decodeBiDiMaxStreamsFrame(cursorBiDi);
+  ASSERT_TRUE(maxStreamsBiDiFrameRes.hasValue());
+  EXPECT_EQ(maxStreamsBiDiFrameRes->maxStreams, maxStreamsId);
 
   folly::io::Cursor cursorUni(buf.get());
-  MaxStreamsFrame maxStreamsUniFrame = decodeUniMaxStreamsFrame(cursorUni);
-  EXPECT_EQ(maxStreamsUniFrame.maxStreams, maxStreamsId);
+  auto maxStreamsUniFrameRes = decodeUniMaxStreamsFrame(cursorUni);
+  ASSERT_TRUE(maxStreamsUniFrameRes.hasValue());
+  EXPECT_EQ(maxStreamsUniFrameRes->maxStreams, maxStreamsId);
 }
 
 // Uni and BiDi have same max limits so uses single 'frame' to check both.
@@ -858,10 +877,14 @@ void MaxStreamsIdCheckInvalid(StreamId maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
 
   folly::io::Cursor cursorBiDi(buf.get());
-  EXPECT_THROW(decodeBiDiMaxStreamsFrame(cursorBiDi), QuicTransportException);
+  auto bidiResult = decodeBiDiMaxStreamsFrame(cursorBiDi);
+  EXPECT_TRUE(bidiResult.hasError());
+  EXPECT_EQ(bidiResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 
   folly::io::Cursor cursorUni(buf.get());
-  EXPECT_THROW(decodeUniMaxStreamsFrame(cursorUni), QuicTransportException);
+  auto uniResult = decodeUniMaxStreamsFrame(cursorUni);
+  EXPECT_TRUE(uniResult.hasError());
+  EXPECT_EQ(uniResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, MaxStreamsIdChecks) {
@@ -881,8 +904,8 @@ TEST_F(DecodeTest, CryptoDecodeSuccess) {
       createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(cryptoFrame.get());
   auto decodedFrame = decodeCryptoFrame(cursor);
-  EXPECT_EQ(decodedFrame.offset, 10);
-  EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
+  EXPECT_EQ(decodedFrame->offset, 10);
+  EXPECT_EQ(decodedFrame->data->computeChainDataLength(), 1);
 }
 
 TEST_F(DecodeTest, CryptoOffsetNotPresent) {
@@ -890,14 +913,18 @@ TEST_F(DecodeTest, CryptoOffsetNotPresent) {
   auto cryptoFrame =
       createCryptoFrame(none, length, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(cryptoFrame.get());
-  EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
+  auto result = decodeCryptoFrame(cursor);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, CryptoLengthNotPresent) {
   QuicInteger offset(0);
   auto cryptoFrame = createCryptoFrame(offset, none, nullptr);
   folly::io::Cursor cursor(cryptoFrame.get());
-  EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
+  auto result = decodeCryptoFrame(cursor);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, CryptoIncorrectDataLength) {
@@ -906,7 +933,9 @@ TEST_F(DecodeTest, CryptoIncorrectDataLength) {
   auto cryptoFrame =
       createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(cryptoFrame.get());
-  EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
+  auto result = decodeCryptoFrame(cursor);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, PaddingFrameTest) {
@@ -971,13 +1000,15 @@ TEST_F(DecodeTest, NewTokenDecodeSuccess) {
       createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(newTokenFrame.get());
   auto decodedFrame = decodeNewTokenFrame(cursor);
-  EXPECT_EQ(decodedFrame.token->computeChainDataLength(), 1);
+  EXPECT_EQ(decodedFrame->token->computeChainDataLength(), 1);
 }
 
 TEST_F(DecodeTest, NewTokenLengthNotPresent) {
   auto newTokenFrame = createNewTokenFrame(none, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(newTokenFrame.get());
-  EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
+  auto result = decodeNewTokenFrame(cursor);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
@@ -985,7 +1016,9 @@ TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
   auto newTokenFrame =
       createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
   folly::io::Cursor cursor(newTokenFrame.get());
-  EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
+  auto result = decodeNewTokenFrame(cursor);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, ParsePlaintextNewToken) {
@@ -1052,8 +1085,10 @@ TEST_F(DecodeTest, StreamGroupDecodeSuccess) {
       groupId);
   BufQueue queue;
   queue.append(streamFrame->clone());
-  auto decodedFrame =
+  auto decodedFrameRes =
       decodeStreamFrame(queue, streamType, true /* isGroupFrame */);
+  ASSERT_TRUE(decodedFrameRes.hasValue());
+  auto decodedFrame = decodedFrameRes.value();
   EXPECT_EQ(decodedFrame.offset, 10);
   EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
   EXPECT_EQ(decodedFrame.streamId, 10);
@@ -1101,7 +1136,7 @@ TEST_F(DecodeTest, RstStreamFrame) {
       queue,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto rstStreamFrame = frame.asRstStreamFrame();
+  auto rstStreamFrame = frame->asRstStreamFrame();
   EXPECT_EQ(rstStreamFrame->streamId, 0);
   EXPECT_EQ(rstStreamFrame->errorCode, 0);
   EXPECT_EQ(rstStreamFrame->finalSize, 10);
@@ -1115,22 +1150,24 @@ TEST_F(DecodeTest, RstStreamAtFrame) {
       queue,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  auto rstStreamFrame = frame.asRstStreamFrame();
-  EXPECT_EQ(rstStreamFrame->streamId, 0);
-  EXPECT_EQ(rstStreamFrame->errorCode, 0);
-  EXPECT_EQ(rstStreamFrame->finalSize, 10);
-  EXPECT_EQ(*rstStreamFrame->reliableSize, 9);
+  auto rstStreamFrameRes = frame->asRstStreamFrame();
+  ASSERT_TRUE(rstStreamFrameRes);
+  auto rstStreamFrame = *rstStreamFrameRes;
+  EXPECT_EQ(rstStreamFrame.streamId, 0);
+  EXPECT_EQ(rstStreamFrame.errorCode, 0);
+  EXPECT_EQ(rstStreamFrame.finalSize, 10);
+  EXPECT_EQ(*rstStreamFrame.reliableSize, 9);
 }
 
 TEST_F(DecodeTest, RstStreamAtFrameRelSizeGreaterThanOffset) {
   auto buf = createRstStreamFrame(0, 0, 10, 11);
   BufQueue queue(std::move(buf));
-  EXPECT_THROW(
-      parseFrame(
-          queue,
-          makeHeader(),
-          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
-      QuicTransportException);
+  auto result = parseFrame(
+      queue,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 TEST_F(DecodeTest, RstStreamAtTruncated) {
@@ -1138,12 +1175,12 @@ TEST_F(DecodeTest, RstStreamAtTruncated) {
   buf->coalesce();
   buf->trimEnd(1);
   BufQueue queue(std::move(buf));
-  EXPECT_THROW(
-      parseFrame(
-          queue,
-          makeHeader(),
-          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
-      QuicTransportException);
+  auto result = parseFrame(
+      queue,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 }
 
 } // namespace quic::test
