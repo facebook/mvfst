@@ -51,8 +51,6 @@ class QuicTransportBase : public QuicSocket,
 
   Optional<ConnectionId> getClientChosenDestConnectionId() const override;
 
-  const std::shared_ptr<QLogger> getQLogger() const;
-
   // QuicSocket interface
   bool replaySafe() const override;
 
@@ -169,8 +167,6 @@ class QuicTransportBase : public QuicSocket,
       ApplicationErrorCode error,
       folly::StringPiece errorMsg) override;
 
-  virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
-
   void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
     conn_->loopDetectorCallback = std::move(callback);
   }
@@ -254,8 +250,6 @@ class QuicTransportBase : public QuicSocket,
       std::chrono::milliseconds pingTimeout);
 
   bool handshakeDoneNotified_{false};
-
-  uint64_t qlogRefcnt_{0};
 
  private:
   /**

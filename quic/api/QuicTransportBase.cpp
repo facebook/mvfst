@@ -57,40 +57,6 @@ void QuicTransportBase::setPacingTimer(
   }
 }
 
-const std::shared_ptr<QLogger> QuicTransportBase::getQLogger() const {
-  return conn_->qLogger;
-}
-
-void QuicTransportBase::setQLogger(std::shared_ptr<QLogger> qLogger) {
-  // setQLogger can be called multiple times for the same connection and with
-  // the same qLogger we track the number of times it gets set and the number
-  // of times it gets reset, and only stop qlog collection when the number of
-  // resets equals the number of times the logger was set
-  if (!conn_->qLogger) {
-    CHECK_EQ(qlogRefcnt_, 0);
-  } else {
-    CHECK_GT(qlogRefcnt_, 0);
-  }
-
-  if (qLogger) {
-    conn_->qLogger = std::move(qLogger);
-    conn_->qLogger->setDcid(conn_->clientChosenDestConnectionId);
-    if (conn_->nodeType == QuicNodeType::Server) {
-      conn_->qLogger->setScid(conn_->serverConnectionId);
-    } else {
-      conn_->qLogger->setScid(conn_->clientConnectionId);
-    }
-    qlogRefcnt_++;
-  } else {
-    if (conn_->qLogger) {
-      qlogRefcnt_--;
-      if (qlogRefcnt_ == 0) {
-        conn_->qLogger = nullptr;
-      }
-    }
-  }
-}
-
 Optional<ConnectionId> QuicTransportBase::getClientConnectionId() const {
   return conn_->clientConnectionId;
 }

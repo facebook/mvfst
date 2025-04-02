@@ -170,6 +170,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       size_t maxLen) override;
 
+  virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
+
+  [[nodiscard]] const std::shared_ptr<QLogger> getQLogger() const;
+
   void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 
   void setSendBuffer(StreamId, size_t /*maxUnacked*/, size_t /*maxUnsent*/)
@@ -922,6 +926,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * additionalCmsgs callback
    */
   void updatePacketProcessorsPrewriteRequests();
+
+  uint64_t qlogRefcnt_{0};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBaseLite& qt);
