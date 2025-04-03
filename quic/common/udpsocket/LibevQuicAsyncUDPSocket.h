@@ -34,6 +34,8 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   void pauseRead() override;
 
+  [[nodiscard]] bool isReadPaused() const override;
+
   ssize_t write(
       const folly::SocketAddress& address,
       const struct iovec* vec,

@@ -137,6 +137,10 @@ class QuicAsyncUDPSocket {
    */
   virtual void pauseRead() = 0;
 
+  [[nodiscard]] virtual bool isReadPaused() const {
+    return false;
+  }
+
   /**
    * Start listening to writable events on the socket.
    */

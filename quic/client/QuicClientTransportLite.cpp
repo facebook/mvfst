@@ -1939,6 +1939,10 @@ uint64_t QuicClientTransportLite::getPacketsSentCount() const {
   return conn_->lossState.totalPacketsSent;
 }
 
+bool QuicClientTransportLite::canRead() const {
+  return socket_ && !socket_->isReadPaused();
+}
+
 const std::shared_ptr<const folly::AsyncTransportCertificate>
 QuicClientTransportLite::getPeerCertificate() const {
   const auto clientHandshakeLayer = clientConn_->clientHandshakeLayer;

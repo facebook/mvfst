@@ -238,6 +238,7 @@ class QuicClientTransportLite
 
   uint64_t getPtoCount() const;
   uint64_t getPacketsSentCount() const;
+  bool canRead() const;
 
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;

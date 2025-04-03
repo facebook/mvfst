@@ -47,6 +47,10 @@ void LibevQuicAsyncUDPSocket::pauseRead() {
   removeEvent(EV_READ);
 }
 
+bool LibevQuicAsyncUDPSocket::isReadPaused() const {
+  return readCallback_ == nullptr;
+}
+
 void LibevQuicAsyncUDPSocket::resumeRead(ReadCallback* cb) {
   CHECK(!readCallback_) << "A read callback is already installed";
   CHECK_NE(fd_, -1)
