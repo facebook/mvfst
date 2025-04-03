@@ -27,7 +27,7 @@ TEST(ConnectionIdTest, TestConnidLen) {
 }
 
 TEST(ConnectionIdTest, TestZeroLenConnid) {
-  std::string out = "";
+  std::string out;
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
   folly::io::Cursor cursor(&buf);
   ConnectionId connid(cursor, out.size());
