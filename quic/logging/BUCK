@@ -69,3 +69,13 @@ mvfst_cpp_library(
         "//quic/codec:types",
     ],
 )
+
+mvfst_cpp_library(
+    name = "qlogger_common",
+    srcs = ["QLoggerCommon.cpp"],
+    headers = ["QLoggerCommon.h"],
+    exported_deps = [
+        ":base_qlogger",
+        ":qlogger_constants",
+    ],
+)
