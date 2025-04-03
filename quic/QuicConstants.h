@@ -377,6 +377,8 @@ enum class QuicVersion : uint32_t {
   // broken.
   MVFST = 0xfaceb002,
   QUIC_V1 = 0x00000001,
+  // QUIC_V1_ALIAS is used to default to BBRv2 instead of BBRv1 in
+  // QuicServerWorker.cpp
   QUIC_V1_ALIAS = 0xfaceb003,
   QUIC_V1_ALIAS2 = 0xfaceb004,
   // MVFST_EXPERIMENTAL is used to default to BBRv2 instead of BBRv1 in

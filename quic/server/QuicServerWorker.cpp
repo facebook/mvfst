@@ -693,7 +693,8 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
 
     auto transportSettingsCopy = transportSettings_;
-    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
+    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL ||
+        quicVersion == QuicVersion::QUIC_V1_ALIAS) {
       // Override BBRv1 with BBRv2
       if (transportSettingsCopy.defaultCongestionController ==
           CongestionControlType::BBR) {
