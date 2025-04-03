@@ -329,7 +329,7 @@ class QuicClientTransportLite
    *                          Bytes transformed into a QUIC packet will be
    *                          removed from this buffer.
    */
-  void processUdpPacketData(
+  folly::Expected<folly::Unit, QuicError> processUdpPacketData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket& udpPacket);
 
