@@ -241,6 +241,26 @@ FizzClientHandshake::getPeerCertificate() const {
   return state_.serverCert();
 }
 
+Handshake::TLSSummary FizzClientHandshake::getTLSSummary() const {
+  Handshake::TLSSummary summary;
+  if (state_.alpn().hasValue()) {
+    summary.alpn = state_.alpn().value();
+  }
+  if (state_.group().hasValue()) {
+    summary.namedGroup =
+        folly::to<std::string>(fizz::toString(state_.group().value()));
+  }
+  if (state_.pskType().hasValue()) {
+    summary.pskType =
+        folly::to<std::string>(fizz::toString(state_.pskType().value()));
+  }
+  if (state_.echState().hasValue()) {
+    summary.echStatus =
+        fizz::client::toString(state_.echState().value().status);
+  }
+  return summary;
+}
+
 class FizzClientHandshake::ActionMoveVisitor {
  public:
   explicit ActionMoveVisitor(FizzClientHandshake& client) : client_(client) {}

@@ -431,7 +431,13 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
     bool usedZeroRttIn,
     QuicVersion quicVersionIn,
     uint64_t dsrPacketCountIn,
+    uint16_t initialPacketsReceivedIn,
+    uint16_t uniqueInitialCryptoFramesReceivedIn,
+    std::chrono::milliseconds timeUntilLastInitialCryptoFrameReceivedIn,
     std::string alpnIn,
+    std::string namedGroupIn,
+    std::string pskTypeIn,
+    std::string echStatusIn,
     std::chrono::microseconds refTimeIn)
     : totalBytesSent{totalBytesSentIn},
       totalBytesRecvd{totalBytesRecvdIn},
@@ -452,7 +458,14 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
       usedZeroRtt{usedZeroRttIn},
       quicVersion{quicVersionIn},
       dsrPacketCount{dsrPacketCountIn},
-      alpn{alpnIn} {
+      initialPacketsReceived{initialPacketsReceivedIn},
+      uniqueInitialCryptoFramesReceived{uniqueInitialCryptoFramesReceivedIn},
+      timeUntilLastInitialCryptoFrameReceived{
+          timeUntilLastInitialCryptoFrameReceivedIn},
+      alpn{std::move(alpnIn)},
+      namedGroup{std::move(namedGroupIn)},
+      pskType{std::move(pskTypeIn)},
+      echStatus{std::move(echStatusIn)} {
   eventType = QLogEventType::TransportSummary;
   refTime = refTimeIn;
 }
@@ -489,7 +502,16 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
       static_cast<std::underlying_type<decltype(quicVersion)>::type>(
           quicVersion);
   data["dsr_packet_count"] = dsrPacketCount;
+  data["initial_packets_received"] = initialPacketsReceived;
+  data["unique_initial_crypto_frames_received"] =
+      uniqueInitialCryptoFramesReceived;
+  data["time_until_last_initial_crypto_frame_received"] =
+      timeUntilLastInitialCryptoFrameReceived.count();
   data["alpn"] = alpn;
+  data["named_group"] = namedGroup;
+  data["psk_type"] = pskType;
+  data["ech_status"] = echStatus;
+  ;
 
   d.push_back(std::move(data));
   return d;

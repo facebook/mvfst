@@ -253,7 +253,13 @@ void FileQLogger::addTransportSummary(const TransportSummaryArgs& args) {
       args.usedZeroRtt,
       args.quicVersion,
       args.dsrPacketCount,
-      std::move(args.alpn),
+      args.initialPacketsReceived,
+      args.uniqueInitialCryptoFramesReceived,
+      args.timeUntilLastInitialCryptoFrameReceived,
+      args.alpn,
+      args.namedGroup,
+      args.pskType,
+      args.echStatus,
       refTime));
 }
 

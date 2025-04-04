@@ -4017,6 +4017,19 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
   }
 }
 
+TEST_F(QuicUnencryptedServerTransportTest, TestDuplicateCryptoInitialLogging) {
+  auto transportSettings = server->getTransportSettings();
+  server->setTransportSettings(transportSettings);
+
+  recvClientHello();
+  recvClientHello();
+  recvClientHello();
+
+  EXPECT_GE(serverWrites.size(), 1);
+  EXPECT_EQ(getConn().initialPacketsReceived, 3);
+  EXPECT_EQ(getConn().uniqueInitialCryptoFramesReceived, 1);
+}
+
 TEST_F(
     QuicUnencryptedServerTransportTest,
     TestHandshakeNotWritableBytesLimited) {

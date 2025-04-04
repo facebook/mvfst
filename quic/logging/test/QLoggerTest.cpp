@@ -117,7 +117,14 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
        false,
        QuicVersion::MVFST,
        37,
-       "blah"});
+       /* numQuicInitialPacketReceived = */ 1,
+       /* numUniqueInitialCryptoFrameReceived = */ 1,
+       /* timeUntilLastInitialCryptoFrameReceived = */
+       std::chrono::milliseconds(1),
+       /* alpn = */ "blah",
+       /* namedGroup = */ "group",
+       /* pskType = */ "resumed",
+       /* echStatus = */ "accepted"});
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogTransportSummaryEvent*>(p.get());
@@ -139,7 +146,13 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
   EXPECT_EQ(gotEvent->finalPacketLossTimeReorderingThreshDividend, 47);
   EXPECT_EQ(gotEvent->usedZeroRtt, false);
   EXPECT_EQ(gotEvent->dsrPacketCount, 37);
+  EXPECT_EQ(gotEvent->initialPacketsReceived, 1);
+  EXPECT_EQ(gotEvent->uniqueInitialCryptoFramesReceived, 1);
+  EXPECT_EQ(gotEvent->timeUntilLastInitialCryptoFrameReceived.count(), 1);
   EXPECT_EQ(gotEvent->alpn, "blah");
+  EXPECT_EQ(gotEvent->namedGroup, "group");
+  EXPECT_EQ(gotEvent->pskType, "resumed");
+  EXPECT_EQ(gotEvent->echStatus, "accepted");
 }
 
 TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
@@ -859,7 +872,13 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        "used_zero_rtt": true,
        "quic_version": 4207849474,
        "dsr_packet_count": 37,
-       "alpn": "blah"
+       "initial_packets_received": 1,
+       "unique_initial_crypto_frames_received": 1,
+       "time_until_last_initial_crypto_frame_received": 1,
+       "alpn": "blah",
+       "named_group": "group",
+       "psk_type": "resumed",
+       "ech_status": "accepted"
      }
    ]
  ])");
@@ -884,7 +903,14 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        true,
        QuicVersion::MVFST,
        37,
-       "blah"});
+       /* numQuicInitialPacketReceived = */ 1,
+       /* numUniqueInitialCryptoFrameReceived = */ 1,
+       /* timeUntilLastInitialCryptoFrameReceived = */
+       std::chrono::milliseconds(1),
+       /* alpn = */ "blah",
+       /* namedGroup = */ "group",
+       /* pskType = */ "resumed",
+       /* echStatus = */ "accepted"});
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

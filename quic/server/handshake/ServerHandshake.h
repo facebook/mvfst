@@ -247,6 +247,8 @@ class ServerHandshake : public Handshake {
    */
   const Optional<Buf>& getAppToken() const;
 
+  TLSSummary getTLSSummary() const override;
+
  protected:
   Phase phase_{Phase::Handshake};
 

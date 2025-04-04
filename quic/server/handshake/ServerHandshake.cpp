@@ -304,6 +304,25 @@ const Optional<Buf>& ServerHandshake::getAppToken() const {
   return state_.appToken();
 }
 
+Handshake::TLSSummary ServerHandshake::getTLSSummary() const {
+  Handshake::TLSSummary summary;
+  if (state_.alpn().hasValue()) {
+    summary.alpn = state_.alpn().value();
+  }
+  if (state_.group().hasValue()) {
+    summary.namedGroup =
+        folly::to<std::string>(fizz::toString(state_.group().value()));
+  }
+  if (state_.pskType().hasValue()) {
+    summary.pskType =
+        folly::to<std::string>(fizz::toString(state_.pskType().value()));
+  }
+  if (state_.echState().hasValue()) {
+    summary.echStatus = fizz::server::toString(state_.echStatus());
+  }
+  return summary;
+}
+
 class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
  public:
   explicit ActionMoveVisitor(ServerHandshake& server) : server_(server) {}

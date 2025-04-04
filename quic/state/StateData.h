@@ -251,6 +251,9 @@ struct QuicCryptoState {
 
   // Stream to exchange handshake data encrypted with 1-rtt keys.
   QuicCryptoStream oneRttStream;
+
+  // Time point that the last initial packet with crypto frame received.
+  TimePoint lastInitialCryptoFrameReceivedTimePoint;
 };
 
 struct ConnectionCloseEvent {
@@ -734,6 +737,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     } fields;
   };
   TosHeader socketTos;
+
+  // Number of QUIC initial packets received.
+  uint16_t initialPacketsReceived{0};
+
+  // Number of QUIC unique crypto frame received with initial package.
+  uint16_t uniqueInitialCryptoFramesReceived{0};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

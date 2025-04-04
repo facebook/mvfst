@@ -137,9 +137,6 @@ mvfst_cpp_library(
         "//quic/logging:qlogger",
         "//quic/observer:socket_observer_types",
     ],
-    external_deps = [
-        "glog",
-    ],
 )
 
 mvfst_cpp_library(
@@ -179,8 +176,6 @@ mvfst_cpp_library(
         "QuicStreamFunctions.h",
     ],
     deps = [
-        ":quic_stream_utilities",
-        "//folly/io:iobuf",
         "//quic:exception",
         "//quic/flowcontrol:flow_control",
     ],

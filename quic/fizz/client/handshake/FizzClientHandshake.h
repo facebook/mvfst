@@ -59,6 +59,8 @@ class FizzClientHandshake : public ClientHandshake {
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;
 
+  TLSSummary getTLSSummary() const override;
+
  protected:
   Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname) const;
 

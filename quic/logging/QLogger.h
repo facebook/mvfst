@@ -62,7 +62,13 @@ class QLogger {
     bool usedZeroRtt{};
     QuicVersion quicVersion{QuicVersion::MVFST_INVALID};
     uint64_t dsrPacketCount{};
+    uint16_t initialPacketsReceived{};
+    uint16_t uniqueInitialCryptoFramesReceived{};
+    std::chrono::milliseconds timeUntilLastInitialCryptoFrameReceived;
     std::string alpn;
+    std::string namedGroup;
+    std::string pskType;
+    std::string echStatus;
   };
   virtual void addTransportSummary(const TransportSummaryArgs& args) = 0;
   virtual void addCongestionMetricUpdate(

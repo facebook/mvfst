@@ -53,6 +53,14 @@ class Handshake {
   virtual void handshakeConfirmed() {
     LOG(FATAL) << "Not implemented";
   }
+
+  struct TLSSummary {
+    std::string alpn;
+    std::string namedGroup;
+    std::string pskType;
+    std::string echStatus;
+  };
+  [[nodiscard]] virtual TLSSummary getTLSSummary() const = 0;
 };
 
 constexpr folly::StringPiece kQuicDraft23Salt =

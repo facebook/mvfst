@@ -976,6 +976,15 @@ void onServerReadDataFromOpen(
 
     bool isZeroRttPacket = protectionLevel == ProtectionType::ZeroRtt;
 
+    bool isQuicInitialPacket =
+        regularPacket.header.getHeaderForm() == HeaderForm::Long &&
+        regularPacket.header.asLong()->getHeaderType() ==
+            LongHeader::Types::Initial;
+
+    if (isQuicInitialPacket) {
+      ++conn.initialPacketsReceived;
+    }
+
     if (!isProtectedPacket || isZeroRttPacket) {
       // there are some frame restrictions
       auto isFrameInvalidFn = !isProtectedPacket
@@ -1182,10 +1191,19 @@ void onServerReadDataFromOpen(
                    << getCryptoStream(*conn.cryptoState, encryptionLevel)
                           ->currentReadOffset
                    << " " << conn;
+          auto cryptoStream =
+              getCryptoStream(*conn.cryptoState, encryptionLevel);
+          auto readBufferSize = cryptoStream->readBuffer.size();
           appendDataToReadBuffer(
-              *getCryptoStream(*conn.cryptoState, encryptionLevel),
+              *cryptoStream,
               StreamBuffer(
                   std::move(cryptoFrame.data), cryptoFrame.offset, false));
+          if (isQuicInitialPacket &&
+              readBufferSize != cryptoStream->readBuffer.size()) {
+            ++conn.uniqueInitialCryptoFramesReceived;
+            conn.cryptoState->lastInitialCryptoFrameReceivedTimePoint =
+                Clock::now();
+          }
           break;
         }
         case QuicFrame::Type::ReadStreamFrame: {

@@ -1373,7 +1373,7 @@ void QuicTransportBaseLite::closeImpl(
 
   uint64_t totalCryptoDataWritten = 0;
   uint64_t totalCryptoDataRecvd = 0;
-
+  auto timeUntilLastInitialCryptoFrameReceived = std::chrono::milliseconds(0);
   if (conn_->cryptoState) {
     totalCryptoDataWritten +=
         conn_->cryptoState->initialStream.currentWriteOffset;
@@ -1386,9 +1386,14 @@ void QuicTransportBaseLite::closeImpl(
     totalCryptoDataRecvd +=
         conn_->cryptoState->handshakeStream.maxOffsetObserved;
     totalCryptoDataRecvd += conn_->cryptoState->oneRttStream.maxOffsetObserved;
+    timeUntilLastInitialCryptoFrameReceived =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            conn_->cryptoState->lastInitialCryptoFrameReceivedTimePoint -
+            conn_->connectionTime);
   }
 
   if (conn_->qLogger) {
+    auto tlsSummary = conn_->handshakeLayer->getTLSSummary();
     conn_->qLogger->addTransportSummary(
         {conn_->lossState.totalBytesSent,
          conn_->lossState.totalBytesRecvd,
@@ -1410,7 +1415,13 @@ void QuicTransportBaseLite::closeImpl(
          conn_->usedZeroRtt,
          conn_->version.value_or(QuicVersion::MVFST_INVALID),
          conn_->dsrPacketCount,
-         getAppProtocol().value_or("")});
+         conn_->initialPacketsReceived,
+         conn_->uniqueInitialCryptoFramesReceived,
+         timeUntilLastInitialCryptoFrameReceived,
+         tlsSummary.alpn,
+         tlsSummary.namedGroup,
+         tlsSummary.pskType,
+         tlsSummary.echStatus});
   }
 
   // TODO: truncate the error code string to be 1MSS only.
