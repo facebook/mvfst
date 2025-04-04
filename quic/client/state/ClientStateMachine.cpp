@@ -100,7 +100,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   return newConn;
 }
 
-void processServerInitialParams(
+folly::Expected<folly::Unit, QuicError> processServerInitialParams(
     QuicClientConnectionState& conn,
     const ServerTransportParameters& serverParams,
     PacketNum packetNum) {
@@ -163,9 +163,9 @@ void processServerInitialParams(
           TransportParameterId::reliable_stream_reset));
   if (reliableResetTpIter != serverParams.parameters.end()) {
     if (!reliableResetTpIter->value->empty()) {
-      throw QuicTransportException(
-          "Reliable reset transport parameter must be empty",
-          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+          "Reliable reset transport parameter must be empty"));
     }
     conn.peerAdvertisedReliableStreamResetSupport = true;
   } else {
@@ -185,9 +185,9 @@ void processServerInitialParams(
             conn.readCodec->getServerConnectionId() ||
         originalDestinationConnId.value() !=
             conn.originalDestinationConnectionId) {
-      throw QuicTransportException(
-          "Initial CID does not match.",
-          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+          "Initial CID does not match."));
     }
   }
 
@@ -197,11 +197,11 @@ void processServerInitialParams(
     packetSize = kDefaultUDPSendPacketLen;
   }
   if (*packetSize < kMinMaxUDPPayload) {
-    throw QuicTransportException(
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         folly::to<std::string>(
             "Max packet size too small. received max_packetSize = ",
-            *packetSize),
-        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+            *packetSize)));
   }
 
   VLOG(10) << "Client advertised flow control ";
@@ -228,9 +228,9 @@ void processServerInitialParams(
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   conn.peerIdleTimeout = timeMin(conn.peerIdleTimeout, kMaxIdleTimeout);
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
-    throw QuicTransportException(
-        "ack_delay_exponent too large",
-        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        "ack_delay_exponent too large"));
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
@@ -264,9 +264,9 @@ void processServerInitialParams(
   if (maxDatagramFrameSize.has_value()) {
     if (maxDatagramFrameSize.value() > 0 &&
         maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
-      throw QuicTransportException(
-          "max_datagram_frame_size too small",
-          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+          "max_datagram_frame_size too small"));
     }
     conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
   }
@@ -292,6 +292,8 @@ void processServerInitialParams(
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
   conn.peerAdvertisedExtendedAckFeatures = extendedAckFeatures.value_or(0);
+
+  return folly::unit;
 }
 
 void cacheServerInitialParams(

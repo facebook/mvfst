@@ -178,13 +178,11 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
       kMaxDatagramPacketOverhead - 1));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  try {
-    processServerInitialParams(clientConn, serverTransportParams, 0);
-    FAIL()
-        << "Expect transport exception due to max datagram frame size too small";
-  } catch (QuicTransportException& e) {
-    EXPECT_EQ(e.errorCode(), TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
-  }
+
+  auto result =
+      processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
 TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
@@ -285,7 +283,6 @@ TEST_F(
   processServerInitialParams(clientConn, serverTransportParams, 0);
   EXPECT_FALSE(clientConn.peerAdvertisedReliableStreamResetSupport);
 }
-
 TEST_F(ClientStateMachineTest, TestProcessReliableStreamResetNonEmptyParam) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -294,9 +291,10 @@ TEST_F(ClientStateMachineTest, TestProcessReliableStreamResetNonEmptyParam) {
       encodeIntegerParameter(TransportParameterId::reliable_stream_reset, 0));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  EXPECT_THROW(
-      processServerInitialParams(clientConn, serverTransportParams, 0),
-      QuicTransportException);
+  auto result =
+      processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
 TEST_F(
