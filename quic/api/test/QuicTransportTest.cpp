@@ -67,6 +67,7 @@ class QuicTransportTest : public Test {
   QuicTransportTest() {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&evb_);
   }
+
   ~QuicTransportTest() override = default;
 
   void SetUp() override {

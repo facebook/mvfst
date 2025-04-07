@@ -33,6 +33,7 @@ constexpr uint64_t kMaxStreamGroupId = 128 * kStreamGroupIncrement;
 class StreamIdSet {
  public:
   explicit StreamIdSet(StreamId base) : base_(static_cast<uint8_t>(base)) {}
+
   StreamIdSet() : base_(0) {}
 
   void add(StreamId id) {
@@ -230,6 +231,7 @@ class QuicStreamManager {
               std::move(pair.second)));
     }
   }
+
   /*
    * Create the state for a stream if it does not exist and return it. Note this
    * function is only used internally or for testing.

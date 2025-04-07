@@ -121,9 +121,11 @@ class FollyQuicEventBase : public QuicEventBase {
     [[nodiscard]] bool isScheduled() const {
       return isScheduledImpl();
     }
+
     void cancelTimeout() noexcept {
       return cancelImpl();
     }
+
     QuicTimerCallback* callback_;
   };
 

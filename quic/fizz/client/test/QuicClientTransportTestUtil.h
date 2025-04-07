@@ -353,6 +353,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   Optional<std::string> alpn_{folly::none};
 
   FizzCryptoFactory cryptoFactory_;
+
   const CryptoFactory& getCryptoFactory() const override {
     return cryptoFactory_;
   }
@@ -361,22 +362,28 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   bool isTLSResumed() const override {
     throw std::runtime_error("isTLSResumed not implemented");
   }
+
   EncryptionLevel getReadRecordLayerEncryptionLevel() override {
     throw std::runtime_error(
         "getReadRecordLayerEncryptionLevel not implemented");
   }
+
   const Optional<std::string>& getApplicationProtocol() const override {
     return alpn_;
   }
+
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
   }
+
   bool matchEarlyParameters() override {
     throw std::runtime_error("matchEarlyParameters not implemented");
   }
+
   std::unique_ptr<Aead> buildAead(CipherKind, folly::ByteRange) override {
     return createNoOpAead();
   }
+
   std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
       folly::ByteRange) override {
     throw std::runtime_error("buildHeaderCipher not implemented");

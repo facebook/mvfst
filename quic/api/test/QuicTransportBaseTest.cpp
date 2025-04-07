@@ -160,7 +160,9 @@ MaxStreamsFrame decodeMaxStreamsFrame(folly::io::Cursor& cursor) {
 class TestPingCallback : public QuicSocket::PingCallback {
  public:
   void pingAcknowledged() noexcept override {}
+
   void pingTimeout() noexcept override {}
+
   void onPing() noexcept override {}
 };
 
@@ -175,10 +177,12 @@ class TestByteEventCallback : public ByteEventCallback {
     EXPECT_TRUE(byteEventTracker_.find(event) == byteEventTracker_.end());
     byteEventTracker_[event] = Status::REGISTERED;
   }
+
   void onByteEvent(ByteEvent event) override {
     EXPECT_TRUE(byteEventTracker_.find(event) != byteEventTracker_.end());
     byteEventTracker_[event] = Status::RECEIVED;
   }
+
   void onByteEventCanceled(ByteEventCancellation cancellation) override {
     const ByteEvent& event = cancellation;
     EXPECT_TRUE(byteEventTracker_.find(event) != byteEventTracker_.end());

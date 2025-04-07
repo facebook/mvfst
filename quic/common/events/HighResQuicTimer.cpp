@@ -47,6 +47,7 @@ void HighResQuicTimer::scheduleTimeout(
   }
   return wheelTimer_->scheduleTimeout(wrapper, timeout);
 }
+
 HighResQuicTimer::~HighResQuicTimer() {
   // Resetting the wheel timer cancels all pending timeouts.
   wheelTimer_.reset();

@@ -350,16 +350,19 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
   // Burst sending machinery.
   uint64_t batchN_{0};
+
   struct {
     quic::StreamId streamId;
     bool acked{false};
     TimePoint startTs;
     TimePoint trueTxStartTs;
   } streamBurstSendResult_;
+
   struct {
     uint64_t missedDeadline{0};
     uint64_t delivered{0};
   } burstSendStats_;
+
   folly::Histogram<uint64_t> burstSendAckedLatencyHistogramMicroseconds_{
       100, /* bucket size */
       0, /* min */
@@ -377,6 +380,7 @@ class TperfStaticCwndCongestionControllerFactory
     : public CongestionControllerFactory {
  public:
   ~TperfStaticCwndCongestionControllerFactory() override = default;
+
   explicit TperfStaticCwndCongestionControllerFactory(
       uint64_t cwndInBytes,
       const std::string& pacerIntervalSource)

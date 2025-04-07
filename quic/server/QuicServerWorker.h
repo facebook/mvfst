@@ -53,6 +53,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
     MsgHdr() = delete;
     ~MsgHdr() override = default;
+
     explicit MsgHdr(QuicServerWorker* worker) {
       arg_ = worker;
       freeFunc_ = MsgHdr::free;
@@ -122,6 +123,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   struct MultishotHdr : public folly::EventRecvmsgMultishotCallback::Hdr {
     MultishotHdr() = delete;
     ~MultishotHdr() override = default;
+
     explicit MultishotHdr(QuicServerWorker* worker) {
       arg_ = worker;
       freeFunc_ = MultishotHdr::free;
@@ -437,6 +439,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   struct SourceIdentityHash {
     size_t operator()(const QuicServerTransport::SourceIdentity& sid) const;
   };
+
   using SrcToTransportMap = folly::F14FastMap<
       QuicServerTransport::SourceIdentity,
       QuicServerTransport::Ptr,
@@ -452,6 +455,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   FollyAsyncUDPSocketAlias::ReadCallback* getTakeoverHandlerCallback() {
     return takeoverCB_.get();
   }
+
   // Handle the network data for a udp packet
   // public so that it can be called by tests as well.
   void handleNetworkData(
@@ -667,7 +671,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   // Handle takeover between processes
   std::unique_ptr<TakeoverHandlerCallback> takeoverCB_;
+
   enum ProcessId processId_ { ProcessId::ZERO };
+
   TakeoverPacketHandler takeoverPktHandler_;
   bool packetForwardingEnabled_{false};
   QuicTimer::SharedPtr pacingTimer_;

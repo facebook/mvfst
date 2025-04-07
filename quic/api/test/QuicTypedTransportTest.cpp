@@ -52,6 +52,7 @@ class QuicTypedTransportTest : public virtual testing::Test,
                                public QuicTypedTransportTestBase<T> {
  public:
   ~QuicTypedTransportTest() override = default;
+
   void SetUp() override {
     // trigger setup of the underlying transport
     QuicTypedTransportTestBase<T>::SetUp();
@@ -88,6 +89,7 @@ template <typename T>
 class QuicTypedTransportAfterStartTest : public QuicTypedTransportTest<T> {
  public:
   ~QuicTypedTransportAfterStartTest() override = default;
+
   void SetUp() override {
     QuicTypedTransportTest<T>::SetUp();
     QuicTypedTransportTestBase<T>::startTransport();
@@ -1520,6 +1522,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateFirstKeyUpdateSuccess) {
 template <typename T>
 struct AckEventMatcherBuilder {
   using Builder = AckEventMatcherBuilder;
+
   Builder&& setExpectedAckedIntervals(
       std::vector<
           typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
@@ -1527,6 +1530,7 @@ struct AckEventMatcherBuilder {
     maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
     return std::move(*this);
   }
+
   Builder&& setExpectedAckedIntervals(
       std::vector<Optional<
           typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
@@ -1541,49 +1545,59 @@ struct AckEventMatcherBuilder {
     maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
     return std::move(*this);
   }
+
   Builder&& setExpectedNumAckedPackets(const uint64_t expectedNumAckedPackets) {
     maybeExpectedNumAckedPackets = expectedNumAckedPackets;
     return std::move(*this);
   }
+
   Builder&& setAckTime(TimePoint ackTime) {
     maybeAckTime = ackTime;
     return std::move(*this);
   }
+
   Builder&& setAckDelay(std::chrono::microseconds ackDelay) {
     maybeAckDelay = ackDelay;
     return std::move(*this);
   }
+
   Builder&& setLargestAckedPacket(quic::PacketNum largestAckedPacketIn) {
     maybeLargestAckedPacket = largestAckedPacketIn;
     return std::move(*this);
   }
+
   Builder&& setLargestNewlyAckedPacket(
       quic::PacketNum largestNewlyAckedPacketIn) {
     maybeLargestNewlyAckedPacket = largestNewlyAckedPacketIn;
     return std::move(*this);
   }
+
   Builder&& setRtt(const OptionalMicros& rttIn) {
     maybeRtt = rttIn;
     CHECK(!noRtt);
     return std::move(*this);
   }
+
   Builder&& setRttNoAckDelay(const OptionalMicros& rttNoAckDelayIn) {
     maybeRttNoAckDelay = rttNoAckDelayIn;
     CHECK(!noRtt);
     CHECK(!noRttWithNoAckDelay);
     return std::move(*this);
   }
+
   Builder&& setNoRtt() {
     noRtt = true;
     CHECK(!maybeRtt);
     CHECK(!maybeRttNoAckDelay);
     return std::move(*this);
   }
+
   Builder&& setNoRttWithNoAckDelay() {
     noRttWithNoAckDelay = true;
     CHECK(!maybeRttNoAckDelay);
     return std::move(*this);
   }
+
   auto build() && {
     CHECK(
         noRtt ||
@@ -1676,6 +1690,7 @@ struct AckEventMatcherBuilder {
       FAIL(); // unhandled typed test
     }
   }
+
   explicit AckEventMatcherBuilder() = default;
 
   Optional<std::vector<
@@ -1697,15 +1712,18 @@ struct ReceivedUdpPacketMatcherBuilder {
   using Builder = ReceivedUdpPacketMatcherBuilder;
   using Obj =
       quic::SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket;
+
   Builder&& setExpectedPacketReceiveTime(
       const TimePoint expectedPacketReceiveTime) {
     maybeExpectedPacketReceiveTime = expectedPacketReceiveTime;
     return std::move(*this);
   }
+
   Builder&& setExpectedPacketNumBytes(const uint64_t expectedPacketNumBytes) {
     maybeExpectedPacketNumBytes = expectedPacketNumBytes;
     return std::move(*this);
   }
+
   Builder&& setExpectedTosValue(const uint8_t expectedTosValue) {
     maybeExpectedTosValue = expectedTosValue;
     return std::move(*this);
@@ -1748,6 +1766,7 @@ struct ReceivedUdpPacketMatcherBuilder {
       FAIL(); // unhandled typed test
     }
   }
+
   explicit ReceivedUdpPacketMatcherBuilder() = default;
 
   Optional<TimePoint> maybeExpectedPacketReceiveTime;
@@ -1784,6 +1803,7 @@ class QuicTypedTransportAfterStartTestForObservers
     : public QuicTypedTransportTestForObservers<T> {
  public:
   ~QuicTypedTransportAfterStartTestForObservers() override = default;
+
   void SetUp() override {
     QuicTypedTransportTestForObservers<T>::SetUp();
     QuicTypedTransportTestForObservers<T>::startTransport();
@@ -3123,6 +3143,7 @@ TYPED_TEST(
     PacketNumberSpace pnSpace{PacketNumberSpace::Initial};
     PacketNum packetNum{0};
   };
+
   InSequence s;
 
   LegacyObserver::EventSet eventSet;
@@ -3225,6 +3246,7 @@ TYPED_TEST(
     PacketNumberSpace pnSpace{PacketNumberSpace::Initial};
     PacketNum packetNum{0};
   };
+
   InSequence s;
 
   LegacyObserver::EventSet eventSet;

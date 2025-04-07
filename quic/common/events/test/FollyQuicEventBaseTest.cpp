@@ -37,6 +37,7 @@ TEST(FollyQuicEventBaseTest, TestDeleteEvbInaCallback) {
   class TestCallback : public quic::QuicEventBaseLoopCallback {
    public:
     explicit TestCallback(quic::FollyQuicEventBase* qEvb) : qEvb_(qEvb) {}
+
     void runLoopCallback() noexcept override {
       // This deletes the FollyQuicEventBase wrapper but leaves the
       // underlying folly::EventBase alive.

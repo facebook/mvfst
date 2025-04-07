@@ -41,6 +41,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   ~TPerfClient() override = default;
 
   void timeoutExpired() noexcept override;
+
   virtual void callbackCanceled() noexcept override {}
 
   void readAvailable(quic::StreamId streamId) noexcept override;

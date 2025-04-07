@@ -114,6 +114,7 @@ struct PacketizationRequest {
         len(lenIn),
         fin(finIn),
         payloadOffset(payloadOffsetIn) {}
+
   PacketNum packetNum;
   PacketNum largestAckedPacketNum;
 

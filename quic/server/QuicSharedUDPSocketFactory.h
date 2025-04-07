@@ -14,6 +14,7 @@ namespace quic {
 class QuicSharedUDPSocketFactory : public QuicUDPSocketFactory {
  public:
   ~QuicSharedUDPSocketFactory() override {}
+
   QuicSharedUDPSocketFactory() {}
 
   std::unique_ptr<FollyAsyncUDPSocketAlias> make(folly::EventBase* evb, int fd)

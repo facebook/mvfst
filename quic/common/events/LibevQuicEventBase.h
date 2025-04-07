@@ -49,6 +49,7 @@ class LibevQuicEventBase
 
     virtual ~EvLoopWeak() = default;
   };
+
   explicit LibevQuicEventBase(std::unique_ptr<EvLoopWeak> loop);
   ~LibevQuicEventBase() override;
 
@@ -285,6 +286,7 @@ class LibevQuicEventBase
       // cancelling it.
       listHook_.unlink();
     }
+
     [[nodiscard]] bool isScheduledImpl() const noexcept override {
       return listHook_.is_linked();
     }

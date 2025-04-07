@@ -17,6 +17,7 @@ class QuicEventBaseMock : public QuicEventBase {
   void runInLoop(QuicEventBaseLoopCallback* cb, bool thisIteration) override {
     runInLoopWithCbPtr(cb, thisIteration);
   }
+
   MOCK_METHOD((void), runInLoopWithCbPtr, (QuicEventBaseLoopCallback*, bool));
   MOCK_METHOD((void), runInLoop, (folly::Function<void()>, bool));
   MOCK_METHOD((void), runAfterDelay, (folly::Function<void()>, uint32_t));
@@ -40,9 +41,11 @@ class QuicEventBaseMock : public QuicEventBase {
       runImmediatelyOrRunInEventBaseThread,
       (folly::Function<void()>),
       (noexcept));
+
   bool isInEventBaseThread() const override {
     return true;
   }
+
   MOCK_METHOD(
       (void),
       scheduleTimeout,

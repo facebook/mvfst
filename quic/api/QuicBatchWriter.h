@@ -92,6 +92,7 @@ class SinglePacketInplaceBatchWriter : public IOBufBatchWriter {
  public:
   explicit SinglePacketInplaceBatchWriter(QuicConnectionStateBase& conn)
       : conn_(conn) {}
+
   ~SinglePacketInplaceBatchWriter() override = default;
 
   void reset() override;

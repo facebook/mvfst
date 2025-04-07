@@ -114,6 +114,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
   QuicTimer::SharedPtr pacingTimer_;
   TimePoint nextPacingTime_;
   const LooperType type_;
+
   struct {
     bool running_ : 1;
     bool inLoopBody_ : 1;

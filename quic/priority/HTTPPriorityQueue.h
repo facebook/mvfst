@@ -22,6 +22,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     bool incremental : 1;
     uint64_t index : 63;
   };
+
   using IndexMap =
       folly::F14ValueMap<Identifier, IndexMapElem, Identifier::hash>;
 
@@ -29,6 +30,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   class Priority : public quic::PriorityQueue::Priority {
    public:
     using OrderId = uint64_t;
+
     struct HTTPPriority {
       uint8_t urgency : 3;
       bool paused : 1;
@@ -55,6 +57,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
 
     enum Paused { PAUSED };
+
     /* implicit */ Priority(Paused) : Priority(0, false, 0) {
       getFields().paused = true;
     }
@@ -187,6 +190,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   // the heap.
   struct Element {
     Element(Priority p, Identifier i) : priority(std::move(p)), identifier(i) {}
+
     Priority priority;
     Identifier identifier;
 
@@ -200,6 +204,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
       // sequential priorities are equal
       return identifier.asUint64() < other.identifier.asUint64();
     }
+
     bool operator<=(const Element& other) const {
       return !(other < *this);
     }
@@ -209,6 +214,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     IndexMapElem elem;
     IndexMap::const_iterator indexIt;
   };
+
   [[nodiscard]] quic::Optional<FindResult> find(Identifier id) const;
   void addIndex(Identifier id, IndexMapElem indexElem);
   void removeIndex(IndexMap::const_iterator it);

@@ -278,6 +278,7 @@ class MockQuicTransport : public QuicServerTransport {
       NetworkData&& networkData) noexcept override {
     onNetworkData(peer, networkData);
   }
+
   MOCK_METHOD(void, setBufAccessor, (BufAccessor*));
 
   MOCK_METHOD(void, addPacketProcessor, (std::shared_ptr<PacketProcessor>));

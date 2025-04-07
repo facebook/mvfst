@@ -35,11 +35,13 @@ constexpr std::array<float, kNumOfCycles> kPacingGainCycles =
 constexpr std::chrono::milliseconds kProbeRttDuration{200};
 // The cwnd gain to use when ccaConfig.largeProbeRttCwnd is set.
 constexpr float kLargeProbeRttCwndGain = 0.75f;
+
 // Bandwidth WindowFilter length, in unit of RTT. This value is from Chromium
 // code. I don't know why.
 constexpr uint8_t bandwidthWindowLength(const uint8_t numOfCycles) {
   return numOfCycles + 2;
 }
+
 // RTT Sampler default expiration
 constexpr std::chrono::seconds kDefaultRttSamplerExpiration{10};
 // 64K, used in sendQuantum calculation:
@@ -126,9 +128,11 @@ class BbrCongestionController : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
+
   void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
+
   uint64_t getWritableBytes() const noexcept override;
 
   uint64_t getCongestionWindow() const noexcept override;

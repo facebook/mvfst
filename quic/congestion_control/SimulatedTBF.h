@@ -144,6 +144,7 @@ class SimulatedTBF : private folly::BasicDynamicTokenBucket<
   static double timePointToDouble(TimePoint timePoint) {
     return std::chrono::duration<double>(timePoint.time_since_epoch()).count();
   }
+
   struct EmptyIntervalState {
     std::shared_ptr<std::deque<TimeInterval>> emptyBucketTimeIntervals_;
     Optional<TimePoint> maybeLastSendTimeBucketNotEmpty_;

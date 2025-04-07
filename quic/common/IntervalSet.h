@@ -24,9 +24,11 @@ template <typename T, T Unit = (T)1>
 struct Interval {
   T start;
   T end;
+
   static constexpr T unitValue() {
     return Unit;
   }
+
   Interval(const T& s, const T& e) : start(s), end(e) {
     if (start > end) {
       throw std::invalid_argument("Trying to construct invalid interval");
@@ -136,4 +138,5 @@ class IntervalSet : private Container<Interval<T, Unit>> {
   uint64_t insertVersion_{kDefaultIntervalSetVersion};
 };
 } // namespace quic
+
 #include <quic/common/IntervalSet-inl.h>

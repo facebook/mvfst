@@ -21,6 +21,7 @@ namespace {
 class TPerfObserver : public quic::LegacyObserver {
  public:
   using LegacyObserver::LegacyObserver;
+
   TPerfObserver(
       EventSet eventSet,
       bool logAppRateLimited,

@@ -131,6 +131,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   QuicServerTransportTestBase() {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
   }
+
   virtual ~QuicServerTransportTestBase() = default;
 
   void SetUp() {

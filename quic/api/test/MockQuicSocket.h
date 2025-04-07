@@ -115,11 +115,13 @@ class MockQuicSocket : public QuicSocket {
       (folly::Expected<folly::Unit, LocalErrorCode>),
       setMaxPacingRate,
       (uint64_t));
+
   folly::Expected<folly::Unit, LocalErrorCode>
   setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override {
     SharedBuf sharedBlob(knobBlob.release());
     return setKnob(knobSpace, knobId, sharedBlob);
   }
+
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       setKnob,
@@ -145,6 +147,7 @@ class MockQuicSocket : public QuicSocket {
       void,
       setConnectionCallback,
       (folly::MaybeManagedPtr<ConnectionCallback>));
+
   void setEarlyDataAppParamsFunctions(
       folly::Function<bool(const Optional<std::string>&, const Buf&) const>
           validator,
@@ -152,6 +155,7 @@ class MockQuicSocket : public QuicSocket {
     earlyDataAppParamsValidator_ = std::move(validator);
     earlyDataAppParamsGetter_ = std::move(getter);
   }
+
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       pauseRead,
@@ -164,6 +168,7 @@ class MockQuicSocket : public QuicSocket {
       (folly::Expected<folly::Unit, LocalErrorCode>),
       stopSending,
       (StreamId, ApplicationErrorCode));
+
   folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxRead) override {
@@ -174,6 +179,7 @@ class MockQuicSocket : public QuicSocket {
       return std::pair<Buf, bool>(Buf(res.value().first), res.value().second);
     }
   }
+
   using ReadResult =
       folly::Expected<std::pair<folly::IOBuf*, bool>, LocalErrorCode>;
   MOCK_METHOD(ReadResult, readNaked, (StreamId, size_t));
@@ -242,11 +248,13 @@ class MockQuicSocket : public QuicSocket {
       getNumByteEventCallbacksForStream,
       (const ByteEvent::Type, const StreamId),
       (const));
+
   folly::Expected<folly::Unit, LocalErrorCode>
   writeChain(StreamId id, Buf data, bool eof, ByteEventCallback* cb) override {
     SharedBuf sharedData(data.release());
     return writeChain(id, sharedData, eof, cb);
   }
+
   MOCK_METHOD(
       WriteResult,
       writeChain,
@@ -349,11 +357,13 @@ class MockQuicSocket : public QuicSocket {
       setDatagramCallback,
       (DatagramCallback*));
   MOCK_METHOD(uint16_t, getDatagramSizeLimit, (), (const));
+
   folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(
       Buf data) override {
     SharedBuf sharedData(data.release());
     return writeDatagram(sharedData);
   }
+
   MOCK_METHOD(WriteResult, writeDatagram, (SharedBuf));
   MOCK_METHOD(
       (folly::Expected<std::vector<ReadDatagram>, LocalErrorCode>),

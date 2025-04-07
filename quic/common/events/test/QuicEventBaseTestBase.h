@@ -34,6 +34,7 @@ TYPED_TEST_P(QuicEventBaseTest, NestedRunInLoopCallbackInThisIteration) {
   class TestCallback : public quic::QuicEventBaseLoopCallback {
    public:
     explicit TestCallback(quic::QuicEventBase* qEvb) : qEvb_(qEvb) {}
+
     void runLoopCallback() noexcept override {
       auto currenCount = ++callbackCount_;
       if (currenCount == 1) {
@@ -68,6 +69,7 @@ TYPED_TEST_P(QuicEventBaseTest, NestedRunInLoopFuncInThisIteration) {
   class TestCallback : public quic::QuicEventBaseLoopCallback {
    public:
     explicit TestCallback(quic::QuicEventBase* qEvb) : qEvb_(qEvb) {}
+
     void runLoopCallback() noexcept override {
       auto currenCount = ++callbackCount_;
       if (currenCount == 1) {
@@ -101,6 +103,7 @@ TYPED_TEST_P(QuicEventBaseTest, NestedRunInLoopCallbackInNextIteration) {
   class TestCallback : public quic::QuicEventBaseLoopCallback {
    public:
     explicit TestCallback(quic::QuicEventBase* qEvb) : qEvb_(qEvb) {}
+
     void runLoopCallback() noexcept override {
       auto currenCount = ++callbackCount_;
       if (currenCount == 1) {
@@ -140,6 +143,7 @@ TYPED_TEST_P(QuicEventBaseTest, NestedRunInLoopFuncInNextIteration) {
   class TestCallback : public quic::QuicEventBaseLoopCallback {
    public:
     explicit TestCallback(quic::QuicEventBase* qEvb) : qEvb_(qEvb) {}
+
     void runLoopCallback() noexcept override {
       auto currenCount = ++callbackCount_;
       if (currenCount == 1) {
@@ -172,6 +176,7 @@ TYPED_TEST_P(QuicEventBaseTest, NestedRunInLoopFuncInNextIteration) {
   // Verify that the nested callback has been executed after the second loop.
   EXPECT_EQ(cb->callbackCount_, 2);
 }
+
 // Tests end here
 
 // All tests must be registered

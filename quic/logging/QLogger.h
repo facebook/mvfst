@@ -43,6 +43,7 @@ class QLogger {
       std::string reason,
       bool drainConnection,
       bool sendCloseImmediately) = 0;
+
   struct TransportSummaryArgs {
     uint64_t totalBytesSent{};
     uint64_t totalBytesRecvd{};
@@ -70,6 +71,7 @@ class QLogger {
     std::string pskType;
     std::string echStatus;
   };
+
   virtual void addTransportSummary(const TransportSummaryArgs& args) = 0;
   virtual void addCongestionMetricUpdate(
       uint64_t bytesInFlight,

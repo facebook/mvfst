@@ -33,7 +33,9 @@ struct Packet32DecodeData {
 };
 
 class Packet8DecodeTest : public TestWithParam<Packet8DecodeData> {};
+
 class Packet16DecodeTest : public TestWithParam<Packet16DecodeData> {};
+
 class Packet32DecodeTest : public TestWithParam<Packet32DecodeData> {};
 
 TEST_P(Packet8DecodeTest, Decode) {

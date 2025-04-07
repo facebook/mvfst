@@ -40,6 +40,7 @@ class FizzAead final : public Aead {
     return fizzAead->inplaceEncrypt(
         std::move(plaintext), associatedData, seqNum);
   }
+
   std::unique_ptr<folly::IOBuf> decrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
@@ -49,6 +50,7 @@ class FizzAead final : public Aead {
     return fizzAead->decrypt(
         std::move(ciphertext), associatedData, seqNum, options);
   }
+
   Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
@@ -58,12 +60,14 @@ class FizzAead final : public Aead {
     return fizzAead->tryDecrypt(
         std::move(ciphertext), associatedData, seqNum, options);
   }
+
   size_t getCipherOverhead() const override {
     return fizzAead->getCipherOverhead();
   }
 
  private:
   std::unique_ptr<fizz::Aead> fizzAead;
+
   explicit FizzAead(std::unique_ptr<fizz::Aead> fizzAeadIn)
       : fizzAead(std::move(fizzAeadIn)) {}
 };

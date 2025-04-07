@@ -39,11 +39,13 @@ struct Nothing {
   PacketDropReason reason;
 
   Nothing() : reason(PacketDropReason::UNEXPECTED_NOTHING) {}
+
   explicit Nothing(PacketDropReason reasonIn) : reason(reasonIn) {}
 };
 
 struct CodecError {
   QuicError error;
+
   explicit CodecError(QuicError errorIn) : error(std::move(errorIn)) {}
 };
 

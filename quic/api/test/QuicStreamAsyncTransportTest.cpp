@@ -44,6 +44,7 @@ class QuicStreamAsyncTransportTest : public Test {
   QuicStreamAsyncTransportTest() {
     clientQuicEvb_ = std::make_shared<FollyQuicEventBase>(&clientEvb_);
   }
+
   void SetUp() override {
     createServer();
     connect();

@@ -20,6 +20,7 @@ struct GetBetterWindowsTimers {
   GetBetterWindowsTimers() {
     CHECK_EQ(timeBeginPeriod(1), TIMERR_NOERROR);
   }
+
   ~GetBetterWindowsTimers() {
     timeEndPeriod(1);
   }

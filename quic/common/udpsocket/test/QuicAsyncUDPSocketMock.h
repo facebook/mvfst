@@ -104,6 +104,7 @@ class MockErrMessageCallback
   ~MockErrMessageCallback() override = default;
 
   MOCK_METHOD(void, errMessage_, (const cmsghdr&));
+
   void errMessage(const cmsghdr& cmsg) noexcept override {
     try {
       errMessage_(cmsg);
@@ -113,6 +114,7 @@ class MockErrMessageCallback
   }
 
   MOCK_METHOD(void, errMessageError_, (const folly::AsyncSocketException&));
+
   void errMessageError(
       const folly::AsyncSocketException& ex) noexcept override {
     try {
@@ -128,6 +130,7 @@ class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
   ~MockUDPReadCallback() override = default;
 
   MOCK_METHOD(void, getReadBuffer_, (void**, size_t*));
+
   void getReadBuffer(void** buf, size_t* len) noexcept override {
     try {
       getReadBuffer_(buf, len);
@@ -138,6 +141,7 @@ class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
 
   MOCK_METHOD(bool, shouldOnlyNotify, ());
   MOCK_METHOD(void, onNotifyDataAvailable_, (quic::QuicAsyncUDPSocket&));
+
   void onNotifyDataAvailable(quic::QuicAsyncUDPSocket& sock) noexcept override {
     try {
       onNotifyDataAvailable_(sock);
@@ -150,6 +154,7 @@ class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
       void,
       onDataAvailable_,
       (const folly::SocketAddress&, size_t, bool, OnDataAvailableParams));
+
   void onDataAvailable(
       const folly::SocketAddress& client,
       size_t len,
@@ -163,6 +168,7 @@ class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
   }
 
   MOCK_METHOD(void, onReadError_, (const folly::AsyncSocketException&));
+
   void onReadError(const folly::AsyncSocketException& ex) noexcept override {
     try {
       onReadError_(ex);
@@ -172,6 +178,7 @@ class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
   }
 
   MOCK_METHOD(void, onReadClosed_, ());
+
   void onReadClosed() noexcept override {
     try {
       onReadClosed_();

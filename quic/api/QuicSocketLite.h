@@ -396,6 +396,7 @@ class QuicSocketLite {
    */
 
   using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
+
   class PeekCallback {
    public:
     virtual ~PeekCallback() = default;
@@ -467,6 +468,7 @@ class QuicSocketLite {
     void onByteEventRegistered(ByteEvent /* byteEvent */) final {
       // Not supported
     }
+
     void onByteEvent(ByteEvent byteEvent) final {
       CHECK_EQ((int)ByteEvent::Type::ACK, (int)byteEvent.type); // sanity
       onDeliveryAck(byteEvent.id, byteEvent.offset, byteEvent.srtt);

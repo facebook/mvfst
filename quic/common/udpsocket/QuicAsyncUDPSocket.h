@@ -53,6 +53,7 @@ class QuicAsyncUDPSocket {
           CMSG_SPACE(sizeof(Timestamp)) + CMSG_SPACE(sizeof(uint8_t));
 #endif
     };
+
     virtual ~ReadCallback() = default;
     virtual void onReadClosed() noexcept = 0;
     virtual void onReadError(const folly::AsyncSocketException&) noexcept = 0;
@@ -182,8 +183,10 @@ class QuicAsyncUDPSocket {
 
   struct WriteOptions {
     WriteOptions() = default;
+
     WriteOptions(int gsoVal, bool zerocopyVal)
         : gso(gsoVal), zerocopy(zerocopyVal) {}
+
     int gso{0};
     bool zerocopy{false};
     std::chrono::microseconds txTime{0};
@@ -256,6 +259,7 @@ class QuicAsyncUDPSocket {
    */
   struct RecvResult {
     RecvResult() = default;
+
     explicit RecvResult(NoReadReason noReadReason)
         : maybeNoReadReason(noReadReason) {}
 

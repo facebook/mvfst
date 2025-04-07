@@ -26,6 +26,7 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
       QuicAsyncUDPSocket* /*unused*/) override;
   ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
       override;
+
   void setTxTime(std::chrono::microseconds txTime) override {
     txTime_ = txTime;
   }
@@ -126,6 +127,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
     bool valid() const {
       return idx_ >= 0;
     }
+
     int idx_ = -1;
   };
 

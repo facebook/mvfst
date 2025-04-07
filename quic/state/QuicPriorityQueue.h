@@ -23,6 +23,7 @@ using OrderId = uint64_t;
 struct OrderedStream {
   StreamId streamId;
   OrderId orderId;
+
   OrderedStream(StreamId s, OrderId o) : streamId(s), orderId(o) {}
 };
 
@@ -78,16 +79,21 @@ struct PriorityQueue {
           : level(inLevel),
             maxNextsPerStream(maxNexts),
             nextStreamIt(level.streams.end()) {}
+
       virtual ~Iterator() = default;
       virtual void begin() const = 0;
       virtual bool end() const = 0;
+
       virtual StreamId current() const {
         return nextStreamIt->streamId;
       }
+
       virtual void next(bool force = false) = 0;
+
       virtual void override(OrderedStreamSet::const_iterator it) {
         nextStreamIt = it;
       }
+
       mutable uint64_t nextsSoFar{0};
       uint64_t maxNextsPerStream{1};
       mutable OrderedStreamSet::const_iterator nextStreamIt;
@@ -100,15 +106,18 @@ struct PriorityQueue {
      public:
       explicit IncrementalIterator(const Level& inLevel, uint64_t maxNexts)
           : Iterator(inLevel, maxNexts), startStreamIt(level.streams.end()) {}
+
       void begin() const override {
         if (nextStreamIt == level.streams.end()) {
           nextStreamIt = level.streams.begin();
         }
         startStreamIt = nextStreamIt;
       }
+
       bool end() const override {
         return nextStreamIt == startStreamIt;
       }
+
       // force will ignore the max nexts and always moves to the next stream.
       void next(bool force) override {
         CHECK(!level.empty());
@@ -127,12 +136,15 @@ struct PriorityQueue {
      public:
       explicit SequentialIterator(const Level& inLevel, uint64_t maxNexts)
           : Iterator(inLevel, maxNexts) {}
+
       void begin() const override {
         nextStreamIt = level.streams.begin();
       }
+
       bool end() const override {
         return nextStreamIt == level.streams.end();
       }
+
       void next(bool) override {
         CHECK(!level.empty());
         nextStreamIt++;
@@ -142,6 +154,7 @@ struct PriorityQueue {
     OrderedStreamSet streams;
     bool incremental{false};
     std::unique_ptr<Iterator> iterator;
+
     FOLLY_NODISCARD bool empty() const {
       return streams.empty();
     }
@@ -170,6 +183,7 @@ struct PriorityQueue {
    private:
     folly::F14FastMap<StreamId, OrderId> streamToOrderId;
   };
+
   std::vector<Level> levels;
   using LevelItr = decltype(levels)::const_iterator;
   // This controls how many times next() needs to be called before moving

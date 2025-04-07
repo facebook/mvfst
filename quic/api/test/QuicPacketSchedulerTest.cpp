@@ -753,6 +753,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
 class CloneAllPacketsWithCryptoFrameTest
     : public QuicPacketSchedulerTest,
       public WithParamInterface<std::tuple<bool, bool>> {};
+
 TEST_P(
     CloneAllPacketsWithCryptoFrameTest,
     TestCloneAllPacketsWithCryptoFrameTrueFalse) {

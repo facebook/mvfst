@@ -37,15 +37,18 @@ class MockClientHandshake : public ClientHandshake {
  public:
   MockClientHandshake(QuicClientConnectionState* conn)
       : ClientHandshake(conn) {}
+
   ~MockClientHandshake() override {
     destroy();
   }
+
   // Legacy workaround for move-only types
   void doHandshake(
       std::unique_ptr<folly::IOBuf> data,
       EncryptionLevel encryptionLevel) override {
     doHandshakeImpl(data.get(), encryptionLevel);
   }
+
   MOCK_METHOD(void, doHandshakeImpl, (folly::IOBuf*, EncryptionLevel));
   MOCK_METHOD(
       bool,

@@ -74,6 +74,7 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
       ConnectionId(std::vector<uint8_t>()));
   EXPECT_THROW(ext.getExtensions(TestMessages::clientHello()), FizzException);
 }
+
 TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
@@ -121,6 +122,7 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
 
   EXPECT_THROW(ext.getExtensions(chlo), FizzException);
 }
+
 TEST(ServerTransportParametersTest, TestQuicV1Fields) {
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,

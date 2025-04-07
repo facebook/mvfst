@@ -55,7 +55,9 @@ struct ReceivedUdpPacket {
   };
 
   ReceivedUdpPacket() = default;
+
   explicit ReceivedUdpPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
+
   ReceivedUdpPacket(Buf&& bufIn, Timings timingsIn, uint8_t tosValueIn)
       : buf(std::move(bufIn)),
         timings(std::move(timingsIn)),
@@ -70,6 +72,7 @@ struct ReceivedUdpPacket {
 
 struct NetworkData {
   NetworkData() = default;
+
   NetworkData(
       Buf&& buf,
       const TimePoint& receiveTimePointIn,

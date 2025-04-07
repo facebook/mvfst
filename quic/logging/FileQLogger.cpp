@@ -21,6 +21,7 @@ void FileQLogger::setDcid(Optional<ConnectionId> connID) {
     }
   }
 }
+
 void FileQLogger::setScid(Optional<ConnectionId> connID) {
   if (connID.hasValue()) {
     scid = connID.value();
@@ -304,6 +305,7 @@ void FileQLogger::addAppUnlimitedUpdate() {
       std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::steady_clock::now().time_since_epoch())));
 }
+
 void FileQLogger::addPacingMetricUpdate(
     uint64_t pacingBurstSizeIn,
     std::chrono::microseconds pacingIntervalIn) {

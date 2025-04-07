@@ -79,9 +79,11 @@ class Cubic : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
+
   void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
+
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacketWrapper& packet) override;
 

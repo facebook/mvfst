@@ -142,6 +142,7 @@ class QuicClientTransportLite
     Accepted,
     Rejected
   };
+
   /**
    * Returns the state of the 0RTT attempt if there was one.
    */
@@ -167,10 +168,12 @@ class QuicClientTransportLite
 
   // QuicAsyncUDPSocket::ReadCallback
   void onReadClosed() noexcept override {}
+
   void onReadError(const folly::AsyncSocketException&) noexcept override;
 
   // QuicAsyncUDPSocket::ErrMessageCallback
   void errMessage(const cmsghdr& cmsg) noexcept override;
+
   void errMessageError(const folly::AsyncSocketException&) noexcept override {}
 
   void setSupportedVersions(const std::vector<QuicVersion>& versions) override;

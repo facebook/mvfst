@@ -336,6 +336,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     void timeoutExpired() noexcept override {
       transport_->keepaliveTimeoutExpired();
     }
+
     void callbackCanceled() noexcept override {
       // Specifically do nothing since if we got canceled we shouldn't write.
     }
@@ -816,6 +817,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
         : offset(offsetIn), callback(callbackIn) {}
+
     uint64_t offset;
     ByteEventCallback* callback;
   };

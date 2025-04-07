@@ -42,6 +42,7 @@ struct CodecParameters {
   CodecParameters(uint8_t peerAckDelayExponentIn, QuicVersion versionIn)
       : peerAckDelayExponent(peerAckDelayExponentIn), version(versionIn) {}
 };
+
 struct ParsedLongHeaderInvariant {
   uint8_t initialByte;
   LongHeaderInvariant invariant;

@@ -166,11 +166,13 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
         pktBuilder.remaining_ -= quicInteger.getSize();
       }));
 }
+
 using PacketsReceivedTimestampsDeque =
     CircularDeque<WriteAckFrameState::ReceivedPacket>;
 const auto kDefaultTimestampsDelta = 10us;
 const AckReceiveTimestampsConfig defaultAckReceiveTimestmpsConfig = {
     .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
+
 PacketsReceivedTimestampsDeque populateReceiveTimestamps(
     const AckBlocks& ackBlocks,
     TimePoint connTime,

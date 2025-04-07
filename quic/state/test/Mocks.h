@@ -25,6 +25,7 @@ class MockCongestionControllerFactory : public CongestionControllerFactory {
 class MockCongestionController : public CongestionController {
  public:
   ~MockCongestionController() override {}
+
   MOCK_METHOD(void, onRemoveBytesFromInflight, (uint64_t));
   MOCK_METHOD(void, onPacketSent, (const OutstandingPacketWrapper&));
   MOCK_METHOD(
@@ -102,6 +103,7 @@ class MockPacer : public Pacer {
 class MockPendingPathRateLimiter : public PendingPathRateLimiter {
  public:
   MockPendingPathRateLimiter() : PendingPathRateLimiter(0) {}
+
   MOCK_METHOD(void, onPacketSent, (uint64_t));
   MOCK_METHOD(
       uint64_t,

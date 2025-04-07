@@ -32,9 +32,11 @@ struct CircularDeque {
   using difference_type = std::ptrdiff_t;
 
   CircularDeque() = default;
+
   CircularDeque(size_type n) {
     resize(n);
   }
+
   CircularDeque(std::initializer_list<T> init);
 
   CircularDeque(const CircularDeque& other) {
@@ -72,6 +74,7 @@ struct CircularDeque {
     folly::sizedFree(storage_, capacity_ * sizeof(T));
     capacity_ = 0;
   }
+
   // Missing: more constructor overloads, and custom Allocator
   bool operator==(const CircularDeque& other) const {
     return size() == other.size() && std::equal(begin(), end(), other.begin());
@@ -85,6 +88,7 @@ struct CircularDeque {
                                     boost::random_access_traversal_tag> {
    public:
     CircularDequeIterator() : deque_(nullptr), index_(0) {}
+
     CircularDequeIterator(const CircularDeque<U>* deque, size_type index)
         : deque_(deque), index_(index) {}
 

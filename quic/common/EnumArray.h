@@ -23,14 +23,17 @@ class EnumArray : public std::array<V, size_t(K::MAX) + 1> {
  public:
   using IntType = typename std::underlying_type<K>::type;
   static constexpr IntType ArraySize = IntType(K::MAX) + 1;
+
   constexpr const V& operator[](K key) const {
     size_t ik = keyToInt(key);
     return this->std::array<V, size_t(K::MAX) + 1>::operator[](ik);
   }
+
   constexpr V& operator[](K key) {
     size_t ik = keyToInt(key);
     return this->std::array<V, size_t(K::MAX) + 1>::operator[](ik);
   }
+
   // Returns all valid values for the enum
   FOLLY_NODISCARD constexpr std::array<K, ArraySize> keys() const {
     return keyArrayHelper(std::make_integer_sequence<IntType, ArraySize>{});

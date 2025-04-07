@@ -32,6 +32,7 @@ class QuicStreamManagerTest
  public:
   QuicStreamManagerTest()
       : conn(FizzServerQuicHandshakeContext::Builder().build()) {}
+
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamFlowControlWindow;
@@ -843,12 +844,14 @@ class QuicStreamManagerGroupsTest : public QuicStreamManagerTest {
     return isUnidirectional ? manager.createNextUnidirectionalStreamGroup()
                             : manager.createNextBidirectionalStreamGroup();
   }
+
   auto getNumGroups() {
     auto& manager = *conn.streamManager;
     const bool isUnidirectional = GetParam().isUnidirectional;
     return isUnidirectional ? manager.getNumUnidirectionalGroups()
                             : manager.getNumBidirectionalGroups();
   }
+
   auto createNextStreamInGroup(StreamGroupId groupId) {
     auto& manager = *conn.streamManager;
     const bool isUnidirectional = GetParam().isUnidirectional;

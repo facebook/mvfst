@@ -62,6 +62,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   QuicClientTransportIntegrationTest() {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&eventbase_);
   }
+
   void SetUp() override {
     // Fizz is the hostname for the server cert.
     hostname = "Fizz";
@@ -1151,9 +1152,11 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
     MOCK_METHOD(void, onTransportReadyMock, (), (noexcept));
     MOCK_METHOD(void, onReplaySafe, (), (noexcept));
     MOCK_METHOD(void, onConnectionEnd, (), (noexcept));
+
     void onConnectionSetupError(QuicError error) noexcept override {
       onConnectionError(std::move(error));
     }
+
     MOCK_METHOD(void, onConnectionError, (QuicError), (noexcept));
 
    private:
@@ -1678,14 +1681,18 @@ class QuicClientTransportHappyEyeballsTest
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+
     // Give up first socket
     union {
       struct cmsghdr hdr;
       unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
     } cmsgbuf;
+
     cmsgbuf.hdr.cmsg_level = SOL_IPV6;
     cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
+
     struct sock_extended_err err {};
+
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
     *dest = err;
@@ -1729,9 +1736,12 @@ class QuicClientTransportHappyEyeballsTest
       struct cmsghdr hdr;
       unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
     } cmsgbuf;
+
     cmsgbuf.hdr.cmsg_level = SOL_IPV6;
     cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
+
     struct sock_extended_err err {};
+
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
     *dest = err;
@@ -1770,13 +1780,17 @@ class QuicClientTransportHappyEyeballsTest
     // Manually expire loss timeout to trigger write to both first and second
     // socket
     EXPECT_CALL(*sock, write(firstAddress, _, _));
+
     union {
       struct cmsghdr hdr;
       unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
     } cmsgbuf;
+
     cmsgbuf.hdr.cmsg_level = SOL_IP;
     cmsgbuf.hdr.cmsg_type = IP_RECVERR;
+
     struct sock_extended_err err {};
+
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
     *dest = err;
@@ -1821,9 +1835,12 @@ class QuicClientTransportHappyEyeballsTest
       struct cmsghdr hdr;
       unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
     } cmsgbuf;
+
     cmsgbuf.hdr.cmsg_level = SOL_IP;
     cmsgbuf.hdr.cmsg_type = IP_RECVERR;
+
     struct sock_extended_err err {};
+
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
     *dest = err;
@@ -4700,6 +4717,7 @@ class TestCCFactory : public CongestionControllerFactory {
     createdControllers++;
     return std::make_unique<Cubic>(conn);
   }
+
   int createdControllers{0};
 };
 
@@ -5921,16 +5939,21 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   class EmptyReadCallback : public QuicAsyncUDPSocket::ReadCallback {
    public:
     void getReadBuffer(void**, size_t*) noexcept override {}
+
     void onDataAvailable(
         const folly::SocketAddress&,
         size_t,
         bool,
         OnDataAvailableParams) noexcept override {}
+
     void onReadError(const AsyncSocketException&) noexcept override {}
+
     void onReadClosed() noexcept override {}
+
     bool shouldOnlyNotify() override {
       return true;
     }
+
     void onNotifyDataAvailable(QuicAsyncUDPSocket&) noexcept override {}
   };
 
@@ -5938,6 +5961,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
       : public QuicAsyncUDPSocket::ErrMessageCallback {
    public:
     void errMessage(const cmsghdr&) noexcept override {}
+
     void errMessageError(const AsyncSocketException&) noexcept override {}
   };
 

@@ -377,6 +377,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
     std::unique_ptr<folly::EventBaseBackendBase> (*factory)();
     bool supportsRecvmsgMultishot = false;
   };
+
   static EventBaseBackendDetails getEventBaseBackendDetails();
 
   // helper function to initialize workers
@@ -450,13 +451,16 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // address that the server is bound to
   folly::SocketAddress boundAddress_;
   folly::SocketOptionMap socketOptions_;
+
   // Rate limits
   struct RateLimit {
     RateLimit(std::function<uint64_t()> c, std::chrono::seconds w)
         : count(std::move(c)), window(w) {}
+
     std::function<uint64_t()> count;
     std::chrono::seconds window;
   };
+
   Optional<RateLimit> rateLimit_;
 
   std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1048576; }};

@@ -54,6 +54,7 @@ using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
 struct PaddingFrame {
   // How many contiguous padding frames this represents.
   uint16_t numFrames{1};
+
   bool operator==(const PaddingFrame& rhs) const {
     return numFrames == rhs.numFrames;
   }
@@ -193,6 +194,7 @@ struct ReadAckFrame {
   uint32_t ecnECT0Count{0};
   uint32_t ecnECT1Count{0};
   uint32_t ecnCECount{0};
+
   bool operator==(const ReadAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;
@@ -213,6 +215,7 @@ struct WriteAckFrame {
   uint32_t ecnECT0Count{0};
   uint32_t ecnECT1Count{0};
   uint32_t ecnCECount{0};
+
   bool operator==(const WriteAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
     return false;
@@ -283,6 +286,7 @@ struct WriteAckFrameResult {
   size_t timestampRangesWritten;
   size_t timestampsWritten;
   uint64_t extendedAckFeaturesEnabled;
+
   WriteAckFrameResult(
       uint64_t bytesWrittenIn,
       WriteAckFrame writeAckFrameIn,
@@ -674,6 +678,7 @@ struct NewConnectionIdFrame {
 
 struct RetireConnectionIdFrame {
   uint64_t sequenceNumber;
+
   explicit RetireConnectionIdFrame(uint64_t sequenceNumberIn)
       : sequenceNumber(sequenceNumberIn) {}
 
@@ -979,7 +984,9 @@ struct LongHeader {
         token_(
             other.token_ ? std::make_unique<std::string>(*other.token_)
                          : nullptr) {}
+
   LongHeader(LongHeader&& other) = default;
+
   LongHeader& operator=(const LongHeader& other) {
     packetSequenceNum_ = other.packetSequenceNum_;
     longHeaderType_ = other.longHeaderType_;
@@ -987,19 +994,23 @@ struct LongHeader {
     token_ = std::make_unique<std::string>(*other.token_);
     return *this;
   }
+
   LongHeader& operator=(LongHeader&& other) = default;
 
   Types getHeaderType() const noexcept;
   const ConnectionId& getSourceConnId() const;
   const ConnectionId& getDestinationConnId() const;
   QuicVersion getVersion() const;
+
   // Note this is defined in the header so it is inlined for performance.
   PacketNumberSpace getPacketNumberSpace() const {
     return typeToPacketNumberSpace(longHeaderType_);
   }
+
   ProtectionType getProtectionType() const;
   bool hasToken() const;
   const std::string& getToken() const;
+
   // Note this is defined in the header so it is inlined for performance.
   PacketNum getPacketSequenceNum() const {
     return packetSequenceNum_;
@@ -1045,12 +1056,15 @@ struct ShortHeader {
       PacketNum packetNum);
 
   ProtectionType getProtectionType() const;
+
   PacketNumberSpace getPacketNumberSpace() const {
     return PacketNumberSpace::AppData;
   }
+
   PacketNum getPacketSequenceNum() const {
     return packetSequenceNum_;
   }
+
   const ConnectionId& getConnectionId() const;
 
   void setPacketNumber(PacketNum packetNum);
@@ -1098,8 +1112,10 @@ struct PacketHeader {
         folly::assume_unreachable();
     }
   }
+
   HeaderForm getHeaderForm() const;
   ProtectionType getProtectionType() const;
+
   // Note this is defined in the header so it is inlined for performance.
   PacketNumberSpace getPacketNumberSpace() const {
     switch (headerForm_) {
@@ -1129,6 +1145,7 @@ PacketNumberSpace protectionTypeToPacketNumberSpace(ProtectionType type);
 struct StreamTypeField {
  public:
   explicit StreamTypeField(uint8_t field) : field_(field) {}
+
   bool hasFin() const;
   bool hasDataLength() const;
   bool hasOffset() const;
@@ -1137,6 +1154,7 @@ struct StreamTypeField {
   struct Builder {
    public:
     Builder() : field_(static_cast<uint8_t>(FrameType::STREAM)) {}
+
     Builder& switchToStreamGroups();
     Builder& setFin();
     Builder& setOffset();
@@ -1184,6 +1202,7 @@ struct RegularPacket {
 
 struct RetryPacket {
   using IntegrityTagType = std::array<uint8_t, kRetryIntegrityTagLen>;
+
   RetryPacket(
       LongHeader&& longHeaderIn,
       IntegrityTagType integrityTagIn,

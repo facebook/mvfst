@@ -53,6 +53,7 @@ struct OutstandingPacketMetadata {
   };
 
   using MapType = InlineMap<StreamId, StreamDetails, 1>;
+
   class DetailsPerStream : private MapType {
    public:
     void addFrame(const WriteStreamFrame& frame, const bool newData) {
@@ -149,6 +150,7 @@ struct OutstandingPacket {
   // Structure representing a collection of metrics and important information
   // about the packet.
   OutstandingPacketMetadata metadata;
+
   // Information regarding the last acked packet on this connection when this
   // packet is sent.
   struct LastAckedPacketInfo {
@@ -160,6 +162,7 @@ struct OutstandingPacket {
     // Total acked bytes on this connection when last acked packet is acked,
     // including the last acked packet.
     uint64_t totalBytesAcked;
+
     LastAckedPacketInfo(
         TimePoint sentTimeIn,
         TimePoint ackTimeIn,
@@ -172,6 +175,7 @@ struct OutstandingPacket {
           totalBytesSent(totalBytesSentIn),
           totalBytesAcked(totalBytesAckedIn) {}
   };
+
   Optional<LastAckedPacketInfo> lastAckedPacketInfo;
 
   // ClonedPacketIdentifier associated with this OutstandingPacketWrapper. This

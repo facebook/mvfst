@@ -59,10 +59,12 @@ class PriorityQueue {
     static constexpr uint64_t kTypeMask =
         static_cast<uint64_t>(Type::UNINITIALIZED) << kTypeShift;
     Identifier() = default;
+
     static Identifier fromStreamID(uint64_t streamID) {
       CHECK_LT(streamID, 1LLU << 62);
       return Identifier(streamID);
     }
+
     static Identifier fromDatagramFlowID(uint32_t flowID) {
       return Identifier((uint64_t(Type::DATAGRAM) << kTypeShift) | flowID);
     }
@@ -70,29 +72,37 @@ class PriorityQueue {
     [[nodiscard]] Type getType() const {
       return Type((value & kTypeMask) >> kTypeShift);
     }
+
     [[nodiscard]] bool isStreamID() const {
       return getType() == Type::STREAM;
     }
+
     [[nodiscard]] bool isDatagramFlowID() const {
       return getType() == Type::DATAGRAM;
     }
+
     [[nodiscard]] bool isInitialized() const {
       return getType() != Type::UNINITIALIZED;
     }
+
     [[nodiscard]] uint64_t asStreamID() const {
       CHECK(isStreamID());
       return value & ~kTypeMask;
     }
+
     [[nodiscard]] uint32_t asDatagramFlowID() const {
       CHECK(isDatagramFlowID());
       return uint32_t(value); // truncating the top works
     }
+
     [[nodiscard]] uint64_t asUint64() const {
       return value & ~kTypeMask;
     }
+
     bool operator==(const Identifier& other) const {
       return value == other.value;
     }
+
     struct hash {
       size_t operator()(const Identifier& id) const {
         return std::hash<uint64_t>()(id.value);
@@ -101,6 +111,7 @@ class PriorityQueue {
 
    private:
     explicit Identifier(uint64_t v) : value(v) {}
+
     uint64_t value{uint64_t(Type::UNINITIALIZED) << kTypeShift};
   };
 
@@ -118,6 +129,7 @@ class PriorityQueue {
 
    protected:
     using StorageType = std::array<uint8_t, 16>;
+
     template <typename T>
     T& getPriority() {
       static_assert(

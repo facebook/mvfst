@@ -4669,6 +4669,7 @@ struct FizzHandshakeParam {
       : chloSync(argCHLOSync),
         cfinSync(argCFINSync),
         acceptZeroRtt(argAcceptZeroRtt) {}
+
   bool chloSync;
   bool cfinSync;
   bool acceptZeroRtt;
@@ -5694,6 +5695,7 @@ class QuicServerTransportCertTest : public QuicServerTransportTest {
     std::string getIdentity() const override {
       return "";
     }
+
     std::optional<std::string> getDER() const override {
       return std::nullopt;
     }

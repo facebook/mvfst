@@ -139,9 +139,11 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   void writeBE(uint64_t data) override;
   void write(const QuicInteger& quicInteger) override;
   void appendBytes(PacketNum value, uint8_t byteNumber) override;
+
   void appendBytes(BufAppender&, PacketNum, uint8_t) override {
     CHECK(false) << "Invalid appender";
   }
+
   void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
       override;
   void insert(std::unique_ptr<folly::IOBuf> buf) override;
@@ -220,9 +222,11 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void appendBytes(PacketNum value, uint8_t byteNumber) override;
   void appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber)
       override;
+
   void appendBytes(BufWriter&, PacketNum, uint8_t) override {
     CHECK(false) << "Invalid BufWriter";
   }
+
   void insert(std::unique_ptr<folly::IOBuf> buf) override;
   void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) override;
   void insert(const BufQueue& buf, size_t limit) override;

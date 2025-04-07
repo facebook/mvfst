@@ -338,6 +338,7 @@ bool writableContains(QuicStreamManager& streamManager, StreamId streamId);
 class FizzCryptoTestFactory : public FizzCryptoFactory {
  public:
   FizzCryptoTestFactory() = default;
+
   explicit FizzCryptoTestFactory(std::shared_ptr<fizz::Factory> fizzFactory) {
     fizzFactory_ = std::move(fizzFactory);
   }
@@ -368,6 +369,7 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
 class TestPacketBatchWriter : public IOBufBatchWriter {
  public:
   explicit TestPacketBatchWriter(int maxBufs) : maxBufs_(maxBufs) {}
+
   ~TestPacketBatchWriter() override {
     CHECK_EQ(bufNum_, 0);
     CHECK_EQ(bufSize_, 0);

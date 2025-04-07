@@ -28,6 +28,7 @@ class FileQLogger : public BaseQLogger {
 
   using QLogger::TransportSummaryArgs;
   std::vector<std::unique_ptr<QLogEvent>> logs;
+
   FileQLogger(
       VantagePoint vantagePointIn,
       std::string protocolTypeIn = kHTTP3ProtocolType,
@@ -46,6 +47,7 @@ class FileQLogger : public BaseQLogger {
       finishStream();
     }
   }
+
   void addPacket(const RegularQuicPacket& regularPacket, uint64_t packetSize)
       override;
   void addPacket(

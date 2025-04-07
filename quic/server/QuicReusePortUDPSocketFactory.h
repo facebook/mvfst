@@ -14,6 +14,7 @@ namespace quic {
 class QuicReusePortUDPSocketFactory : public QuicUDPSocketFactory {
  public:
   ~QuicReusePortUDPSocketFactory() override {}
+
   QuicReusePortUDPSocketFactory(bool reusePort = true, bool reuseAddr = false)
       : reusePort_(reusePort), reuseAddr_(reuseAddr) {}
 

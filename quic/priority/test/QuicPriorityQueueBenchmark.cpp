@@ -94,6 +94,7 @@ BENCHMARK(incremental, n) {
     benchmarkPriority(96, true);
   }
 }
+
 BENCHMARK(sequential8, n) {
   for (size_t i = 0; i < n; i++) {
     benchmarkPriority(8, false);

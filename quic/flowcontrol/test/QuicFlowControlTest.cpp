@@ -26,6 +26,7 @@ class QuicFlowControlTest : public Test {
         conn_, conn_.nodeType, conn_.transportSettings);
     conn_.statsCallback = quicStats_.get();
   }
+
   std::unique_ptr<MockQuicStats> quicStats_;
   QuicConnectionStateBase conn_{QuicNodeType::Client};
 };
@@ -367,6 +368,7 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterAPIWrite) {
   maybeWriteBlockAfterAPIWrite(stream);
   EXPECT_TRUE(conn_.streamManager->hasBlocked());
 }
+
 TEST_F(QuicFlowControlTest, UpdateFlowControlClearsStreamBlockedFlag) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);

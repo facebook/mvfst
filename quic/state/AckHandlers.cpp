@@ -258,6 +258,7 @@ AckEvent processAckFrame(
         const uint64_t ackIntervalSetVersion;
         const Optional<uint64_t> maybeLargestDeliverableOffset;
       };
+
       QuicStreamState* maybeAckedStreamState = nullptr;
       const auto maybePreAckVisitorState =
           [&conn, &maybeAckedStreamState](

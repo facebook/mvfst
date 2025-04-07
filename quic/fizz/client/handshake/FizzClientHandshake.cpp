@@ -196,6 +196,7 @@ std::unique_ptr<Aead> FizzClientHandshake::buildAead(
 
   return aead;
 }
+
 std::unique_ptr<PacketNumberCipher> FizzClientHandshake::buildHeaderCipher(
     folly::ByteRange secret) {
   return cryptoFactory_->makePacketNumberCipher(secret);

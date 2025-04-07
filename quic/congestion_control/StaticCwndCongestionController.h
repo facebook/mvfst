@@ -29,6 +29,7 @@ struct StaticCwndCongestionController : public CongestionController {
    */
   struct CwndInBytes {
     explicit CwndInBytes(uint64_t bytes) : bytes(bytes) {}
+
     const uint64_t bytes;
   };
 

@@ -66,21 +66,26 @@ class SocketObserverContainer : public SocketObserverContainerBaseT {
     void attached(QuicSocketLite* obj) noexcept override {
       observerAttach(obj);
     }
+
     void detached(QuicSocketLite* obj) noexcept override {
       observerDetach(obj);
     }
+
     void destroyed(QuicSocketLite* obj, DestroyContext* /* ctx */) noexcept
         override {
       destroy(obj);
     }
+
     void addedToObserverContainer(
         ObserverContainerBase* list) noexcept override {
       CHECK(list->getObject());
     }
+
     void removedFromObserverContainer(
         ObserverContainerBase* list) noexcept override {
       CHECK(list->getObject());
     }
+
     void movedToObserverContainer(
         ObserverContainerBase* oldList,
         ObserverContainerBase* newList) noexcept override {

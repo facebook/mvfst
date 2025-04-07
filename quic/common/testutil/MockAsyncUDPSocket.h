@@ -17,6 +17,7 @@ namespace quic::test {
 struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
   explicit MockAsyncUDPSocket(std::shared_ptr<FollyQuicEventBase> evb)
       : FollyQuicAsyncUDPSocket(std::move(evb)) {}
+
   ~MockAsyncUDPSocket() override {}
 
   MOCK_METHOD(void, init, (sa_family_t));

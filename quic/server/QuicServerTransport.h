@@ -221,6 +221,7 @@ class QuicServerTransport
    public:
     explicit QuicEventBaseAsFollyExecutor(quic::QuicEventBase* eventBase)
         : eventBase_(eventBase) {}
+
     void add(folly::Func f) override {
       eventBase_->runInLoop(std::move(f));
     }

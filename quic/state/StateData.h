@@ -725,17 +725,21 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // for multiple writes.
     uint64_t targetWriteCount;
   };
+
   SocketCmsgsState socketCmsgsState;
 
   ECNState ecnState{ECNState::NotAttempted};
   std::shared_ptr<EcnL4sTracker> ecnL4sTracker;
+
   union TosHeader {
     uint8_t value{0};
+
     struct components {
       unsigned int ecn : 2;
       unsigned int dscp : 6;
     } fields;
   };
+
   TosHeader socketTos;
 
   // Number of QUIC initial packets received.

@@ -60,6 +60,7 @@ class Handshake {
     std::string pskType;
     std::string echStatus;
   };
+
   [[nodiscard]] virtual TLSSummary getTLSSummary() const = 0;
 };
 

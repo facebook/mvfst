@@ -14,7 +14,9 @@ namespace quic::test {
 class MockQLogger : public QLogger {
  public:
   MockQLogger() = delete;
+
   MockQLogger(VantagePoint vp) : QLogger(vp, kHTTP3ProtocolType) {}
+
   ~MockQLogger() override = default;
   MOCK_METHOD(void, addPacket, (const RegularQuicPacket&, uint64_t));
   MOCK_METHOD(

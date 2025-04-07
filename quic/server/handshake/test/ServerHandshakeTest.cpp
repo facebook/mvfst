@@ -286,31 +286,40 @@ class ServerHandshakeTest : public Test {
   }
 
   void operator()(fizz::DeliverAppData&) {}
+
   void operator()(fizz::WriteToSocket& write) {
     clientWrites.push_back(std::move(write));
   }
+
   void operator()(fizz::client::ReportEarlyHandshakeSuccess&) {
     earlyHandshakeSuccess = true;
   }
+
   void operator()(fizz::client::ReportHandshakeSuccess&) {
     handshakeSuccess = true;
   }
+
   void operator()(fizz::client::ReportEarlyWriteFailed&) {
     earlyWriteFailed = true;
   }
+
   void operator()(fizz::ReportError&) {
     error = true;
   }
+
   void operator()(fizz::WaitForData&) {
     waitForData = true;
     fizzClient->waitForData();
   }
+
   void operator()(fizz::client::MutateState& mutator) {
     mutator(clientState);
   }
+
   void operator()(fizz::client::NewCachedPsk& newCachedPsk) {
     clientCtx->putPsk(hostname, std::move(newCachedPsk.psk));
   }
+
   void operator()(fizz::SecretAvailable&) {}
 
   void operator()(fizz::EndOfData&) {}

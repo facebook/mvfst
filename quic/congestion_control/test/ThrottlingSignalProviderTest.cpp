@@ -28,7 +28,9 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
       Optional<uint64_t> burstRateBytesPerSecond = none)
       : stbf_(std::move(config)),
         burstRateBytesPerSecond_(std::move(burstRateBytesPerSecond)) {}
+
   ~SimpleThrottlingSignalProvider() override = default;
+
   void onPacketSent(const quic::OutstandingPacketWrapper& packet) override {
     stbf_.consumeWithBorrowNonBlockingAndUpdateState(
         packet.metadata.encodedSize, packet.metadata.time);

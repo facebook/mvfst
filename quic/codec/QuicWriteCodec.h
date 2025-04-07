@@ -112,6 +112,7 @@ Optional<WriteAckFrameResult> writeAckFrame(
 size_t computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 
 } // namespace quic
+
 // namespace quic
 // namespace quic
 // namespace quic

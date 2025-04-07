@@ -29,6 +29,7 @@ void QuicClientAsyncTransport::onNewBidirectionalStream(
     StreamId /*id*/) noexcept {
   CHECK(false);
 }
+
 void QuicClientAsyncTransport::onNewUnidirectionalStream(
     StreamId /*id*/) noexcept {
   CHECK(false);

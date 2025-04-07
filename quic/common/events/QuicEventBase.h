@@ -26,15 +26,19 @@ class QuicEventBaseLoopCallback {
       delete implHandle;
     }
   }
+
   virtual void runLoopCallback() noexcept = 0;
+
   void cancelLoopCallback() noexcept {
     if (implHandle) {
       implHandle->cancelImpl();
     }
   }
+
   [[nodiscard]] bool isLoopCallbackScheduled() const noexcept {
     return implHandle ? implHandle->isScheduledImpl() : false;
   }
+
   class LoopCallbackImpl {
    public:
     virtual ~LoopCallbackImpl() = default;
@@ -49,13 +53,16 @@ class QuicEventBaseLoopCallback {
 class QuicTimerCallback {
  public:
   friend class QuicEventBase;
+
   virtual ~QuicTimerCallback() {
     if (implHandle) {
       implHandle->cancelImpl();
       delete implHandle;
     }
   }
+
   virtual void timeoutExpired() noexcept = 0;
+
   /// This callback was canceled. The default implementation is to just
   /// proxy to `timeoutExpired` but if you care about the difference between
   /// the timeout finishing or being canceled you can override this.

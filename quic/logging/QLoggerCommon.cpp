@@ -251,6 +251,7 @@ void QLoggerCommon::addConnectionMigrationUpdate(bool intentionalMigration) {
   logTrace(std::make_unique<quic::QLogConnectionMigrationEvent>(
       intentionalMigration, vantagePoint, refTime));
 }
+
 void QLoggerCommon::addPathValidationEvent(bool success) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
@@ -302,6 +303,7 @@ void QLoggerCommon::setDcid(folly::Optional<quic::ConnectionId> connID) {
     dcid = connID;
   }
 }
+
 void QLoggerCommon::setScid(folly::Optional<quic::ConnectionId> connID) {
   if (connID.hasValue()) {
     scid = connID;

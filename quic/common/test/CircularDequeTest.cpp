@@ -40,7 +40,9 @@ bool verifyStorageContent(
 
 struct TestObject {
   TestObject() : val(0) {}
+
   TestObject(int v, const std::string& w) : val(v), words(w) {}
+
   ~TestObject() = default;
 
   TestObject(const TestObject& other)

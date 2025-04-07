@@ -52,6 +52,7 @@ class ServerTransportParameters : public testing::Test {
   void SetUp() override {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&evb_);
   }
+
   void TearDown() override {
     if (client_) {
       client_->close(none);

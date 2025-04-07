@@ -78,6 +78,7 @@ QuicBatchingMode getQuicBatchingMode(uint32_t val) {
 
   return QuicBatchingMode::BATCHING_MODE_NONE;
 }
+
 std::vector<QuicVersion> filterSupportedVersions(
     const std::vector<QuicVersion>& versions) {
   std::vector<QuicVersion> filteredVersions;

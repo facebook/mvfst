@@ -29,6 +29,7 @@ FOLLY_GFLAGS_DEFINE_int32(
 
 namespace {
 using namespace quic;
+
 // Determine which worker to route to
 // This **MUST** be kept in sync with the BPF program (if supplied)
 size_t getWorkerToRouteTo(
@@ -57,6 +58,7 @@ void ownedEvbDeleter(folly::IOExecutor* evb) {
 void unownedEvbDeleter(folly::IOExecutor*) {}
 
 } // namespace
+
 //
 namespace quic {
 

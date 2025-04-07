@@ -50,6 +50,7 @@ class MockAead : public Aead {
        const folly::IOBuf* associatedData,
        uint64_t seqNum),
       (const));
+
   std::unique_ptr<folly::IOBuf> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* associatedData,
@@ -64,6 +65,7 @@ class MockAead : public Aead {
        const folly::IOBuf* associatedData,
        uint64_t seqNum),
       (const));
+
   std::unique_ptr<folly::IOBuf> decrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,
@@ -78,6 +80,7 @@ class MockAead : public Aead {
        const folly::IOBuf* associatedData,
        uint64_t seqNum),
       (const));
+
   Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,
       const folly::IOBuf* associatedData,

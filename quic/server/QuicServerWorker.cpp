@@ -51,6 +51,7 @@ bool isValidConnIdLength(const quic::ConnectionId& connId) {
 namespace quic {
 
 std::atomic_int globalUnfinishedHandshakes{0};
+
 int QuicServerWorker::getUnfinishedHandshakeCount() {
   return globalUnfinishedHandshakes.load(std::memory_order_relaxed);
 }
@@ -1264,6 +1265,7 @@ void QuicServerWorker::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
   ctx_ = ctx;
 }
+
 TransportSettings QuicServerWorker::validateTransportSettings(
     TransportSettings transportSettings) {
   if (transportSettings.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO &&
@@ -1588,6 +1590,7 @@ size_t QuicServerWorker::SourceIdentityHash::operator()(
   std::array<unsigned char, kKeySize> key{};
 
   struct sockaddr_storage storage {};
+
   const auto& sockaddr = sid.first;
   sockaddr.getAddress(&storage);
   memcpy(key.data(), &storage, sizeof(struct sockaddr_storage));

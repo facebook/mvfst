@@ -313,6 +313,7 @@ void Bbr2CongestionController::resetLowerBounds() {
   bandwidthLo_.reset();
   inflightLo_.reset();
 }
+
 void Bbr2CongestionController::enterStartup() {
   state_ = State::Startup;
   updatePacingAndCwndGain();
@@ -419,6 +420,7 @@ void Bbr2CongestionController::restoreCwnd() {
   cwndBytes_ = std::max(cwndBytes_, previousCwndBytes_);
   VLOG(6) << "Restored cwnd: " << cwndBytes_;
 }
+
 void Bbr2CongestionController::exitProbeRtt() {
   resetLowerBounds();
   if (fullBwReached_) {
@@ -526,6 +528,7 @@ void Bbr2CongestionController::updateAckAggregation() {
   latestExtraAcked_ = std::min(latestExtraAcked_, cwndBytes_);
   maxExtraAckedFilter_.Update(latestExtraAcked_, roundCount_);
 }
+
 void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();
 
@@ -599,6 +602,7 @@ void Bbr2CongestionController::checkDrain() {
     enterProbeBW(); /* BBR estimates the queue was drained */
   }
 }
+
 void Bbr2CongestionController::updateProbeBwCyclePhase() {
   /* The core state machine logic for ProbeBW: */
   if (!fullBwReached_) {
@@ -840,6 +844,7 @@ uint64_t Bbr2CongestionController::getProbeRTTCwnd() {
       getBDPWithGain(kProbeRttCwndGain),
       quic::kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 }
+
 void Bbr2CongestionController::boundCwndForProbeRTT() {
   if (state_ == State::ProbeRTT) {
     cwndBytes_ = std::min(cwndBytes_, getProbeRTTCwnd());
@@ -902,6 +907,7 @@ void Bbr2CongestionController::enterProbeBW() {
 void Bbr2CongestionController::startRound() {
   nextRoundDelivered_ = conn_.lossState.totalBytesAcked;
 }
+
 void Bbr2CongestionController::updateRound() {
   auto pkt = currentAckEvent_->getLargestNewlyAckedPacket();
   if (pkt && pkt->lastAckedPacketInfo &&
@@ -936,6 +942,7 @@ void Bbr2CongestionController::startProbeBwDown() {
     cycleCount_++;
   }
 }
+
 void Bbr2CongestionController::startProbeBwCruise() {
   state_ = State::ProbeBw_Cruise;
   updatePacingAndCwndGain();
@@ -949,6 +956,7 @@ void Bbr2CongestionController::startProbeBwRefill() {
   updatePacingAndCwndGain();
   startRound();
 }
+
 void Bbr2CongestionController::startProbeBwUp() {
   probeBWCycleStart_ = Clock::now();
   state_ = State::ProbeBw_Up;

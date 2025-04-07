@@ -12,6 +12,7 @@
 
 namespace {
 constexpr size_t kLen = 50;
+
 template <typename T>
 void prepareDeque(T& d, size_t count) {
   size_t counter = 0;

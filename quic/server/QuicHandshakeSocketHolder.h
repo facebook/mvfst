@@ -50,9 +50,11 @@ class QuicHandshakeSocketHolder
     }
     delete this;
   }
+
   void onReplaySafe() noexcept override {
     // Unused for server
   }
+
   void onTransportReady() noexcept override {
     quicSocket_->setConnectionSetupCallback(nullptr);
     if (callback_) {

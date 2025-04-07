@@ -176,6 +176,7 @@ struct AckEvent {
 
     // Structure with information about each stream with frames in ACKed packet
     using MapType = InlineMap<StreamId, StreamDetails, 5>;
+
     class DetailsPerStream : private MapType {
      public:
       /**

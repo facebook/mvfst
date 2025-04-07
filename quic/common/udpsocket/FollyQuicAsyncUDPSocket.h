@@ -221,6 +221,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       wrappedReadCallback_ = readCallback;
       parentSocket_ = parentSocket;
     }
+
     void getReadBuffer(void** buf, size_t* len) noexcept override;
 
     void onDataAvailable(

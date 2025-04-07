@@ -35,6 +35,7 @@ class Copa : public CongestionController {
   void onPacketAckOrLoss(
       const AckEvent* FOLLY_NULLABLE,
       const LossEvent* FOLLY_NULLABLE) override;
+
   void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
@@ -59,11 +60,13 @@ class Copa : public CongestionController {
 
   struct VelocityState {
     uint64_t velocity{1};
+
     enum Direction {
       None,
       Up, // cwnd is increasing
       Down, // cwnd is decreasing
     };
+
     Direction direction{None};
     // number of rtts direction has remained same
     uint64_t numTimesDirectionSame{0};
@@ -71,6 +74,7 @@ class Copa : public CongestionController {
     uint64_t lastRecordedCwndBytes;
     Optional<TimePoint> lastCwndRecordTime{none};
   };
+
   void checkAndUpdateDirection(const TimePoint ackTime);
   void changeDirection(
       VelocityState::Direction newDirection,

@@ -68,6 +68,7 @@ class SocketObserverInterface {
         const CloseStartedEvent& left) {
       return right.maybeCloseReason != left.maybeCloseReason;
     }
+
     friend auto operator==(
         const CloseStartedEvent& right,
         const CloseStartedEvent& left) {
@@ -331,6 +332,7 @@ class SocketObserverInterface {
           packetMetadata(std::move(pktMetadata)),
           packetNum(packetNum),
           pnSpace(pnSpace) {}
+
     bool lostByTimeout{false};
     bool lostByReorderThreshold{false};
     const quic::OutstandingPacketMetadata packetMetadata;
@@ -356,6 +358,7 @@ class SocketObserverInterface {
           packetNum,
           pnSpace);
     }
+
     const TimePoint lossTime;
     std::vector<LostPacket> lostPackets;
   };
@@ -371,6 +374,7 @@ class SocketObserverInterface {
           ackDelay(ackDelayIn),
           metadata(pkt.metadata),
           lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
+
     TimePoint rcvTime;
     std::chrono::microseconds rttSample;
     std::chrono::microseconds ackDelay;
@@ -398,6 +402,7 @@ class SocketObserverInterface {
           packetNum,
           pnSpace);
     }
+
     const TimePoint rcvTime;
     std::vector<LostPacket> spuriousPackets;
   };
@@ -405,6 +410,7 @@ class SocketObserverInterface {
   struct KnobFrameEvent {
     explicit KnobFrameEvent(TimePoint rcvTimeIn, quic::KnobFrame knobFrame)
         : rcvTime(rcvTimeIn), knobFrame(std::move(knobFrame)) {}
+
     const TimePoint rcvTime;
     const quic::KnobFrame knobFrame;
   };
@@ -434,6 +440,7 @@ class SocketObserverInterface {
         : l4sWeight(l4sWeightIn),
           newECT1Echoed(newECT1EchoedIn),
           newCEEchoed(newCEEchoedIn) {}
+
     double l4sWeight;
     uint32_t newECT1Echoed;
     uint32_t newCEEchoed;
@@ -444,6 +451,7 @@ class SocketObserverInterface {
         uint64_t packetsPerInterval,
         std::chrono::microseconds interval)
         : packetsPerInterval(packetsPerInterval), interval(interval) {}
+
     uint64_t packetsPerInterval;
     std::chrono::microseconds interval;
   };

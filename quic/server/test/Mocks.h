@@ -101,10 +101,12 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
 class MockQuicUDPSocketFactory : public QuicUDPSocketFactory {
  public:
   ~MockQuicUDPSocketFactory() = default;
+
   std::unique_ptr<FollyAsyncUDPSocketAlias> make(folly::EventBase* evb, int fd)
       override {
     return std::unique_ptr<FollyAsyncUDPSocketAlias>(_make(evb, fd));
   }
+
   MOCK_METHOD(FollyAsyncUDPSocketAlias*, _make, (folly::EventBase*, int));
 };
 
@@ -159,6 +161,7 @@ class MockQuicServerTransport : public QuicServerTransport {
             nullptr,
             nullptr,
             nullptr) {}
+
   MOCK_CONST_METHOD0(getOneRttCipherInfo, CipherInfo());
   MOCK_CONST_METHOD0(getServerConnectionId, Optional<ConnectionId>());
   MOCK_CONST_METHOD0(getClientConnectionId, Optional<ConnectionId>());

@@ -57,16 +57,20 @@ class ServerTransportConnectionSetupCallback
   void onNewBidirectionalStream(StreamId /*id*/) noexcept override {
     CHECK(false);
   }
+
   void onNewUnidirectionalStream(StreamId /*id*/) noexcept override {
     CHECK(false);
   }
+
   void onStopSending(StreamId /*id*/, ApplicationErrorCode /*error*/) noexcept
       override {
     CHECK(false);
   }
+
   void onConnectionEnd() noexcept override {
     CHECK(false);
   }
+
   void onConnectionError(QuicError /*code*/) noexcept override {
     CHECK(false);
   }

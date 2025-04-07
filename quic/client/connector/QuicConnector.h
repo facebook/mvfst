@@ -85,8 +85,11 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
 
   // QuicSocket::ConnectionSetupCallback overrides.
   void onFirstPeerPacketProcessed() noexcept override {}
+
   void onConnectionSetupError(QuicError code) noexcept override;
+
   void onTransportReady() noexcept override {}
+
   void onReplaySafe() noexcept override;
 
   Callback* cb_;

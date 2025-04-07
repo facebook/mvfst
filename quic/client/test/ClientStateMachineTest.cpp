@@ -17,6 +17,7 @@
 #include <quic/handshake/TransportParameters.h>
 
 using namespace ::testing;
+
 namespace quic::test {
 
 namespace {
@@ -283,6 +284,7 @@ TEST_F(
   processServerInitialParams(clientConn, serverTransportParams, 0);
   EXPECT_FALSE(clientConn.peerAdvertisedReliableStreamResetSupport);
 }
+
 TEST_F(ClientStateMachineTest, TestProcessReliableStreamResetNonEmptyParam) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -332,6 +334,7 @@ struct maxStreamGroupsAdvertizedtestStruct {
   uint64_t peerMaxGroupsIn;
   OptionalIntegral<uint64_t> expectedTransportSettingVal;
 };
+
 class ClientStateMachineMaxStreamGroupsAdvertizedParamTest
     : public ClientStateMachineTest,
       public ::testing::WithParamInterface<

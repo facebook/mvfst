@@ -15,6 +15,7 @@ class MockQuicAsyncUDPSocket : public quic::FollyQuicAsyncUDPSocket {
  public:
   explicit MockQuicAsyncUDPSocket(std::shared_ptr<quic::FollyQuicEventBase> evb)
       : quic::FollyQuicAsyncUDPSocket(evb) {}
+
   MOCK_METHOD2(
       applyOptions,
       void(const folly::SocketOptionMap&, folly::SocketOptionKey::ApplyPos));

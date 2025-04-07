@@ -91,6 +91,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
   class EvbTerminateTimeout : public quic::QuicTimerCallback {
    public:
     explicit EvbTerminateTimeout(quic::QuicEventBase* evb) : evb_(evb) {}
+
     void timeoutExpired() noexcept override {
       evb_->terminateLoopSoon();
     }

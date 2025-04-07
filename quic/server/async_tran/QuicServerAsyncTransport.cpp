@@ -20,6 +20,7 @@ void QuicServerAsyncTransport::onNewBidirectionalStream(StreamId id) noexcept {
   CHECK_EQ(id, 0) << "only single stream w/ id=0 is supported";
   setStreamId(id);
 }
+
 void QuicServerAsyncTransport::onNewUnidirectionalStream(
     StreamId /*id*/) noexcept {
   LOG(FATAL) << "Unidirectional stream not supported";

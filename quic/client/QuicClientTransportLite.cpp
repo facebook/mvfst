@@ -1234,7 +1234,9 @@ void QuicClientTransportLite::recvMsg(
     vec.iov_len = readBufferSize;
 
     sockaddr* rawAddr{nullptr};
+
     struct sockaddr_storage addrStorage {};
+
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
       rawAddr->sa_family = sock.getLocalAddressFamily();
@@ -1242,7 +1244,9 @@ void QuicClientTransportLite::recvMsg(
 
     int flags = 0;
     QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
+
     struct msghdr msg {};
+
     msg.msg_name = rawAddr;
     msg.msg_namelen = rawAddr ? kAddrLen : 0;
     msg.msg_iov = &vec;
@@ -1369,7 +1373,9 @@ void QuicClientTransportLite::recvFrom(
     Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
 
     sockaddr* rawAddr{nullptr};
+
     struct sockaddr_storage addrStorage {};
+
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
       rawAddr->sa_family = sock.getLocalAddressFamily();

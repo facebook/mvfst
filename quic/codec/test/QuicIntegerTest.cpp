@@ -27,6 +27,7 @@ struct IntegerParams {
 };
 
 class QuicIntegerDecodeTest : public TestWithParam<IntegerParams> {};
+
 class QuicIntegerEncodeTest : public TestWithParam<IntegerParams> {};
 
 TEST_P(QuicIntegerDecodeTest, DecodeTrim) {

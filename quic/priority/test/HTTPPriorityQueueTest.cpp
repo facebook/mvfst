@@ -14,6 +14,7 @@ namespace {
 
 using namespace quic;
 using Identifier = quic::PriorityQueue::Identifier;
+
 class HTTPPriorityQueueTest : public testing::Test {
  protected:
   HTTPPriorityQueue queue_;

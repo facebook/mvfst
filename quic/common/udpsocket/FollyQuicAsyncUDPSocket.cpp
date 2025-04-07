@@ -17,6 +17,7 @@ void FollyQuicAsyncUDPSocket::init(sa_family_t family) {
 void FollyQuicAsyncUDPSocket::bind(const folly::SocketAddress& address) {
   follySocket_.bind(address);
 }
+
 [[nodiscard]] bool FollyQuicAsyncUDPSocket::isBound() const {
   return follySocket_.isBound();
 }
@@ -132,6 +133,7 @@ int FollyQuicAsyncUDPSocket::getGSO() {
 int FollyQuicAsyncUDPSocket::getGRO() {
   return follySocket_.getGRO();
 }
+
 bool FollyQuicAsyncUDPSocket::setGRO(bool bVal) {
   return follySocket_.setGRO(bVal);
 }
@@ -162,9 +164,11 @@ void FollyQuicAsyncUDPSocket::attachEventBase(
   evb_ = follyEvb;
   follySocket_.attachEventBase(follyEvb->getBackingEventBase());
 }
+
 void FollyQuicAsyncUDPSocket::detachEventBase() {
   follySocket_.detachEventBase();
 }
+
 [[nodiscard]] std::shared_ptr<QuicEventBase>
 FollyQuicAsyncUDPSocket::getEventBase() const {
   if (evb_) {
@@ -176,9 +180,11 @@ FollyQuicAsyncUDPSocket::getEventBase() const {
 void FollyQuicAsyncUDPSocket::setCmsgs(const folly::SocketCmsgMap& cmsgs) {
   follySocket_.setCmsgs(cmsgs);
 }
+
 void FollyQuicAsyncUDPSocket::appendCmsgs(const folly::SocketCmsgMap& cmsgs) {
   follySocket_.appendCmsgs(cmsgs);
 }
+
 void FollyQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
     folly::Function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc) {
   follySocket_.setAdditionalCmsgsFunc(std::move(additionalCmsgsFunc));
