@@ -124,7 +124,8 @@ folly::Expected<size_t, LocalErrorCode> QuicTransportBase::getStreamWriteOffset(
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   try {
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream =
+        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     return stream->currentWriteOffset;
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -147,7 +148,8 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   try {
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream =
+        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     return stream->pendingWrites.chainLength();
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -179,7 +181,8 @@ QuicTransportBase::getMaxWritableOnStream(StreamId id) const {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
 
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream =
+      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   return maxWritableOnStream(*stream);
 }
 
@@ -204,7 +207,8 @@ QuicTransportBase::setStreamFlowControlWindow(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream =
+      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   stream->flowControlState.windowSize = windowSize;
   maybeSendStreamWindowUpdate(*stream, Clock::now());
   updateWriteLooper(true);
@@ -347,7 +351,8 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream =
+      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
 
   if (stream->streamReadError) {
     switch (stream->streamReadError->type()) {
@@ -369,7 +374,8 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::consume(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream =
+      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   auto result = consume(id, stream->currentReadOffset, amount);
   if (result.hasError()) {
     return folly::makeUnexpected(result.error().first);
@@ -399,7 +405,8 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
       return folly::makeUnexpected(
           ConsumeError{LocalErrorCode::STREAM_NOT_EXISTS, readOffset});
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream =
+        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     readOffset = stream->currentReadOffset;
     if (stream->currentReadOffset != offset) {
       return folly::makeUnexpected(
@@ -567,7 +574,8 @@ void QuicTransportBase::resetNonControlStreams(
       auto readCallbackIt = readCallbacks_.find(id);
       if (readCallbackIt != readCallbacks_.end() &&
           readCallbackIt->second.readCb) {
-        auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+        auto stream = CHECK_NOTNULL(
+            conn_->streamManager->getStream(id).value_or(nullptr));
         if (!stream->groupId) {
           readCallbackIt->second.readCb->readError(
               id, QuicError(error, errorMsg.str()));

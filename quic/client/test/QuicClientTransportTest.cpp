@@ -116,8 +116,9 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
   quicClient_->setTransportSettings(std::move(transportSettings));
 
   quicClient_->getClientConn()->oneRttWriteCipher = test::createNoOpAead();
-  quicClient_->getClientConn()->streamManager->setMaxLocalBidirectionalStreams(
-      128);
+  ASSERT_FALSE(quicClient_->getClientConn()
+                   ->streamManager->setMaxLocalBidirectionalStreams(128)
+                   .hasError());
   StreamId streamId = quicClient_->createBidirectionalStream().value();
   quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false);
 

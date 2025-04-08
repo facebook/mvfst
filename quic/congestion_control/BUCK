@@ -37,7 +37,6 @@ mvfst_cpp_library(
         "CongestionControlFunctions.h",
     ],
     deps = [
-        "//quic:constants",
         "//quic/common:time_util",
     ],
     exported_deps = [
@@ -62,7 +61,6 @@ mvfst_cpp_library(
         ":copa2",
         ":cubic",
         ":newreno",
-        ":static_cwnd_congestion_controller",
     ],
     exported_deps = [
         "//quic:constants",
@@ -106,7 +104,6 @@ mvfst_cpp_library(
         ":copa2",
         ":cubic",
         ":newreno",
-        ":static_cwnd_congestion_controller",
     ],
     exported_deps = [
         ":congestion_controller_factory",
@@ -265,9 +262,6 @@ mvfst_cpp_library(
     ],
     headers = [
         "BbrBandwidthSampler.h",
-    ],
-    deps = [
-        "//quic/logging:qlogger_constants",
     ],
     exported_deps = [
         ":bbr",

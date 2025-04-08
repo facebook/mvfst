@@ -142,18 +142,19 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       clientPacketNum);
   ASSERT_EQ(server->getConn().streamManager->streamCount(), 2);
   IOBufEqualTo eq;
-
   auto stream = server->getNonConstConn().streamManager->findStream(0x08);
   ASSERT_TRUE(stream);
   auto streamData = readDataFromQuicStream(*stream);
-  EXPECT_TRUE(eq(buf1, streamData.first));
-  EXPECT_TRUE(streamData.second);
+  ASSERT_FALSE(streamData.hasError());
+  EXPECT_TRUE(eq(buf1, streamData->first));
+  EXPECT_TRUE(streamData->second);
 
   auto stream2 = server->getNonConstConn().streamManager->findStream(0x0C);
   ASSERT_TRUE(stream2);
   auto streamData2 = readDataFromQuicStream(*stream2);
-  EXPECT_TRUE(eq(buf2, streamData2.first));
-  EXPECT_TRUE(streamData2.second);
+  ASSERT_FALSE(streamData2.hasError());
+  EXPECT_TRUE(eq(buf2, streamData2->first));
+  EXPECT_TRUE(streamData2->second);
   EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(2);
 }
 
@@ -610,7 +611,10 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   server->writeChain(streamId, data->clone(), false);
   loopForWrites();
 
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   ASSERT_FALSE(server->getConn().outstandings.packets.empty());
   ASSERT_FALSE(stream->retransmissionBuffer.empty());
   // We need more than one packet for this test.
@@ -728,7 +732,10 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistClientStream) {
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
 
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   ASSERT_TRUE(stream->streamReadError.has_value());
 }
 
@@ -814,7 +821,10 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   };
 
   StreamId streamId = 0x00;
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -825,7 +835,9 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
       std::forward_as_tuple(0),
       std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
           ChainedByteRangeHead(wordsBuf2), 0, false)));
-  writeDataToQuicStream(*stream, IOBuf::copyBuffer(words.at(3)), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, IOBuf::copyBuffer(words.at(3)), false)
+          .hasError());
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
 
@@ -868,7 +880,9 @@ TEST_F(QuicServerTransportTest, RecvReliableRstStreamFrame) {
   clientNextAppDataPacketNum = 3;
 
   StreamId streamId = 0x00;
-  server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
       *server->getConn().serverConnectionId,
@@ -899,7 +913,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   };
 
   StreamId streamId = 0x00;
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -944,7 +961,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
   };
 
   StreamId streamId = 0x00;
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -990,7 +1010,10 @@ TEST_F(QuicServerTransportTest, RecvInvalidMaxStreamData) {
   };
 
   StreamId streamId = 0x02;
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -1033,7 +1056,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   };
 
   StreamId streamId = 0x00;
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -1117,7 +1143,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
 
   StreamId streamId1 = 0x00;
   StreamId streamId2 = 0x04;
-  auto stream1 = server->getNonConstConn().streamManager->getStream(streamId1);
+  auto stream1Result =
+      server->getNonConstConn().streamManager->getStream(streamId1);
+  ASSERT_FALSE(stream1Result.hasError());
+  auto stream1 = stream1Result.value();
   stream1->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream1->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -1130,7 +1159,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream1->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream1->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream1->currentReadOffset = words.at(0).length() + words.at(1).length();
-  auto stream2 = server->getNonConstConn().streamManager->getStream(streamId2);
+  auto stream2Result =
+      server->getNonConstConn().streamManager->getStream(streamId2);
+  ASSERT_FALSE(stream2Result.hasError());
+  auto stream2 = stream2Result.value();
   stream2->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream2->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
@@ -1173,7 +1205,9 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
 TEST_F(QuicServerTransportTest, StopSendingLoss) {
   server->getNonConstConn().ackStates.appDataAckState.nextPacketNum = 3;
   auto streamId = server->createBidirectionalStream().value();
-  server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
       *server->getConn().serverConnectionId,
@@ -1189,7 +1223,8 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
-  markPacketLoss(server->getNonConstConn(), packet.packet, false);
+  ASSERT_FALSE(markPacketLoss(server->getNonConstConn(), packet.packet, false)
+                   .hasError());
   EXPECT_EQ(server->getNonConstConn().pendingEvents.frames.size(), 1);
   StopSendingFrame* stopFrame = server->getNonConstConn()
                                     .pendingEvents.frames.front()
@@ -1201,7 +1236,9 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
 TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
   server->getNonConstConn().ackStates.appDataAckState.nextPacketNum = 3;
   auto streamId = server->createBidirectionalStream().value();
-  server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
       *server->getConn().serverConnectionId,
@@ -1221,7 +1258,8 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
   // clear out all the streams, this is not a great way to simulate closed
   // streams, but good enough for this test.
   server->getNonConstConn().streamManager->clearOpenStreams();
-  markPacketLoss(server->getNonConstConn(), packet.packet, false);
+  ASSERT_FALSE(markPacketLoss(server->getNonConstConn(), packet.packet, false)
+                   .hasError());
   EXPECT_EQ(server->getNonConstConn().pendingEvents.frames.size(), 0);
 }
 
@@ -1229,7 +1267,9 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto streamId = server->createBidirectionalStream().value();
   auto qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
-  server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
   // knock every handshake outstanding packets out
   server->getNonConstConn().outstandings.reset();
   for (auto& t : server->getNonConstConn().lossState.lossTimes) {
@@ -1266,7 +1306,9 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
 
 TEST_F(QuicServerTransportTest, TestAckStopSending) {
   auto streamId = server->createBidirectionalStream().value();
-  server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
   server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   auto match = findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame>();
@@ -1316,7 +1358,10 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
 
 TEST_F(QuicServerTransportTest, TestAckRstStream) {
   auto streamId = server->createUnidirectionalStream().value();
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   auto packetNum = rstStreamAndSendPacket(
       server->getNonConstConn(),
@@ -3325,13 +3370,13 @@ TEST_F(QuicServerTransportTest, ResetDSRStream) {
   EXPECT_CALL(*dsrSender, release()).Times(1);
   server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
   EXPECT_TRUE(server->writeChain(streamId, std::move(buf), false).hasValue());
-  ASSERT_NE(conn.streamManager->getStream(streamId), nullptr);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   EXPECT_TRUE(server->writeBufMeta(streamId, meta, false).hasValue());
   loopForWrites();
-  auto stream = conn.streamManager->getStream(streamId);
   ASSERT_NE(stream, nullptr);
-  conn.streamManager->getStream(streamId)->writeBufMeta.split(
-      conn.udpSendPacketLen - 200);
+  stream->writeBufMeta.split(conn.udpSendPacketLen - 200);
 
   server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
@@ -3487,7 +3532,8 @@ TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
   conn.lossState.srtt = 100us;
   NetworkData networkData;
   auto streamState = conn.streamManager->getStream(stream);
-  streamState->ackedIntervals.insert(0, 1);
+  ASSERT_FALSE(streamState.hasError());
+  streamState.value()->ackedIntervals.insert(0, 1);
   EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(writeBufMetaDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
@@ -4351,7 +4397,10 @@ TEST_F(QuicUnencryptedServerTransportTest, TestEncryptedDataBeforeCFIN) {
   StreamId streamId = 4;
   recvEncryptedStream(streamId, *IOBuf::copyBuffer("hello"));
 
-  auto stream = server->getNonConstConn().streamManager->getStream(streamId);
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   ASSERT_TRUE(stream->readBuffer.empty());
 }
 

@@ -11,21 +11,20 @@
 #include <quic/state/stream/StreamStateFunctions.h>
 
 namespace quic {
-
-void sendStopSendingSMHandler(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> sendStopSendingSMHandler(
     QuicStreamState& stream,
     const StopSendingFrame& frame);
 
-void sendRstSMHandler(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> sendRstSMHandler(
     QuicStreamState& stream,
     ApplicationErrorCode errorCode,
     const Optional<uint64_t>& reliableSize = folly::none);
 
-void sendAckSMHandler(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame);
 
-void sendRstAckSMHandler(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> sendRstAckSMHandler(
     QuicStreamState& stream,
     folly::Optional<uint64_t> reliableSize);
 

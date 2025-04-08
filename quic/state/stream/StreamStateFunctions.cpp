@@ -10,12 +10,15 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 
 namespace quic {
-
-void resetQuicStream(
+folly::Expected<folly::Unit, QuicError> resetQuicStream(
     QuicStreamState& stream,
     ApplicationErrorCode error,
     Optional<uint64_t> reliableSize) {
-  updateFlowControlOnResetStream(stream, reliableSize);
+  auto updateResult = updateFlowControlOnResetStream(stream, reliableSize);
+  if (!updateResult) {
+    return folly::makeUnexpected(updateResult.error());
+  }
+
   if (reliableSize && *reliableSize > 0) {
     stream.reliableSizeToPeer = *reliableSize;
     stream.removeFromRetransmissionBufStartingAtOffset(*reliableSize);
@@ -43,26 +46,30 @@ void resetQuicStream(
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
+
+  return folly::unit;
 }
 
-void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
+folly::Expected<folly::Unit, QuicError> onResetQuicStream(
+    QuicStreamState& stream,
+    const RstStreamFrame& frame) {
   if (stream.finalReadOffset &&
       stream.finalReadOffset.value() != frame.finalSize) {
-    throw QuicTransportException(
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::STREAM_STATE_ERROR,
         "Read offset mismatch, " +
             folly::to<std::string>(stream.finalReadOffset.value()) +
-            " != " + folly::to<std::string>(frame.finalSize),
-        TransportErrorCode::STREAM_STATE_ERROR);
+            " != " + folly::to<std::string>(frame.finalSize)));
   }
   if (stream.streamReadError &&
       stream.streamReadError.value().asApplicationErrorCode() &&
       *stream.streamReadError.value().asApplicationErrorCode() !=
           frame.errorCode) {
-    throw QuicTransportException(
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::STREAM_STATE_ERROR,
         "Reset error code mismatch, " +
             toString(stream.streamReadError.value()) +
-            " != " + toString(frame.errorCode),
-        TransportErrorCode::STREAM_STATE_ERROR);
+            " != " + toString(frame.errorCode)));
   }
   if (stream.reliableSizeFromPeer && frame.reliableSize &&
       *frame.reliableSize > *stream.reliableSizeFromPeer) {
@@ -70,15 +77,15 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
     // than before, but not to send one with a higher offset than before. Due
     // to reordering, we may receive a RESET_STREAM_AT frame with a higher
     // offset than before. In this case, we should ignore the frame.
-    return;
+    return folly::unit;
   }
 
   stream.reliableSizeFromPeer =
       frame.reliableSize.hasValue() ? *frame.reliableSize : 0;
   // Mark eofoffset:
   if (stream.maxOffsetObserved > frame.finalSize) {
-    throw QuicTransportException(
-        "Reset in middle of stream", TransportErrorCode::FINAL_SIZE_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::FINAL_SIZE_ERROR, "Reset in middle of stream"));
   }
   // Drop non-reliable data:
   stream.removeFromReadBufferStartingAtOffset(*stream.reliableSizeFromPeer);
@@ -94,14 +101,21 @@ void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
       *frame.reliableSize == 0 ||
       isAllDataReceivedUntil(stream, *frame.reliableSize - 1);
   if (!appReadAllBytes && allReliableBytesReceived) {
-    updateFlowControlOnStreamData(
+    auto flowControlResult = updateFlowControlOnStreamData(
         stream, stream.maxOffsetObserved, frame.finalSize);
+    if (!flowControlResult) {
+      return folly::makeUnexpected(flowControlResult.error());
+    }
     stream.maxOffsetObserved = frame.finalSize;
-    updateFlowControlOnReceiveReset(stream, Clock::now());
+    auto result = updateFlowControlOnReceiveReset(stream, Clock::now());
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
   QUIC_STATS(stream.conn.statsCallback, onQuicStreamReset, frame.errorCode);
+  return folly::unit;
 }
 
 bool isAllDataReceived(const QuicStreamState& stream) {

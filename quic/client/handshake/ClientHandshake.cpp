@@ -48,8 +48,14 @@ void ClientHandshake::connect(
         cachedServerTransportParams->receiveTimestampsExponent,
         cachedServerTransportParams->reliableStreamResetSupport,
         cachedServerTransportParams->extendedAckFeatures);
-    updateTransportParamsFromCachedEarlyParams(
+    auto result = updateTransportParamsFromCachedEarlyParams(
         *conn_, *cachedServerTransportParams);
+    // TODO remove throw
+    if (result.hasError()) {
+      raiseError(QuicTransportException(
+          result.error().message, *result.error().code.asTransportErrorCode()));
+      return;
+    }
   }
 }
 

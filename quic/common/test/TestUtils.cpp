@@ -40,16 +40,17 @@ const RegularQuicWritePacket& writeQuicPacket(
   auto version = conn.version.value_or(*conn.originalVersion);
   auto aead = createNoOpAead();
   auto headerCipher = createNoOpHeaderCipher();
-  writeDataToQuicStream(stream, data.clone(), eof);
-  writeQuicDataToSocket(
-      sock,
-      conn,
-      srcConnId,
-      dstConnId,
-      *aead,
-      *headerCipher,
-      version,
-      conn.transportSettings.writeConnectionDataPacketsLimit);
+  CHECK(!writeDataToQuicStream(stream, data.clone(), eof).hasError());
+  CHECK(!writeQuicDataToSocket(
+             sock,
+             conn,
+             srcConnId,
+             dstConnId,
+             *aead,
+             *headerCipher,
+             version,
+             conn.transportSettings.writeConnectionDataPacketsLimit)
+             .hasError());
   CHECK(
       conn.outstandings.packets.rend() !=
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData));
@@ -64,16 +65,17 @@ PacketNum rstStreamAndSendPacket(
   auto aead = createNoOpAead();
   auto headerCipher = createNoOpHeaderCipher();
   auto version = conn.version.value_or(*conn.originalVersion);
-  sendRstSMHandler(stream, errorCode);
-  writeQuicDataToSocket(
-      sock,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      *aead,
-      *headerCipher,
-      version,
-      conn.transportSettings.writeConnectionDataPacketsLimit);
+  CHECK(!sendRstSMHandler(stream, errorCode).hasError());
+  CHECK(!writeQuicDataToSocket(
+             sock,
+             conn,
+             *conn.clientConnectionId,
+             *conn.serverConnectionId,
+             *aead,
+             *headerCipher,
+             version,
+             conn.transportSettings.writeConnectionDataPacketsLimit)
+             .hasError());
 
   for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {

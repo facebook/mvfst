@@ -95,7 +95,10 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       newConn->transportSettings,
       std::move(*conn->streamManager));
 
-  markZeroRttPacketsLost(*newConn, markPacketLoss);
+  auto result = markZeroRttPacketsLost(*newConn, markPacketLoss);
+  if (result.hasError()) {
+    LOG(FATAL) << "error marking packets lost";
+  }
 
   return newConn;
 }
@@ -219,11 +222,17 @@ folly::Expected<folly::Unit, QuicError> processServerInitialParams(
       maxStreamDataBidiRemote.value_or(0);
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
       maxStreamDataUni.value_or(0);
-  conn.streamManager->setMaxLocalBidirectionalStreams(
+  auto resultBidi = conn.streamManager->setMaxLocalBidirectionalStreams(
       maxStreamsBidi.value_or(0));
+  if (resultBidi.hasError()) {
+    return folly::makeUnexpected(resultBidi.error());
+  }
   conn.peerAdvertisedInitialMaxStreamsBidi = maxStreamsBidi.value_or(0);
-  conn.streamManager->setMaxLocalUnidirectionalStreams(
+  auto resultUni = conn.streamManager->setMaxLocalUnidirectionalStreams(
       maxStreamsUni.value_or(0));
+  if (resultUni.hasError()) {
+    return folly::makeUnexpected(resultUni.error());
+  }
   conn.peerAdvertisedInitialMaxStreamsUni = maxStreamsUni.value_or(0);
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   conn.peerIdleTimeout = timeMin(conn.peerIdleTimeout, kMaxIdleTimeout);
@@ -375,7 +384,8 @@ CachedServerTransportParameters getServerCachedTransportParameters(
   return transportParams;
 }
 
-void updateTransportParamsFromCachedEarlyParams(
+folly::Expected<folly::Unit, QuicError>
+updateTransportParamsFromCachedEarlyParams(
     QuicClientConnectionState& conn,
     const CachedServerTransportParameters& transportParams) {
   conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
@@ -387,10 +397,16 @@ void updateTransportParamsFromCachedEarlyParams(
       transportParams.initialMaxStreamDataBidiRemote;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
       transportParams.initialMaxStreamDataUni;
-  conn.streamManager->setMaxLocalBidirectionalStreams(
+  auto resultBidi = conn.streamManager->setMaxLocalBidirectionalStreams(
       transportParams.initialMaxStreamsBidi);
-  conn.streamManager->setMaxLocalUnidirectionalStreams(
+  if (resultBidi.hasError()) {
+    return folly::makeUnexpected(resultBidi.error());
+  }
+  auto resultUni = conn.streamManager->setMaxLocalUnidirectionalStreams(
       transportParams.initialMaxStreamsUni);
+  if (resultUni.hasError()) {
+    return folly::makeUnexpected(resultUni.error());
+  }
   conn.peerAdvertisedKnobFrameSupport = transportParams.knobFrameSupport;
   conn.peerAdvertisedReliableStreamResetSupport =
       transportParams.reliableStreamResetSupport;
@@ -407,5 +423,6 @@ void updateTransportParamsFromCachedEarlyParams(
     conn.maybePeerAckReceiveTimestampsConfig.clear();
   }
   conn.peerAdvertisedExtendedAckFeatures = transportParams.extendedAckFeatures;
+  return folly::unit;
 }
 } // namespace quic

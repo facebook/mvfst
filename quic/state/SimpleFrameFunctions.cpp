@@ -108,7 +108,7 @@ void updateSimpleFrameOnPacketLoss(
   }
 }
 
-bool updateSimpleFrameOnPacketReceived(
+folly::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame,
     const ConnectionId& dstConnId,
@@ -116,18 +116,25 @@ bool updateSimpleFrameOnPacketReceived(
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame: {
       const StopSendingFrame& stopSending = *frame.asStopSendingFrame();
-      auto stream = conn.streamManager->getStream(stopSending.streamId);
+      auto streamResult = conn.streamManager->getStream(stopSending.streamId);
+      if (streamResult.hasError()) {
+        return folly::makeUnexpected(streamResult.error());
+      }
+      auto& stream = streamResult.value();
       if (stream) {
-        sendStopSendingSMHandler(*stream, stopSending);
+        auto result = sendStopSendingSMHandler(*stream, stopSending);
+        if (result.hasError()) {
+          return folly::makeUnexpected(result.error());
+        }
       }
       return true;
     }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
       bool rotatedId = conn.retireAndSwitchPeerConnectionIds();
       if (!rotatedId) {
-        throw QuicTransportException(
-            "No more connection ids to use for new path.",
-            TransportErrorCode::INVALID_MIGRATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::INVALID_MIGRATION,
+            "No more connection ids to use for new path."));
       }
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
 
@@ -165,18 +172,18 @@ bool updateSimpleFrameOnPacketReceived(
       // TODO vchynaro Ensure we ignore smaller subsequent retirePriorTos
       // than the largest seen so far.
       if (newConnectionId.retirePriorTo > newConnectionId.sequenceNumber) {
-        throw QuicTransportException(
-            "Retire prior to greater than sequence number",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Retire prior to greater than sequence number"));
       }
 
       for (const auto& existingPeerConnIdData : conn.peerConnectionIds) {
         if (existingPeerConnIdData.connId == newConnectionId.connectionId) {
           if (existingPeerConnIdData.sequenceNumber !=
               newConnectionId.sequenceNumber) {
-            throw QuicTransportException(
-                "Repeated connection id with different sequence number.",
-                TransportErrorCode::PROTOCOL_VIOLATION);
+            return folly::makeUnexpected(QuicError(
+                TransportErrorCode::PROTOCOL_VIOLATION,
+                "Repeated connection id with different sequence number."));
           } else {
             // No-op on repeated conn id.
             return false;
@@ -191,9 +198,9 @@ bool updateSimpleFrameOnPacketReceived(
           (conn.nodeType == QuicNodeType::Client ? conn.serverConnectionId
                                                  : conn.clientConnectionId);
       if (!peerConnId || peerConnId->size() == 0) {
-        throw QuicTransportException(
-            "Endpoint is already using 0-len connection ids.",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Endpoint is already using 0-len connection ids."));
       }
       // TODO vchynaro Implement retire_prior_to logic
 
@@ -216,11 +223,17 @@ bool updateSimpleFrameOnPacketReceived(
     case QuicSimpleFrame::Type::MaxStreamsFrame: {
       const MaxStreamsFrame& maxStreamsFrame = *frame.asMaxStreamsFrame();
       if (maxStreamsFrame.isForBidirectionalStream()) {
-        conn.streamManager->setMaxLocalBidirectionalStreams(
+        auto result = conn.streamManager->setMaxLocalBidirectionalStreams(
             maxStreamsFrame.maxStreams);
+        if (result.hasError()) {
+          return folly::makeUnexpected(result.error());
+        }
       } else {
-        conn.streamManager->setMaxLocalUnidirectionalStreams(
+        auto result = conn.streamManager->setMaxLocalUnidirectionalStreams(
             maxStreamsFrame.maxStreams);
+        if (result.hasError()) {
+          return folly::makeUnexpected(result.error());
+        }
       }
       return true;
     }
@@ -229,9 +242,9 @@ bool updateSimpleFrameOnPacketReceived(
           ? conn.serverConnectionId
           : conn.clientConnectionId;
       if (!curNodeConnId || curNodeConnId->size() == 0) {
-        throw QuicTransportException(
-            "Peer issued RETIRE_CONNECTION_ID_FRAME to endpoint using 0-len connection ids.",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Peer issued RETIRE_CONNECTION_ID_FRAME to endpoint using 0-len connection ids."));
       }
       const RetireConnectionIdFrame& retireConnIdFrame =
           *frame.asRetireConnectionIdFrame();
@@ -249,9 +262,9 @@ bool updateSimpleFrameOnPacketReceived(
       }
 
       if (dstConnId == it->connId) {
-        throw QuicTransportException(
-            "Peer issued RETIRE_CONNECTION_ID_FRAME refers to dst conn id field of containing packet.",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Peer issued RETIRE_CONNECTION_ID_FRAME refers to dst conn id field of containing packet."));
       }
 
       if (conn.nodeType == QuicNodeType::Server) {
@@ -264,9 +277,9 @@ bool updateSimpleFrameOnPacketReceived(
     }
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {
       if (conn.nodeType == QuicNodeType::Server) {
-        throw QuicTransportException(
-            "Received HANDSHAKE_DONE from client.",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Received HANDSHAKE_DONE from client."));
       }
       // Mark the handshake confirmed in the handshake layer before doing
       // any dropping, as this gives us a chance to process ACKs in this
@@ -284,9 +297,9 @@ bool updateSimpleFrameOnPacketReceived(
       if (!conn.transportSettings.minAckDelay.has_value()) {
         // We do not accept ACK_FREQUENCY frames. This is a protocol
         // violation.
-        throw QuicTransportException(
-            "Received ACK_FREQUENCY frame without announcing min_ack_delay",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Received ACK_FREQUENCY frame without announcing min_ack_delay"));
       }
       const auto ackFrequencyFrame = frame.asAckFrequencyFrame();
       auto& ackState = conn.ackStates.appDataAckState;
@@ -308,7 +321,8 @@ bool updateSimpleFrameOnPacketReceived(
       return true;
     }
   }
-  folly::assume_unreachable();
+  return folly::makeUnexpected(
+      QuicError(TransportErrorCode::INTERNAL_ERROR, "Unknown frame type"));
 }
 
 } // namespace quic

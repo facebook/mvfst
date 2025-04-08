@@ -1026,9 +1026,9 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.finalReadOffset = 1024;
-  EXPECT_THROW(
-      receiveRstStreamSMHandler(stream, std::move(rst)),
-      QuicTransportException);
+  auto result = receiveRstStreamSMHandler(stream, std::move(rst));
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
   // This doesn't change the send state machine implicitly anymore
   bool matches = (stream.sendState == StreamSendState::Open);
   EXPECT_TRUE(matches);
@@ -1044,7 +1044,8 @@ TEST_F(QuicStateFunctionsTest, InvokeResetDoesNotSendFlowControl) {
   stream.flowControlState.windowSize = 100;
   conn.flowControlState.advertisedMaxOffset = 100;
   conn.flowControlState.windowSize = 100;
-  receiveRstStreamSMHandler(stream, std::move(rst));
+  auto result = receiveRstStreamSMHandler(stream, std::move(rst));
+  EXPECT_TRUE(result.hasValue());
   bool matches = (stream.recvState == StreamRecvState::Closed);
   EXPECT_TRUE(matches);
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
@@ -1058,12 +1059,12 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
       FizzServerQuicHandshakeContext::Builder().build());
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
-  try {
-    sendRstAckSMHandler(stream, folly::none);
-    ADD_FAILURE();
-  } catch (QuicTransportException& ex) {
-    EXPECT_EQ(ex.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
-  }
+  auto result = sendRstAckSMHandler(stream, folly::none);
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::STREAM_STATE_ERROR);
   bool matches = (stream.sendState == StreamSendState::Open);
   EXPECT_TRUE(matches);
 }

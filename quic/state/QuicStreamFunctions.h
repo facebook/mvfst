@@ -8,7 +8,6 @@
 #pragma once
 
 #include <quic/state/StateData.h>
-#include <algorithm>
 
 namespace quic {
 
@@ -18,7 +17,8 @@ namespace quic {
  *
  * @throws QuicTransportException on error.
  */
-void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof);
 
 /**
  * Adds data represented in the form of BufferMeta to the end of the Buffer
@@ -26,7 +26,7 @@ void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof);
  *
  * TODO: move to dsr directory.
  */
-void writeBufMetaToQuicStream(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> writeBufMetaToQuicStream(
     QuicStreamState& stream,
     const BufferMeta& data,
     bool eof);
@@ -43,7 +43,9 @@ void writeDataToQuicStream(QuicCryptoStream& stream, Buf data);
  *
  * @throws QuicTransportException on error.
  */
-void appendDataToReadBuffer(QuicStreamState& stream, StreamBuffer buffer);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
+    QuicStreamState& stream,
+    StreamBuffer buffer);
 
 /**
  * Process data received from the network to add it to the crypto stream.
@@ -51,14 +53,16 @@ void appendDataToReadBuffer(QuicStreamState& stream, StreamBuffer buffer);
  *
  * @throws QuicTransportException on error.
  */
-void appendDataToReadBuffer(QuicCryptoStream& stream, StreamBuffer buffer);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
+    QuicCryptoStream& stream,
+    StreamBuffer buffer);
 
 /**
  * Reads data from the QUIC stream if data exists.
  * Returns a pair of data and whether or not EOF was reached on the stream.
  * amount == 0 reads all the pending data in the stream.
  */
-std::pair<Buf, bool> readDataFromQuicStream(
+folly::Expected<std::pair<Buf, bool>, QuicError> readDataFromQuicStream(
     QuicStreamState& state,
     uint64_t amount = 0);
 
@@ -84,7 +88,9 @@ void peekDataFromQuicStream(
  * Same as readDataFromQuicStream,
  * releases data instead of returning it.
  */
-void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount);
+folly::Expected<folly::Unit, QuicError> consumeDataFromQuicStream(
+    QuicStreamState& stream,
+    uint64_t amount);
 
 bool allBytesTillFinAcked(const QuicStreamState& state);
 
@@ -134,7 +140,8 @@ uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream);
  * object. Callers should provide a connFlowControlVisitor which will be invoked
  * when flow control operations need to be performed.
  */
-void appendDataToReadBufferCommon(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,

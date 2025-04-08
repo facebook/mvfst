@@ -74,7 +74,8 @@ class ClientStateMachineTest : public Test {
 };
 
 TEST_F(ClientStateMachineTest, TestUpdateTransportParamsNotIgnorePathMTU) {
-  updateTransportParamsFromCachedEarlyParams(*client_, kParams);
+  ASSERT_FALSE(
+      updateTransportParamsFromCachedEarlyParams(*client_, kParams).hasError());
   EXPECT_EQ(client_->udpSendPacketLen, kDefaultUDPSendPacketLen);
 }
 
@@ -85,7 +86,8 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   client_->maybePeerAckReceiveTimestampsConfig.assign(
       {.maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0});
 
-  updateTransportParamsFromCachedEarlyParams(*client_, kParams);
+  ASSERT_FALSE(
+      updateTransportParamsFromCachedEarlyParams(*client_, kParams).hasError());
   EXPECT_EQ(client_->peerIdleTimeout, idleTimeout);
   EXPECT_NE(client_->udpSendPacketLen, maxRecvPacketSize);
   EXPECT_EQ(client_->flowControlState.peerAdvertisedMaxOffset, initialMaxData);
@@ -182,7 +184,7 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
 
   auto result =
       processServerInitialParams(clientConn, serverTransportParams, 0);
-  EXPECT_TRUE(result.hasError());
+  ASSERT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
@@ -194,7 +196,8 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
       encodeIntegerParameter(TransportParameterId::max_datagram_frame_size, 0));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_EQ(clientConn.datagramState.maxWriteFrameSize, 0);
 }
 
@@ -207,7 +210,8 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
       kMaxDatagramPacketOverhead + 1));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_EQ(
       clientConn.datagramState.maxWriteFrameSize,
       kMaxDatagramPacketOverhead + 1);
@@ -221,7 +225,8 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
       encodeIntegerParameter(TransportParameterId::knob_frames_supported, 1));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_TRUE(clientConn.peerAdvertisedKnobFrameSupport);
 }
 
@@ -233,7 +238,8 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
       encodeIntegerParameter(TransportParameterId::knob_frames_supported, 0));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_FALSE(clientConn.peerAdvertisedKnobFrameSupport);
 }
 
@@ -245,7 +251,8 @@ TEST_F(ClientStateMachineTest, TestProcessExtendedAckSupportedParam) {
       encodeIntegerParameter(TransportParameterId::extended_ack_features, 3));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_EQ(clientConn.peerAdvertisedExtendedAckFeatures, 3);
 }
 
@@ -255,7 +262,8 @@ TEST_F(ClientStateMachineTest, TestProcessExtendedAckSupportedParamDefault) {
   std::vector<TransportParameter> transportParams;
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_EQ(clientConn.peerAdvertisedExtendedAckFeatures, 0);
 }
 
@@ -269,7 +277,8 @@ TEST_F(
       encodeEmptyParameter(TransportParameterId::reliable_stream_reset));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_TRUE(clientConn.peerAdvertisedReliableStreamResetSupport);
 }
 
@@ -281,7 +290,8 @@ TEST_F(
   std::vector<TransportParameter> transportParams;
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
   EXPECT_FALSE(clientConn.peerAdvertisedReliableStreamResetSupport);
 }
 
@@ -354,7 +364,8 @@ TEST_P(
   }
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
-  processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
 
   EXPECT_EQ(
       clientConn.peerAdvertisedMaxStreamGroups,

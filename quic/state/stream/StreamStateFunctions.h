@@ -12,13 +12,15 @@
 namespace quic {
 
 // Common operations to conduct on QuicStreamState when send reset on it
-void resetQuicStream(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> resetQuicStream(
     QuicStreamState& stream,
     ApplicationErrorCode error,
     Optional<uint64_t> reliableSize = folly::none);
 
 // Common operations to conduct on QuicStreamState when receive reset on it
-void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> onResetQuicStream(
+    QuicStreamState& stream,
+    const RstStreamFrame& frame);
 
 bool isAllDataReceived(const QuicStreamState& stream);
 

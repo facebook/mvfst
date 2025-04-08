@@ -102,12 +102,16 @@ class QuicTransportTest : public Test {
         kDefaultStreamFlowControlWindow;
     transport_->getConnectionState().flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
-    transport_->getConnectionState()
-        .streamManager->setMaxLocalBidirectionalStreams(
-            kDefaultMaxStreamsBidirectional);
-    transport_->getConnectionState()
-        .streamManager->setMaxLocalUnidirectionalStreams(
-            kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !transport_->getConnectionState()
+             .streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!transport_->getConnectionState()
+               .streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
   }
 
   void loopForWrites() {
@@ -1425,10 +1429,12 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
       StreamDirectionality::Bidirectional,
       transport_->getStreamDirectionality(id));
   EXPECT_EQ(StreamInitiator::Local, transport_->getStreamInitiator(id));
-
   EXPECT_CALL(*cb1, streamClosed(transport_.get(), streamEventMatcher));
-  auto stream = CHECK_NOTNULL(
-      transport_->getConnectionState().streamManager->getStream(id));
+  auto streamExpected =
+      transport_->getConnectionState().streamManager->getStream(id);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
+  ASSERT_NE(stream, nullptr);
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   transport_->getConnectionState().streamManager->addClosed(id);
@@ -1463,9 +1469,11 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
       id, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
 
   EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
-  auto stream = CHECK_NOTNULL(
-      transport_->getConnectionState().streamManager->getStream(id));
-  EXPECT_THAT(stream, NotNull());
+  auto streamExpected =
+      transport_->getConnectionState().streamManager->getStream(id);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
+  ASSERT_NE(stream, nullptr);
 
   EXPECT_EQ(
       StreamDirectionality::Bidirectional,
@@ -1515,8 +1523,11 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
   EXPECT_EQ(StreamInitiator::Local, transport_->getStreamInitiator(id));
 
   EXPECT_CALL(*cb1, streamClosed(transport_.get(), streamEventMatcher));
-  auto stream = CHECK_NOTNULL(
-      transport_->getConnectionState().streamManager->getStream(id));
+  auto streamExpected =
+      transport_->getConnectionState().streamManager->getStream(id);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
+  ASSERT_NE(stream, nullptr);
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   transport_->getConnectionState().streamManager->addClosed(id);
@@ -1551,8 +1562,11 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
       id, StreamInitiator::Remote, StreamDirectionality::Unidirectional);
 
   EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
-  auto stream = CHECK_NOTNULL(
-      transport_->getConnectionState().streamManager->getStream(id));
+  auto streamExpected =
+      transport_->getConnectionState().streamManager->getStream(id);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
+  ASSERT_NE(stream, nullptr);
 
   EXPECT_EQ(
       StreamDirectionality::Unidirectional,
@@ -1589,7 +1603,11 @@ TEST_F(QuicTransportTest, StreamBidirectionalLocal) {
 TEST_F(QuicTransportTest, StreamBidirectionalRemote) {
   const auto id = 0x00;
   // trigger tracking of new remote stream via getStream()
-  CHECK_NOTNULL(transport_->getConnectionState().streamManager->getStream(id));
+  auto streamExpected =
+      transport_->getConnectionState().streamManager->getStream(id);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
+  ASSERT_NE(stream, nullptr);
 
   EXPECT_EQ(
       StreamDirectionality::Bidirectional,
@@ -1610,7 +1628,11 @@ TEST_F(QuicTransportTest, StreamUnidirectionalLocal) {
 TEST_F(QuicTransportTest, StreamUnidirectionalRemote) {
   const auto id = 0x02;
   // trigger tracking of new remote stream via getStream()
-  CHECK_NOTNULL(transport_->getConnectionState().streamManager->getStream(id));
+  auto streamExpected =
+      transport_->getConnectionState().streamManager->getStream(id);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
+  ASSERT_NE(stream, nullptr);
 
   EXPECT_EQ(
       StreamDirectionality::Unidirectional,
@@ -1635,7 +1657,7 @@ TEST_F(QuicTransportTest, WriteSmall) {
   dropPackets(conn);
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1644,6 +1666,7 @@ TEST_F(QuicTransportTest, WriteSmall) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
 
   verifyCorrectness(conn, 0, stream, *buf);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
@@ -1670,7 +1693,7 @@ TEST_F(QuicTransportTest, WriteLarge) {
   EXPECT_CALL(*socket_, write(_, _, _))
       .Times(NumFullPackets + 1)
       .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1679,6 +1702,7 @@ TEST_F(QuicTransportTest, WriteLarge) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
   EXPECT_EQ(NumFullPackets + 1, conn.outstandings.packets.size());
   verifyCorrectness(conn, 0, stream, *buf);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
@@ -1731,7 +1755,7 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
   // Should retransmit lost streams in a single packet
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1740,6 +1764,7 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
   verifyCorrectness(conn, 0, s1, *buf);
   verifyCorrectness(conn, 0, s2, *buf2);
 }
@@ -1750,7 +1775,9 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   conn.qLogger = mockQLogger;
 
   auto streamId = transport_->createBidirectionalStream().value();
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto& stream = streamResult.value();
   stream->flowControlState.peerAdvertisedMaxOffset = 100;
   stream->currentWriteOffset = 100;
   stream->conn.flowControlState.sumCurWriteOffset = 100;
@@ -1796,7 +1823,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   conn.streamManager->updateWritableStreams(*stream);
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1805,6 +1832,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
   verifyCorrectness(conn, 100, streamId, *buf1, false, false);
 
   // Connection flow controlled
@@ -1814,7 +1842,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   EXPECT_CALL(*socket_, write(_, _, _))
       .Times(2)
       .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes2 = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1823,6 +1851,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes2.hasError());
   auto buf2 = buf->clone();
   buf2->trimEnd(30);
   verifyCorrectness(conn, 100, streamId, *buf2, false, false);
@@ -1846,7 +1875,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   // Try again, verify that there should not be any Data blocked frame emitted
   // again.
   EXPECT_CALL(*socket_, write(_, _, _)).Times(0);
-  writeQuicDataToSocket(
+  auto writeRes3 = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1855,12 +1884,13 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes3.hasError());
 
   // Flow control lifted
   stream->conn.flowControlState.peerAdvertisedMaxOffset = 300;
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes4 = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1869,6 +1899,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes4.hasError());
   verifyCorrectness(conn, 100, streamId, *buf, false, false);
 }
 
@@ -1914,7 +1945,7 @@ TEST_F(QuicTransportTest, WriteFin) {
   dropPackets(conn);
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1923,6 +1954,7 @@ TEST_F(QuicTransportTest, WriteFin) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
   verifyCorrectness(conn, 0, stream, *buf, true);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
@@ -1945,7 +1977,7 @@ TEST_F(QuicTransportTest, WriteOnlyFin) {
   dropPackets(conn);
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1954,6 +1986,7 @@ TEST_F(QuicTransportTest, WriteOnlyFin) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
   verifyCorrectness(conn, 0, stream, *buf, true);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
@@ -1989,7 +2022,7 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
   addAckStatesWithCurrentTimestamps(conn.ackStates.appDataAckState, start, end);
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
+  auto writeRes = writeQuicDataToSocket(
       *socket_,
       conn,
       *conn.clientConnectionId,
@@ -1998,6 +2031,7 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes.hasError());
   EXPECT_TRUE(conn.outstandings.packets.empty());
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, end);
   EXPECT_FALSE(conn.ackStates.appDataAckState.needsToSendAckImmediately);
@@ -2322,7 +2356,8 @@ TEST_F(QuicTransportTest, RstStreamReliably) {
     for (auto& frame : packet.packet.frames) {
       auto maybeWriteStreamFrame = frame.asWriteStreamFrame();
       if (maybeWriteStreamFrame) {
-        sendAckSMHandler(*stream, *maybeWriteStreamFrame);
+        auto ackResult = sendAckSMHandler(*stream, *maybeWriteStreamFrame);
+        ASSERT_FALSE(ackResult.hasError());
       }
     }
   }
@@ -2332,7 +2367,8 @@ TEST_F(QuicTransportTest, RstStreamReliably) {
   EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
 
   // ACK the reliable reset
-  sendRstAckSMHandler(*stream, 12);
+  auto rstAckResult = sendRstAckSMHandler(*stream, 12);
+  ASSERT_FALSE(rstAckResult.hasError());
 
   // We should transition to Closed because the peer has ACKed the reliable
   // reset, and has also ACKed all of the reliable bytes.
@@ -2651,7 +2687,8 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLoss) {
           ->packet;
 
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
-  markPacketLoss(conn, packet, false);
+  auto result = markPacketLoss(conn, packet, false);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(*conn.pendingEvents.pathChallenge, pathChallenge);
 }
 
@@ -2676,7 +2713,8 @@ TEST_F(QuicTransportTest, DoNotResendLostPathChallengeIfNotOutstanding) {
   transport_->getPathValidationTimeout().timeoutExpired();
 
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
-  markPacketLoss(conn, packet, false);
+  auto result = markPacketLoss(conn, packet, false);
+  ASSERT_FALSE(result.hasError());
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
 }
 
@@ -2717,7 +2755,9 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   transport_->writeChain(streamId, IOBuf::create(0), true);
   loopForWrites();
   EXPECT_EQ(1, conn.outstandings.packets.size());
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto& stream = streamResult.value();
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
   EXPECT_EQ(0, stream->retransmissionBuffer.at(0)->data.chainLength());
   EXPECT_TRUE(stream->retransmissionBuffer.at(0)->eof);
@@ -2727,7 +2767,8 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   EXPECT_EQ(0, *stream->finalWriteOffset);
 
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  receiveRstStreamSMHandler(*stream, std::move(rstFrame));
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(*stream, std::move(rstFrame)).hasError());
 
   // This will clone twice. :/ Maybe we should change this to clone only once in
   // the future, thus the EXPECT were written with LT and LE. But it will clone
@@ -2795,7 +2836,8 @@ TEST_F(QuicTransportTest, ResendPathResponseOnLoss) {
   EXPECT_EQ(numPathResponseFrames, 1);
 
   // pathResponseFrame should be queued for re-tx on packet loss
-  markPacketLoss(conn, packet, false);
+  auto result = markPacketLoss(conn, packet, false);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
   numPathResponseFrames = std::count_if(
       conn.pendingEvents.frames.begin(),
@@ -2936,7 +2978,8 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
           ->packet;
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  markPacketLoss(conn, packet, false);
+  auto result = markPacketLoss(conn, packet, false);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
   NewConnectionIdFrame* connIdFrame =
       conn.pendingEvents.frames.front().asNewConnectionIdFrame();
@@ -3021,7 +3064,8 @@ TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {
           ->packet;
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  markPacketLoss(conn, packet, false);
+  auto result = markPacketLoss(conn, packet, false);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
   RetireConnectionIdFrame* retireFrame =
       conn.pendingEvents.frames.front().asRetireConnectionIdFrame();
@@ -3035,7 +3079,9 @@ TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
-  auto streamState = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto& streamState = streamResult.value();
 
   // write EOF
   transport_->writeChain(streamId, buf->clone(), true);
@@ -3244,7 +3290,8 @@ TEST_F(QuicTransportTest, WriteAckNotSetLossAlarm) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, res.packetsWritten); // Write one packet out
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(1, res->packetsWritten); // Write one packet out
   EXPECT_FALSE(transport_->isLossTimeoutScheduled()); // no alarm scheduled
 }
 
@@ -3264,7 +3311,8 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, res.packetsWritten); // Write one packet out
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(1, res->packetsWritten); // Write one packet out
   EXPECT_EQ(1, conn.outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
@@ -3280,12 +3328,12 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
   }
 
   EXPECT_TRUE(connWindowFound);
-
   EXPECT_EQ(conn.flowControlState.advertisedMaxOffset, 100);
   conn.outstandings.reset();
-
   auto stream = transport_->createBidirectionalStream().value();
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto& streamState = streamResult.value();
   streamState->flowControlState.windowSize = 100;
   streamState->flowControlState.advertisedMaxOffset = 0;
   MaxStreamDataFrame frame(stream, 100);
@@ -3301,7 +3349,8 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
       *conn.oneRttWriteHeaderCipher,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, res.packetsWritten); // Write one packet out
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(1, res->packetsWritten); // Write one packet out
   EXPECT_EQ(1, conn.outstandings.packets.size());
   auto packet1 =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
@@ -3314,14 +3363,16 @@ TEST_F(QuicTransportTest, FlowControlCallbacks) {
   auto stream = transport_->createBidirectionalStream().value();
   auto stream2 = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamState1 = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamState1.hasError());
   auto streamState2 = conn.streamManager->getStream(stream2);
+  ASSERT_FALSE(streamState2.hasError());
 
-  conn.streamManager->queueFlowControlUpdated(streamState->id);
-  conn.streamManager->queueFlowControlUpdated(streamState2->id);
-  EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState->id));
+  conn.streamManager->queueFlowControlUpdated(streamState1.value()->id);
+  conn.streamManager->queueFlowControlUpdated(streamState2.value()->id);
+  EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState1.value()->id));
   // We should be able to create streams from this callback.
-  EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState2->id))
+  EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState2.value()->id))
       .WillOnce(Invoke([&](auto) { transport_->createBidirectionalStream(); }));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
@@ -3352,7 +3403,9 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
   loopForWrites();
 
   auto& conn = transport_->getConnectionState();
-  auto streamState = conn.streamManager->getStream(stream1);
+  auto streamResult = conn.streamManager->getStream(stream1);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   conn.streamManager->addDeliverable(stream1);
   folly::SocketAddress addr;
   NetworkData emptyData;
@@ -3372,7 +3425,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
   loopForWrites();
 
   auto& conn = transport_->getConnectionState();
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
 
   folly::SocketAddress addr;
   NetworkData emptyData;
@@ -3410,7 +3465,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
   // Faking a delivery:
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->retransmissionBuffer.clear();
   streamState->ackedIntervals.insert(0, 1);
 
@@ -3436,7 +3493,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   // Faking a delivery:
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->retransmissionBuffer.clear();
 
   folly::SocketAddress addr;
@@ -3478,7 +3537,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   // Faking a delivery and retx:
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->retransmissionBuffer.clear();
   auto retxBufferData = folly::IOBuf::copyBuffer("But i'm not delivered yet");
   streamState->retransmissionBuffer.emplace(
@@ -3527,7 +3588,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   // Faking a delivery, retx and loss:
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->retransmissionBuffer.clear();
   streamState->lossBuffer.clear();
   auto retxBufferData = folly::IOBuf::copyBuffer("But i'm not delivered yet");
@@ -3589,7 +3652,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByte) {
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->ackedIntervals.insert(0, 0);
   EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
@@ -3642,7 +3707,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByteWithFin) {
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->ackedIntervals.insert(0, 1);
   EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
@@ -4030,12 +4097,13 @@ TEST_F(
   EXPECT_CALL(txCb3, onByteEvent(getTxMatcher(stream, 20))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb3);
-
   folly::SocketAddress addr;
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;
-  auto streamState = conn.streamManager->getStream(stream);
+  auto streamResult = conn.streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  auto streamState = streamResult.value();
   streamState->ackedIntervals.insert(0, 20);
   EXPECT_CALL(deliveryCb1, onDeliveryAck(stream, 9, 100us)).Times(1);
   EXPECT_CALL(deliveryCb2, onDeliveryAck(stream, 19, 100us)).Times(1);
@@ -4086,10 +4154,13 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnAsync) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the conn flow control to have no bytes remaining.
-  updateFlowControlOnWriteToStream(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
   transport_->notifyPendingWriteOnConnection(&writeCallback_);
@@ -4115,10 +4186,12 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
 
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // Fill up the buffer to its limit
-  updateFlowControlOnWriteToStream(*stream, 100);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(*stream, 100).hasError());
   transport_->notifyPendingWriteOnConnection(&writeCallback_);
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
@@ -4126,7 +4199,7 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
   evb_.loop();
 
   // Write 10 bytes to the socket to free up space
-  updateFlowControlOnWriteToSocket(*stream, 10);
+  ASSERT_FALSE(updateFlowControlOnWriteToSocket(*stream, 10).hasError());
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_));
 
   transport_->onNetworkData(
@@ -4172,10 +4245,12 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferUseTotalSpace) {
 
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // Fill up the buffer to its limit
-  updateFlowControlOnWriteToStream(*stream, 100);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(*stream, 100).hasError());
   transport_->notifyPendingWriteOnConnection(&writeCallback_);
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
@@ -4196,10 +4271,12 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferOveruseSpace) {
 
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // Fill up the buffer to its limit
-  updateFlowControlOnWriteToStream(*stream, 1000);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(*stream, 1000).hasError());
   transport_->notifyPendingWriteOnConnection(&writeCallback_);
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
@@ -4223,11 +4300,14 @@ TEST_F(
   transport_->setTransportSettings(transportSettings);
 
   auto streamId = transport_->createBidirectionalStream().value();
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // Use up the entire flow control (but not the buffer space)
-  updateFlowControlOnWriteToStream(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
   transport_->notifyPendingWriteOnConnection(&writeCallback_);
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
@@ -4252,10 +4332,13 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the conn flow control to have no bytes remaining.
-  updateFlowControlOnWriteToStream(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
 
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _)).Times(0);
   transport_->notifyPendingWriteOnStream(stream->id, &writeCallback_);
@@ -4283,12 +4366,16 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
   auto& conn = transport_->getConnectionState();
   conn.transportSettings.backpressureHeadroomFactor = 1;
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the conn flow control to have no bytes remaining.
-  updateFlowControlOnWriteToStream(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
-  updateFlowControlOnWriteToSocket(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
+  ASSERT_FALSE(updateFlowControlOnWriteToSocket(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
 
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _)).Times(0);
   transport_->notifyPendingWriteOnStream(stream->id, &writeCallback_);
@@ -4327,7 +4414,9 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncStreamBlocked) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the stream flow control to have no bytes remaining.
   stream->currentWriteOffset = stream->flowControlState.peerAdvertisedMaxOffset;
 
@@ -4354,10 +4443,13 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnTwice) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the conn flow control to have no bytes remaining.
-  updateFlowControlOnWriteToStream(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
   EXPECT_FALSE(
@@ -4371,7 +4463,9 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamTwice) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the stream flow control to have no bytes remaining.
   stream->currentWriteOffset = stream->flowControlState.peerAdvertisedMaxOffset;
 
@@ -4391,10 +4485,13 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnDuringClose) {
   auto streamId2 = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   // Artificially restrict the conn flow control to have no bytes remaining.
-  updateFlowControlOnWriteToStream(
-      *stream, conn.flowControlState.peerAdvertisedMaxOffset);
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *stream, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
 
   transport_->notifyPendingWriteOnStream(stream->id, &writeCallback_);
   transport_->notifyPendingWriteOnStream(streamId2, &writeCallback_);
@@ -4425,8 +4522,12 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamDuringClose) {
   auto streamId2 = transport_->createBidirectionalStream().value();
   auto& conn = transport_->getConnectionState();
 
-  auto stream = conn.streamManager->getStream(streamId);
-  auto stream2 = conn.streamManager->getStream(streamId2);
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
+  auto streamResult2 = conn.streamManager->getStream(streamId2);
+  ASSERT_FALSE(streamResult2.hasError());
+  auto stream2 = streamResult2.value();
   // Artificially restrict the stream flow control to have no bytes remaining.
   stream->currentWriteOffset = stream->flowControlState.peerAdvertisedMaxOffset;
   stream2->currentWriteOffset =
@@ -4468,25 +4569,32 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
         return res;
       }));
 
-  auto stream1 = conn.streamManager->getStream(s1);
+  auto streamResult1 = conn.streamManager->getStream(s1);
+  ASSERT_FALSE(streamResult1.hasError());
+  auto stream1 = streamResult1.value();
   auto buf1 = buildRandomInputData(kDefaultUDPSendPacketLen);
-  writeDataToQuicStream(*stream1, buf1->clone(), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream1, buf1->clone(), false).hasError());
 
   auto buf2 = buildRandomInputData(kDefaultUDPSendPacketLen);
-  auto stream2 = conn.streamManager->getStream(s2);
-  writeDataToQuicStream(*stream2, buf2->clone(), false);
+  auto streamResult2 = conn.streamManager->getStream(s2);
+  ASSERT_FALSE(streamResult2.hasError());
+  auto stream2 = streamResult2.value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream2, buf2->clone(), false).hasError());
 
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
-      *socket_,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      *aead_,
-      *conn.oneRttWriteHeaderCipher,
-      transport_->getVersion(),
-      conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *socket_,
+                   conn,
+                   *conn.clientConnectionId,
+                   *conn.serverConnectionId,
+                   *aead_,
+                   *conn.oneRttWriteHeaderCipher,
+                   transport_->getVersion(),
+                   conn.transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(1, conn.outstandings.packets.size());
   auto& packet = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   EXPECT_EQ(1, packet.packet.frames.size());
@@ -4502,15 +4610,16 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
 
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
-      *socket_,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      *aead_,
-      *conn.oneRttWriteHeaderCipher,
-      transport_->getVersion(),
-      conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *socket_,
+                   conn,
+                   *conn.clientConnectionId,
+                   *conn.serverConnectionId,
+                   *aead_,
+                   *conn.oneRttWriteHeaderCipher,
+                   transport_->getVersion(),
+                   conn.transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(1, conn.outstandings.packets.size());
   auto& outstandingPacket2 =
       *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
@@ -4527,15 +4636,16 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   writableBytes = kDefaultUDPSendPacketLen;
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
-  writeQuicDataToSocket(
-      *socket_,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      *aead_,
-      *conn.oneRttWriteHeaderCipher,
-      transport_->getVersion(),
-      conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *socket_,
+                   conn,
+                   *conn.clientConnectionId,
+                   *conn.serverConnectionId,
+                   *aead_,
+                   *conn.oneRttWriteHeaderCipher,
+                   transport_->getVersion(),
+                   conn.transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(1, conn.outstandings.packets.size());
   auto& outstandingPacket3 =
       *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
@@ -4555,15 +4665,16 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
 TEST_F(QuicTransportTest, NoStream) {
   auto& conn = transport_->getConnectionState();
   EventBase evb;
-  writeQuicDataToSocket(
-      *socket_,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      *aead_,
-      *conn.oneRttWriteHeaderCipher,
-      transport_->getVersion(),
-      conn.transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *socket_,
+                   conn,
+                   *conn.clientConnectionId,
+                   *conn.serverConnectionId,
+                   *aead_,
+                   *conn.oneRttWriteHeaderCipher,
+                   transport_->getVersion(),
+                   conn.transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_TRUE(conn.outstandings.packets.empty());
 }
 
@@ -5009,7 +5120,9 @@ TEST_F(QuicTransportTest, GetSetReceiveWindowOnIncomingUnidirectionalStream) {
   // Stream ID is for a peer-initiated unidirectional stream
   StreamId id = 0b110;
   uint64_t windowSize = 1500;
-  auto stream = conn.streamManager->getStream(id);
+  auto streamResult = conn.streamManager->getStream(id);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   EXPECT_FALSE(stream->writable());
   EXPECT_TRUE(stream->shouldSendFlowControl());
   auto res1 = transport_->setStreamFlowControlWindow(id, windowSize);
@@ -5045,7 +5158,8 @@ TEST_F(QuicTransportTest, GetMaxWritableOnIncomingUnidirectionalStream) {
   auto& conn = transport_->getConnectionState();
   // Stream ID is for a peer-initiated unidirectional stream
   StreamId id = 0b110;
-  conn.streamManager->getStream(id);
+  auto streamResult = conn.streamManager->getStream(id);
+  ASSERT_FALSE(streamResult.hasError());
   auto maxWritable = transport_->getMaxWritableOnStream(id);
   // max writable on receive only stream returns an error
   EXPECT_TRUE(maxWritable.hasError());
@@ -5056,7 +5170,9 @@ TEST_F(QuicTransportTest, GetMaxWritableStreamFlowControlLimited) {
   auto transportSettings = transport_->getTransportSettings();
   // Stream ID is for a peer-initiated bidirectional stream
   StreamId id = 0b100;
-  auto stream = conn.streamManager->getStream(id);
+  auto streamResult = conn.streamManager->getStream(id);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // set stream fcw < both conn fc and total buffer space available, such that
   // we're limited by stream fcw
@@ -5075,7 +5191,9 @@ TEST_F(QuicTransportTest, GetMaxWritableConnFlowControlLimited) {
   auto transportSettings = transport_->getTransportSettings();
   // Stream ID is for a peer-initiated bidirectional stream
   StreamId id = 0b100;
-  auto stream = conn.streamManager->getStream(id);
+  auto streamResult = conn.streamManager->getStream(id);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // set conn fcw < both stream fcw and buffer space, such that we're conn fcw
   // limited
@@ -5094,7 +5212,9 @@ TEST_F(QuicTransportTest, GetMaxWritableBufferSpaceLimited) {
   auto transportSettings = transport_->getTransportSettings();
   // Stream ID is for a peer-initiated bidirectional stream
   StreamId id = 0b100;
-  auto stream = conn.streamManager->getStream(id);
+  auto streamResult = conn.streamManager->getStream(id);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
 
   // set total buffer space available < stream and conn fcw, such that
   // we're limited by buffer space
@@ -5116,11 +5236,15 @@ TEST_F(QuicTransportTest, GetMaxWritableStreamFlowControlLimitedTwoStreams) {
   StreamId id2 = 0b1100;
 
   // let's assume we have 1k bytes left in each window
-  auto stream1 = conn.streamManager->getStream(id1);
+  auto streamResult1 = conn.streamManager->getStream(id1);
+  ASSERT_FALSE(streamResult1.hasError());
+  auto stream1 = streamResult1.value();
   stream1->currentWriteOffset = 1000;
   stream1->flowControlState.peerAdvertisedMaxOffset = 2000;
 
-  auto stream2 = conn.streamManager->getStream(id2);
+  auto streamResult2 = conn.streamManager->getStream(id2);
+  ASSERT_FALSE(streamResult2.hasError());
+  auto stream2 = streamResult2.value();
   stream2->currentWriteOffset = 1000;
   stream2->flowControlState.peerAdvertisedMaxOffset = 2000;
 
@@ -5150,11 +5274,15 @@ TEST_F(QuicTransportTest, GetMaxWritableConnFlowControlLimitedTwoStreams) {
   StreamId id2 = 0b1100;
 
   // let's assume we have 1k bytes left in each window
-  auto stream1 = conn.streamManager->getStream(id1);
+  auto streamResult1 = conn.streamManager->getStream(id1);
+  ASSERT_FALSE(streamResult1.hasError());
+  auto stream1 = streamResult1.value();
   stream1->currentWriteOffset = 1000;
   stream1->flowControlState.peerAdvertisedMaxOffset = 2000;
 
-  auto stream2 = conn.streamManager->getStream(id2);
+  auto streamResult2 = conn.streamManager->getStream(id2);
+  ASSERT_FALSE(streamResult2.hasError());
+  auto stream2 = streamResult2.value();
   stream2->currentWriteOffset = 1000;
   stream2->flowControlState.peerAdvertisedMaxOffset = 2000;
 
@@ -5184,11 +5312,15 @@ TEST_F(QuicTransportTest, GetMaxWritableBufferSpaceLimitedTwoStreams) {
   StreamId id2 = 0b1100;
 
   // let's assume we have 1k bytes left in each window
-  auto stream1 = conn.streamManager->getStream(id1);
+  auto streamResult1 = conn.streamManager->getStream(id1);
+  ASSERT_FALSE(streamResult1.hasError());
+  auto stream1 = streamResult1.value();
   stream1->currentWriteOffset = 1000;
   stream1->flowControlState.peerAdvertisedMaxOffset = 2000;
 
-  auto stream2 = conn.streamManager->getStream(id2);
+  auto streamResult2 = conn.streamManager->getStream(id2);
+  ASSERT_FALSE(streamResult2.hasError());
+  auto stream2 = streamResult2.value();
   stream2->currentWriteOffset = 1000;
   stream2->flowControlState.peerAdvertisedMaxOffset = 2000;
 

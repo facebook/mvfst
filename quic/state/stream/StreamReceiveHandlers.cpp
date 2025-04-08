@@ -34,16 +34,18 @@ namespace quic {
  * Receive::Closed <---------+
  *
  */
-
-void receiveReadStreamFrameSMHandler(
+folly::Expected<folly::Unit, QuicError> receiveReadStreamFrameSMHandler(
     QuicStreamState& stream,
     ReadStreamFrame&& frame) {
   switch (stream.recvState) {
     case StreamRecvState::Open: {
       VLOG_IF(10, frame.fin) << "Open: Received data with fin"
                              << " stream=" << stream.id << " " << stream.conn;
-      appendDataToReadBuffer(
+      auto appendResult = appendDataToReadBuffer(
           stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
+      if (appendResult.hasError()) {
+        return appendResult;
+      }
       bool allDataTillReliableSizeReceived = stream.reliableSizeFromPeer &&
           (*stream.reliableSizeFromPeer == 0 ||
            isAllDataReceivedUntil(stream, *stream.reliableSizeFromPeer - 1));
@@ -67,23 +69,27 @@ void receiveReadStreamFrameSMHandler(
       break;
     }
     case StreamRecvState::Invalid: {
-      throw QuicTransportException(
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::STREAM_STATE_ERROR,
           folly::to<std::string>(
               "Invalid transition from state=",
-              streamStateToString(stream.recvState)),
-          TransportErrorCode::STREAM_STATE_ERROR);
+              streamStateToString(stream.recvState))));
     }
   }
+  return folly::unit;
 }
 
-void receiveRstStreamSMHandler(
+folly::Expected<folly::Unit, QuicError> receiveRstStreamSMHandler(
     QuicStreamState& stream,
     const RstStreamFrame& rst) {
   switch (stream.recvState) {
     case StreamRecvState::Closed: {
       // This will check whether the reset is still consistent with the
       // stream.
-      onResetQuicStream(stream, rst);
+      auto resetResult = onResetQuicStream(stream, rst);
+      if (resetResult.hasError()) {
+        return resetResult;
+      }
       break;
     }
     case StreamRecvState::Open: {
@@ -100,18 +106,21 @@ void receiveRstStreamSMHandler(
           stream.conn.streamManager->addClosed(stream.id);
         }
       }
-      onResetQuicStream(stream, rst);
+      auto resetResult = onResetQuicStream(stream, rst);
+      if (resetResult.hasError()) {
+        return resetResult;
+      }
       break;
     }
     case StreamRecvState::Invalid: {
-      throw QuicTransportException(
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::STREAM_STATE_ERROR,
           folly::to<std::string>(
               "Invalid transition from state=",
-              streamStateToString(stream.recvState)),
-          TransportErrorCode::STREAM_STATE_ERROR);
-      break;
+              streamStateToString(stream.recvState))));
     }
   }
+  return folly::unit;
 }
 
 } // namespace quic

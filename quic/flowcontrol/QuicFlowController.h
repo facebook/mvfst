@@ -32,32 +32,34 @@ bool maybeSendConnWindowUpdate(
     TimePoint updateTime);
 
 bool maybeSendStreamWindowUpdate(QuicStreamState& stream, TimePoint updateTime);
-
 /**
  * Update the connection flow control state based on receiving data on the
  * stream. previousMaxOffsetObserved is the maxOffsetObserved on the stream
  * before receiving the data. bufferEndOffset is the end offset of the current
  * buffer.
  */
-void updateFlowControlOnStreamData(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+updateFlowControlOnStreamData(
     QuicStreamState& stream,
     uint64_t previousMaxOffsetObserved,
     uint64_t bufferEndOffset);
 
-void updateFlowControlOnRead(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
     QuicStreamState& stream,
     uint64_t lastReadOffset,
     TimePoint readTime);
 
-void updateFlowControlOnReceiveReset(
-    QuicStreamState& stream,
-    TimePoint resetTime);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+updateFlowControlOnReceiveReset(QuicStreamState& stream, TimePoint resetTime);
 
-void updateFlowControlOnWriteToSocket(QuicStreamState& stream, uint64_t length);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+updateFlowControlOnWriteToSocket(QuicStreamState& stream, uint64_t length);
 
-void updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
 
-void updateFlowControlOnResetStream(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+updateFlowControlOnResetStream(
     QuicStreamState& stream,
     folly::Optional<uint64_t> reliableSize = folly::none);
 

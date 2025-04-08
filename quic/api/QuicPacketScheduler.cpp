@@ -571,7 +571,8 @@ bool RstStreamScheduler::writeRsts(PacketBuilderInterface& builder) {
   bool rstWritten = false;
   for (const auto& resetStream : conn_.pendingEvents.resets) {
     auto streamId = resetStream.first;
-    QuicStreamState* streamState = conn_.streamManager->getStream(streamId);
+    QuicStreamState* streamState =
+        conn_.streamManager->getStream(streamId).value_or(nullptr);
     CHECK(streamState) << "Stream " << streamId
                        << " not found when going through resets";
     if (streamState->pendingWrites.empty() &&
@@ -901,10 +902,14 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // Or we can throw away the built packet and send a ping.
 
     // Rebuilder will write the rest of frames
-    auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
-    if (rebuildResult) {
+    auto rebuildResultExpected = rebuilder.rebuildFromPacket(outstandingPacket);
+    // TODO handle error better.
+    if (rebuildResultExpected.hasError()) {
+      return SchedulingResult(none, none, 0);
+    }
+    if (rebuildResultExpected.value()) {
       return SchedulingResult(
-          std::move(rebuildResult),
+          std::move(rebuildResultExpected.value()),
           std::move(*internalBuilder).buildPacket(),
           0);
     } else if (

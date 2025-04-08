@@ -709,16 +709,17 @@ TEST_F(BbrTest, BytesCounting) {
   ackFrame.largestAcked = packetNum;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
   auto ackPacketVisitor = [](auto&) {};
-  auto ackFrameVisitor = [](auto&, auto&) {};
-  auto lossVisitor = [](auto&, auto&, bool) {};
-  processAckFrame(
-      conn,
-      PacketNumberSpace::AppData,
-      ackFrame,
-      ackPacketVisitor,
-      ackFrameVisitor,
-      lossVisitor,
-      Clock::now());
+  auto ackFrameVisitor = [](auto&, auto&) { return folly::unit; };
+  auto lossVisitor = [](auto&, auto&, bool) { return folly::unit; };
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   PacketNumberSpace::AppData,
+                   ackFrame,
+                   ackPacketVisitor,
+                   ackFrameVisitor,
+                   lossVisitor,
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(1200, conn.lossState.totalBytesAcked);
 }
 

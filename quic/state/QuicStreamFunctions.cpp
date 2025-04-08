@@ -23,8 +23,8 @@ void prependToBuf(quic::Buf& buf, quic::Buf toAppend) {
 } // namespace
 
 namespace quic {
-
-void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
+folly::Expected<folly::Unit, QuicError>
+writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
   auto neverWrittenBufMeta = (0 == stream.writeBufMeta.offset);
   uint64_t len = 0;
   if (data) {
@@ -47,11 +47,15 @@ void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
     auto bufferSize = stream.pendingWrites.chainLength();
     stream.finalWriteOffset = stream.currentWriteOffset + bufferSize;
   }
-  updateFlowControlOnWriteToStream(stream, len);
+  auto result = updateFlowControlOnWriteToStream(stream, len);
+  if (result.hasError()) {
+    return folly::makeUnexpected(result.error());
+  }
   stream.conn.streamManager->updateWritableStreams(stream);
+  return folly::unit;
 }
 
-void writeBufMetaToQuicStream(
+folly::Expected<folly::Unit, QuicError> writeBufMetaToQuicStream(
     QuicStreamState& stream,
     const BufferMeta& data,
     bool eof) {
@@ -75,8 +79,12 @@ void writeBufMetaToQuicStream(
         stream.writeBufMeta.offset + stream.writeBufMeta.length;
     stream.writeBufMeta.eof = true;
   }
-  updateFlowControlOnWriteToStream(stream, data.length);
+  auto result = updateFlowControlOnWriteToStream(stream, data.length);
+  if (result.hasError()) {
+    return folly::makeUnexpected(result.error());
+  }
   stream.conn.streamManager->updateWritableStreams(stream);
+  return folly::unit;
 }
 
 void writeDataToQuicStream(QuicCryptoStream& stream, Buf data) {
@@ -116,7 +124,7 @@ static void pushToTail(folly::IOBuf* dst, Buf src, size_t allocSize) {
   }
 }
 
-void appendDataToReadBufferCommon(
+folly::Expected<folly::Unit, QuicError> appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,
@@ -131,25 +139,28 @@ void appendDataToReadBufferCommon(
     bufferEofOffset = bufferEndOffset;
   } else if (buffer.data.chainLength() == 0) {
     VLOG(10) << "Empty stream without EOF";
-    return;
+    return folly::unit;
   }
 
   if (stream.finalReadOffset && bufferEofOffset &&
       *stream.finalReadOffset != *bufferEofOffset) {
-    throw QuicTransportException(
-        "Invalid EOF", TransportErrorCode::FINAL_SIZE_ERROR);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::FINAL_SIZE_ERROR),
+        std::string("Invalid EOF")));
   } else if (bufferEofOffset) {
     // Do some consistency checks on the stream.
     if (stream.maxOffsetObserved > *bufferEofOffset) {
-      throw QuicTransportException(
-          "EOF in middle of stream", TransportErrorCode::FINAL_SIZE_ERROR);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::FINAL_SIZE_ERROR),
+          std::string("EOF in middle of stream")));
     }
     stream.finalReadOffset = bufferEofOffset;
   } else if (stream.finalReadOffset) {
     // We did not receive a segment with an EOF set.
     if (buffer.offset + buffer.data.chainLength() > *stream.finalReadOffset) {
-      throw QuicTransportException(
-          "Invalid data after EOF", TransportErrorCode::FINAL_SIZE_ERROR);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::FINAL_SIZE_ERROR),
+          std::string("Invalid data after EOF")));
     }
   }
   // Update the flow control information before changing max offset observed on
@@ -161,7 +172,7 @@ void appendDataToReadBufferCommon(
   if (buffer.data.chainLength() == 0) {
     // Nothing more to do since we already processed the EOF
     // case.
-    return;
+    return folly::unit;
   }
 
   if (buffer.offset < stream.currentReadOffset) {
@@ -169,14 +180,14 @@ void appendDataToReadBufferCommon(
     buffer.data.trimStartAtMost(stream.currentReadOffset - buffer.offset);
     buffer.offset = stream.currentReadOffset;
     if (buffer.data.chainLength() == 0) {
-      return;
+      return folly::unit;
     }
   }
 
   // Nothing in the buffer, just append it.
   if (it == readBuffer.end()) {
     readBuffer.emplace_back(std::move(buffer));
-    return;
+    return folly::unit;
   }
 
   // Start overlap will point to the first buffer that overlaps with the
@@ -269,34 +280,39 @@ void appendDataToReadBufferCommon(
         *startOverlap != readBuffer.end() || *endOverlap == readBuffer.end());
     auto insertIt = readBuffer.erase(*startOverlap, *endOverlap);
     readBuffer.emplace(insertIt, std::move(*current));
-    return;
+    return folly::unit;
   } else if (currentAlreadyInserted) {
     DCHECK(startOverlap);
     DCHECK(endOverlap);
     DCHECK(
         *startOverlap != readBuffer.end() || *endOverlap == readBuffer.end());
     readBuffer.erase(*startOverlap, *endOverlap);
-    return;
+    return folly::unit;
   }
   auto last = readBuffer.end() - 1;
   if (current->offset > last->offset + last->data.chainLength()) {
     readBuffer.emplace_back(std::move(*current));
   }
+  return folly::unit;
 }
 
-void appendDataToReadBuffer(QuicStreamState& stream, StreamBuffer buffer) {
-  appendDataToReadBufferCommon(
+folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
+    QuicStreamState& stream,
+    StreamBuffer buffer) {
+  return appendDataToReadBufferCommon(
       stream,
       std::move(buffer),
       stream.conn.transportSettings.readCoalescingSize,
       [&stream](uint64_t previousMaxOffsetObserved, uint64_t bufferEndOffset) {
-        updateFlowControlOnStreamData(
+        return updateFlowControlOnStreamData(
             stream, previousMaxOffsetObserved, bufferEndOffset);
       });
 }
 
-void appendDataToReadBuffer(QuicCryptoStream& stream, StreamBuffer buffer) {
-  appendDataToReadBufferCommon(
+folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
+    QuicCryptoStream& stream,
+    StreamBuffer buffer) {
+  return appendDataToReadBufferCommon(
       stream, std::move(buffer), 0, [](uint64_t, uint64_t) {});
 }
 
@@ -351,7 +367,7 @@ Buf readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount) {
   return readDataInOrderFromReadBuffer(stream, amount).first;
 }
 
-std::pair<Buf, bool> readDataFromQuicStream(
+folly::Expected<std::pair<Buf, bool>, QuicError> readDataFromQuicStream(
     QuicStreamState& stream,
     uint64_t amount) {
   auto eof = stream.finalReadOffset &&
@@ -371,7 +387,11 @@ std::pair<Buf, bool> readDataFromQuicStream(
   std::tie(data, eof) = readDataInOrderFromReadBuffer(stream, amount);
   // Update flow control before handling eof as eof is not subject to flow
   // control
-  updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
+  auto flowControlResult =
+      updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
+  if (flowControlResult.hasError()) {
+    return folly::makeUnexpected(flowControlResult.error());
+  }
   eof = stream.finalReadOffset &&
       stream.currentReadOffset == *stream.finalReadOffset;
   if (eof) {
@@ -398,7 +418,9 @@ void peekDataFromQuicStream(
  * Same as readDataFromQuicStream(),
  * only releases existing data instead of returning it.
  */
-void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount) {
+folly::Expected<folly::Unit, QuicError> consumeDataFromQuicStream(
+    QuicStreamState& stream,
+    uint64_t amount) {
   bool eof = stream.finalReadOffset &&
       stream.currentReadOffset >= *stream.finalReadOffset;
   if (eof) {
@@ -407,7 +429,7 @@ void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount) {
     }
     stream.conn.streamManager->updateReadableStreams(stream);
     stream.conn.streamManager->updatePeekableStreams(stream);
-    return;
+    return folly::unit;
   }
 
   uint64_t lastReadOffset = stream.currentReadOffset;
@@ -415,7 +437,11 @@ void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount) {
   readDataInOrderFromReadBuffer(stream, amount, true /* sinkData */);
   // Update flow control before handling eof as eof is not subject to flow
   // control
-  updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
+  auto flowControlResult =
+      updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
+  if (flowControlResult.hasError()) {
+    return folly::makeUnexpected(flowControlResult.error());
+  }
   eof = stream.finalReadOffset &&
       stream.currentReadOffset == *stream.finalReadOffset;
   if (eof) {
@@ -423,6 +449,7 @@ void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount) {
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updatePeekableStreams(stream);
+  return folly::unit;
 }
 
 bool allBytesTillFinAcked(const QuicStreamState& stream) {

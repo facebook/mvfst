@@ -89,7 +89,8 @@ struct WriteQuicDataResult {
  * Attempts to write data from all frames in the QUIC connection into the UDP
  * socket supplied with the aead and the headerCipher.
  */
-WriteQuicDataResult writeQuicDataToSocket(
+[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+writeQuicDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -105,7 +106,8 @@ WriteQuicDataResult writeQuicDataToSocket(
  *
  * return the number of packets written to socket.
  */
-WriteQuicDataResult writeCryptoAndAckDataToSocket(
+[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+writeCryptoAndAckDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -122,7 +124,8 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
  * This is useful when the crypto stream still needs to be sent in separate
  * packets and cannot use the encryption of the data key.
  */
-WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
+[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+writeQuicDataExceptCryptoStreamToSocket(
     QuicAsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -136,7 +139,7 @@ WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
  * Writes frame data including zero rtt data to the socket with the supplied
  * zero rtt cipher.
  */
-uint64_t writeZeroRttDataToSocket(
+[[nodiscard]] folly::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
     QuicAsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -199,7 +202,7 @@ bool handleStreamBufMetaWritten(
 /**
  * Update the connection state after sending a new packet.
  */
-void updateConnection(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> updateConnection(
     QuicConnectionStateBase& conn,
     Optional<ClonedPacketIdentifier> clonedPacketIdentifier,
     RegularQuicWritePacket packet,
@@ -279,7 +282,8 @@ void encryptPacketHeader(
  * data allowed by the writableBytesFunc and will only write a maximum
  * number of packetLimit packets at each invocation.
  */
-WriteQuicDataResult writeConnectionDataToSocket(
+[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+writeConnectionDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -295,7 +299,8 @@ WriteQuicDataResult writeConnectionDataToSocket(
     TimePoint writeLoopBeginTime,
     const std::string& token = std::string());
 
-WriteQuicDataResult writeProbingDataToSocket(
+[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+writeProbingDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,

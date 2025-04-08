@@ -28,13 +28,18 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
       FizzServerQuicHandshakeContext::Builder().build());
   StreamId streamId = 0xbaad;
   QuicStreamState stream(streamId, conn);
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::copyBuffer("It is a hotdog!"), 0));
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15));
-  writeDataToQuicStream(
-      stream, folly::IOBuf::copyBuffer("What is it then?"), false);
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream, StreamBuffer(folly::IOBuf::copyBuffer("It is a hotdog!"), 0))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15))
+          .hasError());
+  ASSERT_FALSE(writeDataToQuicStream(
+                   stream, folly::IOBuf::copyBuffer("What is it then?"), false)
+                   .hasError());
 
   std::string retxBufData = "How would I know?";
   Buf retxBuf = folly::IOBuf::copyBuffer(retxBufData);
@@ -45,7 +50,8 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
   auto currentReadOffset = stream.currentReadOffset;
   EXPECT_TRUE(stream.writable());
 
-  sendRstSMHandler(stream, GenericApplicationErrorCode::UNKNOWN);
+  ASSERT_FALSE(sendRstSMHandler(stream, GenericApplicationErrorCode::UNKNOWN)
+                   .hasError());
 
   // Something are cleared:
   EXPECT_TRUE(stream.writeBuffer.empty());
@@ -64,13 +70,18 @@ TEST_F(StreamStateFunctionsTests, BasicReliableResetTest) {
       FizzServerQuicHandshakeContext::Builder().build());
   StreamId streamId = 0xbaad;
   QuicStreamState stream(streamId, conn);
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::copyBuffer("It is a hotdog!"), 0));
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15));
-  writeDataToQuicStream(
-      stream, folly::IOBuf::copyBuffer("What is it then?"), false);
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream, StreamBuffer(folly::IOBuf::copyBuffer("It is a hotdog!"), 0))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15))
+          .hasError());
+  ASSERT_FALSE(writeDataToQuicStream(
+                   stream, folly::IOBuf::copyBuffer("What is it then?"), false)
+                   .hasError());
 
   std::string retxBufData = "How would I know?";
   Buf retxBuf = folly::IOBuf::copyBuffer(retxBufData);
@@ -81,7 +92,8 @@ TEST_F(StreamStateFunctionsTests, BasicReliableResetTest) {
   auto currentReadOffset = stream.currentReadOffset;
   EXPECT_TRUE(stream.writable());
 
-  sendRstSMHandler(stream, GenericApplicationErrorCode::UNKNOWN, 5);
+  ASSERT_FALSE(sendRstSMHandler(stream, GenericApplicationErrorCode::UNKNOWN, 5)
+                   .hasError());
 
   // The writeBuffer is going to have bytes 0-4 because the reliableSize is 5.
   EXPECT_EQ(stream.writeBuffer.chainLength(), 5);
@@ -115,10 +127,13 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferHasHole) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(
-          folly::IOBuf::copyBuffer("Your read buffer has a hole"), 150, true));
+  ASSERT_FALSE(appendDataToReadBuffer(
+                   stream,
+                   StreamBuffer(
+                       folly::IOBuf::copyBuffer("Your read buffer has a hole"),
+                       150,
+                       true))
+                   .hasError());
   EXPECT_FALSE(isAllDataReceived(stream));
 }
 
@@ -128,9 +143,12 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferNoHoleNoFin) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer("Your haven't seen FIN yet"), 100));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(
+              folly::IOBuf::copyBuffer("Your haven't seen FIN yet"), 100))
+          .hasError());
   EXPECT_FALSE(isAllDataReceived(stream));
 }
 
@@ -140,8 +158,9 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferEmptyBufferFin) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::create(0), 100, true));
+  ASSERT_FALSE(appendDataToReadBuffer(
+                   stream, StreamBuffer(folly::IOBuf::create(0), 100, true))
+                   .hasError());
   EXPECT_TRUE(isAllDataReceived(stream));
 }
 
@@ -151,10 +170,12 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferBufferFin) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(
-          folly::IOBuf::copyBuffer("you may say im a dreamer"), 100, true));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(
+              folly::IOBuf::copyBuffer("you may say im a dreamer"), 100, true))
+          .hasError());
   EXPECT_TRUE(isAllDataReceived(stream));
 }
 
@@ -164,14 +185,20 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedMultipleStreamDataNoHole) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::copyBuffer("0123456789"), 100));
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer("01234567890123456789"), 110));
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer("Counting is hard"), 130, true));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream, StreamBuffer(folly::IOBuf::copyBuffer("0123456789"), 100))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(folly::IOBuf::copyBuffer("01234567890123456789"), 110))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(folly::IOBuf::copyBuffer("Counting is hard"), 130, true))
+          .hasError());
   EXPECT_TRUE(isAllDataReceived(stream));
 }
 
@@ -181,14 +208,20 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedMultipleStreamDataHasHole) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::copyBuffer("0123456789"), 100));
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer("01234567890123456789"), 115));
-  appendDataToReadBuffer(
-      stream,
-      StreamBuffer(folly::IOBuf::copyBuffer("Counting is hard"), 130, true));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream, StreamBuffer(folly::IOBuf::copyBuffer("0123456789"), 100))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(folly::IOBuf::copyBuffer("01234567890123456789"), 115))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream,
+          StreamBuffer(folly::IOBuf::copyBuffer("Counting is hard"), 130, true))
+          .hasError());
   EXPECT_FALSE(isAllDataReceived(stream));
 }
 
@@ -211,14 +244,18 @@ TEST_F(StreamStateFunctionsTests, SendReset) {
   QuicStreamState stream(id, conn);
   auto initialConnWindow = getSendConnFlowControlBytesAPI(conn);
   EXPECT_EQ(initialConnWindow, 1024);
-  writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true)
+          .hasError());
   EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 5);
   EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow - 5);
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(
+                   stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0))
+                   .hasError());
   EXPECT_FALSE(stream.writeBuffer.empty());
   EXPECT_FALSE(stream.readBuffer.empty());
-  resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN);
+  ASSERT_FALSE(
+      resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN).hasError());
   EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow);
   EXPECT_TRUE(stream.writeBuffer.empty());
 }
@@ -230,21 +267,25 @@ TEST_F(StreamStateFunctionsTests, SendResetDSRStream) {
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   auto initialConnWindow = getSendConnFlowControlBytesAPI(conn);
-  writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("aloha"), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("aloha"), false)
+          .hasError());
   auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
   EXPECT_CALL(*mockDSRSender, release()).Times(1);
   stream.flowControlState.peerAdvertisedMaxOffset =
       std::numeric_limits<uint64_t>::max();
   stream.dsrSender = std::move(mockDSRSender);
   BufferMeta bufMeta(2000);
-  writeBufMetaToQuicStream(stream, bufMeta, true);
+  ASSERT_FALSE(writeBufMetaToQuicStream(stream, bufMeta, true).hasError());
   EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 5 + 2000);
   EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow - 5 - 2000);
-  appendDataToReadBuffer(
-      stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(
+                   stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0))
+                   .hasError());
   EXPECT_FALSE(stream.writeBuffer.empty());
   EXPECT_FALSE(stream.readBuffer.empty());
-  resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN);
+  ASSERT_FALSE(
+      resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN).hasError());
   EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow);
   EXPECT_TRUE(stream.streamWriteError.hasValue());
   EXPECT_TRUE(stream.writeBuffer.empty());
@@ -257,7 +298,9 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
       FizzServerQuicHandshakeContext::Builder().build());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true)
+          .hasError());
   EXPECT_GT(conn.flowControlState.sumCurStreamBufferLen, 0);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 90);
 
@@ -270,7 +313,7 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
   conn.flowControlState.sumCurReadOffset = 80;
   conn.flowControlState.windowSize = 10000;
 
-  onResetQuicStream(stream, std::move(rst));
+  ASSERT_FALSE(onResetQuicStream(stream, std::move(rst)).hasError());
   EXPECT_EQ(stream.currentReadOffset, 90);
   EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 90);
   EXPECT_FALSE(conn.pendingEvents.connWindowUpdate);
@@ -284,7 +327,9 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
 
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true)
+          .hasError());
   EXPECT_GT(conn.flowControlState.sumCurStreamBufferLen, 0);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.currentReadOffset = 80;
@@ -296,7 +341,7 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   conn.flowControlState.sumCurReadOffset = 80;
   conn.flowControlState.windowSize = 100;
 
-  onResetQuicStream(stream, std::move(rst));
+  ASSERT_FALSE(onResetQuicStream(stream, std::move(rst)).hasError());
   EXPECT_EQ(stream.currentReadOffset, 100);
   EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 100);
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
@@ -322,8 +367,12 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {
   stream.maxOffsetObserved = 100;
   stream.finalReadOffset = 100;
   stream.flowControlState.advertisedMaxOffset = 300;
-  EXPECT_THROW(
-      onResetQuicStream(stream, std::move(rst)), QuicTransportException);
+  auto result = onResetQuicStream(stream, std::move(rst));
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetFinalSizeChange) {
@@ -334,12 +383,12 @@ TEST_F(StreamStateFunctionsTests, ResetFinalSizeChange) {
   stream.finalReadOffset = 11;
   stream.streamReadError = GenericApplicationErrorCode::UNKNOWN;
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 10);
-  try {
-    onResetQuicStream(stream, rst);
-    FAIL() << "Should throw QuicTransportException";
-  } catch (QuicTransportException& exc) {
-    EXPECT_EQ(exc.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
-  }
+  auto result = onResetQuicStream(stream, rst);
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetErrorCodeChange) {
@@ -350,12 +399,12 @@ TEST_F(StreamStateFunctionsTests, ResetErrorCodeChange) {
   stream.finalReadOffset = 10;
   stream.streamReadError = GenericApplicationErrorCode::UNKNOWN + 1;
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 10);
-  try {
-    onResetQuicStream(stream, rst);
-    FAIL() << "Should throw QuicTransportException";
-  } catch (QuicTransportException& exc) {
-    EXPECT_EQ(exc.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
-  }
+  auto result = onResetQuicStream(stream, rst);
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetLessThanMaxObserved) {
@@ -367,8 +416,12 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetLessThanMaxObserved) {
   stream.currentReadOffset = 20;
   stream.maxOffsetObserved = 100;
   stream.flowControlState.advertisedMaxOffset = 300;
-  EXPECT_THROW(
-      onResetQuicStream(stream, std::move(rst)), QuicTransportException);
+  auto result = onResetQuicStream(stream, std::move(rst));
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::FINAL_SIZE_ERROR);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanStreamFlowControl) {
@@ -380,8 +433,12 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanStreamFlowControl) {
   stream.currentReadOffset = 20;
   stream.maxOffsetObserved = 30;
   stream.flowControlState.advertisedMaxOffset = 100;
-  EXPECT_THROW(
-      onResetQuicStream(stream, std::move(rst)), QuicTransportException);
+  auto result = onResetQuicStream(stream, std::move(rst));
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::FLOW_CONTROL_ERROR);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanConnFlowControl) {
@@ -400,8 +457,12 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanConnFlowControl) {
   conn.flowControlState.sumMaxObservedOffset = 30;
   conn.flowControlState.advertisedMaxOffset = 100;
   conn.flowControlState.windowSize = 100;
-  EXPECT_THROW(
-      onResetQuicStream(stream, std::move(rst)), QuicTransportException);
+  auto result = onResetQuicStream(stream, std::move(rst));
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::FLOW_CONTROL_ERROR);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetAfterReadingAllBytesTillFin) {
@@ -414,7 +475,7 @@ TEST_F(StreamStateFunctionsTests, ResetAfterReadingAllBytesTillFin) {
   stream.finalReadOffset = 100;
   stream.maxOffsetObserved = 100;
   stream.flowControlState.advertisedMaxOffset = 300;
-  onResetQuicStream(stream, std::move(rst));
+  ASSERT_FALSE(onResetQuicStream(stream, std::move(rst)).hasError());
   EXPECT_EQ(stream.currentReadOffset, 101);
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
   EXPECT_FALSE(conn.pendingEvents.connWindowUpdate);

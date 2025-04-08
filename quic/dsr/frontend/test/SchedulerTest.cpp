@@ -32,10 +32,11 @@ TEST_F(SchedulerTest, ScheduleStream) {
   auto stream = *conn_.streamManager->createNextBidirectionalStream();
   stream->flowControlState.peerAdvertisedMaxOffset = 200;
   stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("New York Bagles"), false);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("New York Bagles"), false)
+                   .hasError());
   BufferMeta bufMeta(200);
-  writeBufMetaToQuicStream(*stream, bufMeta, true);
+  ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufMeta, true).hasError());
   auto expectedBufMetaOffset = stream->writeBufMeta.offset;
   ASSERT_TRUE(
       conn_.streamManager->hasWritable() &&

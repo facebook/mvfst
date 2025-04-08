@@ -653,13 +653,15 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void handleConnWritable();
   void cleanupAckEventState();
 
-  WriteQuicDataResult handleInitialWriteDataCommon(
+  [[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+  handleInitialWriteDataCommon(
       const ConnectionId& srcConnId,
       const ConnectionId& dstConnId,
       uint64_t packetLimit,
       const std::string& token = "");
 
-  WriteQuicDataResult handleHandshakeWriteDataCommon(
+  [[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+  handleHandshakeWriteDataCommon(
       const ConnectionId& srcConnId,
       const ConnectionId& dstConnId,
       uint64_t packetLimit);

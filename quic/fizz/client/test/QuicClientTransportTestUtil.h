@@ -515,10 +515,16 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
     setupCryptoLayer();
     start();
-    client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
-    client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
+    CHECK(!client->getNonConstConn()
+               .streamManager
+               ->setMaxLocalBidirectionalStreams(
+                   std::numeric_limits<uint32_t>::max())
+               .hasError());
+    CHECK(!client->getNonConstConn()
+               .streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   std::numeric_limits<uint32_t>::max())
+               .hasError());
   }
 
   void destroyTransport() {

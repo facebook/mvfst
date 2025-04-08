@@ -43,20 +43,21 @@ uint64_t writeProbingDataToSocketForTest(
                                            .streamFrames()
                                            .cryptoFrames())
                                  .build();
-  return writeProbingDataToSocket(
-             sock,
-             conn,
-             *conn.clientConnectionId,
-             *conn.serverConnectionId,
-             ShortHeaderBuilder(conn.oneRttWritePhase),
-             EncryptionLevel::AppData,
-             PacketNumberSpace::AppData,
-             scheduler,
-             probesToSend,
-             aead,
-             headerCipher,
-             version)
-      .probesWritten;
+  auto result = writeProbingDataToSocket(
+      sock,
+      conn,
+      *conn.clientConnectionId,
+      *conn.serverConnectionId,
+      ShortHeaderBuilder(conn.oneRttWritePhase),
+      EncryptionLevel::AppData,
+      PacketNumberSpace::AppData,
+      scheduler,
+      probesToSend,
+      aead,
+      headerCipher,
+      version);
+  CHECK(!result.hasError());
+  return result->probesWritten;
 }
 
 void writeCryptoDataProbesToSocketForTest(
@@ -74,19 +75,21 @@ void writeCryptoDataProbesToSocketForTest(
                                  conn, encryptionLevel, pnSpace, "Crypto")
                                  .cryptoFrames())
                        .build();
-  writeProbingDataToSocket(
-      sock,
-      conn,
-      *conn.clientConnectionId,
-      *conn.serverConnectionId,
-      LongHeaderBuilder(type),
-      protectionTypeToEncryptionLevel(longHeaderTypeToProtectionType(type)),
-      LongHeader::typeToPacketNumberSpace(type),
-      scheduler,
-      probesToSend,
-      aead,
-      headerCipher,
-      version);
+  CHECK(!writeProbingDataToSocket(
+             sock,
+             conn,
+             *conn.clientConnectionId,
+             *conn.serverConnectionId,
+             LongHeaderBuilder(type),
+             protectionTypeToEncryptionLevel(
+                 longHeaderTypeToProtectionType(type)),
+             LongHeader::typeToPacketNumberSpace(type),
+             scheduler,
+             probesToSend,
+             aead,
+             headerCipher,
+             version)
+             .hasError());
 }
 
 RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
@@ -189,10 +192,14 @@ class QuicTransportFunctionsTest : public Test {
     conn->statsCallback = quicStats_.get();
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();
-    conn->streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn->streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn->streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn->streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
     return conn;
   }
 
@@ -210,8 +217,9 @@ TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(PingFrame());
   EXPECT_EQ(0, conn->outstandings.packets.size());
-  updateConnection(
+  auto result = updateConnection(
       *conn, none, packet.packet, Clock::now(), 50, 0, false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
 }
@@ -235,8 +243,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
 
   auto buf = IOBuf::copyBuffer("hey whats up");
   EXPECT_CALL(*quicStats_, onPacketRetransmission()).Times(2);
-  writeDataToQuicStream(*stream1, buf->clone(), true);
-  writeDataToQuicStream(*stream2, buf->clone(), true);
+  auto result1 = writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(result1.hasError());
+  auto result2 = writeDataToQuicStream(*stream2, buf->clone(), true);
+  ASSERT_FALSE(result2.hasError());
 
   WriteStreamFrame writeStreamFrame1(stream1->id, 0, 5, false);
   WriteStreamFrame writeStreamFrame2(stream2->id, 0, 12, true);
@@ -253,7 +263,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
       .WillOnce(Return(true));
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -261,6 +271,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
@@ -318,7 +329,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
       .WillOnce(Return(false));
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet2.packet,
@@ -326,6 +337,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       getEncodedSize(packet2),
       getEncodedBodySize(packet2),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum);
@@ -423,8 +435,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
   auto stream1 = conn->streamManager->findStream(stream1Id);
   auto stream2 = conn->streamManager->findStream(stream2Id);
   auto buf = IOBuf::copyBuffer("hey whats up");
-  writeDataToQuicStream(*stream1, buf->clone(), true /* eof */);
-  writeDataToQuicStream(*stream2, buf->clone(), true /* eof */);
+  auto result1 = writeDataToQuicStream(*stream1, buf->clone(), true /* eof */);
+  ASSERT_FALSE(result1.hasError());
+  auto result2 = writeDataToQuicStream(*stream2, buf->clone(), true /* eof */);
+  ASSERT_FALSE(result2.hasError());
   WriteStreamFrame writeStreamFrame1(stream1->id, 0, 12, true /* eom */);
   WriteStreamFrame writeStreamFrame2(stream2->id, 0, 12, true /* eom */);
   EXPECT_EQ(stream1->currentWriteOffset, 0);
@@ -447,7 +461,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
       .WillOnce(Return(true));
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet1.packet,
@@ -455,6 +469,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       getEncodedSize(packet1),
       getEncodedBodySize(packet1),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   // appData packet number should increase
   EXPECT_EQ(
@@ -513,7 +528,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
       .WillOnce(Return(false));
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet2.packet,
@@ -521,6 +536,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       getEncodedSize(packet2),
       getEncodedBodySize(packet2),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum); // no change
@@ -589,9 +605,12 @@ TEST_F(
   auto stream2 = conn->streamManager->findStream(stream2Id);
   auto stream3 = conn->streamManager->findStream(stream3Id);
   auto buf = IOBuf::copyBuffer("hey whats up");
-  writeDataToQuicStream(*stream1, buf->clone(), true /* eof */);
-  writeDataToQuicStream(*stream2, buf->clone(), true /* eof */);
-  writeDataToQuicStream(*stream3, buf->clone(), false /* eof */);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream1, buf->clone(), true /* eof */).hasError());
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream2, buf->clone(), true /* eof */).hasError());
+  ASSERT_FALSE(writeDataToQuicStream(*stream3, buf->clone(), false /* eof */)
+                   .hasError());
   WriteStreamFrame writeStreamFrame1(stream1->id, 0, 12, true /* eom */);
   WriteStreamFrame writeStreamFrame2(stream2->id, 0, 5, false /* eom */);
   WriteStreamFrame writeStreamFrame3(stream3->id, 0, 12, false /* eom */);
@@ -617,14 +636,15 @@ TEST_F(
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
       .WillOnce(Return(true));
-  updateConnection(
-      *conn,
-      none,
-      packet1.packet,
-      TimePoint{},
-      getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet1.packet,
+                   TimePoint{},
+                   getEncodedSize(packet1),
+                   getEncodedBodySize(packet1),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // appData packet number should increase
   EXPECT_EQ(
@@ -686,7 +706,8 @@ TEST_F(
   // add some additional data
   // write a "?" to stream3 and set eof
   auto buf2 = IOBuf::copyBuffer("?");
-  writeDataToQuicStream(*stream3, buf->clone(), true /* eof */);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream3, buf->clone(), true /* eof */).hasError());
 
   // packet2 contains originally transmitted frames + new data frames
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -707,14 +728,15 @@ TEST_F(
   EXPECT_CALL(*rawCongestionController, isAppLimited())
       .Times(1)
       .WillOnce(Return(false));
-  updateConnection(
-      *conn,
-      none,
-      packet2.packet,
-      TimePoint(),
-      getEncodedSize(packet2),
-      getEncodedBodySize(packet2),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet2.packet,
+                   TimePoint(),
+                   getEncodedSize(packet2),
+                   getEncodedBodySize(packet2),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
       currentNextInitialPacketNum); // no change
@@ -765,39 +787,44 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   auto appDataPacket = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(
-      *stream,
-      folly::IOBuf::copyBuffer("The sun is cold and the rain is hard."),
-      true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(
+          *stream,
+          folly::IOBuf::copyBuffer("The sun is cold and the rain is hard."),
+          true)
+          .hasError());
   WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
   initialPacket.packet.frames.push_back(writeStreamFrame);
   handshakePacket.packet.frames.push_back(writeStreamFrame);
   appDataPacket.packet.frames.push_back(writeStreamFrame);
 
-  updateConnection(
-      *conn,
-      none,
-      handshakePacket.packet,
-      TimePoint{},
-      getEncodedSize(handshakePacket),
-      getEncodedBodySize(handshakePacket),
-      false /* isDSRPacket */);
-  updateConnection(
-      *conn,
-      none,
-      initialPacket.packet,
-      TimePoint{},
-      getEncodedSize(initialPacket),
-      getEncodedBodySize(initialPacket),
-      false /* isDSRPacket */);
-  updateConnection(
-      *conn,
-      none,
-      appDataPacket.packet,
-      TimePoint{},
-      getEncodedSize(appDataPacket),
-      getEncodedBodySize(appDataPacket),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   handshakePacket.packet,
+                   TimePoint{},
+                   getEncodedSize(handshakePacket),
+                   getEncodedBodySize(handshakePacket),
+                   false /* isDSRPacket */)
+                   .hasError());
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   initialPacket.packet,
+                   TimePoint{},
+                   getEncodedSize(initialPacket),
+                   getEncodedBodySize(initialPacket),
+                   false /* isDSRPacket */)
+                   .hasError());
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   appDataPacket.packet,
+                   TimePoint{},
+                   getEncodedSize(appDataPacket),
+                   getEncodedBodySize(appDataPacket),
+                   false /* isDSRPacket */)
+                   .hasError());
   // verify qLogger added correct logs
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
@@ -840,16 +867,17 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
 
-  writeDataToQuicStream(*stream1, nullptr, true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, nullptr, true).hasError());
   packet.packet.frames.push_back(WriteStreamFrame(stream1->id, 0, 0, true));
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -889,18 +917,19 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   auto stream1 = conn->streamManager->createNextUnidirectionalStream().value();
 
   auto buf = IOBuf::copyBuffer("Bluberries are purple");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   packet.packet.frames.push_back(
       WriteStreamFrame(stream1->id, 0, buf->computeChainDataLength(), false));
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -941,7 +970,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
   // verify.
   auto currentPendingLargestAckScheduled =
       conn->ackStates.handshakeAckState->largestAckScheduled;
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -949,6 +978,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -971,7 +1001,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream, nullptr, true);
+  auto result1 = writeDataToQuicStream(*stream, nullptr, true);
+  ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
@@ -979,7 +1010,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   WriteAckFrame ackFrame;
   ackFrame.ackBlocks.emplace_back(0, 100);
   packet.packet.frames.push_back(std::move(ackFrame));
-  updateConnection(
+  auto result2 = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -987,10 +1018,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result2.hasError());
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream1, nullptr, true);
+  auto result3 = writeDataToQuicStream(*stream1, nullptr, true);
+  ASSERT_FALSE(result3.hasError());
 
   conn->pendingEvents.resets.emplace(
       1, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 0));
@@ -998,7 +1031,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   RstStreamFrame rstFrame(1, GenericApplicationErrorCode::UNKNOWN, 0);
   packet2.packet.frames.push_back(std::move(rstFrame));
 
-  updateConnection(
+  auto result4 = updateConnection(
       *conn,
       none,
       packet2.packet,
@@ -1006,6 +1039,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result4.hasError());
 
   //  verify QLogger contains correct packet and frame information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1031,7 +1065,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   ackFrame.ackBlocks.emplace_back(0, 100);
   packet.packet.frames.push_back(std::move(ackFrame));
   packet.packet.frames.push_back(PaddingFrame());
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1039,6 +1073,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet and frames information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1069,7 +1104,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
   initialStream->pendingWrites.append(data);
   initialStream->writeBuffer.append(data->clone());
-  updateConnection(
+  auto result1 = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1077,6 +1112,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
@@ -1091,7 +1127,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->writeBuffer.append(data->clone());
   initialStream->pendingWrites.append(data);
   initialStream->writeBuffer.append(data->clone());
-  updateConnection(
+  auto result2 = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1099,6 +1135,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
@@ -1123,7 +1160,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
   handshakeStream->pendingWrites.append(data);
   handshakeStream->writeBuffer.append(data->clone());
-  updateConnection(
+  auto result3 = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1131,6 +1168,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result3.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
@@ -1141,7 +1179,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       WriteCryptoFrame(data->length(), data->length()));
   handshakeStream->pendingWrites.append(data);
   handshakeStream->writeBuffer.append(data->clone());
-  updateConnection(
+  auto result4 = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1149,6 +1187,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result4.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(3, conn->outstandings.packets.size());
@@ -1190,7 +1229,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream, nullptr, true);
+  auto result1 = writeDataToQuicStream(*stream, nullptr, true);
+  ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
@@ -1200,7 +1240,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       !packet.body.empty() ? packet.body.computeChainDataLength() : 0;
 
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
-  updateConnection(
+  auto result2 = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1208,6 +1248,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -1218,11 +1259,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       ? nonHandshake.body.computeChainDataLength()
       : 0;
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream1, nullptr, true);
+  auto result3 = writeDataToQuicStream(*stream1, nullptr, true);
+  ASSERT_FALSE(result3.hasError());
 
   nonHandshake.packet.frames.push_back(
       WriteStreamFrame(stream1->id, 0, 0, true));
-  updateConnection(
+  auto result4 = updateConnection(
       *conn,
       none,
       nonHandshake.packet,
@@ -1230,6 +1272,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result4.hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1269,39 +1312,41 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream, nullptr, true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, true).hasError());
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   // Packet with CryptoFrame in AppData pn space
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData, true);
 
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream1, nullptr, true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, nullptr, true).hasError());
 
   nonHandshake.packet.frames.push_back(
       WriteStreamFrame(stream1->id, 0, 0, true));
-  updateConnection(
-      *conn,
-      none,
-      nonHandshake.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   nonHandshake.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1358,14 +1403,15 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   packet.packet.frames.push_back(std::move(ackFrame));
   EXPECT_CALL(*rawController, onPacketSent(_)).Times(0);
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(1, conn->lossState.totalPacketsSent);
   EXPECT_EQ(0, conn->lossState.totalAckElicitingPacketsSent);
   EXPECT_EQ(0, conn->outstandings.packets.size());
@@ -1393,8 +1439,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   // This is clearly not 555 bytes. I just need some data inside the packet.
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(
+          *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true)
+          .hasError());
   WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   conn->lossState.totalBytesSent = 13579;
@@ -1408,14 +1456,15 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   conn->lossState.totalBytesAckedAtLastAck = 5000;
   conn->lossState.totalPacketsSent = 20;
   conn->lossState.totalAckElicitingPacketsSent = 15;
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      555,
-      500,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   555,
+                   500,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(21, conn->lossState.totalPacketsSent);
   EXPECT_EQ(16, conn->lossState.totalAckElicitingPacketsSent);
 
@@ -1478,8 +1527,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithAppLimitedStats) {
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(
+          *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true)
+          .hasError());
   WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
   packet.packet.frames.push_back(std::move(writeStreamFrame));
 
@@ -1495,14 +1546,15 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithAppLimitedStats) {
       conn->appLimitedTracker.getTotalAppLimitedTime());
 
   // record the packet as having been sent
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      555,
-      500,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   555,
+                   500,
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // should have the current app limited time recorded in metadata
   EXPECT_EQ(
@@ -1518,8 +1570,10 @@ TEST_F(
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(
+          *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true)
+          .hasError());
   WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
   packet.packet.frames.push_back(std::move(writeStreamFrame));
 
@@ -1553,14 +1607,15 @@ TEST_F(
       conn->appLimitedTracker.getTotalAppLimitedTime());
 
   // record the packet as having been sent
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      555,
-      500,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   555,
+                   500,
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // should have the current app limited time recorded in metadata
   EXPECT_EQ(
@@ -1593,7 +1648,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   auto futureMoment = thisMoment + 50ms;
   MockClock::mockNow = [=]() { return futureMoment; };
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       clonedPacketIdentifier,
       std::move(writePacket),
@@ -1601,6 +1656,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
       1500,
       1400,
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
@@ -1645,7 +1701,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   MaxStreamDataFrame streamWindowUpdate(stream->id, 0);
   conn->streamManager->queueWindowUpdate(stream->id);
   packet.packet.frames.push_back(std::move(streamWindowUpdate));
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1653,6 +1709,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1668,7 +1725,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
 
   // verify QLogger contains correct frame information
-  EXPECT_EQ(event->frames.size(), 1);
+  ASSERT_EQ(event->frames.size(), 1);
   auto frame = static_cast<MaxStreamDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->streamId, stream->id);
   EXPECT_EQ(frame->maximumData, 0);
@@ -1681,7 +1738,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   conn->pendingEvents.connWindowUpdate = true;
   MaxDataFrame connWindowUpdate(conn->flowControlState.advertisedMaxOffset);
   packet.packet.frames.push_back(std::move(connWindowUpdate));
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1689,6 +1746,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1711,7 +1769,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
 TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1719,6 +1777,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   // Since there is no ACK eliciting frame in this packet,
   // it is not included as an outstanding packet, and there's no StreamDetails
   EXPECT_EQ(0, conn->outstandings.packets.size());
@@ -1731,7 +1790,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
   StreamDataBlockedFrame blockedFrame(stream->id, 1000);
   packet.packet.frames.push_back(blockedFrame);
   packet.packet.frames.push_back(PingFrame());
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1739,6 +1798,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   // If we have only control frames sent, there should be no stream data in the
   // outstanding packet.
   ASSERT_EQ(1, conn->outstandings.packets.size());
@@ -1752,7 +1812,7 @@ TEST_F(QuicTransportFunctionsTest, TestPingFrameCounter) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(PingFrame());
-  updateConnection(
+  auto result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1760,6 +1820,7 @@ TEST_F(QuicTransportFunctionsTest, TestPingFrameCounter) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
   ASSERT_EQ(1, conn->numPingFramesSent);
 }
 
@@ -1770,11 +1831,13 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+  auto result = writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+  ASSERT_FALSE(result.hasError());
   WriteStreamFrame writeStreamFrame(
       stream->id, frameOffset, frameLen, false /* fin */);
   packet.packet.frames.push_back(writeStreamFrame);
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1782,6 +1845,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   const auto streamMatcher = testing::Pair(
       stream->id,
@@ -1808,15 +1872,16 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(
+  auto result = writeDataToQuicStream(
       *stream, folly::IOBuf::copyBuffer("abcdefghijklmno"), true);
+  ASSERT_FALSE(result.hasError());
   WriteStreamFrame writeStreamFrame1(
       stream->id, 0 /* offset */, 10 /* length */, false /* fin */);
   WriteStreamFrame writeStreamFrame2(
       stream->id, 10 /* offset */, 5 /* length */, true /* fin */);
   packet.packet.frames.push_back(writeStreamFrame1);
   packet.packet.frames.push_back(writeStreamFrame2);
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1824,6 +1889,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   const auto streamMatcher = testing::Pair(
       stream->id,
@@ -1849,14 +1915,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
 
-  writeDataToQuicStream(
+  auto result = writeDataToQuicStream(
       *stream, folly::IOBuf::copyBuffer("abcdefghij"), false /* eof */);
+  ASSERT_FALSE(result.hasError());
   uint64_t frame1Offset = 0;
   uint64_t frame1Len = 10;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame1(stream->id, frame1Offset, frame1Len, false /* fin */);
   packet.packet.frames.push_back(frame1);
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1864,6 +1931,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(1, conn->outstandings.packets.size());
 
@@ -1893,7 +1961,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   // retransmit the same frame1 again.
   packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(frame1);
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1901,6 +1969,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(2, conn->outstandings.packets.size());
 
@@ -1928,15 +1997,16 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   }
 
   // Retransmit frame1 and send new data in frame2.
-  writeDataToQuicStream(
+  result = writeDataToQuicStream(
       *stream, folly::IOBuf::copyBuffer("klmnopqrstuvwxy"), false /* eof */);
+  ASSERT_FALSE(result.hasError());
   uint64_t frame2Offset = 10;
   uint64_t frame2Len = 15;
   packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame2(stream->id, frame2Offset, frame2Len, false /* fin */);
   packet.packet.frames.push_back(frame1);
   packet.packet.frames.push_back(frame2);
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1944,6 +2014,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(3, conn->outstandings.packets.size());
 
@@ -1975,7 +2046,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(frame1);
   packet.packet.frames.push_back(frame2);
-  updateConnection(
+  result = updateConnection(
       *conn,
       none,
       packet.packet,
@@ -1983,6 +2054,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
+  ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(4, conn->outstandings.packets.size());
 
@@ -2018,34 +2090,39 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
 
   // write two packets, each containing one byte of frame data
   // second packet contains FIN
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("a"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("a"), false /* eof */)
+                   .hasError());
   uint64_t frame1Offset = 0;
   auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame1(stream->id, frame1Offset, frameLen, false /* fin */);
   packet1.packet.frames.push_back(frame1);
-  updateConnection(
-      *conn,
-      none,
-      packet1.packet,
-      TimePoint(),
-      getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet1.packet,
+                   TimePoint(),
+                   getEncodedSize(packet1),
+                   getEncodedBodySize(packet1),
+                   false /* isDSRPacket */)
+                   .hasError());
 
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("b"), true /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("b"), true /* eof */)
+                   .hasError());
   uint64_t frame2Offset = (frameLen * 2) - 1;
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, true /* fin */);
   packet2.packet.frames.push_back(frame2);
-  updateConnection(
-      *conn,
-      none,
-      packet2.packet,
-      TimePoint(),
-      getEncodedSize(packet2),
-      getEncodedBodySize(packet2),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet2.packet,
+                   TimePoint(),
+                   getEncodedSize(packet2),
+                   getEncodedBodySize(packet2),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Should be two packets at this point, each with 1 frame of data
   EXPECT_THAT(conn->outstandings.packets, SizeIs(2));
@@ -2088,14 +2165,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet3.packet.frames.push_back(frame1);
   packet3.packet.frames.push_back(frame2);
-  updateConnection(
-      *conn,
-      none,
-      packet3.packet,
-      TimePoint(),
-      getEncodedSize(packet3),
-      getEncodedBodySize(packet3),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet3.packet,
+                   TimePoint(),
+                   getEncodedSize(packet3),
+                   getEncodedBodySize(packet3),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Should be three packets at this point
   //
@@ -2134,50 +2212,56 @@ TEST_F(
   const uint64_t frameLen = 1;
 
   // write three packets, each containing one byte of frame data
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("a"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("a"), false /* eof */)
+                   .hasError());
   uint64_t frame1Offset = 0;
   auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame1(stream->id, frame1Offset, frameLen, false /* fin */);
   packet1.packet.frames.push_back(frame1);
-  updateConnection(
-      *conn,
-      none,
-      packet1.packet,
-      TimePoint(),
-      getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet1.packet,
+                   TimePoint(),
+                   getEncodedSize(packet1),
+                   getEncodedBodySize(packet1),
+                   false /* isDSRPacket */)
+                   .hasError());
 
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("b"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("b"), false /* eof */)
+                   .hasError());
   uint64_t frame2Offset = frameLen;
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, false /* fin */);
   packet2.packet.frames.push_back(frame2);
-  updateConnection(
-      *conn,
-      none,
-      packet2.packet,
-      TimePoint(),
-      getEncodedSize(packet2),
-      getEncodedBodySize(packet2),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet2.packet,
+                   TimePoint(),
+                   getEncodedSize(packet2),
+                   getEncodedBodySize(packet2),
+                   false /* isDSRPacket */)
+                   .hasError());
 
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("c"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("c"), false /* eof */)
+                   .hasError());
   uint64_t frame3Offset = frameLen * 2;
   auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame3(stream->id, frame3Offset, frameLen, false /* fin */);
   packet3.packet.frames.push_back(frame3);
-  updateConnection(
-      *conn,
-      none,
-      packet3.packet,
-      TimePoint(),
-      getEncodedSize(packet3),
-      getEncodedBodySize(packet3),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet3.packet,
+                   TimePoint(),
+                   getEncodedSize(packet3),
+                   getEncodedBodySize(packet3),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Should be three packets at this point, each with 1 frame of data
   EXPECT_THAT(conn->outstandings.packets, SizeIs(3));
@@ -2229,14 +2313,15 @@ TEST_F(
   auto packet4 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet4.packet.frames.push_back(frame1);
   packet4.packet.frames.push_back(frame3);
-  updateConnection(
-      *conn,
-      none,
-      packet4.packet,
-      TimePoint(),
-      getEncodedSize(packet4),
-      getEncodedBodySize(packet4),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet4.packet,
+                   TimePoint(),
+                   getEncodedSize(packet4),
+                   getEncodedBodySize(packet4),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Should be four packets at this point
   EXPECT_THAT(conn->outstandings.packets, SizeIs(4));
@@ -2276,52 +2361,58 @@ TEST_F(
   const uint64_t frameLen = 2;
 
   // write three packets, each containing two bytes of frame data
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("ab"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("ab"), false /* eof */)
+                   .hasError());
   uint64_t frame1Offset = 0;
   auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame1(stream->id, frame1Offset, frameLen, false /* fin */);
   packet1.packet.frames.push_back(frame1);
-  updateConnection(
-      *conn,
-      none,
-      packet1.packet,
-      TimePoint(),
-      getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet1.packet,
+                   TimePoint(),
+                   getEncodedSize(packet1),
+                   getEncodedBodySize(packet1),
+                   false /* isDSRPacket */)
+                   .hasError());
 
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("cd"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("cd"), false /* eof */)
+                   .hasError());
   uint64_t frame2Offset = frameLen;
   LOG(INFO) << "frame2Offset = " << frame2Offset;
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, false /* fin */);
   packet2.packet.frames.push_back(frame2);
-  updateConnection(
-      *conn,
-      none,
-      packet2.packet,
-      TimePoint(),
-      getEncodedSize(packet2),
-      getEncodedBodySize(packet2),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet2.packet,
+                   TimePoint(),
+                   getEncodedSize(packet2),
+                   getEncodedBodySize(packet2),
+                   false /* isDSRPacket */)
+                   .hasError());
 
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("ef"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("ef"), false /* eof */)
+                   .hasError());
   uint64_t frame3Offset = (frameLen * 2);
   LOG(INFO) << "frame3Offset = " << frame3Offset;
   auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame3(stream->id, frame3Offset, frameLen, false /* fin */);
   packet3.packet.frames.push_back(frame3);
-  updateConnection(
-      *conn,
-      none,
-      packet3.packet,
-      TimePoint(),
-      getEncodedSize(packet3),
-      getEncodedBodySize(packet3),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet3.packet,
+                   TimePoint(),
+                   getEncodedSize(packet3),
+                   getEncodedBodySize(packet3),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Should be three packets at this point, each with 1 frame of data
   EXPECT_THAT(conn->outstandings.packets, SizeIs(3));
@@ -2373,14 +2464,15 @@ TEST_F(
   auto packet4 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet4.packet.frames.push_back(frame1);
   packet4.packet.frames.push_back(frame3);
-  updateConnection(
-      *conn,
-      none,
-      packet4.packet,
-      TimePoint(),
-      getEncodedSize(packet4),
-      getEncodedBodySize(packet4),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet4.packet,
+                   TimePoint(),
+                   getEncodedSize(packet4),
+                   getEncodedBodySize(packet4),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Should be four packets at this point
   EXPECT_THAT(conn->outstandings.packets, SizeIs(4));
@@ -2428,9 +2520,9 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
   ASSERT_NE(nullptr, stream3);
 
   auto buf = IOBuf::copyBuffer("hey whats up");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
-  writeDataToQuicStream(*stream2, buf->clone(), true);
-  writeDataToQuicStream(*stream3, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
+  ASSERT_FALSE(writeDataToQuicStream(*stream2, buf->clone(), true).hasError());
+  ASSERT_FALSE(writeDataToQuicStream(*stream3, buf->clone(), true).hasError());
 
   uint64_t stream1Offset = 0;
   uint64_t stream2Offset = 0;
@@ -2450,14 +2542,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
   packet1.packet.frames.push_back(writeStreamFrame2);
   packet1.packet.frames.push_back(writeStreamFrame3);
 
-  updateConnection(
-      *conn,
-      none,
-      packet1.packet,
-      TimePoint(),
-      getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet1.packet,
+                   TimePoint(),
+                   getEncodedSize(packet1),
+                   getEncodedBodySize(packet1),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // check stream details for the sent packet
   {
@@ -2520,14 +2613,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
   packet2.packet.frames.push_back(writeStreamFrame2);
   packet2.packet.frames.push_back(writeStreamFrame3);
 
-  updateConnection(
-      *conn,
-      none,
-      packet2.packet,
-      TimePoint(),
-      getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet2.packet,
+                   TimePoint(),
+                   getEncodedSize(packet1),
+                   getEncodedBodySize(packet1),
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // check stream details for the retransmitted packet
   EXPECT_THAT(conn->outstandings.packets, SizeIs(2));
@@ -2600,7 +2694,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf =
       IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   uint64_t writableBytes = 30;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -2616,15 +2710,16 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
           }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   EXPECT_CALL(*quicStats_, onWrite(_));
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicdataToSocketWithPacer) {
@@ -2643,19 +2738,20 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicdataToSocketWithPacer) {
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf =
       IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(1);
   EXPECT_CALL(*quicStats_, onWrite(_));
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
@@ -2676,7 +2772,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   // ~50 bytes
   auto buf =
       IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
   uint64_t writableBytes = 30;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(
@@ -2696,9 +2792,10 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(0, res.packetsWritten);
-  EXPECT_EQ(0, res.probesWritten);
-  EXPECT_EQ(0, res.bytesWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(0, res->packetsWritten);
+  EXPECT_EQ(0, res->probesWritten);
+  EXPECT_EQ(0, res->bytesWritten);
 
   // Normal limit
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
@@ -2726,17 +2823,17 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-
-  EXPECT_EQ(1, res.packetsWritten);
-  EXPECT_EQ(0, res.probesWritten);
-  EXPECT_EQ(actualWritten, res.bytesWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(1, res->packetsWritten);
+  EXPECT_EQ(0, res->probesWritten);
+  EXPECT_EQ(actualWritten, res->bytesWritten);
 
   // Probing can exceed packet limit. In practice we limit it to
   // kPacketToSendForPTO
   actualWritten = 0;
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] =
       kDefaultWriteConnectionDataPacketLimit * 2;
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
   writableBytes = 10000;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(
@@ -2760,10 +2857,10 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-
-  EXPECT_EQ(0, res.packetsWritten);
-  EXPECT_EQ(kDefaultWriteConnectionDataPacketLimit * 2, res.probesWritten);
-  EXPECT_EQ(actualWritten, res.bytesWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(0, res->packetsWritten);
+  EXPECT_EQ(kDefaultWriteConnectionDataPacketLimit * 2, res->probesWritten);
+  EXPECT_EQ(actualWritten, res->bytesWritten);
 }
 
 TEST_F(
@@ -2786,7 +2883,7 @@ TEST_F(
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf =
       IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   conn->writableBytesLimit = 100;
   uint64_t writableBytes = 5 * *conn->writableBytesLimit;
@@ -2804,15 +2901,16 @@ TEST_F(
             return getTotalIovecLen(vec, iovec_len);
           }));
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
@@ -2832,20 +2930,21 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithNoBytesForHeader) {
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789012");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(0));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   // No header space left. Should send nothing.
   EXPECT_TRUE(conn->outstandings.packets.empty());
 }
@@ -2858,29 +2957,33 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketRetxBufferSorted) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("Whatsapp");
-  writeDataToQuicStream(*stream, std::move(buf1), false);
-  writeQuicDataToSocket(
-      socket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(buf1), false).hasError());
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   socket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
 
   auto buf2 = IOBuf::copyBuffer("Google Buzz");
-  writeDataToQuicStream(*stream, std::move(buf2), false);
-  writeQuicDataToSocket(
-      socket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(buf2), false).hasError());
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   socket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(2, stream->retransmissionBuffer.size());
 }
 
@@ -2917,9 +3020,10 @@ TEST_F(QuicTransportFunctionsTest, NothingWritten) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(0, res.packetsWritten);
-  EXPECT_EQ(0, res.probesWritten);
-  EXPECT_EQ(0, res.bytesWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(0, res->packetsWritten);
+  EXPECT_EQ(0, res->probesWritten);
+  EXPECT_EQ(0, res->bytesWritten);
 }
 
 const QuicWriteFrame& getFirstFrameInOutstandingPackets(
@@ -2945,7 +3049,7 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   auto rawSocket = socket.get();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(200);
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   auto originalNextSeq = conn->ackStates.appDataAckState.nextPacketNum;
   uint64_t sentBytes = 0;
@@ -2961,15 +3065,16 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   stream1->flowControlState.peerAdvertisedMaxOffset = 10;
   // writes blocked frame in additionally
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_LT(sentBytes, 200);
 
   EXPECT_GT(conn->ackStates.appDataAckState.nextPacketNum, originalNextSeq);
@@ -2983,15 +3088,16 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   // won't have any new packets to write if we trigger a write.
   auto previousPackets = conn->outstandings.packets.size();
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(previousPackets, conn->outstandings.packets.size());
 }
 
@@ -3016,7 +3122,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingNewData) {
   auto rawSocket = socket.get();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(conn->udpSendPacketLen * 2);
-  writeDataToQuicStream(*stream1, buf->clone(), true /* eof */);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream1, buf->clone(), true /* eof */).hasError());
 
   auto currentStreamWriteOffset = stream1->currentWriteOffset;
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
@@ -3052,8 +3159,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   auto capturingAead = std::make_unique<MockAead>();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Where you wanna go");
-  writeDataToQuicStream(*stream, buf->clone(), true);
-
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
   folly::IOBuf pktBodyCaptured;
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
@@ -3064,10 +3170,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
           return folly::IOBuf::create(0);
         }
       }));
-  EXPECT_EQ(
-      1,
-      writeProbingDataToSocketForTest(
-          *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  writeProbingDataToSocketForTest(
+      *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn));
   // Now we have no new data, let's probe again, and verify the same old data
   // is sent.
   folly::IOBuf secondBodyCaptured;
@@ -3080,10 +3184,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
           return folly::IOBuf::create(0);
         }
       }));
-  EXPECT_EQ(
-      1,
-      writeProbingDataToSocketForTest(
-          *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  writeProbingDataToSocketForTest(
+      *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn));
   // Verify two pacekts have the same body
   EXPECT_TRUE(folly::IOBufEqualTo()(pktBodyCaptured, secondBodyCaptured));
 }
@@ -3102,7 +3204,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
   auto capturingAead = std::make_unique<MockAead>();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Where you wanna go");
-  writeDataToQuicStream(*stream, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
 
   folly::IOBuf pktBodyCaptured;
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
@@ -3114,10 +3216,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
           return folly::IOBuf::create(0);
         }
       }));
-  EXPECT_EQ(
-      2,
-      writeProbingDataToSocketForTest(
-          *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  writeProbingDataToSocketForTest(
+      *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn));
 
   auto immAck =
       getFirstFrameInOutstandingPackets(
@@ -3136,10 +3236,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
           return folly::IOBuf::create(0);
         }
       }));
-  EXPECT_EQ(
-      2,
-      writeProbingDataToSocketForTest(
-          *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  writeProbingDataToSocketForTest(
+      *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn));
   // Verify two pacekts have the same body
   EXPECT_TRUE(folly::IOBufEqualTo()(pktBodyCaptured, secondBodyCaptured));
 }
@@ -3344,11 +3442,12 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
       *conn->initialHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_GE(res.bytesWritten, buf->computeChainDataLength());
+  ASSERT_FALSE(res.hasError());
+  EXPECT_GE(res->bytesWritten, buf->computeChainDataLength());
 
-  EXPECT_EQ(1, res.packetsWritten);
-  EXPECT_EQ(0, res.probesWritten);
-  EXPECT_EQ(conn->udpSendPacketLen, res.bytesWritten);
+  EXPECT_EQ(1, res->packetsWritten);
+  EXPECT_EQ(0, res->probesWritten);
+  EXPECT_EQ(conn->udpSendPacketLen, res->bytesWritten);
   ASSERT_EQ(1, conn->outstandings.packets.size());
   ASSERT_EQ(1, cryptoStream->retransmissionBuffer.size());
   ASSERT_TRUE(cryptoStream->pendingWrites.empty());
@@ -3366,9 +3465,10 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
       *conn->initialHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(0, res.bytesWritten);
-  EXPECT_EQ(0, res.packetsWritten);
-  EXPECT_EQ(0, res.probesWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(0, res->bytesWritten);
+  EXPECT_EQ(0, res->packetsWritten);
+  EXPECT_EQ(0, res->probesWritten);
 }
 
 TEST_F(QuicTransportFunctionsTest, ImmediatelyRetransmitInitialPackets) {
@@ -3393,11 +3493,12 @@ TEST_F(QuicTransportFunctionsTest, ImmediatelyRetransmitInitialPackets) {
       *conn->initialHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_GE(res.bytesWritten, buf->computeChainDataLength());
+  ASSERT_FALSE(res.hasError());
+  EXPECT_GE(res->bytesWritten, buf->computeChainDataLength());
 
-  EXPECT_EQ(2, res.packetsWritten);
-  EXPECT_EQ(2, res.probesWritten);
-  EXPECT_EQ(conn->udpSendPacketLen * 4, res.bytesWritten);
+  EXPECT_EQ(2, res->packetsWritten);
+  EXPECT_EQ(2, res->probesWritten);
+  EXPECT_EQ(conn->udpSendPacketLen * 4, res->bytesWritten);
   ASSERT_EQ(4, conn->outstandings.packets.size());
   ASSERT_EQ(2, cryptoStream->retransmissionBuffer.size());
   ASSERT_TRUE(cryptoStream->pendingWrites.empty());
@@ -3423,8 +3524,9 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
       *conn->initialHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes1.hasError());
   EXPECT_FALSE(conn->pendingEvents.anyProbePackets());
-  EXPECT_EQ(0, writeRes1.bytesWritten);
+  EXPECT_EQ(0, writeRes1->bytesWritten);
 
   conn->handshakeWriteCipher = createNoOpAead();
   conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
@@ -3439,13 +3541,14 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
       *conn->handshakeWriteHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes2.hasError());
   EXPECT_FALSE(conn->pendingEvents.anyProbePackets());
-  EXPECT_EQ(0, writeRes2.bytesWritten);
+  EXPECT_EQ(0, writeRes2->bytesWritten);
 
   conn->oneRttWriteCipher = createNoOpAead();
   conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 2;
-  writeQuicDataToSocket(
+  auto writeRes3 = writeQuicDataToSocket(
       *rawSocket,
       *conn,
       *conn->clientConnectionId,
@@ -3454,6 +3557,7 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
       *conn->oneRttWriteHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeRes3.hasError());
   EXPECT_FALSE(conn->pendingEvents.anyProbePackets());
 }
 
@@ -3473,7 +3577,7 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789012");
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   addAckStatesWithCurrentTimestamps(conn->ackStates.appDataAckState, 0, 100);
   conn->ackStates.appDataAckState.needsToSendAckImmediately = true;
@@ -3500,8 +3604,9 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_GT(res.packetsWritten, 0);
-  EXPECT_EQ(res.bytesWritten, actualWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_GT(res->packetsWritten, 0);
+  EXPECT_EQ(res->bytesWritten, actualWritten);
   EXPECT_EQ(0, conn->outstandings.packets.size());
 }
 
@@ -3534,37 +3639,39 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // Congestion control
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(0));
   EXPECT_CALL(*quicStats_, onCwndBlocked());
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   EXPECT_CALL(*quicStats_, onCwndBlocked());
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
@@ -3587,7 +3694,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
   // Have stream data queued up during the test so there's something TO write.
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
 
   // Only case that we allow the write; both CC / PathLimiter have
   // writablebytes
@@ -3630,7 +3737,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteStreamsNoCipher) {
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
@@ -3658,7 +3765,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataNoConnFlowControl) {
       .WillRepeatedly(Return(1500));
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
   // Artificially limit the connection flow control.
   conn->flowControlState.peerAdvertisedMaxOffset = 0;
@@ -3675,7 +3782,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataNoConnFlowControlLoss) {
       .WillRepeatedly(Return(1500));
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
   // Artificially limit the connection flow control.
   conn->streamManager->addLoss(stream1->id);
@@ -3765,7 +3872,9 @@ TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
   conn->flowControlState.peerAdvertisedMaxOffset = 1000;
   conn->flowControlState.sumCurWriteOffset = 800;
   QuicStreamState stream(0, *conn);
-  writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("I'm a devil"), true);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   stream, folly::IOBuf::copyBuffer("I'm a devil"), true)
+                   .hasError());
   conn->streamManager->updateWritableStreams(stream);
   EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 
@@ -3794,14 +3903,15 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterAppData) {
   ClonedPacketIdentifier clonedPacketIdentifier(
       PacketNumberSpace::AppData, 100);
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
-  updateConnection(
-      *conn,
-      clonedPacketIdentifier,
-      packet.packet,
-      TimePoint(),
-      123,
-      100,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   clonedPacketIdentifier,
+                   packet.packet,
+                   TimePoint(),
+                   123,
+                   100,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(
       0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(
@@ -3822,14 +3932,15 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterHandshake) {
   ClonedPacketIdentifier clonedPacketIdentifier(
       PacketNumberSpace::AppData, 100);
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
-  updateConnection(
-      *conn,
-      clonedPacketIdentifier,
-      packet.packet,
-      TimePoint(),
-      123,
-      123,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   clonedPacketIdentifier,
+                   packet.packet,
+                   TimePoint(),
+                   123,
+                   123,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(
       0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(
@@ -3850,14 +3961,15 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterInitial) {
   ClonedPacketIdentifier clonedPacketIdentifier(
       PacketNumberSpace::AppData, 100);
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
-  updateConnection(
-      *conn,
-      clonedPacketIdentifier,
-      packet.packet,
-      TimePoint(),
-      123,
-      123,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   clonedPacketIdentifier,
+                   packet.packet,
+                   TimePoint(),
+                   123,
+                   123,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(
       1, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(
@@ -3873,14 +3985,15 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
   StreamDataBlockedFrame blockedFrame(stream->id, 1000);
   packet.packet.frames.push_back(blockedFrame);
   conn->streamManager->queueBlocked(stream->id, 1000);
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_FALSE(conn->streamManager->hasBlocked());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(0, conn->outstandings.numClonedPackets());
@@ -3897,14 +4010,15 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
   packet.packet.frames.emplace_back(blockedFrame);
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
   // This shall not crash
-  updateConnection(
-      *conn,
-      clonedPacketIdentifier,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   clonedPacketIdentifier,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(
       1, conn->outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
@@ -3919,7 +4033,7 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
   packet.packet.frames.emplace_back(connWindowUpdate);
   conn->pendingEvents.connWindowUpdate = true;
   EXPECT_DEATH(
-      updateConnection(
+      (void)updateConnection(
           *conn,
           none,
           packet.packet,
@@ -3934,18 +4048,22 @@ TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("I feel like a million bucks."), true);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream,
+                   folly::IOBuf::copyBuffer("I feel like a million bucks."),
+                   true)
+                   .hasError());
   WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
   packet.packet.frames.push_back(std::move(writeStreamFrame));
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_FALSE(conn->outstandings.packets.empty());
 }
 
@@ -3957,14 +4075,15 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
       stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
   packet.packet.frames.push_back(rstStreamFrame);
   conn->pendingEvents.resets.emplace(stream->id, rstStreamFrame);
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_TRUE(conn->pendingEvents.resets.empty());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(0, conn->outstandings.numClonedPackets());
@@ -3982,14 +4101,15 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   packet.packet.frames.emplace_back(std::move(rstStreamFrame));
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
   // This shall not crash
-  updateConnection(
-      *conn,
-      clonedPacketIdentifier,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   clonedPacketIdentifier,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(1, conn->outstandings.numClonedPackets());
 }
@@ -3999,14 +4119,15 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
   conn->lossState.totalBytesSent = 1234;
   conn->lossState.totalBodyBytesSent = 1000;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint{},
-      4321,
-      4000,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint{},
+                   4321,
+                   4000,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(5555, conn->lossState.totalBytesSent);
   EXPECT_EQ(5000, conn->lossState.totalBodyBytesSent);
 }
@@ -4016,14 +4137,15 @@ TEST_F(QuicTransportFunctionsTest, TotalPacketsSentUpdate) {
   auto conn = createConn();
   conn->lossState.totalPacketsSent = startTotalPacketsSent;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint{},
-      4321,
-      0,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint{},
+                   4321,
+                   0,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(startTotalPacketsSent + 1, conn->lossState.totalPacketsSent);
 }
 
@@ -4038,14 +4160,15 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   ClonedPacketIdentifier clonedPacketIdentifier(
       PacketNumberSpace::AppData, 100);
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
-  updateConnection(
-      *conn,
-      clonedPacketIdentifier,
-      packet.packet,
-      TimePoint(),
-      0,
-      0,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   clonedPacketIdentifier,
+                   packet.packet,
+                   TimePoint(),
+                   0,
+                   0,
+                   false /* isDSRPacket */)
+                   .hasError());
   EXPECT_EQ(247, conn->lossState.timeoutBasedRtxCount);
 }
 
@@ -4067,7 +4190,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(2048 * 2048);
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   uint64_t actualWritten = 0;
   EXPECT_CALL(*rawSocket, write(_, _, _))
@@ -4090,9 +4213,9 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       1000 /* packetLimit */,
       writeLoopBeginTime);
 
-  EXPECT_GT(1000, res.packetsWritten);
-  EXPECT_EQ(actualWritten, res.bytesWritten);
-  EXPECT_EQ(res.probesWritten, 0);
+  EXPECT_GT(1000, res->packetsWritten);
+  EXPECT_EQ(actualWritten, res->bytesWritten);
+  EXPECT_EQ(res->probesWritten, 0);
 
   res = writeQuicDataToSocket(
       *rawSocket,
@@ -4106,7 +4229,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       writeLoopBeginTime);
   EXPECT_EQ(
       conn->transportSettings.writeConnectionDataPacketsLimit,
-      res.packetsWritten);
+      res->packetsWritten);
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
@@ -4128,7 +4251,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(2048 * 2048);
-  writeDataToQuicStream(*stream1, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
   EXPECT_CALL(*rawSocket, write(_, _, _)).WillRepeatedly(Return(1));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -4144,9 +4267,10 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
       getVersion(*conn),
       1000 /* packetLimit */,
       writeLoopBeginTime);
+  ASSERT_FALSE(res.hasError());
 
-  EXPECT_GE(1000, res.packetsWritten);
-  EXPECT_EQ(res.probesWritten, 0);
+  EXPECT_GE(1000, res->packetsWritten);
+  EXPECT_EQ(res->probesWritten, 0);
 
   res = writeQuicDataToSocket(
       *rawSocket,
@@ -4158,7 +4282,8 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFractionNoLimit) {
       getVersion(*conn),
       1000 /* packetLimit */,
       writeLoopBeginTime);
-  EXPECT_EQ(1000, res.packetsWritten);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(1000, res->packetsWritten);
 }
 
 TEST_F(QuicTransportFunctionsTest, CongestionControlWritableBytesRoundUp) {
@@ -4275,31 +4400,33 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Drug facts");
-  writeDataToQuicStream(*stream, buf->clone(), true);
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   ASSERT_EQ(1, stream->retransmissionBuffer.size());
 
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 1;
   conn->flowControlState.windowSize *= 2;
   conn->flowControlState.timeOfLastFlowControlUpdate = Clock::now() - 20s;
   maybeSendConnWindowUpdate(*conn, Clock::now());
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      1 /* limit to 1 packet */);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   1 /* limit to 1 packet */)
+                   .hasError());
   EXPECT_EQ(2, conn->outstandings.packets.size());
   auto packet = stripPaddingFrames(conn->outstandings.packets[1].packet);
   EXPECT_EQ(1, packet.frames.size());
@@ -4326,31 +4453,33 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFramesAckFreq) {
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Drug facts");
-  writeDataToQuicStream(*stream, buf->clone(), true);
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   ASSERT_EQ(1, stream->retransmissionBuffer.size());
 
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 1;
   conn->flowControlState.windowSize *= 2;
   conn->flowControlState.timeOfLastFlowControlUpdate = Clock::now() - 20s;
   maybeSendConnWindowUpdate(*conn, Clock::now());
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      1 /* limit to 1 packet */);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   1 /* limit to 1 packet */)
+                   .hasError());
   EXPECT_EQ(3, conn->outstandings.packets.size());
   auto packet = stripPaddingFrames(conn->outstandings.packets[1].packet);
   EXPECT_EQ(1, packet.frames.size());
@@ -4380,7 +4509,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Andante in C minor");
-  writeDataToQuicStream(*stream, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const SocketAddress&,
@@ -4394,15 +4523,16 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
         EXPECT_EQ(iovec_len, 1);
         return getTotalIovecLen(vec, iovec_len);
       }));
-  writeQuicDataToSocket(
-      mockSock,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   mockSock,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(0, bufPtr->length());
   EXPECT_EQ(0, bufPtr->headroom());
 }
@@ -4422,15 +4552,16 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderRollbackBuf) {
   quic::test::MockAsyncUDPSocket mockSock(qEvb);
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
   EXPECT_CALL(mockSock, write(_, _, _)).Times(0);
-  writeQuicDataToSocket(
-      mockSock,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   mockSock,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(0, bufPtr->length());
   EXPECT_EQ(0, bufPtr->headroom());
 }
@@ -4451,7 +4582,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
   EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = buildRandomInputData(conn->udpSendPacketLen * 10);
-  writeDataToQuicStream(*stream, buf->clone(), true);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
@@ -4465,15 +4596,16 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
         EXPECT_EQ(iovec_len, 1);
         return getTotalIovecLen(vec, iovec_len);
       }));
-  writeQuicDataToSocket(
-      mockSock,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   mockSock,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
   EXPECT_EQ(0, bufPtr->length());
   EXPECT_EQ(0, bufPtr->headroom());
 }
@@ -4499,7 +4631,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   auto inputBuf = buildRandomInputData(
       conn->udpSendPacketLen *
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  writeDataToQuicStream(*stream, inputBuf->clone(), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, inputBuf->clone(), true).hasError());
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
       .WillOnce(Invoke([&](const folly::SocketAddress&,
@@ -4516,15 +4649,16 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
         EXPECT_EQ(iovec_len, 1);
         return getTotalIovecLen(vec, iovec_len);
       }));
-  writeQuicDataToSocket(
-      mockSock,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit + 1);
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   mockSock,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   getVersion(*conn),
+                   conn->transportSettings.writeConnectionDataPacketsLimit + 1)
+                   .hasError());
   ASSERT_EQ(0, bufPtr->length());
   ASSERT_EQ(0, bufPtr->headroom());
   EXPECT_GE(conn->outstandings.packets.size(), 5);
@@ -4591,10 +4725,14 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
       conn->streamManager->createNextBidirectionalStream().value()->id;
   auto stream = conn->streamManager->findStream(streamId);
   EXPECT_TRUE(stream->retransmissionBufMetas.empty());
-  writeDataToQuicStream(
-      *stream, IOBuf::copyBuffer("Wear a face mask please!"), false /* eof */);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream,
+                   IOBuf::copyBuffer("Wear a face mask please!"),
+                   false /* eof */)
+                   .hasError());
   BufferMeta bufMeta(2000);
-  writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */);
+  ASSERT_FALSE(
+      writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */).hasError());
   EXPECT_TRUE(stream->writeBufMeta.eof);
   EXPECT_EQ(2000, stream->writeBufMeta.length);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
@@ -4603,14 +4741,15 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   writeStreamFrame.fromBufMeta = true;
   packet.packet.frames.push_back(writeStreamFrame);
 
-  updateConnection(
-      *conn,
-      none,
-      packet.packet,
-      TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      true /* dsr */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   true /* dsr */)
+                   .hasError());
   EXPECT_EQ(1000 + bufMetaStartingOffset, stream->writeBufMeta.offset);
   EXPECT_EQ(1000, stream->writeBufMeta.length);
   EXPECT_FALSE(stream->retransmissionBufMetas.empty());
@@ -4632,14 +4771,15 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   auto retxPacket = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   // Retx of the stream looks exactly the same
   retxPacket.packet.frames.push_back(writeStreamFrame);
-  updateConnection(
-      *conn,
-      none,
-      retxPacket.packet,
-      TimePoint(),
-      getEncodedSize(retxPacket),
-      getEncodedBodySize(packet),
-      true /* dsr */);
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   retxPacket.packet,
+                   TimePoint(),
+                   getEncodedSize(retxPacket),
+                   getEncodedBodySize(packet),
+                   true /* dsr */)
+                   .hasError());
   EXPECT_TRUE(stream->lossBufMetas.empty());
   retxBufMetaIter = stream->retransmissionBufMetas.find(bufMetaStartingOffset);
   EXPECT_NE(retxBufMetaIter, stream->retransmissionBufMetas.end());
@@ -4653,21 +4793,24 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("abcdefghij"), true)
+                   .hasError());
 
   // write frame with bytes 0 -> 3 (start at offset 0, write 4 bytes)
   {
     WriteStreamFrame writeStreamFrame(
         stream->id, 0 /* offset */, 4 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    updateConnection(
-        *conn,
-        none,
-        packet.packet,
-        TimePoint(),
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */);
+    ASSERT_FALSE(updateConnection(
+                     *conn,
+                     none,
+                     packet.packet,
+                     TimePoint(),
+                     getEncodedSize(packet),
+                     getEncodedBodySize(packet),
+                     false /* isDSRPacket */)
+                     .hasError());
   }
 
   // write frame with bytes 5 -> 6 (start at offset 5, write 2 bytes)
@@ -4676,14 +4819,15 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
     WriteStreamFrame writeStreamFrame(
         stream->id, 5 /* offset */, 2 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    EXPECT_ANY_THROW(updateConnection(
-        *conn,
-        none,
-        packet.packet,
-        TimePoint(),
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */));
+    EXPECT_ANY_THROW(ASSERT_FALSE(updateConnection(
+                                      *conn,
+                                      none,
+                                      packet.packet,
+                                      TimePoint(),
+                                      getEncodedSize(packet),
+                                      getEncodedBodySize(packet),
+                                      false /* isDSRPacket */)
+                                      .hasError()));
   }
 }
 
@@ -4692,21 +4836,24 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   const std::string str = "abcdefg";
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(str), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(str), true)
+          .hasError());
 
   // write frame with bytes 0 -> 3 (start at offset 0, write 4 bytes)
   {
     WriteStreamFrame writeStreamFrame(
         stream->id, 0 /* offset */, 4 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    updateConnection(
-        *conn,
-        none,
-        packet.packet,
-        TimePoint(),
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */);
+    ASSERT_FALSE(updateConnection(
+                     *conn,
+                     none,
+                     packet.packet,
+                     TimePoint(),
+                     getEncodedSize(packet),
+                     getEncodedBodySize(packet),
+                     false /* isDSRPacket */)
+                     .hasError());
   }
 
   // write frame with bytes 5 -> 6 (start at offset 5, write 2 bytes)
@@ -4720,14 +4867,15 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
     WriteStreamFrame writeStreamFrame(
         stream->id, offset /* offset */, len /* len */, true /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    EXPECT_ANY_THROW(updateConnection(
-        *conn,
-        none,
-        packet.packet,
-        TimePoint(),
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */));
+    EXPECT_ANY_THROW(ASSERT_FALSE(updateConnection(
+                                      *conn,
+                                      none,
+                                      packet.packet,
+                                      TimePoint(),
+                                      getEncodedSize(packet),
+                                      getEncodedBodySize(packet),
+                                      false /* isDSRPacket */)
+                                      .hasError()));
   }
 }
 
@@ -4736,21 +4884,24 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   const std::string str = "abcdefg";
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(str), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(str), true)
+          .hasError());
 
   // write frame with bytes 0 -> 3 (start at offset 0, write 4 bytes)
   {
     WriteStreamFrame writeStreamFrame(
         stream->id, 0 /* offset */, 4 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    updateConnection(
-        *conn,
-        none,
-        packet.packet,
-        TimePoint(),
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */);
+    ASSERT_FALSE(updateConnection(
+                     *conn,
+                     none,
+                     packet.packet,
+                     TimePoint(),
+                     getEncodedSize(packet),
+                     getEncodedBodySize(packet),
+                     false /* isDSRPacket */)
+                     .hasError());
   }
 
   // write frame with bytes 5 -> 5 (start at offset 5, write 1 byte)
@@ -4759,14 +4910,15 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
     WriteStreamFrame writeStreamFrame(
         stream->id, 5 /* offset */, 1 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    EXPECT_ANY_THROW(updateConnection(
-        *conn,
-        none,
-        packet.packet,
-        TimePoint(),
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */));
+    EXPECT_ANY_THROW(ASSERT_FALSE(updateConnection(
+                                      *conn,
+                                      none,
+                                      packet.packet,
+                                      TimePoint(),
+                                      getEncodedSize(packet),
+                                      getEncodedBodySize(packet),
+                                      false /* isDSRPacket */)
+                                      .hasError()));
   }
 }
 
@@ -4837,7 +4989,7 @@ TEST_F(QuicTransportFunctionsTest, onQuicStreamClosed) {
   EXPECT_EQ(conn->streamManager->streamCount(), 1);
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
-  conn->streamManager->removeClosedStream(stream->id);
+  ASSERT_FALSE(conn->streamManager->removeClosedStream(stream->id).hasError());
   EXPECT_EQ(conn->streamManager->streamCount(), 0);
 }
 

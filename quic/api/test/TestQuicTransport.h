@@ -95,17 +95,18 @@ class TestQuicTransport
     if (closed) {
       return;
     }
-    writeQuicDataToSocket(
-        *socket_,
-        *conn_,
-        *conn_->clientConnectionId,
-        *conn_->serverConnectionId,
-        *aead,
-        *headerCipher,
-        getVersion(),
-        (isConnectionPaced(*conn_)
-             ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
-             : conn_->transportSettings.writeConnectionDataPacketsLimit));
+    CHECK(!writeQuicDataToSocket(
+               *socket_,
+               *conn_,
+               *conn_->clientConnectionId,
+               *conn_->serverConnectionId,
+               *aead,
+               *headerCipher,
+               getVersion(),
+               (isConnectionPaced(*conn_)
+                    ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
+                    : conn_->transportSettings.writeConnectionDataPacketsLimit))
+               .hasError());
     writePacketizationRequest(
         *dynamic_cast<QuicServerConnectionState*>(conn_.get()),
         *conn_->clientConnectionId,

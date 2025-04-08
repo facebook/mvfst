@@ -109,7 +109,9 @@ std::unique_ptr<QuicClientConnectionState>
 createConn(uint32_t maxStreams, uint64_t maxOffset, uint64_t initialMaxOffset) {
   auto conn = std::make_unique<QuicClientConnectionState>(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn->streamManager->setMaxLocalBidirectionalStreams(maxStreams);
+  auto result =
+      conn->streamManager->setMaxLocalBidirectionalStreams(maxStreams);
+  CHECK(!result.hasError()) << "Failed to set max local bidirectional streams";
   conn->flowControlState.peerAdvertisedMaxOffset = maxOffset;
   conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
       initialMaxOffset;
@@ -157,7 +159,9 @@ WriteStreamFrame writeDataToStream(
   auto stream = conn.streamManager->findStream(streamId);
   auto length = data.size();
   CHECK(stream);
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(data), false);
+  auto result =
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(data), false);
+  CHECK(!result.hasError());
   return {streamId, 0, length, false};
 }
 
@@ -168,7 +172,8 @@ WriteStreamFrame writeDataToStream(
     std::unique_ptr<folly::IOBuf> buf) {
   auto stream = conn.streamManager->findStream(streamId);
   auto length = buf->computeChainDataLength();
-  writeDataToQuicStream(*stream, std::move(buf), false);
+  auto result = writeDataToQuicStream(*stream, std::move(buf), false);
+  CHECK(!result.hasError());
   return {streamId, 0, length, false};
 }
 
@@ -521,7 +526,8 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto connId = getTestConnectionId();
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
@@ -544,7 +550,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
 TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto connId = getTestConnectionId();
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
@@ -1095,7 +1102,8 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
 TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  auto result = conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(result.hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "GiantsShoulder", 0);
@@ -1218,7 +1226,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
 TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  auto streamResult = conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(streamResult.hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
@@ -1229,7 +1238,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   conn.bufAccessor = &bufAccessor;
   auto stream = *conn.streamManager->createNextBidirectionalStream();
   auto inBuf = buildRandomInputData(conn.udpSendPacketLen * 10);
-  writeDataToQuicStream(*stream, inBuf->clone(), false);
+  auto writeResult = writeDataToQuicStream(*stream, inBuf->clone(), false);
+  ASSERT_FALSE(writeResult.hasError());
 
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
                                            conn,
@@ -1254,7 +1264,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   auto bufferLength = result.packet->header.computeChainDataLength() +
       result.packet->body.computeChainDataLength();
   EXPECT_EQ(conn.udpSendPacketLen, bufferLength);
-  updateConnection(
+  auto updateResult = updateConnection(
       conn,
       none,
       result.packet->packet,
@@ -1262,6 +1272,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       bufferLength,
       0,
       false /* isDSRPacket */);
+  ASSERT_FALSE(updateResult.hasError());
   buf = bufAccessor.obtain();
   ASSERT_EQ(conn.udpSendPacketLen, buf->length());
   buf->clear();
@@ -1299,12 +1310,14 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.udpSendPacketLen = 1000;
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  auto result = conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(result.hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto inputData = buildRandomInputData(conn.udpSendPacketLen * 10);
-  writeDataToQuicStream(*stream, inputData->clone(), false);
+  auto writeResult = writeDataToQuicStream(*stream, inputData->clone(), false);
+  ASSERT_FALSE(writeResult.hasError());
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
                                            conn,
                                            EncryptionLevel::AppData,
@@ -1327,7 +1340,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   auto encodedSize = packetResult.packet->body.computeChainDataLength() +
       packetResult.packet->header.computeChainDataLength() + cipherOverhead;
   EXPECT_EQ(encodedSize, conn.udpSendPacketLen);
-  updateConnection(
+  auto updateResult = updateConnection(
       conn,
       none,
       packetResult.packet->packet,
@@ -1335,6 +1348,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
       encodedSize,
       0,
       false /* isDSRPacket */);
+  ASSERT_FALSE(updateResult.hasError());
 
   // make packetNum too larger to be encoded into the same size:
   packetNum += 0xFF;
@@ -1579,8 +1593,9 @@ TEST_F(
 
   BufferMeta bufMeta(20);
   writeDataToStream(conn, stream4, "some data");
-  writeBufMetaToQuicStream(
-      *conn.streamManager->findStream(stream4), bufMeta, true /* eof */);
+  ASSERT_FALSE(writeBufMetaToQuicStream(
+                   *conn.streamManager->findStream(stream4), bufMeta, true)
+                   .hasError());
 
   // Pretend we sent the non DSR data
   dsrStream->ackedIntervals.insert(0, dsrStream->writeBuffer.chainLength() - 1);
@@ -1861,14 +1876,16 @@ TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
 TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
 
   auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
   auto stream = conn.streamManager->findStream(streamId);
   auto data = buildRandomInputData(1000);
-  writeDataToQuicStream(*stream, std::move(data), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), true).hasError());
   conn.streamManager->updateWritableStreams(*stream);
 
   StreamFrameScheduler scheduler(conn);
@@ -1884,8 +1901,10 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   builder1.encodePacketHeader();
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
-  updateConnection(
-      conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */);
+  ASSERT_FALSE(
+      updateConnection(
+          conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
@@ -1912,8 +1931,10 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   builder2.encodePacketHeader();
   scheduler.writeStreams(builder2);
   auto packet2 = std::move(builder2).buildPacket().packet;
-  updateConnection(
-      conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */);
+  ASSERT_FALSE(
+      updateConnection(
+          conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */)
+          .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame2.streamId);
@@ -1926,7 +1947,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
 TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
 
@@ -1934,7 +1956,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   auto dsrStream = conn.streamManager->createNextBidirectionalStream().value();
   auto stream = conn.streamManager->findStream(streamId);
   auto data = buildRandomInputData(1000);
-  writeDataToQuicStream(*stream, std::move(data), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), true).hasError());
   WriteBufferMeta bufMeta{};
   bufMeta.offset = 0;
   bufMeta.length = 100;
@@ -1956,8 +1979,10 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   builder1.encodePacketHeader();
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
-  updateConnection(
-      conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */);
+  ASSERT_FALSE(
+      updateConnection(
+          conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
@@ -1972,7 +1997,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
 TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
 
@@ -1980,7 +2006,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   conn.streamManager->setStreamPriority(streamId, Priority(0, false));
   auto stream = conn.streamManager->findStream(streamId);
   auto data = buildRandomInputData(1000);
-  writeDataToQuicStream(*stream, std::move(data), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), true).hasError());
   conn.streamManager->updateWritableStreams(*stream);
 
   StreamFrameScheduler scheduler(conn);
@@ -1996,8 +2023,10 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   builder1.encodePacketHeader();
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
-  updateConnection(
-      conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */);
+  ASSERT_FALSE(
+      updateConnection(
+          conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
@@ -2024,8 +2053,10 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   builder2.encodePacketHeader();
   scheduler.writeStreams(builder2);
   auto packet2 = std::move(builder2).buildPacket().packet;
-  updateConnection(
-      conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */);
+  ASSERT_FALSE(
+      updateConnection(
+          conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */)
+          .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame2.streamId);
@@ -2038,7 +2069,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
 TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
   conn.udpSendPacketLen = 2000;
@@ -2048,7 +2080,8 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   auto stream1 = conn.streamManager->findStream(streamId1);
   auto stream2 = conn.streamManager->findStream(streamId2);
   auto newData = buildRandomInputData(1000);
-  writeDataToQuicStream(*stream1, std::move(newData), true);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream1, std::move(newData), true).hasError());
   conn.streamManager->updateWritableStreams(*stream1);
 
   // Fake a loss data for stream2:
@@ -2069,8 +2102,10 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   builder1.encodePacketHeader();
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
-  updateConnection(
-      conn, none, packet1, Clock::now(), 1200, 0, false /* isDSR */);
+  ASSERT_FALSE(
+      updateConnection(
+          conn, none, packet1, Clock::now(), 1200, 0, false /* isDSR */)
+          .hasError());
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId1, writeStreamFrame1.streamId);
@@ -2090,15 +2125,18 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
 TEST_F(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   auto* stream = *(conn.streamManager->createNextBidirectionalStream());
   stream->flowControlState.peerAdvertisedMaxOffset = 100000;
 
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false)
+          .hasError());
   stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   BufferMeta bufferMeta(5000);
-  writeBufMetaToQuicStream(*stream, bufferMeta, true);
+  ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
   EXPECT_TRUE(stream->finalWriteOffset.hasValue());
 
   stream->writeBufMeta.split(5000);
@@ -2131,15 +2169,18 @@ TEST_F(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
 TEST_F(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   auto* stream = *(conn.streamManager->createNextBidirectionalStream());
   stream->flowControlState.peerAdvertisedMaxOffset = 100000;
 
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false)
+          .hasError());
   stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   BufferMeta bufferMeta(5000);
-  writeBufMetaToQuicStream(*stream, bufferMeta, true);
+  ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
   EXPECT_TRUE(stream->finalWriteOffset.hasValue());
   PacketNum packetNum = 0;
   ShortHeader header(
@@ -2345,10 +2386,12 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
       1000000;
 
   // Create stream and write data
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto data = buildRandomInputData(50); // Small enough to fit in one packet
-  writeDataToQuicStream(*stream, std::move(data), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), false).hasError());
 
   // Set up scheduler and builder
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
@@ -2562,13 +2605,14 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
 TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("cupcake");
   auto bufLen = buf->computeChainDataLength();
-  writeDataToQuicStream(*stream, buf->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), false).hasError());
 
   // Reliable reset with reliableSize = bufLen
   conn.pendingEvents.resets.emplace(
@@ -2596,14 +2640,15 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
       std::move(builder1), conn.udpSendPacketLen - cipherOverhead);
   auto encodedSize1 = packetResult1.packet->body.computeChainDataLength() +
       packetResult1.packet->header.computeChainDataLength() + cipherOverhead;
-  updateConnection(
-      conn,
-      none,
-      packetResult1.packet->packet,
-      Clock::now(),
-      encodedSize1,
-      0,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   conn,
+                   none,
+                   packetResult1.packet->packet,
+                   Clock::now(),
+                   encodedSize1,
+                   0,
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // We shouldn't send the reliable reset just yet, because we haven't yet
   // egressed all the stream data upto the reliable offset.
@@ -2622,14 +2667,15 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
       std::move(builder2), conn.udpSendPacketLen - cipherOverhead);
   auto encodedSize2 = packetResult1.packet->body.computeChainDataLength() +
       packetResult2.packet->header.computeChainDataLength() + cipherOverhead;
-  updateConnection(
-      conn,
-      none,
-      packetResult2.packet->packet,
-      Clock::now(),
-      encodedSize2,
-      0,
-      false /* isDSRPacket */);
+  ASSERT_FALSE(updateConnection(
+                   conn,
+                   none,
+                   packetResult2.packet->packet,
+                   Clock::now(),
+                   encodedSize2,
+                   0,
+                   false /* isDSRPacket */)
+                   .hasError());
 
   // Now we should have egressed all the stream data upto the reliable offset,
   // so we should have sent the reliable reset.
@@ -2700,10 +2746,12 @@ TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
       1000000;
 
   // Create stream and write data
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto data = buildRandomInputData(50); // Small enough to fit in one packet
-  writeDataToQuicStream(*stream, std::move(data), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), false).hasError());
   conn.streamManager->updateWritableStreams(*stream);
 
   // Set up scheduler and builder

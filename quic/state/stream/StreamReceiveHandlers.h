@@ -11,12 +11,12 @@
 #include <quic/state/QuicStreamUtilities.h>
 
 namespace quic {
-
-void receiveReadStreamFrameSMHandler(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+receiveReadStreamFrameSMHandler(
     QuicStreamState& stream,
     ReadStreamFrame&& frame);
 
-void receiveRstStreamSMHandler(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> receiveRstStreamSMHandler(
     QuicStreamState& stream,
     const RstStreamFrame& rst);
 

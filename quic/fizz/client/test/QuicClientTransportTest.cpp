@@ -3775,8 +3775,10 @@ TEST_F(
       PacketNumberSpace::AppData));
   deliverData(packet2->coalesce());
 
-  ASSERT_EQ(
-      client->getNonConstConn().streamManager->getStream(streamId), nullptr);
+  auto streamResult =
+      client->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  ASSERT_EQ(streamResult.value(), nullptr);
   client->close(none);
 }
 
@@ -3812,8 +3814,10 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
       0 /* largestAcked */));
   deliverData(packet->coalesce());
 
-  ASSERT_EQ(
-      client->getNonConstConn().streamManager->getStream(streamId), nullptr);
+  auto streamResult =
+      client->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  ASSERT_EQ(streamResult.value(), nullptr);
   client->close(none);
 }
 
@@ -4314,7 +4318,9 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
+  auto result =
+      markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
+  ASSERT_FALSE(result.hasError());
   ASSERT_TRUE(client->getConn().streamManager->hasLoss());
 
   client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
@@ -4335,9 +4341,13 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
-  auto stream = CHECK_NOTNULL(
-      client->getNonConstConn().streamManager->getStream(streamId));
+  auto result =
+      markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
+  ASSERT_FALSE(result.hasError());
+  auto streamResult =
+      client->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
   ASSERT_TRUE(stream->lossBuffer.empty());
   ASSERT_FALSE(client->getConn().streamManager->hasLoss());
 }
@@ -5251,7 +5261,7 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   EXPECT_TRUE(zeroRttPacketsOutstanding());
 
   // The PTO should trigger marking all the zero-rtt data as lost.
-  onPTOAlarm(client->getNonConstConn());
+  ASSERT_FALSE(onPTOAlarm(client->getNonConstConn()).hasError());
   EXPECT_FALSE(zeroRttPacketsOutstanding());
 
   // Transport parameters did not change since zero rtt was accepted.

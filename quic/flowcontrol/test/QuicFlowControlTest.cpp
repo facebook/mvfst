@@ -656,8 +656,9 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnStreamData) {
 
   auto data1 = buildRandomInputData(10);
   uint64_t buffer1EndOffset = 200 + data1->computeChainDataLength();
-  updateFlowControlOnStreamData(
+  auto result = updateFlowControlOnStreamData(
       stream, stream.maxOffsetObserved, buffer1EndOffset);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumMaxObservedOffset, 560);
 }
 
@@ -674,8 +675,9 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnStreamDataUnchangedOffset) {
   stream.flowControlState.advertisedMaxOffset = 250;
 
   uint64_t buffer1EndOffset = 100;
-  updateFlowControlOnStreamData(
+  auto result = updateFlowControlOnStreamData(
       stream, stream.maxOffsetObserved, buffer1EndOffset);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.maxOffsetObserved, 200);
   EXPECT_EQ(conn_.flowControlState.sumMaxObservedOffset, 550);
 }
@@ -695,22 +697,25 @@ TEST_F(QuicFlowControlTest, UpdateBadFlowControlOnStreamData) {
   auto data1 = buildRandomInputData(100);
   uint64_t buffer1EndOffset = 200 + data1->computeChainDataLength();
   // Stream flow control violation
-  EXPECT_THROW(
-      updateFlowControlOnStreamData(
-          stream, stream.maxOffsetObserved, buffer1EndOffset),
-      QuicTransportException);
+  auto result1 = updateFlowControlOnStreamData(
+      stream, stream.maxOffsetObserved, buffer1EndOffset);
+  EXPECT_TRUE(result1.hasError());
+  EXPECT_NE(result1.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_FALSE(result1.error().message.empty());
 
   stream.currentReadOffset = 200;
   // Connection flow control violation
-  EXPECT_THROW(
-      updateFlowControlOnStreamData(
-          stream, stream.maxOffsetObserved, buffer1EndOffset),
-      QuicTransportException);
+  auto result2 = updateFlowControlOnStreamData(
+      stream, stream.maxOffsetObserved, buffer1EndOffset);
+  EXPECT_TRUE(result2.hasError());
+  EXPECT_NE(result2.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_FALSE(result2.error().message.empty());
 
   auto data2 = buildRandomInputData(50);
   uint64_t buffer2EndOffset = 200 + data2->computeChainDataLength();
-  EXPECT_NO_THROW(updateFlowControlOnStreamData(
-      stream, stream.maxOffsetObserved, buffer2EndOffset));
+  auto result3 = updateFlowControlOnStreamData(
+      stream, stream.maxOffsetObserved, buffer2EndOffset);
+  ASSERT_FALSE(result3.hasError());
   EXPECT_EQ(conn_.flowControlState.sumMaxObservedOffset, 600);
 }
 
@@ -729,7 +734,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadBasic) {
   conn_.flowControlState.sumCurReadOffset = 100;
   EXPECT_CALL(*quicStats_, onConnFlowControlUpdate());
   EXPECT_CALL(*quicStats_, onStreamFlowControlUpdate());
-  updateFlowControlOnRead(stream, 100, Clock::now());
+  auto result = updateFlowControlOnRead(stream, 100, Clock::now());
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 200);
 
   EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
@@ -760,7 +766,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadReliableReset1) {
 
   // Simulate the reading of 10 bytes
   stream.currentReadOffset = 20;
-  updateFlowControlOnRead(stream, 10, Clock::now());
+  auto result = updateFlowControlOnRead(stream, 10, Clock::now());
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 50);
   EXPECT_EQ(stream.currentReadOffset, 20);
 }
@@ -782,7 +789,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadReliableReset2) {
 
   // Simulate the reading of 90 bytes
   stream.currentReadOffset = 100;
-  updateFlowControlOnRead(stream, 10, Clock::now());
+  auto result = updateFlowControlOnRead(stream, 10, Clock::now());
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
   EXPECT_EQ(stream.currentReadOffset, 150);
@@ -804,7 +812,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset1) {
   // Simulate the receiving of a reliable reset
   stream.reliableSizeFromPeer = 100;
   stream.finalReadOffset = 150;
-  updateFlowControlOnReceiveReset(stream, Clock::now());
+  auto result = updateFlowControlOnReceiveReset(stream, Clock::now());
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 40);
   EXPECT_EQ(stream.currentReadOffset, 10);
 }
@@ -825,7 +834,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset2) {
   // Simulate the receiving of a reliable reset
   stream.reliableSizeFromPeer = 10;
   stream.finalReadOffset = 150;
-  updateFlowControlOnReceiveReset(stream, Clock::now());
+  auto result = updateFlowControlOnReceiveReset(stream, Clock::now());
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
   EXPECT_EQ(stream.currentReadOffset, 150);
 }
@@ -845,7 +855,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset3) {
   // Simulate the receiving of a non-reliable reset
   stream.reliableSizeFromPeer = 0;
   stream.finalReadOffset = 150;
-  updateFlowControlOnReceiveReset(stream, Clock::now());
+  auto result = updateFlowControlOnReceiveReset(stream, Clock::now());
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
   EXPECT_EQ(stream.currentReadOffset, 150);
 }
@@ -858,10 +869,12 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnWrite) {
 
   conn_.flowControlState.sumCurWriteOffset = 200;
   EXPECT_CALL(*quicStats_, onConnFlowControlBlocked()).Times(0);
-  updateFlowControlOnWriteToStream(stream, 100);
+  auto result1 = updateFlowControlOnWriteToStream(stream, 100);
+  ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 100);
   EXPECT_CALL(*quicStats_, onConnFlowControlBlocked()).Times(0);
-  updateFlowControlOnWriteToSocket(stream, 100);
+  auto result2 = updateFlowControlOnWriteToSocket(stream, 100);
+  ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurWriteOffset, 300);
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 0);
 
@@ -869,11 +882,13 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnWrite) {
 
   stream.currentWriteOffset = 300;
   EXPECT_CALL(*quicStats_, onConnFlowControlBlocked()).Times(0);
-  updateFlowControlOnWriteToStream(stream, 100);
+  auto result3 = updateFlowControlOnWriteToStream(stream, 100);
+  ASSERT_FALSE(result3.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 100);
 
   EXPECT_CALL(*quicStats_, onConnFlowControlBlocked()).Times(0);
-  updateFlowControlOnWriteToSocket(stream, 100);
+  auto result4 = updateFlowControlOnWriteToSocket(stream, 100);
+  ASSERT_FALSE(result4.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 0);
   EXPECT_EQ(conn_.flowControlState.sumCurWriteOffset, 400);
   EXPECT_FALSE(conn_.streamManager->flowControlUpdatedContains(id));
@@ -882,7 +897,8 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnWrite) {
   conn_.flowControlState.sumCurStreamBufferLen = 100;
   stream.flowControlState.peerAdvertisedMaxOffset = 600;
   EXPECT_CALL(*quicStats_, onConnFlowControlBlocked()).Times(1);
-  updateFlowControlOnWriteToSocket(stream, 100);
+  auto result5 = updateFlowControlOnWriteToSocket(stream, 100);
+  ASSERT_FALSE(result5.hasError());
 }
 
 TEST_F(QuicFlowControlTest, UpdateFlowControlOnWriteToStream) {
@@ -893,13 +909,16 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnWriteToStream) {
   conn_.flowControlState.sumCurStreamBufferLen = 100;
   stream.flowControlState.peerAdvertisedMaxOffset = 300;
 
-  updateFlowControlOnWriteToStream(stream, 100);
+  auto result1 = updateFlowControlOnWriteToStream(stream, 100);
+  ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 200);
 
-  updateFlowControlOnWriteToSocket(stream, 150);
+  auto result2 = updateFlowControlOnWriteToSocket(stream, 150);
+  ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 50);
 
-  updateFlowControlOnWriteToStream(stream, 100);
+  auto result3 = updateFlowControlOnWriteToStream(stream, 100);
+  ASSERT_FALSE(result3.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurStreamBufferLen, 150);
 }
 
@@ -957,7 +976,7 @@ TEST_F(QuicFlowControlTest, WritableList) {
 
   auto buf = IOBuf::create(100);
   buf->append(100);
-  writeDataToQuicStream(stream, std::move(buf), false);
+  ASSERT_FALSE(writeDataToQuicStream(stream, std::move(buf), false).hasError());
   conn_.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(writableContains(*conn_.streamManager, id));
 
@@ -967,7 +986,7 @@ TEST_F(QuicFlowControlTest, WritableList) {
   EXPECT_FALSE(writableContains(*conn_.streamManager, id));
 
   // Fin
-  writeDataToQuicStream(stream, nullptr, true);
+  ASSERT_FALSE(writeDataToQuicStream(stream, nullptr, true).hasError());
   stream.writeBuffer.move();
   ChainedByteRangeHead(std::move(stream.pendingWrites));
   stream.currentWriteOffset += 100;
@@ -1129,7 +1148,8 @@ TEST_F(QuicFlowControlTest, ReliableSizeNonDsrReset1) {
   stream.writeBuffer.append(std::move(inputData));
   stream.conn.flowControlState.sumCurStreamBufferLen = 5;
 
-  updateFlowControlOnResetStream(stream, 22);
+  auto result = updateFlowControlOnResetStream(stream, 22);
+  ASSERT_FALSE(result.hasError());
 
   // We threw away 3 bytes due to the reliable reset
   EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 2);
@@ -1147,7 +1167,8 @@ TEST_F(QuicFlowControlTest, ReliableSizeNonDsrReset2) {
   stream.writeBuffer.append(std::move(inputData));
   stream.conn.flowControlState.sumCurStreamBufferLen = 5;
 
-  updateFlowControlOnResetStream(stream, 10);
+  auto result = updateFlowControlOnResetStream(stream, 10);
+  ASSERT_FALSE(result.hasError());
 
   // We threw away all 5 bytes due to the reliable reset
   EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 0);
@@ -1165,7 +1186,8 @@ TEST_F(QuicFlowControlTest, ReliableSizeNonDsrReset3) {
   stream.writeBuffer.append(std::move(inputData));
   stream.conn.flowControlState.sumCurStreamBufferLen = 5;
 
-  updateFlowControlOnResetStream(stream, 30);
+  auto result = updateFlowControlOnResetStream(stream, 30);
+  ASSERT_FALSE(result.hasError());
 
   // We didn't throw away any bytes after the reliable reset
   EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 5);
@@ -1181,7 +1203,8 @@ TEST_F(QuicFlowControlTest, ReliableSizeDsrReset1) {
   stream.writeBufMeta.length = 5;
 
   stream.conn.flowControlState.sumCurStreamBufferLen = 5;
-  updateFlowControlOnResetStream(stream, 22);
+  auto result = updateFlowControlOnResetStream(stream, 22);
+  ASSERT_FALSE(result.hasError());
 
   // We threw away 3 bytes due to the reliable reset
   EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 2);
@@ -1198,7 +1221,8 @@ TEST_F(QuicFlowControlTest, ReliableSizeDsrReset2) {
 
   stream.conn.flowControlState.sumCurStreamBufferLen = 5;
 
-  updateFlowControlOnResetStream(stream, 10);
+  auto result = updateFlowControlOnResetStream(stream, 10);
+  ASSERT_FALSE(result.hasError());
 
   // We threw away all 5 bytes due to the reliable reset
   EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 0);
@@ -1215,7 +1239,8 @@ TEST_F(QuicFlowControlTest, ReliableSizeDsrReset3) {
 
   stream.conn.flowControlState.sumCurStreamBufferLen = 5;
 
-  updateFlowControlOnResetStream(stream, 30);
+  auto result = updateFlowControlOnResetStream(stream, 30);
+  ASSERT_FALSE(result.hasError());
 
   // We didn't throw away any bytes after the reliable reset
   EXPECT_EQ(stream.conn.flowControlState.sumCurStreamBufferLen, 5);

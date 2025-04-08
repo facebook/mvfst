@@ -22,7 +22,7 @@ using AckVisitor = std::function<void(
 using AckedPacketVisitor = std::function<void(
     const OutstandingPacketWrapper&)>; // outstanding packet acked
 
-using AckedFrameVisitor = std::function<void(
+using AckedFrameVisitor = std::function<folly::Expected<folly::Unit, QuicError>(
     const OutstandingPacketWrapper&, // outstanding packet acked
     const QuicWriteFrame&)>; // outstanding frame acked
 
@@ -40,7 +40,7 @@ void removeOutstandingsForAck(
  *
  * Returns AckEvent with information about what was observed during processing
  */
-AckEvent processAckFrame(
+[[nodiscard]] folly::Expected<AckEvent, QuicError> processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& ackFrame,

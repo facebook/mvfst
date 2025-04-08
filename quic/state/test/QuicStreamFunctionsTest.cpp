@@ -41,10 +41,14 @@ class QuicStreamFunctionsTest : public Test {
         kDefaultStreamFlowControlWindow;
     conn.flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
-    conn.streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn.streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn.streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn.streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
     maybeSetReadCoalescing();
   }
 
@@ -67,10 +71,14 @@ class QuicServerStreamFunctionsTest : public Test {
         kDefaultStreamFlowControlWindow;
     conn.flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
-    conn.streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn.streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn.streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn.streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
   }
 
   QuicServerConnectionState conn;
@@ -127,8 +135,8 @@ TEST_P(QuicStreamFunctionsTestBase, TestWriteStream) {
   auto buf1 = IOBuf::copyBuffer("I just met you");
   auto buf2 = IOBuf::copyBuffer("and this is crazy");
 
-  writeDataToQuicStream(*stream, buf1->clone(), false);
-  writeDataToQuicStream(*stream, buf2->clone(), false);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf1->clone(), false).hasError());
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf2->clone(), false).hasError());
 
   IOBufEqualTo eq;
   buf1->prependChain(std::move(buf2));
@@ -146,30 +154,33 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataWrittenInOrder) {
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
   buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(buf2->clone(), buf1->computeChainDataLength(), true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(buf2->clone(), buf1->computeChainDataLength(), true))
+          .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 
   auto readData1 = readDataFromQuicStream(*stream, 10);
-  EXPECT_EQ("I just met", readData1.first->to<std::string>());
-  EXPECT_FALSE(readData1.second);
+  EXPECT_EQ("I just met", readData1->first->to<std::string>());
+  EXPECT_FALSE(readData1->second);
 
   auto readData2 = readDataFromQuicStream(*stream, 30);
   EXPECT_EQ(
-      " you and this is crazy. Here's", readData2.first->to<std::string>());
-  EXPECT_FALSE(readData2.second);
+      " you and this is crazy. Here's", readData2->first->to<std::string>());
+  EXPECT_FALSE(readData2->second);
 
   auto readData3 = readDataFromQuicStream(*stream, 21);
-  EXPECT_EQ(" my number so call me", readData3.first->to<std::string>());
-  EXPECT_FALSE(readData3.second);
+  EXPECT_EQ(" my number so call me", readData3->first->to<std::string>());
+  EXPECT_FALSE(readData3->second);
 
   auto readData4 = readDataFromQuicStream(*stream, 20);
-  EXPECT_EQ(" maybe", readData4.first->to<std::string>());
-  EXPECT_TRUE(readData4.second);
+  EXPECT_EQ(" maybe", readData4->first->to<std::string>());
+  EXPECT_TRUE(readData4->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeContiguousData) {
@@ -182,10 +193,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeContiguousData) {
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
   buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(buf2->clone(), buf1->computeChainDataLength(), true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(buf2->clone(), buf1->computeChainDataLength(), true))
+          .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
@@ -230,10 +244,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
   auto buf2 = IOBuf::copyBuffer("'s my number ");
   buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(buf2->clone(), buf1->computeChainDataLength() + 4, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(buf2->clone(), buf1->computeChainDataLength() + 4, true))
+          .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
@@ -278,9 +295,12 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
 
   // Add missing middle bytes.
   auto buf3 = IOBuf::copyBuffer("Here");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0));
-  appendDataToReadBuffer(
-      *stream, StreamBuffer(buf3->clone(), buf1->computeChainDataLength()));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream, StreamBuffer(buf3->clone(), buf1->computeChainDataLength()))
+          .hasError());
 
   cbCalled = false;
   peekDataFromQuicStream(
@@ -338,7 +358,8 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeEmptyDataEof) {
     EXPECT_EQ(range.size(), 0);
   };
 
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true))
+                   .hasError());
 
   peekDataFromQuicStream(*stream, peekCallback);
   EXPECT_TRUE(cbCalled);
@@ -360,10 +381,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufs) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(buf2->clone(), buf1->computeChainDataLength(), true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(buf2->clone(), buf1->computeChainDataLength(), true))
+          .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
@@ -374,11 +398,11 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufs) {
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number so call me maybe",
-      readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.first);
+      readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->first);
 
   auto readData2 = readDataFromQuicStream(*stream, 30);
-  EXPECT_EQ(nullptr, readData2.first);
+  EXPECT_EQ(nullptr, readData2->first);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufsShared) {
@@ -398,13 +422,19 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufsShared) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(std::move(buf2), buf1->computeChainDataLength(), false));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(std::move(buf3), buf1->computeChainDataLength() + 33, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(std::move(buf2), buf1->computeChainDataLength(), false))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(
+              std::move(buf3), buf1->computeChainDataLength() + 33, true))
+          .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
@@ -415,11 +445,11 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufsShared) {
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number so call me maybe it's hard to look right at you",
-      readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.first);
+      readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->first);
 
   auto readData2 = readDataFromQuicStream(*stream, 30);
-  EXPECT_EQ(nullptr, readData2.first);
+  EXPECT_EQ(nullptr, readData2->first);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestReadDataOutOfOrder) {
@@ -432,31 +462,36 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataOutOfOrder) {
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 10));
-  appendDataToReadBuffer(
-      *stream,
-      StreamBuffer(buf2->clone(), buf1->computeChainDataLength() + 10, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 10))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          *stream,
+          StreamBuffer(
+              buf2->clone(), buf1->computeChainDataLength() + 10, true))
+          .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(nullptr, readData1.first);
+  EXPECT_EQ(nullptr, readData1->first);
 
-  appendDataToReadBuffer(
-      *stream, StreamBuffer(IOBuf::copyBuffer("I just met"), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(
+                   *stream, StreamBuffer(IOBuf::copyBuffer("I just met"), 0))
+                   .hasError());
   auto readData2 = readDataFromQuicStream(*stream, 19);
-  EXPECT_EQ("I just met you and ", readData2.first->to<std::string>());
-  EXPECT_FALSE(readData2.second);
+  EXPECT_EQ("I just met you and ", readData2->first->to<std::string>());
+  EXPECT_FALSE(readData2->second);
 
   auto readData3 = readDataFromQuicStream(*stream, 31);
   EXPECT_EQ(
-      "this is crazy. Here's my number", readData3.first->to<std::string>());
-  EXPECT_FALSE(readData3.second);
+      "this is crazy. Here's my number", readData3->first->to<std::string>());
+  EXPECT_FALSE(readData3->second);
 
   auto readData4 = readDataFromQuicStream(*stream);
-  EXPECT_EQ(" so call me maybe", readData4.first->to<std::string>());
-  EXPECT_TRUE(readData4.second);
+  EXPECT_EQ(" so call me maybe", readData4->first->to<std::string>());
+  EXPECT_TRUE(readData4->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestReadOverlappingData) {
@@ -472,19 +507,23 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadOverlappingData) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 34, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 34, true))
+          .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  auto str = readData1.first->to<std::string>();
+  auto str = readData1->first->to<std::string>();
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number, so call me maybe.",
       str);
-  EXPECT_TRUE(readData1.second);
+  EXPECT_TRUE(readData1->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestCompleteOverlap) {
@@ -495,9 +534,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestCompleteOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 19));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 19))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0, true))
+          .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
@@ -505,8 +548,8 @@ TEST_P(QuicStreamFunctionsTestBase, TestCompleteOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+      "I just met you and this is crazy", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -516,17 +559,21 @@ TEST_P(QuicStreamFunctionsTestBase, TestTotalOverlap) {
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0, true))
+          .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("met you ", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+  EXPECT_EQ("met you ", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -538,17 +585,21 @@ TEST_P(QuicStreamFunctionsTestBase, TestSubsetOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 4));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 4, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 4))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 4, true))
+          .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("met you ", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+  EXPECT_EQ("met you ", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -559,16 +610,19 @@ TEST_P(QuicStreamFunctionsTestBase, TestLeftOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7, true));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7, true))
+          .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just met you ", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+  EXPECT_EQ("I just met you ", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -579,8 +633,11 @@ TEST_P(QuicStreamFunctionsTestBase, TestLeftNoOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7, true));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7, true))
+          .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
@@ -590,8 +647,8 @@ TEST_P(QuicStreamFunctionsTestBase, TestLeftNoOverlap) {
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 2);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->to<std::string>());
-  EXPECT_FALSE(readData1.second);
+  EXPECT_EQ("I just", readData1->first->to<std::string>());
+  EXPECT_FALSE(readData1->second);
   EXPECT_EQ(stream->readBuffer.size(), 1);
 }
 
@@ -603,9 +660,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestRightOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 6));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 11, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 6))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 11, true))
+          .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
@@ -613,8 +674,8 @@ TEST_P(QuicStreamFunctionsTestBase, TestRightOverlap) {
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+      "I just met you and this is crazy", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 } // namespace test
 
@@ -625,16 +686,18 @@ TEST_P(QuicStreamFunctionsTestBase, TestRightNoOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7))
+                   .hasError());
 
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 2);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->to<std::string>());
-  EXPECT_FALSE(readData1.second);
+  EXPECT_EQ("I just", readData1->first->to<std::string>());
+  EXPECT_FALSE(readData1->second);
   EXPECT_EQ(stream->readBuffer.size(), 1);
 }
 
@@ -646,17 +709,21 @@ TEST_P(QuicStreamFunctionsTestBase, TestRightLeftOverlap) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 11, true));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 11, true))
+          .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7))
+                   .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+      "I just met you and this is crazy", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -677,26 +744,37 @@ TEST_P(QuicStreamFunctionsTestBase, TestInsertVariations) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 19));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 33));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 44));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf5->clone(), 2));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 58));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf7->clone(), 19));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf8->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf9->clone(), 34, true));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf10->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 7))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 19))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 33))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 44))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf5->clone(), 2))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 58))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf7->clone(), 19))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf8->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf9->clone(), 34, true))
+          .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf10->clone(), 0))
+                   .hasError());
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
 
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  auto str = readData1.first->to<std::string>();
+  auto str = readData1->first->to<std::string>();
   EXPECT_EQ(
       "I just met you and this is crazy. Here's my number so call me maybe",
       str);
-  EXPECT_TRUE(readData1.second);
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -714,41 +792,49 @@ TEST_P(QuicStreamFunctionsTestBase, TestAppendAlreadyReadData) {
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
   auto readData1 = readDataFromQuicStream(*stream, 100);
   EXPECT_EQ(
-      "I just met you and this is crazy", readData1.first->to<std::string>());
-  EXPECT_FALSE(readData1.second);
+      "I just met you and this is crazy", readData1->first->to<std::string>());
+  EXPECT_FALSE(readData1->second);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
   auto readData2 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(readData2.first, nullptr);
-  EXPECT_FALSE(readData2.second);
+  EXPECT_EQ(readData2->first, nullptr);
+  EXPECT_FALSE(readData2->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0))
+                   .hasError());
   auto readData3 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(readData3.first, nullptr);
-  EXPECT_FALSE(readData3.second);
+  EXPECT_EQ(readData3->first, nullptr);
+  EXPECT_FALSE(readData3->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 0))
+                   .hasError());
   auto readData4 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(". Here's my number", readData4.first->to<std::string>());
-  EXPECT_FALSE(readData4.second);
+  EXPECT_EQ(". Here's my number", readData4->first->to<std::string>());
+  EXPECT_FALSE(readData4->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf5->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf5->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 0))
+                   .hasError());
   auto readData5 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(" so call me maybe", readData5.first->to<std::string>());
-  EXPECT_FALSE(readData5.second);
+  EXPECT_EQ(" so call me maybe", readData5->first->to<std::string>());
+  EXPECT_FALSE(readData5->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 0, true));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf6->clone(), 0, true))
+          .hasError());
   auto readData6 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ(readData6.first, nullptr);
-  EXPECT_TRUE(readData6.second);
+  EXPECT_EQ(readData6->first, nullptr);
+  EXPECT_TRUE(readData6->second);
   EXPECT_EQ(
       stream->maxOffsetObserved - streamLastMaxOffset,
       conn.flowControlState.sumMaxObservedOffset - connLastMaxOffset);
@@ -759,20 +845,24 @@ TEST_P(QuicStreamFunctionsTestBase, TestEmptyEOF) {
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7, true))
+          .hasError());
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->to<std::string>());
-  EXPECT_FALSE(readData1.second);
+  EXPECT_EQ("I just", readData1->first->to<std::string>());
+  EXPECT_FALSE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 
   auto buf3 = IOBuf::copyBuffer("m");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 6));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 6))
+                   .hasError());
   auto readData2 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("m", readData2.first->to<std::string>());
-  EXPECT_TRUE(readData2.second);
+  EXPECT_EQ("m", readData2->first->to<std::string>());
+  EXPECT_TRUE(readData2->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -781,13 +871,17 @@ TEST_P(QuicStreamFunctionsTestBase, TestEmptyEOFOverlap) {
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0, true));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 6, true));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0, true))
+          .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 6, true))
+          .hasError());
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+  EXPECT_EQ("I just", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
@@ -796,21 +890,26 @@ TEST_P(QuicStreamFunctionsTestBase, TestOverlapEOF) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2, true));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2, true))
+          .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
 
   EXPECT_EQ(stream->readBuffer.size(), 1);
   auto readData1 = readDataFromQuicStream(*stream, 100);
-  EXPECT_EQ("I just", readData1.first->to<std::string>());
-  EXPECT_TRUE(readData1.second);
+  EXPECT_EQ("I just", readData1->first->to<std::string>());
+  EXPECT_TRUE(readData1->second);
   EXPECT_TRUE(stream->readBuffer.empty());
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestEmptyBuffer) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithAlreadyReadData) {
@@ -818,14 +917,17 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithAlreadyReadData) {
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer(" met you");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 6));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 6))
+                   .hasError());
   auto readData1 = readDataFromQuicStream(*stream, 6);
   EXPECT_EQ(stream->readBuffer.size(), 1);
 
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0, true)),
-      QuicTransportException);
+  auto result =
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0, true));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithSubsetData) {
@@ -833,10 +935,12 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithSubsetData) {
   auto buf1 = IOBuf::copyBuffer("I just");
   auto buf2 = IOBuf::copyBuffer("I");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0, true)),
-      QuicTransportException);
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  auto result =
+      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0, true));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithNoOverlap) {
@@ -844,10 +948,12 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidEOFWithNoOverlap) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0, true)),
-      QuicTransportException);
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
+  auto result =
+      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0, true));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFWithCompleteOverlap) {
@@ -855,10 +961,12 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFWithCompleteOverlap) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I just met");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2, true));
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0)),
-      QuicTransportException);
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2, true))
+          .hasError());
+  auto result = appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFNotLastBuffer) {
@@ -868,11 +976,14 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFNotLastBuffer) {
   auto buf2 = IOBuf::copyBuffer("you");
   auto buf3 = IOBuf::copyBuffer("I just");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 11));
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0, true)),
-      QuicTransportException);
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 11))
+                   .hasError());
+  auto result =
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 0, true));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFRightOverlap) {
@@ -881,10 +992,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFRightOverlap) {
   auto buf1 = IOBuf::copyBuffer("just met");
   auto buf2 = IOBuf::copyBuffer("met you");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2, true));
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7, true)),
-      QuicTransportException);
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2, true))
+          .hasError());
+  auto result =
+      appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7, true));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFRightOverlapNotLast) {
@@ -894,26 +1008,40 @@ TEST_P(QuicStreamFunctionsTestBase, TestInvalidExistingEOFRightOverlapNotLast) {
   auto buf2 = IOBuf::copyBuffer("this is");
   auto buf3 = IOBuf::copyBuffer("met you");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 16));
-  EXPECT_THROW(
-      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 7, true)),
-      QuicTransportException);
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 16))
+                   .hasError());
+  auto result =
+      appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 7, true));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, SetInvalidMaxStreams) {
-  conn.streamManager->setMaxLocalBidirectionalStreams(100, true);
-  conn.streamManager->setMaxLocalUnidirectionalStreams(100, true);
-  conn.streamManager->setMaxLocalBidirectionalStreams(0);
-  conn.streamManager->setMaxLocalUnidirectionalStreams(0);
+  ASSERT_FALSE(conn.streamManager->setMaxLocalBidirectionalStreams(100, true)
+                   .hasError());
+  ASSERT_FALSE(conn.streamManager->setMaxLocalUnidirectionalStreams(100, true)
+                   .hasError());
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(0).hasError());
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalUnidirectionalStreams(0).hasError());
   EXPECT_EQ(conn.streamManager->openableLocalBidirectionalStreams(), 100);
   EXPECT_EQ(conn.streamManager->openableLocalUnidirectionalStreams(), 100);
-  EXPECT_THROW(
-      conn.streamManager->setMaxLocalBidirectionalStreams(kMaxMaxStreams + 1),
-      QuicTransportException);
-  EXPECT_THROW(
-      conn.streamManager->setMaxLocalUnidirectionalStreams(kMaxMaxStreams + 1),
-      QuicTransportException);
+
+  auto bidirectionalResult =
+      conn.streamManager->setMaxLocalBidirectionalStreams(kMaxMaxStreams + 1);
+  EXPECT_TRUE(bidirectionalResult.hasError());
+  EXPECT_EQ(
+      bidirectionalResult.error().code, TransportErrorCode::STREAM_LIMIT_ERROR);
+
+  auto unidirectionalResult =
+      conn.streamManager->setMaxLocalUnidirectionalStreams(kMaxMaxStreams + 1);
+  EXPECT_TRUE(unidirectionalResult.hasError());
+  EXPECT_EQ(
+      unidirectionalResult.error().code,
+      TransportErrorCode::STREAM_LIMIT_ERROR);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, GetOrCreateClientCryptoStream) {
@@ -924,7 +1052,7 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateClientOutOfOrderStream) {
   StreamId outOfOrderStream = 100;
   StreamId existingStream = 88;
   StreamId closedStream = 84;
-  conn.streamManager->getStream(outOfOrderStream);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream).hasError());
 
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_TRUE(conn.streamManager->streamExists(outOfOrderStream));
@@ -933,7 +1061,7 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateClientOutOfOrderStream) {
       conn.streamManager->openBidirectionalPeerStreams().size(),
       ((outOfOrderStream) / kStreamIncrement) + 1);
 
-  conn.streamManager->getStream(existingStream);
+  ASSERT_FALSE(conn.streamManager->getStream(existingStream).hasError());
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_TRUE(conn.streamManager->streamExists(outOfOrderStream));
   EXPECT_EQ(
@@ -941,7 +1069,9 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateClientOutOfOrderStream) {
       ((outOfOrderStream) / kStreamIncrement) + 1);
 
   conn.streamManager->openBidirectionalPeerStreams().remove(closedStream);
-  EXPECT_EQ(conn.streamManager->getStream(closedStream), nullptr);
+  auto streamResult = conn.streamManager->getStream(closedStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value(), nullptr);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, GetOrCreateExistingClientStream) {
@@ -951,7 +1081,7 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateExistingClientStream) {
   auto stream = conn.streamManager->getStream(outOfOrderStream1);
   auto stream2 = conn.streamManager->getStream(outOfOrderStream1);
   EXPECT_EQ(stream, stream2);
-  conn.streamManager->getStream(outOfOrderStream2);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream2).hasError());
 }
 
 TEST_P(QuicStreamFunctionsTestBase, GetOrCreateExistingServerStream) {
@@ -960,15 +1090,17 @@ TEST_P(QuicStreamFunctionsTestBase, GetOrCreateExistingServerStream) {
   auto stream = conn.streamManager->getStream(outOfOrderStream1);
   auto stream2 = conn.streamManager->getStream(outOfOrderStream1);
   EXPECT_EQ(stream, stream2);
-  conn.streamManager->getStream(outOfOrderStream2);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream2).hasError());
 }
 
 TEST_F(QuicServerStreamFunctionsTest, GetOrCreateClosedClientStream) {
   StreamId outOfOrderStream1 = 100;
   StreamId closedStream = 48;
-  conn.streamManager->getStream(outOfOrderStream1);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream1).hasError());
   conn.streamManager->openBidirectionalPeerStreams().remove(closedStream);
-  EXPECT_EQ(conn.streamManager->getStream(closedStream), nullptr);
+  auto streamResult = conn.streamManager->getStream(closedStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value(), nullptr);
 }
 
 TEST_F(
@@ -976,9 +1108,9 @@ TEST_F(
     GetOrCreateClientStreamAfterClosingLastStream) {
   StreamId outOfOrderStream1 = 96;
   StreamId outOfOrderStream2 = 100;
-  conn.streamManager->getStream(outOfOrderStream1);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream1).hasError());
   conn.streamManager->openBidirectionalPeerStreams().remove(outOfOrderStream1);
-  conn.streamManager->getStream(outOfOrderStream2);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream2).hasError());
   EXPECT_EQ(
       conn.streamManager->openBidirectionalPeerStreams().size(),
       (outOfOrderStream2) / kStreamIncrement);
@@ -989,9 +1121,9 @@ TEST_P(
     GetOrCreateServerStreamAfterClosingLastStream) {
   StreamId outOfOrderStream1 = 97;
   StreamId outOfOrderStream2 = 101;
-  conn.streamManager->getStream(outOfOrderStream1);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream1).hasError());
   conn.streamManager->openBidirectionalPeerStreams().remove(outOfOrderStream1);
-  conn.streamManager->getStream(outOfOrderStream2);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream2).hasError());
   EXPECT_EQ(
       conn.streamManager->openBidirectionalPeerStreams().size(),
       (outOfOrderStream2 + 1) / kStreamIncrement);
@@ -1000,39 +1132,44 @@ TEST_P(
 TEST_P(QuicStreamFunctionsTestBase, GetOrCreateClosedServerStream) {
   StreamId outOfOrderStream1 = 97;
   StreamId closedStream = 49;
-  conn.streamManager->getStream(outOfOrderStream1);
+  ASSERT_FALSE(conn.streamManager->getStream(outOfOrderStream1).hasError());
   conn.streamManager->openBidirectionalPeerStreams().remove(closedStream);
-  EXPECT_EQ(conn.streamManager->getStream(closedStream), nullptr);
+  auto streamResult = conn.streamManager->getStream(closedStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value(), nullptr);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, GetOrCreateServerStreamOnServer) {
   StreamId serverStream = 101;
-  EXPECT_THROW(
-      conn.streamManager->getStream(serverStream), QuicTransportException);
+  auto streamResult = conn.streamManager->getStream(serverStream);
+  ASSERT_TRUE(streamResult.hasError());
+  EXPECT_EQ(streamResult.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, GetOrCreateClientStreamOnClient) {
   StreamId clientStream = 100;
-  EXPECT_THROW(
-      conn.streamManager->getStream(clientStream), QuicTransportException);
+  auto streamResult = conn.streamManager->getStream(clientStream);
+  ASSERT_TRUE(streamResult.hasError());
+  EXPECT_EQ(streamResult.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, GetOrCreateNonClientOrServer) {
   StreamId streamZero = 0;
-  EXPECT_THROW(
-      conn.streamManager->getStream(streamZero), QuicTransportException);
+  auto streamResult = conn.streamManager->getStream(streamZero);
+  ASSERT_TRUE(streamResult.hasError());
+  EXPECT_EQ(streamResult.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, CreateQuicStreamServerOutOfOrder) {
   StreamId outOfOrderStream1 = 101;
   StreamId outOfOrderStream2 = 49;
-  conn.streamManager->createStream(outOfOrderStream1).value();
+  ASSERT_FALSE(conn.streamManager->createStream(outOfOrderStream1).hasError());
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
           conn.streamManager->openBidirectionalLocalStreams().size(),
       26);
-  conn.streamManager->createStream(outOfOrderStream2).value();
+  ASSERT_FALSE(conn.streamManager->createStream(outOfOrderStream2).hasError());
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1043,13 +1180,13 @@ TEST_F(QuicServerStreamFunctionsTest, CreateQuicStreamServerOutOfOrder) {
 TEST_P(QuicStreamFunctionsTestBase, CreateQuicStreamClientOutOfOrder) {
   StreamId outOfOrderStream1 = 96;
   StreamId outOfOrderStream2 = 48;
-  conn.streamManager->createStream(outOfOrderStream1);
+  ASSERT_FALSE(conn.streamManager->createStream(outOfOrderStream1).hasError());
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
           conn.streamManager->openBidirectionalLocalStreams().size(),
       25);
-  conn.streamManager->createStream(outOfOrderStream2).value();
+  ASSERT_FALSE(conn.streamManager->createStream(outOfOrderStream2).hasError());
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1060,9 +1197,12 @@ TEST_P(QuicStreamFunctionsTestBase, CreateQuicStreamClientOutOfOrder) {
 TEST_F(QuicServerStreamFunctionsTest, CreateClosedServerStream) {
   StreamId outOfOrderStream1 = 101;
   StreamId outOfOrderStream2 = 49;
-  conn.streamManager->createStream(outOfOrderStream1);
+  auto result1 = conn.streamManager->createStream(outOfOrderStream1);
+  ASSERT_FALSE(result1.hasError());
+  ASSERT_TRUE(result1.value());
   conn.streamManager->openBidirectionalLocalStreams().remove(outOfOrderStream2);
-  EXPECT_FALSE(conn.streamManager->createStream(outOfOrderStream2));
+  auto result2 = conn.streamManager->createStream(outOfOrderStream2);
+  ASSERT_TRUE(result2.hasError());
 }
 
 TEST_P(QuicStreamFunctionsTestBase, CreateClosedClientStream) {
@@ -1075,21 +1215,24 @@ TEST_P(QuicStreamFunctionsTestBase, CreateClosedClientStream) {
 
 TEST_P(QuicStreamFunctionsTestBase, CreateInvalidServerStreamOnClient) {
   StreamId serverStream = 0x09;
-  EXPECT_THROW(
-      conn.streamManager->createStream(serverStream), QuicTransportException);
+  auto result = conn.streamManager->createStream(serverStream);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, CreateInvalidClientStreamOnServer) {
   StreamId clientStream = 0x04;
-  EXPECT_THROW(
-      conn.streamManager->createStream(clientStream), QuicTransportException);
+  auto result = conn.streamManager->createStream(clientStream);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, CreateAlreadyExistingStream) {
   StreamId stream = 0x08;
   conn.streamManager->createStream(stream).value();
-  EXPECT_THROW(
-      conn.streamManager->createStream(stream), QuicTransportException);
+  auto result = conn.streamManager->createStream(stream);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, IsClientStream) {
@@ -1236,9 +1379,11 @@ TEST_P(QuicStreamFunctionsTestBase, GetStreamInitiatorBidirectional) {
   EXPECT_EQ(clientStream2Id, 0x04);
 
   const auto serverStream1Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(clientStream1Id + 1))->id;
+      CHECK_NOTNULL(
+          conn.streamManager->getStream(clientStream1Id + 1).value_or(nullptr))
+          ->id;
   const auto serverStream2Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(clientStream2Id + 1))->id;
+      conn.streamManager->getStream(clientStream2Id + 1).value_or(nullptr)->id;
 
   EXPECT_EQ(
       StreamDirectionality::Bidirectional,
@@ -1278,9 +1423,9 @@ TEST_F(QuicServerStreamFunctionsTest, GetStreamInitiatorBidirectional) {
   EXPECT_EQ(serverStream2Id, 0x05);
 
   const auto clientStream1Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(serverStream1Id - 1))->id;
+      conn.streamManager->getStream(serverStream1Id - 1).value_or(nullptr)->id;
   const auto clientStream2Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(serverStream2Id - 1))->id;
+      conn.streamManager->getStream(serverStream2Id - 1).value_or(nullptr)->id;
 
   EXPECT_EQ(
       StreamDirectionality::Bidirectional,
@@ -1320,9 +1465,9 @@ TEST_P(QuicStreamFunctionsTestBase, GetStreamInitiatorUnidirectional) {
   EXPECT_EQ(clientStream2Id, 0x06);
 
   const auto serverStream1Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(clientStream1Id + 1))->id;
+      conn.streamManager->getStream(clientStream1Id + 1).value_or(nullptr)->id;
   const auto serverStream2Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(clientStream2Id + 1))->id;
+      conn.streamManager->getStream(clientStream2Id + 1).value_or(nullptr)->id;
 
   EXPECT_EQ(
       StreamDirectionality::Unidirectional,
@@ -1362,9 +1507,9 @@ TEST_F(QuicServerStreamFunctionsTest, GetStreamInitiatorUnidirectional) {
   EXPECT_EQ(serverStream2Id, 0x07);
 
   const auto clientStream1Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(serverStream1Id - 1))->id;
+      conn.streamManager->getStream(serverStream1Id - 1).value_or(nullptr)->id;
   const auto clientStream2Id =
-      CHECK_NOTNULL(conn.streamManager->getStream(serverStream2Id - 1))->id;
+      conn.streamManager->getStream(serverStream2Id - 1).value_or(nullptr)->id;
 
   EXPECT_EQ(
       StreamDirectionality::Unidirectional,
@@ -1398,7 +1543,8 @@ TEST_P(QuicStreamFunctionsTestBase, HasReadableDataNoData) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   EXPECT_FALSE(stream->hasReadableData());
 }
 
@@ -1410,32 +1556,37 @@ TEST_P(QuicStreamFunctionsTestBase, HasReadableDataNoDataInBuf) {
 TEST_P(QuicStreamFunctionsTestBase, HasReadableDataEofInBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 1, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 1, true))
+                   .hasError());
   EXPECT_FALSE(stream->hasReadableData());
-  appendDataToReadBuffer(*stream, StreamBuffer(IOBuf::copyBuffer("1"), 0));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(IOBuf::copyBuffer("1"), 0))
+          .hasError());
   EXPECT_TRUE(stream->hasReadableData());
   auto read1 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read1.second);
+  EXPECT_TRUE(read1->second);
   EXPECT_FALSE(stream->hasReadableData());
   auto read2 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read2.second);
+  EXPECT_TRUE(read2->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, HasReadableDataEofInEmptyBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true))
+                   .hasError());
   EXPECT_TRUE(stream->hasReadableData());
   auto read1 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read1.second);
+  EXPECT_TRUE(read1->second);
   EXPECT_FALSE(stream->hasReadableData());
   auto read2 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read2.second);
+  EXPECT_TRUE(read2->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, HasReadableDataOnlyEof) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true))
+                   .hasError());
   EXPECT_TRUE(stream->hasReadableData());
 }
 
@@ -1443,15 +1594,18 @@ TEST_P(QuicStreamFunctionsTestBase, HasReadableData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I ");
   auto buf2 = IOBuf::copyBuffer("met");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7))
+                   .hasError());
   EXPECT_TRUE(stream->hasReadableData());
 
   readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->hasReadableData());
 
   auto buf3 = IOBuf::copyBuffer("just ");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 2))
+                   .hasError());
   EXPECT_TRUE(stream->hasReadableData());
   readDataFromQuicStream(*stream, 5);
   EXPECT_TRUE(stream->hasReadableData());
@@ -1464,7 +1618,8 @@ TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataGappedData) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   EXPECT_TRUE(stream->hasPeekableData());
 }
 
@@ -1476,32 +1631,37 @@ TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataNoDataInBuf) {
 TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataEofInBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 1, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 1, true))
+                   .hasError());
   EXPECT_FALSE(stream->hasPeekableData());
-  appendDataToReadBuffer(*stream, StreamBuffer(IOBuf::copyBuffer("1"), 0));
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(IOBuf::copyBuffer("1"), 0))
+          .hasError());
   EXPECT_TRUE(stream->hasPeekableData());
   auto read1 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read1.second);
+  EXPECT_TRUE(read1->second);
   EXPECT_FALSE(stream->hasPeekableData());
   auto read2 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read2.second);
+  EXPECT_TRUE(read2->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataEofInEmptyBuf) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
 
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true))
+                   .hasError());
   EXPECT_FALSE(stream->hasPeekableData());
   auto read1 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read1.second);
+  EXPECT_TRUE(read1->second);
   EXPECT_FALSE(stream->hasPeekableData());
   auto read2 = readDataFromQuicStream(*stream, 1);
-  EXPECT_TRUE(read2.second);
+  EXPECT_TRUE(read2->second);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, HasPeekableDataOnlyEof) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
-  appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(nullptr, 0, true))
+                   .hasError());
   EXPECT_FALSE(stream->hasPeekableData());
 }
 
@@ -1509,15 +1669,18 @@ TEST_P(QuicStreamFunctionsTestBase, HasPeekableData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I ");
   auto buf2 = IOBuf::copyBuffer("met");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 7))
+                   .hasError());
   EXPECT_TRUE(stream->hasPeekableData());
 
   readDataFromQuicStream(*stream);
   EXPECT_TRUE(stream->hasPeekableData());
 
   auto buf3 = IOBuf::copyBuffer("just ");
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 2))
+                   .hasError());
   EXPECT_TRUE(stream->hasPeekableData());
   readDataFromQuicStream(*stream, 5);
   EXPECT_TRUE(stream->hasPeekableData());
@@ -1530,7 +1693,8 @@ TEST_P(QuicStreamFunctionsTestBase, UpdatesLastHolbTime) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   // Should not be HOL blocked before data has arrived
   EXPECT_FALSE(stream->lastHolbTime);
   readDataFromQuicStream(*stream);
@@ -1549,7 +1713,8 @@ TEST_P(
   auto buf3 = IOBuf::copyBuffer("you");
   auto buf4 = IOBuf::copyBuffer(" met ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   // Should not be HOL blocked until the readable list has been updated
   EXPECT_FALSE(stream->lastHolbTime);
 
@@ -1570,7 +1735,8 @@ TEST_P(
   EXPECT_EQ(0us, stream->totalHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
 
   // uRL 1.0 - expected state transition:
   //   HOLB in progress -> !HOLB && holbCount == 1
@@ -1586,7 +1752,8 @@ TEST_P(
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 11));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 11))
+                   .hasError());
 
   // uRL 2.0 - expected state transition:
   // !HOLB && holbCount == 1
@@ -1623,7 +1790,8 @@ TEST_P(
   // HOLB && holbCount == 2
   //     && totalTime == totalTimeMark
   // => !HOLB && holbCount == 2
-  appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 6));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 6))
+                   .hasError());
   conn.streamManager->updateReadableStreams(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(2, stream->holbCount);
@@ -1646,7 +1814,8 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingFirstBufferHOLBlocked) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   // Should not be HOL blocked until the readable list has been updated
   EXPECT_FALSE(stream->lastHolbTime);
 
@@ -1664,7 +1833,8 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingFirstBufferHOLBlocked) {
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
   conn.streamManager->updateReadableStreams(*stream);
   // HOLB state must be cleared by buf2, and total time should be available
 
@@ -1677,12 +1847,14 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingReadingEntireStream) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   conn.streamManager->updateReadableStreams(*stream);
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
   conn.streamManager->updateReadableStreams(*stream);
   // HOLB state must be cleared by buf2, and total time should be available
   EXPECT_FALSE(stream->lastHolbTime);
@@ -1701,7 +1873,8 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingLockstepScenario) {
   auto buf3 = IOBuf::copyBuffer("met you ");
   auto buf4 = IOBuf::copyBuffer("and this is crazy");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   // Should not be HOL blocked before data has arrived
   EXPECT_FALSE(stream->lastHolbTime);
 
@@ -1715,8 +1888,10 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingLockstepScenario) {
   EXPECT_EQ(0us, stream->totalHolbTime);
 
   // Data has arrived
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
-  appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 15));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf4->clone(), 15))
+                   .hasError());
 
   // Update readable list has not been called yet, hence
   // the total holb time has not been set yet
@@ -1740,7 +1915,8 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingLockstepScenario) {
   // The total HOLB time shouldn't have changed since the last update
   EXPECT_EQ(snapshotHolbTime, stream->totalHolbTime);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 6));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 6))
+                   .hasError());
   conn.streamManager->updateReadableStreams(*stream);
 
   // Should be not HOLB
@@ -1753,13 +1929,15 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingReadDataCallsUpdateRL) {
   auto buf1 = IOBuf::copyBuffer("just");
   auto buf2 = IOBuf::copyBuffer("I ");
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
+                   .hasError());
   readDataFromQuicStream(*stream);
   // Should be HOL blocked
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
+  ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
+                   .hasError());
   readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
@@ -1770,7 +1948,9 @@ TEST_P(QuicStreamFunctionsTestBase, RemovedClosedState) {
   auto streamId = stream->id;
   conn.streamManager->readableStreams().emplace(streamId);
   conn.streamManager->peekableStreams().emplace(streamId);
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("write data"), true);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("write data"), true)
+                   .hasError());
   conn.streamManager->updateWritableStreams(*stream);
   conn.streamManager->queueBlocked(streamId, 0);
   conn.streamManager->addDeliverable(streamId);
@@ -1781,7 +1961,7 @@ TEST_P(QuicStreamFunctionsTestBase, RemovedClosedState) {
   conn.streamManager->queueFlowControlUpdated(streamId);
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
-  conn.streamManager->removeClosedStream(streamId);
+  ASSERT_FALSE(conn.streamManager->removeClosedStream(streamId).hasError());
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(conn.streamManager->readableStreams().empty());
   EXPECT_TRUE(conn.streamManager->peekableStreams().empty());
@@ -1797,13 +1977,17 @@ TEST_P(QuicStreamFunctionsTestBase, RemovedClosedState) {
 TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
   StreamId clientStream = 0x10;
   std::vector<StreamId> newStreams = {0x0, 0x4, 0x8, 0xc, 0x10};
-  EXPECT_EQ(conn.streamManager->getStream(clientStream)->id, clientStream);
+  auto streamResult = conn.streamManager->getStream(clientStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, clientStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 5);
   EXPECT_EQ(conn.streamManager->newPeerStreams(), newStreams);
 
   StreamId clientStream2 = 0x4;
-  EXPECT_EQ(conn.streamManager->getStream(clientStream2)->id, clientStream2);
+  auto streamResult2 = conn.streamManager->getStream(clientStream2);
+  ASSERT_FALSE(streamResult2.hasError());
+  EXPECT_EQ(streamResult2.value()->id, clientStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 5);
   EXPECT_EQ(conn.streamManager->newPeerStreams().size(), 5);
@@ -1811,7 +1995,9 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
 
   StreamId clientStream3 = 0x6;
   newStreams = {0x0, 0x2, 0x4, 0x6, 0x8, 0xc, 0x10};
-  EXPECT_EQ(conn.streamManager->getStream(clientStream3)->id, clientStream3);
+  auto streamResult3 = conn.streamManager->getStream(clientStream3);
+  ASSERT_FALSE(streamResult3.hasError());
+  EXPECT_EQ(streamResult3.value()->id, clientStream3);
   EXPECT_EQ(conn.streamManager->streamCount(), 3);
   EXPECT_EQ(conn.streamManager->openUnidirectionalPeerStreams().size(), 2);
   std::sort(
@@ -1823,7 +2009,9 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
 TEST_F(QuicServerStreamFunctionsTest, ServerGetServerQuicStream) {
   StreamId serverStream = 0x09;
   conn.streamManager->createStream(serverStream).value();
-  EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
+  auto streamResult = conn.streamManager->getStream(serverStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1831,7 +2019,9 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerQuicStream) {
       3);
 
   StreamId serverStream2 = 0x05;
-  EXPECT_EQ(conn.streamManager->getStream(serverStream2)->id, serverStream2);
+  auto streamResult2 = conn.streamManager->getStream(serverStream2);
+  ASSERT_FALSE(streamResult2.hasError());
+  EXPECT_EQ(streamResult2.value()->id, serverStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1839,14 +2029,17 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerQuicStream) {
       3);
 
   StreamId serverStream3 = 0x0D;
-  EXPECT_THROW(
-      conn.streamManager->getStream(serverStream3), QuicTransportException);
+  auto streamResult3 = conn.streamManager->getStream(serverStream3);
+  EXPECT_TRUE(streamResult3.hasError());
+  EXPECT_EQ(streamResult3.error().code, TransportErrorCode::STREAM_STATE_ERROR);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetBothDirections) {
   StreamId serverBiStream = 0x09;
   conn.streamManager->createStream(serverBiStream).value();
-  EXPECT_EQ(conn.streamManager->getStream(serverBiStream)->id, serverBiStream);
+  auto streamResult = conn.streamManager->getStream(serverBiStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, serverBiStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1855,8 +2048,9 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetBothDirections) {
 
   StreamId serverUniStream = 0x0B;
   conn.streamManager->createStream(serverUniStream).value();
-  EXPECT_EQ(
-      conn.streamManager->getStream(serverUniStream)->id, serverUniStream);
+  auto streamResult2 = conn.streamManager->getStream(serverUniStream);
+  ASSERT_FALSE(streamResult2.hasError());
+  EXPECT_EQ(streamResult2.value()->id, serverUniStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1866,15 +2060,19 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetBothDirections) {
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetCloseBothDirections) {
   StreamId serverBiStream = 0x09;
-  conn.streamManager->createStream(serverBiStream).value();
-  EXPECT_EQ(conn.streamManager->getStream(serverBiStream)->id, serverBiStream);
+  ASSERT_FALSE(conn.streamManager->createStream(serverBiStream).hasError());
+  auto streamResult = conn.streamManager->getStream(serverBiStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, serverBiStream);
   StreamId serverUniStream = 0x0B;
   auto stream = conn.streamManager->createStream(serverUniStream).value();
   stream->sendState = StreamSendState::Closed;
 
-  conn.streamManager->removeClosedStream(serverUniStream);
-  EXPECT_TRUE(
-      conn.streamManager->getStream(serverUniStream - kStreamIncrement));
+  ASSERT_FALSE(
+      conn.streamManager->removeClosedStream(serverUniStream).hasError());
+  auto streamResult2 =
+      conn.streamManager->getStream(serverUniStream - kStreamIncrement);
+  ASSERT_FALSE(streamResult2.hasError());
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
 
   EXPECT_FALSE(conn.streamManager->streamExists(serverUniStream));
@@ -1891,8 +2089,10 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetCloseBothDirections) {
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetServerUnidirectionalQuicStream) {
   StreamId serverStream = 0x0F;
-  conn.streamManager->createStream(serverStream).value();
-  EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
+  ASSERT_FALSE(conn.streamManager->createStream(serverStream).hasError());
+  auto streamResult = conn.streamManager->getStream(serverStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1900,7 +2100,9 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerUnidirectionalQuicStream) {
       4);
 
   StreamId serverStream2 = 0x0B;
-  EXPECT_EQ(conn.streamManager->getStream(serverStream2)->id, serverStream2);
+  auto streamResult2 = conn.streamManager->getStream(serverStream2);
+  ASSERT_FALSE(streamResult2.hasError());
+  EXPECT_EQ(streamResult2.value()->id, serverStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1908,27 +2110,33 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerUnidirectionalQuicStream) {
       4);
 
   StreamId serverStream3 = 0x1F;
-  EXPECT_THROW(
-      conn.streamManager->getStream(serverStream3), QuicTransportException);
+  auto streamResult3 = conn.streamManager->getStream(serverStream3);
+  ASSERT_TRUE(streamResult3.hasError());
+  EXPECT_NE(streamResult3.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, ClientGetServerQuicStream) {
   StreamId serverStream = 0x09;
-  EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
+  auto streamResult = conn.streamManager->getStream(serverStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 3);
 
   StreamId serverStream2 = 0x05;
-  EXPECT_EQ(conn.streamManager->getStream(serverStream2)->id, serverStream2);
+  auto streamResult2 = conn.streamManager->getStream(serverStream2);
+  ASSERT_FALSE(streamResult2.hasError());
+  EXPECT_EQ(streamResult2.value()->id, serverStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 3);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, ClientGetClientQuicStream) {
   StreamId clientStream = 0x0C;
-  conn.streamManager->createStream(clientStream).value();
-
-  EXPECT_EQ(conn.streamManager->getStream(clientStream)->id, clientStream);
+  ASSERT_FALSE(conn.streamManager->createStream(clientStream).hasError());
+  auto streamResult = conn.streamManager->getStream(clientStream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value()->id, clientStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1936,7 +2144,9 @@ TEST_P(QuicStreamFunctionsTestBase, ClientGetClientQuicStream) {
       4);
 
   StreamId clientStream2 = 0x08;
-  EXPECT_EQ(conn.streamManager->getStream(clientStream2)->id, clientStream2);
+  auto streamResult2 = conn.streamManager->getStream(clientStream2);
+  ASSERT_FALSE(streamResult2.hasError());
+  EXPECT_EQ(streamResult2.value()->id, clientStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_EQ(
       conn.streamManager->openUnidirectionalLocalStreams().size() +
@@ -1944,8 +2154,9 @@ TEST_P(QuicStreamFunctionsTestBase, ClientGetClientQuicStream) {
       4);
 
   StreamId clientStream3 = 0x10;
-  EXPECT_THROW(
-      conn.streamManager->getStream(clientStream3), QuicTransportException);
+  auto streamResult3 = conn.streamManager->getStream(clientStream3);
+  ASSERT_TRUE(streamResult3.hasError());
+  EXPECT_NE(streamResult3.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicStreamFunctionsTestBase, StreamExists) {
@@ -1958,7 +2169,7 @@ TEST_P(QuicStreamFunctionsTestBase, StreamExists) {
   StreamId notOpenedLocal = 16;
   StreamId notOpenedPeer = 17;
 
-  conn.streamManager->createStream(localStream).value();
+  ASSERT_FALSE(conn.streamManager->createStream(localStream).hasError());
   EXPECT_TRUE(conn.streamManager->streamExists(localStream));
   EXPECT_TRUE(conn.streamManager->streamExists(localAutoOpened));
   EXPECT_FALSE(conn.streamManager->streamExists(notOpenedLocal));
@@ -1966,10 +2177,10 @@ TEST_P(QuicStreamFunctionsTestBase, StreamExists) {
   EXPECT_FALSE(conn.streamManager->streamExists(peerStream));
   EXPECT_FALSE(conn.streamManager->streamExists(peerAutoOpened));
 
-  conn.streamManager->getStream(peerStream)->sendState =
-      StreamSendState::Closed;
-  conn.streamManager->getStream(peerStream)->recvState =
-      StreamRecvState::Closed;
+  auto streamResult = conn.streamManager->getStream(peerStream);
+  ASSERT_FALSE(streamResult.hasError());
+  streamResult.value()->sendState = StreamSendState::Closed;
+  streamResult.value()->recvState = StreamRecvState::Closed;
   EXPECT_TRUE(conn.streamManager->streamExists(localStream));
   EXPECT_TRUE(conn.streamManager->streamExists(localAutoOpened));
   EXPECT_FALSE(conn.streamManager->streamExists(notOpenedLocal));
@@ -1979,7 +2190,7 @@ TEST_P(QuicStreamFunctionsTestBase, StreamExists) {
 
   conn.streamManager->openBidirectionalPeerStreams().remove(peerAutoOpened);
 
-  conn.streamManager->removeClosedStream(peerStream);
+  ASSERT_FALSE(conn.streamManager->removeClosedStream(peerStream).hasError());
 
   EXPECT_FALSE(conn.streamManager->streamExists(peerAutoOpened));
   EXPECT_FALSE(conn.streamManager->streamExists(peerStream));
@@ -1994,15 +2205,15 @@ TEST_P(QuicStreamFunctionsTestBase, StreamLimitUpdates) {
 
   conn.streamManager->setStreamLimitWindowingFraction(
       conn.transportSettings.advertisedInitialMaxStreamsBidi);
-  conn.streamManager->getStream(peerStream)->sendState =
-      StreamSendState::Closed;
-  conn.streamManager->getStream(peerStream)->recvState =
-      StreamRecvState::Closed;
+  auto streamResult = conn.streamManager->getStream(peerStream);
+  ASSERT_FALSE(streamResult.hasError());
+  streamResult.value()->sendState = StreamSendState::Closed;
+  streamResult.value()->recvState = StreamRecvState::Closed;
   EXPECT_FALSE(conn.streamManager->streamExists(notOpenedPeer));
   EXPECT_TRUE(conn.streamManager->streamExists(peerStream));
   EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened));
 
-  conn.streamManager->removeClosedStream(peerStream);
+  ASSERT_FALSE(conn.streamManager->removeClosedStream(peerStream).hasError());
 
   EXPECT_FALSE(conn.streamManager->streamExists(peerStream));
   EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened));
@@ -2125,7 +2336,7 @@ TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamResetAllData) {
   QuicStreamState stream(id, conn);
   auto data = IOBuf::copyBuffer("this is data");
   auto len = data->computeChainDataLength();
-  writeDataToQuicStream(stream, std::move(data), true);
+  ASSERT_FALSE(writeDataToQuicStream(stream, std::move(data), true).hasError());
 
   // Simulate all bytes and EOF written on network.
   stream.currentWriteOffset = len + 1;
@@ -2144,7 +2355,7 @@ TEST_F(
   QuicStreamState stream(id, conn);
   auto data = IOBuf::copyBuffer("this is data");
   auto len = data->computeChainDataLength();
-  writeDataToQuicStream(stream, std::move(data), true);
+  ASSERT_FALSE(writeDataToQuicStream(stream, std::move(data), true).hasError());
 
   // Simulate all bytes except EOF written on network.
   stream.currentWriteOffset = len;
@@ -2163,7 +2374,8 @@ TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamReliableReset1) {
   QuicStreamState stream(id, conn);
   auto data = IOBuf::copyBuffer("this is data");
   auto len = data->computeChainDataLength();
-  writeDataToQuicStream(stream, std::move(data), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(stream, std::move(data), false).hasError());
 
   stream.currentWriteOffset = len - 5;
 
@@ -2181,7 +2393,8 @@ TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamReliableReset2) {
   QuicStreamState stream(id, conn);
   auto data = IOBuf::copyBuffer("this is data");
   auto len = data->computeChainDataLength();
-  writeDataToQuicStream(stream, std::move(data), false);
+  ASSERT_FALSE(
+      writeDataToQuicStream(stream, std::move(data), false).hasError());
 
   stream.currentWriteOffset = len - 5;
 
@@ -2375,7 +2588,7 @@ TEST_P(QuicStreamFunctionsTestBase, WritableList) {
 
   auto buf = IOBuf::create(100);
   buf->append(100);
-  writeDataToQuicStream(stream, std::move(buf), false);
+  ASSERT_FALSE(writeDataToQuicStream(stream, std::move(buf), false).hasError());
   conn.streamManager->updateWritableStreams(stream);
   EXPECT_TRUE(writableContains(*stream.conn.streamManager, id));
 
@@ -2385,7 +2598,7 @@ TEST_P(QuicStreamFunctionsTestBase, WritableList) {
   EXPECT_FALSE(writableContains(*stream.conn.streamManager, id));
 
   // Fin
-  writeDataToQuicStream(stream, nullptr, true);
+  ASSERT_FALSE(writeDataToQuicStream(stream, nullptr, true).hasError());
   stream.writeBuffer.move();
   ChainedByteRangeHead(std::move(stream.pendingWrites));
   stream.currentWriteOffset += 100;

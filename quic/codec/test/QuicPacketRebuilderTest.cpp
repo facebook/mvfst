@@ -81,7 +81,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
   ASSERT_EQ(packet.packet.frames.size(), 2);
   EXPECT_FALSE(packet.body.empty());
   regularBuilder2.encodePacketHeader();
-  ASSERT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
   auto rebuilt = std::move(regularBuilder2).buildPacket();
   EXPECT_FALSE(rebuilt.header.empty());
   ASSERT_EQ(rebuilt.packet.frames.size(), 3);
@@ -115,7 +117,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf =
@@ -171,7 +174,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size());
@@ -259,7 +264,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   regularBuilder1.encodePacketHeader();
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf = folly::IOBuf::copyBuffer("A million miles away.");
@@ -277,7 +283,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   ASSERT_EQ(1, packet1.packet.frames.size());
 
   // Then we reset the stream
-  sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN);
+  ASSERT_FALSE(sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN)
+                   .hasError());
   ShortHeader shortHeader2(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
@@ -285,7 +292,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  EXPECT_FALSE(rebuildResult.value().hasValue());
 }
 
 TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
@@ -296,7 +305,8 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   regularBuilder1.encodePacketHeader();
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
 
@@ -318,7 +328,9 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 2000);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size());
   EXPECT_TRUE(
@@ -342,7 +354,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   // Get a bunch frames
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   StreamId streamId = stream->id;
   auto buf =
@@ -381,7 +394,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size() + 1);
@@ -426,7 +441,9 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  EXPECT_FALSE(rebuildResult.value().hasValue());
 }
 
 TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
@@ -451,7 +468,8 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf =
@@ -492,7 +510,9 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
+  ASSERT_FALSE(rebuildResult.hasError());
+  EXPECT_FALSE(rebuildResult.value().hasValue());
 }
 
 TEST_F(QuicPacketRebuilderTest, CloneCounter) {
@@ -513,7 +533,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
-  rebuilder.rebuildFromPacket(outstandingPacket);
+  ASSERT_FALSE(rebuilder.rebuildFromPacket(outstandingPacket).hasError());
   EXPECT_TRUE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
   EXPECT_EQ(1, conn.outstandings.numClonedPackets());
 }
@@ -537,7 +557,9 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0);
   regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
   EXPECT_TRUE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
   EXPECT_EQ(1, conn.outstandings.numClonedPackets());
 }
@@ -545,7 +567,8 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(100).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf1 =
@@ -589,7 +612,6 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       std::forward_as_tuple(buf1->computeChainDataLength()),
       std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
           ChainedByteRangeHead(buf2), buf1->computeChainDataLength(), true)));
-
   MockQuicPacketBuilder mockBuilder;
   size_t packetLimit = 1200;
   EXPECT_CALL(mockBuilder, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
@@ -615,13 +637,16 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       }));
 
   PacketRebuilder rebuilder(mockBuilder, conn);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
 }
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(100).hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf1 =
@@ -689,6 +714,8 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       }));
 
   PacketRebuilder rebuilder(mockBuilder, conn);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().hasValue());
 }
 } // namespace quic::test

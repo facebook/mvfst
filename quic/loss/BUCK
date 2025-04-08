@@ -16,6 +16,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//folly:chrono",
+        "//folly:expected",
         "//quic:constants",
         "//quic/codec:types",
         "//quic/common:optional",

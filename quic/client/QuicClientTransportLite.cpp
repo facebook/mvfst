@@ -427,62 +427,69 @@ QuicClientTransportLite::processUdpPacketData(
         }
         maybeVerifyPendingKeyUpdate(*conn_, outstandingPacket, regularPacket);
       };
-
   AckedFrameVisitor ackedFrameVisitor =
       [&](const OutstandingPacketWrapper& outstandingPacket,
-          const QuicWriteFrame& packetFrame) {
-        auto outstandingProtectionType =
-            outstandingPacket.packet.header.getProtectionType();
-        switch (packetFrame.type()) {
-          case QuicWriteFrame::Type::WriteAckFrame: {
-            const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
-            DCHECK(!frame.ackBlocks.empty());
-            VLOG(4) << "Client received ack for largestAcked="
-                    << frame.ackBlocks.front().end << " " << *this;
-            commonAckVisitorForAckFrame(ackState, frame);
-            break;
-          }
-          case QuicWriteFrame::Type::RstStreamFrame: {
-            const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
-            VLOG(4) << "Client received ack for reset frame stream="
-                    << frame.streamId << " " << *this;
+          const QuicWriteFrame& packetFrame)
+      -> folly::Expected<folly::Unit, QuicError> {
+    auto outstandingProtectionType =
+        outstandingPacket.packet.header.getProtectionType();
+    switch (packetFrame.type()) {
+      case QuicWriteFrame::Type::WriteAckFrame: {
+        const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+        DCHECK(!frame.ackBlocks.empty());
+        VLOG(4) << "Client received ack for largestAcked="
+                << frame.ackBlocks.front().end << " " << *this;
+        commonAckVisitorForAckFrame(ackState, frame);
+        break;
+      }
+      case QuicWriteFrame::Type::RstStreamFrame: {
+        const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+        VLOG(4) << "Client received ack for reset frame stream="
+                << frame.streamId << " " << *this;
 
-            auto stream = conn_->streamManager->getStream(frame.streamId);
-            if (stream) {
-              sendRstAckSMHandler(*stream, frame.reliableSize);
-            }
-            break;
-          }
-          case QuicWriteFrame::Type::WriteStreamFrame: {
-            const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
-
-            auto ackedStream = conn_->streamManager->getStream(frame.streamId);
-            VLOG(4) << "Client got ack for stream=" << frame.streamId
-                    << " offset=" << frame.offset << " fin=" << frame.fin
-                    << " data=" << frame.len
-                    << " closed=" << (ackedStream == nullptr) << " " << *this;
-            if (ackedStream) {
-              sendAckSMHandler(*ackedStream, frame);
-            }
-            break;
-          }
-          case QuicWriteFrame::Type::WriteCryptoFrame: {
-            const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
-            auto cryptoStream = getCryptoStream(
-                *conn_->cryptoState,
-                protectionTypeToEncryptionLevel(outstandingProtectionType));
-            processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
-            break;
-          }
-          case QuicWriteFrame::Type::PingFrame:
-            conn_->pendingEvents.cancelPingTimeout = true;
-            break;
-          case QuicWriteFrame::Type::QuicSimpleFrame:
-          default:
-            // ignore other frames.
-            break;
+        auto stream =
+            conn_->streamManager->getStream(frame.streamId).value_or(nullptr);
+        if (stream) {
+          return sendRstAckSMHandler(*stream, frame.reliableSize);
         }
-      };
+        break;
+      }
+      case QuicWriteFrame::Type::WriteStreamFrame: {
+        const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
+
+        auto ackedStreamResult =
+            conn_->streamManager->getStream(frame.streamId);
+        if (ackedStreamResult.hasError()) {
+          return folly::makeUnexpected(ackedStreamResult.error());
+        }
+        auto& ackedStream = ackedStreamResult.value();
+        VLOG(4) << "Client got ack for stream=" << frame.streamId
+                << " offset=" << frame.offset << " fin=" << frame.fin
+                << " data=" << frame.len
+                << " closed=" << (ackedStream == nullptr) << " " << *this;
+        if (ackedStream) {
+          return sendAckSMHandler(*ackedStream, frame);
+        }
+        break;
+      }
+      case QuicWriteFrame::Type::WriteCryptoFrame: {
+        const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
+        auto cryptoStream = getCryptoStream(
+            *conn_->cryptoState,
+            protectionTypeToEncryptionLevel(outstandingProtectionType));
+        processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
+        break;
+      }
+      case QuicWriteFrame::Type::PingFrame:
+        conn_->pendingEvents.cancelPingTimeout = true;
+        break;
+      case QuicWriteFrame::Type::QuicSimpleFrame:
+      default:
+        // ignore other frames.
+        break;
+    }
+    return folly::unit;
+  };
 
   for (auto& quicFrame : regularPacket.frames) {
     switch (quicFrame.type()) {
@@ -505,14 +512,18 @@ QuicClientTransportLite::processUdpPacketData(
               "Received unexpected ACK_RECEIVE_TIMESTAMPS frame"));
         }
 
-        conn_->lastProcessedAckEvents.emplace_back(processAckFrame(
+        auto result = processAckFrame(
             *conn_,
             pnSpace,
             ackFrame,
             ackedPacketVisitor,
             ackedFrameVisitor,
             markPacketLoss,
-            udpPacket.timings.receiveTimePoint));
+            udpPacket.timings.receiveTimePoint);
+        if (result.hasError()) {
+          return folly::makeUnexpected(result.error());
+        }
+        conn_->lastProcessedAckEvents.emplace_back(std::move(result.value()));
         break;
       }
       case QuicFrame::Type::RstStreamFrame: {
@@ -526,12 +537,18 @@ QuicClientTransportLite::processUdpPacketData(
               "Reliable resets not supported"));
         }
         pktHasRetransmittableData = true;
-        auto streamId = frame.streamId;
-        auto stream = conn_->streamManager->getStream(streamId);
+        auto streamResult = conn_->streamManager->getStream(frame.streamId);
+        if (streamResult.hasError()) {
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto& stream = streamResult.value();
         if (!stream) {
           break;
         }
-        receiveRstStreamSMHandler(*stream, frame);
+        auto rstResult = receiveRstStreamSMHandler(*stream, frame);
+        if (rstResult.hasError()) {
+          return folly::makeUnexpected(rstResult.error());
+        }
         break;
       }
       case QuicFrame::Type::ReadCryptoFrame: {
@@ -541,10 +558,13 @@ QuicClientTransportLite::processUdpPacketData(
         VLOG(10) << "Client received crypto data offset=" << cryptoFrame.offset
                  << " len=" << cryptoFrame.data->computeChainDataLength()
                  << " packetNum=" << packetNum << " " << *this;
-        appendDataToReadBuffer(
+        auto appendResult = appendDataToReadBuffer(
             *getCryptoStream(*conn_->cryptoState, encryptionLevel),
             StreamBuffer(
                 std::move(cryptoFrame.data), cryptoFrame.offset, false));
+        if (appendResult.hasError()) {
+          return folly::makeUnexpected(appendResult.error());
+        }
         break;
       }
       case QuicFrame::Type::ReadStreamFrame: {
@@ -554,15 +574,22 @@ QuicClientTransportLite::processUdpPacketData(
                  << " len=" << frame.data->computeChainDataLength()
                  << " fin=" << frame.fin << " packetNum=" << packetNum << " "
                  << *this;
-        auto stream = conn_->streamManager->getStream(
-            frame.streamId, frame.streamGroupId);
+        auto streamResult = conn_->streamManager->getStream(frame.streamId);
+        if (streamResult.hasError()) {
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto& stream = streamResult.value();
         pktHasRetransmittableData = true;
         if (!stream) {
           VLOG(10) << "Could not find stream=" << frame.streamId << " "
                    << *conn_;
           break;
         }
-        receiveReadStreamFrameSMHandler(*stream, std::move(frame));
+        auto readResult =
+            receiveReadStreamFrameSMHandler(*stream, std::move(frame));
+        if (readResult.hasError()) {
+          return folly::makeUnexpected(readResult.error());
+        }
         break;
       }
       case QuicFrame::Type::ReadNewTokenFrame: {
@@ -596,8 +623,12 @@ QuicClientTransportLite::processUdpPacketData(
               "Received MaxStreamDataFrame for receiving stream."));
         }
         pktHasRetransmittableData = true;
-        auto stream =
+        auto streamResult =
             conn_->streamManager->getStream(streamWindowUpdate.streamId);
+        if (streamResult.hasError()) {
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto& stream = streamResult.value();
         if (stream) {
           handleStreamWindowUpdate(
               *stream, streamWindowUpdate.maximumData, packetNum);
@@ -617,7 +648,11 @@ QuicClientTransportLite::processUdpPacketData(
         VLOG(10) << "Client received blocked stream=" << blocked.streamId << " "
                  << *this;
         pktHasRetransmittableData = true;
-        auto stream = conn_->streamManager->getStream(blocked.streamId);
+        auto streamResult = conn_->streamManager->getStream(blocked.streamId);
+        if (streamResult.hasError()) {
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto& stream = streamResult.value();
         if (stream) {
           handleStreamBlocked(*stream);
         }
@@ -659,12 +694,15 @@ QuicClientTransportLite::processUdpPacketData(
       case QuicFrame::Type::QuicSimpleFrame: {
         QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
         pktHasRetransmittableData = true;
-        updateSimpleFrameOnPacketReceived(
+        auto updateResult = updateSimpleFrameOnPacketReceived(
             *conn_,
             simpleFrame,
             longHeader ? longHeader->getDestinationConnId()
                        : shortHeader->getConnectionId(),
             false);
+        if (updateResult.hasError()) {
+          return folly::makeUnexpected(updateResult.error());
+        }
         break;
       }
       case QuicFrame::Type::DatagramFrame: {
@@ -776,8 +814,11 @@ QuicClientTransportLite::processUdpPacketData(
         auto maxStreamsUni = getIntegerParameter(
             TransportParameterId::initial_max_streams_uni,
             serverParams->parameters);
-        processServerInitialParams(
+        auto processResult = processServerInitialParams(
             *clientConn_, serverParams.value(), packetNum);
+        if (processResult.hasError()) {
+          return folly::makeUnexpected(processResult.error());
+        }
 
         cacheServerInitialParams(
             *clientConn_,
@@ -865,7 +906,10 @@ QuicClientTransportLite::processUdpPacketData(
       // state.
       clientConn_->zeroRttWriteCipher.reset();
       clientConn_->zeroRttWriteHeaderCipher.reset();
-      markZeroRttPacketsLost(*conn_, markPacketLoss);
+      auto result = markZeroRttPacketsLost(*conn_, markPacketLoss);
+      if (result.hasError()) {
+        return result;
+      }
     }
   }
   updateAckSendStateOnRecvPacket(
@@ -1015,24 +1059,32 @@ void QuicClientTransportLite::writeData() {
     const std::string& token = clientConn_->retryToken.empty()
         ? clientConn_->newToken
         : clientConn_->retryToken;
-    packetLimit -=
-        handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit, token)
-            .packetsWritten;
+    auto result =
+        handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit, token);
+    if (result.hasError()) {
+      throw QuicTransportException(
+          result.error().message, *result.error().code.asTransportErrorCode());
+    }
+    packetLimit -= result->packetsWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
   }
   if (conn_->handshakeWriteCipher) {
-    packetLimit -=
-        handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit)
-            .packetsWritten;
+    auto result =
+        handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit);
+    if (result.hasError()) {
+      throw QuicTransportException(
+          result.error().message, *result.error().code.asTransportErrorCode());
+    }
+    packetLimit -= result->packetsWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
   }
   if (clientConn_->zeroRttWriteCipher && !conn_->oneRttWriteCipher) {
     CHECK(clientConn_->zeroRttWriteHeaderCipher);
-    packetLimit -= writeZeroRttDataToSocket(
+    auto result = writeZeroRttDataToSocket(
         *socket_,
         *conn_,
         srcConnId /* src */,
@@ -1041,13 +1093,18 @@ void QuicClientTransportLite::writeData() {
         *clientConn_->zeroRttWriteHeaderCipher,
         version,
         packetLimit);
+    if (result.hasError()) {
+      throw QuicTransportException(
+          result.error().message, *result.error().code.asTransportErrorCode());
+    }
+    packetLimit -= *result;
   }
   if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
     return;
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(clientConn_->oneRttWriteHeaderCipher);
-    writeQuicDataExceptCryptoStreamToSocket(
+    auto result = writeQuicDataExceptCryptoStreamToSocket(
         *socket_,
         *conn_,
         srcConnId,
@@ -1056,6 +1113,10 @@ void QuicClientTransportLite::writeData() {
         *conn_->oneRttWriteHeaderCipher,
         version,
         packetLimit);
+    if (result.hasError()) {
+      throw QuicTransportException(
+          result.error().message, *result.error().code.asTransportErrorCode());
+    }
   }
 }
 
@@ -1660,7 +1721,10 @@ void QuicClientTransportLite::
   happyEyeballsStartSecondSocket(clientConn_->happyEyeballsState);
   // If this gets called from the write path then we haven't added the packets
   // to the outstanding packet list yet.
-  runOnEvbAsync([&](auto) { markZeroRttPacketsLost(*conn_, markPacketLoss); });
+  runOnEvbAsync([&](auto) {
+    auto result = markZeroRttPacketsLost(*conn_, markPacketLoss);
+    LOG_IF(ERROR, result.hasError()) << "Failed to mark 0-RTT packets as lost.";
+  });
 }
 
 void QuicClientTransportLite::start(

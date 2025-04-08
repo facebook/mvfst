@@ -295,7 +295,6 @@ void processClientInitialParams(
         "Retry Source Connection ID is received by server",
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
-
   if (maxAckDelay && *maxAckDelay >= kMaxAckDelay) {
     throw QuicTransportException(
         "Max Ack Delay is greater than 2^14 ",
@@ -326,10 +325,25 @@ void processClientInitialParams(
       maxStreamDataBidiRemote.value_or(0);
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
       maxStreamDataUni.value_or(0);
-  conn.streamManager->setMaxLocalBidirectionalStreams(
-      maxStreamsBidi.value_or(0));
-  conn.streamManager->setMaxLocalUnidirectionalStreams(
-      maxStreamsUni.value_or(0));
+
+  auto maxBidiStreamsResult =
+      conn.streamManager->setMaxLocalBidirectionalStreams(
+          maxStreamsBidi.value_or(0));
+  if (!maxBidiStreamsResult) {
+    throw QuicTransportException(
+        "Failed to set max local bidirectional streams",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+
+  auto maxUniStreamsResult =
+      conn.streamManager->setMaxLocalUnidirectionalStreams(
+          maxStreamsUni.value_or(0));
+  if (!maxUniStreamsResult) {
+    throw QuicTransportException(
+        "Failed to set max local unidirectional streams",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   conn.peerIdleTimeout = timeMin(conn.peerIdleTimeout, kMaxIdleTimeout);
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
@@ -1068,65 +1082,77 @@ void onServerReadDataFromOpen(
         [&](const OutstandingPacketWrapper& outstandingPacket) {
           maybeVerifyPendingKeyUpdate(conn, outstandingPacket, regularPacket);
         };
-
-    AckedFrameVisitor ackedFrameVisitor =
-        [&](const OutstandingPacketWrapper&,
-            const QuicWriteFrame& packetFrame) {
-          switch (packetFrame.type()) {
-            case QuicWriteFrame::Type::WriteStreamFrame: {
-              const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
-              VLOG(4) << "Server received ack for stream=" << frame.streamId
-                      << " offset=" << frame.offset << " fin=" << frame.fin
-                      << " len=" << frame.len << " " << conn;
-              auto ackedStream = conn.streamManager->getStream(frame.streamId);
-              if (ackedStream) {
-                sendAckSMHandler(*ackedStream, frame);
-              }
-              break;
-            }
-            case QuicWriteFrame::Type::WriteCryptoFrame: {
-              const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
-              auto cryptoStream =
-                  getCryptoStream(*conn.cryptoState, encryptionLevel);
-              processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
-              break;
-            }
-            case QuicWriteFrame::Type::RstStreamFrame: {
-              const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
-              VLOG(4) << "Server received ack for reset stream="
-                      << frame.streamId << " " << conn;
-              auto stream = conn.streamManager->getStream(frame.streamId);
-              if (stream) {
-                sendRstAckSMHandler(*stream, frame.reliableSize);
-              }
-              break;
-            }
-            case QuicWriteFrame::Type::WriteAckFrame: {
-              const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
-              DCHECK(!frame.ackBlocks.empty());
-              VLOG(4) << "Server received ack for largestAcked="
-                      << frame.ackBlocks.front().end << " " << conn;
-              commonAckVisitorForAckFrame(ackState, frame);
-              break;
-            }
-            case QuicWriteFrame::Type::PingFrame:
-              conn.pendingEvents.cancelPingTimeout = true;
-              return;
-            case QuicWriteFrame::Type::QuicSimpleFrame: {
-              const QuicSimpleFrame& frame = *packetFrame.asQuicSimpleFrame();
-              // ACK of HandshakeDone is a server-specific behavior.
-              if (frame.asHandshakeDoneFrame()) {
-                // Call handshakeConfirmed outside of the packet
-                // processing loop to avoid a re-entrancy.
-                handshakeConfirmedThisLoop = true;
-              }
-              break;
-            }
-            default: {
-              break;
+    AckedFrameVisitor ackedFrameVisitor = [&](const OutstandingPacketWrapper&,
+                                              const QuicWriteFrame& packetFrame)
+        -> folly::Expected<folly::Unit, QuicError> {
+      switch (packetFrame.type()) {
+        case QuicWriteFrame::Type::WriteStreamFrame: {
+          const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
+          VLOG(4) << "Server received ack for stream=" << frame.streamId
+                  << " offset=" << frame.offset << " fin=" << frame.fin
+                  << " len=" << frame.len << " " << conn;
+          auto ackedStream =
+              conn.streamManager->getStream(frame.streamId).value_or(nullptr);
+          if (ackedStream) {
+            auto result = sendAckSMHandler(*ackedStream, frame);
+            if (result.hasError()) {
+              throw QuicTransportException(
+                  result.error().message,
+                  *result.error().code.asTransportErrorCode());
             }
           }
-        };
+          break;
+        }
+        case QuicWriteFrame::Type::WriteCryptoFrame: {
+          const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
+          auto cryptoStream =
+              getCryptoStream(*conn.cryptoState, encryptionLevel);
+          processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
+          break;
+        }
+        case QuicWriteFrame::Type::RstStreamFrame: {
+          const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+          VLOG(4) << "Server received ack for reset stream=" << frame.streamId
+                  << " " << conn;
+          auto stream =
+              conn.streamManager->getStream(frame.streamId).value_or(nullptr);
+          if (stream) {
+            auto result = sendRstAckSMHandler(*stream, frame.reliableSize);
+            if (result.hasError()) {
+              throw QuicTransportException(
+                  result.error().message,
+                  *result.error().code.asTransportErrorCode());
+            }
+          }
+          break;
+        }
+        case QuicWriteFrame::Type::WriteAckFrame: {
+          const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+          DCHECK(!frame.ackBlocks.empty());
+          VLOG(4) << "Server received ack for largestAcked="
+                  << frame.ackBlocks.front().end << " " << conn;
+          commonAckVisitorForAckFrame(ackState, frame);
+          break;
+        }
+        case QuicWriteFrame::Type::PingFrame:
+          conn.pendingEvents.cancelPingTimeout = true;
+          break;
+        case QuicWriteFrame::Type::QuicSimpleFrame: {
+          const QuicSimpleFrame& frame = *packetFrame.asQuicSimpleFrame();
+          // ACK of HandshakeDone is a server-specific behavior.
+          if (frame.asHandshakeDoneFrame()) {
+            // Call handshakeConfirmed outside of the packet
+            // processing loop to avoid a re-entrancy.
+            handshakeConfirmedThisLoop = true;
+          }
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+      return folly::unit;
+    };
 
     for (auto& quicFrame : regularPacket.frames) {
       switch (quicFrame.type()) {
@@ -1150,14 +1176,20 @@ void onServerReadDataFromOpen(
                 TransportErrorCode::PROTOCOL_VIOLATION);
           }
 
-          conn.lastProcessedAckEvents.emplace_back(processAckFrame(
+          auto result = processAckFrame(
               conn,
               packetNumberSpace,
               ackFrame,
               ackedPacketVisitor,
               ackedFrameVisitor,
               markPacketLoss,
-              readData.udpPacket.timings.receiveTimePoint));
+              readData.udpPacket.timings.receiveTimePoint);
+          if (result.hasError()) {
+            throw QuicTransportException(
+                result.error().message,
+                *result.error().code.asTransportErrorCode());
+          }
+          conn.lastProcessedAckEvents.emplace_back(std::move(result.value()));
           break;
         }
         case QuicFrame::Type::RstStreamFrame: {
@@ -1172,11 +1204,24 @@ void onServerReadDataFromOpen(
                    << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
-          auto stream = conn.streamManager->getStream(frame.streamId);
+          auto streamResult = conn.streamManager->getStream(frame.streamId);
+          if (streamResult.hasError()) {
+            // TODO don't throw
+            throw QuicTransportException(
+                streamResult.error().message,
+                *streamResult.error().code.asTransportErrorCode());
+          }
+          auto& stream = streamResult.value();
+
           if (!stream) {
             break;
           }
-          receiveRstStreamSMHandler(*stream, frame);
+          auto result = receiveRstStreamSMHandler(*stream, frame);
+          if (result.hasError()) {
+            throw QuicTransportException(
+                result.error().message,
+                *result.error().code.asTransportErrorCode());
+          }
           break;
         }
         case QuicFrame::Type::ReadCryptoFrame: {
@@ -1188,16 +1233,19 @@ void onServerReadDataFromOpen(
                    << cryptoFrame.offset
                    << " len=" << cryptoFrame.data->computeChainDataLength()
                    << " currentReadOffset="
-                   << getCryptoStream(*conn.cryptoState, encryptionLevel)
-                          ->currentReadOffset
-                   << " " << conn;
+                   << getCryptoStream(*conn.cryptoState, encryptionLevel);
           auto cryptoStream =
               getCryptoStream(*conn.cryptoState, encryptionLevel);
           auto readBufferSize = cryptoStream->readBuffer.size();
-          appendDataToReadBuffer(
+          auto result = appendDataToReadBuffer(
               *cryptoStream,
               StreamBuffer(
                   std::move(cryptoFrame.data), cryptoFrame.offset, false));
+          if (result.hasError()) {
+            throw QuicTransportException(
+                result.error().message,
+                *result.error().code.asTransportErrorCode());
+          }
           if (isQuicInitialPacket &&
               readBufferSize != cryptoStream->readBuffer.size()) {
             ++conn.uniqueInitialCryptoFramesReceived;
@@ -1214,12 +1262,25 @@ void onServerReadDataFromOpen(
                    << " fin=" << frame.fin << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
-          auto stream = conn.streamManager->getStream(
+          auto streamResult = conn.streamManager->getStream(
               frame.streamId, frame.streamGroupId);
+          if (streamResult.hasError()) {
+            // TODO don't throw
+            throw QuicTransportException(
+                streamResult.error().message,
+                *streamResult.error().code.asTransportErrorCode());
+          }
+          auto& stream = streamResult.value();
           // Ignore data from closed streams that we don't have the
           // state for any more.
           if (stream) {
-            receiveReadStreamFrameSMHandler(*stream, std::move(frame));
+            auto result =
+                receiveReadStreamFrameSMHandler(*stream, std::move(frame));
+            if (result.hasError()) {
+              throw QuicTransportException(
+                  result.error().message,
+                  *result.error().code.asTransportErrorCode());
+            }
           }
           break;
         }
@@ -1246,8 +1307,14 @@ void onServerReadDataFromOpen(
           }
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
-          auto stream =
+          auto streamResult =
               conn.streamManager->getStream(streamWindowUpdate.streamId);
+          if (streamResult.hasError()) {
+            throw QuicTransportException(
+                streamResult.error().message,
+                *streamResult.error().code.asTransportErrorCode());
+          }
+          auto& stream = streamResult.value();
           if (stream) {
             handleStreamWindowUpdate(
                 *stream, streamWindowUpdate.maximumData, packetNum);
@@ -1268,7 +1335,13 @@ void onServerReadDataFromOpen(
                    << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
-          auto stream = conn.streamManager->getStream(blocked.streamId);
+          auto streamResult = conn.streamManager->getStream(blocked.streamId);
+          if (streamResult.hasError()) {
+            throw QuicTransportException(
+                streamResult.error().message,
+                *streamResult.error().code.asTransportErrorCode());
+          }
+          auto& stream = streamResult.value();
           if (stream) {
             handleStreamBlocked(*stream);
           }
@@ -1319,8 +1392,14 @@ void onServerReadDataFromOpen(
               : regularPacket.header.asLong()->getDestinationConnId();
           pktHasRetransmittableData = true;
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
-          isNonProbingPacket |= updateSimpleFrameOnPacketReceived(
+          auto simpleResult = updateSimpleFrameOnPacketReceived(
               conn, simpleFrame, dstConnId, readData.peer != conn.peerAddress);
+          if (simpleResult.hasError()) {
+            throw QuicTransportException(
+                simpleResult.error().message,
+                *simpleResult.error().code.asTransportErrorCode());
+          }
+          isNonProbingPacket |= simpleResult.value();
           break;
         }
         case QuicFrame::Type::DatagramFrame: {
@@ -1366,8 +1445,8 @@ void onServerReadDataFromOpen(
     maybeHandleIncomingKeyUpdate(conn);
 
     // Update writable limit before processing the handshake data. This is so
-    // that if we haven't decided whether or not to validate the peer, we won't
-    // increase the limit.
+    // that if we haven't decided whether or not to validate the peer, we
+    // won't increase the limit.
     updateWritableByteLimitOnRecvPacket(conn);
 
     if (conn.peerAddress != readData.peer) {

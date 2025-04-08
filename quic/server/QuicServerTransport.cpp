@@ -17,7 +17,6 @@
 
 #include <quic/common/Optional.h>
 #include <quic/common/TransportKnobs.h>
-#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <stdexcept>
@@ -190,7 +189,10 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
   if (serverConn_->transportSettings.enableWritableBytesLimit &&
       serverConn_->numProbesWritableBytesLimited &&
       prevWritableBytes < curWritableBytes) {
-    onPTOAlarm(*serverConn_);
+    auto ptoAlarmResult = onPTOAlarm(*serverConn_);
+    if (ptoAlarmResult.hasError()) {
+      return ptoAlarmResult;
+    }
     serverConn_->numProbesWritableBytesLimited = 0;
   }
 
@@ -283,8 +285,12 @@ void QuicServerTransport::writeData() {
   };
   if (conn_->initialWriteCipher) {
     auto res = handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit);
-    packetLimit -= res.packetsWritten;
-    serverConn_->numHandshakeBytesSent += res.bytesWritten;
+    if (res.hasError()) {
+      throw QuicTransportException(
+          res.error().message, *res.error().code.asTransportErrorCode());
+    }
+    packetLimit -= res->packetsWritten;
+    serverConn_->numHandshakeBytesSent += res->bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
@@ -292,8 +298,12 @@ void QuicServerTransport::writeData() {
   if (conn_->handshakeWriteCipher) {
     auto res =
         handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit);
-    packetLimit -= res.packetsWritten;
-    serverConn_->numHandshakeBytesSent += res.bytesWritten;
+    if (res.hasError()) {
+      throw QuicTransportException(
+          res.error().message, *res.error().code.asTransportErrorCode());
+    }
+    packetLimit -= res->packetsWritten;
+    serverConn_->numHandshakeBytesSent += res->bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
@@ -302,7 +312,7 @@ void QuicServerTransport::writeData() {
     CHECK(conn_->oneRttWriteHeaderCipher);
     auto writeLoopBeginTime = Clock::now();
     auto nonDsrPath = [&](auto limit) {
-      return writeQuicDataToSocket(
+      auto result = writeQuicDataToSocket(
           *socket_,
           *conn_,
           srcConnId /* src */,
@@ -312,12 +322,18 @@ void QuicServerTransport::writeData() {
           version,
           limit,
           writeLoopBeginTime);
+      if (result.hasError()) {
+        throw QuicTransportException(
+            result.error().message,
+            *result.error().code.asTransportErrorCode());
+      }
+      return *result;
     };
     auto dsrPath = [&](auto limit) {
       auto bytesBefore = conn_->lossState.totalBytesSent;
       // The DSR path can't write probes.
       // This is packetsWritte, probesWritten, bytesWritten.
-      return WriteQuicDataResult{
+      auto result = WriteQuicDataResult{
           writePacketizationRequest(
               *serverConn_,
               destConnId,
@@ -326,6 +342,7 @@ void QuicServerTransport::writeData() {
               writeLoopBeginTime),
           0,
           conn_->lossState.totalBytesSent - bytesBefore};
+      return result;
     };
     // We need a while loop because both paths write streams from the same
     // queue, which can result in empty writes.
@@ -1195,7 +1212,8 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
     if (!conn_->streamManager->streamExists(id)) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream =
+        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     if (!stream->writable()) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
@@ -1220,7 +1238,12 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
       wasAppLimitedOrIdle = conn_->congestionController->isAppLimited();
       wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
     }
-    writeBufMetaToQuicStream(*stream, data, eof);
+    auto writeResult = writeBufMetaToQuicStream(*stream, data, eof);
+    if (writeResult.hasError()) {
+      throw QuicTransportException(
+          writeResult.error().message,
+          *writeResult.error().code.asTransportErrorCode());
+    }
     // If we were previously app limited restart pacing with the current rate.
     if (wasAppLimitedOrIdle && conn_->pacer) {
       conn_->pacer->reset();
@@ -1268,7 +1291,8 @@ QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
     if (!conn_->streamManager->streamExists(id)) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream =
+        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     // Only allow resetting it back to nullptr once set.
     if (stream->dsrSender && sender != nullptr) {
       return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);

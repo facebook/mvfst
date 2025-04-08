@@ -27,8 +27,8 @@ class PacketRebuilder {
       PacketBuilderInterface& regularBuilder,
       QuicConnectionStateBase& conn);
 
-  Optional<ClonedPacketIdentifier> rebuildFromPacket(
-      OutstandingPacketWrapper& packet);
+  [[nodiscard]] folly::Expected<Optional<ClonedPacketIdentifier>, QuicError>
+  rebuildFromPacket(OutstandingPacketWrapper& packet);
 
   // TODO: Same as passing cipherOverhead into the CloningScheduler, this really
   // is a sad way to solve the writableBytes problem.

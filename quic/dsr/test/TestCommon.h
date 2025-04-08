@@ -54,19 +54,27 @@ class DSRCommonTestFixture : public testing::Test {
         kDefaultStreamFlowControlWindow;
     conn_.flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
-    conn_.streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn_.streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn_.streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn_.streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
   }
 
   StreamId prepareOneStream(
       size_t bufMetaLength = 1000,
       uint64_t peeMaxOffsetSimulated = std::numeric_limits<uint64_t>::max()) {
-    conn_.streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn_.streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn_.streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn_.streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
     auto id = conn_.streamManager->createNextBidirectionalStream().value()->id;
     auto stream = conn_.streamManager->findStream(id);
     stream->flowControlState.peerAdvertisedMaxOffset = peeMaxOffsetSimulated;
@@ -85,12 +93,14 @@ class DSRCommonTestFixture : public testing::Test {
         }));
     ON_CALL(*sender, flush()).WillByDefault(testing::Return(true));
     stream->dsrSender = std::move(sender);
-    writeDataToQuicStream(
-        *stream,
-        folly::IOBuf::copyBuffer("MetroCard Customer Claims"),
-        false /* eof */);
+    CHECK(!writeDataToQuicStream(
+               *stream,
+               folly::IOBuf::copyBuffer("MetroCard Customer Claims"),
+               false /* eof */)
+               .hasError());
     BufferMeta bufMeta(bufMetaLength);
-    writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */);
+    CHECK(
+        !writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */).hasError());
     return id;
   }
 

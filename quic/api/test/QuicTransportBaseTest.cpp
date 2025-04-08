@@ -299,16 +299,21 @@ class TestQuicTransport
       auto type = static_cast<TestFrameType>(cursor.readBE<uint8_t>());
       if (type == TestFrameType::CRYPTO) {
         auto cryptoBuffer = decodeCryptoBuffer(cursor);
-        appendDataToReadBuffer(
-            conn_->cryptoState->initialStream, std::move(cryptoBuffer));
+        CHECK(!appendDataToReadBuffer(
+                   conn_->cryptoState->initialStream, std::move(cryptoBuffer))
+                   .hasError());
       } else if (type == TestFrameType::MAX_STREAMS) {
         auto maxStreamsFrame = decodeMaxStreamsFrame(cursor);
         if (maxStreamsFrame.isForBidirectionalStream()) {
-          conn_->streamManager->setMaxLocalBidirectionalStreams(
-              maxStreamsFrame.maxStreams);
+          CHECK(
+              !conn_->streamManager
+                   ->setMaxLocalBidirectionalStreams(maxStreamsFrame.maxStreams)
+                   .hasError());
         } else {
-          conn_->streamManager->setMaxLocalUnidirectionalStreams(
-              maxStreamsFrame.maxStreams);
+          CHECK(!conn_->streamManager
+                     ->setMaxLocalUnidirectionalStreams(
+                         maxStreamsFrame.maxStreams)
+                     .hasError());
         }
       } else if (type == TestFrameType::DATAGRAM) {
         auto buffer = decodeDatagramFrame(cursor);
@@ -316,21 +321,30 @@ class TestQuicTransport
         handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
       } else if (type == TestFrameType::STREAM_GROUP) {
         auto res = decodeStreamGroupBuffer(cursor);
-        QuicStreamState* stream =
+        auto streamResult =
             conn_->streamManager->getStream(res.id, res.groupId);
+        if (streamResult.hasError()) {
+          return folly::makeUnexpected(streamResult.error());
+        }
+        QuicStreamState* stream = streamResult.value();
         if (!stream) {
           continue;
         }
-        appendDataToReadBuffer(*stream, std::move(res.buf));
+        CHECK(!appendDataToReadBuffer(*stream, std::move(res.buf)).hasError());
         conn_->streamManager->updateReadableStreams(*stream);
         conn_->streamManager->updatePeekableStreams(*stream);
       } else {
         auto buffer = decodeStreamBuffer(cursor);
-        QuicStreamState* stream = conn_->streamManager->getStream(buffer.first);
+        auto streamResult = conn_->streamManager->getStream(buffer.first);
+        if (streamResult.hasError()) {
+          return folly::makeUnexpected(streamResult.error());
+        }
+        QuicStreamState* stream = streamResult.value();
         if (!stream) {
           continue;
         }
-        appendDataToReadBuffer(*stream, std::move(buffer.second));
+        (void)appendDataToReadBuffer(*stream, std::move(buffer.second))
+            .hasError();
         conn_->streamManager->updateReadableStreams(*stream);
         conn_->streamManager->updatePeekableStreams(*stream);
       }
@@ -339,15 +353,16 @@ class TestQuicTransport
   }
 
   void writeData() override {
-    writeQuicDataToSocket(
-        *socket_,
-        *conn_,
-        *conn_->serverConnectionId,
-        *conn_->clientConnectionId,
-        *aead,
-        *headerCipher,
-        *conn_->version,
-        conn_->transportSettings.writeConnectionDataPacketsLimit);
+    CHECK(!writeQuicDataToSocket(
+               *socket_,
+               *conn_,
+               *conn_->serverConnectionId,
+               *conn_->clientConnectionId,
+               *aead,
+               *headerCipher,
+               *conn_->version,
+               conn_->transportSettings.writeConnectionDataPacketsLimit)
+               .hasError());
   }
 
   // This is to expose the protected pacedWriteDataToSocket() function
@@ -441,7 +456,9 @@ class TestQuicTransport
   }
 
   void addStreamReadError(StreamId id, QuicErrorCode ex) {
-    QuicStreamState* stream = conn_->streamManager->getStream(id);
+    auto streamResult = conn_->streamManager->getStream(id);
+    ASSERT_FALSE(streamResult.hasError());
+    QuicStreamState* stream = streamResult.value();
     stream->streamReadError = ex;
     conn_->streamManager->updateReadableStreams(*stream);
     conn_->streamManager->updatePeekableStreams(*stream);
@@ -457,7 +474,9 @@ class TestQuicTransport
   }
 
   void closeStream(StreamId id) {
-    QuicStreamState* stream = conn_->streamManager->getStream(id);
+    auto streamResult = conn_->streamManager->getStream(id);
+    ASSERT_FALSE(streamResult.hasError());
+    QuicStreamState* stream = streamResult.value();
     stream->sendState = StreamSendState::Closed;
     stream->recvState = StreamRecvState::Closed;
     conn_->streamManager->addClosed(id);
@@ -503,7 +522,7 @@ class TestQuicTransport
   }
 
   QuicStreamState* getStream(StreamId id) {
-    return conn_->streamManager->getStream(id);
+    return conn_->streamManager->getStream(id).value_or(nullptr);
   }
 
   void setServerConnectionId() {
@@ -637,10 +656,14 @@ class QuicTransportImplTest : public Test {
         kDefaultStreamFlowControlWindow;
     conn.flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
-    conn.streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn.streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn.streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn.streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
     maybeSetNotifyOnNewStreamsExplicitly();
   }
 
@@ -706,8 +729,9 @@ TEST_P(QuicTransportImplTestBase, IdleTimeoutExpiredDestroysTransport) {
 }
 
 TEST_P(QuicTransportImplTestBase, DelayConnCallback) {
-  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
-      0, /*force=*/true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalBidirectionalStreams(0, /*force=*/true)
+                   .hasError());
   transport->setConnectionCallback(nullptr);
 
   transport->addMaxStreamsFrame(
@@ -793,7 +817,7 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   // suppose we tx a rst stream (and rx its corresponding ack), expect
   // terminal state and queued in closed streams
   transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR);
-  sendRstAckSMHandler(*stream, folly::none);
+  ASSERT_FALSE(sendRstAckSMHandler(*stream, folly::none).hasError());
   EXPECT_TRUE(stream->inTerminalStates());
   EXPECT_TRUE(streamManager.closedStreams().contains(streamID));
   transport->driveReadCallbacks();
@@ -802,8 +826,10 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   EXPECT_TRUE(streamManager.streamExists(streamID));
   EXPECT_CALL(readCb1, readError(streamID, QuicError(unknownErrorCode)))
       .Times(1);
-  receiveRstStreamSMHandler(
-      *stream, RstStreamFrame(streamID, unknownErrorCode, ingressDataLen));
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(
+          *stream, RstStreamFrame(streamID, unknownErrorCode, ingressDataLen))
+          .hasError());
   transport->readLooper()->runLoopCallback();
 
   // same test as above, but we tx a rst stream first followed by send stop
@@ -827,7 +853,7 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
 
   // suppose we tx a rst stream (and rx its corresponding ack)
   transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR);
-  sendRstAckSMHandler(*stream, folly::none);
+  ASSERT_FALSE(sendRstAckSMHandler(*stream, folly::none).hasError());
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
   transport->driveReadCallbacks();
@@ -848,8 +874,10 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   // delivering callback to application
   EXPECT_CALL(readCb2, readError(streamID, QuicError(unknownErrorCode)))
       .Times(1);
-  receiveRstStreamSMHandler(
-      *stream, RstStreamFrame(streamID, unknownErrorCode, ingressDataLen));
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(
+          *stream, RstStreamFrame(streamID, unknownErrorCode, ingressDataLen))
+          .hasError());
   EXPECT_TRUE(stream->inTerminalStates());
   EXPECT_TRUE(streamManager.closedStreams().contains(streamID));
   transport->readLooper()->runLoopCallback();
@@ -866,9 +894,11 @@ TEST_P(QuicTransportImplTestBase, NoopStopSendingIngressClosed) {
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   // suppose we rx a reset from peer which closes our ingress SM
-  receiveRstStreamSMHandler(
-      *stream,
-      RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0));
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(
+          *stream,
+          RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0))
+          .hasError());
   EXPECT_EQ(stream->sendState, StreamSendState::Open);
   EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
 
@@ -881,14 +911,18 @@ TEST_P(QuicTransportImplTestBase, NoopStopSendingIngressClosed) {
   auto nextPeerUniStream =
       streamManager.nextAcceptablePeerUnidirectionalStreamId();
   EXPECT_TRUE(nextPeerUniStream.has_value());
-  stream = streamManager.getStream(*nextPeerUniStream);
+  auto streamResult = streamManager.getStream(*nextPeerUniStream);
+  ASSERT_FALSE(streamResult.hasError());
+  stream = streamResult.value();
   EXPECT_EQ(stream->sendState, StreamSendState::Invalid);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   // suppose we rx a reset from peer which closes our ingress SM
-  receiveRstStreamSMHandler(
-      *stream,
-      RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0));
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(
+          *stream,
+          RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0))
+          .hasError());
   EXPECT_EQ(stream->sendState, StreamSendState::Invalid);
   EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
   EXPECT_TRUE(stream->inTerminalStates());
@@ -984,16 +1018,18 @@ TEST_P(QuicTransportImplTestBase, ReliableResetReadCallback) {
   transport->driveReadCallbacks();
 
   // Simulate receiving a reliable reset with a reliableSize of 29
-  receiveRstStreamSMHandler(
-      *transport->getStream(stream),
-      RstStreamFrame(stream, GenericApplicationErrorCode::UNKNOWN, 100, 29));
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(
+          *transport->getStream(stream),
+          RstStreamFrame(stream, GenericApplicationErrorCode::UNKNOWN, 100, 29))
+          .hasError());
 
   // The application hasn't yet read all of the reliable data, so we
   // shouldn't fire the readError callback yet.
   EXPECT_CALL(readCb, readAvailable(stream));
   transport->driveReadCallbacks();
 
-  transport->read(stream, 29);
+  ASSERT_FALSE(transport->read(stream, 29).hasError());
 
   // The application has yet read all of the reliable data, so we should fire
   // the readError callback.
@@ -1017,7 +1053,9 @@ TEST_P(
   auto nextPeerUniStream =
       streamManager.nextAcceptablePeerUnidirectionalStreamId();
   EXPECT_TRUE(nextPeerUniStream.has_value());
-  StreamId qpackStream = streamManager.getStream(*nextPeerUniStream)->id;
+  auto qpackStreamResult = streamManager.getStream(*nextPeerUniStream);
+  ASSERT_FALSE(qpackStreamResult.hasError());
+  StreamId qpackStream = qpackStreamResult.value()->id;
 
   auto requestStream = transport->createBidirectionalStream().value();
 
@@ -1667,8 +1705,9 @@ TEST_P(QuicTransportImplTestBase, CreateBothStream) {
 }
 
 TEST_P(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalZero) {
-  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
-      0, true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalBidirectionalStreams(0, true)
+                   .hasError());
   EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 0);
   auto result = transport->createBidirectionalStream();
   ASSERT_FALSE(result);
@@ -1679,8 +1718,9 @@ TEST_P(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalZero) {
 }
 
 TEST_P(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalZero) {
-  transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
-      0, true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalUnidirectionalStreams(0, true)
+                   .hasError());
   EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 0);
   auto result = transport->createUnidirectionalStream();
   ASSERT_FALSE(result);
@@ -1691,8 +1731,9 @@ TEST_P(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalZero) {
 }
 
 TEST_P(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalFew) {
-  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
-      10, true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalBidirectionalStreams(10, true)
+                   .hasError());
   EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 10);
   for (int i = 0; i < 10; i++) {
     EXPECT_TRUE(transport->createBidirectionalStream());
@@ -1706,8 +1747,9 @@ TEST_P(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalFew) {
 }
 
 TEST_P(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalFew) {
-  transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
-      10, true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalUnidirectionalStreams(10, true)
+                   .hasError());
   EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 10);
   for (int i = 0; i < 10; i++) {
     EXPECT_TRUE(transport->createUnidirectionalStream());
@@ -1721,8 +1763,9 @@ TEST_P(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalFew) {
 }
 
 TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallback) {
-  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
-      0, /*force=*/true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalBidirectionalStreams(0, /*force=*/true)
+                   .hasError());
 
   EXPECT_CALL(connCallback, onBidirectionalStreamsAvailable(_))
       .WillOnce(Invoke([](uint64_t numAvailableStreams) {
@@ -1738,8 +1781,9 @@ TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallback) {
 }
 
 TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallbackAfterExausted) {
-  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
-      0, /*force=*/true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalBidirectionalStreams(0, /*force=*/true)
+                   .hasError());
 
   EXPECT_CALL(connCallback, onBidirectionalStreamsAvailable(_)).Times(2);
   transport->addMaxStreamsFrame(MaxStreamsFrame(
@@ -1757,8 +1801,9 @@ TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallbackAfterExausted) {
 }
 
 TEST_P(QuicTransportImplTestBase, oneUniStreamsAvailableCallback) {
-  transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
-      0, /*force=*/true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalUnidirectionalStreams(0, /*force=*/true)
+                   .hasError());
 
   EXPECT_CALL(connCallback, onUnidirectionalStreamsAvailable(_))
       .WillOnce(Invoke([](uint64_t numAvailableStreams) {
@@ -1774,8 +1819,9 @@ TEST_P(QuicTransportImplTestBase, oneUniStreamsAvailableCallback) {
 }
 
 TEST_P(QuicTransportImplTestBase, onUniStreamsAvailableCallbackAfterExausted) {
-  transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
-      0, /*force=*/true);
+  ASSERT_FALSE(transport->transportConn->streamManager
+                   ->setMaxLocalUnidirectionalStreams(0, /*force=*/true)
+                   .hasError());
 
   EXPECT_CALL(connCallback, onUnidirectionalStreamsAvailable(_)).Times(2);
   transport->addMaxStreamsFrame(
@@ -2149,8 +2195,10 @@ TEST_P(QuicTransportImplTestBase, RegisterTxDeliveryCallbackLowerThanExpected) {
   transport->registerDeliveryCallback(stream, 20, &dcb2);
   Mock::VerifyAndClearExpectations(&txcb1);
   Mock::VerifyAndClearExpectations(&txcb2);
-
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -2182,7 +2230,10 @@ TEST_F(
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb;
   NiceMock<MockDeliveryCallback> dcb;
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
 
   EXPECT_CALL(txcb, onByteEventRegistered(getTxMatcher(stream, 2)));
@@ -2204,7 +2255,10 @@ TEST_P(
   StrictMock<MockByteEventCallback> txcb2;
 
   // Set the current write offset to 7.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -2240,7 +2294,10 @@ TEST_F(
   StrictMock<MockByteEventCallback> txcb2;
 
   // Set the current write offset to 7.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -2278,7 +2335,10 @@ TEST_P(
   StrictMock<MockByteEventCallback> txcb2;
 
   // Set the current write offset to 7.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -2316,7 +2376,10 @@ TEST_P(
   StrictMock<MockByteEventCallback> txcb2;
 
   // Set the current write offset to 7.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -2352,7 +2415,10 @@ TEST_P(QuicTransportImplTestBase, RegisterDeliveryCallbackAsyncDeliveryTx) {
   StrictMock<MockByteEventCallback> txcb2;
 
   // Set the current write offset to 7.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -2397,7 +2463,10 @@ TEST_P(QuicTransportImplTestBase, RegisterDeliveryCallbackAsyncDeliveryAck) {
   StrictMock<MockByteEventCallback> txcb2;
 
   // Set the current write offset to 7.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
@@ -3058,8 +3127,10 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithActiveStream) {
 
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
-  EXPECT_FALSE(transport->transportConn->streamManager->getStream(stream)
-                   ->readBuffer.empty());
+  auto streamResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_FALSE(streamResult.value()->readBuffer.empty());
 
   // Close the last stream.
   // TODO: replace this when we call conn callbacks.
@@ -3096,7 +3167,10 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
   EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
 
   // Close the last stream.
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   // Fake that the data was TXed and delivered to keep all the state
   // consistent.
   streamState->currentWriteOffset = 7;
@@ -3216,8 +3290,10 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
 
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
-  EXPECT_EQ(
-      transport->transportConn->streamManager->getStream(stream), nullptr);
+  auto streamResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamResult.hasError());
+  EXPECT_EQ(streamResult.value(), nullptr);
   qEvb->loopOnce();
   EXPECT_EQ(resetCount, 1);
 }
@@ -3312,7 +3388,10 @@ TEST_P(QuicTransportImplTestBase, GetLocalAddressBadSocket) {
 TEST_P(QuicTransportImplTestBase, AsyncStreamFlowControlWrite) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
-  auto streamState = transport->transportConn->streamManager->getStream(stream);
+  auto streamStateResult =
+      transport->transportConn->streamManager->getStream(stream);
+  ASSERT_FALSE(streamStateResult.hasError());
+  auto streamState = streamStateResult.value();
   transport->setServerConnectionId();
   transport->writeLooper()->stop();
   streamState->flowControlState.advertisedMaxOffset = 0; // Easier to calculate
@@ -4435,8 +4514,9 @@ TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   auto groupId = transport->createBidirectionalStreamGroup();
   EXPECT_TRUE(groupId.hasValue());
@@ -4485,8 +4565,9 @@ TEST_P(QuicTransportImplTestWithGroups, ReadErrorCallbackWithGroups) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   auto groupId = transport->createBidirectionalStreamGroup();
   EXPECT_TRUE(groupId.hasValue());
@@ -4514,8 +4595,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   auto groupId = transport->createBidirectionalStreamGroup();
   EXPECT_TRUE(groupId.hasValue());
@@ -4550,8 +4632,9 @@ TEST_P(QuicTransportImplTestWithGroups, onNewStreamsAndGroupsCallbacks) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
@@ -4584,8 +4667,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   const StreamGroupId groupId = 0x00;
   const QuicStreamGroupRetransmissionPolicy policy;
@@ -4597,8 +4681,9 @@ TEST_P(
   // Test policy set not allowed.
   transportSettings.advertisedMaxStreamGroups = 0;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
   res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
   EXPECT_TRUE(res.hasError());
   EXPECT_EQ(res.error(), LocalErrorCode::INVALID_OPERATION);
@@ -4613,8 +4698,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   const StreamGroupId groupId = 0x00;
   QuicStreamGroupRetransmissionPolicy policy;
@@ -4649,8 +4735,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 16;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   // Add a policy.
   const StreamGroupId groupId = 0x00;
@@ -4685,8 +4772,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.advertisedMaxStreamGroups = 1;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   // Add a policy.
   const StreamGroupId groupId = 0x00;
@@ -4709,8 +4797,9 @@ TEST_P(QuicTransportImplTestBase, TestUpdateWriteLooperWithWritableCallback) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   EXPECT_CALL(*socketPtr, isWritableCallbackSet()).WillOnce(Return(true));
   transport->updateWriteLooper(true /* thisIteration */);
@@ -4719,8 +4808,9 @@ TEST_P(QuicTransportImplTestBase, TestUpdateWriteLooperWithWritableCallback) {
   transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = false;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   EXPECT_CALL(*socketPtr, isWritableCallbackSet()).Times(0);
   transport->updateWriteLooper(true /* thisIteration */);
@@ -4734,8 +4824,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 
@@ -4772,8 +4863,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 
@@ -4797,8 +4889,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 
@@ -4832,8 +4925,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 
@@ -4871,8 +4965,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 
@@ -4909,8 +5004,9 @@ TEST_P(QuicTransportImplTestBase, TestOnSocketWritable) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   // Write looper is not running.
   EXPECT_FALSE(transport->writeLooper()->isRunning());
@@ -4937,8 +5033,9 @@ TEST_P(
   transportSettings.enableWriterBackpressure = true;
 
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 
@@ -5008,8 +5105,9 @@ TEST_P(
   auto transportSettings = transport->getTransportSettings();
   transportSettings.useSockWritableEvents = true;
   transport->setTransportSettings(transportSettings);
-  transport->getConnectionState().streamManager->refreshTransportSettings(
-      transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
 
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
 

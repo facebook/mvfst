@@ -82,7 +82,7 @@ uint64_t writePacketizationRequest(
     // Similar to the regular write case, if we build, we update connection
     // states. The connection states are changed already no matter the result
     // of addSendInstruction() call.
-    updateConnection(
+    auto updateResult = updateConnection(
         connection,
         none /* Packet Event */,
         packet.packet,
@@ -93,6 +93,12 @@ uint64_t writePacketizationRequest(
         // used, so setting it to 0
         0,
         true /* isDSRPacket */);
+
+    if (updateResult.hasError()) {
+      throw QuicTransportException(
+          updateResult.error().message,
+          *updateResult.error().code.asTransportErrorCode());
+    }
     connection.dsrPacketCount++;
 
     if (instructionAddError) {

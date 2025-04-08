@@ -1094,13 +1094,14 @@ TYPED_TEST(
   EXPECT_CALL(
       cb, onDeliveryAck(streamId, combined->computeChainDataLength(), _))
       .Times(0);
-
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(this->buildAckPacketForSentAppDataPackets(
       std::vector<Optional<typename TestFixture::NewOutstandingPacketInterval>>{
           maybeWrittenPackets1, maybeWrittenPackets2}));
-  auto stream = this->getNonConstConn().streamManager->getStream(streamId);
-  ASSERT_TRUE(stream);
+  auto streamExpected =
+      this->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
   EXPECT_FALSE(stream->ackedIntervals.empty());
   EXPECT_EQ(stream->ackedIntervals.size(), 1);
   EXPECT_EQ(stream->ackedIntervals.front().start, 0);
@@ -1131,8 +1132,10 @@ TYPED_TEST(
   // deliver an ACK for all of the outstanding packets
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1));
-  auto stream = this->getNonConstConn().streamManager->getStream(streamId);
-  ASSERT_TRUE(stream);
+  auto streamExpected =
+      this->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
   EXPECT_FALSE(stream->ackedIntervals.empty());
   EXPECT_EQ(stream->ackedIntervals.size(), 1);
   EXPECT_EQ(stream->ackedIntervals.front().start, 0);
@@ -1162,8 +1165,10 @@ TYPED_TEST(
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1),
       std::chrono::steady_clock::time_point());
-  auto stream = this->getNonConstConn().streamManager->getStream(streamId);
-  ASSERT_TRUE(stream);
+  auto streamExpected =
+      this->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamExpected.hasError());
+  auto stream = streamExpected.value();
   EXPECT_FALSE(stream->ackedIntervals.empty());
   EXPECT_EQ(stream->ackedIntervals.size(), 1);
   EXPECT_EQ(stream->ackedIntervals.front().start, 0);

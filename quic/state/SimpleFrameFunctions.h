@@ -44,7 +44,8 @@ void updateSimpleFrameOnPacketLoss(
  * Update the connection state on receipt of the given simple frame.
  * Returns true if the frame is NOT a probing frame
  */
-bool updateSimpleFrameOnPacketReceived(
+[[nodiscard]] folly::Expected<bool, QuicError>
+updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frameIn,
     const ConnectionId& dstConnId,

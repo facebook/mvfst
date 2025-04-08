@@ -46,8 +46,8 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
   return *packet.maybeClonedPacketIdentifier;
 }
 
-Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
-    OutstandingPacketWrapper& packet) {
+folly::Expected<Optional<ClonedPacketIdentifier>, QuicError>
+PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
   // TODO: if PMTU changes between the transmission of the original packet and
   // now, then we cannot clone everything in the packet.
 
@@ -87,7 +87,16 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
       }
       case QuicWriteFrame::Type::WriteStreamFrame: {
         const WriteStreamFrame& streamFrame = *frame.asWriteStreamFrame();
-        auto stream = conn_.streamManager->getStream(streamFrame.streamId);
+        auto streamResult =
+            conn_.streamManager->getStream(streamFrame.streamId);
+        if (streamResult.hasError()) {
+          VLOG(4) << "Failed to get stream " << streamFrame.streamId
+                  << " for cloning WriteStreamFrame: "
+                  << streamResult.error().message;
+          // Propagate error
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto* stream = streamResult.value();
         if (stream && retransmittable(*stream)) {
           auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
           auto bufferLen = streamData ? streamData->chainLength() : 0;
@@ -104,9 +113,11 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
               lastFrame && bufferLen && !hasAckFrame,
               streamFrame.streamGroupId);
           if (res.hasError()) {
-            throw QuicInternalException(
-                res.error().message, *res.error().code.asLocalErrorCode());
+            VLOG(4) << "Failed to write stream frame header for cloning: "
+                    << res.error().message;
+            return folly::makeUnexpected(res.error());
           }
+
           auto dataLen = *res;
           bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
@@ -143,6 +154,7 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
         auto cryptoWriteResult =
             writeCryptoFrame(cryptoFrame.offset, *buf, builder_);
         bool ret = cryptoWriteResult.has_value() &&
+
             cryptoWriteResult->offset == cryptoFrame.offset &&
             cryptoWriteResult->len == cryptoFrame.len;
         notPureAck |= ret;
@@ -160,14 +172,22 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
       case QuicWriteFrame::Type::MaxStreamDataFrame: {
         const MaxStreamDataFrame& maxStreamDataFrame =
             *frame.asMaxStreamDataFrame();
-        auto stream =
+        auto streamResult =
             conn_.streamManager->getStream(maxStreamDataFrame.streamId);
+        if (streamResult.hasError()) {
+          VLOG(4) << "Failed to get stream " << maxStreamDataFrame.streamId
+                  << " for cloning MaxStreamDataFrame: "
+                  << streamResult.error().message;
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto* stream = streamResult.value();
+
         if (!stream || !stream->shouldSendFlowControl()) {
           writeSuccess = true;
           break;
         }
         shouldWriteWindowUpdate = true;
-        auto ret =
+        bool ret =
             0 != writeFrame(generateMaxStreamDataFrame(*stream), builder_);
         windowUpdateWritten |= ret;
         notPureAck |= ret;
@@ -200,9 +220,7 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
         break;
       }
       case QuicWriteFrame::Type::DatagramFrame:
-        // Do not clone Datagram frames. If datagram frame is the only frame in
-        // the packet, notPureAck will be false, and the function will return
-        // none correctly.
+        // Do not clone Datagram frames.
         writeSuccess = true;
         break;
       default: {
@@ -216,6 +234,7 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
       return none;
     }
   }
+
   // If this packet had a WriteAckFrame, build a new one it with
   // fresh AckState on best-effort basis. If writing
   // that ACK fails, just ignore it and use the rest of the
@@ -228,6 +247,7 @@ Optional<ClonedPacketIdentifier> PacketRebuilder::rebuildFromPacket(
     AckScheduler ackScheduler(conn_, ackState);
     ackScheduler.writeNextAcks(builder_);
   }
+
   // We shouldn't clone if:
   // (1) we only end up cloning only acks, ping, or paddings.
   // (2) we should write window update, but didn't, and wrote nothing else.

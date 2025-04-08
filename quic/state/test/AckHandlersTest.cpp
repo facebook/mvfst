@@ -44,6 +44,7 @@ auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
   return [&lostPackets](QuicConnectionStateBase&, auto& packet, bool) {
     auto packetNum = packet.header.getPacketSequenceNum();
     lostPackets.push_back(packetNum);
+    return folly::unit;
   };
 }
 
@@ -222,17 +223,20 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
       }));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto& packetFrame) {
-        auto& stream = *packetFrame.asWriteStreamFrame();
-        streams.emplace_back(stream);
-      },
-      testLossHandler(lostPackets),
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&, const auto& packetFrame)
+                       -> folly::Expected<folly::Unit, QuicError> {
+                     auto& stream = *packetFrame.asWriteStreamFrame();
+                     streams.emplace_back(stream);
+                     return folly::unit;
+                   },
+                   testLossHandler(lostPackets),
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
   StreamId nextExpectedStream = 21; // packets (streams) 21 - 101 are ACKed
@@ -287,13 +291,15 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
+      [](const auto&, const auto&) { return folly::unit; },
+      [](auto&, auto&, bool) { return folly::unit; },
       ackReceiveTime);
+  ASSERT_FALSE(ackEvent.hasError());
+  auto ackEventValue = ackEvent.value();
 
-  EXPECT_EQ(ackEvent.ecnECT0Count, 100);
-  EXPECT_EQ(ackEvent.ecnECT1Count, 200);
-  EXPECT_EQ(ackEvent.ecnCECount, 300);
+  EXPECT_EQ(ackEventValue.ecnECT0Count, 100);
+  EXPECT_EQ(ackEventValue.ecnECT1Count, 200);
+  EXPECT_EQ(ackEventValue.ecnCECount, 300);
 
   if (GetParam().pnSpace == PacketNumberSpace::AppData) {
     auto& ackState = getAckState(conn, GetParam().pnSpace);
@@ -309,10 +315,11 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
-  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(100).hasError());
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
-  auto noopLossVisitor = [](auto&, auto&, bool) {};
+  auto noopLossVisitor = [](auto&, auto&, bool) { return folly::unit; };
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
@@ -361,22 +368,25 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
-  detectLossPackets(
-      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
+  ASSERT_FALSE(
+      detectLossPackets(
+          conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace)
+          .hasError());
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 2;
   ackFrame.ackBlocks.emplace_back(0, 2);
 
-  processAckFrame(
+  auto ackResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
+      [](const auto&, const auto&) { return folly::unit; },
+      [](auto&, auto&, bool) { return folly::unit; },
       startTime + 30ms);
+  ASSERT_FALSE(ackResult.hasError());
 
   EXPECT_TRUE(streamState->lossBuffer.empty());
   ASSERT_FALSE(streamState->ackedIntervals.empty());
@@ -389,10 +399,11 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
-  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(100).hasError());
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
-  auto noopLossVisitor = [](auto&, auto&, bool) {};
+  auto noopLossVisitor = [](auto&, auto&, bool) { return folly::unit; };
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
@@ -441,22 +452,25 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
-  detectLossPackets(
-      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
+  ASSERT_FALSE(
+      detectLossPackets(
+          conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace)
+          .hasError());
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 2;
   ackFrame.ackBlocks.emplace_back(0, 2);
 
-  processAckFrame(
+  auto ackResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
+      [](const auto&, const auto&) { return folly::unit; },
+      [](auto&, auto&, bool) { return folly::unit; },
       startTime + 30ms);
+  ASSERT_FALSE(ackResult.hasError());
 
   ASSERT_EQ(streamState->lossBuffer.size(), 2);
   EXPECT_EQ(streamState->lossBuffer[0].offset, 0);
@@ -475,10 +489,11 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
-  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(100).hasError());
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
-  auto noopLossVisitor = [](auto&, auto&, bool) {};
+  auto noopLossVisitor = [](auto&, auto&, bool) { return folly::unit; };
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
@@ -527,22 +542,25 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
-  detectLossPackets(
-      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
+  ASSERT_FALSE(
+      detectLossPackets(
+          conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace)
+          .hasError());
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 2;
   ackFrame.ackBlocks.emplace_back(0, 2);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      startTime + 30ms);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   startTime + 30ms)
+                   .hasError());
 
   ASSERT_EQ(streamState->lossBuffer.size(), 1);
   EXPECT_EQ(streamState->lossBuffer[0].offset, 50);
@@ -558,10 +576,11 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
-  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(100).hasError());
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
-  auto noopLossVisitor = [](auto&, auto&, bool) {};
+  auto noopLossVisitor = [](auto&, auto&, bool) { return folly::unit; };
 
   StreamId streamId = 1;
   auto streamState = conn.streamManager->createStream(streamId).value();
@@ -610,22 +629,25 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
-  detectLossPackets(
-      conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace);
+  ASSERT_FALSE(
+      detectLossPackets(
+          conn, ackState, noopLossVisitor, checkTime, GetParam().pnSpace)
+          .hasError());
 
   // Here we receive the spurious loss packets in a late ack
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 2;
   ackFrame.ackBlocks.emplace_back(0, 2);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      startTime + 30ms);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   startTime + 30ms)
+                   .hasError());
 
   ASSERT_EQ(streamState->lossBuffer.size(), 1);
   EXPECT_EQ(streamState->lossBuffer[0].offset, 0);
@@ -695,14 +717,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
             outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_THAT(packetNumsDestroyed, UnorderedElementsAre(1, 2, 3));
 
   EXPECT_EQ(conn.outstandings.packets.size(), 0);
@@ -759,7 +782,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 3);
-
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
   // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
@@ -767,12 +789,13 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 3;
   ackState.largestAckedByPeer = 3;
-  detectLossPackets(
-      conn,
-      ackState,
-      [](auto&, auto&, bool) {},
-      startTime + 250ms,
-      GetParam().pnSpace);
+  ASSERT_FALSE(detectLossPackets(
+                   conn,
+                   ackState,
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   startTime + 250ms,
+                   GetParam().pnSpace)
+                   .hasError());
 
   // now we get late acks for #2 and #3, triggering #1 to be marked lost.
   ReadAckFrame ackFrame;
@@ -788,14 +811,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
             outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      startTime + 260ms);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   startTime + 260ms)
+                   .hasError());
 
   EXPECT_THAT(packetsDestroyed, UnorderedElementsAre(2, 3));
 
@@ -840,14 +864,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         packetNumToDeclaredLost[packetNum] = declatedLost;
       }));
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame1,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      startTime + 600ms);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame1,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   startTime + 600ms)
+                   .hasError());
 
   EXPECT_THAT(
       packetNumToDeclaredLost,
@@ -914,14 +939,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
           &OutstandingPacket::getPacketSequenceNum, AllOf(Lt(1000), Gt(1)))))
       .Times(998);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
 
   // Shrink the deque to the remaining packets.
   conn.outstandings.packets.shrink_to_fit();
@@ -937,14 +963,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
         EXPECT_EQ(true, outstandingPacket.declaredLost);
       }));
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame1,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame1,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
 
   ReadAckFrame ackFrame2;
   ackFrame2.largestAcked = 1000;
@@ -957,14 +984,15 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
         EXPECT_EQ(1000, outstandingPacket.packet.header.getPacketSequenceNum());
       }));
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame2,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame2,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
 
   EXPECT_EQ(conn.outstandings.packets.size(), 0);
 }
@@ -1032,17 +1060,19 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       }))
       .WillRepeatedly(Invoke([](auto, auto) {}));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(3);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto& packetFrame) {
-        auto& stream = *packetFrame.asWriteStreamFrame();
-        streams.emplace_back(stream);
-      },
-      testLossHandler(lostPackets),
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&, const auto& packetFrame) {
+                     auto& stream = *packetFrame.asWriteStreamFrame();
+                     streams.emplace_back(stream);
+                     return folly::unit;
+                   },
+                   testLossHandler(lostPackets),
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
   StreamId nextExpectedStream = 21; // packets (streams) 21 - 101 are ACKed
@@ -1092,14 +1122,15 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   EXPECT_EQ(itr->packet.header.getPacketSequenceNum(), 16);
   EXPECT_EQ(conn.lossState.totalPacketsSpuriouslyMarkedLost, 0);
   ackFrame.ackBlocks.emplace_back(15, 16);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](auto&, auto) {},
-      [](auto&, auto&, auto) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](auto&, auto) { return folly::unit; },
+                   [](auto&, auto&, auto) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   itr = std::find_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
@@ -1110,14 +1141,15 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   EXPECT_TRUE(itr == conn.outstandings.packets.end());
 
   // Duplicate ACK much later, should clear out declared lost.
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](auto&, auto) {},
-      [](auto&, auto&, auto) {},
-      Clock::now() + 2 * calculatePTO(conn));
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](auto&, auto) { return folly::unit; },
+                   [](auto&, auto&, auto) { return folly::unit; },
+                   Clock::now() + 2 * calculatePTO(conn))
+                   .hasError());
 
   numDeclaredLost = std::count_if(
       conn.outstandings.packets.begin(),
@@ -1187,17 +1219,19 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
         }
       }));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto& packetFrame) {
-        auto& stream = *packetFrame.asWriteStreamFrame();
-        streams.emplace_back(stream);
-      },
-      testLossHandler(lostPackets),
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&, const auto& packetFrame) {
+                     auto& stream = *packetFrame.asWriteStreamFrame();
+                     streams.emplace_back(stream);
+                     return folly::unit;
+                   },
+                   testLossHandler(lostPackets),
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
   StreamId start = 45;
@@ -1322,17 +1356,20 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         EXPECT_EQ(expectedAckedPackets, ackEvent->ackedPackets.size());
       }));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto& packetFrame) {
-        auto& stream = *packetFrame.asWriteStreamFrame();
-        streams.emplace_back(stream);
-      },
-      testLossHandler(lostPackets),
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&, const auto& packetFrame)
+                       -> folly::Expected<folly::Unit, QuicError> {
+                     auto& stream = *packetFrame.asWriteStreamFrame();
+                     streams.emplace_back(stream);
+                     return folly::unit;
+                   },
+                   testLossHandler(lostPackets),
+                   Clock::now())
+                   .hasError());
 
   EXPECT_EQ(26, streams.rbegin()->streamId);
 
@@ -1419,23 +1456,27 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   ReadAckFrame firstReceivedAck;
   firstReceivedAck.largestAcked = 100;
   firstReceivedAck.ackBlocks.emplace_back(100, 100);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      firstReceivedAck,
-      [](const auto&) {},
-      [&](const auto& outstandingPacket, const auto& packetFrame) {
-        auto ackedPacketNum =
-            outstandingPacket.packet.header.getPacketSequenceNum();
-        EXPECT_EQ(ackedPacketNum, firstReceivedAck.largestAcked);
-        const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
-        if (frame) {
-          commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
-        }
-      },
-      [](auto& /* conn */, auto& /* packet */, bool /* processed */
-      ) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   firstReceivedAck,
+                   [](const auto&) {},
+                   [&](const auto& outstandingPacket, const auto& packetFrame)
+                       -> folly::Expected<folly::Unit, QuicError> {
+                     auto ackedPacketNum =
+                         outstandingPacket.packet.header.getPacketSequenceNum();
+                     EXPECT_EQ(ackedPacketNum, firstReceivedAck.largestAcked);
+                     const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
+                     if (frame) {
+                       commonAckVisitorForAckFrame(
+                           conn.ackStates.appDataAckState, *frame);
+                     }
+                     return folly::unit;
+                   },
+                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   ) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(2, conn.ackStates.appDataAckState.acks.size());
   EXPECT_EQ(
       Interval<PacketNum>(1002, 1090),
@@ -1447,20 +1488,24 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   ReadAckFrame secondReceivedAck;
   secondReceivedAck.largestAcked = 101;
   secondReceivedAck.ackBlocks.emplace_back(101, 101);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      secondReceivedAck,
-      [](const auto&) {},
-      [&](const auto&, const auto& packetFrame) {
-        const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
-        if (frame) {
-          commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
-        }
-      },
-      [](auto& /* conn */, auto& /* packet */, bool /* processed */
-      ) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   secondReceivedAck,
+                   [](const auto&) {},
+                   [&](const auto&, const auto& packetFrame)
+                       -> folly::Expected<folly::Unit, QuicError> {
+                     const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
+                     if (frame) {
+                       commonAckVisitorForAckFrame(
+                           conn.ackStates.appDataAckState, *frame);
+                     }
+                     return folly::unit;
+                   },
+                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   ) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_TRUE(conn.ackStates.appDataAckState.acks.empty());
 }
 
@@ -1491,14 +1536,18 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 5;
   EXPECT_CALL(*rawController, onPacketAckOrLoss(_, _)).Times(0);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&,
+                      const auto&) -> folly::Expected<folly::Unit, QuicError> {
+                     return folly::unit;
+                   },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
   EXPECT_EQ(conn.lossState.ptoCount, 1);
   EXPECT_TRUE(!conn.ackStates.appDataAckState.largestAckedByPeer.has_value());
@@ -1513,14 +1562,18 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 10;
   ackFrame.ackBlocks.emplace_back(5, 10);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&,
+                      const auto&) -> folly::Expected<folly::Unit, QuicError> {
+                     return folly::unit;
+                   },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
 }
 
 TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
@@ -1569,14 +1622,18 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   ackFrame.largestAcked = 1000;
   ackFrame.ackBlocks.emplace_back(1000, 1000);
   ackFrame.ackBlocks.emplace_back(10, 10);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&,
+                      const auto&) -> folly::Expected<folly::Unit, QuicError> {
+                     return folly::unit;
+                   },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(1, conn.outstandings.packets.size());
 }
 
@@ -1612,14 +1669,18 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
   ackFrame.ackBlocks.emplace_back(3, 7);
 
   std::vector<PacketNum> lostPackets;
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto&) {},
-      testLossHandler(lostPackets),
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&,
+                       const auto&) -> folly::Expected<folly::Unit, QuicError> {
+                     return folly::unit;
+                   },
+                   testLossHandler(lostPackets),
+                   Clock::now())
+                   .hasError());
   // When [3, 7] are acked, [0, 2] may also be marked loss if they are in the
   // same packet number space, due to reordering threshold
   auto numDeclaredLost = std::count_if(
@@ -1825,16 +1886,18 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
                                 const auto& /* packetFrame */) {
     ackVisitorCounter++;
+    return folly::unit;
   };
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      countingAckVisitor,
-      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   countingAckVisitor,
+                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   ) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(1, ackVisitorCounter);
 }
 
@@ -1891,16 +1954,18 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
                                 const auto& /* packetFrame */) {
     ackVisitorCounter++;
+    return folly::unit;
   };
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      countingAckVisitor,
-      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   countingAckVisitor,
+                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   ) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(0, ackVisitorCounter);
 }
 
@@ -1966,14 +2031,15 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
         checkAck(*ack);
       }));
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto&) { /* ackVisitor */ },
-      [&](auto&, auto&, bool) { /* lossVisitor */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&, const auto&) { return folly::unit; },
+                   [&](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
 }
 
 TEST_P(AckHandlersTest, NoDoubleProcess) {
@@ -2027,36 +2093,38 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
                                 const auto& /* packetFrame */) {
     ackVisitorCounter++;
+    return folly::unit;
   };
 
   // First ack. This will ack first packet, and trigger a ack visiting.
   ReadAckFrame ackFrame1;
   ackFrame1.largestAcked = 0;
   ackFrame1.ackBlocks.emplace_back(0, 0);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame1,
-      [](auto&) {},
-      countingAckVisitor,
-      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame1,
+                   [](auto&) {},
+                   countingAckVisitor,
+                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   ) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(1, ackVisitorCounter);
 
   // Second ack that acks the second packet.  This won't trigger a visit.
   ReadAckFrame ackFrame2;
   ackFrame2.largestAcked = 1;
   ackFrame2.ackBlocks.emplace_back(1, 1);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame2,
-      [](auto&) {},
-      countingAckVisitor,
-      [&](auto& /* conn */, auto& /* packet */, bool /* processed */
-      ) { /* no-op */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame2,
+                   [](auto&) {},
+                   countingAckVisitor,
+                   [&](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(1, ackVisitorCounter);
 }
 
@@ -2114,16 +2182,17 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
                                 const auto& /* packetFrame */) {
     ackVisitorCounter++;
+    return folly::unit;
   };
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      countingAckVisitor,
-      [&](auto& /* conn */, auto& /* packet */, bool /* processed */
-      ) { /* no-op */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   countingAckVisitor,
+                   [&](auto&, auto&, bool) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(2, ackVisitorCounter);
   EXPECT_EQ(0, conn.outstandings.numClonedPackets());
 }
@@ -2157,14 +2226,15 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
   ackFrame.ackBlocks.emplace_back(0, 0);
 
   auto receiveTime = sentTime + 10us;
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](const auto&, const auto&) { /* ackVisitor */ },
-      [&](auto&, auto&, bool) { /* lossVisitor */ },
-      receiveTime);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](const auto&, const auto&) { return folly::unit; },
+                   [&](auto&, auto&, bool) { return folly::unit; },
+                   receiveTime)
+                   .hasError());
   EXPECT_EQ(10us, conn.lossState.mrtt);
 }
 
@@ -2237,16 +2307,18 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   auto countingAckVisitor = [&](const auto& /* outstandingPacket */,
                                 const auto& /* packetFrame */) {
     ackVisitorCounter++;
+    return folly::unit;
   };
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      countingAckVisitor,
-      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
-      Clock::now());
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   countingAckVisitor,
+                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   ) { return folly::unit; },
+                   Clock::now())
+                   .hasError());
   EXPECT_EQ(0, ackVisitorCounter);
 }
 
@@ -2283,14 +2355,15 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   ackFrame.ackBlocks.emplace_back(0, 0);
 
   auto receiveTime = Clock::now() - 200ms;
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [&](auto&, auto) { /* ackVisitor */ },
-      [&](auto&, auto&, auto) { /* lossVisitor */ },
-      receiveTime);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [&](auto&, auto) { return folly::unit; },
+                   [&](auto&, auto&, auto) { return folly::unit; },
+                   receiveTime)
+                   .hasError());
   EXPECT_EQ(2468 + 111, conn.lossState.totalBytesSentAtLastAck);
   EXPECT_EQ(1357 + 111, conn.lossState.totalBytesAckedAtLastAck);
   EXPECT_EQ(sentTime, *conn.lossState.lastAckedPacketSentTime);
@@ -2411,14 +2484,16 @@ TEST_P(AckHandlersTest, AckEventCreation) {
 
   // check the AckEvent returned by processAckFrame so everything is filled
   // out
-  auto ackEvent = processAckFrame(
+  auto ackEventResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
+      [](const auto&, const auto&) { return folly::unit; },
+      [](auto&, auto&, bool) { return folly::unit; },
       ackTime);
+  ASSERT_FALSE(ackEventResult.hasError());
+  auto ackEvent = ackEventResult.value();
   checkAck(ackEvent);
   ASSERT_TRUE(ackEvent.ccState.has_value());
   EXPECT_EQ(
@@ -2539,14 +2614,16 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
 
   // check the AckEvent returned by processAckFrame so everything is filled
   // out
-  auto ackEvent = processAckFrame(
+  auto ackEventResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
+      [](const auto&, const auto&) { return folly::unit; },
+      [](auto&, auto&, bool) { return folly::unit; },
       ackTime);
+  ASSERT_FALSE(ackEventResult.hasError());
+  auto ackEvent = ackEventResult.value();
   checkAck(ackEvent);
   ASSERT_TRUE(ackEvent.ccState.has_value());
   EXPECT_EQ(
@@ -2647,14 +2724,16 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
 
   // check the AckEvent returned by processAckFrame so everything is filled
   // out
-  auto ackEvent = processAckFrame(
+  auto ackEventResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
+      [](const auto&, const auto&) { return folly::unit; },
+      [](auto&, auto&, bool) { return folly::unit; },
       ackTime);
+  ASSERT_FALSE(ackEventResult.hasError());
+  auto ackEvent = ackEventResult.value();
   checkAck(ackEvent);
   ASSERT_FALSE(ackEvent.ccState.has_value()); // no congestion control
 }
@@ -2703,16 +2782,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestamps) {
 
   // check the AckEvent returned by processAckFrame so everything is filled
   // out
-  auto ackEvent = processAckFrame(
+  auto ackEventResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto& /*outstandingPacket*/,
-         const auto& /*frame*/) { /* ack visitor */ },
-      [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
+      [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+        return folly::unit;
+      },
+      [&](auto&, auto&, bool) { return folly::unit; },
       ackTime);
+  ASSERT_FALSE(ackEventResult.hasError());
+  auto ackEvent = ackEventResult.value();
 
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     // Check the AckEvent is populated with the right receive
@@ -2798,17 +2879,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsGaps) {
 
   // check the AckEvent returned by processAckFrame so everything is filled
   // out
-  auto ackEvent = processAckFrame(
+  auto ackEventResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto& /*outstandingPacket*/,
-         const auto& /*frame*/) { /* ack visitor */ },
-      [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
+      [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+        return folly::unit;
+      },
+      [&](auto&, auto&, bool) { return folly::unit; },
       ackTime);
-
+  ASSERT_FALSE(ackEventResult.hasError());
+  auto ackEvent = ackEventResult.value();
   checkAck(ackEvent);
 
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
@@ -2859,16 +2941,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
     ackFrame.recvdPacketsTimestampRanges = {recvdPacketsTimestampsRange1};
   }
   {
-    auto ackEvent = processAckFrame(
+    auto ackEventResult = processAckFrame(
         conn,
         GetParam().pnSpace,
         ackFrame,
         [](auto&) {},
-        [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/) { /* ack visitor */ },
-        [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-        ) { /* no-op lossVisitor */ },
+        [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+          return folly::unit;
+        },
+        [&](auto&, auto&, bool) { return folly::unit; },
         ackTime);
+    ASSERT_FALSE(ackEventResult.hasError());
+    auto ackEvent = ackEventResult.value();
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
       // All packets should be populated with timestamps.
@@ -2887,16 +2971,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
     // were processed.
     // Send a duplicate ACK with the same ACK blocks and timestamps (assuming
     // this ACK was lost).
-    auto ackEvent2 = processAckFrame(
+    auto ackEventResult2 = processAckFrame(
         conn,
         GetParam().pnSpace,
         ackFrame,
         [](auto&) {},
-        [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/) { /* ack visitor */ },
-        [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-        ) { /* no-op lossVisitor */ },
+        [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+          return folly::unit;
+        },
+        [&](auto&, auto&, bool) { return folly::unit; },
         ackTime);
+    ASSERT_FALSE(ackEventResult2.hasError());
+    auto ackEvent2 = ackEventResult2.value();
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
       // No new timestamps were processed.
@@ -2952,16 +3038,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
     }
     // check the AckEvent returned by processAckFrame so everything is filled
     // out
-    auto ackEvent = processAckFrame(
+    auto ackEventResult = processAckFrame(
         conn,
         GetParam().pnSpace,
         ackFrame,
         [](auto&) {},
-        [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/) { /* ack visitor */ },
-        [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-        ) { /* no-op lossVisitor */ },
+        [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+          return folly::unit;
+        },
+        [&](auto&, auto&, bool) { return folly::unit; },
         ackTime);
+    ASSERT_FALSE(ackEventResult.hasError());
+    auto ackEvent = ackEventResult.value();
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
       // All packets should be populated with timestamps.
@@ -3067,16 +3155,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
     }
     // check the AckEvent returned by processAckFrame so everything is filled
     // out
-    auto ackEvent = processAckFrame(
+    auto ackEventResult = processAckFrame(
         conn,
         GetParam().pnSpace,
         ackFrame,
         [](auto&) {},
-        [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/) { /* ack visitor */ },
-        [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-        ) { /* no-op lossVisitor */ },
+        [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+          return folly::unit;
+        },
+        [&](auto&, auto&, bool) { return folly::unit; },
         ackTime);
+    ASSERT_FALSE(ackEventResult.hasError());
+    auto ackEvent = ackEventResult.value();
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
       // All packets should be populated with timestamps.
@@ -3121,16 +3211,18 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
     }
 
     // check the AckEvent returned by processAckFrame
-    auto ackEvent2 = processAckFrame(
+    auto ackEventResult2 = processAckFrame(
         conn,
         GetParam().pnSpace,
         ackFrame2,
         [](auto&) {},
-        [](const auto& /*outstandingPacket*/,
-           const auto& /*frame*/) { /* ack visitor */ },
-        [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-        ) { /* no-op lossVisitor */ },
+        [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+          return folly::unit;
+        },
+        [&](auto&, auto&, bool) { return folly::unit; },
         ackTime);
+    ASSERT_FALSE(ackEventResult2.hasError());
+    auto ackEvent2 = ackEventResult2.value();
 
     EXPECT_EQ(ackEvent2.ackedPackets.size(), 5);
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
@@ -3194,16 +3286,19 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsMaxCheck) {
             .maxReceiveTimestampsPerAck);
   }
 
-  auto ackEvent = processAckFrame(
+  auto ackEventResult = processAckFrame(
       conn,
       GetParam().pnSpace,
       ackFrame,
       [](auto&) {},
-      [](const auto& /*outstandingPacket*/,
-         const auto& /*frame*/) { /* ack visitor */ },
-      [](auto& /*conn*/, auto& /* packet */, bool /* processed */
-      ) { /* no-op lossVisitor */ },
+      [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
+        return folly::unit;
+      },
+      [&](auto&, auto&, bool) { return folly::unit; },
       ackTime);
+
+  ASSERT_FALSE(ackEventResult.hasError());
+  auto ackEvent = ackEventResult.value();
 
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     // Number of packets with timestamps should be max(5).
@@ -3377,14 +3472,15 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
   EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      ackTime);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   ackTime)
+                   .hasError());
 }
 
 TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
@@ -3477,14 +3573,15 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
   EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      ackTime);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   ackTime)
+                   .hasError());
 }
 
 TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
@@ -3604,14 +3701,15 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackTime);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     ackTime)
+                     .hasError());
   }
 
   // AckFrame acking packets (0 -> 4, 7 -> 9)
@@ -3660,14 +3758,15 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackTime);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     ackTime)
+                     .hasError());
   }
 
   // AckFrame acking packets (0 -> 9)
@@ -3716,14 +3815,15 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackTime);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     ackTime)
+                     .hasError());
   }
 }
 
@@ -3835,14 +3935,15 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         .WillOnce(Return(none));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackTime);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     ackTime)
+                     .hasError());
   }
 
   // should have zero outstanding at this point
@@ -3860,14 +3961,15 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
     ackFrame.ackDelay = 10ms;
     const auto ackTime = getSentTime(3) + propDelay + ackFrame.ackDelay + 5ms;
     EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackTime);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     ackTime)
+                     .hasError());
   }
 }
 
@@ -3959,14 +4061,15 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
   EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      ackTime);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   ackTime)
+                   .hasError());
 }
 
 TEST_P(AckHandlersTest, ObserverRttSample) {
@@ -4071,14 +4174,15 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
                         ackData.endSeq + 1)))));
   }
   for (const auto& ackData : ackVec) {
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackData.ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackData.ackTime);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackData.ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     ackData.ackTime)
+                     .hasError());
   }
 
   observerContainer->removeObserver(obs1.get());
@@ -4140,8 +4244,13 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
-  detectLossPackets(
-      conn, ackState, [](auto&, auto&, bool) {}, checkTime, GetParam().pnSpace);
+  ASSERT_FALSE(detectLossPackets(
+                   conn,
+                   ackState,
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   checkTime,
+                   GetParam().pnSpace)
+                   .hasError());
 
   // now we get acks for packets marked lost, triggering spuriousLossDetected
   EXPECT_CALL(
@@ -4160,14 +4269,15 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
     ackFrame.largestAcked = 2;
     ackFrame.ackBlocks.emplace_back(0, 2);
 
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        startTime + 30ms);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     startTime + 30ms)
+                     .hasError());
   }
 
   observerContainer->removeObserver(obs1.get());
@@ -4232,8 +4342,13 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 10;
   ackState.largestAckedByPeer = 10;
-  detectLossPackets(
-      conn, ackState, [](auto&, auto&, bool) {}, checkTime, GetParam().pnSpace);
+  ASSERT_FALSE(detectLossPackets(
+                   conn,
+                   ackState,
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   checkTime,
+                   GetParam().pnSpace)
+                   .hasError());
 
   // now we get acks for packets marked lost, triggering spuriousLossDetected
   EXPECT_CALL(
@@ -4254,14 +4369,15 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
     ackFrame.largestAcked = 9;
     ackFrame.ackBlocks.emplace_back(5, 9);
 
-    processAckFrame(
-        conn,
-        GetParam().pnSpace,
-        ackFrame,
-        [](auto&) {},
-        [](const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        startTime + 510ms);
+    ASSERT_FALSE(processAckFrame(
+                     conn,
+                     GetParam().pnSpace,
+                     ackFrame,
+                     [](auto&) {},
+                     [](const auto&, const auto&) { return folly::unit; },
+                     [](auto&, auto&, bool) { return folly::unit; },
+                     startTime + 510ms)
+                     .hasError());
   }
 
   observerContainer->removeObserver(obs1.get());
@@ -4298,14 +4414,15 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
   auto ackReceiveTime = packetSendTime + 400ns;
   ackFrame.largestAcked = 5;
   ackFrame.ackBlocks.emplace_back(5, 5);
-  processAckFrame(
-      conn,
-      GetParam().pnSpace,
-      ackFrame,
-      [](auto&) {},
-      [](const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      ackReceiveTime);
+  ASSERT_FALSE(processAckFrame(
+                   conn,
+                   GetParam().pnSpace,
+                   ackFrame,
+                   [](auto&) {},
+                   [](const auto&, const auto&) { return folly::unit; },
+                   [](auto&, auto&, bool) { return folly::unit; },
+                   ackReceiveTime)
+                   .hasError());
   EXPECT_EQ(conn.lossState.lrtt, 1us);
 }
 
@@ -4333,10 +4450,14 @@ class AckEventForAppDataTest : public Test {
         kDefaultConnectionFlowControlWindow;
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();
-    conn->streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn->streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
+    CHECK(
+        !conn->streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+    CHECK(!conn->streamManager
+               ->setMaxLocalUnidirectionalStreams(
+                   kDefaultMaxStreamsUnidirectional)
+               .hasError());
     return conn;
   }
 
@@ -4346,7 +4467,7 @@ class AckEventForAppDataTest : public Test {
       const bool eof) {
     const auto offset = getLargestWriteOffsetSeen(stream);
     const auto len = data->computeChainDataLength();
-    writeDataToQuicStream(stream, data->clone(), eof);
+    CHECK(!writeDataToQuicStream(stream, data->clone(), eof).hasError());
     return WriteStreamFrame(stream.id, offset, len, eof);
   }
 
@@ -4433,14 +4554,15 @@ class AckEventForAppDataTest : public Test {
   void sendAppDataPacket(
       const RegularQuicPacketBuilder::Packet& packet,
       const TimePoint timepoint = Clock::now()) {
-    updateConnection(
-        *conn_,
-        none,
-        packet.packet,
-        timepoint,
-        getEncodedSize(packet),
-        getEncodedBodySize(packet),
-        false /* isDSRPacket */);
+    CHECK(!updateConnection(
+               *conn_,
+               none,
+               packet.packet,
+               timepoint,
+               getEncodedSize(packet),
+               getEncodedBodySize(packet),
+               false /* isDSRPacket */)
+               .hasError());
   }
 
   auto deliverAckForAppDataPackets(
@@ -4458,31 +4580,37 @@ class AckEventForAppDataTest : public Test {
       it++;
     }
 
-    return processAckFrame(
+    auto result = processAckFrame(
         *conn_,
         PacketNumberSpace::AppData,
         ackFrame,
         [](auto&) {},
         [&](const OutstandingPacketWrapper& /* packet */,
-            const QuicWriteFrame& packetFrame) {
+            const QuicWriteFrame& packetFrame)
+            -> folly::Expected<folly::Unit, QuicError> {
           switch (packetFrame.type()) {
             case QuicWriteFrame::Type::WriteStreamFrame: {
               const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
               VLOG(4) << "Received ack for stream=" << frame.streamId
                       << " offset=" << frame.offset << " fin=" << frame.fin
                       << " len=" << frame.len << " " << *conn_;
-              auto ackedStream =
+              auto ackedStreamResult =
                   conn_->streamManager->getStream(frame.streamId);
+              CHECK(!ackedStreamResult.hasError());
+              auto& ackedStream = ackedStreamResult.value();
               if (ackedStream) {
-                sendAckSMHandler(*ackedStream, frame);
+                CHECK(!sendAckSMHandler(*ackedStream, frame).hasError());
               }
             } break;
             default:
-              FAIL();
+              CHECK(false);
           }
+          return folly::unit;
         },
-        [&](auto&, auto&, auto) { /* lossVisitor */ },
+        [&](auto&, auto&, auto) { return folly::unit; },
         timepoint);
+    CHECK(!result.hasError());
+    return result.value();
   }
 
   auto deliverAckForAppDataPackets(

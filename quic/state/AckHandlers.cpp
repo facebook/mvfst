@@ -57,7 +57,7 @@ void removeOutstandingsForAck(
  *
  */
 
-AckEvent processAckFrame(
+folly::Expected<AckEvent, QuicError> processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& frame,
@@ -283,7 +283,10 @@ AckEvent processAckFrame(
       }(packetFrame);
 
       // run the ACKed frame visitor
-      ackedFrameVisitor(*outstandingPacket, packetFrame);
+      auto result = ackedFrameVisitor(*outstandingPacket, packetFrame);
+      if (result.hasError()) {
+        return folly::makeUnexpected(result.error());
+      }
 
       // Part 2 and 3: Process current state relative to the PreAckVistorState.
       if (maybePreAckVisitorState.has_value()) {
@@ -354,7 +357,11 @@ AckEvent processAckFrame(
       << originalPacketCount[PacketNumberSpace::Handshake] << ","
       << originalPacketCount[PacketNumberSpace::AppData] << "}";
   CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
-  auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
+  auto lossEventExpected = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
+  if (lossEventExpected.hasError()) {
+    return folly::makeUnexpected(lossEventExpected.error());
+  }
+  auto& lossEvent = lossEventExpected.value();
   if (conn.congestionController &&
       (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {

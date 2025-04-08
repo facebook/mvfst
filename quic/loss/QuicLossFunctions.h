@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/Chrono.h>
+#include <folly/Expected.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Optional.h>
@@ -184,10 +185,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
 }
 
 /**
- * Processes outstandings for loss and returns true if the loss timer should be
- * set. False otherwise.
+ * Processes outstandings for loss.
+ * Returns true if the loss timer should be set, false otherwise.
+ * Returns QuicError if the LossVisitor fails.
  */
-bool processOutstandingsForLoss(
+[[nodiscard]] folly::Expected<bool, QuicError> processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
@@ -195,54 +197,68 @@ bool processOutstandingsForLoss(
     const Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
     const TimePoint& lossTime,
     const std::chrono::microseconds& rttSample,
-    const LossVisitor& lossVisitor,
+    const LossVisitor& lossVisitor, // Visitor now returns Expected
     std::chrono::microseconds& delayUntilLost,
     CongestionController::LossEvent& lossEvent,
     Optional<SocketObserverInterface::LossEvent>& observerLossEvent);
 
 /*
- * This function should be invoked after some event that is possible to
- * trigger loss detection, for example: packets are acked
+ * Detects losses based on ACKs or timeout.
+ * Returns a LossEvent on success (possibly empty), or a QuicError if
+ * processing encountered an error (e.g., from the lossVisitor).
  */
-Optional<CongestionController::LossEvent> detectLossPackets(
-    QuicConnectionStateBase& conn,
-    const AckState& ackState,
-    const LossVisitor& lossVisitor,
-    const TimePoint lossTime,
-    const PacketNumberSpace pnSpace,
-    const CongestionController::AckEvent* ackEvent = nullptr);
+[[nodiscard]] folly::
+    Expected<Optional<CongestionController::LossEvent>, QuicError>
+    detectLossPackets(
+        QuicConnectionStateBase& conn,
+        const AckState& ackState,
+        const LossVisitor& lossVisitor,
+        const TimePoint lossTime,
+        const PacketNumberSpace pnSpace,
+        const CongestionController::AckEvent* ackEvent = nullptr);
 
-void onPTOAlarm(QuicConnectionStateBase& conn);
+/*
+ * Function invoked when PTO alarm fires. Handles errors internally.
+ */
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> onPTOAlarm(
+    QuicConnectionStateBase& conn);
 
 /*
  * Function invoked when loss detection timer fires
  */
 template <class ClockType = Clock>
-void onLossDetectionAlarm(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> onLossDetectionAlarm(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor) {
   auto now = ClockType::now();
   if (conn.outstandings.packets.empty()) {
     VLOG(10) << "Transmission alarm fired with no outstanding packets " << conn;
-    return;
+    return folly::unit;
   }
   if (conn.lossState.currentAlarmMethod ==
       LossState::AlarmMethod::EarlyRetransmitOrReordering) {
     auto lossTimeAndSpace = earliestLossTimer(conn);
     CHECK(lossTimeAndSpace.first);
-    auto lossEvent = detectLossPackets(
+    auto lossEventResult = detectLossPackets(
         conn,
         getAckState(conn, lossTimeAndSpace.second),
         lossVisitor,
         now,
         lossTimeAndSpace.second);
+    if (lossEventResult.hasError()) {
+      return folly::makeUnexpected(lossEventResult.error());
+    }
+    auto& lossEvent = lossEventResult.value();
     if (conn.congestionController && lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       conn.congestionController->onPacketAckOrLoss(
           nullptr, lossEvent.get_pointer());
     }
   } else {
-    onPTOAlarm(conn);
+    auto result = onPTOAlarm(conn);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   conn.pendingEvents.setLossDetectionAlarm =
       conn.outstandings.numOutstanding() > 0;
@@ -254,32 +270,42 @@ void onLossDetectionAlarm(
            << " handshakePackets="
            << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
            << conn;
+  return folly::unit;
 }
 
 /*
- * Process streams in a RegularQuicWritePacket for loss
- *
- * processed: whether this packet is a already processed clone
+ * Process streams in a RegularQuicWritePacket for loss.
+ * This is the canonical implementation often used *by* the LossVisitor.
+ * Returns folly::unit on success, or QuicError if accessing stream state fails.
  */
-void markPacketLoss(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> markPacketLoss(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,
     bool processed);
 
-Optional<CongestionController::LossEvent> handleAckForLoss(
-    QuicConnectionStateBase& conn,
-    const LossVisitor& lossVisitor,
-    CongestionController::AckEvent& ack,
-    PacketNumberSpace pnSpace);
+/*
+ * Handles ACK processing related to loss detection.
+ * Returns a LossEvent on success (possibly empty), or QuicError if processing
+ * failed.
+ */
+[[nodiscard]] folly::
+    Expected<Optional<CongestionController::LossEvent>, QuicError>
+    handleAckForLoss(
+        QuicConnectionStateBase& conn,
+        const LossVisitor& lossVisitor, // Visitor now returns Expected
+        CongestionController::AckEvent& ack,
+        PacketNumberSpace pnSpace);
 
 /**
- * We force mark zero rtt packets as lost during zero rtt rejection.
+ * Force marks zero rtt packets as lost during zero rtt rejection.
+ * Returns folly::unit on success, or QuicError if marking fails.
  */
 template <class ClockType = Clock>
-void markZeroRttPacketsLost(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> markZeroRttPacketsLost(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor) {
   CongestionController::LossEvent lossEvent(ClockType::now());
+
   auto iter = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   while (iter != conn.outstandings.packets.end()) {
     DCHECK_EQ(
@@ -291,9 +317,12 @@ void markZeroRttPacketsLost(
       bool processed = pkt.maybeClonedPacketIdentifier &&
           !conn.outstandings.clonedPacketIdentifiers.count(
               *pkt.maybeClonedPacketIdentifier);
-      lossVisitor(conn, pkt.packet, processed);
-      // Remove the ClonedPacketIdentifier from the
-      // outstandings.clonedPacketIdentifiers set
+
+      auto visitorResult = lossVisitor(conn, pkt.packet, processed);
+      if (visitorResult.hasError()) {
+        return folly::makeUnexpected(visitorResult.error());
+      }
+
       if (pkt.maybeClonedPacketIdentifier) {
         conn.outstandings.clonedPacketIdentifiers.erase(
             *pkt.maybeClonedPacketIdentifier);
@@ -312,10 +341,13 @@ void markZeroRttPacketsLost(
           getNextOutstandingPacket(conn, PacketNumberSpace::AppData, iter + 1);
     }
   }
+
   conn.lossState.rtxCount += lossEvent.lostPackets;
   if (conn.congestionController && lossEvent.largestLostPacketNum.hasValue()) {
     conn.congestionController->onRemoveBytesFromInflight(lossEvent.lostBytes);
   }
   VLOG(10) << __func__ << " marked=" << lossEvent.lostPackets;
+  return folly::unit;
 }
+
 } // namespace quic

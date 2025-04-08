@@ -6,6 +6,7 @@
  */
 
 #include <folly/small_vector.h>
+
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 
@@ -44,7 +45,8 @@ bool isPersistentCongestion(
   return it == ack.ackedPackets.cend();
 }
 
-void onPTOAlarm(QuicConnectionStateBase& conn) {
+folly::Expected<folly::Unit, QuicError> onPTOAlarm(
+    QuicConnectionStateBase& conn) {
   VLOG(10) << __func__ << " " << conn;
   QUIC_STATS(conn.statsCallback, onPTO);
   conn.lossState.ptoCount++;
@@ -56,9 +58,10 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
         conn.outstandings.numOutstanding(),
         kPtoAlarm);
   }
-  if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {
-    throw QuicInternalException(
-        "Exceeded max PTO", LocalErrorCode::CONNECTION_ABANDONED);
+  if (conn.lossState.ptoCount >= conn.transportSettings.maxNumPTOs) {
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
+        "Exceeded max PTO"));
   }
 
   // The first PTO after the oneRttWriteCipher is available is an opportunity to
@@ -66,7 +69,12 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
   if (conn.transportSettings.earlyRetransmit0Rtt &&
       !conn.lossState.attemptedEarlyRetransmit0Rtt && conn.oneRttWriteCipher) {
     conn.lossState.attemptedEarlyRetransmit0Rtt = true;
-    markZeroRttPacketsLost(conn, markPacketLoss);
+    auto markResult = markZeroRttPacketsLost(conn, markPacketLoss);
+    if (markResult.hasError()) {
+      VLOG(3) << "Closing connection due to error marking 0-RTT packets lost: "
+              << markResult.error().message;
+      return markResult;
+    }
   }
 
   // We should avoid sending pointless PTOs if we don't have packets in the loss
@@ -100,6 +108,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
           packetCount[PacketNumberSpace::AppData];
     }
   }
+  return folly::unit;
 }
 
 template <class T, size_t N>
@@ -117,13 +126,15 @@ using InlineSet = folly::heap_vector_set<
     void,
     Container>;
 
-void markPacketLoss(
+folly::Expected<folly::Unit, QuicError> markPacketLoss(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,
     bool processed) {
   QUIC_STATS(conn.statsCallback, onPacketLoss);
   InlineSet<uint64_t, 10> streamsWithAddedStreamLossForPacket;
   for (auto& packetFrame : packet.frames) {
+    folly::Expected<QuicStreamState*, QuicError> streamResult = nullptr;
+
     switch (packetFrame.type()) {
       case QuicWriteFrame::Type::MaxStreamDataFrame: {
         MaxStreamDataFrame& frame = *packetFrame.asMaxStreamDataFrame();
@@ -131,7 +142,14 @@ void markPacketLoss(
         // packet, or if the clone and its siblings have never been processed.
         // But for both MaxData and MaxStreamData, we opportunistically send
         // an update to avoid stalling the peer.
-        auto stream = conn.streamManager->getStream(frame.streamId);
+        streamResult = conn.streamManager->getStream(frame.streamId);
+        if (streamResult.hasError()) {
+          VLOG(4) << "Failed to get stream " << frame.streamId
+                  << " in markPacketLoss (MaxStreamDataFrame): "
+                  << streamResult.error().message;
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto* stream = streamResult.value();
         if (!stream) {
           break;
         }
@@ -144,7 +162,7 @@ void markPacketLoss(
         onConnWindowUpdateLost(conn);
         break;
       }
-      // For other frame types, we only process them if the packet is not a
+        // For other frame types, we only process them if the packet is not a
       // processed clone.
       case QuicWriteFrame::Type::DataBlockedFrame: {
         if (processed) {
@@ -158,16 +176,21 @@ void markPacketLoss(
         if (processed) {
           break;
         }
-        auto stream = conn.streamManager->getStream(frame.streamId);
+        streamResult = conn.streamManager->getStream(frame.streamId);
+        if (streamResult.hasError()) {
+          VLOG(4) << "Failed to get stream " << frame.streamId
+                  << " in markPacketLoss (WriteStreamFrame): "
+                  << streamResult.error().message;
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto* stream = streamResult.value();
         if (!stream) {
           break;
         }
+
         if (!frame.fromBufMeta) {
           auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
           if (bufferItr == stream->retransmissionBuffer.end()) {
-            // It's possible that the stream was reset or data on the stream was
-            // skipped while we discovered that its packet was lost so we might
-            // not have the offset.
             break;
           }
           if (!streamRetransmissionDisabled(conn, *stream)) {
@@ -185,10 +208,6 @@ void markPacketLoss(
           if (retxBufMetaItr == stream->retransmissionBufMetas.end()) {
             break;
           }
-          auto& bufMeta = retxBufMetaItr->second;
-          CHECK_EQ(bufMeta.offset, frame.offset);
-          CHECK_EQ(bufMeta.length, frame.len);
-          CHECK_EQ(bufMeta.eof, frame.fin);
           if (!streamRetransmissionDisabled(conn, *stream)) {
             stream->insertIntoLossBufMeta(retxBufMetaItr->second);
           }
@@ -213,8 +232,6 @@ void markPacketLoss(
 
         auto bufferItr = cryptoStream->retransmissionBuffer.find(frame.offset);
         if (bufferItr == cryptoStream->retransmissionBuffer.end()) {
-          // It's possible that the stream was reset while we discovered that
-          // it's packet was lost so we might not have the offset.
           break;
         }
         DCHECK_EQ(bufferItr->second->offset, frame.offset);
@@ -227,14 +244,18 @@ void markPacketLoss(
         if (processed) {
           break;
         }
-        auto stream = conn.streamManager->getStream(frame.streamId);
+        streamResult = conn.streamManager->getStream(frame.streamId);
+        if (streamResult.hasError()) {
+          VLOG(4) << "Failed to get stream " << frame.streamId
+                  << " in markPacketLoss (RstStreamFrame): "
+                  << streamResult.error().message;
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto* stream = streamResult.value();
         if (!stream) {
-          // If the stream is dead, ignore the retransmissions of the rst
-          // stream.
           break;
         }
-        // Add the lost RstStreamFrame back to pendingEvents:
-        conn.pendingEvents.resets.insert({frame.streamId, frame});
+        conn.pendingEvents.resets.emplace(frame.streamId, frame);
         break;
       }
       case QuicWriteFrame::Type::StreamDataBlockedFrame: {
@@ -242,7 +263,14 @@ void markPacketLoss(
         if (processed) {
           break;
         }
-        auto stream = conn.streamManager->getStream(frame.streamId);
+        streamResult = conn.streamManager->getStream(frame.streamId);
+        if (streamResult.hasError()) {
+          VLOG(4) << "Failed to get stream " << frame.streamId
+                  << " in markPacketLoss (StreamDataBlockedFrame): "
+                  << streamResult.error().message;
+          return folly::makeUnexpected(streamResult.error());
+        }
+        auto* stream = streamResult.value();
         if (!stream) {
           break;
         }
@@ -258,17 +286,17 @@ void markPacketLoss(
         break;
       }
       default:
-        // ignore the rest of the frames.
         break;
     }
   }
+  return folly::unit;
 }
 
 /**
  * Processes outstandings for loss and returns true if the loss timer should be
  * set. False otherwise.
  */
-bool processOutstandingsForLoss(
+folly::Expected<bool, QuicError> processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
@@ -299,7 +327,6 @@ bool processOutstandingsForLoss(
       iter++;
       continue;
     }
-
     // We now have to determine the largest ACKed packet number we should use
     // for the reordering threshold loss determination.
     auto maybeStreamFrame = pkt.packet.frames.empty()
@@ -342,6 +369,7 @@ bool processOutstandingsForLoss(
     largestAckedForComparison =
         std::max(largestAckedForComparison, currentPacketNum);
 
+    // TODO, should we ignore this if srtt == 0?
     bool lostByTimeout = (lossTime - pkt.metadata.time) > delayUntilLost;
     const auto reorderDistance = largestAckedForComparison - currentPacketNum;
     auto reorderingThreshold = conn.lossState.reorderingThreshold;
@@ -368,15 +396,19 @@ bool processOutstandingsForLoss(
       CHECK(conn.outstandings.clonedPacketCount[pnSpace]);
       --conn.outstandings.clonedPacketCount[pnSpace];
     }
+
     // Invoke LossVisitor if the packet doesn't have a associated
     // ClonedPacketIdentifier; or if the ClonedPacketIdentifier is present in
     // conn.outstandings.clonedPacketIdentifiers.
     bool processed = pkt.maybeClonedPacketIdentifier &&
         !conn.outstandings.clonedPacketIdentifiers.count(
             *pkt.maybeClonedPacketIdentifier);
-    lossVisitor(conn, pkt.packet, processed);
-    // Remove the ClonedPacketIdentifier from the
-    // outstandings.clonedPacketIdentifiers set
+
+    auto visitorResult = lossVisitor(conn, pkt.packet, processed);
+    if (visitorResult.hasError()) {
+      return folly::makeUnexpected(visitorResult.error());
+    }
+
     if (pkt.maybeClonedPacketIdentifier) {
       conn.outstandings.clonedPacketIdentifiers.erase(
           *pkt.maybeClonedPacketIdentifier);
@@ -385,6 +417,7 @@ bool processOutstandingsForLoss(
       CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
       --conn.outstandings.packetCount[currentPacketNumberSpace];
     }
+
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum;
     // Rather than erasing here, instead mark the packet as lost so we can
     // determine if this was spurious later.
@@ -416,7 +449,8 @@ bool processOutstandingsForLoss(
  * This function should be invoked after some event that is possible to
  * trigger loss detection, for example: packets are acked
  */
-Optional<CongestionController::LossEvent> detectLossPackets(
+folly::Expected<Optional<CongestionController::LossEvent>, QuicError>
+detectLossPackets(
     QuicConnectionStateBase& conn,
     const AckState& ackState,
     const LossVisitor& lossVisitor,
@@ -443,6 +477,7 @@ Optional<CongestionController::LossEvent> detectLossPackets(
       observerLossEvent.emplace(lossTime);
     }
   }
+
   // Note that time based loss detection is also within the same PNSpace.
 
   // Loop over all ACKed packets and collect the largest ACKed packet per DSR
@@ -451,7 +486,7 @@ Optional<CongestionController::LossEvent> detectLossPackets(
   // multiple DSR senders. Similarly track the largest non-DSR ACKed, for the
   // reason but when DSR packets are reordered "before" non-DSR packets.
   // These two variables hold DSR and non-DSR sequence numbers not actual packet
-  // numbers
+  // numbers  InlineMap<StreamId, PacketNum, 20> largestDsrAckedSeqNo;
   InlineMap<StreamId, PacketNum, 20> largestDsrAckedSeqNo;
   Optional<PacketNum> largestNonDsrAckedSeqNo;
   if (ackEvent) {
@@ -485,7 +520,7 @@ Optional<CongestionController::LossEvent> detectLossPackets(
 
   bool shouldSetTimer = false;
   if (ackState.largestAckedByPeer.has_value()) {
-    shouldSetTimer = processOutstandingsForLoss(
+    auto processResult = processOutstandingsForLoss(
         conn,
         *ackState.largestAckedByPeer,
         pnSpace,
@@ -493,13 +528,17 @@ Optional<CongestionController::LossEvent> detectLossPackets(
         largestNonDsrAckedSeqNo,
         lossTime,
         rttSample,
-        lossVisitor,
+        lossVisitor, // Pass the visitor (which returns Expected)
         delayUntilLost,
         lossEvent,
         observerLossEvent);
+
+    if (processResult.hasError()) {
+      return folly::makeUnexpected(processResult.error());
+    }
+    shouldSetTimer = processResult.value();
   }
 
-  // notify observers
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
     if (observerLossEvent && observerLossEvent->hasPackets() &&
@@ -508,7 +547,7 @@ Optional<CongestionController::LossEvent> detectLossPackets(
             SocketObserverInterface::Events::lossEvents>()) {
       socketObserverContainer
           ->invokeInterfaceMethod<SocketObserverInterface::Events::lossEvents>(
-              [observerLossEvent](auto observer, auto observed) {
+              [&](auto observer, auto observed) {
                 observer->packetLossDetected(observed, *observerLossEvent);
               });
     }
@@ -526,6 +565,7 @@ Optional<CongestionController::LossEvent> detectLossPackets(
       break;
     }
   }
+
   if (shouldSetTimer && earliest != conn.outstandings.packets.end()) {
     // We are eligible to set a loss timer and there are a few packets which
     // are unacked, so we can set the early retransmit timer for them.
@@ -534,6 +574,7 @@ Optional<CongestionController::LossEvent> detectLossPackets(
              << delayUntilLost.count() << "us" << " " << conn;
     getLossTime(conn, pnSpace) = delayUntilLost + earliest->metadata.time;
   }
+
   if (lossEvent.largestLostPacketNum.hasValue()) {
     DCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
     if (conn.qLogger) {
@@ -551,7 +592,8 @@ Optional<CongestionController::LossEvent> detectLossPackets(
   return none;
 }
 
-Optional<CongestionController::LossEvent> handleAckForLoss(
+folly::Expected<Optional<CongestionController::LossEvent>, QuicError>
+handleAckForLoss(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor,
     CongestionController::AckEvent& ack,
@@ -574,8 +616,13 @@ Optional<CongestionController::LossEvent> handleAckForLoss(
           largestNewlyAckedPacket->nonDsrPacketSequenceNumber);
     }
   }
-  auto lossEvent = detectLossPackets(
+  auto lossEventResult = detectLossPackets(
       conn, ackState, lossVisitor, ack.ackTime, pnSpace, &ack);
+
+  if (lossEventResult.hasError()) {
+    return folly::makeUnexpected(lossEventResult.error());
+  }
+
   conn.pendingEvents.setLossDetectionAlarm =
       conn.outstandings.numOutstanding() > 0;
   VLOG(10) << __func__ << " largestAckedInPacket="
@@ -588,7 +635,7 @@ Optional<CongestionController::LossEvent> handleAckForLoss(
            << " handshakePackets="
            << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
            << conn;
-  return lossEvent;
-}
 
+  return lossEventResult.value();
+}
 } // namespace quic
