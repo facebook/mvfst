@@ -327,13 +327,8 @@ StreamTypeField StreamTypeField::Builder::build() {
  * associated data during aead encryption/decryption.
  */
 Buf QuicAddrValidationToken::getPlaintextToken() const {
-  auto buf = std::make_unique<folly::IOBuf>();
-  folly::io::Appender appender(buf.get(), sizeof(uint64_t));
-
-  // Write the timestamp
-  appender.writeBE<uint64_t>(timestampInMs);
-
-  return buf;
+  auto ts = folly::Endian::big(timestampInMs);
+  return folly::IOBuf::copyBuffer(&ts, sizeof(ts));
 }
 
 Buf RetryToken::genAeadAssocData() const {
