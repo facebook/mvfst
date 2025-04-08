@@ -133,6 +133,9 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
         static_cast<const HTTPPriorityQueue::Priority&>(p2);
   }
 
+  [[nodiscard]] PriorityLogFields toLogFields(
+      const PriorityQueue::Priority& pri) const override;
+
   [[nodiscard]] bool contains(Identifier id) const override {
     return find(id) != quic::none;
   }

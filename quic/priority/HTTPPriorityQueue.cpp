@@ -13,6 +13,21 @@ constexpr size_t kDestroyIndexThreshold = 50;
 } // namespace
 
 namespace quic {
+PriorityQueue::PriorityLogFields HTTPPriorityQueue::toLogFields(
+    const PriorityQueue::Priority& pri) const {
+  // This is defined by the QLOG schema
+  auto httpPri = static_cast<const HTTPPriorityQueue::Priority&>(pri);
+  if (httpPri->paused) {
+    return {{"paused", "true"}};
+  }
+  PriorityLogFields result;
+  result.reserve(3);
+  result.emplace_back("urgency", std::to_string(httpPri->urgency));
+  result.emplace_back("incremental", httpPri->incremental ? "true" : "false");
+  result.emplace_back("order", std::to_string(httpPri->order));
+
+  return result;
+}
 
 quic::Optional<HTTPPriorityQueue::FindResult> HTTPPriorityQueue::find(
     Identifier id) const {

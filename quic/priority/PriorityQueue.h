@@ -10,6 +10,7 @@
 #include <glog/logging.h>
 #include <quic/common/Optional.h>
 #include <array>
+#include <vector>
 
 namespace quic {
 /*
@@ -162,6 +163,11 @@ class PriorityQueue {
 
   // Returns true if the queue contains no elements, false otherwise
   [[nodiscard]] virtual bool empty() const = 0;
+
+  // Convert the Priority to JSON string.
+  using PriorityLogFields = std::vector<std::pair<std::string, std::string>>;
+  [[nodiscard]] virtual PriorityLogFields toLogFields(
+      const Priority& pri) const = 0;
 
   // Compare two Priority's for equality
   [[nodiscard]] virtual bool equalPriority(

@@ -306,4 +306,40 @@ TEST_F(HTTPPriorityQueueTest, IndexEverything) {
   queue_.erase(Identifier::fromStreamID(199));
   EXPECT_TRUE(queue_.empty());
 }
+
+TEST_F(HTTPPriorityQueueTest, ToLogFields) {
+  // Test for PAUSED priority
+  HTTPPriorityQueue::Priority pausedPriority(
+      HTTPPriorityQueue::Priority::PAUSED);
+  auto lookup =
+      [](const std::vector<std::pair<std::string, std::string>>& fields,
+         const std::string& key) {
+        auto it = std::find_if(
+            fields.begin(),
+            fields.end(),
+            [&key](const std::pair<std::string, std::string>& field) {
+              return field.first == key;
+            });
+        if (it != fields.end()) {
+          return it->second;
+        }
+        return std::string{};
+      };
+
+  auto fieldsPaused = queue_.toLogFields(pausedPriority);
+  EXPECT_EQ(lookup(fieldsPaused, "paused"), "true");
+
+  // Test for regular priority
+  HTTPPriorityQueue::Priority regularPriority1(3, true, 0);
+  auto fieldsRegular1 = queue_.toLogFields(regularPriority1);
+  EXPECT_EQ(lookup(fieldsRegular1, "urgency"), "3");
+  EXPECT_EQ(lookup(fieldsRegular1, "incremental"), "true");
+  EXPECT_EQ(lookup(fieldsRegular1, "order"), "0");
+
+  HTTPPriorityQueue::Priority regularPriority2(4, false, 5);
+  auto fieldsRegular2 = queue_.toLogFields(regularPriority2);
+  EXPECT_EQ(lookup(fieldsRegular2, "urgency"), "4");
+  EXPECT_EQ(lookup(fieldsRegular2, "incremental"), "false");
+  EXPECT_EQ(lookup(fieldsRegular2, "order"), "5");
+}
 } // namespace
