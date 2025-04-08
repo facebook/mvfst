@@ -38,17 +38,17 @@ class Bbr2CongestionController : public CongestionController {
       const AckEvent* FOLLY_NULLABLE ackEvent,
       const LossEvent* FOLLY_NULLABLE lossEvent) override;
 
-  FOLLY_NODISCARD uint64_t getWritableBytes() const noexcept override;
+  [[nodiscard]] uint64_t getWritableBytes() const noexcept override;
 
-  FOLLY_NODISCARD uint64_t getCongestionWindow() const noexcept override;
+  [[nodiscard]] uint64_t getCongestionWindow() const noexcept override;
 
-  FOLLY_NODISCARD CongestionControlType type() const noexcept override;
+  [[nodiscard]] CongestionControlType type() const noexcept override;
 
-  FOLLY_NODISCARD bool isAppLimited() const override;
+  [[nodiscard]] bool isAppLimited() const override;
 
-  FOLLY_NODISCARD Optional<Bandwidth> getBandwidth() const override;
+  [[nodiscard]] Optional<Bandwidth> getBandwidth() const override;
 
-  FOLLY_NODISCARD uint64_t getBDP() const override;
+  [[nodiscard]] uint64_t getBDP() const override;
 
   void setAppLimited() noexcept override;
 

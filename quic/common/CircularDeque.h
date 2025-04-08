@@ -92,11 +92,11 @@ struct CircularDeque {
     CircularDequeIterator(const CircularDeque<U>* deque, size_type index)
         : deque_(deque), index_(index) {}
 
-    FOLLY_NODISCARD U& dereference() const {
+    [[nodiscard]] U& dereference() const {
       return const_cast<U&>(deque_->storage_[index_]);
     }
 
-    FOLLY_NODISCARD bool equal(const CircularDequeIterator<U>& other) const {
+    [[nodiscard]] bool equal(const CircularDequeIterator<U>& other) const {
       return deque_ == other.deque_ && index_ == other.index_;
     }
 
@@ -134,8 +134,8 @@ struct CircularDeque {
       }
     }
 
-    FOLLY_NODISCARD difference_type
-    distance_to(const CircularDequeIterator<U>& other) const {
+    [[nodiscard]] difference_type distance_to(
+        const CircularDequeIterator<U>& other) const {
       if (index_ == other.index_) {
         return 0;
       }
@@ -162,7 +162,7 @@ struct CircularDeque {
     friend struct CircularDeque<U>;
     friend struct CircularDeque<typename std::remove_const<U>::type>;
 
-    FOLLY_NODISCARD inline bool wrapped() const {
+    [[nodiscard]] inline bool wrapped() const {
       return deque_->begin_ > deque_->end_;
     }
 
@@ -175,10 +175,10 @@ struct CircularDeque {
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  FOLLY_NODISCARD bool empty() const noexcept;
-  FOLLY_NODISCARD size_type size() const noexcept;
+  [[nodiscard]] bool empty() const noexcept;
+  [[nodiscard]] size_type size() const noexcept;
 
-  FOLLY_NODISCARD size_type max_size() const noexcept;
+  [[nodiscard]] size_type max_size() const noexcept;
   void resize(size_type count);
   // Missing compared to std::deque:
   // resize(size_t, const T&);
@@ -186,25 +186,25 @@ struct CircularDeque {
 
   const_reference operator[](size_type index) const;
   reference operator[](size_type index);
-  FOLLY_NODISCARD const_reference at(size_type index) const;
-  FOLLY_NODISCARD reference at(size_type index);
-  FOLLY_NODISCARD const_reference front() const;
-  FOLLY_NODISCARD reference front();
-  FOLLY_NODISCARD const_reference back() const;
-  FOLLY_NODISCARD reference back();
+  [[nodiscard]] const_reference at(size_type index) const;
+  [[nodiscard]] reference at(size_type index);
+  [[nodiscard]] const_reference front() const;
+  [[nodiscard]] reference front();
+  [[nodiscard]] const_reference back() const;
+  [[nodiscard]] reference back();
 
-  FOLLY_NODISCARD iterator begin() noexcept;
-  FOLLY_NODISCARD const_iterator begin() const noexcept;
-  FOLLY_NODISCARD iterator end() noexcept;
-  FOLLY_NODISCARD const_iterator end() const noexcept;
-  FOLLY_NODISCARD const_iterator cbegin() const noexcept;
-  FOLLY_NODISCARD const_iterator cend() const noexcept;
-  FOLLY_NODISCARD reverse_iterator rbegin() noexcept;
-  FOLLY_NODISCARD const_reverse_iterator rbegin() const noexcept;
-  FOLLY_NODISCARD const_reverse_iterator crbegin() const noexcept;
-  FOLLY_NODISCARD reverse_iterator rend() noexcept;
-  FOLLY_NODISCARD const_reverse_iterator rend() const noexcept;
-  FOLLY_NODISCARD const_reverse_iterator crend() const noexcept;
+  [[nodiscard]] iterator begin() noexcept;
+  [[nodiscard]] const_iterator begin() const noexcept;
+  [[nodiscard]] iterator end() noexcept;
+  [[nodiscard]] const_iterator end() const noexcept;
+  [[nodiscard]] const_iterator cbegin() const noexcept;
+  [[nodiscard]] const_iterator cend() const noexcept;
+  [[nodiscard]] reverse_iterator rbegin() noexcept;
+  [[nodiscard]] const_reverse_iterator rbegin() const noexcept;
+  [[nodiscard]] const_reverse_iterator crbegin() const noexcept;
+  [[nodiscard]] reverse_iterator rend() noexcept;
+  [[nodiscard]] const_reverse_iterator rend() const noexcept;
+  [[nodiscard]] const_reverse_iterator crend() const noexcept;
 
   template <class... Args>
   reference emplace_front(Args&&... args);
@@ -235,7 +235,7 @@ struct CircularDeque {
   void swap(CircularDeque<T>& other) noexcept;
 
  private:
-  FOLLY_NODISCARD bool needSpace() const noexcept;
+  [[nodiscard]] bool needSpace() const noexcept;
 
   template <
       typename U = T,

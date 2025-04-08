@@ -499,13 +499,13 @@ class QuicSocketLite {
   /**
    * Get the number of pending byte events for the given stream.
    */
-  FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(
+  [[nodiscard]] virtual size_t getNumByteEventCallbacksForStream(
       const StreamId streamId) const = 0;
 
   /**
    * Get the number of pending byte events of specified type for given stream.
    */
-  FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(
+  [[nodiscard]] virtual size_t getNumByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId streamId) const = 0;
 
@@ -781,7 +781,7 @@ class QuicSocketLite {
   /**
    * Can Knob Frames be exchanged with the peer on this connection?
    */
-  FOLLY_NODISCARD virtual bool isKnobSupported() const = 0;
+  [[nodiscard]] virtual bool isKnobSupported() const = 0;
 
   /**
    * Set stream priority.
@@ -851,7 +851,7 @@ class QuicSocketLite {
   /**
    * Get the cert presented by peer
    */
-  FOLLY_NODISCARD virtual const std::shared_ptr<
+  [[nodiscard]] virtual const std::shared_ptr<
       const folly::AsyncTransportCertificate>
   getPeerCertificate() const {
     return nullptr;
@@ -860,7 +860,7 @@ class QuicSocketLite {
   /**
    * Get the cert presented by self
    */
-  FOLLY_NODISCARD virtual const std::shared_ptr<
+  [[nodiscard]] virtual const std::shared_ptr<
       const folly::AsyncTransportCertificate>
   getSelfCertificate() const {
     return nullptr;
@@ -919,7 +919,7 @@ class QuicSocketLite {
   /**
    * Returns varios stats of the connection.
    */
-  FOLLY_NODISCARD virtual QuicConnectionStats getConnectionsStats() const = 0;
+  [[nodiscard]] virtual QuicConnectionStats getConnectionsStats() const = 0;
 
   using Observer = SocketObserverContainer::Observer;
   using ManagedObserver = SocketObserverContainer::ManagedObserver;

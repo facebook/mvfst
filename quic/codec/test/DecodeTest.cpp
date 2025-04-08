@@ -589,10 +589,12 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksOverflow) {
       firstAckBlockLength,
       ackBlocks);
   folly::io::Cursor cursor(result.get());
-  decodeAckFrame(
-      cursor,
-      makeHeader(),
-      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  ASSERT_FALSE(
+      decodeAckFrame(
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST))
+          .hasError());
 }
 
 TEST_F(DecodeTest, AckFrameMissingFields) {
@@ -944,14 +946,14 @@ TEST_F(DecodeTest, PaddingFrameTest) {
   memset(buf->writableData(), 0, 1);
 
   folly::io::Cursor cursor(buf.get());
-  decodePaddingFrame(cursor);
+  ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
 }
 
 TEST_F(DecodeTest, PaddingFrameNoBytesTest) {
   auto buf = folly::IOBuf::create(sizeof(UnderlyingFrameType));
 
   folly::io::Cursor cursor(buf.get());
-  decodePaddingFrame(cursor);
+  ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
 }
 
 TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
@@ -963,7 +965,7 @@ TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
   memset(buf->writableData() + 10, 5, 1);
 
   folly::io::Cursor cursor(buf.get());
-  decodePaddingFrame(cursor);
+  ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
   // If we encountered an interleaved frame, leave the whole thing
   // as is
   EXPECT_EQ(cursor.totalLength(), 11);
@@ -975,7 +977,7 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
   memset(buf->writableData(), 0, 10);
 
   folly::io::Cursor cursor(buf.get());
-  decodePaddingFrame(cursor);
+  ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
   EXPECT_EQ(cursor.totalLength(), 0);
 }
 

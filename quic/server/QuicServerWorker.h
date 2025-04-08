@@ -715,7 +715,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     /**
      * Get reference to vector containing observers.
      */
-    FOLLY_NODISCARD const std::vector<AcceptObserver*>& getAll() const {
+    [[nodiscard]] const std::vector<AcceptObserver*>& getAll() const {
       return observers_;
     }
 

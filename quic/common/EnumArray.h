@@ -35,7 +35,7 @@ class EnumArray : public std::array<V, size_t(K::MAX) + 1> {
   }
 
   // Returns all valid values for the enum
-  FOLLY_NODISCARD constexpr std::array<K, ArraySize> keys() const {
+  [[nodiscard]] constexpr std::array<K, ArraySize> keys() const {
     return keyArrayHelper(std::make_integer_sequence<IntType, ArraySize>{});
   }
 

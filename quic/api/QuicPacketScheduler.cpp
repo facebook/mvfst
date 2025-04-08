@@ -53,15 +53,15 @@ class MiddleStartingIterationWrapper {
       wrappedAround_ = false;
     }
 
-    FOLLY_NODISCARD const MapType::value_type& dereference() const {
+    [[nodiscard]] const MapType::value_type& dereference() const {
       return *itr_;
     }
 
-    FOLLY_NODISCARD MapType::const_iterator rawIterator() const {
+    [[nodiscard]] MapType::const_iterator rawIterator() const {
       return itr_;
     }
 
-    FOLLY_NODISCARD bool equal(const MiddleStartingIterator& other) const {
+    [[nodiscard]] bool equal(const MiddleStartingIterator& other) const {
       return wrappedAround_ == other.wrappedAround_ && itr_ == other.itr_;
     }
 
@@ -94,11 +94,11 @@ class MiddleStartingIterationWrapper {
       const MapType::const_iterator& start)
       : streams_(streams), start_(&streams_, start) {}
 
-  FOLLY_NODISCARD MiddleStartingIterator cbegin() const {
+  [[nodiscard]] MiddleStartingIterator cbegin() const {
     return start_;
   }
 
-  FOLLY_NODISCARD MiddleStartingIterator cend() const {
+  [[nodiscard]] MiddleStartingIterator cend() const {
     MiddleStartingIterator itr(start_);
     itr.wrappedAround_ = true;
     return itr;

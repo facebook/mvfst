@@ -453,7 +453,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // Number of probing packets to send after PTO
     EnumArray<PacketNumberSpace, uint8_t> numProbePackets{};
 
-    FOLLY_NODISCARD bool anyProbePackets() const {
+    [[nodiscard]] bool anyProbePackets() const {
       return numProbePackets[PacketNumberSpace::Initial] +
           numProbePackets[PacketNumberSpace::Handshake] +
           numProbePackets[PacketNumberSpace::AppData];

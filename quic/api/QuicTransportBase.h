@@ -181,7 +181,7 @@ class QuicTransportBase : public QuicSocket,
    * Returns the maximum allowed Datagram payload size.
    * 0 means Datagram is not supported
    */
-  FOLLY_NODISCARD uint16_t getDatagramSizeLimit() const override;
+  [[nodiscard]] uint16_t getDatagramSizeLimit() const override;
 
   /**
    * Writes a Datagram frame. If buf is larger than the size limit returned by

@@ -538,15 +538,15 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   // Whether this stream has non-DSR data in the write buffer or loss buffer.
-  FOLLY_NODISCARD bool hasSchedulableData() const {
+  [[nodiscard]] bool hasSchedulableData() const {
     return hasWritableData() || !lossBuffer.empty();
   }
 
-  FOLLY_NODISCARD bool hasSchedulableDsr() const {
+  [[nodiscard]] bool hasSchedulableDsr() const {
     return hasWritableBufMeta() || !lossBufMetas.empty();
   }
 
-  FOLLY_NODISCARD bool hasWritableBufMeta() const {
+  [[nodiscard]] bool hasWritableBufMeta() const {
     if (writeBufMeta.offset == 0) {
       return false;
     }
@@ -560,7 +560,7 @@ struct QuicStreamState : public QuicStreamLike {
     return false;
   }
 
-  FOLLY_NODISCARD bool hasSentFIN() const {
+  [[nodiscard]] bool hasSentFIN() const {
     if (!finalWriteOffset) {
       return false;
     }
@@ -568,11 +568,11 @@ struct QuicStreamState : public QuicStreamLike {
         writeBufMeta.offset > *finalWriteOffset;
   }
 
-  FOLLY_NODISCARD bool hasLoss() const {
+  [[nodiscard]] bool hasLoss() const {
     return !lossBuffer.empty() || !lossBufMetas.empty();
   }
 
-  FOLLY_NODISCARD uint64_t nextOffsetToWrite() const {
+  [[nodiscard]] uint64_t nextOffsetToWrite() const {
     // The stream has never had WriteBufferMetas. Then currentWriteOffset
     // always points to the next offset we send. This of course relies on the
     // current contract of DSR: Real data always comes first. This code (and a

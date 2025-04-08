@@ -16,7 +16,7 @@ class DSRStreamFrameScheduler {
  public:
   explicit DSRStreamFrameScheduler(QuicServerConnectionState& conn);
 
-  FOLLY_NODISCARD bool hasPendingData() const;
+  [[nodiscard]] bool hasPendingData() const;
 
   struct SchedulingResult {
     bool writeSuccess{false};

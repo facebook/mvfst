@@ -59,7 +59,7 @@ class PacketBuilderInterface {
           body(std::move(bodyIn)) {}
   };
 
-  FOLLY_NODISCARD virtual uint32_t remainingSpaceInPkt() const = 0;
+  [[nodiscard]] virtual uint32_t remainingSpaceInPkt() const = 0;
 
   virtual void encodePacketHeader() = 0;
 
@@ -87,7 +87,7 @@ class PacketBuilderInterface {
   virtual void markNonEmpty() = 0;
 
   // Returns the packet header for the current packet.
-  FOLLY_NODISCARD virtual const PacketHeader& getPacketHeader() const = 0;
+  [[nodiscard]] virtual const PacketHeader& getPacketHeader() const = 0;
 
   virtual void accountForCipherOverhead(uint8_t overhead) = 0;
 
@@ -95,7 +95,7 @@ class PacketBuilderInterface {
    * Whether the packet builder is able to build a packet. This should be
    * checked right after the creation of a packet builder object.
    */
-  FOLLY_NODISCARD virtual bool canBuildPacket() const noexcept = 0;
+  [[nodiscard]] virtual bool canBuildPacket() const noexcept = 0;
 
   /**
    * Return an estimated header bytes count.
@@ -106,9 +106,9 @@ class PacketBuilderInterface {
    * of header bytes already written, the maximum possible packet length field
    * bytes count and packet number field bytes count.
    */
-  FOLLY_NODISCARD virtual uint32_t getHeaderBytes() const = 0;
+  [[nodiscard]] virtual uint32_t getHeaderBytes() const = 0;
 
-  FOLLY_NODISCARD virtual bool hasFramesPending() const = 0;
+  [[nodiscard]] virtual bool hasFramesPending() const = 0;
 
   virtual Packet buildPacket() && = 0;
 
@@ -130,7 +130,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
       uint8_t frameHint = 0);
 
   // PacketBuilderInterface
-  FOLLY_NODISCARD uint32_t remainingSpaceInPkt() const override;
+  [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
 
   void encodePacketHeader() override;
 
@@ -155,17 +155,17 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   void appendFrame(QuicWriteFrame frame) override;
   void appendPaddingFrame() override;
   void markNonEmpty() override;
-  FOLLY_NODISCARD const PacketHeader& getPacketHeader() const override;
+  [[nodiscard]] const PacketHeader& getPacketHeader() const override;
 
   PacketBuilderInterface::Packet buildPacket() && override;
 
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
+  [[nodiscard]] bool canBuildPacket() const noexcept override;
 
   void accountForCipherOverhead(uint8_t overhead) noexcept override;
 
-  FOLLY_NODISCARD uint32_t getHeaderBytes() const override;
+  [[nodiscard]] uint32_t getHeaderBytes() const override;
 
-  FOLLY_NODISCARD bool hasFramesPending() const override;
+  [[nodiscard]] bool hasFramesPending() const override;
 
   void releaseOutputBuffer() && override;
 
@@ -208,12 +208,12 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
       PacketNum largestAckedPacketNum,
       uint8_t frameHint = 0);
 
-  FOLLY_NODISCARD uint32_t getHeaderBytes() const override;
+  [[nodiscard]] uint32_t getHeaderBytes() const override;
 
   void encodePacketHeader() override;
 
   // PacketBuilderInterface
-  FOLLY_NODISCARD uint32_t remainingSpaceInPkt() const override;
+  [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
 
   void writeBE(uint8_t data) override;
   void writeBE(uint16_t data) override;
@@ -237,18 +237,18 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void appendFrame(QuicWriteFrame frame) override;
   void appendPaddingFrame() override;
   void markNonEmpty() override;
-  FOLLY_NODISCARD const PacketHeader& getPacketHeader() const override;
+  [[nodiscard]] const PacketHeader& getPacketHeader() const override;
 
   Packet buildPacket() && override;
   /**
    * Whether the packet builder is able to build a packet. This should be
    * checked right after the creation of a packet builder object.
    */
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
+  [[nodiscard]] bool canBuildPacket() const noexcept override;
 
   void accountForCipherOverhead(uint8_t overhead) noexcept override;
 
-  FOLLY_NODISCARD bool hasFramesPending() const override;
+  [[nodiscard]] bool hasFramesPending() const override;
 
   void releaseOutputBuffer() && override;
 
@@ -283,7 +283,7 @@ class WrapperPacketBuilderInterface {
 
   virtual ~WrapperPacketBuilderInterface() = default;
 
-  FOLLY_NODISCARD virtual bool canBuildPacket() const noexcept = 0;
+  [[nodiscard]] virtual bool canBuildPacket() const noexcept = 0;
 
   virtual Packet buildPacket() && = 0;
 };
@@ -307,7 +307,7 @@ class RegularSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
    * Returns true when packet has short header, and that enforced size >
    * current packet size + cipher overhead, otherwise false
    */
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
+  [[nodiscard]] bool canBuildPacket() const noexcept override;
 
   Packet buildPacket() && override;
 
@@ -341,7 +341,7 @@ class InplaceSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
    * packet size + cipher oveahead and that iobuf has enough tailroom,
    * otherwise false
    */
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
+  [[nodiscard]] bool canBuildPacket() const noexcept override;
 
   Packet buildPacket() && override;
 
@@ -370,12 +370,12 @@ class VersionNegotiationPacketBuilder {
    * Whether the packet builder is able to build a packet. This should be
    * checked right after the creation of a packet builder object.
    */
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept;
+  [[nodiscard]] bool canBuildPacket() const noexcept;
 
  private:
   void writeVersionNegotiationPacket(const std::vector<QuicVersion>& versions);
 
-  FOLLY_NODISCARD uint8_t generateRandomPacketType() const;
+  [[nodiscard]] uint8_t generateRandomPacketType() const;
 
  private:
   uint32_t remainingBytes_;
@@ -429,7 +429,7 @@ class RetryPacketBuilder {
    * Whether the RetryPacketBuilder is able to build a packet. This should be
    * checked right after the creation of the RetryPacketBuilder.
    */
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept;
+  [[nodiscard]] bool canBuildPacket() const noexcept;
 
  private:
   void writeRetryPacket();
@@ -475,7 +475,7 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
                 ? 0
                 : builder.remainingSpaceInPkt() - writableBytes) {}
 
-  FOLLY_NODISCARD uint32_t remainingSpaceInPkt() const override {
+  [[nodiscard]] uint32_t remainingSpaceInPkt() const override {
     return builder.remainingSpaceInPkt() > diff
         ? builder.remainingSpaceInPkt() - diff
         : 0;
@@ -548,7 +548,7 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     builder.push(data, len);
   }
 
-  FOLLY_NODISCARD const PacketHeader& getPacketHeader() const override {
+  [[nodiscard]] const PacketHeader& getPacketHeader() const override {
     return builder.getPacketHeader();
   }
 
@@ -560,15 +560,15 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     builder.accountForCipherOverhead(overhead);
   }
 
-  FOLLY_NODISCARD bool canBuildPacket() const noexcept override {
+  [[nodiscard]] bool canBuildPacket() const noexcept override {
     return builder.canBuildPacket();
   }
 
-  FOLLY_NODISCARD uint32_t getHeaderBytes() const override {
+  [[nodiscard]] uint32_t getHeaderBytes() const override {
     return builder.getHeaderBytes();
   }
 
-  FOLLY_NODISCARD bool hasFramesPending() const override {
+  [[nodiscard]] bool hasFramesPending() const override {
     return builder.hasFramesPending();
   }
 

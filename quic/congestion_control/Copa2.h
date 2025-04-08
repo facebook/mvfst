@@ -31,17 +31,17 @@ class Copa2 : public CongestionController {
     onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
   }
 
-  FOLLY_NODISCARD uint64_t getWritableBytes() const noexcept override;
-  FOLLY_NODISCARD uint64_t getCongestionWindow() const noexcept override;
-  FOLLY_NODISCARD CongestionControlType type() const noexcept override;
+  [[nodiscard]] uint64_t getWritableBytes() const noexcept override;
+  [[nodiscard]] uint64_t getCongestionWindow() const noexcept override;
+  [[nodiscard]] CongestionControlType type() const noexcept override;
 
   void setAppIdle(bool, TimePoint) noexcept override;
   void setAppLimited() override;
-  FOLLY_NODISCARD bool isAppLimited() const noexcept override;
+  [[nodiscard]] bool isAppLimited() const noexcept override;
 
-  FOLLY_NODISCARD bool inLossyMode() const noexcept;
-  FOLLY_NODISCARD bool inProbeRtt() const noexcept;
-  FOLLY_NODISCARD uint64_t getBytesInFlight() const noexcept;
+  [[nodiscard]] bool inLossyMode() const noexcept;
+  [[nodiscard]] bool inProbeRtt() const noexcept;
+  [[nodiscard]] uint64_t getBytesInFlight() const noexcept;
 
   void getStats(CongestionControllerStats& stats) const override;
 

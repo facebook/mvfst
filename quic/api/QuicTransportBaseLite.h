@@ -212,7 +212,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   /**
    * Can Knob Frames be exchanged with the peer on this connection?
    */
-  FOLLY_NODISCARD bool isKnobSupported() const override;
+  [[nodiscard]] bool isKnobSupported() const override;
 
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
@@ -434,13 +434,13 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   /**
    * Get the number of pending byte events for the given stream.
    */
-  FOLLY_NODISCARD size_t
-  getNumByteEventCallbacksForStream(const StreamId id) const override;
+  [[nodiscard]] size_t getNumByteEventCallbacksForStream(
+      const StreamId id) const override;
 
   /**
    * Get the number of pending byte events of specified type for given stream.
    */
-  FOLLY_NODISCARD size_t getNumByteEventCallbacksForStream(
+  [[nodiscard]] size_t getNumByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id) const override;
 
@@ -469,7 +469,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
 
-  FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
+  [[nodiscard]] QuicConnectionStats getConnectionsStats() const override;
 
   /**
    * Returns a shared_ptr which can be used as a guard to keep this
@@ -826,7 +826,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   using ByteEventMap = folly::F14FastMap<StreamId, std::deque<ByteEventDetail>>;
   ByteEventMap& getByteEventMap(const ByteEvent::Type type);
-  FOLLY_NODISCARD const ByteEventMap& getByteEventMapConst(
+  [[nodiscard]] const ByteEventMap& getByteEventMapConst(
       const ByteEvent::Type type) const;
 
   ByteEventMap deliveryCallbacks_;

@@ -794,9 +794,9 @@ struct QuicAddrValidationToken {
   QuicAddrValidationToken& operator=(const QuicAddrValidationToken& other) =
       default;
 
-  FOLLY_NODISCARD Buf getPlaintextToken() const;
-  FOLLY_NODISCARD virtual TokenType getTokenType() const = 0;
-  FOLLY_NODISCARD virtual Buf genAeadAssocData() const = 0;
+  [[nodiscard]] Buf getPlaintextToken() const;
+  [[nodiscard]] virtual TokenType getTokenType() const = 0;
+  [[nodiscard]] virtual Buf genAeadAssocData() const = 0;
   virtual ~QuicAddrValidationToken() = default;
 
   folly::IPAddress clientIp;
@@ -820,11 +820,11 @@ struct RetryToken : QuicAddrValidationToken {
 
   RetryToken& operator=(const RetryToken& other) = default;
 
-  FOLLY_NODISCARD TokenType getTokenType() const override {
+  [[nodiscard]] TokenType getTokenType() const override {
     return tokenType;
   }
 
-  FOLLY_NODISCARD Buf genAeadAssocData() const override;
+  [[nodiscard]] Buf genAeadAssocData() const override;
 
   ConnectionId originalDstConnId;
   uint16_t clientPort;
@@ -845,11 +845,11 @@ struct NewToken : QuicAddrValidationToken {
 
   NewToken& operator=(const NewToken& other) = default;
 
-  FOLLY_NODISCARD TokenType getTokenType() const override {
+  [[nodiscard]] TokenType getTokenType() const override {
     return tokenType;
   }
 
-  FOLLY_NODISCARD Buf genAeadAssocData() const override;
+  [[nodiscard]] Buf genAeadAssocData() const override;
 
   bool operator==(const NewToken& other) const {
     return clientIp == other.clientIp && timestampInMs == other.timestampInMs;

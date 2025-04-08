@@ -101,8 +101,8 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Get the original Quic Server Connection ID chosen by client
    */
-  FOLLY_NODISCARD virtual Optional<ConnectionId>
-  getClientChosenDestConnectionId() const = 0;
+  [[nodiscard]] virtual Optional<ConnectionId> getClientChosenDestConnectionId()
+      const = 0;
 
   virtual bool replaySafe() const = 0;
 
@@ -395,7 +395,7 @@ class QuicSocket : virtual public QuicSocketLite {
    * Returns the maximum allowed Datagram payload size.
    * 0 means Datagram is not supported
    */
-  FOLLY_NODISCARD virtual uint16_t getDatagramSizeLimit() const = 0;
+  [[nodiscard]] virtual uint16_t getDatagramSizeLimit() const = 0;
 
   /**
    * Writes a Datagram frame. If buf is larger than the size limit returned by

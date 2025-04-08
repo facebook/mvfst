@@ -171,7 +171,7 @@ class DatagramFrameScheduler {
  public:
   explicit DatagramFrameScheduler(QuicConnectionStateBase& conn);
 
-  FOLLY_NODISCARD bool hasPendingDatagramFrames() const;
+  [[nodiscard]] bool hasPendingDatagramFrames() const;
 
   bool writeDatagramFrames(PacketBuilderInterface& builder);
 
@@ -287,15 +287,15 @@ class FrameScheduler : public QuicPacketScheduler {
       uint32_t writableBytes) override;
 
   // If any scheduler, including AckScheduler, has pending data to send
-  FOLLY_NODISCARD bool hasData() const override;
+  [[nodiscard]] bool hasData() const override;
 
   // If AckScheduler has any pending acks to write.
-  FOLLY_NODISCARD bool hasPendingAcks() const;
+  [[nodiscard]] bool hasPendingAcks() const;
 
   // If any of the non-Ack scheduler has pending data to send
-  FOLLY_NODISCARD virtual bool hasImmediateData() const;
+  [[nodiscard]] virtual bool hasImmediateData() const;
 
-  FOLLY_NODISCARD folly::StringPiece name() const override;
+  [[nodiscard]] folly::StringPiece name() const override;
 
  private:
   Optional<StreamFrameScheduler> streamFrameScheduler_;
