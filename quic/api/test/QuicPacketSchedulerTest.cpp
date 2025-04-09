@@ -18,6 +18,7 @@
 #include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/MockQuicStats.h>
@@ -120,7 +121,7 @@ createConn(uint32_t maxStreams, uint64_t maxOffset, uint64_t initialMaxOffset) {
 
 auto createStream(
     QuicClientConnectionState& conn,
-    std::optional<Priority> priority = std::nullopt) {
+    std::optional<HTTPPriorityQueue::Priority> priority = std::nullopt) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   if (priority) {
     stream->priority = *priority;
@@ -232,9 +233,17 @@ void verifyStreamFrames(
 
 namespace quic::test {
 
-class QuicPacketSchedulerTest : public testing::Test {
+class QuicPacketSchedulerTestBase {
  public:
   QuicVersion version{QuicVersion::MVFST};
+};
+
+class QuicPacketSchedulerTest : public QuicPacketSchedulerTestBase,
+                                public testing::Test {
+ public:
+  StreamId nextScheduledStreamID(QuicConnectionStateBase& conn) {
+    return conn.streamManager->writeQueue().getNextScheduledStream();
+  }
 };
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
@@ -1499,9 +1508,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
   auto builder = setupMockPacketBuilder();
   scheduler.writeStreams(*builder);
   verifyStreamFrames(*builder, {f1, f2, f3});
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      0);
+  EXPECT_EQ(nextScheduledStreamID(conn), 0);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
@@ -1548,11 +1555,11 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
       setupMockPacketBuilder({1500, 0, 1400, 0, 1300, 1100, 1000, 0});
   scheduler.writeStreams(*builder2);
   builder2->advanceRemaining();
-  ASSERT_EQ(conn.streamManager->writeQueue().getNextScheduledStream(), stream1);
+  ASSERT_EQ(nextScheduledStreamID(conn), stream1);
   ASSERT_EQ(builder2->frames_.size(), 1);
   scheduler.writeStreams(*builder2);
   ASSERT_EQ(builder2->frames_.size(), 2);
-  ASSERT_EQ(conn.streamManager->writeQueue().getNextScheduledStream(), stream2);
+  ASSERT_EQ(nextScheduledStreamID(conn), stream2);
   builder2->advanceRemaining();
   scheduler.writeStreams(*builder2);
   scheduler.writeStreams(*builder2);
@@ -1576,9 +1583,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
 
   auto builder = createPacketBuilder(conn);
   scheduler.writeStreams(builder);
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      stream2);
+  EXPECT_EQ(nextScheduledStreamID(conn), stream2);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
   auto builder2 = setupMockPacketBuilder();
@@ -1634,9 +1639,7 @@ TEST_F(
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      stream2);
+  EXPECT_EQ(nextScheduledStreamID(conn), stream2);
 
   // Should write frames for stream2, stream3, followed by an empty write.
   auto builder2 = setupMockPacketBuilder();
@@ -1657,9 +1660,9 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
-  auto stream1 = createStream(conn, Priority(0, false));
-  auto stream2 = createStream(conn, Priority(0, false));
-  auto stream3 = createStream(conn, Priority(0, false));
+  auto stream1 = createStream(conn, HTTPPriorityQueue::Priority(0, false));
+  auto stream2 = createStream(conn, HTTPPriorityQueue::Priority(0, false));
+  auto stream3 = createStream(conn, HTTPPriorityQueue::Priority(0, false));
 
   auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
   auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
@@ -1670,10 +1673,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(
-          Priority(0, false)),
-      stream1);
+  EXPECT_EQ(nextScheduledStreamID(conn), stream1);
 
   // Should write frames for stream1, stream2, stream3, in that order.
   auto builder2 = setupMockPacketBuilder();
@@ -1685,7 +1685,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
   auto connPtr = createConn(10, 100000, 100000);
   auto& conn = *connPtr;
-  conn.transportSettings.defaultPriority = Priority(0, false);
+  conn.transportSettings.defaultPriority =
+      HTTPPriorityQueue::Priority(0, false);
   StreamFrameScheduler scheduler(conn);
 
   auto stream1 = createStream(conn);
@@ -1700,10 +1701,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(
-          Priority(0, false)),
-      stream1);
+  EXPECT_EQ(nextScheduledStreamID(conn), stream1);
 
   // Should write frames for stream1, stream2, stream3, in that order.
   auto builder2 = setupMockPacketBuilder();
@@ -1736,9 +1734,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      stream3);
+  EXPECT_EQ(nextScheduledStreamID(conn), stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
   // Should write frames for stream2, stream4, followed by stream 3 then 1.
@@ -1747,9 +1743,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
 
   verifyStreamFrames(*builder2, {f2, f4, f3, f1});
 
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      stream3);
+  EXPECT_EQ(nextScheduledStreamID(conn), stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 }
 
@@ -1764,9 +1758,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
-  EXPECT_EQ(
-      conn.streamManager->writeQueue().getNextScheduledStream(kDefaultPriority),
-      0);
+  EXPECT_EQ(nextScheduledStreamID(conn), 0);
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
@@ -1884,8 +1876,10 @@ TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
-  auto lowPriStreamId = createStream(conn, Priority(5, false));
-  auto highPriStreamId = createStream(conn, Priority(0, false));
+  auto lowPriStreamId =
+      createStream(conn, HTTPPriorityQueue::Priority(5, false));
+  auto highPriStreamId =
+      createStream(conn, HTTPPriorityQueue::Priority(0, false));
 
   writeDataToStream(conn, lowPriStreamId, "Onegin");
   writeDataToStream(
@@ -2030,7 +2024,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
 
   auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
-  conn.streamManager->setStreamPriority(streamId, Priority(0, false));
+  conn.streamManager->setStreamPriority(
+      streamId, HTTPPriorityQueue::Priority(0, false));
   auto stream = conn.streamManager->findStream(streamId);
   auto data = buildRandomInputData(1000);
   ASSERT_FALSE(
@@ -2723,8 +2718,9 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
 }
 
 TEST_F(QuicPacketSchedulerTest, PausedPriorityEnabled) {
-  static const auto kSequentialPriority = Priority(3, false);
-  static const auto kPausedPriority = Priority(0, false, 0, true /* paused */);
+  static const auto kSequentialPriority = HTTPPriorityQueue::Priority(3, false);
+  static const HTTPPriorityQueue::Priority kPausedPriority =
+      HTTPPriorityQueue::Priority::PAUSED;
 
   auto connPtr = createConn(10, 100000, 100000);
   auto& conn = *connPtr;
@@ -2757,8 +2753,9 @@ TEST_F(QuicPacketSchedulerTest, PausedPriorityEnabled) {
 }
 
 TEST_F(QuicPacketSchedulerTest, PausedPriorityDisabled) {
-  static const auto kSequentialPriority = Priority(3, false);
-  static const auto kPausedPriority = Priority(0, false, 0, true /* paused */);
+  static const auto kSequentialPriority = HTTPPriorityQueue::Priority(3, false);
+  static const HTTPPriorityQueue::Priority kPausedPriority =
+      HTTPPriorityQueue::Priority::PAUSED;
 
   auto connPtr = createConn(10, 100000, 100000);
   auto& conn = *connPtr;
@@ -2773,7 +2770,7 @@ TEST_F(QuicPacketSchedulerTest, PausedPriorityDisabled) {
 
   auto builder = setupMockPacketBuilder();
   scheduler.writeStreams(*builder);
-  verifyStreamFrames(*builder, {pausedFrame, regularFrame});
+  verifyStreamFrames(*builder, {regularFrame, pausedFrame});
 }
 
 TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {

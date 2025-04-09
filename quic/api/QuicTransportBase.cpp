@@ -681,8 +681,8 @@ QuicTransportBase::readDatagramBufs(size_t atMost) {
   return retDatagrams;
 }
 
-folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
-    StreamId id) {
+folly::Expected<PriorityQueue::Priority, LocalErrorCode>
+QuicTransportBase::getStreamPriority(StreamId id) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }

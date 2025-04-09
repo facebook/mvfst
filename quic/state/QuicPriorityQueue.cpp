@@ -7,7 +7,7 @@
 
 #include <quic/state/QuicPriorityQueue.h>
 
-namespace quic {
+namespace quic::deprecated {
 
 /**
  * Default priority, urgency = 3, incremental = true
@@ -15,4 +15,4 @@ namespace quic {
  */
 const Priority kDefaultPriority(3, true);
 
-} // namespace quic
+} // namespace quic::deprecated

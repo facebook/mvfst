@@ -811,12 +811,19 @@ const std::shared_ptr<QLogger> QuicTransportBaseLite::getQLogger() const {
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::setStreamPriority(StreamId id, Priority priority) {
+QuicTransportBaseLite::setPriorityQueue(std::unique_ptr<PriorityQueue> queue) {
+  if (conn_) {
+    return conn_->streamManager->setPriorityQueue(std::move(queue));
+  }
+  return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBaseLite::setStreamPriority(
+    StreamId id,
+    PriorityQueue::Priority priority) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (priority.level > kDefaultMaxPriority) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (!conn_->streamManager->streamExists(id)) {
     // It's not an error to try to prioritize a non-existent stream.
@@ -824,10 +831,7 @@ QuicTransportBaseLite::setStreamPriority(StreamId id, Priority priority) {
   }
   // It's not an error to prioritize a stream after it's sent its FIN - this
   // can reprioritize retransmissions.
-  bool updated = conn_->streamManager->setStreamPriority(id, priority);
-  if (updated && conn_->qLogger) {
-    conn_->qLogger->addPriorityUpdate(id, priority.level, priority.incremental);
-  }
+  conn_->streamManager->setStreamPriority(id, priority, conn_->qLogger);
   return folly::unit;
 }
 

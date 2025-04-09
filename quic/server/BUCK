@@ -75,6 +75,7 @@ mvfst_cpp_library(
         "//quic/dsr/frontend:write_functions",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/priority:http_priority_queue",
         "//quic/server/handshake:app_token",
         "//quic/server/handshake:default_app_token_validator",
         "//quic/server/handshake:stateless_reset_generator",
@@ -83,7 +84,9 @@ mvfst_cpp_library(
         "//quic/state:quic_stream_utilities",
         "//quic/state:transport_settings_functions",
     ] + select({
-        "DEFAULT": ["//folly/io/async:io_uring_backend"],
+        "DEFAULT": [
+            "//folly/io/async:io_uring_backend",
+        ],
         "ovr_config//os:windows": [],
     }),
     exported_deps = [

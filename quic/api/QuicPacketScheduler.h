@@ -109,7 +109,7 @@ class StreamFrameScheduler {
 
   void writeStreamsHelper(
       PacketBuilderInterface& builder,
-      PriorityQueue& writableStreams,
+      deprecated::PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 

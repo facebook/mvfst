@@ -23,6 +23,7 @@
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/test/Mocks.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
@@ -1648,7 +1649,7 @@ TEST_F(QuicTransportTest, WriteSmall) {
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   transport_->writeChain(stream, buf->clone(), false);
-  transport_->setStreamPriority(stream, Priority(0, false));
+  transport_->setStreamPriority(stream, HTTPPriorityQueue::Priority(0, false));
   loopForWrites();
   auto& conn = transport_->getConnectionState();
   verifyCorrectness(conn, 0, stream, *buf);
@@ -3101,7 +3102,8 @@ TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   // Check that write-side APIs return an error
   auto res2 = transport_->notifyPendingWriteOnStream(streamId, &writeCallback_);
   EXPECT_EQ(LocalErrorCode::STREAM_CLOSED, res2.error());
-  auto res3 = transport_->setStreamPriority(streamId, Priority(0, false));
+  auto res3 = transport_->setStreamPriority(
+      streamId, HTTPPriorityQueue::Priority(0, false));
   EXPECT_FALSE(res3.hasError());
 }
 
@@ -5103,9 +5105,17 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
 
 TEST_F(QuicTransportTest, PrioritySetAndGet) {
   auto stream = transport_->createBidirectionalStream().value();
-  EXPECT_EQ(kDefaultPriority, transport_->getStreamPriority(stream).value());
-  transport_->setStreamPriority(stream, Priority(0, false));
-  EXPECT_EQ(Priority(0, false), transport_->getStreamPriority(stream).value());
+  PriorityQueue::Priority basePri;
+  HTTPPriorityQueue::Priority defaultPri(basePri);
+  EXPECT_EQ(
+      defaultPri,
+      HTTPPriorityQueue::Priority(
+          transport_->getStreamPriority(stream).value()));
+  transport_->setStreamPriority(stream, HTTPPriorityQueue::Priority(0, false));
+  EXPECT_EQ(
+      HTTPPriorityQueue::Priority(0, false),
+      HTTPPriorityQueue::Priority(
+          transport_->getStreamPriority(stream).value()));
   auto nonExistStreamPri = transport_->getStreamPriority(stream + 4);
   EXPECT_TRUE(nonExistStreamPri.hasError());
   EXPECT_EQ(LocalErrorCode::STREAM_NOT_EXISTS, nonExistStreamPri.error());

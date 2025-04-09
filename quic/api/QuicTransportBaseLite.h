@@ -214,9 +214,12 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   [[nodiscard]] bool isKnobSupported() const override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
+      std::unique_ptr<PriorityQueue> queue) override;
+
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
-      Priority priority) override;
+      PriorityQueue::Priority priority) override;
 
   /**
    * Sets the maximum pacing rate in Bytes per second to be used

@@ -42,8 +42,8 @@ class DSRStreamFrameScheduler {
       SchedulingResult,
       DSRPacketBuilderBase&,
       SendInstruction::Builder&,
-      const PriorityQueue&,
-      const PriorityQueue::LevelItr&,
+      const deprecated::PriorityQueue&,
+      const deprecated::PriorityQueue::LevelItr&,
       QuicStreamState&);
 
  private:

@@ -10,6 +10,7 @@
 #include <folly/json/dynamic.h> // @manual=//folly:dynamic
 #include <quic/codec/Types.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/priority/PriorityQueue.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -786,8 +787,7 @@ class QLogPriorityUpdateEvent : public QLogEvent {
  public:
   explicit QLogPriorityUpdateEvent(
       StreamId id,
-      uint8_t urgency,
-      bool incremental,
+      PriorityQueue::PriorityLogFields priority,
       std::chrono::microseconds refTimeIn);
   ~QLogPriorityUpdateEvent() override = default;
 
@@ -795,8 +795,7 @@ class QLogPriorityUpdateEvent : public QLogEvent {
 
  private:
   StreamId streamId_;
-  uint8_t urgency_;
-  bool incremental_;
+  PriorityQueue::PriorityLogFields priority_;
 };
 
 class QLogL4sWeightUpdateEvent : public QLogEvent {

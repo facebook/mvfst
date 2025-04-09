@@ -10,6 +10,7 @@
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/priority/PriorityQueue.h>
 
 namespace quic {
 
@@ -120,8 +121,7 @@ class QLogger {
   virtual void addPathValidationEvent(bool success) = 0;
   virtual void addPriorityUpdate(
       quic::StreamId streamId,
-      uint8_t urgency,
-      bool incremental) = 0;
+      PriorityQueue::PriorityLogFields priority) = 0;
   virtual void
   addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe) = 0;
   virtual void addNetworkPathModelUpdate(

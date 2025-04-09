@@ -13,7 +13,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
-#include <quic/state/QuicPriorityQueue.h>
+#include <quic/priority/PriorityQueue.h>
 
 namespace quic {
 
@@ -493,7 +493,8 @@ struct QuicStreamState : public QuicStreamLike {
   // lastHolbTime indicates whether the stream is HOL blocked at the moment.
   uint32_t holbCount{0};
 
-  Priority priority{kDefaultPriority};
+  // Uninitialized = default
+  PriorityQueue::Priority priority;
 
   // This monotonically increases by 1 this stream is written to packets. Note
   // that this is only used for DSR and facilitates loss detection.

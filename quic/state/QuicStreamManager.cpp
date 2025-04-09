@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/logging/QLogger.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/QuicTransportStatsCallback.h>
@@ -101,6 +103,11 @@ static LocalErrorCode openLocalStreamIfNotClosed(
     nextAcceptableStreamId = streamId + detail::kStreamIncrement;
   }
   return LocalErrorCode::NO_ERROR;
+}
+
+void QuicStreamManager::setWriteQueueMaxNextsPerStream(
+    uint64_t maxNextsPerStream) {
+  writeQueue_.setMaxNextsPerStream(maxNextsPerStream);
 }
 
 bool QuicStreamManager::streamExists(StreamId streamId) {
@@ -222,15 +229,22 @@ bool QuicStreamManager::consumeMaxLocalUnidirectionalStreamIdIncreased() {
   return res;
 }
 
-bool QuicStreamManager::setStreamPriority(StreamId id, Priority newPriority) {
+bool QuicStreamManager::setStreamPriority(
+    StreamId id,
+    const PriorityQueue::Priority& newPriority,
+    const std::shared_ptr<QLogger>& qLogger) {
   auto stream = findStream(id);
   if (stream) {
-    if (stream->priority == newPriority) {
+    static const HTTPPriorityQueue kPriorityQueue;
+    if (kPriorityQueue.equalPriority(stream->priority, newPriority)) {
       return false;
     }
     stream->priority = newPriority;
     updateWritableStreams(*stream);
-    writeQueue_.updateIfExist(id, stream->priority);
+    if (qLogger) {
+      qLogger->addPriorityUpdate(
+          id, kPriorityQueue.toLogFields(stream->priority));
+    }
     return true;
   }
   return false;
@@ -834,7 +848,9 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   }
 
   // Check if paused
-  if (stream.priority.paused && !transportSettings_->disablePausedPriority) {
+  // pausedButDisabled adds a hard dep on writeQueue being an HTTPPriorityQueue.
+  auto httpPri = HTTPPriorityQueue::Priority(stream.priority);
+  if (httpPri->paused && !transportSettings_->disablePausedPriority) {
     removeWritable(stream);
     return;
   }
@@ -866,7 +882,12 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
     if (stream.isControl) {
       controlWriteQueue_.emplace(stream.id);
     } else {
-      writeQueue_.insertOrUpdate(stream.id, stream.priority);
+      const static deprecated::Priority kPausedDisabledPriority(7, true);
+      auto oldPri = httpPri->paused
+          ? kPausedDisabledPriority
+          : deprecated::Priority(
+                httpPri->urgency, httpPri->incremental, httpPri->order);
+      writeQueue_.insertOrUpdate(stream.id, oldPri);
     }
   } else {
     // Not schedulable, remove from queues

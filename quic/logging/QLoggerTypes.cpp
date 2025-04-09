@@ -970,10 +970,9 @@ folly::dynamic QLogPathValidationEvent::toDynamic() const {
 
 QLogPriorityUpdateEvent::QLogPriorityUpdateEvent(
     StreamId streamId,
-    uint8_t urgency,
-    bool incremental,
+    PriorityQueue::PriorityLogFields priority,
     std::chrono::microseconds refTimeIn)
-    : streamId_(streamId), urgency_(urgency), incremental_(incremental) {
+    : streamId_(streamId), priority_(std::move(priority)) {
   eventType = QLogEventType::PriorityUpdate;
   refTime = refTimeIn;
 }
@@ -984,8 +983,9 @@ folly::dynamic QLogPriorityUpdateEvent::toDynamic() const {
   folly::dynamic data = folly::dynamic::object();
 
   data["id"] = streamId_;
-  data["urgency"] = urgency_;
-  data["incremental"] = incremental_;
+  for (const auto& entry : priority_) {
+    data[entry.first] = entry.second;
+  }
   d.push_back(std::move(data));
   return d;
 }

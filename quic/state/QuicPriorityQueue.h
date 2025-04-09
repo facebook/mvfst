@@ -13,7 +13,7 @@
 
 #include <quic/codec/Types.h>
 
-namespace quic {
+namespace quic::deprecated {
 
 constexpr uint8_t kDefaultPriorityLevels = kDefaultMaxPriority + 1;
 constexpr uint8_t kDefaultPriorityLevelsSize = 2 * kDefaultPriorityLevels;
@@ -347,4 +347,4 @@ struct PriorityQueue {
   }
 };
 
-} // namespace quic
+} // namespace quic::deprecated

@@ -142,7 +142,7 @@ class QuicTransportBase : public QuicSocket,
 
   // Subclass API.
 
-  folly::Expected<Priority, LocalErrorCode> getStreamPriority(
+  folly::Expected<PriorityQueue::Priority, LocalErrorCode> getStreamPriority(
       StreamId id) override;
 
   /**

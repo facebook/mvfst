@@ -28,6 +28,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":qlogger_constants",
         "//quic/codec:types",
+        "//quic/priority:priority_queue",
     ],
 )
 
@@ -49,6 +50,7 @@ mvfst_cpp_library(
         ":qlogger_constants",
         "//folly:dynamic",
         "//quic/codec:types",
+        "//quic/priority:priority_queue",
     ],
 )
 

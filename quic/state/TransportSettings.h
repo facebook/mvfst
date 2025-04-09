@@ -9,7 +9,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/common/Optional.h>
-#include <quic/state/QuicPriorityQueue.h>
+#include <quic/priority/PriorityQueue.h>
 #include <chrono>
 #include <cstdint>
 
@@ -367,7 +367,7 @@ struct TransportSettings {
   bool useCwndHintsInSessionTicket{false};
 
   // The default priority to instantiate streams with.
-  Priority defaultPriority{kDefaultPriority};
+  PriorityQueue::Priority defaultPriority;
 
   // How many times we will a schedule a stream to packets before moving onto
   // the next one in the queue. Only relevant for incremental priority.

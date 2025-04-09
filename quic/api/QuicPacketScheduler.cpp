@@ -436,14 +436,14 @@ StreamId StreamFrameScheduler::writeStreamsHelper(
 
 void StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
-    PriorityQueue& writableStreams,
+    deprecated::PriorityQueue& writableStreams,
     uint64_t& connWritableBytes,
     bool streamPerPacket) {
   // Fill a packet with non-control stream data, in priority order
   for (size_t index = 0; index < writableStreams.levels.size() &&
        builder.remainingSpaceInPkt() > 0;
        index++) {
-    PriorityQueue::Level& level = writableStreams.levels[index];
+    deprecated::PriorityQueue::Level& level = writableStreams.levels[index];
     if (level.empty()) {
       // No data here, keep going
       continue;

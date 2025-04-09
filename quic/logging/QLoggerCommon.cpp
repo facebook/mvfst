@@ -261,12 +261,11 @@ void QLoggerCommon::addPathValidationEvent(bool success) {
 
 void QLoggerCommon::addPriorityUpdate(
     quic::StreamId streamId,
-    uint8_t urgency,
-    bool incremental) {
+    PriorityQueue::PriorityLogFields priority) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
   logTrace(std::make_unique<quic::QLogPriorityUpdateEvent>(
-      streamId, urgency, incremental, refTime));
+      streamId, std::move(priority), refTime));
 }
 
 void QLoggerCommon::addL4sWeightUpdate(

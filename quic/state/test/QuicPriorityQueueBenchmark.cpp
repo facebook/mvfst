@@ -12,27 +12,30 @@
 
 using namespace std;
 using namespace folly;
+using namespace quic;
 
-static inline uint8_t findNonemptyLevel(quic::PriorityQueue& pq) {
+static inline uint8_t findNonemptyLevel(deprecated::PriorityQueue& pq) {
   for (auto i = 0; i < 16; i++) {
-    quic::Priority pri(i / 2, i % 2);
-    if (!pq.levels[quic::PriorityQueue::priority2index(pri)].empty()) {
+    deprecated::Priority pri(i / 2, i % 2);
+    if (!pq.levels[deprecated::PriorityQueue::priority2index(pri)].empty()) {
       return i;
     }
   }
   return 16;
 }
 
-static inline void
-insert(quic::PriorityQueue& pq, size_t numConcurrentStreams, bool incremental) {
+static inline void insert(
+    deprecated::PriorityQueue& pq,
+    size_t numConcurrentStreams,
+    bool incremental) {
   // insert streams at various priorities
   for (size_t i = 0; i < numConcurrentStreams; i++) {
-    pq.insertOrUpdate(i, quic::Priority(i % 8, incremental));
+    pq.insertOrUpdate(i, deprecated::Priority(i % 8, incremental));
   }
 }
 
 static inline void processQueueIncremental(
-    quic::PriorityQueue& pq,
+    deprecated::PriorityQueue& pq,
     size_t numConcurrentStreams,
     size_t packetsPerStream,
     uint8_t shift) {
@@ -59,7 +62,7 @@ static inline void processQueueIncremental(
 }
 
 static inline void processQueueSequential(
-    quic::PriorityQueue& pq,
+    deprecated::PriorityQueue& pq,
     size_t numConcurrentStreams,
     size_t packetsPerStream) {
   CHECK_GT(packetsPerStream, 0);
@@ -78,7 +81,7 @@ static inline void processQueueSequential(
 static inline void benchmarkPriority(
     size_t numConcurrentStreams,
     bool incremental) {
-  quic::PriorityQueue pq;
+  deprecated::PriorityQueue pq;
   insert(pq, numConcurrentStreams, incremental);
 
   size_t packetsPerStream = 4;
@@ -123,7 +126,7 @@ BENCHMARK(incremental8, n) {
 BENCHMARK(insertSequential, n) {
   // insert streams at various priorities
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    deprecated::PriorityQueue pq;
     insert(pq, 100, false);
     pq.clear();
   }
@@ -132,7 +135,7 @@ BENCHMARK(insertSequential, n) {
 BENCHMARK(insertIncremental, n) {
   // insert streams at various priorities
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    deprecated::PriorityQueue pq;
     insert(pq, 100, true);
     pq.clear();
   }
@@ -142,7 +145,7 @@ BENCHMARK(processSequential, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    deprecated::PriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, false);
     }
@@ -154,7 +157,7 @@ BENCHMARK(processIncremental, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    deprecated::PriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, true);
     }
@@ -166,7 +169,7 @@ BENCHMARK(eraseSequential, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    deprecated::PriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, false);
     }
@@ -183,7 +186,7 @@ BENCHMARK(eraseIncremental, n) {
   // insert streams at various priorities
   size_t nStreams = 96;
   for (size_t j = 0; j < n; j++) {
-    quic::PriorityQueue pq;
+    deprecated::PriorityQueue pq;
     BENCHMARK_SUSPEND {
       insert(pq, nStreams, true);
     }

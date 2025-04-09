@@ -18,8 +18,8 @@
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverTypes.h>
+#include <quic/priority/PriorityQueue.h>
 #include <quic/state/QuicConnectionStats.h>
-#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
@@ -157,8 +157,8 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Get stream priority.
    */
-  virtual folly::Expected<Priority, LocalErrorCode> getStreamPriority(
-      StreamId id) = 0;
+  virtual folly::Expected<PriorityQueue::Priority, LocalErrorCode>
+  getStreamPriority(StreamId id) = 0;
 
   /**
    * Convenience function that sets the read callbacks of all streams to be

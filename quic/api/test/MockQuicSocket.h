@@ -130,9 +130,13 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       setStreamPriority,
-      (StreamId, Priority));
+      (StreamId, PriorityQueue::Priority));
   MOCK_METHOD(
-      (folly::Expected<Priority, LocalErrorCode>),
+      (folly::Expected<folly::Unit, LocalErrorCode>),
+      setPriorityQueue,
+      (std::unique_ptr<PriorityQueue> queue));
+  MOCK_METHOD(
+      (folly::Expected<PriorityQueue::Priority, LocalErrorCode>),
       getStreamPriority,
       (StreamId));
   MOCK_METHOD(

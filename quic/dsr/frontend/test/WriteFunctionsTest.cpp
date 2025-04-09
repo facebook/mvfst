@@ -8,6 +8,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/dsr/test/TestCommon.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -263,8 +264,10 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsNonIncremental) {
   auto streamId2 = prepareOneStream(1000);
   auto stream1 = conn_.streamManager->findStream(streamId1);
   auto stream2 = conn_.streamManager->findStream(streamId2);
-  conn_.streamManager->setStreamPriority(streamId1, Priority{3, false});
-  conn_.streamManager->setStreamPriority(streamId2, Priority{3, false});
+  conn_.streamManager->setStreamPriority(
+      streamId1, HTTPPriorityQueue::Priority{3, false});
+  conn_.streamManager->setStreamPriority(
+      streamId2, HTTPPriorityQueue::Priority{3, false});
   // Pretend we sent the non DSR data on first stream
   stream1->ackedIntervals.insert(0, stream1->writeBuffer.chainLength() - 1);
   stream1->currentWriteOffset = stream1->writeBuffer.chainLength();
@@ -289,8 +292,10 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsIncremental) {
   auto streamId2 = prepareOneStream(1000);
   auto stream1 = conn_.streamManager->findStream(streamId1);
   auto stream2 = conn_.streamManager->findStream(streamId2);
-  conn_.streamManager->setStreamPriority(streamId1, Priority{3, true});
-  conn_.streamManager->setStreamPriority(streamId2, Priority{3, true});
+  conn_.streamManager->setStreamPriority(
+      streamId1, HTTPPriorityQueue::Priority{3, true});
+  conn_.streamManager->setStreamPriority(
+      streamId2, HTTPPriorityQueue::Priority{3, true});
   // Pretend we sent the non DSR data on second stream
   stream2->ackedIntervals.insert(0, stream2->writeBuffer.chainLength() - 1);
   stream2->currentWriteOffset = stream2->writeBuffer.chainLength();

@@ -9,6 +9,7 @@
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
@@ -1067,7 +1068,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         } catch (std::exception&) {
           parseSuccess = false;
         }
-        if (!parseSuccess) {
+        if (!parseSuccess || level > 7) {
           auto errMsg = fmt::format(
               "Received invalid KnobParam for DEFAULT_STREAM_PRIORITY: {}",
               val);
@@ -1075,7 +1076,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           throw std::runtime_error(errMsg);
         }
         serverConn->transportSettings.defaultPriority =
-            Priority(level, incremental);
+            HTTPPriorityQueue::Priority(level, incremental);
         VLOG(3) << "DEFAULT_STREAM_PRIORITY KnobParam received: " << val;
       });
   registerTransportKnobParamHandler(
@@ -1094,7 +1095,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
         serverConn->transportSettings.priorityQueueWritesPerStream = val;
-        serverConn->streamManager->writeQueue().setMaxNextsPerStream(val);
+        serverConn->streamManager->setWriteQueueMaxNextsPerStream(
+            serverConn->transportSettings.priorityQueueWritesPerStream);
         VLOG(3) << "WRITES_PER_STREAM KnobParam received: " << val;
       });
   registerTransportKnobParamHandler(
@@ -1328,7 +1330,7 @@ QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
     // shown good results.
     if (conn_->transportSettings.priorityQueueWritesPerStream == 1) {
       conn_->transportSettings.priorityQueueWritesPerStream = 5;
-      conn_->streamManager->writeQueue().setMaxNextsPerStream(5);
+      conn_->streamManager->setWriteQueueMaxNextsPerStream(5);
     }
 
     // Fow now, no appLimited or appIdle update here since we are not writing

@@ -12,6 +12,8 @@
 
 namespace quic::test {
 
+using namespace quic::deprecated;
+
 class QuicPriorityQueueTest : public testing::Test {
  public:
   PriorityQueue queue_;

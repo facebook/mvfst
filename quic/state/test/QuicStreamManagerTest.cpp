@@ -9,8 +9,8 @@
 #include <gtest/gtest.h>
 
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/state/ServerStateMachine.h>
-#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/stream/StreamStateFunctions.h>
@@ -75,17 +75,17 @@ TEST_P(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
   ASSERT_TRUE(streamResult.hasValue());
   auto* stream = streamResult.value();
   auto streamId = stream->id;
-  Priority currentPriority = stream->priority;
+  HTTPPriorityQueue::Priority currentPriority(stream->priority);
   EXPECT_TRUE(manager.setStreamPriority(
       streamId,
-      Priority(
-          (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
-          !currentPriority.incremental)));
+      HTTPPriorityQueue::Priority(
+          (currentPriority->urgency + 1) % (kDefaultMaxPriority + 1),
+          !currentPriority->incremental)));
   EXPECT_FALSE(manager.setStreamPriority(
       streamId,
-      Priority(
-          (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
-          !currentPriority.incremental)));
+      HTTPPriorityQueue::Priority(
+          (currentPriority->urgency + 1) % (kDefaultMaxPriority + 1),
+          !currentPriority->incremental)));
 }
 
 TEST_P(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {

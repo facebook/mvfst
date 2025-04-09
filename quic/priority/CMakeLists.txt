@@ -62,6 +62,7 @@ target_compile_options(
 target_link_libraries(
   mvfst_http_priority_queue PUBLIC
   Folly::folly
+  mvfst_round_robin
 )
 
 file(

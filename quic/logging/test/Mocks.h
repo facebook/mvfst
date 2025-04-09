@@ -67,7 +67,10 @@ class MockQLogger : public QLogger {
   MOCK_METHOD(void, addPathValidationEvent, (bool));
   MOCK_METHOD(void, setDcid, (Optional<ConnectionId>));
   MOCK_METHOD(void, setScid, (Optional<ConnectionId>));
-  MOCK_METHOD(void, addPriorityUpdate, (quic::StreamId, uint8_t, bool));
+  MOCK_METHOD(
+      void,
+      addPriorityUpdate,
+      (quic::StreamId, PriorityQueue::PriorityLogFields));
   MOCK_METHOD(
       void,
       addL4sWeightUpdate,

@@ -13,6 +13,7 @@
 #include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/logging/FileQLogger.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/Mocks.h>
@@ -5364,15 +5365,32 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
         "1,1"}});
-  EXPECT_EQ(server->getTransportSettings().defaultPriority, Priority(1, true));
+  EXPECT_EQ(
+      HTTPPriorityQueue::Priority(
+          server->getTransportSettings().defaultPriority),
+      HTTPPriorityQueue::Priority(1, true));
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
         "4,0"}});
-  EXPECT_EQ(server->getTransportSettings().defaultPriority, Priority(4, false));
+  EXPECT_EQ(
+      HTTPPriorityQueue::Priority(
+          server->getTransportSettings().defaultPriority),
+      HTTPPriorityQueue::Priority(4, false));
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
         "4,0,10"}});
-  EXPECT_EQ(server->getTransportSettings().defaultPriority, Priority(4, false));
+  EXPECT_EQ(
+      HTTPPriorityQueue::Priority(
+          server->getTransportSettings().defaultPriority),
+      HTTPPriorityQueue::Priority(4, false));
+  // level too large, unchanged
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
+        "20,0"}});
+  EXPECT_EQ(
+      HTTPPriorityQueue::Priority(
+          server->getTransportSettings().defaultPriority),
+      HTTPPriorityQueue::Priority(4, false));
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
         uint64_t(2)}});

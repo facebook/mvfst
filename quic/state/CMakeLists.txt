@@ -49,6 +49,7 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_dsr_sender
   mvfst_handshake
+  mvfst_http_priority_queue
 )
 
 add_library(

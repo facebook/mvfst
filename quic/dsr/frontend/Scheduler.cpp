@@ -30,8 +30,8 @@ DSRStreamFrameScheduler::enrichAndAddSendInstruction(
     DSRStreamFrameScheduler::SchedulingResult result,
     DSRPacketBuilderBase& packetBuilder,
     SendInstruction::Builder& instructionBuilder,
-    const PriorityQueue& writeQueue,
-    const PriorityQueue::LevelItr& levelIter,
+    const deprecated::PriorityQueue& writeQueue,
+    const deprecated::PriorityQueue::LevelItr& levelIter,
     QuicStreamState& stream) {
   enrichInstruction(instructionBuilder, stream);
   packetBuilder.addSendInstruction(

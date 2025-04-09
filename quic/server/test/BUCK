@@ -92,6 +92,7 @@ fb_dirsync_cpp_unittest(
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/logging:file_qlogger",
+        "//quic/priority:http_priority_queue",
         "//quic/server/handshake:server_handshake",
         "//quic/state:stream_functions",
         "//quic/state/test:mocks",

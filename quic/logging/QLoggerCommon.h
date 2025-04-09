@@ -85,8 +85,7 @@ class QLoggerCommon : public quic::BaseQLogger {
   void addPathValidationEvent(bool success) override;
   void addPriorityUpdate(
       quic::StreamId streamId,
-      uint8_t urgency,
-      bool incremental) override;
+      PriorityQueue::PriorityLogFields priority) override;
   void addL4sWeightUpdate(double l4sWeight, uint32_t newEct1, uint32_t newCe)
       override;
   void addNetworkPathModelUpdate(

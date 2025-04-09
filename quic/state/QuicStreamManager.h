@@ -11,11 +11,15 @@
 #include <folly/container/F14Set.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/priority/PriorityQueue.h>
+#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 #include <numeric>
 
 namespace quic {
+class QLogger;
+
 namespace detail {
 
 constexpr uint8_t kStreamIncrement = 0x04;
@@ -140,9 +144,6 @@ class QuicStreamManager {
       // Consider throwing here if construction must fail, or setting an error
       // state. For now, logging is consistent with previous changes.
     }
-
-    writeQueue_.setMaxNextsPerStream(
-        transportSettings.priorityQueueWritesPerStream);
   }
 
   /**
@@ -237,6 +238,15 @@ class QuicStreamManager {
           std::forward_as_tuple(
               conn_, // Use the new conn ref
               std::move(pair.second)));
+    }
+    // Call refreshTransportSettings which now returns Expected
+    auto refreshResult = refreshTransportSettings(transportSettings);
+    if (refreshResult.hasError()) {
+      // Constructor cannot return error easily. Log or handle internally.
+      LOG(ERROR) << "Failed initial transport settings refresh: "
+                 << refreshResult.error().message;
+      // Consider throwing here if construction must fail, or setting an error
+      // state. For now, logging is consistent with previous changes.
     }
   }
 
@@ -431,10 +441,19 @@ class QuicStreamManager {
     lossStreams_.insert(id);
   }
 
+  folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
+      std::unique_ptr<PriorityQueue>) {
+    LOG(ERROR) << "setPriorityQueue is not supported yet";
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+
   /**
    * Update stream priority if the stream indicated by id exists.
    */
-  bool setStreamPriority(StreamId id, Priority priority);
+  bool setStreamPriority(
+      StreamId id,
+      const PriorityQueue::Priority& priority,
+      const std::shared_ptr<QLogger>& qLogger = nullptr);
 
   auto& writableDSRStreams() {
     return writableDSRStreams_;
@@ -778,6 +797,8 @@ class QuicStreamManager {
         peerBidirectionalStreamGroupsSeen_.size();
   }
 
+  void setWriteQueueMaxNextsPerStream(uint64_t maxNextsPerStream);
+
  private:
   void updateAppIdleState();
 
@@ -857,7 +878,7 @@ class QuicStreamManager {
   folly::F14FastSet<StreamId> unidirectionalReadableStreams_;
   folly::F14FastSet<StreamId> peekableStreams_;
 
-  PriorityQueue writeQueue_;
+  deprecated::PriorityQueue writeQueue_;
   std::set<StreamId> controlWriteQueue_;
   folly::F14FastSet<StreamId> writableStreams_;
   folly::F14FastSet<StreamId> writableDSRStreams_;

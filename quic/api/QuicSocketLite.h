@@ -783,24 +783,18 @@ class QuicSocketLite {
    */
   [[nodiscard]] virtual bool isKnobSupported() const = 0;
 
-  /**
-   * Set stream priority.
-   * level: can only be in [0, 7].
+  /*
+   * Set the priority queue implementation.
    */
-  folly::Expected<folly::Unit, LocalErrorCode>
-  setStreamPriority(StreamId id, PriorityLevel level, bool incremental) {
-    return setStreamPriority(id, Priority(level, incremental));
-  }
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
+      std::unique_ptr<PriorityQueue> queue) = 0;
 
   /**
    * Set stream priority.
-   * level: can only be in [0, 7].
-   * incremental: true/false
-   * orderId: uint64
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
-      Priority priority) = 0;
+      PriorityQueue::Priority pri) = 0;
 
   /**
    * Sets the maximum pacing rate in Bytes per second to be used
