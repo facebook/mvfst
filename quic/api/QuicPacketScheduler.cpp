@@ -218,7 +218,8 @@ FrameScheduler::FrameScheduler(
     QuicConnectionStateBase& conn)
     : name_(name), conn_(conn) {}
 
-SchedulingResult FrameScheduler::scheduleFramesForPacket(
+folly::Expected<SchedulingResult, QuicError>
+FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
   size_t shortHeaderPadding = 0;
@@ -796,7 +797,8 @@ bool CloningScheduler::hasData() const {
       conn_.outstandings.numOutstanding() > conn_.outstandings.dsrCount;
 }
 
-SchedulingResult CloningScheduler::scheduleFramesForPacket(
+folly::Expected<SchedulingResult, QuicError>
+CloningScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
   // Store header type information before any moves
@@ -903,9 +905,8 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
 
     // Rebuilder will write the rest of frames
     auto rebuildResultExpected = rebuilder.rebuildFromPacket(outstandingPacket);
-    // TODO handle error better.
     if (rebuildResultExpected.hasError()) {
-      return SchedulingResult(none, none, 0);
+      return folly::makeUnexpected(rebuildResultExpected.error());
     }
     if (rebuildResultExpected.value()) {
       return SchedulingResult(

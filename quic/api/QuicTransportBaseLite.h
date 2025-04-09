@@ -29,7 +29,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * It may also throw an exception in case of an error in which case the
    * connection will be closed.
    */
-  virtual void writeData() = 0;
+  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> writeData() = 0;
 
   // Interface with the Transport layer when data is available.
   // This is invoked when new data is received from the UDP socket.
@@ -617,7 +617,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * both pacing oblivious and writeLooper oblivious. Caller needs to explicitly
    * invoke updateWriteLooper afterwards if that's desired.
    */
-  void writeSocketData();
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeSocketData();
 
   void closeImpl(
       Optional<QuicError> error,

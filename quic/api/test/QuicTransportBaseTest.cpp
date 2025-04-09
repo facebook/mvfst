@@ -352,17 +352,20 @@ class TestQuicTransport
     return folly::unit;
   }
 
-  void writeData() override {
-    CHECK(!writeQuicDataToSocket(
-               *socket_,
-               *conn_,
-               *conn_->serverConnectionId,
-               *conn_->clientConnectionId,
-               *aead,
-               *headerCipher,
-               *conn_->version,
-               conn_->transportSettings.writeConnectionDataPacketsLimit)
-               .hasError());
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeData() override {
+    auto result = writeQuicDataToSocket(
+        *socket_,
+        *conn_,
+        conn_->serverConnectionId.value_or(ConnectionId::createRandom(0)),
+        conn_->clientConnectionId.value_or(ConnectionId::createRandom(0)),
+        *aead,
+        *headerCipher,
+        *conn_->version,
+        conn_->transportSettings.writeConnectionDataPacketsLimit);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
+    return folly::unit;
   }
 
   // This is to expose the protected pacedWriteDataToSocket() function
@@ -548,7 +551,11 @@ class TestQuicTransport
   }
 
   void invokeWriteSocketData() {
-    writeSocketData();
+    CHECK(!writeSocketData().hasError());
+  }
+
+  [[nodiscard]] auto invokeWriteSocketDataReturn() {
+    return writeSocketData();
   }
 
   void invokeProcessCallbacksAfterNetworkData() {
@@ -3074,10 +3081,15 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
 TEST_P(QuicTransportImplTestBase, TestTransportCloseWithMaxPacketNumber) {
   transport->setServerConnectionId();
   transport->transportConn->pendingEvents.closeTransport = false;
-  EXPECT_NO_THROW(transport->invokeWriteSocketData());
+  ASSERT_FALSE(transport->invokeWriteSocketDataReturn().hasError());
 
   transport->transportConn->pendingEvents.closeTransport = true;
-  EXPECT_THROW(transport->invokeWriteSocketData(), QuicTransportException);
+  auto result = transport->invokeWriteSocketDataReturn();
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::PROTOCOL_VIOLATION);
 }
 
 TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithActiveStream) {

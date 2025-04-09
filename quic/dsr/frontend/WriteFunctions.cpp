@@ -9,7 +9,7 @@
 #include <quic/dsr/frontend/WriteFunctions.h>
 
 namespace quic {
-uint64_t writePacketizationRequest(
+folly::Expected<uint64_t, QuicError> writePacketizationRequest(
     QuicServerConnectionState& connection,
     const ConnectionId& dstCid,
     size_t packetLimit,
@@ -95,9 +95,7 @@ uint64_t writePacketizationRequest(
         true /* isDSRPacket */);
 
     if (updateResult.hasError()) {
-      throw QuicTransportException(
-          updateResult.error().message,
-          *updateResult.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(updateResult.error());
     }
     connection.dsrPacketCount++;
 

@@ -152,10 +152,10 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   auto split = stream->writeBufMeta.split(500);
   stream->lossBufMetas.push_back(split);
   size_t packetLimit = 10;
-  EXPECT_EQ(
-      2,
-      writePacketizationRequest(
-          conn_, getTestConnectionId(), packetLimit, *aead_));
+  auto packetizationResult = writePacketizationRequest(
+      conn_, getTestConnectionId(), packetLimit, *aead_);
+  ASSERT_FALSE(packetizationResult.hasError());
+  EXPECT_EQ(2, packetizationResult.value());
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
   auto& packet1 = conn_.outstandings.packets.front().packet;

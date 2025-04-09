@@ -53,7 +53,8 @@ class QuicPacketScheduler {
    * packet is a clone and the associated ClonedPacketIdentifier for both origin
    * and clone.
    */
-  virtual SchedulingResult scheduleFramesForPacket(
+  [[nodiscard]] virtual folly::Expected<SchedulingResult, QuicError>
+  scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) = 0;
 
@@ -282,7 +283,8 @@ class FrameScheduler : public QuicPacketScheduler {
 
   FrameScheduler(folly::StringPiece name, QuicConnectionStateBase& conn);
 
-  SchedulingResult scheduleFramesForPacket(
+  [[nodiscard]] folly::Expected<SchedulingResult, QuicError>
+  scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
@@ -337,7 +339,8 @@ class CloningScheduler : public QuicPacketScheduler {
    * packet is a clone and the associated ClonedPacketIdentifier for both origin
    * and clone.
    */
-  SchedulingResult scheduleFramesForPacket(
+  [[nodiscard]] folly::Expected<SchedulingResult, QuicError>
+  scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 

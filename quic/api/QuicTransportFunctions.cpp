@@ -236,7 +236,8 @@ void updateErrnoCount(
   }
 }
 
-DataPathResult continuousMemoryBuildScheduleEncrypt(
+[[nodiscard]] folly::Expected<DataPathResult, QuicError>
+continuousMemoryBuildScheduleEncrypt(
     QuicConnectionStateBase& connection,
     PacketHeader header,
     PacketNumberSpace pnSpace,
@@ -265,7 +266,10 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   auto result =
       scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
   CHECK(connection.bufAccessor->ownsBuffer());
-  auto& packet = result.packet;
+  if (result.hasError()) {
+    return folly::makeUnexpected(result.error());
+  }
+  auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
     rollbackBuf();
     ioBufBatch.flush();
@@ -326,10 +330,11 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
   updateErrnoCount(connection, ioBufBatch);
   return DataPathResult::makeWriteResult(
-      ret, std::move(result), encodedSize, encodedBodySize);
+      ret, std::move(result.value()), encodedSize, encodedBodySize);
 }
 
-DataPathResult iobufChainBasedBuildScheduleEncrypt(
+[[nodiscard]] folly::Expected<DataPathResult, QuicError>
+iobufChainBasedBuildScheduleEncrypt(
     QuicConnectionStateBase& connection,
     PacketHeader header,
     PacketNumberSpace pnSpace,
@@ -348,7 +353,10 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   pktBuilder.accountForCipherOverhead(cipherOverhead);
   auto result =
       scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
-  auto& packet = result.packet;
+  if (result.hasError()) {
+    return folly::makeUnexpected(result.error());
+  }
+  auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
     ioBufBatch.flush();
     updateErrnoCount(connection, ioBufBatch);
@@ -400,7 +408,7 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
   updateErrnoCount(connection, ioBufBatch);
   return DataPathResult::makeWriteResult(
-      ret, std::move(result), encodedSize, encodedBodySize);
+      ret, std::move(result.value()), encodedSize, encodedBodySize);
 }
 
 } // namespace
@@ -534,7 +542,7 @@ void handleRetransmissionBufMetaWritten(
  * with new data, as well as retranmissions. Returns true if the data sent is
  * new data.
  */
-bool handleStreamWritten(
+folly::Expected<bool, QuicError> handleStreamWritten(
     QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
     uint64_t frameOffset,
@@ -548,13 +556,13 @@ bool handleStreamWritten(
     handleNewStreamDataWritten(stream, frameLen, frameFin);
     writtenNewData = true;
   } else if (frameOffset > stream.currentWriteOffset) {
-    throw QuicTransportException(
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
         fmt::format(
             "Byte offset of first byte in written stream frame ({}) is "
             "greater than stream's current write offset ({})",
             frameOffset,
-            stream.currentWriteOffset),
-        TransportErrorCode::INTERNAL_ERROR);
+            stream.currentWriteOffset)));
   }
 
   if (writtenNewData) {
@@ -687,7 +695,7 @@ folly::Expected<folly::Unit, QuicError> updateConnection(
               packetNum,
               packetNumberSpace);
         } else {
-          newStreamDataWritten = handleStreamWritten(
+          auto streamWrittenResult = handleStreamWritten(
               conn,
               *stream,
               writeStreamFrame.offset,
@@ -695,6 +703,10 @@ folly::Expected<folly::Unit, QuicError> updateConnection(
               writeStreamFrame.fin,
               packetNum,
               packetNumberSpace);
+          if (streamWrittenResult.hasError()) {
+            return folly::makeUnexpected(streamWrittenResult.error());
+          }
+          newStreamDataWritten = streamWrittenResult.value();
         }
         if (newStreamDataWritten) {
           auto flowControlResult =
@@ -719,7 +731,7 @@ folly::Expected<folly::Unit, QuicError> updateConnection(
         // NewSessionTicket is sent in crypto frame encrypted with 1-rtt key,
         // however, it is not part of handshake
         auto encryptionLevel = protectionTypeToEncryptionLevel(protectionType);
-        handleStreamWritten(
+        auto cryptoWritten = handleStreamWritten(
             conn,
             *getCryptoStream(*conn.cryptoState, encryptionLevel),
             writeCryptoFrame.offset,
@@ -727,6 +739,9 @@ folly::Expected<folly::Unit, QuicError> updateConnection(
             false /* fin */,
             packetNum,
             packetNumberSpace);
+        if (cryptoWritten.hasError()) {
+          return folly::makeUnexpected(cryptoWritten.error());
+        }
         break;
       }
       case QuicWriteFrame::Type::WriteAckFrame: {
@@ -1661,7 +1676,11 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
         aead,
         headerCipher);
 
-    if (!ret.buildSuccess) {
+    // This is a fatal error vs. a build error.
+    if (ret.hasError()) {
+      return folly::makeUnexpected(ret.error());
+    }
+    if (!ret->buildSuccess) {
       // If we're returning because we couldn't schedule more packets,
       // make sure we flush the buffer in this function.
       ioBufBatch.flush();
@@ -1673,20 +1692,20 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     // matter the write result. We are basically treating this case as if we
     // pretend write was also successful but packet is lost somewhere in the
     // network.
-    bytesWritten += ret.encodedSize;
-    if (ret.result && ret.result->shortHeaderPadding > 0) {
+    bytesWritten += ret->encodedSize;
+    if (ret->result && ret->result->shortHeaderPadding > 0) {
       shortHeaderPaddingCount++;
-      shortHeaderPadding += ret.result->shortHeaderPadding;
+      shortHeaderPadding += ret->result->shortHeaderPadding;
     }
 
-    auto& result = ret.result;
+    auto& result = ret->result;
     auto updateConnResult = updateConnection(
         connection,
         std::move(result->clonedPacketIdentifier),
         std::move(result->packet->packet),
         sentTime,
-        folly::to<uint32_t>(ret.encodedSize),
-        folly::to<uint32_t>(ret.encodedBodySize),
+        folly::to<uint32_t>(ret->encodedSize),
+        folly::to<uint32_t>(ret->encodedBodySize),
         false /* isDSRPacket */);
     if (updateConnResult.hasError()) {
       return folly::makeUnexpected(updateConnResult.error());
@@ -1694,7 +1713,7 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
 
     // if ioBufBatch.write returns false
     // it is because a flush() call failed
-    if (!ret.writeSuccess) {
+    if (!ret->writeSuccess) {
       if (connection.loopDetectorCallback) {
         connection.writeDebugState.noWriteReason =
             NoWriteReason::SOCKET_FAILURE;
@@ -1967,6 +1986,7 @@ void implicitAckCryptoStream(
       implicitAck,
       [](const auto&) {
         // ackedPacketVisitor. No action needed.
+        return folly::unit;
       },
       [&](auto&, auto& packetFrame) {
         switch (packetFrame.type()) {
@@ -2109,7 +2129,7 @@ void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
   }
 }
 
-void maybeVerifyPendingKeyUpdate(
+folly::Expected<folly::Unit, QuicError> maybeVerifyPendingKeyUpdate(
     QuicConnectionStateBase& conn,
     const OutstandingPacketWrapper& outstandingPacket,
     const RegularQuicPacket& ackPacket) {
@@ -2117,7 +2137,7 @@ void maybeVerifyPendingKeyUpdate(
             outstandingPacket.packet.header.getProtectionType()) ==
         EncryptionLevel::AppData)) {
     // This is not an app data packet. We can't have initiated a key update yet.
-    return;
+    return folly::unit;
   }
 
   if (conn.oneRttWritePendingVerificationPacketNumber &&
@@ -2130,11 +2150,12 @@ void maybeVerifyPendingKeyUpdate(
       conn.oneRttWritePendingVerificationPacketNumber.reset();
       conn.oneRttWritePendingVerification = false;
     } else {
-      throw QuicTransportException(
-          "Packet with key update was acked in the wrong phase",
-          TransportErrorCode::CRYPTO_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::CRYPTO_ERROR,
+          "Packet with key update was acked in the wrong phase"));
     }
   }
+  return folly::unit;
 }
 
 // Unfortunate, we should make this more portable.

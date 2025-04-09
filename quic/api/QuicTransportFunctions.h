@@ -181,7 +181,7 @@ void handleRetransmissionWritten(
  * with new data, as well as retranmissions. Returns true if the data sent is
  * new data.
  */
-bool handleStreamWritten(
+[[nodiscard]] folly::Expected<bool, QuicError> handleStreamWritten(
     QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
     uint64_t frameOffset,
@@ -340,7 +340,8 @@ void updateOneRttWriteCipher(
     ProtectionType oneRttPhase);
 void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn);
 void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn);
-void maybeVerifyPendingKeyUpdate(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+maybeVerifyPendingKeyUpdate(
     QuicConnectionStateBase& conn,
     const OutstandingPacketWrapper& outstandingPacket,
     const RegularQuicPacket& ackPacket);

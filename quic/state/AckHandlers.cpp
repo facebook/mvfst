@@ -224,7 +224,10 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
     auto& outstandingPacket = packetWithHandlerContextItr->outstandingPacket;
 
     // run the ACKed packet visitor
-    ackedPacketVisitor(*outstandingPacket);
+    auto ackedPacketResult = ackedPacketVisitor(*outstandingPacket);
+    if (ackedPacketResult.hasError()) {
+      return folly::makeUnexpected(ackedPacketResult.error());
+    }
 
     // Update ecn counts
     incrementEcnCountForAckedPacket(conn, pnSpace);

@@ -19,8 +19,9 @@ using AckVisitor = std::function<void(
     const QuicWriteFrame&,
     const ReadAckFrame&)>;
 
-using AckedPacketVisitor = std::function<void(
-    const OutstandingPacketWrapper&)>; // outstanding packet acked
+using AckedPacketVisitor =
+    std::function<folly::Expected<folly::Unit, QuicError>(
+        const OutstandingPacketWrapper&)>; // outstanding packet acked
 
 using AckedFrameVisitor = std::function<folly::Expected<folly::Unit, QuicError>(
     const OutstandingPacketWrapper&, // outstanding packet acked

@@ -269,7 +269,10 @@ QuicClientTransportLite::processUdpPacketData(
     // TODO (amsharma): verify the "original_connection_id" parameter
     // upon receiving a subsequent initial from the server.
 
-    startCryptoHandshake();
+    auto handshakeResult = startCryptoHandshake();
+    if (handshakeResult.hasError()) {
+      return folly::makeUnexpected(handshakeResult.error());
+    }
     return folly::unit; // Retry processed successfully
   }
 
@@ -425,7 +428,8 @@ QuicClientTransportLite::processUdpPacketData(
           // processing loop.
           conn_->handshakeLayer->handshakeConfirmed();
         }
-        maybeVerifyPendingKeyUpdate(*conn_, outstandingPacket, regularPacket);
+        return maybeVerifyPendingKeyUpdate(
+            *conn_, outstandingPacket, regularPacket);
       };
   AckedFrameVisitor ackedFrameVisitor =
       [&](const OutstandingPacketWrapper& outstandingPacket,
@@ -989,7 +993,7 @@ QuicClientTransportLite::setDSRPacketizationRequestSender(
   return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
 }
 
-void QuicClientTransportLite::writeData() {
+folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::writeData() {
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
   const ConnectionId& destConnId = conn_->serverConnectionId.value_or(
@@ -1001,7 +1005,7 @@ void QuicClientTransportLite::writeData() {
         : clientConn_->lossState.srtt;
     if (clientConn_->lastCloseSentTime &&
         Clock::now() - *clientConn_->lastCloseSentTime < rtt) {
-      return;
+      return folly::unit;
     }
     clientConn_->lastCloseSentTime = Clock::now();
     if (clientConn_->clientHandshakeLayer->getPhase() ==
@@ -1042,7 +1046,7 @@ void QuicClientTransportLite::writeData() {
           *conn_->initialHeaderCipher,
           version);
     }
-    return;
+    return folly::unit;
   }
 
   uint64_t packetLimit =
@@ -1062,24 +1066,22 @@ void QuicClientTransportLite::writeData() {
     auto result =
         handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit, token);
     if (result.hasError()) {
-      throw QuicTransportException(
-          result.error().message, *result.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(result.error());
     }
     packetLimit -= result->packetsWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-      return;
+      return folly::unit;
     }
   }
   if (conn_->handshakeWriteCipher) {
     auto result =
         handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit);
     if (result.hasError()) {
-      throw QuicTransportException(
-          result.error().message, *result.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(result.error());
     }
     packetLimit -= result->packetsWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-      return;
+      return folly::unit;
     }
   }
   if (clientConn_->zeroRttWriteCipher && !conn_->oneRttWriteCipher) {
@@ -1094,13 +1096,12 @@ void QuicClientTransportLite::writeData() {
         version,
         packetLimit);
     if (result.hasError()) {
-      throw QuicTransportException(
-          result.error().message, *result.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(result.error());
     }
     packetLimit -= *result;
   }
   if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-    return;
+    return folly::unit;
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(clientConn_->oneRttWriteHeaderCipher);
@@ -1114,13 +1115,14 @@ void QuicClientTransportLite::writeData() {
         version,
         packetLimit);
     if (result.hasError()) {
-      throw QuicTransportException(
-          result.error().message, *result.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(result.error());
     }
   }
+  return folly::unit;
 }
 
-void QuicClientTransportLite::startCryptoHandshake() {
+folly::Expected<folly::Unit, QuicError>
+QuicClientTransportLite::startCryptoHandshake() {
   auto self = this->shared_from_this();
   setIdleTimer();
   // We need to update the flow control settings every time we start a crypto
@@ -1172,7 +1174,11 @@ void QuicClientTransportLite::startCryptoHandshake() {
   }
   handshakeLayer->connect(hostname_, std::move(paramsExtension));
 
-  writeSocketData();
+  auto writeResult = writeSocketData();
+  if (writeResult.hasError()) {
+    return folly::makeUnexpected(writeResult.error());
+  }
+
   if (!transportReadyNotified_ && clientConn_->zeroRttWriteCipher) {
     transportReadyNotified_ = true;
     runOnEvbAsync([](auto self) {
@@ -1182,6 +1188,8 @@ void QuicClientTransportLite::startCryptoHandshake() {
       }
     });
   }
+
+  return folly::unit;
 }
 
 bool QuicClientTransportLite::hasWriteCipher() const {
@@ -1768,7 +1776,13 @@ void QuicClientTransportLite::start(
         socketOptions_);
     // adjust the GRO buffers
     adjustGROBuffers();
-    startCryptoHandshake();
+    auto handshakeResult = startCryptoHandshake();
+    if (handshakeResult.hasError()) {
+      runOnEvbAsync([error = handshakeResult.error()](auto self) {
+        auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
+        clientPtr->closeImpl(error);
+      });
+    }
   } catch (const QuicTransportException& ex) {
     runOnEvbAsync([ex](auto self) {
       auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());

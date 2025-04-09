@@ -4819,15 +4819,15 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
     WriteStreamFrame writeStreamFrame(
         stream->id, 5 /* offset */, 2 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    EXPECT_ANY_THROW(ASSERT_FALSE(updateConnection(
-                                      *conn,
-                                      none,
-                                      packet.packet,
-                                      TimePoint(),
-                                      getEncodedSize(packet),
-                                      getEncodedBodySize(packet),
-                                      false /* isDSRPacket */)
-                                      .hasError()));
+    ASSERT_TRUE(updateConnection(
+                    *conn,
+                    none,
+                    packet.packet,
+                    TimePoint(),
+                    getEncodedSize(packet),
+                    getEncodedBodySize(packet),
+                    false /* isDSRPacket */)
+                    .hasError());
   }
 }
 
@@ -4867,15 +4867,15 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
     WriteStreamFrame writeStreamFrame(
         stream->id, offset /* offset */, len /* len */, true /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    EXPECT_ANY_THROW(ASSERT_FALSE(updateConnection(
-                                      *conn,
-                                      none,
-                                      packet.packet,
-                                      TimePoint(),
-                                      getEncodedSize(packet),
-                                      getEncodedBodySize(packet),
-                                      false /* isDSRPacket */)
-                                      .hasError()));
+    ASSERT_TRUE(updateConnection(
+                    *conn,
+                    none,
+                    packet.packet,
+                    TimePoint(),
+                    getEncodedSize(packet),
+                    getEncodedBodySize(packet),
+                    false /* isDSRPacket */)
+                    .hasError());
   }
 }
 
@@ -4910,15 +4910,15 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
     WriteStreamFrame writeStreamFrame(
         stream->id, 5 /* offset */, 1 /* len */, false /* fin */);
     packet.packet.frames.push_back(writeStreamFrame);
-    EXPECT_ANY_THROW(ASSERT_FALSE(updateConnection(
-                                      *conn,
-                                      none,
-                                      packet.packet,
-                                      TimePoint(),
-                                      getEncodedSize(packet),
-                                      getEncodedBodySize(packet),
-                                      false /* isDSRPacket */)
-                                      .hasError()));
+    ASSERT_TRUE(updateConnection(
+                    *conn,
+                    none,
+                    packet.packet,
+                    TimePoint(),
+                    getEncodedSize(packet),
+                    getEncodedBodySize(packet),
+                    false /* isDSRPacket */)
+                    .hasError());
   }
 }
 

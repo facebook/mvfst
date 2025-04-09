@@ -56,7 +56,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   MOCK_METHOD((bool), isTLSResumed, (), (const));
   MOCK_METHOD((ZeroRttAttemptState), getZeroRttState, ());
   MOCK_METHOD((void), close, (Optional<QuicError>));
-  MOCK_METHOD((void), writeData, ());
+  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), writeData, ());
   MOCK_METHOD((void), closeSecondSocket, ());
   MOCK_METHOD((void), setHappyEyeballsEnabled, (bool));
   MOCK_METHOD(

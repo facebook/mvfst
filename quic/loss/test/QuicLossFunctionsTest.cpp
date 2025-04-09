@@ -403,7 +403,7 @@ TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {
                    *conn,
                    PacketNumberSpace::Initial,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](auto&, auto&) { return folly::unit; },
                    lossVisitor,
                    Clock::now())
@@ -927,7 +927,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
     return folly::unit;
   };
 
-  auto ackPacketVisitor = [](auto&) {};
+  auto ackPacketVisitor = [](auto&) { return folly::unit; };
   auto ackFrameVisitor = [&](auto&, auto&) { return folly::unit; };
 
   // process and remove the acked packet.
@@ -2524,14 +2524,15 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_TRUE(stream->writeBufMeta.eof);
   ASSERT_EQ(bufMetaStartingOffset + 1000, *stream->finalWriteOffset);
   // Send real data
-  handleStreamWritten(
-      *conn,
-      *stream,
-      0,
-      bufMetaStartingOffset,
-      false,
-      0 /* PacketNum */,
-      PacketNumberSpace::AppData);
+  ASSERT_FALSE(handleStreamWritten(
+                   *conn,
+                   *stream,
+                   0,
+                   bufMetaStartingOffset,
+                   false,
+                   0 /* PacketNum */,
+                   PacketNumberSpace::AppData)
+                   .hasError());
   ASSERT_EQ(0, stream->pendingWrites.chainLength());
   auto retxIter = stream->retransmissionBuffer.find(0);
   ASSERT_NE(stream->retransmissionBuffer.end(), retxIter);

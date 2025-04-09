@@ -227,7 +227,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&, const auto& packetFrame)
                        -> folly::Expected<folly::Unit, QuicError> {
                      auto& stream = *packetFrame.asWriteStreamFrame();
@@ -290,7 +290,7 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto&, const auto&) { return folly::unit; },
       [](auto&, auto&, bool) { return folly::unit; },
       ackReceiveTime);
@@ -382,7 +382,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto&, const auto&) { return folly::unit; },
       [](auto&, auto&, bool) { return folly::unit; },
       startTime + 30ms);
@@ -466,7 +466,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto&, const auto&) { return folly::unit; },
       [](auto&, auto&, bool) { return folly::unit; },
       startTime + 30ms);
@@ -556,7 +556,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    startTime + 30ms)
@@ -643,7 +643,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    startTime + 30ms)
@@ -721,7 +721,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -815,7 +815,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    startTime + 260ms)
@@ -868,7 +868,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame1,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    startTime + 600ms)
@@ -943,7 +943,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -967,7 +967,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame1,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -988,7 +988,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame2,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -1064,7 +1064,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&, const auto& packetFrame) {
                      auto& stream = *packetFrame.asWriteStreamFrame();
                      streams.emplace_back(stream);
@@ -1126,7 +1126,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](auto&, auto) { return folly::unit; },
                    [](auto&, auto&, auto) { return folly::unit; },
                    Clock::now())
@@ -1145,7 +1145,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](auto&, auto) { return folly::unit; },
                    [](auto&, auto&, auto) { return folly::unit; },
                    Clock::now() + 2 * calculatePTO(conn))
@@ -1223,7 +1223,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&, const auto& packetFrame) {
                      auto& stream = *packetFrame.asWriteStreamFrame();
                      streams.emplace_back(stream);
@@ -1360,7 +1360,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&, const auto& packetFrame)
                        -> folly::Expected<folly::Unit, QuicError> {
                      auto& stream = *packetFrame.asWriteStreamFrame();
@@ -1460,7 +1460,7 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
                    conn,
                    GetParam().pnSpace,
                    firstReceivedAck,
-                   [](const auto&) {},
+                   [](const auto&) { return folly::unit; },
                    [&](const auto& outstandingPacket, const auto& packetFrame)
                        -> folly::Expected<folly::Unit, QuicError> {
                      auto ackedPacketNum =
@@ -1492,7 +1492,7 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
                    conn,
                    GetParam().pnSpace,
                    secondReceivedAck,
-                   [](const auto&) {},
+                   [](const auto&) { return folly::unit; },
                    [&](const auto&, const auto& packetFrame)
                        -> folly::Expected<folly::Unit, QuicError> {
                      const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
@@ -1540,7 +1540,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&,
                       const auto&) -> folly::Expected<folly::Unit, QuicError> {
                      return folly::unit;
@@ -1566,7 +1566,7 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&,
                       const auto&) -> folly::Expected<folly::Unit, QuicError> {
                      return folly::unit;
@@ -1626,7 +1626,7 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&,
                       const auto&) -> folly::Expected<folly::Unit, QuicError> {
                      return folly::unit;
@@ -1673,7 +1673,7 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&,
                        const auto&) -> folly::Expected<folly::Unit, QuicError> {
                      return folly::unit;
@@ -1892,7 +1892,7 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    countingAckVisitor,
                    [](auto& /* conn */, auto& /* packet */, bool /* processed */
                    ) { return folly::unit; },
@@ -1960,7 +1960,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    countingAckVisitor,
                    [](auto& /* conn */, auto& /* packet */, bool /* processed */
                    ) { return folly::unit; },
@@ -2035,7 +2035,7 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&, const auto&) { return folly::unit; },
                    [&](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -2104,7 +2104,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame1,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    countingAckVisitor,
                    [](auto& /* conn */, auto& /* packet */, bool /* processed */
                    ) { return folly::unit; },
@@ -2120,7 +2120,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame2,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    countingAckVisitor,
                    [&](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -2188,7 +2188,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    countingAckVisitor,
                    [&](auto&, auto&, bool) { return folly::unit; },
                    Clock::now())
@@ -2230,7 +2230,7 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](const auto&, const auto&) { return folly::unit; },
                    [&](auto&, auto&, bool) { return folly::unit; },
                    receiveTime)
@@ -2313,7 +2313,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    countingAckVisitor,
                    [](auto& /* conn */, auto& /* packet */, bool /* processed */
                    ) { return folly::unit; },
@@ -2359,7 +2359,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [&](auto&, auto) { return folly::unit; },
                    [&](auto&, auto&, auto) { return folly::unit; },
                    receiveTime)
@@ -2488,7 +2488,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto&, const auto&) { return folly::unit; },
       [](auto&, auto&, bool) { return folly::unit; },
       ackTime);
@@ -2618,7 +2618,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto&, const auto&) { return folly::unit; },
       [](auto&, auto&, bool) { return folly::unit; },
       ackTime);
@@ -2728,7 +2728,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto&, const auto&) { return folly::unit; },
       [](auto&, auto&, bool) { return folly::unit; },
       ackTime);
@@ -2786,7 +2786,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestamps) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
         return folly::unit;
       },
@@ -2883,7 +2883,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsGaps) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
         return folly::unit;
       },
@@ -2945,7 +2945,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](auto&) {},
+        [](auto&) { return folly::unit; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
           return folly::unit;
         },
@@ -2975,7 +2975,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](auto&) {},
+        [](auto&) { return folly::unit; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
           return folly::unit;
         },
@@ -3042,7 +3042,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](auto&) {},
+        [](auto&) { return folly::unit; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
           return folly::unit;
         },
@@ -3159,7 +3159,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
         conn,
         GetParam().pnSpace,
         ackFrame,
-        [](auto&) {},
+        [](auto&) { return folly::unit; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
           return folly::unit;
         },
@@ -3215,7 +3215,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
         conn,
         GetParam().pnSpace,
         ackFrame2,
-        [](auto&) {},
+        [](auto&) { return folly::unit; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
           return folly::unit;
         },
@@ -3290,7 +3290,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsMaxCheck) {
       conn,
       GetParam().pnSpace,
       ackFrame,
-      [](auto&) {},
+      [](auto&) { return folly::unit; },
       [](const auto& /*outstandingPacket*/, const auto& /*frame*/) {
         return folly::unit;
       },
@@ -3476,7 +3476,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    ackTime)
@@ -3577,7 +3577,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    ackTime)
@@ -3705,7 +3705,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      ackTime)
@@ -3762,7 +3762,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      ackTime)
@@ -3819,7 +3819,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      ackTime)
@@ -3939,7 +3939,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      ackTime)
@@ -3965,7 +3965,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      ackTime)
@@ -4065,7 +4065,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    ackTime)
@@ -4178,7 +4178,7 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
                      conn,
                      GetParam().pnSpace,
                      ackData.ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      ackData.ackTime)
@@ -4273,7 +4273,7 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      startTime + 30ms)
@@ -4373,7 +4373,7 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
                      conn,
                      GetParam().pnSpace,
                      ackFrame,
-                     [](auto&) {},
+                     [](auto&) { return folly::unit; },
                      [](const auto&, const auto&) { return folly::unit; },
                      [](auto&, auto&, bool) { return folly::unit; },
                      startTime + 510ms)
@@ -4418,7 +4418,7 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
                    conn,
                    GetParam().pnSpace,
                    ackFrame,
-                   [](auto&) {},
+                   [](auto&) { return folly::unit; },
                    [](const auto&, const auto&) { return folly::unit; },
                    [](auto&, auto&, bool) { return folly::unit; },
                    ackReceiveTime)
@@ -4584,7 +4584,7 @@ class AckEventForAppDataTest : public Test {
         *conn_,
         PacketNumberSpace::AppData,
         ackFrame,
-        [](auto&) {},
+        [](auto&) { return folly::unit; },
         [&](const OutstandingPacketWrapper& /* packet */,
             const QuicWriteFrame& packetFrame)
             -> folly::Expected<folly::Unit, QuicError> {

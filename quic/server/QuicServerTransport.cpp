@@ -216,9 +216,9 @@ void QuicServerTransport::accept() {
       std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
-void QuicServerTransport::writeData() {
+folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
   if (!conn_->clientConnectionId || !conn_->serverConnectionId) {
-    return;
+    return folly::unit;
   }
   auto version = conn_->version.value_or(*(conn_->originalVersion));
   const ConnectionId& srcConnId = *conn_->serverConnectionId;
@@ -227,12 +227,12 @@ void QuicServerTransport::writeData() {
     if (conn_->peerConnectionError &&
         hasReceivedUdpPacketsAtLastCloseSent(*conn_)) {
       // The peer sent us an error, we are in draining state now.
-      return;
+      return folly::unit;
     }
     if (hasReceivedUdpPacketsAtLastCloseSent(*conn_) &&
         hasNotReceivedNewPacketsSinceLastCloseSent(*conn_)) {
       // We did not receive any new packets, do not sent a new close frame.
-      return;
+      return folly::unit;
     }
     updateLargestReceivedUdpPacketsAtLastCloseSent(*conn_);
     if (conn_->oneRttWriteCipher) {
@@ -271,7 +271,7 @@ void QuicServerTransport::writeData() {
           *conn_->initialHeaderCipher,
           version);
     }
-    return;
+    return folly::unit;
   }
   uint64_t packetLimit =
       (isConnectionPaced(*conn_)
@@ -286,32 +286,31 @@ void QuicServerTransport::writeData() {
   if (conn_->initialWriteCipher) {
     auto res = handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit);
     if (res.hasError()) {
-      throw QuicTransportException(
-          res.error().message, *res.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(res.error());
     }
     packetLimit -= res->packetsWritten;
     serverConn_->numHandshakeBytesSent += res->bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-      return;
+      return folly::unit;
     }
   }
   if (conn_->handshakeWriteCipher) {
     auto res =
         handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit);
     if (res.hasError()) {
-      throw QuicTransportException(
-          res.error().message, *res.error().code.asTransportErrorCode());
+      return folly::makeUnexpected(res.error());
     }
     packetLimit -= res->packetsWritten;
     serverConn_->numHandshakeBytesSent += res->bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-      return;
+      return folly::unit;
     }
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
     auto writeLoopBeginTime = Clock::now();
-    auto nonDsrPath = [&](auto limit) {
+    auto nonDsrPath =
+        [&](auto limit) -> folly::Expected<WriteQuicDataResult, QuicError> {
       auto result = writeQuicDataToSocket(
           *socket_,
           *conn_,
@@ -323,25 +322,26 @@ void QuicServerTransport::writeData() {
           limit,
           writeLoopBeginTime);
       if (result.hasError()) {
-        throw QuicTransportException(
-            result.error().message,
-            *result.error().code.asTransportErrorCode());
+        return folly::makeUnexpected(result.error());
       }
-      return *result;
+      return result.value();
     };
-    auto dsrPath = [&](auto limit) {
+    auto dsrPath =
+        [&](auto limit) -> folly::Expected<WriteQuicDataResult, QuicError> {
       auto bytesBefore = conn_->lossState.totalBytesSent;
       // The DSR path can't write probes.
       // This is packetsWritte, probesWritten, bytesWritten.
+      auto dsrResult = writePacketizationRequest(
+          *serverConn_,
+          destConnId,
+          limit,
+          *conn_->oneRttWriteCipher,
+          writeLoopBeginTime);
+      if (dsrResult.hasError()) {
+        return folly::makeUnexpected(dsrResult.error());
+      }
       auto result = WriteQuicDataResult{
-          writePacketizationRequest(
-              *serverConn_,
-              destConnId,
-              limit,
-              *conn_->oneRttWriteCipher,
-              writeLoopBeginTime),
-          0,
-          conn_->lossState.totalBytesSent - bytesBefore};
+          dsrResult.value(), 0, conn_->lossState.totalBytesSent - bytesBefore};
       return result;
     };
     // We need a while loop because both paths write streams from the same
@@ -351,14 +351,20 @@ void QuicServerTransport::writeData() {
       // Give the non-DSR path a chance first for things like ACKs and flow
       // control.
       auto written = nonDsrPath(packetLimit);
+      if (written.hasError()) {
+        return folly::makeUnexpected(written.error());
+      }
       // For both paths we only consider full packets against the packet
       // limit. While this is slightly more aggressive than the intended
       // packet limit it also helps ensure that small packets don't cause
       // us to underutilize the link when mixing between DSR and non-DSR.
-      packetLimit -= written.bytesWritten / conn_->udpSendPacketLen;
+      packetLimit -= written->bytesWritten / conn_->udpSendPacketLen;
       if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
-        written = dsrPath(packetLimit);
-        packetLimit -= written.bytesWritten / conn_->udpSendPacketLen;
+        auto dsrWritten = dsrPath(packetLimit);
+        if (dsrWritten.hasError()) {
+          return folly::makeUnexpected(dsrWritten.error());
+        }
+        packetLimit -= dsrWritten->bytesWritten / conn_->udpSendPacketLen;
       }
       if (totalSentBefore == conn_->lossState.totalBytesSent) {
         // We haven't written anything with either path, so we're done.
@@ -366,6 +372,7 @@ void QuicServerTransport::writeData() {
       }
     }
   }
+  return folly::unit;
 }
 
 void QuicServerTransport::closeTransport() {
@@ -444,7 +451,11 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     maybeNotifyConnectionIdBound();
     maybeNotifyHandshakeFinished();
     maybeIssueConnectionIds();
-    writeSocketData();
+    auto writeResult = writeSocketData();
+    if (writeResult.hasError()) {
+      closeImpl(writeResult.error());
+      return;
+    }
     maybeNotifyTransportReady();
   } catch (const QuicTransportException& ex) {
     VLOG(4) << "onCryptoEventAvailable() error " << ex.what() << " " << *this;

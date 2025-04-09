@@ -708,7 +708,7 @@ TEST_F(BbrTest, BytesCounting) {
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = packetNum;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
-  auto ackPacketVisitor = [](auto&) {};
+  auto ackPacketVisitor = [](auto&) { return folly::unit; };
   auto ackFrameVisitor = [](auto&, auto&) { return folly::unit; };
   auto lossVisitor = [](auto&, auto&, bool) { return folly::unit; };
   ASSERT_FALSE(processAckFrame(

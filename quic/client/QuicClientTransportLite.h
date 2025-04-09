@@ -160,7 +160,7 @@ class QuicClientTransportLite
   folly::Expected<folly::Unit, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) override;
-  void writeData() override;
+  folly::Expected<folly::Unit, QuicError> writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
   bool hasWriteCipher() const override;
@@ -337,7 +337,8 @@ class QuicClientTransportLite
       const folly::SocketAddress& peer,
       ReceivedUdpPacket& udpPacket);
 
-  void startCryptoHandshake();
+  [[nodiscard]]
+  folly::Expected<folly::Unit, QuicError> startCryptoHandshake();
 
   void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept;
 

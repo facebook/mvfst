@@ -140,7 +140,7 @@ class QuicServerTransport
   folly::Expected<folly::Unit, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) override;
-  void writeData() override;
+  folly::Expected<folly::Unit, QuicError> writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
   bool hasWriteCipher() const override;

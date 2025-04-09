@@ -1145,8 +1145,9 @@ TEST_F(QuicOpenStateTest, DSRFullStreamAcked) {
   size_t len = buf->computeChainDataLength();
   ASSERT_FALSE(
       writeDataToQuicStream(*stream, std::move(buf), false).hasError());
-  handleStreamWritten(
-      *conn, *stream, 0, len, false, 1, PacketNumberSpace::AppData);
+  ASSERT_FALSE(handleStreamWritten(
+                   *conn, *stream, 0, len, false, 1, PacketNumberSpace::AppData)
+                   .hasError());
   ASSERT_EQ(stream->retransmissionBuffer.size(), 1);
   ASSERT_FALSE(
       writeBufMetaToQuicStream(*stream, BufferMeta(1000), true).hasError());

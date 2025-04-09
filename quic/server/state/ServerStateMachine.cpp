@@ -1080,7 +1080,8 @@ void onServerReadDataFromOpen(
 
     AckedPacketVisitor ackedPacketVisitor =
         [&](const OutstandingPacketWrapper& outstandingPacket) {
-          maybeVerifyPendingKeyUpdate(conn, outstandingPacket, regularPacket);
+          return maybeVerifyPendingKeyUpdate(
+              conn, outstandingPacket, regularPacket);
         };
     AckedFrameVisitor ackedFrameVisitor = [&](const OutstandingPacketWrapper&,
                                               const QuicWriteFrame& packetFrame)

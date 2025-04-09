@@ -174,7 +174,12 @@ void QuicTransportBaseLite::onNetworkData(
     } else {
       // In the closed state, we would want to write a close if possible
       // however the write looper will not be set.
-      writeSocketData();
+      auto result = writeSocketData();
+      if (result.hasError()) {
+        VLOG(4) << __func__ << " " << result.error().message << " " << *this;
+        exceptionCloseWhat_ = result.error().message;
+        closeImpl(result.error());
+      }
     }
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -1203,7 +1208,13 @@ void QuicTransportBaseLite::checkForClosedStream() {
 void QuicTransportBaseLite::writeSocketDataAndCatch() {
   [[maybe_unused]] auto self = sharedGuard();
   try {
-    writeSocketData();
+    auto result = writeSocketData();
+    if (result.hasError()) {
+      VLOG(4) << __func__ << " " << result.error().message << " " << *this;
+      exceptionCloseWhat_ = result.error().message;
+      closeImpl(result.error());
+      return;
+    }
     processCallbacksAfterWriteData();
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << ex.what() << " " << *this;
@@ -1264,7 +1275,8 @@ void QuicTransportBaseLite::pacedWriteDataToSocket() {
   writeSocketDataAndCatch();
 }
 
-void QuicTransportBaseLite::writeSocketData() {
+folly::Expected<folly::Unit, QuicError>
+QuicTransportBaseLite::writeSocketData() {
   if (socket_) {
     ++(conn_->writeCount); // incremented on each write (or write attempt)
 
@@ -1284,12 +1296,15 @@ void QuicTransportBaseLite::writeSocketData() {
       conn_->appLimitedTracker.setNotAppLimited();
       notifyStartWritingFromAppRateLimited();
     }
-    writeData();
+    auto result = writeData();
+    if (result.hasError()) {
+      return result;
+    }
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
-        throw QuicTransportException(
-            "Max packet number reached",
-            TransportErrorCode::PROTOCOL_VIOLATION);
+        return folly::makeUnexpected(QuicError(
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            "Max packet number reached"));
       }
       setLossDetectionAlarm(*conn_, *this);
 
@@ -1372,6 +1387,7 @@ void QuicTransportBaseLite::writeSocketData() {
   scheduleAckTimeout();
   schedulePathValidationTimeout();
   updateWriteLooper(false);
+  return folly::unit;
 }
 
 // TODO: t64691045 change the closeImpl API to include both the sanitized and
@@ -1555,16 +1571,14 @@ void QuicTransportBaseLite::closeImpl(
 
   // We don't need no congestion control.
   conn_->congestionController = nullptr;
-
   sendCloseImmediately = sendCloseImmediately && !isReset && !isAbandon;
   if (sendCloseImmediately) {
     // We might be invoked from the destructor, so just send the connection
     // close directly.
-    try {
-      writeData();
-    } catch (const std::exception& ex) {
-      // This could happen if the writes fail.
-      LOG(ERROR) << "close threw exception " << ex.what() << " " << *this;
+    auto result = writeData();
+    if (result.hasError()) {
+      LOG(ERROR) << "close failed with error: " << result.error().message << " "
+                 << *this;
     }
   }
   drainConnection =

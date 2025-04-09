@@ -91,22 +91,24 @@ class TestQuicTransport
     return folly::unit;
   }
 
-  void writeData() override {
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeData() override {
     if (closed) {
-      return;
+      return folly::unit;
     }
-    CHECK(!writeQuicDataToSocket(
-               *socket_,
-               *conn_,
-               *conn_->clientConnectionId,
-               *conn_->serverConnectionId,
-               *aead,
-               *headerCipher,
-               getVersion(),
-               (isConnectionPaced(*conn_)
-                    ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
-                    : conn_->transportSettings.writeConnectionDataPacketsLimit))
-               .hasError());
+    auto result = writeQuicDataToSocket(
+        *socket_,
+        *conn_,
+        *conn_->clientConnectionId,
+        *conn_->serverConnectionId,
+        *aead,
+        *headerCipher,
+        getVersion(),
+        (isConnectionPaced(*conn_)
+             ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
+             : conn_->transportSettings.writeConnectionDataPacketsLimit));
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
     writePacketizationRequest(
         *dynamic_cast<QuicServerConnectionState*>(conn_.get()),
         *conn_->clientConnectionId,
@@ -115,6 +117,7 @@ class TestQuicTransport
              : conn_->transportSettings.writeConnectionDataPacketsLimit),
         *aead,
         Clock::now());
+    return folly::unit;
   }
 
   void closeTransport() override {

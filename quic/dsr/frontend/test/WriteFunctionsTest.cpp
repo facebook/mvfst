@@ -24,7 +24,9 @@ TEST_F(WriteFunctionsTest, SchedulerNoData) {
   prepareFlowControlAndStreamLimit();
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(0, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteFunctionsTest, CwndBlockd) {
@@ -37,7 +39,9 @@ TEST_F(WriteFunctionsTest, CwndBlockd) {
       .WillRepeatedly(Return(0));
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(0, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteFunctionsTest, FlowControlBlockded) {
@@ -50,7 +54,9 @@ TEST_F(WriteFunctionsTest, FlowControlBlockded) {
       .WillRepeatedly(Return(0));
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(0, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteFunctionsTest, WriteOne) {
@@ -60,7 +66,9 @@ TEST_F(WriteFunctionsTest, WriteOne) {
   auto stream = conn_.streamManager->findStream(streamId);
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 20;
-  EXPECT_EQ(1, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(1, result.value());
   EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
   EXPECT_EQ(1, stream->retransmissionBufMetas.size());
   EXPECT_EQ(1, countInstructions(streamId));
@@ -81,7 +89,9 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimit) {
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 2;
   conn_.lossState.srtt = 100ms;
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_EQ(2, countInstructions(streamId));
@@ -90,10 +100,10 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimit) {
 
   // Fake the time so it's in the past.
   auto writeLoopBeginTime = Clock::now() - 200ms;
-  EXPECT_EQ(
-      0,
-      writePacketizationRequest(
-          conn_, cid, packetLimit, *aead_, writeLoopBeginTime));
+  result = writePacketizationRequest(
+      conn_, cid, packetLimit, *aead_, writeLoopBeginTime);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
@@ -114,7 +124,9 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimitNoLimit) {
   size_t packetLimit = 2;
   conn_.lossState.srtt = 100ms;
   conn_.transportSettings.writeLimitRttFraction = 0;
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_EQ(2, countInstructions(streamId));
@@ -123,10 +135,10 @@ TEST_F(WriteFunctionsTest, WriteLoopTimeLimitNoLimit) {
 
   // Fake the time so it's in the past.
   auto writeLoopBeginTime = Clock::now() - 200ms;
-  EXPECT_EQ(
-      1,
-      writePacketizationRequest(
-          conn_, cid, packetLimit, *aead_, writeLoopBeginTime));
+  result = writePacketizationRequest(
+      conn_, cid, packetLimit, *aead_, writeLoopBeginTime);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(1, result.value());
   EXPECT_EQ(3, stream->retransmissionBufMetas.size());
   EXPECT_EQ(3, countInstructions(streamId));
   EXPECT_EQ(3, conn_.outstandings.packets.size());
@@ -144,7 +156,9 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   conn_.streamManager->updateWritableStreams(*stream);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
@@ -172,7 +186,9 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
       .WillRepeatedly(Return(1000));
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(20, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(20, result.value());
   EXPECT_EQ(20, stream->retransmissionBufMetas.size());
   EXPECT_EQ(20, countInstructions(streamId));
   EXPECT_EQ(20, conn_.outstandings.packets.size());
@@ -197,7 +213,9 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   conn_.streamManager->updateWritableStreams(*stream2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
   EXPECT_EQ(1, countInstructions(streamId1));
@@ -218,13 +236,17 @@ TEST_F(WriteFunctionsTest, WriteThreeStreamsNonDsrAndDsr) {
   size_t packetLimit = 20;
   // First loop only write a single packet because it will find there's non-DSR
   // data to write on the next stream.
-  EXPECT_EQ(1, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(1, result.value());
   // Pretend we sent the non DSR data for last stream
   stream3->ackedIntervals.insert(0, stream3->writeBuffer.chainLength() - 1);
   stream3->currentWriteOffset = stream3->writeBuffer.chainLength();
   ChainedByteRangeHead(std::move(stream3->pendingWrites));
   conn_.streamManager->updateWritableStreams(*stream3);
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream3->retransmissionBufMetas.size());
@@ -250,7 +272,9 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsNonIncremental) {
   conn_.streamManager->updateWritableStreams(*stream1);
   auto cid = getTestConnectionId();
   size_t packetLimit = 2;
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_EQ(2, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(0, stream2->retransmissionBufMetas.size());
   EXPECT_EQ(2, countInstructions(streamId1));
@@ -274,7 +298,9 @@ TEST_F(WriteFunctionsTest, WriteTwoStreamsIncremental) {
   conn_.streamManager->updateWritableStreams(*stream2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 2;
-  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
+  auto result = writePacketizationRequest(conn_, cid, packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
   EXPECT_EQ(1, countInstructions(streamId1));
@@ -297,10 +323,10 @@ TEST_F(WriteFunctionsTest, LossAndFreshTwoInstructionsInTwoPackets) {
   auto split = stream->writeBufMeta.split(500);
   stream->lossBufMetas.push_back(split);
   size_t packetLimit = 10;
-  EXPECT_EQ(
-      2,
-      writePacketizationRequest(
-          conn_, getTestConnectionId(), packetLimit, *aead_));
+  auto result = writePacketizationRequest(
+      conn_, getTestConnectionId(), packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(2, result.value());
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
   auto& packet1 = conn_.outstandings.packets.front().packet;
@@ -331,10 +357,10 @@ TEST_F(
       conn_.flowControlState.peerAdvertisedMaxOffset;
   size_t packetLimit = 10;
   // Should only write lost data
-  EXPECT_EQ(
-      1,
-      writePacketizationRequest(
-          conn_, getTestConnectionId(), packetLimit, *aead_));
+  auto result = writePacketizationRequest(
+      conn_, getTestConnectionId(), packetLimit, *aead_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(1, result.value());
   EXPECT_EQ(1, countInstructions(streamId));
   ASSERT_EQ(1, conn_.outstandings.packets.size());
   auto& packet1 = conn_.outstandings.packets.front().packet;
