@@ -1639,7 +1639,7 @@ TEST_F(QuicServerWorkerRetryTest, TestRetryValidInitial) {
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
 
   // send initial to extract the retry token sent by the server
-  std::string retryToken{""};
+  std::string retryToken;
   expectServerRetryPacketWrite(retryToken);
   testSendInitial(srcConnId, dstConnId, kClientAddr);
 
@@ -1658,7 +1658,7 @@ TEST_F(QuicServerWorkerRetryTest, TestRetryUnfinishedValidInitial) {
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
 
   // send initial to extract the retry token sent by the server
-  std::string retryToken{""};
+  std::string retryToken;
   expectServerRetryPacketWrite(retryToken);
   testSendInitial(srcConnId, dstConnId, kClientAddr);
 
@@ -1674,7 +1674,7 @@ TEST_F(QuicServerWorkerRetryTest, TestRetryInvalidInitialClientIp) {
   auto srcConnId = getTestConnectionId(0);
 
   // send initial to extract the retry token sent by the server
-  std::string retryToken{""};
+  std::string retryToken;
   expectServerRetryPacketWrite(retryToken);
   testSendInitial(srcConnId, dstConnId, kClientAddr);
 
@@ -1695,7 +1695,7 @@ TEST_F(QuicServerWorkerRetryTest, TestRetryUnfinishedInvalidInitialClientIp) {
   auto srcConnId = getTestConnectionId(0);
 
   // send initial to extract the retry token sent by the server
-  std::string retryToken{""};
+  std::string retryToken;
   expectServerRetryPacketWrite(retryToken);
   testSendInitial(srcConnId, dstConnId, kClientAddr);
 
@@ -1712,7 +1712,7 @@ TEST_F(QuicServerWorkerRetryTest, TestRetryInvalidInitialDstConnId) {
   auto srcConnId = getTestConnectionId(0);
 
   // send initial to extract the retry token sent by the server
-  std::string retryToken{""};
+  std::string retryToken;
   expectServerRetryPacketWrite(retryToken);
   testSendInitial(srcConnId, dstConnId, kClientAddr);
 
