@@ -265,10 +265,10 @@ continuousMemoryBuildScheduleEncrypt(
   CHECK(scheduler.hasData());
   auto result =
       scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
-  CHECK(connection.bufAccessor->ownsBuffer());
   if (result.hasError()) {
     return folly::makeUnexpected(result.error());
   }
+  CHECK(connection.bufAccessor->ownsBuffer());
   auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
     rollbackBuf();
