@@ -50,7 +50,10 @@ folly::Expected<uint64_t, QuicError> writePacketizationRequest(
         getAckState(connection, PacketNumberSpace::AppData)
             .largestAckedByPeer.value_or(0));
     auto schedulerResult = scheduler.writeStream(packetBuilder);
-    if (!schedulerResult.writeSuccess) {
+    if (schedulerResult.hasError()) {
+      return folly::makeUnexpected(schedulerResult.error());
+    }
+    if (!schedulerResult->writeSuccess) {
       /**
        * Scheduling can fail when we:
        * (1) run out of flow control
@@ -61,19 +64,19 @@ folly::Expected<uint64_t, QuicError> writePacketizationRequest(
        *
        * At least for (1) and (3), we should flush the sender.
        */
-      if (schedulerResult.sender) {
-        senders.insert(schedulerResult.sender);
+      if (schedulerResult->sender) {
+        senders.insert(schedulerResult->sender);
       }
       return packetCounter;
     }
-    CHECK(schedulerResult.sender);
+    CHECK(schedulerResult->sender);
     auto packet = std::move(packetBuilder).buildPacket();
     // The contract is that if scheduler can schedule, builder has to be able to
     // build.
     CHECK_GT(packet.encodedSize, 0u);
     bool instructionAddError = false;
     for (const auto& instruction : packet.sendInstructions) {
-      if (!schedulerResult.sender->addSendInstruction(instruction)) {
+      if (!schedulerResult->sender->addSendInstruction(instruction)) {
         instructionAddError = true;
         break;
       }
@@ -101,12 +104,13 @@ folly::Expected<uint64_t, QuicError> writePacketizationRequest(
 
     if (instructionAddError) {
       // TODO: Support empty write loop detection
-      senders.insert(schedulerResult.sender);
+      senders.insert(schedulerResult->sender);
       return packetCounter;
     }
     ++packetCounter;
-    senders.insert(schedulerResult.sender);
+    senders.insert(schedulerResult->sender);
   }
   return packetCounter;
 }
+
 } // namespace quic

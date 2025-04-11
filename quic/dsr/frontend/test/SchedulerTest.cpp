@@ -52,7 +52,9 @@ TEST_F(SchedulerTest, ScheduleStream) {
         writtenLength = instruction.len;
         EXPECT_FALSE(instruction.fin);
       }));
-  EXPECT_TRUE(scheduler.writeStream(builder_).writeSuccess);
+  auto result = scheduler.writeStream(builder_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_TRUE(result.value().writeSuccess);
 
   auto writtenMeta = stream->writeBufMeta.split(writtenLength);
   auto nextExpectedOffset = stream->writeBufMeta.offset;
@@ -79,7 +81,9 @@ TEST_F(SchedulerTest, ScheduleStream) {
         writtenLength = instruction.len;
         EXPECT_TRUE(instruction.fin);
       }));
-  EXPECT_TRUE(scheduler.writeStream(builder_).writeSuccess);
+  result = scheduler.writeStream(builder_);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_TRUE(result.value().writeSuccess);
 
   auto nextWrittenMeta = stream->writeBufMeta.split(writtenLength);
   EXPECT_EQ(stream->writeBufMeta.length, 0);

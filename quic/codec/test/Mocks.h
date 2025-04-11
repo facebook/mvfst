@@ -96,7 +96,10 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD(uint32_t, getHeaderBytes, (), (const));
   MOCK_METHOD(bool, hasFramesPending, (), (const));
   MOCK_METHOD(void, releaseOutputBufferMock, ());
-  MOCK_METHOD(void, encodePacketHeader, ());
+  MOCK_METHOD(
+      (folly::Expected<folly::Unit, QuicError>),
+      encodePacketHeader,
+      ());
 
   void releaseOutputBuffer() && override {
     releaseOutputBufferMock();

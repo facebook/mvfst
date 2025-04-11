@@ -49,7 +49,7 @@ TEST_F(QuicHeaderCodecTest, ShortHeaderTest) {
       ShortHeader(
           ProtectionType::KeyPhaseZero, getTestConnectionId(), packetNum),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   auto packet = std::move(builder).buildPacket();
   auto result = parseHeader(packet.header);
   auto& header = result->parsedHeader;

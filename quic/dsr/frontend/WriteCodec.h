@@ -11,7 +11,7 @@
 #include <quic/dsr/frontend/PacketBuilder.h>
 
 namespace quic {
-uint32_t writeDSRStreamFrame(
+[[nodiscard]] folly::Expected<uint32_t, QuicError> writeDSRStreamFrame(
     DSRPacketBuilderBase& packetBuilder,
     SendInstruction::Builder& instructionBuilder,
     StreamId id,

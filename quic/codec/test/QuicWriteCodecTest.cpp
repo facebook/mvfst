@@ -158,12 +158,13 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
             pktBuilder.appender_.push(data, len);
             pktBuilder.remaining_ -= len;
           })));
-
   EXPECT_CALL(pktBuilder, write(_))
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInteger) {
+        auto size = quicInteger.getSize();
+        ASSERT_FALSE(size.hasError());
         quicInteger.encode(
             [&](auto val) { pktBuilder.appender_.writeBE(val); });
-        pktBuilder.remaining_ -= quicInteger.getSize();
+        pktBuilder.remaining_ -= *size;
       }));
 }
 
@@ -224,8 +225,10 @@ size_t computeBytesForOptionalAckFields(
 
   if (frameType == FrameType::ACK_EXTENDED) {
     // Account for the extended ack header if it is included into the ack.
-    sizeConsumed += getQuicIntegerSizeThrows(
-        ackFrameWriteResult.extendedAckFeaturesEnabled);
+    auto sizeResult =
+        getQuicIntegerSize(ackFrameWriteResult.extendedAckFeaturesEnabled);
+    CHECK(!sizeResult.hasError());
+    sizeConsumed += sizeResult.value();
   }
 
   if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS ||
@@ -250,27 +253,41 @@ size_t computeBytesForOptionalAckFields(
     // 1. last received packet's timestamp delta,
     // 2. last received packet's number,
     // 3. count of timestamp ranges
-    sizeConsumed +=
-        getQuicIntegerSizeThrows(
-            lastTimeStampDelta
-                .count()) + // latest received packet timestamp delta
-        getQuicIntegerSizeThrows(lastPktNum) + // latest received packet number
-        getQuicIntegerSizeThrows(
-            numRanges); // count of ack_receive_timestamp ranges
+    auto lastTimeDeltaSizeResult =
+        getQuicIntegerSize(lastTimeStampDelta.count());
+    CHECK(!lastTimeDeltaSizeResult.hasError());
+    auto lastPktNumSizeResult = getQuicIntegerSize(lastPktNum);
+    CHECK(!lastPktNumSizeResult.hasError());
+    auto numRangesSizeResult = getQuicIntegerSize(numRanges);
+    CHECK(!numRangesSizeResult.hasError());
+
+    sizeConsumed += lastTimeDeltaSizeResult
+                        .value() + // latest received packet timestamp delta
+        lastPktNumSizeResult.value() + // latest received packet number
+        numRangesSizeResult.value(); // count of ack_receive_timestamp ranges
 
     if (numRanges > 0) {
-      sizeConsumed +=
+      auto sizeUsedResult =
           computeSizeUsedByRecvdTimestamps(ackFrameWriteResult.writeAckFrame);
+      CHECK(!sizeUsedResult.hasError());
+      sizeConsumed += sizeUsedResult.value();
     };
   }
 
   if (shouldHaveECN) {
     // Account for ECN count fields if they are included into the ack.
-    sizeConsumed += getQuicIntegerSizeThrows(
-                        ackFrameMetadata.ackState.ecnECT0CountReceived) +
-        getQuicIntegerSizeThrows(
-                        ackFrameMetadata.ackState.ecnECT1CountReceived) +
-        getQuicIntegerSizeThrows(ackFrameMetadata.ackState.ecnCECountReceived);
+    auto ect0SizeResult =
+        getQuicIntegerSize(ackFrameMetadata.ackState.ecnECT0CountReceived);
+    CHECK(!ect0SizeResult.hasError());
+    auto ect1SizeResult =
+        getQuicIntegerSize(ackFrameMetadata.ackState.ecnECT1CountReceived);
+    CHECK(!ect1SizeResult.hasError());
+    auto ceSizeResult =
+        getQuicIntegerSize(ackFrameMetadata.ackState.ecnCECountReceived);
+    CHECK(!ceSizeResult.hasError());
+
+    sizeConsumed +=
+        ect0SizeResult.value() + ect1SizeResult.value() + ceSizeResult.value();
   }
   return sizeConsumed;
 }
@@ -383,13 +400,16 @@ TEST_P(QuicWriteCodecExtendedAckTest, WriteWithFeatures) {
   // There is 1 gap => each represented by 2 bytes => 2 bytes
   // 2 byte for first ack block length, then 2 bytes for the next len => 4 bytes
   // total 11 bytes for base ACK. Extended frame size is added below.
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored,
       extendedAckSupport);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
   EXPECT_EQ(11 + addlBytesConsumed, ackFrameWriteResult.bytesWritten);
@@ -1020,7 +1040,9 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeSkipLen) {
   EXPECT_CALL(pktBuilder, write(_))
       .Times(2)
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
-        packetLimit -= quicInt.getSize();
+        auto size = quicInt.getSize();
+        ASSERT_FALSE(size.hasError());
+        packetLimit -= size.value();
       }));
   StreamId streamId = 0;
   uint64_t offset = 10;
@@ -1047,7 +1069,8 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeNotSkipLen) {
   EXPECT_CALL(pktBuilder, write(_))
       .Times(3)
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
-        packetLimit -= quicInt.getSize();
+        ASSERT_FALSE(quicInt.getSize().hasError());
+        packetLimit -= quicInt.getSize().value();
       }));
   StreamId streamId = 0;
   uint64_t offset = 10;
@@ -1074,7 +1097,8 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeLengthHintTrue) {
   EXPECT_CALL(pktBuilder, write(_))
       .Times(2)
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
-        packetLimit -= quicInt.getSize();
+        ASSERT_FALSE(quicInt.getSize().hasError());
+        packetLimit -= quicInt.getSize().value();
       }));
   StreamId streamId = 0;
   uint64_t offset = 10;
@@ -1101,7 +1125,8 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeLengthHintFalse) {
   EXPECT_CALL(pktBuilder, write(_))
       .Times(3)
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
-        packetLimit -= quicInt.getSize();
+        ASSERT_FALSE(quicInt.getSize().hasError());
+        packetLimit -= quicInt.getSize().value();
       }));
   StreamId streamId = 0;
   uint64_t offset = 10;
@@ -1132,14 +1157,14 @@ TEST_P(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {
       .connTime = connTime,
   };
 
-  EXPECT_THROW(
-      writeAckFrame(
-          ackFrameMetaData,
-          pktBuilder,
-          frameType,
-          defaultAckReceiveTimestmpsConfig,
-          0),
-      QuicTransportException);
+  auto result = writeAckFrame(
+      ackFrameMetaData,
+      pktBuilder,
+      frameType,
+      defaultAckReceiveTimestmpsConfig,
+      0);
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
 TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
@@ -1193,12 +1218,15 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
       .connTime = connTime,
   };
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
 
@@ -1227,7 +1255,6 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
     assertsOnDecodedReceiveTimestamps(
         ackFrameMetaData,
         ackFrameWriteResult.writeAckFrame,
-
         decodedAckFrame,
         1 /* timestamp ranges count */,
         kMaxReceivedPktsTimestampsStored /* timestamps count */,
@@ -1264,7 +1291,8 @@ TEST_P(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
-  EXPECT_FALSE(result.has_value());
+  EXPECT_FALSE(result.hasError());
+  EXPECT_FALSE(result.value().has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 4);
 }
 
@@ -1294,13 +1322,16 @@ TEST_P(QuicWriteCodecTest, WriteSimpleAckFrame) {
   // There is 1 gap => each represented by 2 bytes => 2 bytes
   // 2 byte for first ack block length, then 2 bytes for the next len => 4 bytes
   // total 11 bytes
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored,
       extendedAckSupport);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
   EXPECT_EQ(11 + addlBytesConsumed, ackFrameWriteResult.bytesWritten);
@@ -1369,12 +1400,14 @@ TEST_P(QuicWriteCodecTest, WriteAckFrameWillSaveAckDelay) {
       .connTime = connTime,
   };
 
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResult = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  ASSERT_FALSE(ackFrameWriteResult.hasError());
+  ASSERT_TRUE(ackFrameWriteResult.value().has_value());
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
@@ -1422,12 +1455,15 @@ TEST_P(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
   // There is 1 gap => each represented by 2 bytes => 2 bytes
   // 2 byte for first ack block length, then 2 bytes for the next len => 4 bytes
   // total 11 bytes
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
   auto builtOut = std::move(pktBuilder).buildTestPacket();
@@ -1585,12 +1621,15 @@ TEST_P(QuicWriteCodecTest, OnlyAckLargestPacket) {
       .connTime = connTime,
   };
 
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
 
@@ -1628,7 +1667,6 @@ TEST_P(QuicWriteCodecTest, OnlyAckLargestPacket) {
     assertsOnDecodedReceiveTimestamps(
         ackFrameMetaData,
         ackFrameWriteResult.writeAckFrame,
-
         decodedAckFrame,
         1 /* timestamp ranges count */,
         1 /* timestamps count */,
@@ -1686,13 +1724,16 @@ TEST_P(QuicWriteCodecTest, WriteSomeAckBlocks) {
       .connTime = connTime,
   };
 
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored,
       extendedAckSupport);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
 
@@ -1730,7 +1771,6 @@ TEST_P(QuicWriteCodecTest, WriteSomeAckBlocks) {
     assertsOnDecodedReceiveTimestamps(
         ackFrameMetaData,
         ackFrameWriteResult.writeAckFrame,
-
         decodedAckFrame,
         0 /* timestamp ranges count */,
         0 /* timestamps count */,
@@ -1765,7 +1805,8 @@ TEST_P(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
-  EXPECT_FALSE(ackFrameWriteResult.has_value());
+  ASSERT_FALSE(ackFrameWriteResult.hasError());
+  EXPECT_FALSE(ackFrameWriteResult.value().hasValue());
 }
 
 TEST_P(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
@@ -1802,12 +1843,15 @@ TEST_P(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
       .connTime = connTime,
   };
 
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().hasValue());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
 
@@ -1875,13 +1919,16 @@ TEST_P(QuicWriteCodecTest, WriteAckFrameWithMultipleTimestampRanges) {
       .connTime = connTime,
   };
 
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       50, /*maxRecvTimestampsToSend*/
       extendedAckSupport);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().hasValue());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
 
@@ -1969,13 +2016,16 @@ TEST_P(
     // - 3 bytes for the ECN counts (all 0 in this test)
     pktBuilder.remaining_ = 84;
   }
-  auto ackFrameWriteResult = *writeAckFrame(
+  auto ackFrameWriteResultExpected = writeAckFrame(
       ackFrameMetaData,
       pktBuilder,
       frameType,
       defaultAckReceiveTimestmpsConfig,
       100,
       extendedAckSupport);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
   auto addlBytesConsumed = computeBytesForOptionalAckFields(
       ackFrameMetaData, ackFrameWriteResult, frameType);
 
@@ -2045,7 +2095,9 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamData) {
   StreamId id = 1;
   uint64_t offset = 0x08;
   MaxStreamDataFrame maxStreamDataFrame(id, offset);
-  auto bytesWritten = writeFrame(maxStreamDataFrame, pktBuilder);
+  auto bytesWrittenExpected = writeFrame(maxStreamDataFrame, pktBuilder);
+  ASSERT_FALSE(bytesWrittenExpected.hasError());
+  auto bytesWritten = bytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2072,14 +2124,17 @@ TEST_F(QuicWriteCodecTest, NoSpaceForMaxStreamData) {
   pktBuilder.remaining_ = 1;
   setupCommonExpects(pktBuilder);
   MaxStreamDataFrame maxStreamDataFrame(1, 0x08);
-  EXPECT_EQ(0, writeFrame(maxStreamDataFrame, pktBuilder));
+  ASSERT_FALSE(writeFrame(maxStreamDataFrame, pktBuilder).hasError());
+  EXPECT_EQ(0, writeFrame(maxStreamDataFrame, pktBuilder).value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteMaxData) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   MaxDataFrame maxDataFrame(1000);
-  auto bytesWritten = writeFrame(maxDataFrame, pktBuilder);
+  auto bytesWrittenExpected = writeFrame(maxDataFrame, pktBuilder);
+  ASSERT_FALSE(bytesWrittenExpected.hasError());
+  auto bytesWritten = bytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2101,7 +2156,8 @@ TEST_F(QuicWriteCodecTest, NoSpaceForMaxData) {
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
   MaxDataFrame maxDataFrame(1000);
-  EXPECT_EQ(0, writeFrame(maxDataFrame, pktBuilder));
+  ASSERT_FALSE(writeFrame(maxDataFrame, pktBuilder).hasError());
+  EXPECT_EQ(0, writeFrame(maxDataFrame, pktBuilder).value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
@@ -2111,8 +2167,10 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     uint64_t maxStream = i;
     bool isBidirectional = true;
     MaxStreamsFrame maxStreamsFrame(maxStream, isBidirectional);
-    auto bytesWritten =
+    auto bytesWrittenExpected =
         writeFrame(QuicSimpleFrame(maxStreamsFrame), pktBuilder);
+    ASSERT_FALSE(bytesWrittenExpected.hasError());
+    auto bytesWritten = bytesWrittenExpected.value();
 
     auto builtOut = std::move(pktBuilder).buildTestPacket();
     auto regularPacket = builtOut.first;
@@ -2142,8 +2200,10 @@ TEST_F(QuicWriteCodecTest, WriteUniMaxStreamId) {
     uint64_t maxStream = i;
     bool isBidirectional = false;
     MaxStreamsFrame maxStreamsFrame(maxStream, isBidirectional);
-    auto bytesWritten =
+    auto bytesWrittenExpected =
         writeFrame(QuicSimpleFrame(maxStreamsFrame), pktBuilder);
+    ASSERT_FALSE(bytesWrittenExpected.hasError());
+    auto bytesWritten = bytesWrittenExpected.value();
 
     auto builtOut = std::move(pktBuilder).buildTestPacket();
     auto regularPacket = builtOut.first;
@@ -2170,18 +2230,22 @@ TEST_F(QuicWriteCodecTest, NoSpaceForMaxStreamId) {
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
   StreamId maxStream = 0x1234;
-  MaxStreamsFrame maxStreamIdFrame(maxStream, true);
-  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(maxStreamIdFrame), pktBuilder));
+  auto result =
+      writeFrame(QuicSimpleFrame(MaxStreamsFrame(maxStream, true)), pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteConnClose) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   std::string reasonPhrase("You are fired");
-  ConnectionCloseFrame connectionCloseFrame(
-      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase);
-  auto connCloseBytesWritten =
-      writeFrame(std::move(connectionCloseFrame), pktBuilder);
+  auto connCloseBytesWrittenExpected = writeFrame(
+      ConnectionCloseFrame(
+          QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase),
+      pktBuilder);
+  ASSERT_FALSE(connCloseBytesWrittenExpected.hasError());
+  auto connCloseBytesWritten = connCloseBytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2213,9 +2277,11 @@ TEST_F(QuicWriteCodecTest, DecodeConnCloseLarge) {
   setupCommonExpects(pktBuilder);
   std::string reasonPhrase;
   reasonPhrase.resize(kMaxReasonPhraseLength + 10);
-  ConnectionCloseFrame connectionCloseFrame(
-      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase);
-  writeFrame(connectionCloseFrame, pktBuilder);
+  auto result = writeFrame(
+      ConnectionCloseFrame(
+          QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase),
+      pktBuilder);
+  ASSERT_FALSE(result.hasError());
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   auto& resultConnCloseFrame =
@@ -2236,9 +2302,12 @@ TEST_F(QuicWriteCodecTest, NoSpaceConnClose) {
   pktBuilder.remaining_ = 2;
   setupCommonExpects(pktBuilder);
   std::string reasonPhrase("You are all fired");
-  ConnectionCloseFrame connCloseFrame(
-      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase);
-  EXPECT_EQ(0, writeFrame(std::move(connCloseFrame), pktBuilder));
+  auto result = writeFrame(
+      ConnectionCloseFrame(
+          QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase),
+      pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
@@ -2250,7 +2319,8 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       reasonPhrase,
       quic::FrameType::CONNECTION_CLOSE_APP_ERR);
-  writeFrame(std::move(applicationCloseFrame), pktBuilder);
+  auto result = writeFrame(std::move(applicationCloseFrame), pktBuilder);
+  ASSERT_FALSE(result.hasError());
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2269,7 +2339,9 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
 TEST_F(QuicWriteCodecTest, WritePing) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  auto pingBytesWritten = writeFrame(PingFrame(), pktBuilder);
+  auto pingBytesWrittenExpected = writeFrame(PingFrame(), pktBuilder);
+  ASSERT_FALSE(pingBytesWrittenExpected.hasError());
+  auto pingBytesWritten = pingBytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2292,13 +2364,17 @@ TEST_F(QuicWriteCodecTest, NoSpaceForPing) {
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
-  EXPECT_EQ(0, writeFrame(PingFrame(), pktBuilder));
+  auto result = writeFrame(PingFrame(), pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WritePadding) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  auto paddingBytesWritten = writeFrame(PaddingFrame(), pktBuilder);
+  auto paddingBytesWrittenExpected = writeFrame(PaddingFrame(), pktBuilder);
+  ASSERT_FALSE(paddingBytesWrittenExpected.hasError());
+  auto paddingBytesWritten = paddingBytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2320,7 +2396,9 @@ TEST_F(QuicWriteCodecTest, NoSpaceForPadding) {
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
   PaddingFrame paddingFrame;
-  EXPECT_EQ(0, writeFrame(paddingFrame, pktBuilder));
+  auto result = writeFrame(paddingFrame, pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteStreamBlocked) {
@@ -2329,7 +2407,9 @@ TEST_F(QuicWriteCodecTest, WriteStreamBlocked) {
   StreamId blockedId = 0xF00D;
   uint64_t blockedOffset = 0x1111;
   StreamDataBlockedFrame blockedFrame(blockedId, blockedOffset);
-  auto blockedBytesWritten = writeFrame(blockedFrame, pktBuilder);
+  auto blockedBytesWrittenExpected = writeFrame(blockedFrame, pktBuilder);
+  ASSERT_FALSE(blockedBytesWrittenExpected.hasError());
+  auto blockedBytesWritten = blockedBytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2354,7 +2434,9 @@ TEST_F(QuicWriteCodecTest, NoSpaceForBlockedStream) {
   StreamId blockedStream = 0x01;
   uint64_t blockedOffset = 0x1111;
   StreamDataBlockedFrame blockedFrame(blockedStream, blockedOffset);
-  EXPECT_EQ(0, writeFrame(blockedFrame, pktBuilder));
+  auto result = writeFrame(blockedFrame, pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteRstStream) {
@@ -2364,7 +2446,9 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
   ApplicationErrorCode errorCode = GenericApplicationErrorCode::UNKNOWN;
   uint64_t offset = 0xF00D;
   RstStreamFrame rstStreamFrame(id, errorCode, offset);
-  auto rstStreamBytesWritten = writeFrame(rstStreamFrame, pktBuilder);
+  auto rstStreamBytesWrittenExpected = writeFrame(rstStreamFrame, pktBuilder);
+  ASSERT_FALSE(rstStreamBytesWrittenExpected.hasError());
+  auto rstStreamBytesWritten = rstStreamBytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2394,7 +2478,9 @@ TEST_F(QuicWriteCodecTest, NoSpaceForRst) {
   ApplicationErrorCode errorCode = GenericApplicationErrorCode::UNKNOWN;
   uint64_t offset = 0xF00D;
   RstStreamFrame rstStreamFrame(id, errorCode, offset);
-  EXPECT_EQ(0, writeFrame(rstStreamFrame, pktBuilder));
+  auto result = writeFrame(rstStreamFrame, pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteRstStreamAt) {
@@ -2405,7 +2491,9 @@ TEST_F(QuicWriteCodecTest, WriteRstStreamAt) {
   uint64_t finalSize = 0xF00D;
   uint64_t reliableSize = 0xF00C;
   RstStreamFrame rstStreamFrame(id, errorCode, finalSize, reliableSize);
-  auto rstStreamBytesWritten = writeFrame(rstStreamFrame, pktBuilder);
+  auto rstStreamBytesWrittenExpected = writeFrame(rstStreamFrame, pktBuilder);
+  ASSERT_FALSE(rstStreamBytesWrittenExpected.hasError());
+  auto rstStreamBytesWritten = rstStreamBytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2434,7 +2522,9 @@ TEST_F(QuicWriteCodecTest, WriteBlockedFrame) {
   setupCommonExpects(pktBuilder);
   uint64_t blockedOffset = 0x11111;
   DataBlockedFrame blockedFrame(blockedOffset);
-  auto bytesWritten = writeFrame(blockedFrame, pktBuilder);
+  auto bytesWrittenExpected = writeFrame(blockedFrame, pktBuilder);
+  ASSERT_FALSE(bytesWrittenExpected.hasError());
+  auto bytesWritten = bytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2456,7 +2546,9 @@ TEST_F(QuicWriteCodecTest, NoSpaceForBlocked) {
   setupCommonExpects(pktBuilder);
   uint64_t blockedOffset = 0x11111;
   DataBlockedFrame blockedFrame(blockedOffset);
-  EXPECT_EQ(0, writeFrame(blockedFrame, pktBuilder));
+  auto result = writeFrame(blockedFrame, pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteStreamIdNeeded) {
@@ -2464,7 +2556,10 @@ TEST_F(QuicWriteCodecTest, WriteStreamIdNeeded) {
   setupCommonExpects(pktBuilder);
   StreamId blockedStreamId = 0x211;
   MaxStreamsFrame streamIdNeeded(blockedStreamId, true);
-  auto bytesWritten = writeFrame(QuicSimpleFrame(streamIdNeeded), pktBuilder);
+  auto bytesWrittenExpected =
+      writeFrame(QuicSimpleFrame(streamIdNeeded), pktBuilder);
+  ASSERT_FALSE(bytesWrittenExpected.hasError());
+  auto bytesWritten = bytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2489,7 +2584,9 @@ TEST_F(QuicWriteCodecTest, NoSpaceForStreamIdNeeded) {
   setupCommonExpects(pktBuilder);
   StreamId blockedStreamId = 0x211;
   MaxStreamsFrame streamIdNeeded(blockedStreamId, true);
-  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(streamIdNeeded), pktBuilder));
+  auto result = writeFrame(QuicSimpleFrame(streamIdNeeded), pktBuilder);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(QuicWriteCodecTest, WriteNewConnId) {
@@ -2498,7 +2595,10 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   StatelessResetToken token;
   memset(token.data(), 'a', token.size());
   NewConnectionIdFrame newConnId(1, 0, getTestConnectionId(), token);
-  auto bytesWritten = writeFrame(QuicSimpleFrame(newConnId), pktBuilder);
+  auto bytesWrittenExpected =
+      writeFrame(QuicSimpleFrame(newConnId), pktBuilder);
+  ASSERT_FALSE(bytesWrittenExpected.hasError());
+  auto bytesWritten = bytesWrittenExpected.value();
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
@@ -2528,10 +2628,11 @@ TEST_F(QuicWriteCodecTest, WriteRetireConnId) {
   setupCommonExpects(pktBuilder);
   RetireConnectionIdFrame retireConnId(3);
   auto bytesWritten = writeFrame(QuicSimpleFrame(retireConnId), pktBuilder);
+  ASSERT_FALSE(bytesWritten.hasError());
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(bytesWritten, 2);
+  EXPECT_EQ(bytesWritten.value(), 2);
   RetireConnectionIdFrame resultRetireConnIdFrame =
       *regularPacket.frames[0].asQuicSimpleFrame()->asRetireConnectionIdFrame();
   EXPECT_EQ(resultRetireConnIdFrame.sequenceNumber, 3);
@@ -2555,10 +2656,11 @@ TEST_F(QuicWriteCodecTest, WriteStopSending) {
 
   StopSendingFrame stopSending(streamId, errorCode);
   auto bytesWritten = writeSimpleFrame(stopSending, pktBuilder);
+  ASSERT_FALSE(bytesWritten.hasError());
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(bytesWritten, 10);
+  EXPECT_EQ(bytesWritten.value(), 10);
 
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
@@ -2577,7 +2679,8 @@ TEST_F(QuicWriteCodecTest, NoSpaceForNewConnId) {
   setupCommonExpects(pktBuilder);
   NewConnectionIdFrame newConnId(
       1, 0, getTestConnectionId(), StatelessResetToken());
-  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(newConnId), pktBuilder));
+  ASSERT_FALSE(writeFrame(QuicSimpleFrame(newConnId), pktBuilder).hasError());
+  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(newConnId), pktBuilder).value());
 }
 
 TEST_F(QuicWriteCodecTest, WritePathChallenge) {
@@ -2587,7 +2690,8 @@ TEST_F(QuicWriteCodecTest, WritePathChallenge) {
   uint64_t pathData = 0x64;
   PathChallengeFrame pathChallenge(pathData);
   auto bytesWritten = writeSimpleFrame(pathChallenge, pktBuilder);
-  EXPECT_EQ(bytesWritten, 9);
+  ASSERT_FALSE(bytesWritten.hasError());
+  EXPECT_EQ(bytesWritten.value(), 9);
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
 
@@ -2614,7 +2718,8 @@ TEST_F(QuicWriteCodecTest, WritePathResponse) {
   uint64_t pathData = 0x64;
   PathResponseFrame pathResponse(pathData);
   auto bytesWritten = writeSimpleFrame(pathResponse, pktBuilder);
-  EXPECT_EQ(bytesWritten, 9);
+  ASSERT_FALSE(bytesWritten.hasError());
+  EXPECT_EQ(bytesWritten.value(), 9);
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
 
@@ -2700,7 +2805,10 @@ TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
   frame.reorderThreshold = 50; // Length: 1
 
   auto dataLen = writeSimpleFrame(frame, pktBuilder);
-  ASSERT_EQ(dataLen, 10); // Based upon the values passed above + 2 (frame-type)
+  ASSERT_FALSE(dataLen.hasError());
+  ASSERT_EQ(
+      dataLen.value(),
+      10); // Based upon the values passed above + 2 (frame-type)
 
   auto outputBuf = pktBuilder.data_->clone();
   EXPECT_EQ(outputBuf->computeChainDataLength(), 10);

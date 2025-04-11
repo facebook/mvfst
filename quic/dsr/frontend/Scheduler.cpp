@@ -54,8 +54,8 @@ DSRStreamFrameScheduler::enrichAndAddSendInstruction(
  * same backend. Thus one SendInstruction can only have one stream. So this API
  * only write a single stream.
  */
-DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
-    DSRPacketBuilderBase& builder) {
+folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
   SchedulingResult result;
   auto& writeQueue = conn_.streamManager->writeQueue();
   const auto& levelIter = std::find_if(
@@ -78,7 +78,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   CHECK(stream->hasSchedulableDsr());
   if (hasLossBufMeta) {
     SendInstruction::Builder instructionBuilder(conn_, streamId);
-    auto encodedSize = writeDSRStreamFrame(
+    auto encodedSizeExpected = writeDSRStreamFrame(
         builder,
         instructionBuilder,
         streamId,
@@ -88,6 +88,12 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
             .length, // flowControlLen shouldn't be used to limit loss write
         stream->lossBufMetas.front().eof,
         stream->currentWriteOffset + stream->pendingWrites.chainLength());
+
+    if (encodedSizeExpected.hasError()) {
+      return folly::makeUnexpected(encodedSizeExpected.error());
+    }
+
+    auto encodedSize = encodedSizeExpected.value();
     if (encodedSize > 0) {
       if (builder.remainingSpace() < encodedSize) {
         return result;
@@ -123,7 +129,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   bool canWriteFin = stream->finalWriteOffset.has_value() &&
       stream->writeBufMeta.length <= flowControlLen;
   SendInstruction::Builder instructionBuilder(conn_, streamId);
-  auto encodedSize = writeDSRStreamFrame(
+  auto encodedSizeExpected = writeDSRStreamFrame(
       builder,
       instructionBuilder,
       streamId,
@@ -132,6 +138,12 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
       flowControlLen,
       canWriteFin,
       stream->currentWriteOffset + stream->pendingWrites.chainLength());
+
+  if (encodedSizeExpected.hasError()) {
+    return folly::makeUnexpected(encodedSizeExpected.error());
+  }
+
+  auto encodedSize = encodedSizeExpected.value();
   if (encodedSize > 0) {
     if (builder.remainingSpace() < encodedSize) {
       return result;

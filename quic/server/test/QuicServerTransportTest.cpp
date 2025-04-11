@@ -81,7 +81,8 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  auto encodeResult = builder.encodePacketHeader();
+  ASSERT_FALSE(encodeResult.hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
   auto buf1 = IOBuf::copyBuffer("Aloha");
@@ -437,13 +438,13 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
   // Deliver a reset to non existent stream to trigger a local conn error
   StreamId streamId = 0x01;
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  writeFrame(std::move(rstFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   EXPECT_TRUE(verifyFramePresent(
@@ -460,9 +461,9 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
       server->getConn().udpSendPacketLen,
       std::move(header2),
       0 /* largestAcked */);
-  builder2.encodePacketHeader();
+  ASSERT_FALSE(builder2.encodePacketHeader().hasError());
   RstStreamFrame rstFrame2(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  writeFrame(std::move(rstFrame2), builder2);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame2), builder2).hasError());
   auto packet2 = std::move(builder2).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet2));
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
@@ -484,13 +485,13 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
   // Deliver a reset to non existent stream to trigger a local conn error
   StreamId streamId = 0x01;
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  writeFrame(std::move(rstFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   EXPECT_TRUE(verifyFramePresent(
@@ -511,11 +512,11 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       server->getConn().udpSendPacketLen,
       std::move(header2),
       0 /* largestAcked */);
-  builder2.encodePacketHeader();
+  ASSERT_FALSE(builder2.encodePacketHeader().hasError());
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
-  writeFrame(std::move(connClose), builder2);
+  ASSERT_FALSE(writeFrame(std::move(connClose), builder2).hasError());
 
   auto packet2 = std::move(builder2).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet2));
@@ -552,23 +553,24 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
   auto buf = folly::IOBuf::copyBuffer("hello");
-  writeStreamFrameHeader(
-      builder,
-      4,
-      0,
-      buf->computeChainDataLength(),
-      buf->computeChainDataLength(),
-      true,
-      none /* skipLenHint */);
+  ASSERT_FALSE(writeStreamFrameHeader(
+                   builder,
+                   4,
+                   0,
+                   buf->computeChainDataLength(),
+                   buf->computeChainDataLength(),
+                   true,
+                   none /* skipLenHint */)
+                   .hasError());
   writeStreamFrameData(builder, buf->clone(), buf->computeChainDataLength());
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
-  writeFrame(std::move(connClose), builder);
+  ASSERT_FALSE(writeFrame(std::move(connClose), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -725,11 +727,11 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistClientStream) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  writeFrame(std::move(rstFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
 
@@ -754,8 +756,8 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
-  writeFrame(rstFrame, builder);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(rstFrame, builder).hasError());
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(std::move(packet));
 
@@ -770,18 +772,19 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
       server->getConn().udpSendPacketLen,
       std::move(header2),
       0 /* largestAcked */);
-  builder2.encodePacketHeader();
-  writeFrame(rstFrame, builder2);
+  ASSERT_FALSE(builder2.encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(rstFrame, builder2).hasError());
 
   auto data = folly::IOBuf::copyBuffer("hello");
-  writeStreamFrameHeader(
-      builder2,
-      streamId,
-      0,
-      data->computeChainDataLength(),
-      data->computeChainDataLength(),
-      false,
-      none /* skipLenHint */);
+  ASSERT_FALSE(writeStreamFrameHeader(
+                   builder2,
+                   streamId,
+                   0,
+                   data->computeChainDataLength(),
+                   data->computeChainDataLength(),
+                   false,
+                   none /* skipLenHint */)
+                   .hasError());
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));
@@ -802,12 +805,12 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistServerStream) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
   StreamId streamId = 0x01;
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  writeFrame(std::move(rstFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
 }
@@ -851,14 +854,14 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   RstStreamFrame rstFrame(
       streamId,
       GenericApplicationErrorCode::UNKNOWN,
       words.at(0).length() + words.at(1).length());
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(rstFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
 
@@ -892,11 +895,11 @@ TEST_F(QuicServerTransportTest, RecvReliableRstStreamFrame) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 5, 5);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(rstFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   EXPECT_EQ(
@@ -940,11 +943,12 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
       connCallback,
@@ -989,12 +993,13 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   EXPECT_CALL(connCallback, onStopSending(_, _)).Times(0);
@@ -1038,11 +1043,11 @@ TEST_F(QuicServerTransportTest, RecvInvalidMaxStreamData) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   MaxStreamDataFrame maxStreamDataFrame(streamId, 100);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(maxStreamDataFrame), builder);
+  ASSERT_FALSE(writeFrame(std::move(maxStreamDataFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
 }
@@ -1083,7 +1088,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
@@ -1100,7 +1105,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   auto dataLen = *res;
   ASSERT_TRUE(dataLen.has_value());
   ASSERT_EQ(*dataLen, 0);
-  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
       connCallback,
@@ -1119,12 +1125,13 @@ TEST_F(QuicServerTransportTest, RecvStopSendingBeforeStream) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onNewBidirectionalStream(streamId));
   EXPECT_CALL(
@@ -1185,15 +1192,17 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   StopSendingFrame stopSendingFrame1(
       streamId1, GenericApplicationErrorCode::UNKNOWN);
   StopSendingFrame stopSendingFrame2(
       streamId2, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(QuicSimpleFrame(stopSendingFrame1), builder);
-  writeFrame(QuicSimpleFrame(stopSendingFrame2), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame1), builder).hasError());
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame2), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
       connCallback, onStopSending(_, GenericApplicationErrorCode::UNKNOWN))
@@ -1218,11 +1227,12 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
       std::move(header),
       server->getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(
           0));
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   ASSERT_FALSE(markPacketLoss(server->getNonConstConn(), packet.packet, false)
                    .hasError());
@@ -1249,11 +1259,12 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
       std::move(header),
       server->getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(
           0));
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
 
   // clear out all the streams, this is not a great way to simulate closed
@@ -1338,10 +1349,11 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
       ProtectionType::KeyPhaseZero, *conn.serverConnectionId, 10);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   PathChallengeFrame pathChallenge(123);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -1393,11 +1405,11 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   std::string errMsg = "Stand clear of the closing doors, please";
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
-  writeFrame(std::move(connClose), builder);
+  ASSERT_FALSE(writeFrame(std::move(connClose), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onConnectionEnd());
   deliverDataWithoutErrorCheck(packetToBuf(packet));
@@ -1438,11 +1450,11 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
         server->getConn().udpSendPacketLen,
         std::move(header),
         0 /* largestAcked */);
-    builder.encodePacketHeader();
+    ASSERT_FALSE(builder.encodePacketHeader().hasError());
     StringPiece datagramPayload = "do not rely on me. I am unreliable";
     DatagramFrame datagramFrame(
         datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
-    writeFrame(datagramFrame, builder);
+    ASSERT_FALSE(writeFrame(datagramFrame, builder).hasError());
     auto packet = std::move(builder).buildPacket();
 
     EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(1);
@@ -1467,11 +1479,11 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
         server->getConn().udpSendPacketLen,
         std::move(header),
         0 /* largestAcked */);
-    builder.encodePacketHeader();
+    ASSERT_FALSE(builder.encodePacketHeader().hasError());
     std::string errMsg = "Stand clear of the closing doors, please";
     ConnectionCloseFrame connClose(
         QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
-    writeFrame(std::move(connClose), builder);
+    ASSERT_FALSE(writeFrame(std::move(connClose), builder).hasError());
     auto packet = std::move(builder).buildPacket();
 
     // Build late datagram.
@@ -1483,11 +1495,11 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
         server->getConn().udpSendPacketLen,
         std::move(header2),
         0 /* largestAcked */);
-    builder2.encodePacketHeader();
+    ASSERT_FALSE(builder2.encodePacketHeader().hasError());
     StringPiece datagramPayload = "do not rely on me. I am unreliable";
     DatagramFrame datagramFrame(
         datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
-    writeFrame(datagramFrame, builder2);
+    ASSERT_FALSE(writeFrame(datagramFrame, builder2).hasError());
     auto packet2 = std::move(builder2).buildPacket();
 
     // Deliver conn close followed by late datagram.
@@ -1528,12 +1540,12 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   std::string errMsg = "Stand clear of the closing doors, please";
   ConnectionCloseFrame appClose(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN), errMsg);
-  writeFrame(std::move(appClose), builder);
+  ASSERT_FALSE(writeFrame(std::move(appClose), builder).hasError());
   auto packet = std::move(builder).buildPacket();
 
   EXPECT_CALL(
@@ -1569,11 +1581,11 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
-  writeFrame(std::move(connClose), builder);
+  ASSERT_FALSE(writeFrame(std::move(connClose), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onConnectionEnd());
   deliverDataWithoutErrorCheck(packetToBuf(packet));
@@ -1832,7 +1844,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFrames) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   Buf buf = packetToBuf(std::move(builder).buildPacket());
 
@@ -1883,7 +1895,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   Buf buf = packetToBuf(std::move(builder).buildPacket());
   buf->coalesce();
@@ -1949,10 +1961,10 @@ TEST_P(
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
-  writeSimpleFrame(PathChallengeFrame(123), builder);
+  ASSERT_FALSE(writeSimpleFrame(PathChallengeFrame(123), builder).hasError());
   auto packet = std::move(builder).buildPacket();
   auto packetData = packetToBuf(packet);
   folly::SocketAddress newPeer("100.101.102.103", 23456);
@@ -2084,12 +2096,14 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
-  writeSimpleFrame(
-      PathResponseFrame(server->getConn().outstandingPathValidation->pathData),
-      builder);
+  ASSERT_FALSE(writeSimpleFrame(
+                   PathResponseFrame(
+                       server->getConn().outstandingPathValidation->pathData),
+                   builder)
+                   .hasError());
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet), false, &newPeer);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
@@ -2167,12 +2181,14 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
-  writeSimpleFrame(
-      PathResponseFrame(server->getConn().outstandingPathValidation->pathData),
-      builder);
+  ASSERT_FALSE(writeSimpleFrame(
+                   PathResponseFrame(
+                       server->getConn().outstandingPathValidation->pathData),
+                   builder)
+                   .hasError());
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet), false, &newPeer);
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
@@ -2235,13 +2251,15 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
 
-  writeSimpleFrame(
-      PathResponseFrame(
-          server->getConn().outstandingPathValidation->pathData ^ 1),
-      builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(
+          PathResponseFrame(
+              server->getConn().outstandingPathValidation->pathData ^ 1),
+          builder)
+          .hasError());
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet), false, &newPeer);
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
@@ -2293,11 +2311,13 @@ TEST_P(
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
-  writeSimpleFrame(
-      PathResponseFrame(server->getConn().outstandingPathValidation->pathData),
-      builder);
+  ASSERT_FALSE(writeSimpleFrame(
+                   PathResponseFrame(
+                       server->getConn().outstandingPathValidation->pathData),
+                   builder)
+                   .hasError());
   auto packet = std::move(builder).buildPacket();
   folly::SocketAddress newPeer2("200.101.102.103", 23456);
   try {
@@ -2387,12 +2407,13 @@ TEST_P(QuicServerTransportAllowMigrationTest, RetiringConnIdIssuesNewIds) {
       ProtectionType::KeyPhaseZero, nextConnId, clientNextAppDataPacketNum++);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   // build packet containing a frame retiring the initial server conn id
   ASSERT_TRUE(builder.canBuildPacket());
   RetireConnectionIdFrame retireConnIdFrame(initialServerConnId.sequenceNumber);
-  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder).hasError());
   auto retireConnIdPacket = std::move(builder).buildPacket();
 
   /**
@@ -2426,12 +2447,13 @@ TEST_P(QuicServerTransportAllowMigrationTest, RetiringInvalidConnId) {
       clientNextAppDataPacketNum++);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   // build packet containing a frame retiring an invalid conn id / seq no
   ASSERT_TRUE(builder.canBuildPacket());
   RetireConnectionIdFrame retireConnIdFrame(conn.nextSelfConnectionIdSequence);
-  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder).hasError());
   auto retireConnIdPacket = std::move(builder).buildPacket();
 
   // retiring invalid conn id should not invoke onConnectionIdRetired()
@@ -2468,12 +2490,13 @@ TEST_P(QuicServerTransportAllowMigrationTest, RetireConnIdOfContainingPacket) {
       clientNextAppDataPacketNum++);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   // build packet containing a frame retiring conn id of containing packet
   ASSERT_TRUE(builder.canBuildPacket());
   RetireConnectionIdFrame retireConnIdFrame(0);
-  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder).hasError());
   auto retireConnIdPacket = std::move(builder).buildPacket();
 
   // parsing packet should throw an error
@@ -2503,12 +2526,13 @@ TEST_P(
       clientNextAppDataPacketNum++);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
 
   // build packet containing a RETIRE_CONNECTION_ID frame
   ASSERT_TRUE(builder.canBuildPacket());
   RetireConnectionIdFrame retireConnIdFrame(0);
-  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder).hasError());
   auto retireConnIdPacket = std::move(builder).buildPacket();
 
   // parsing packet should throw an error
@@ -3127,8 +3151,8 @@ TEST_F(QuicServerTransportTest, PingIsTreatedAsRetransmittable) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
-  writeFrame(pingFrame, builder);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(pingFrame, builder).hasError());
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
   EXPECT_TRUE(server->getConn().pendingEvents.scheduleAckTimeout);
@@ -3150,8 +3174,8 @@ TEST_F(QuicServerTransportTest, ImmediateAckValid) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
-  writeFrame(immediateAckFrame, builder);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(immediateAckFrame, builder).hasError());
   auto packet = std::move(builder).buildPacket();
   ASSERT_NO_THROW(deliverData(packetToBuf(packet)));
   // An ACK has been scheduled for AppData number space.
@@ -3179,8 +3203,8 @@ TEST_F(QuicServerTransportTest, ImmediateAckProtocolViolation) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
-  writeFrame(immediateAckFrame, builder);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(immediateAckFrame, builder).hasError());
   auto packet = std::move(builder).buildPacket();
   // This should throw a protocol violation error
   ASSERT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
@@ -3202,11 +3226,11 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndDiscard) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   StringPiece datagramPayload = "do not rely on me. I am unreliable";
   DatagramFrame datagramFrame(
       datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
-  writeFrame(datagramFrame, builder);
+  ASSERT_FALSE(writeFrame(datagramFrame, builder).hasError());
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(1);
   deliverData(packetToBuf(packet));
@@ -3232,11 +3256,11 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndStore) {
         server->getConn().udpSendPacketLen,
         std::move(header),
         0 /* largestAcked */);
-    builder.encodePacketHeader();
+    ASSERT_FALSE(builder.encodePacketHeader().hasError());
     StringPiece datagramPayload = "do not rely on me. I am unreliable";
     DatagramFrame datagramFrame(
         datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
-    writeFrame(datagramFrame, builder);
+    ASSERT_FALSE(writeFrame(datagramFrame, builder).hasError());
     auto packet = std::move(builder).buildPacket();
     deliverData(packetToBuf(packet));
     if (i < conn.datagramState.maxReadBufferSize) {
@@ -3255,11 +3279,12 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
       1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken{9, 8, 7, 6});
-  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -3278,11 +3303,12 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdTooManyReceivedIds) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
       1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
-  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -3298,11 +3324,12 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdInvalidRetire) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
       1, 3, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
-  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -3320,10 +3347,11 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdNoopValidDuplicate) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(1, 0, connId2, StatelessResetToken());
-  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -3341,10 +3369,11 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdExceptionInvalidDuplicate) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(2, 0, connId2, StatelessResetToken());
-  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -3625,14 +3654,14 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
       QuicVersion::MVFST);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   DCHECK(builder.canBuildPacket());
   WriteAckFrameState writeAckState = {.acks = acks};
   WriteAckFrameMetaData ackData = {
       .ackState = writeAckState,
       .ackDelay = 0us,
       .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
-  writeAckFrame(ackData, builder);
+  ASSERT_FALSE(writeAckFrame(ackData, builder).hasError());
   auto packet = packetToBufCleartext(
       std::move(builder).buildPacket(),
       *getInitialCipher(),
@@ -3837,7 +3866,8 @@ TEST_F(
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), /*largestAckedPacketNum=*/0);
   RetireConnectionIdFrame retireConnIdFrame(0);
-  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder).hasError());
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
@@ -3856,7 +3886,7 @@ TEST_F(
       data->clone(),
       std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
 
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(0);
 
   auto packet = std::move(builder).buildPacket();
@@ -3880,7 +3910,8 @@ TEST_F(
       server->getConn().supportedVersions[0]);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
-  writeSimpleFrame(PathResponseFrame(0xaabbccddeeff), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(PathResponseFrame(0xaabbccddeeff), builder).hasError());
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
@@ -3899,7 +3930,7 @@ TEST_F(
       data->clone(),
       std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
 
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(0);
 
   auto packet = std::move(builder).buildPacket();
@@ -3923,7 +3954,9 @@ TEST_F(
       server->getConn().supportedVersions[0]);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
-  writeSimpleFrame(NewTokenFrame(IOBuf::copyBuffer("token!")), builder);
+  ASSERT_FALSE(
+      writeSimpleFrame(NewTokenFrame(IOBuf::copyBuffer("token!")), builder)
+          .hasError());
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
@@ -3942,7 +3975,7 @@ TEST_F(
       data->clone(),
       std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
 
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(0);
 
   auto packet = std::move(builder).buildPacket();
@@ -4652,9 +4685,9 @@ Buf getHandshakePacketWithFrame(
       kDefaultUDPSendPacketLen,
       std::move(header),
       clientPacketNum / 2 /* largestAcked */);
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(clientWriteCipher.getCipherOverhead());
-  writeFrame(std::move(frame), builder);
+  CHECK(!writeFrame(std::move(frame), builder).hasError());
   return packetToBufCleartext(
       std::move(builder).buildPacket(),
       clientWriteCipher,

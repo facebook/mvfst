@@ -13,7 +13,6 @@
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
 #include <cstdint>
-#include <sstream>
 
 namespace {
 
@@ -27,7 +26,6 @@ bool packetSpaceCheck(uint64_t limit, size_t require) {
 } // namespace
 
 namespace quic {
-
 folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
@@ -58,9 +56,17 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
 
   // First account for the things that are non-optional: frame type, stream id
   // and (optional) group id.
-  uint64_t headerSize = sizeof(uint8_t) + idInt.getSize();
+  auto idIntSize = idInt.getSize();
+  if (idIntSize.hasError()) {
+    return folly::makeUnexpected(idIntSize.error());
+  }
+  uint64_t headerSize = sizeof(uint8_t) + idIntSize.value();
   if (groupIdInt) {
-    headerSize += groupIdInt->getSize();
+    auto groupIdIntSize = groupIdInt->getSize();
+    if (groupIdIntSize.hasError()) {
+      return folly::makeUnexpected(groupIdIntSize.error());
+    }
+    headerSize += groupIdIntSize.value();
   }
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
@@ -70,7 +76,11 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   QuicInteger offsetInt(offset);
   if (offset != 0) {
     streamTypeBuilder.setOffset();
-    headerSize += offsetInt.getSize();
+    auto offsetIntSize = offsetInt.getSize();
+    if (offsetIntSize.hasError()) {
+      return folly::makeUnexpected(offsetIntSize.error());
+    }
+    headerSize += offsetIntSize.value();
   }
   // Next we have to deal with the data length. This is trickier. The length of
   // data we are able to send depends on 3 things: how much we have in the
@@ -175,36 +185,51 @@ void writeStreamFrameData(
   }
 }
 
-Optional<WriteCryptoFrame> writeCryptoFrame(
+folly::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
     uint64_t offsetIn,
     const ChainedByteRangeHead& data,
     PacketBuilderInterface& builder) {
   uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
   QuicInteger intFrameType(static_cast<uint8_t>(FrameType::CRYPTO_FRAME));
+  auto intFrameTypeRes = intFrameType.getSize();
+  if (intFrameTypeRes.hasError()) {
+    return folly::makeUnexpected(intFrameTypeRes.error());
+  }
+
   QuicInteger offsetInteger(offsetIn);
+  auto offsetIntegerRes = offsetInteger.getSize();
+  if (offsetIntegerRes.hasError()) {
+    return folly::makeUnexpected(offsetIntegerRes.error());
+  }
 
   size_t lengthBytes = 2;
   size_t cryptoFrameHeaderSize =
-      intFrameType.getSize() + offsetInteger.getSize() + lengthBytes;
+      intFrameTypeRes.value() + offsetIntegerRes.value() + lengthBytes;
 
   if (spaceLeftInPkt <= cryptoFrameHeaderSize) {
     VLOG(3) << "No space left in packet to write cryptoFrame header of size: "
             << cryptoFrameHeaderSize << ", space left=" << spaceLeftInPkt;
-    return none;
+    return Optional<WriteCryptoFrame>(none);
   }
   size_t spaceRemaining = spaceLeftInPkt - cryptoFrameHeaderSize;
   size_t dataLength = data.chainLength();
   size_t writableData = std::min(dataLength, spaceRemaining);
-  QuicInteger lengthVarInt(writableData);
 
-  CHECK(lengthVarInt.getSize() <= lengthBytes)
+  QuicInteger lengthVarInt(writableData);
+  auto lengthVarIntSizeRes = lengthVarInt.getSize();
+  if (lengthVarIntSizeRes.hasError()) {
+    return folly::makeUnexpected(lengthVarIntSizeRes.error());
+  }
+
+  CHECK(lengthVarIntSizeRes.value() <= lengthBytes)
       << "Length bytes representation exceeds allocated space";
   builder.write(intFrameType);
   builder.write(offsetInteger);
   builder.write(lengthVarInt);
   builder.insert(data, writableData);
   builder.appendFrame(WriteCryptoFrame(offsetIn, lengthVarInt.getValue()));
-  return WriteCryptoFrame(offsetIn, lengthVarInt.getValue());
+  return Optional<WriteCryptoFrame>(
+      WriteCryptoFrame(offsetIn, lengthVarInt.getValue()));
 }
 
 /*
@@ -212,7 +237,7 @@ Optional<WriteCryptoFrame> writeCryptoFrame(
  * parameter ackBlocks until it runs out of space (bytesLimit). The largest
  * ack block should have been inserted by the caller.
  */
-static size_t fillFrameWithAckBlocks(
+[[nodiscard]] static folly::Expected<size_t, QuicError> fillFrameWithAckBlocks(
     const AckBlocks& ackBlocks,
     WriteAckFrame& ackFrame,
     uint64_t bytesLimit) {
@@ -235,15 +260,30 @@ static size_t fillFrameWithAckBlocks(
     // TODO this is still extra work, as we end up duplicating these
     // calculations in the caller, we could store the results so they
     // can be reused by the caller when writing the frame.
-    size_t gapSize = getQuicIntegerSizeThrows(gap);
-    size_t currBlockLenSize = getQuicIntegerSizeThrows(currBlockLen);
-    size_t numAdditionalAckBlocksSize =
-        getQuicIntegerSizeThrows(numAdditionalAckBlocks + 1);
-    size_t previousNumAckBlocksSize =
-        getQuicIntegerSizeThrows(previousNumAckBlocks);
+    auto gapSizeRes = getQuicIntegerSize(gap);
+    if (gapSizeRes.hasError()) {
+      return folly::makeUnexpected(gapSizeRes.error());
+    }
 
-    size_t additionalSize = gapSize + currBlockLenSize +
-        (numAdditionalAckBlocksSize - previousNumAckBlocksSize);
+    auto currBlockLenSizeRes = getQuicIntegerSize(currBlockLen);
+    if (currBlockLenSizeRes.hasError()) {
+      return folly::makeUnexpected(currBlockLenSizeRes.error());
+    }
+
+    auto numAdditionalAckBlocksSizeRes =
+        getQuicIntegerSize(numAdditionalAckBlocks + 1);
+    if (numAdditionalAckBlocksSizeRes.hasError()) {
+      return folly::makeUnexpected(numAdditionalAckBlocksSizeRes.error());
+    }
+
+    auto previousNumAckBlocksSizeRes = getQuicIntegerSize(previousNumAckBlocks);
+    if (previousNumAckBlocksSizeRes.hasError()) {
+      return folly::makeUnexpected(previousNumAckBlocksSizeRes.error());
+    }
+
+    size_t additionalSize = gapSizeRes.value() + currBlockLenSizeRes.value() +
+        (numAdditionalAckBlocksSizeRes.value() -
+         previousNumAckBlocksSizeRes.value());
     if (bytesLimit < additionalSize) {
       break;
     }
@@ -256,21 +296,37 @@ static size_t fillFrameWithAckBlocks(
   return numAdditionalAckBlocks;
 }
 
-size_t computeSizeUsedByRecvdTimestamps(WriteAckFrame& ackFrame) {
+folly::Expected<size_t, QuicError> computeSizeUsedByRecvdTimestamps(
+    WriteAckFrame& ackFrame) {
   size_t usedSize = 0;
   for (auto& recvdPacketsTimestampRanges :
        ackFrame.recvdPacketsTimestampRanges) {
-    usedSize += getQuicIntegerSizeThrows(recvdPacketsTimestampRanges.gap);
-    usedSize += getQuicIntegerSizeThrows(
-        recvdPacketsTimestampRanges.timestamp_delta_count);
+    auto gapSize = getQuicIntegerSize(recvdPacketsTimestampRanges.gap);
+    if (gapSize.hasError()) {
+      return folly::makeUnexpected(gapSize.error());
+    }
+    usedSize += gapSize.value();
+
+    auto countSize =
+        getQuicIntegerSize(recvdPacketsTimestampRanges.timestamp_delta_count);
+    if (countSize.hasError()) {
+      return folly::makeUnexpected(countSize.error());
+    }
+    usedSize += countSize.value();
+
     for (auto& timestampDelta : recvdPacketsTimestampRanges.deltas) {
-      usedSize += getQuicIntegerSizeThrows(timestampDelta);
+      auto deltaSize = getQuicIntegerSize(timestampDelta);
+      if (deltaSize.hasError()) {
+        return folly::makeUnexpected(deltaSize.error());
+      }
+      usedSize += deltaSize.value();
     }
   }
   return usedSize;
 }
 
-static size_t fillFrameWithPacketReceiveTimestamps(
+[[nodiscard]] static folly::Expected<size_t, QuicError>
+fillFrameWithPacketReceiveTimestamps(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     WriteAckFrame& ackFrame,
     uint64_t largestAckedPacketNum,
@@ -311,8 +367,11 @@ static size_t fillFrameWithPacketReceiveTimestamps(
       nextTimestampRange.gap = prevPktNum - 2 - timestampIntervalsIt->end;
     }
     // Initialize spaced used by the next candidate time-stamp range
-    nextTimestampRangeUsedSpace +=
-        getQuicIntegerSizeThrows(nextTimestampRange.gap);
+    auto gapSizeResult = getQuicIntegerSize(nextTimestampRange.gap);
+    if (gapSizeResult.hasError()) {
+      return folly::makeUnexpected(gapSizeResult.error());
+    }
+    nextTimestampRangeUsedSpace += gapSizeResult.value();
 
     while (timestampIt != recvdPacketInfos.crend() &&
            timestampIt->pktNum >= timestampIntervalsIt->start &&
@@ -331,28 +390,50 @@ static size_t fillFrameWithPacketReceiveTimestamps(
             timestampIt->timings.receiveTimePoint);
       }
       auto delta = deltaDuration.count() >> receiveTimestampsExponent;
+
       // Check if adding a new time-stamp delta from the current time-stamp
       // interval Will allow us to run out of space. Since adding a new delta
       // impacts cumulative counts of deltas these are not already incorporated
       // into nextTimestampRangeUsedSpace.
-      if (spaceLeft <
-          (cumUsedSpace + nextTimestampRangeUsedSpace +
-           getQuicIntegerSizeThrows(delta) +
-           getQuicIntegerSizeThrows(nextTimestampRange.deltas.size() + 1) +
-           getQuicIntegerSizeThrows(
-               ackFrame.recvdPacketsTimestampRanges.size() + 1))) {
+      auto deltaSizeResult = getQuicIntegerSize(delta);
+      if (deltaSizeResult.hasError()) {
+        return folly::makeUnexpected(deltaSizeResult.error());
+      }
+
+      auto deltasCountSizeResult =
+          getQuicIntegerSize(nextTimestampRange.deltas.size() + 1);
+      if (deltasCountSizeResult.hasError()) {
+        return folly::makeUnexpected(deltasCountSizeResult.error());
+      }
+
+      auto rangesCountSizeResult =
+          getQuicIntegerSize(ackFrame.recvdPacketsTimestampRanges.size() + 1);
+      if (rangesCountSizeResult.hasError()) {
+        return folly::makeUnexpected(rangesCountSizeResult.error());
+      }
+
+      if (spaceLeft < (cumUsedSpace + nextTimestampRangeUsedSpace +
+                       deltaSizeResult.value() + deltasCountSizeResult.value() +
+                       rangesCountSizeResult.value())) {
         outOfSpace = true;
         break;
       }
       nextTimestampRange.deltas.push_back(delta);
-      nextTimestampRangeUsedSpace += getQuicIntegerSizeThrows(delta);
+      nextTimestampRangeUsedSpace += deltaSizeResult.value();
       timestampIt++;
     }
     if (nextTimestampRange.deltas.size() > 0) {
       nextTimestampRange.timestamp_delta_count =
           nextTimestampRange.deltas.size();
-      cumUsedSpace += nextTimestampRangeUsedSpace +
-          getQuicIntegerSizeThrows(nextTimestampRange.deltas.size());
+
+      auto deltasCountSizeResult =
+          getQuicIntegerSize(nextTimestampRange.deltas.size());
+      if (deltasCountSizeResult.hasError()) {
+        return folly::makeUnexpected(deltasCountSizeResult.error());
+      }
+
+      cumUsedSpace +=
+          nextTimestampRangeUsedSpace + deltasCountSizeResult.value();
       ackFrame.recvdPacketsTimestampRanges.push_back(nextTimestampRange);
       prevPktNum = timestampIntervalsIt->start;
       DCHECK(cumUsedSpace <= spaceLeft);
@@ -361,11 +442,17 @@ static size_t fillFrameWithPacketReceiveTimestamps(
       break;
     }
   }
-  DCHECK(cumUsedSpace == computeSizeUsedByRecvdTimestamps(ackFrame));
+
+  auto computedSizeResult = computeSizeUsedByRecvdTimestamps(ackFrame);
+  if (computedSizeResult.hasError()) {
+    return folly::makeUnexpected(computedSizeResult.error());
+  }
+  DCHECK(cumUsedSpace == computedSizeResult.value());
   return ackFrame.recvdPacketsTimestampRanges.size();
 }
 
-static Optional<WriteAckFrame> maybeWriteAckBaseFields(
+[[nodiscard]] static folly::Expected<Optional<WriteAckFrame>, QuicError>
+maybeWriteAckBaseFields(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType,
@@ -392,12 +479,39 @@ static Optional<WriteAckFrame> maybeWriteAckBaseFields(
   // Required fields are Type, LargestAcked, AckDelay, AckBlockCount,
   // firstAckBlockLength
   QuicInteger encodedintFrameType(static_cast<uint8_t>(frameType));
-  uint64_t headerSize = encodedintFrameType.getSize() +
-      largestAckedPacketInt.getSize() + ackDelayInt.getSize() +
-      minAdditionalAckBlockCount.getSize() + firstAckBlockLengthInt.getSize();
+
+  auto largestAckedPacketIntSize = largestAckedPacketInt.getSize();
+  if (largestAckedPacketIntSize.hasError()) {
+    return folly::makeUnexpected(largestAckedPacketIntSize.error());
+  }
+
+  auto ackDelayIntSize = ackDelayInt.getSize();
+  if (ackDelayIntSize.hasError()) {
+    return folly::makeUnexpected(ackDelayIntSize.error());
+  }
+
+  auto minAdditionalAckBlockCountSize = minAdditionalAckBlockCount.getSize();
+  if (minAdditionalAckBlockCountSize.hasError()) {
+    return folly::makeUnexpected(minAdditionalAckBlockCountSize.error());
+  }
+
+  auto firstAckBlockLengthIntSize = firstAckBlockLengthInt.getSize();
+  if (firstAckBlockLengthIntSize.hasError()) {
+    return folly::makeUnexpected(firstAckBlockLengthIntSize.error());
+  }
+
+  auto encodedintFrameTypeSize = encodedintFrameType.getSize();
+  if (encodedintFrameTypeSize.hasError()) {
+    return folly::makeUnexpected(encodedintFrameTypeSize.error());
+  }
+
+  uint64_t headerSize = encodedintFrameTypeSize.value() +
+      largestAckedPacketIntSize.value() + ackDelayIntSize.value() +
+      minAdditionalAckBlockCountSize.value() +
+      firstAckBlockLengthIntSize.value();
 
   if (spaceLeft < headerSize) {
-    return none;
+    return Optional<WriteAckFrame>(none);
   }
   WriteAckFrame ackFrame;
   ackFrame.frameType = frameType;
@@ -409,9 +523,13 @@ static Optional<WriteAckFrame> maybeWriteAckBaseFields(
   spaceLeft -= headerSize;
 
   ackFrame.ackBlocks.push_back(ackState.acks.back());
-  auto numAdditionalAckBlocks =
+  auto numAdditionalAckBlocksResult =
       fillFrameWithAckBlocks(ackState.acks, ackFrame, spaceLeft);
-  QuicInteger numAdditionalAckBlocksInt(numAdditionalAckBlocks);
+  if (numAdditionalAckBlocksResult.hasError()) {
+    return folly::makeUnexpected(numAdditionalAckBlocksResult.error());
+  }
+
+  QuicInteger numAdditionalAckBlocksInt(numAdditionalAckBlocksResult.value());
   builder.write(encodedintFrameType);
   builder.write(largestAckedPacketInt);
   builder.write(ackDelayInt);
@@ -433,18 +551,35 @@ static Optional<WriteAckFrame> maybeWriteAckBaseFields(
   }
   ackFrame.ackDelay = ackFrameMetaData.ackDelay;
 
-  return ackFrame;
+  return Optional<WriteAckFrame>(std::move(ackFrame));
 }
 
-static uint64_t computeEcnRequiredSpace(
-    const quic::WriteAckFrameMetaData& ackFrameMetaData) {
+[[nodiscard]] static folly::Expected<uint64_t, QuicError>
+computeEcnRequiredSpace(const quic::WriteAckFrameMetaData& ackFrameMetaData) {
   QuicInteger ecnECT0Count(ackFrameMetaData.ackState.ecnECT0CountReceived);
   QuicInteger ecnECT1Count(ackFrameMetaData.ackState.ecnECT1CountReceived);
   QuicInteger ecnCECount(ackFrameMetaData.ackState.ecnCECountReceived);
-  return ecnECT0Count.getSize() + ecnECT1Count.getSize() + ecnCECount.getSize();
+
+  auto ecnECT0Size = ecnECT0Count.getSize();
+  if (ecnECT0Size.hasError()) {
+    return folly::makeUnexpected(ecnECT0Size.error());
+  }
+
+  auto ecnECT1Size = ecnECT1Count.getSize();
+  if (ecnECT1Size.hasError()) {
+    return folly::makeUnexpected(ecnECT1Size.error());
+  }
+
+  auto ecnCESize = ecnCECount.getSize();
+  if (ecnCESize.hasError()) {
+    return folly::makeUnexpected(ecnCESize.error());
+  }
+
+  return ecnECT0Size.value() + ecnECT1Size.value() + ecnCESize.value();
 }
 
-static uint64_t computeReceiveTimestampsMinimumSpace(
+[[nodiscard]] static folly::Expected<uint64_t, QuicError>
+computeReceiveTimestampsMinimumSpace(
     const quic::WriteAckFrameMetaData& ackFrameMetaData) {
   // Compute minimum size requirements for 3 fields that must be sent
   // in every ACK_RECEIVE_TIMESTAMPS frame
@@ -465,9 +600,23 @@ static uint64_t computeReceiveTimestampsMinimumSpace(
              : 0us);
   }
 
-  return getQuicIntegerSize(countTimestampRanges).value_or(0) +
-      getQuicIntegerSize(maybeLastPktNum).value_or(0) +
-      getQuicIntegerSize(maybeLastPktTsDelta.count()).value_or(0);
+  auto countRangesSize = getQuicIntegerSize(countTimestampRanges);
+  if (countRangesSize.hasError()) {
+    return folly::makeUnexpected(countRangesSize.error());
+  }
+
+  auto lastPktNumSize = getQuicIntegerSize(maybeLastPktNum);
+  if (lastPktNumSize.hasError()) {
+    return folly::makeUnexpected(lastPktNumSize.error());
+  }
+
+  auto lastPktTsDeltaSize = getQuicIntegerSize(maybeLastPktTsDelta.count());
+  if (lastPktTsDeltaSize.hasError()) {
+    return folly::makeUnexpected(lastPktTsDeltaSize.error());
+  }
+
+  return countRangesSize.value() + lastPktNumSize.value() +
+      lastPktTsDeltaSize.value();
 }
 
 static void writeECNFieldsToAck(
@@ -492,7 +641,8 @@ struct AckReceiveTimesStampsWritten {
 };
 } // namespace
 
-AckReceiveTimesStampsWritten writeReceiveTimestampFieldsToAck(
+[[nodiscard]] folly::Expected<AckReceiveTimesStampsWritten, QuicError>
+writeReceiveTimestampFieldsToAck(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     WriteAckFrame& ackFrame,
     PacketBuilderInterface& builder,
@@ -528,13 +678,17 @@ AckReceiveTimesStampsWritten writeReceiveTimestampFieldsToAck(
     auto largestAckedPacket = ackState.acks.back().end;
     uint64_t receiveTimestampsExponentToUse =
         recvTimestampsConfig.receiveTimestampsExponent;
-    countTimestampRanges = fillFrameWithPacketReceiveTimestamps(
+    auto countTimestampRangesResult = fillFrameWithPacketReceiveTimestamps(
         ackFrameMetaData,
         ackFrame,
         largestAckedPacket,
         spaceLeft,
         receiveTimestampsExponentToUse,
         maxRecvTimestampsToSend);
+    if (countTimestampRangesResult.hasError()) {
+      return folly::makeUnexpected(countTimestampRangesResult.error());
+    }
+    countTimestampRanges = countTimestampRangesResult.value();
     if (countTimestampRanges > 0) {
       QuicInteger timeStampRangeCountInt(
           ackFrame.recvdPacketsTimestampRanges.size());
@@ -560,7 +714,7 @@ AckReceiveTimesStampsWritten writeReceiveTimestampFieldsToAck(
   return AckReceiveTimesStampsWritten{countTimestampRanges, countTimestamps};
 }
 
-Optional<WriteAckFrameResult> writeAckFrame(
+folly::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
     const quic::WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType,
@@ -568,7 +722,7 @@ Optional<WriteAckFrameResult> writeAckFrame(
     uint64_t maxRecvTimestampsToSend,
     ExtendedAckFeatureMaskType extendedAckFeatures) {
   if (ackFrameMetaData.ackState.acks.empty()) {
-    return none;
+    return Optional<WriteAckFrameResult>(none);
   }
   uint64_t beginningSpace = builder.remainingSpaceInPkt();
   uint64_t spaceLeft = beginningSpace;
@@ -586,28 +740,42 @@ Optional<WriteAckFrameResult> writeAckFrame(
 
   // Reserve space for ACK_EXTENDED header
   if (frameType == FrameType::ACK_EXTENDED) {
-    auto extendedAckRequiredSpace = QuicInteger(extendedAckFeatures).getSize();
+    auto extendedAckRequiredSpaceResult =
+        QuicInteger(extendedAckFeatures).getSize();
+    if (extendedAckRequiredSpaceResult.hasError()) {
+      return folly::makeUnexpected(extendedAckRequiredSpaceResult.error());
+    }
+    auto extendedAckRequiredSpace = extendedAckRequiredSpaceResult.value();
     if (spaceLeft < extendedAckRequiredSpace) {
-      return none;
+      return Optional<WriteAckFrameResult>(none);
     }
     spaceLeft -= extendedAckRequiredSpace;
   }
 
   // Reserve space for ECN counts if enabled
   if (ecnEnabled) {
-    auto ecnRequiredSpace = computeEcnRequiredSpace(ackFrameMetaData);
+    auto ecnRequiredSpaceResult = computeEcnRequiredSpace(ackFrameMetaData);
+    if (ecnRequiredSpaceResult.hasError()) {
+      return folly::makeUnexpected(ecnRequiredSpaceResult.error());
+    }
+    auto ecnRequiredSpace = ecnRequiredSpaceResult.value();
     if (spaceLeft < ecnRequiredSpace) {
-      return none;
+      return Optional<WriteAckFrameResult>(none);
     }
     spaceLeft -= ecnRequiredSpace;
   }
 
   // Reserve space for receive timestamps if enabled
   if (receiveTimestampsEnabled) {
-    auto receiveTimestampsMinimumSpace =
+    auto receiveTimestampsMinimumSpaceResult =
         computeReceiveTimestampsMinimumSpace(ackFrameMetaData);
+    if (receiveTimestampsMinimumSpaceResult.hasError()) {
+      return folly::makeUnexpected(receiveTimestampsMinimumSpaceResult.error());
+    }
+    auto receiveTimestampsMinimumSpace =
+        receiveTimestampsMinimumSpaceResult.value();
     if (spaceLeft < receiveTimestampsMinimumSpace) {
-      return none;
+      return Optional<WriteAckFrameResult>(none);
     }
     spaceLeft -= receiveTimestampsMinimumSpace;
   }
@@ -615,10 +783,14 @@ Optional<WriteAckFrameResult> writeAckFrame(
   // Start writing fields to the builder
 
   // 1. Write the base ack fields
-  auto maybeAckFrame =
+  auto maybeAckFrameResult =
       maybeWriteAckBaseFields(ackFrameMetaData, builder, frameType, spaceLeft);
-  if (!maybeAckFrame.has_value()) {
-    return none;
+  if (maybeAckFrameResult.hasError()) {
+    return folly::makeUnexpected(maybeAckFrameResult.error());
+  }
+  auto& maybeAckFrame = maybeAckFrameResult.value();
+  if (!maybeAckFrame.hasValue()) {
+    return Optional<WriteAckFrameResult>(none);
   }
   auto& ackFrame = maybeAckFrame.value();
 
@@ -636,12 +808,16 @@ Optional<WriteAckFrameResult> writeAckFrame(
   // 4. Write receive timestamp fields if enabled
   AckReceiveTimesStampsWritten receiveTimestampsWritten;
   if (receiveTimestampsEnabled) {
-    receiveTimestampsWritten = writeReceiveTimestampFieldsToAck(
+    auto receiveTimestampsResult = writeReceiveTimestampFieldsToAck(
         ackFrameMetaData,
         ackFrame,
         builder,
         recvTimestampsConfig,
         maxRecvTimestampsToSend);
+    if (receiveTimestampsResult.hasError()) {
+      return folly::makeUnexpected(receiveTimestampsResult.error());
+    }
+    receiveTimestampsWritten = receiveTimestampsResult.value();
   }
   // Everything written
   auto ackFrameWriteResult = WriteAckFrameResult(
@@ -653,10 +829,10 @@ Optional<WriteAckFrameResult> writeAckFrame(
       extendedAckFeatures);
 
   builder.appendFrame(std::move(ackFrame));
-  return ackFrameWriteResult;
+  return Optional<WriteAckFrameResult>(std::move(ackFrameWriteResult));
 }
 
-size_t writeSimpleFrame(
+folly::Expected<size_t, QuicError> writeSimpleFrame(
     QuicSimpleFrame&& frame,
     PacketBuilderInterface& builder) {
   using FrameTypeType = std::underlying_type<FrameType>::type;
@@ -669,9 +845,20 @@ size_t writeSimpleFrame(
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::STOP_SENDING));
       QuicInteger streamId(stopSendingFrame.streamId);
       QuicInteger errorCode(static_cast<uint64_t>(stopSendingFrame.errorCode));
-      size_t errorSize = errorCode.getSize();
-      auto stopSendingFrameSize =
-          intFrameType.getSize() + streamId.getSize() + errorSize;
+      auto errorSizeRes = errorCode.getSize();
+      if (errorSizeRes.hasError()) {
+        return folly::makeUnexpected(errorSizeRes.error());
+      }
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto streamIdSize = streamId.getSize();
+      if (streamIdSize.hasError()) {
+        return folly::makeUnexpected(streamIdSize.error());
+      }
+      auto stopSendingFrameSize = intFrameTypeSize.value() +
+          streamIdSize.value() + errorSizeRes.value();
       if (packetSpaceCheck(spaceLeft, stopSendingFrameSize)) {
         builder.write(intFrameType);
         builder.write(streamId);
@@ -686,8 +873,12 @@ size_t writeSimpleFrame(
       const PathChallengeFrame& pathChallengeFrame =
           *frame.asPathChallengeFrame();
       QuicInteger frameType(static_cast<uint8_t>(FrameType::PATH_CHALLENGE));
+      auto frameTypeSize = frameType.getSize();
+      if (frameTypeSize.hasError()) {
+        return folly::makeUnexpected(frameTypeSize.error());
+      }
       auto pathChallengeFrameSize =
-          frameType.getSize() + sizeof(pathChallengeFrame.pathData);
+          frameTypeSize.value() + sizeof(pathChallengeFrame.pathData);
       if (packetSpaceCheck(spaceLeft, pathChallengeFrameSize)) {
         builder.write(frameType);
         builder.writeBE(pathChallengeFrame.pathData);
@@ -700,8 +891,12 @@ size_t writeSimpleFrame(
     case QuicSimpleFrame::Type::PathResponseFrame: {
       const PathResponseFrame& pathResponseFrame = *frame.asPathResponseFrame();
       QuicInteger frameType(static_cast<uint8_t>(FrameType::PATH_RESPONSE));
+      auto frameTypeSize = frameType.getSize();
+      if (frameTypeSize.hasError()) {
+        return folly::makeUnexpected(frameTypeSize.error());
+      }
       auto pathResponseFrameSize =
-          frameType.getSize() + sizeof(pathResponseFrame.pathData);
+          frameTypeSize.value() + sizeof(pathResponseFrame.pathData);
       if (packetSpaceCheck(spaceLeft, pathResponseFrameSize)) {
         builder.write(frameType);
         builder.writeBE(pathResponseFrame.pathData);
@@ -717,10 +912,24 @@ size_t writeSimpleFrame(
       QuicInteger frameType(static_cast<uint8_t>(FrameType::NEW_CONNECTION_ID));
       QuicInteger sequenceNumber(newConnectionIdFrame.sequenceNumber);
       QuicInteger retirePriorTo(newConnectionIdFrame.retirePriorTo);
+
+      auto frameTypeSize = frameType.getSize();
+      if (frameTypeSize.hasError()) {
+        return folly::makeUnexpected(frameTypeSize.error());
+      }
+      auto sequenceNumberSize = sequenceNumber.getSize();
+      if (sequenceNumberSize.hasError()) {
+        return folly::makeUnexpected(sequenceNumberSize.error());
+      }
+      auto retirePriorToSize = retirePriorTo.getSize();
+      if (retirePriorToSize.hasError()) {
+        return folly::makeUnexpected(retirePriorToSize.error());
+      }
+
       // Include an 8-bit unsigned integer containing the length of the connId
-      auto newConnectionIdFrameSize = frameType.getSize() +
-          sequenceNumber.getSize() + retirePriorTo.getSize() + sizeof(uint8_t) +
-          newConnectionIdFrame.connectionId.size() +
+      auto newConnectionIdFrameSize = frameTypeSize.value() +
+          sequenceNumberSize.value() + retirePriorToSize.value() +
+          sizeof(uint8_t) + newConnectionIdFrame.connectionId.size() +
           newConnectionIdFrame.token.size();
       if (packetSpaceCheck(spaceLeft, newConnectionIdFrameSize)) {
         builder.write(frameType);
@@ -746,7 +955,18 @@ size_t writeSimpleFrame(
           : FrameType::MAX_STREAMS_UNI;
       QuicInteger intFrameType(static_cast<FrameTypeType>(frameType));
       QuicInteger streamCount(maxStreamsFrame.maxStreams);
-      auto maxStreamsFrameSize = intFrameType.getSize() + streamCount.getSize();
+
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto streamCountSize = streamCount.getSize();
+      if (streamCountSize.hasError()) {
+        return folly::makeUnexpected(streamCountSize.error());
+      }
+
+      auto maxStreamsFrameSize =
+          intFrameTypeSize.value() + streamCountSize.value();
       if (packetSpaceCheck(spaceLeft, maxStreamsFrameSize)) {
         builder.write(intFrameType);
         builder.write(streamCount);
@@ -761,8 +981,18 @@ size_t writeSimpleFrame(
       QuicInteger frameType(
           static_cast<uint8_t>(FrameType::RETIRE_CONNECTION_ID));
       QuicInteger sequence(retireConnectionIdFrame.sequenceNumber);
+
+      auto frameTypeSize = frameType.getSize();
+      if (frameTypeSize.hasError()) {
+        return folly::makeUnexpected(frameTypeSize.error());
+      }
+      auto sequenceSize = sequence.getSize();
+      if (sequenceSize.hasError()) {
+        return folly::makeUnexpected(sequenceSize.error());
+      }
+
       auto retireConnectionIdFrameSize =
-          frameType.getSize() + sequence.getSize();
+          frameTypeSize.value() + sequenceSize.value();
       if (packetSpaceCheck(spaceLeft, retireConnectionIdFrameSize)) {
         builder.write(frameType);
         builder.write(sequence);
@@ -777,10 +1007,16 @@ size_t writeSimpleFrame(
           *frame.asHandshakeDoneFrame();
       CHECK(builder.getPacketHeader().asShort());
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::HANDSHAKE_DONE));
-      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+
+      if (packetSpaceCheck(spaceLeft, intFrameTypeSize.value())) {
         builder.write(intFrameType);
         builder.appendFrame(QuicSimpleFrame(handshakeDoneFrame));
-        return intFrameType.getSize();
+        return intFrameTypeSize.value();
       }
       // no space left in packet
       return size_t(0);
@@ -791,8 +1027,27 @@ size_t writeSimpleFrame(
       QuicInteger intKnobSpace(knobFrame.knobSpace);
       QuicInteger intKnobId(knobFrame.id);
       QuicInteger intKnobLen(knobFrame.len);
-      size_t knobFrameLen = intFrameType.getSize() + intKnobSpace.getSize() +
-          intKnobId.getSize() + intKnobLen.getSize() + intKnobLen.getValue();
+
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto intKnobSpaceSize = intKnobSpace.getSize();
+      if (intKnobSpaceSize.hasError()) {
+        return folly::makeUnexpected(intKnobSpaceSize.error());
+      }
+      auto intKnobIdSize = intKnobId.getSize();
+      if (intKnobIdSize.hasError()) {
+        return folly::makeUnexpected(intKnobIdSize.error());
+      }
+      auto intKnobLenSize = intKnobLen.getSize();
+      if (intKnobLenSize.hasError()) {
+        return folly::makeUnexpected(intKnobLenSize.error());
+      }
+
+      size_t knobFrameLen = intFrameTypeSize.value() +
+          intKnobSpaceSize.value() + intKnobIdSize.value() +
+          intKnobLenSize.value() + intKnobLen.getValue();
       if (packetSpaceCheck(spaceLeft, knobFrameLen)) {
         builder.write(intFrameType);
         builder.write(intKnobSpace);
@@ -812,9 +1067,31 @@ size_t writeSimpleFrame(
       QuicInteger intPacketTolerance(ackFrequencyFrame->packetTolerance);
       QuicInteger intUpdateMaxAckDelay(ackFrequencyFrame->updateMaxAckDelay);
       QuicInteger intReorderThreshold(ackFrequencyFrame->reorderThreshold);
-      size_t ackFrequencyFrameLen = intFrameType.getSize() +
-          intSequenceNumber.getSize() + intPacketTolerance.getSize() +
-          intUpdateMaxAckDelay.getSize() + intReorderThreshold.getSize();
+
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto intSequenceNumberSize = intSequenceNumber.getSize();
+      if (intSequenceNumberSize.hasError()) {
+        return folly::makeUnexpected(intSequenceNumberSize.error());
+      }
+      auto intPacketToleranceSize = intPacketTolerance.getSize();
+      if (intPacketToleranceSize.hasError()) {
+        return folly::makeUnexpected(intPacketToleranceSize.error());
+      }
+      auto intUpdateMaxAckDelaySize = intUpdateMaxAckDelay.getSize();
+      if (intUpdateMaxAckDelaySize.hasError()) {
+        return folly::makeUnexpected(intUpdateMaxAckDelaySize.error());
+      }
+      auto intReorderThresholdSize = intReorderThreshold.getSize();
+      if (intReorderThresholdSize.hasError()) {
+        return folly::makeUnexpected(intReorderThresholdSize.error());
+      }
+
+      size_t ackFrequencyFrameLen = intFrameTypeSize.value() +
+          intSequenceNumberSize.value() + intPacketToleranceSize.value() +
+          intUpdateMaxAckDelaySize.value() + intReorderThresholdSize.value();
       if (packetSpaceCheck(spaceLeft, ackFrequencyFrameLen)) {
         builder.write(intFrameType);
         builder.write(intSequenceNumber);
@@ -833,8 +1110,18 @@ size_t writeSimpleFrame(
 
       auto& token = newTokenFrame->token;
       QuicInteger tokenLength(token->computeChainDataLength());
-      auto newTokenFrameLength = intFrameType.getSize() +
-          /*encoding token length*/ tokenLength.getSize() +
+
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto tokenLengthSize = tokenLength.getSize();
+      if (tokenLengthSize.hasError()) {
+        return folly::makeUnexpected(tokenLengthSize.error());
+      }
+
+      auto newTokenFrameLength = intFrameTypeSize.value() +
+          /*encoding token length*/ tokenLengthSize.value() +
           tokenLength.getValue();
 
       if (packetSpaceCheck(spaceLeft, newTokenFrameLength)) {
@@ -851,7 +1138,9 @@ size_t writeSimpleFrame(
   folly::assume_unreachable();
 }
 
-size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
+folly::Expected<size_t, QuicError> writeFrame(
+    QuicWriteFrame&& frame,
+    PacketBuilderInterface& builder) {
   using FrameTypeType = std::underlying_type<FrameType>::type;
 
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
@@ -859,10 +1148,14 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
   switch (frame.type()) {
     case QuicWriteFrame::Type::PaddingFrame: {
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PADDING));
-      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      if (packetSpaceCheck(spaceLeft, intFrameTypeSize.value())) {
         builder.write(intFrameType);
         builder.appendPaddingFrame();
-        return intFrameType.getSize();
+        return intFrameTypeSize.value();
       }
       return size_t(0);
     }
@@ -875,12 +1168,31 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       QuicInteger finalSize(rstStreamFrame.finalSize);
       QuicInteger errorCode(static_cast<uint64_t>(rstStreamFrame.errorCode));
       folly::Optional<QuicInteger> maybeReliableSize = folly::none;
-      size_t errorSize = errorCode.getSize();
-      auto rstStreamFrameSize = intFrameType.getSize() + errorSize +
-          streamId.getSize() + finalSize.getSize();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto streamIdSize = streamId.getSize();
+      if (streamIdSize.hasError()) {
+        return folly::makeUnexpected(streamIdSize.error());
+      }
+      auto finalSizeSize = finalSize.getSize();
+      if (finalSizeSize.hasError()) {
+        return folly::makeUnexpected(finalSizeSize.error());
+      }
+      auto errorSize = errorCode.getSize();
+      if (errorSize.hasError()) {
+        return folly::makeUnexpected(errorSize.error());
+      }
+      auto rstStreamFrameSize = intFrameTypeSize.value() + errorSize.value() +
+          streamIdSize.value() + finalSizeSize.value();
       if (rstStreamFrame.reliableSize) {
         maybeReliableSize = QuicInteger(*rstStreamFrame.reliableSize);
-        rstStreamFrameSize += maybeReliableSize->getSize();
+        auto reliableSize = maybeReliableSize->getSize();
+        if (reliableSize.hasError()) {
+          return folly::makeUnexpected(reliableSize.error());
+        }
+        rstStreamFrameSize += reliableSize.value();
       }
       if (packetSpaceCheck(spaceLeft, rstStreamFrameSize)) {
         builder.write(intFrameType);
@@ -900,14 +1212,21 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       MaxDataFrame& maxDataFrame = *frame.asMaxDataFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::MAX_DATA));
       QuicInteger maximumData(maxDataFrame.maximumData);
-      auto frameSize = intFrameType.getSize() + maximumData.getSize();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto maximumDataSize = maximumData.getSize();
+      if (maximumDataSize.hasError()) {
+        return folly::makeUnexpected(maximumDataSize.error());
+      }
+      auto frameSize = intFrameTypeSize.value() + maximumDataSize.value();
       if (packetSpaceCheck(spaceLeft, frameSize)) {
         builder.write(intFrameType);
         builder.write(maximumData);
         builder.appendFrame(std::move(maxDataFrame));
         return frameSize;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::MaxStreamDataFrame: {
@@ -916,8 +1235,20 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           static_cast<uint8_t>(FrameType::MAX_STREAM_DATA));
       QuicInteger streamId(maxStreamDataFrame.streamId);
       QuicInteger maximumData(maxStreamDataFrame.maximumData);
-      auto maxStreamDataFrameSize =
-          intFrameType.getSize() + streamId.getSize() + maximumData.getSize();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto streamIdSize = streamId.getSize();
+      if (streamIdSize.hasError()) {
+        return folly::makeUnexpected(streamIdSize.error());
+      }
+      auto maximumDataSize = maximumData.getSize();
+      if (maximumDataSize.hasError()) {
+        return folly::makeUnexpected(maximumDataSize.error());
+      }
+      auto maxStreamDataFrameSize = intFrameTypeSize.value() +
+          streamIdSize.value() + maximumDataSize.value();
       if (packetSpaceCheck(spaceLeft, maxStreamDataFrameSize)) {
         builder.write(intFrameType);
         builder.write(streamId);
@@ -925,21 +1256,27 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         builder.appendFrame(std::move(maxStreamDataFrame));
         return maxStreamDataFrameSize;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::DataBlockedFrame: {
       DataBlockedFrame& blockedFrame = *frame.asDataBlockedFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::DATA_BLOCKED));
       QuicInteger dataLimit(blockedFrame.dataLimit);
-      auto blockedFrameSize = intFrameType.getSize() + dataLimit.getSize();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto dataLimitSize = dataLimit.getSize();
+      if (dataLimitSize.hasError()) {
+        return folly::makeUnexpected(dataLimitSize.error());
+      }
+      auto blockedFrameSize = intFrameTypeSize.value() + dataLimitSize.value();
       if (packetSpaceCheck(spaceLeft, blockedFrameSize)) {
         builder.write(intFrameType);
         builder.write(dataLimit);
         builder.appendFrame(std::move(blockedFrame));
         return blockedFrameSize;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::StreamDataBlockedFrame: {
@@ -949,8 +1286,20 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           static_cast<uint8_t>(FrameType::STREAM_DATA_BLOCKED));
       QuicInteger streamId(streamBlockedFrame.streamId);
       QuicInteger dataLimit(streamBlockedFrame.dataLimit);
-      auto blockedFrameSize =
-          intFrameType.getSize() + streamId.getSize() + dataLimit.getSize();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto streamIdSize = streamId.getSize();
+      if (streamIdSize.hasError()) {
+        return folly::makeUnexpected(streamIdSize.error());
+      }
+      auto dataLimitSize = dataLimit.getSize();
+      if (dataLimitSize.hasError()) {
+        return folly::makeUnexpected(dataLimitSize.error());
+      }
+      auto blockedFrameSize = intFrameTypeSize.value() + streamIdSize.value() +
+          dataLimitSize.value();
       if (packetSpaceCheck(spaceLeft, blockedFrameSize)) {
         builder.write(intFrameType);
         builder.write(streamId);
@@ -958,7 +1307,6 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         builder.appendFrame(std::move(streamBlockedFrame));
         return blockedFrameSize;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::StreamsBlockedFrame: {
@@ -968,20 +1316,27 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           : FrameType::STREAMS_BLOCKED_UNI;
       QuicInteger intFrameType(static_cast<FrameTypeType>(frameType));
       QuicInteger streamId(streamsBlockedFrame.streamLimit);
-      auto streamBlockedFrameSize = intFrameType.getSize() + streamId.getSize();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto streamIdSize = streamId.getSize();
+      if (streamIdSize.hasError()) {
+        return folly::makeUnexpected(streamIdSize.error());
+      }
+      auto streamBlockedFrameSize =
+          intFrameTypeSize.value() + streamIdSize.value();
       if (packetSpaceCheck(spaceLeft, streamBlockedFrameSize)) {
         builder.write(intFrameType);
         builder.write(streamId);
         builder.appendFrame(std::move(streamsBlockedFrame));
         return streamBlockedFrameSize;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::ConnectionCloseFrame: {
       ConnectionCloseFrame& connectionCloseFrame =
           *frame.asConnectionCloseFrame();
-      // Need to distinguish between CONNECTION_CLOSE & CONNECTINO_CLOSE_APP_ERR
       const TransportErrorCode* isTransportErrorCode =
           connectionCloseFrame.errorCode.asTransportErrorCode();
       const ApplicationErrorCode* isApplicationErrorCode =
@@ -1003,10 +1358,40 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
               ? static_cast<uint64_t>(TransportErrorCode(*isTransportErrorCode))
               : static_cast<uint64_t>(
                     ApplicationErrorCode(*isApplicationErrorCode)));
-      size_t errorSize = errorCode.getSize();
-      auto connCloseFrameSize = intFrameType.getSize() + errorSize +
-          (closingFrameType ? closingFrameType.value().getSize() : 0) +
-          reasonLength.getSize() + connectionCloseFrame.reasonPhrase.size();
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      auto errorSize = errorCode.getSize();
+      if (errorSize.hasError()) {
+        return folly::makeUnexpected(errorSize.error());
+      }
+      auto reasonLengthSize = reasonLength.getSize();
+      if (reasonLengthSize.hasError()) {
+        return folly::makeUnexpected(reasonLengthSize.error());
+      }
+      folly::Expected<size_t, QuicError> closingFrameTypeSize = [&]() {
+        if (closingFrameType) {
+          auto result = closingFrameType.value().getSize();
+          if (result.hasError()) {
+            return result;
+          }
+          return result;
+        } else {
+          return folly::Expected<size_t, QuicError>(0);
+        }
+      }();
+
+      if (closingFrameType && closingFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(closingFrameTypeSize.error());
+      }
+
+      size_t closingFrameTypeSizeValue =
+          closingFrameType ? closingFrameTypeSize.value() : 0;
+
+      auto connCloseFrameSize = intFrameTypeSize.value() + errorSize.value() +
+          closingFrameTypeSizeValue + reasonLengthSize.value() +
+          connectionCloseFrame.reasonPhrase.size();
       if (packetSpaceCheck(spaceLeft, connCloseFrameSize)) {
         builder.write(intFrameType);
         builder.write(errorCode);
@@ -1020,18 +1405,20 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         builder.appendFrame(std::move(connectionCloseFrame));
         return connCloseFrameSize;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::PingFrame: {
       const PingFrame& pingFrame = *frame.asPingFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PING));
-      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      if (packetSpaceCheck(spaceLeft, intFrameTypeSize.value())) {
         builder.write(intFrameType);
         builder.appendFrame(pingFrame);
-        return intFrameType.getSize();
+        return intFrameTypeSize.value();
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::QuicSimpleFrame: {
@@ -1042,8 +1429,16 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       QuicInteger frameTypeQuicInt(
           static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
       QuicInteger datagramLenInt(datagramFrame.length);
-      auto datagramFrameLength = frameTypeQuicInt.getSize() +
-          datagramFrame.length + datagramLenInt.getSize();
+      auto frameTypeQuicIntSize = frameTypeQuicInt.getSize();
+      if (frameTypeQuicIntSize.hasError()) {
+        return folly::makeUnexpected(frameTypeQuicIntSize.error());
+      }
+      auto datagramLenIntSize = datagramLenInt.getSize();
+      if (datagramLenIntSize.hasError()) {
+        return folly::makeUnexpected(datagramLenIntSize.error());
+      }
+      auto datagramFrameLength = frameTypeQuicIntSize.value() +
+          datagramFrame.length + datagramLenIntSize.value();
       if (packetSpaceCheck(spaceLeft, datagramFrameLength)) {
         builder.write(frameTypeQuicInt);
         builder.write(datagramLenInt);
@@ -1051,18 +1446,20 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         builder.appendFrame(datagramFrame);
         return datagramFrameLength;
       }
-      // no space left in packet
       return size_t(0);
     }
     case QuicWriteFrame::Type::ImmediateAckFrame: {
       const ImmediateAckFrame& immediateAckFrame = *frame.asImmediateAckFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::IMMEDIATE_ACK));
-      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return folly::makeUnexpected(intFrameTypeSize.error());
+      }
+      if (packetSpaceCheck(spaceLeft, intFrameTypeSize.value())) {
         builder.write(intFrameType);
         builder.appendFrame(immediateAckFrame);
-        return intFrameType.getSize();
+        return intFrameTypeSize.value();
       }
-      // no space left in packet
       return size_t(0);
     }
     default: {

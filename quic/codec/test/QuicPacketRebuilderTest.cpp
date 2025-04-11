@@ -44,7 +44,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildEmpty) {
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0 /* largestAcked */);
-  regularBuilder.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
   QuicConnectionStateBase conn(QuicNodeType::Client);
   PacketRebuilder rebuilder(regularBuilder, conn);
   auto packet = std::move(regularBuilder).buildPacket();
@@ -69,10 +69,11 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
       kDefaultUDPSendPacketLen, std::move(initialHeader2), 0);
 
   PingFrame pingFrame{};
-  writeFrame(pingFrame, regularBuilder1);
+  ASSERT_FALSE(writeFrame(pingFrame, regularBuilder1).hasError());
   MaxStreamsFrame maxStreamsFrame(4321, true);
-  writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1).hasError());
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   QuicConnectionStateBase conn(QuicNodeType::Client);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto packet = std::move(regularBuilder1).buildPacket();
@@ -80,7 +81,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
   EXPECT_FALSE(packet.header.empty());
   ASSERT_EQ(packet.packet.frames.size(), 2);
   EXPECT_FALSE(packet.body.empty());
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
   ASSERT_TRUE(rebuildResult.value().hasValue());
@@ -99,7 +100,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   // Get a bunch frames
   ConnectionCloseFrame connCloseFrame(
       QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
@@ -131,10 +132,11 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   PingFrame pingFrame{};
   // Write them with a regular builder
   // Write the ACK frame first since it has special rebuilder handling.
-  writeAckFrame(ackMeta, regularBuilder1);
-  writeFrame(connCloseFrame, regularBuilder1);
-  writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
-  writeFrame(pingFrame, regularBuilder1);
+  ASSERT_FALSE(writeAckFrame(ackMeta, regularBuilder1).hasError());
+  ASSERT_FALSE(writeFrame(connCloseFrame, regularBuilder1).hasError());
+  ASSERT_FALSE(
+      writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1).hasError());
+  ASSERT_FALSE(writeFrame(pingFrame, regularBuilder1).hasError());
   writeStreamFrameHeader(
       regularBuilder1,
       streamId,
@@ -145,10 +147,12 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
-  writeFrame(maxDataFrame, regularBuilder1);
-  writeFrame(maxStreamDataFrame, regularBuilder1);
-  writeCryptoFrame(
-      cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1);
+  ASSERT_FALSE(writeFrame(maxDataFrame, regularBuilder1).hasError());
+  ASSERT_FALSE(writeFrame(maxStreamDataFrame, regularBuilder1).hasError());
+  ASSERT_FALSE(
+      writeCryptoFrame(
+          cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1)
+          .hasError());
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(8, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
@@ -171,7 +175,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
@@ -261,7 +265,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -289,7 +293,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
@@ -302,7 +306,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -325,7 +329,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 2000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
@@ -350,7 +354,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   // Get a bunch frames
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -374,8 +378,10 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
-  writeCryptoFrame(
-      cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1);
+  ASSERT_FALSE(
+      writeCryptoFrame(
+          cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1)
+          .hasError());
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(2, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
@@ -391,7 +397,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
@@ -418,7 +424,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   // Get a bunch frames
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -426,8 +432,10 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
   auto cryptoBuf = folly::IOBuf::copyBuffer("NewSessionTicket");
 
   // Write them with a regular builder
-  writeCryptoFrame(
-      cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1);
+  ASSERT_FALSE(
+      writeCryptoFrame(
+          cryptoOffset, ChainedByteRangeHead(cryptoBuf), regularBuilder1)
+          .hasError());
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(1, packet1.packet.frames.size());
   // Do not add the buf to crypto stream's retransmission buffer,
@@ -438,7 +446,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
@@ -451,7 +459,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder1.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder1.encodePacketHeader().hasError());
   // Get a bunch frames
   ConnectionCloseFrame connCloseFrame(
       QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
@@ -476,10 +484,10 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       folly::IOBuf::copyBuffer("You can't deny you are looking for the sunset");
   PingFrame pingFrame;
   // Write them with a regular builder
-  writeFrame(connCloseFrame, regularBuilder1);
-  writeFrame(maxStreamIdFrame, regularBuilder1);
-  writeFrame(pingFrame, regularBuilder1);
-  writeAckFrame(ackMeta, regularBuilder1);
+  ASSERT_FALSE(writeFrame(connCloseFrame, regularBuilder1).hasError());
+  ASSERT_FALSE(writeFrame(maxStreamIdFrame, regularBuilder1).hasError());
+  ASSERT_FALSE(writeFrame(pingFrame, regularBuilder1).hasError());
+  ASSERT_FALSE(writeAckFrame(ackMeta, regularBuilder1).hasError());
   writeStreamFrameHeader(
       regularBuilder1,
       streamId,
@@ -507,7 +515,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
           2,
       std::move(shortHeader2),
       0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
@@ -520,9 +528,9 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-  regularBuilder.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
   MaxDataFrame maxDataFrame(31415926);
-  writeFrame(maxDataFrame, regularBuilder);
+  ASSERT_FALSE(writeFrame(maxDataFrame, regularBuilder).hasError());
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1000);
   QuicServerConnectionState conn(
@@ -531,7 +539,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   ASSERT_FALSE(rebuilder.rebuildFromPacket(outstandingPacket).hasError());
   EXPECT_TRUE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
@@ -543,9 +551,9 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0);
-  regularBuilder.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
   PingFrame pingFrame;
-  writeFrame(pingFrame, regularBuilder);
+  ASSERT_FALSE(writeFrame(pingFrame, regularBuilder).hasError());
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 50);
   EXPECT_EQ(1, outstandingPacket.packet.frames.size());
@@ -555,7 +563,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0);
-  regularBuilder2.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
   ASSERT_FALSE(rebuildResult.hasError());
@@ -579,7 +587,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader), 0);
-  regularBuilder.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
   writeStreamFrameHeader(
       regularBuilder,
       streamId,
@@ -633,7 +641,9 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   EXPECT_CALL(mockBuilder, write(_))
       .Times(4)
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
-        packetLimit -= quicInt.getSize();
+        auto sizeResult = quicInt.getSize();
+        ASSERT_FALSE(sizeResult.hasError());
+        packetLimit -= sizeResult.value();
       }));
 
   PacketRebuilder rebuilder(mockBuilder, conn);
@@ -656,7 +666,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader), 0);
-  regularBuilder.encodePacketHeader();
+  ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
   writeStreamFrameHeader(
       regularBuilder,
       streamId,
@@ -710,7 +720,9 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   EXPECT_CALL(mockBuilder, write(_))
       .Times(5)
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
-        packetLimit -= quicInt.getSize();
+        auto sizeResult = quicInt.getSize();
+        ASSERT_FALSE(sizeResult.hasError());
+        packetLimit -= sizeResult.value();
       }));
 
   PacketRebuilder rebuilder(mockBuilder, conn);

@@ -38,7 +38,7 @@ bool PacketGroupWriter::writeSingleQuicPacket(
       std::move(shortHeader),
       largestAckedByPeer,
       0);
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(aead.getCipherOverhead());
   // frontend has already limited the length to flow control, thus
   // flowControlLen == length

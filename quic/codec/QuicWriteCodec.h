@@ -14,7 +14,6 @@
 #include <quic/common/IntervalSet.h>
 #include <quic/state/TransportSettings.h>
 #include <sys/types.h>
-#include <chrono>
 #include <cstdint>
 
 namespace quic {
@@ -25,7 +24,7 @@ namespace quic {
  * The input parameter is the frame to be written to the output appender.
  *
  */
-size_t writeSimpleFrame(
+[[nodiscard]] folly::Expected<size_t, QuicError> writeSimpleFrame(
     QuicSimpleFrame&& frame,
     PacketBuilderInterface& builder);
 
@@ -35,7 +34,9 @@ size_t writeSimpleFrame(
  * The input parameter is the frame to be written to the output appender.
  *
  */
-size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder);
+[[nodiscard]] folly::Expected<size_t, QuicError> writeFrame(
+    QuicWriteFrame&& frame,
+    PacketBuilderInterface& builder);
 
 /**
  * Write a complete stream frame header into builder
@@ -76,7 +77,8 @@ void writeStreamFrameData(
  * written. The caller should check the structure to confirm how many bytes were
  * written.
  */
-Optional<WriteCryptoFrame> writeCryptoFrame(
+[[nodiscard]] folly::Expected<Optional<WriteCryptoFrame>, QuicError>
+writeCryptoFrame(
     uint64_t offsetIn,
     const ChainedByteRangeHead& data,
     PacketBuilderInterface& builder);
@@ -97,7 +99,8 @@ Optional<WriteCryptoFrame> writeCryptoFrame(
  * written to the appender. Returns an empty optional if an ack block could not
  * be written.
  */
-Optional<WriteAckFrameResult> writeAckFrame(
+[[nodiscard]] folly::Expected<Optional<WriteAckFrameResult>, QuicError>
+writeAckFrame(
     const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
     FrameType frameType = FrameType::ACK,
@@ -109,7 +112,8 @@ Optional<WriteAckFrameResult> writeAckFrame(
 /**
  * Helper functions to write the fields for ACK_RECEIVE_TIMESTAMPS frame
  */
-size_t computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
+[[nodiscard]] folly::Expected<size_t, QuicError>
+computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 
 } // namespace quic
 

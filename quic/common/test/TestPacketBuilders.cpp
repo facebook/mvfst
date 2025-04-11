@@ -132,7 +132,7 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
       std::move(*header),
       getAckState(*CHECK_NOTNULL(dstConn), ackPnSpace)
           .largestAckScheduled.value_or(0));
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   if (maybeAead) {
     builder.accountForCipherOverhead(maybeAead.value()->getCipherOverhead());
   }
@@ -145,7 +145,7 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
       static_cast<uint8_t>(
           CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent),
       TimePoint()};
-  writeAckFrame(ackData, builder);
+  CHECK(!writeAckFrame(ackData, builder).hasError());
   return std::move(builder).buildPacket();
 }
 

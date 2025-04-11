@@ -285,12 +285,12 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         peerPacketNumStore.nextAppDataPacketNum++);
     RegularQuicPacketBuilder builder(
         getConn().udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-    builder.encodePacketHeader();
+    CHECK(!builder.encodePacketHeader().hasError());
     CHECK(builder.canBuildPacket());
 
     StopSendingFrame stopSendingFrame(
         streamId, GenericApplicationErrorCode::UNKNOWN);
-    writeSimpleFrame(stopSendingFrame, builder);
+    CHECK(!writeSimpleFrame(stopSendingFrame, builder).hasError());
 
     auto buf = quic::test::packetToBuf(std::move(builder).buildPacket());
     buf->coalesce();
@@ -309,12 +309,12 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         peerPacketNumStore.nextAppDataPacketNum++);
     RegularQuicPacketBuilder builder(
         getConn().udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-    builder.encodePacketHeader();
+    CHECK(!builder.encodePacketHeader().hasError());
     CHECK(builder.canBuildPacket());
 
     RstStreamFrame rstStreamFrame(
         streamId, GenericApplicationErrorCode::UNKNOWN, offset);
-    writeFrame(rstStreamFrame, builder);
+    CHECK(!writeFrame(rstStreamFrame, builder).hasError());
 
     auto buf = quic::test::packetToBuf(std::move(builder).buildPacket());
     buf->coalesce();

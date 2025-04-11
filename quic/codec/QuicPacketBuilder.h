@@ -61,7 +61,8 @@ class PacketBuilderInterface {
 
   [[nodiscard]] virtual uint32_t remainingSpaceInPkt() const = 0;
 
-  virtual void encodePacketHeader() = 0;
+  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
+  encodePacketHeader() = 0;
 
   // Functions to write bytes to the packet
   virtual void writeBE(uint8_t data) = 0;
@@ -132,7 +133,8 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   // PacketBuilderInterface
   [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
 
-  void encodePacketHeader() override;
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodePacketHeader()
+      override;
 
   void writeBE(uint8_t data) override;
   void writeBE(uint16_t data) override;
@@ -210,7 +212,8 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
 
   [[nodiscard]] uint32_t getHeaderBytes() const override;
 
-  void encodePacketHeader() override;
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodePacketHeader()
+      override;
 
   // PacketBuilderInterface
   [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
@@ -253,7 +256,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void releaseOutputBuffer() && override;
 
  private:
-  void encodeLongHeader(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodeLongHeader(
       const LongHeader& longHeader,
       PacketNum largestAckedPacketNum);
   void encodeShortHeader(
@@ -432,7 +435,7 @@ class RetryPacketBuilder {
   [[nodiscard]] bool canBuildPacket() const noexcept;
 
  private:
-  void writeRetryPacket();
+  folly::Expected<folly::Unit, QuicError> writeRetryPacket();
 
   Buf packetBuf_;
 
@@ -481,7 +484,8 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
         : 0;
   }
 
-  void encodePacketHeader() override {
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodePacketHeader()
+      override {
     CHECK(false)
         << "We only support wrapping builder that has already encoded header";
   }

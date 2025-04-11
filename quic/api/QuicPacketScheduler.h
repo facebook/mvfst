@@ -174,7 +174,8 @@ class DatagramFrameScheduler {
 
   [[nodiscard]] bool hasPendingDatagramFrames() const;
 
-  bool writeDatagramFrames(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<bool, QuicError> writeDatagramFrames(
+      PacketBuilderInterface& builder);
 
  private:
   QuicConnectionStateBase& conn_;
@@ -213,7 +214,8 @@ class CryptoStreamScheduler {
   /**
    * Returns whether or we could write data to the stream.
    */
-  bool writeCryptoData(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<bool, QuicError> writeCryptoData(
+      PacketBuilderInterface& builder);
 
   bool hasData() const;
 

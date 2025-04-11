@@ -1313,47 +1313,80 @@ void writeCloseCommon(
       connection.udpSendPacketLen,
       header,
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
-  packetBuilder.encodePacketHeader();
+  auto encodeResult = packetBuilder.encodePacketHeader();
+  if (encodeResult.hasError()) {
+    LOG(ERROR) << "Error encoding packet header: "
+               << encodeResult.error().message;
+    return;
+  }
   packetBuilder.accountForCipherOverhead(aead.getCipherOverhead());
   size_t written = 0;
   if (!closeDetails) {
-    written = writeFrame(
+    auto writeResult = writeFrame(
         ConnectionCloseFrame(
             QuicErrorCode(TransportErrorCode::NO_ERROR),
             std::string("No error")),
         packetBuilder);
+    if (writeResult.hasError()) {
+      LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+      return;
+    }
+    written = *writeResult;
   } else {
     switch (closeDetails->code.type()) {
-      case QuicErrorCode::Type::ApplicationErrorCode:
-        written = writeFrame(
+      case QuicErrorCode::Type::ApplicationErrorCode: {
+        auto writeResult = writeFrame(
             ConnectionCloseFrame(
                 QuicErrorCode(*closeDetails->code.asApplicationErrorCode()),
                 closeDetails->message,
                 quic::FrameType::CONNECTION_CLOSE_APP_ERR),
             packetBuilder);
+        if (writeResult.hasError()) {
+          LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+          return;
+        }
+        written = *writeResult;
         break;
-      case QuicErrorCode::Type::TransportErrorCode:
-        written = writeFrame(
+      }
+      case QuicErrorCode::Type::TransportErrorCode: {
+        auto writeResult = writeFrame(
             ConnectionCloseFrame(
                 QuicErrorCode(*closeDetails->code.asTransportErrorCode()),
                 closeDetails->message,
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
+        if (writeResult.hasError()) {
+          LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+          return;
+        }
+        written = *writeResult;
         break;
-      case QuicErrorCode::Type::LocalErrorCode:
-        written = writeFrame(
+      }
+      case QuicErrorCode::Type::LocalErrorCode: {
+        auto writeResult = writeFrame(
             ConnectionCloseFrame(
                 QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
                 std::string("Internal error"),
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
+        if (writeResult.hasError()) {
+          LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+          return;
+        }
+        written = *writeResult;
         break;
+      }
     }
   }
   if (pnSpace == PacketNumberSpace::Initial &&
       connection.nodeType == QuicNodeType::Client) {
     while (packetBuilder.remainingSpaceInPkt() > 0) {
-      writeFrame(PaddingFrame(), packetBuilder);
+      auto paddingResult = writeFrame(PaddingFrame(), packetBuilder);
+      if (paddingResult.hasError()) {
+        LOG(ERROR) << "Error writing padding frame: "
+                   << paddingResult.error().message;
+        return;
+      }
     }
   }
   if (written == 0) {

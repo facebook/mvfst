@@ -16,7 +16,8 @@ class AckScheduler {
  public:
   AckScheduler(const QuicConnectionStateBase& conn, const AckState& ackState);
 
-  Optional<PacketNum> writeNextAcks(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<Optional<PacketNum>, QuicError> writeNextAcks(
+      PacketBuilderInterface& builder);
 
   [[nodiscard]] bool hasPendingAcks() const;
 

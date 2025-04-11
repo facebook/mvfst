@@ -114,14 +114,8 @@ uint8_t decodeQuicIntegerLength(uint8_t firstByte);
  * if value is too large to be represented with the variable
  * length encoding
  */
-folly::Expected<size_t, TransportErrorCode> getQuicIntegerSize(uint64_t value);
-
-/**
- * Returns number of bytes needed to encode value as a QUIC integer, or throws
- * an exception if value is too large to be represented with the variable
- * length encoding
- */
-size_t getQuicIntegerSizeThrows(uint64_t value);
+[[nodiscard]] folly::Expected<size_t, QuicError> getQuicIntegerSize(
+    uint64_t value);
 
 /**
  * A better API for dealing with QUIC integers for encoding.
@@ -151,7 +145,7 @@ class QuicInteger {
    * Returns the number of bytes needed to represent the QUIC integer in
    * its encoded form.
    **/
-  size_t getSize() const;
+  [[nodiscard]] folly::Expected<size_t, QuicError> getSize() const;
 
   /**
    * Returns the real value of the QUIC integer that it was instantiated with.

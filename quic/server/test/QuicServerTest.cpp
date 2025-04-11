@@ -984,9 +984,9 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   while (builder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), builder);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToReceivedUdpPacket(std::move(builder).buildPacket());
   worker_->handleNetworkData(blockedSrcPort, packet);
@@ -1003,9 +1003,9 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   while (builder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), builder);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToReceivedUdpPacket(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, packet);
@@ -1021,7 +1021,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       LongHeader::Types::Initial, srcConnId, destConnId, num, version);
   RegularQuicPacketBuilder initialBuilder(
       kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
-  initialBuilder.encodePacketHeader();
+  ASSERT_FALSE(initialBuilder.encodePacketHeader().hasError());
   auto initialPacket =
       packetToReceivedUdpPacket((std::move(initialBuilder).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
@@ -1035,7 +1035,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       LongHeader::Types::Initial, srcConnId, destConnId, bignum, version);
   RegularQuicPacketBuilder initialBuilderBigNum(
       kDefaultUDPSendPacketLen, std::move(initialHeaderBigNum), 0);
-  initialBuilderBigNum.encodePacketHeader();
+  ASSERT_FALSE(initialBuilderBigNum.encodePacketHeader().hasError());
   auto initialPacketBigNum = packetToReceivedUdpPacket(
       (std::move(initialBuilderBigNum).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
@@ -1047,7 +1047,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       LongHeader::Types::Handshake, srcConnId, destConnId, num, version);
   RegularQuicPacketBuilder handshakeBuilder(
       kDefaultUDPSendPacketLen, std::move(handshakeHeader), 0);
-  handshakeBuilder.encodePacketHeader();
+  ASSERT_FALSE(handshakeBuilder.encodePacketHeader().hasError());
   auto handshakePacket =
       packetToReceivedUdpPacket((std::move(handshakeBuilder).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(_)).Times(0);
@@ -1068,9 +1068,9 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   while (builder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), builder);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToReceivedUdpPacket((std::move(builder).buildPacket()));
   worker_->handleNetworkData(kClientAddr, packet);
@@ -1091,9 +1091,9 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
       LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   while (builder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), builder);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   // To force dropping path, set initial to false
@@ -1130,9 +1130,9 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   while (builder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), builder);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   RoutingData routingData(HeaderForm::Long, true, false, dstConnId, srcConnId);
@@ -1158,9 +1158,9 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   while (builder.remainingSpaceInPkt() > 0) {
-    writeFrame(PaddingFrame(), builder);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   RoutingData routingData(HeaderForm::Long, true, false, dstConnId, srcConnId);
@@ -1201,7 +1201,7 @@ TEST_F(QuicServerWorkerTest, PacketAfterShutdown) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
   auto packet = packetToReceivedUdpPacket((std::move(builder).buildPacket()));
   worker_->handleNetworkData(kClientAddr, packet);
   eventbase_.terminateLoopSoon();
@@ -1459,7 +1459,7 @@ auto createInitialStream(
       pktHeaderType == LongHeader::Types::Retry ? std::move(headerRetry)
                                                 : std::move(header),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   auto streamData = data.clone();
   auto res = writeStreamFrameHeader(
       builder,
@@ -1540,9 +1540,9 @@ class QuicServerWorkerRetryTest : public QuicServerWorkerTest {
 
     RegularQuicPacketBuilder initialBuilder(
         kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
-    initialBuilder.encodePacketHeader();
+    CHECK(!initialBuilder.encodePacketHeader().hasError());
     while (initialBuilder.remainingSpaceInPkt() > 0) {
-      writeFrame(PaddingFrame(), initialBuilder);
+      CHECK(!writeFrame(PaddingFrame(), initialBuilder).hasError());
     }
     auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
     RoutingData routingData(

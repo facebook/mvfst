@@ -246,10 +246,12 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       2000);
-  builder->encodePacketHeader();
+  auto encodeResult = builder->encodePacketHeader();
+  ASSERT_FALSE(encodeResult.hasError());
 
   // write out at least one frame
-  writeFrame(PaddingFrame(), *builder);
+  auto writeFrameResult = writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrameResult.hasError());
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
@@ -305,10 +307,12 @@ TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
       largestAckedPacketNum,
       2000);
   builder->accountForCipherOverhead(cipherOverhead);
-  builder->encodePacketHeader();
+  auto encodeResult = builder->encodePacketHeader();
+  ASSERT_FALSE(encodeResult.hasError());
 
   // write out at least one frame
-  writeFrame(PaddingFrame(), *builder);
+  auto writeFrameResult = writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrameResult.hasError());
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
 
@@ -351,7 +355,8 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       0 /*largestAckedPacketNum*/,
       kDefaultUDPSendPacketLen);
-  builder->encodePacketHeader();
+  auto encodeResult = builder->encodePacketHeader();
+  ASSERT_FALSE(encodeResult.hasError());
 
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
@@ -383,10 +388,12 @@ TEST_P(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       kDefaultUDPSendPacketLen);
-  builder->encodePacketHeader();
+  auto encodeResult = builder->encodePacketHeader();
+  ASSERT_FALSE(encodeResult.hasError());
   builder->accountForCipherOverhead(cipherOverhead);
   EXPECT_TRUE(builder->canBuildPacket());
-  writeFrame(PaddingFrame(), *builder);
+  auto writeFrameResult = writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrameResult.hasError());
   auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
   // We should have padded the remaining bytes with Padding frames.
@@ -410,9 +417,11 @@ TEST_P(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       2000);
-  builder->encodePacketHeader();
+  auto encodeResult = builder->encodePacketHeader();
+  ASSERT_FALSE(encodeResult.hasError());
   EXPECT_TRUE(builder->canBuildPacket());
-  writeFrame(PaddingFrame(), *builder);
+  auto writeFrameResult = writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrameResult.hasError());
   auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
 
@@ -451,14 +460,14 @@ TEST_P(QuicPacketBuilderTest, LongHeaderBytesCounting) {
       std::move(header),
       largestAcked,
       kDefaultUDPSendPacketLen);
-  builder->encodePacketHeader();
+  ASSERT_FALSE(builder->encodePacketHeader().hasError());
   auto expectedWrittenHeaderFieldLen = sizeof(uint8_t) +
       sizeof(QuicVersionType) + sizeof(uint8_t) + clientCid.size() +
       sizeof(uint8_t) + serverCid.size();
   auto estimatedHeaderBytes = builder->getHeaderBytes();
   EXPECT_GT(
       estimatedHeaderBytes, expectedWrittenHeaderFieldLen + kMaxPacketLenSize);
-  writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrame(PaddingFrame(), *builder).hasError());
   EXPECT_LE(
       std::move(*builder).buildPacket().header.computeChainDataLength(),
       estimatedHeaderBytes);
@@ -474,9 +483,9 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
       ShortHeader(ProtectionType::KeyPhaseZero, cid, pktNum),
       largestAcked,
       2000);
-  builder->encodePacketHeader();
+  ASSERT_FALSE(builder->encodePacketHeader().hasError());
   auto headerBytes = builder->getHeaderBytes();
-  writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrame(PaddingFrame(), *builder).hasError());
   EXPECT_EQ(
       std::move(*builder).buildPacket().header.computeChainDataLength(),
       headerBytes);
@@ -503,9 +512,9 @@ TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInBuild) {
       1000,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0);
-  builder->encodePacketHeader();
+  ASSERT_FALSE(builder->encodePacketHeader().hasError());
   EXPECT_FALSE(bufAccessor.ownsBuffer());
-  writeFrame(PaddingFrame(), *builder);
+  ASSERT_FALSE(writeFrame(PaddingFrame(), *builder).hasError());
   std::move(*builder).buildPacket();
   EXPECT_TRUE(bufAccessor.ownsBuffer());
 }
@@ -518,10 +527,10 @@ TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
       1000,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0);
-  builder1->encodePacketHeader();
+  ASSERT_FALSE(builder1->encodePacketHeader().hasError());
   auto headerBytes = builder1->getHeaderBytes();
   for (size_t i = 0; i < 20; i++) {
-    writeFrame(PaddingFrame(), *builder1);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), *builder1).hasError());
   }
   EXPECT_EQ(headerBytes, builder1->getHeaderBytes());
   auto builtOut1 = std::move(*builder1).buildPacket();
@@ -534,10 +543,10 @@ TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
       1000,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0);
-  builder2->encodePacketHeader();
+  ASSERT_FALSE(builder2->encodePacketHeader().hasError());
   EXPECT_EQ(headerBytes, builder2->getHeaderBytes());
   for (size_t i = 0; i < 40; i++) {
-    writeFrame(PaddingFrame(), *builder2);
+    ASSERT_FALSE(writeFrame(PaddingFrame(), *builder2).hasError());
   }
   auto builtOut2 = std::move(*builder2).buildPacket();
   EXPECT_EQ(1, builtOut2.packet.frames.size());
@@ -558,7 +567,7 @@ TEST_F(QuicPacketBuilderTest, InplaceBuilderShorterHeaderBytes) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum),
       largestAckedPacketNum,
       kDefaultUDPSendPacketLen);
-  inplaceBuilder->encodePacketHeader();
+  ASSERT_FALSE(inplaceBuilder->encodePacketHeader().hasError());
   EXPECT_EQ(2 + connId.size(), inplaceBuilder->getHeaderBytes());
 }
 
@@ -578,7 +587,7 @@ TEST_F(QuicPacketBuilderTest, InplaceBuilderLongHeaderBytes) {
           QuicVersion::MVFST),
       largestAckedPacketNum,
       kDefaultUDPSendPacketLen);
-  inplaceBuilder->encodePacketHeader();
+  ASSERT_FALSE(inplaceBuilder->encodePacketHeader().hasError());
   EXPECT_EQ(
       9 /* initial + version + cid + cid + token length */ + srcConnId.size() +
           destConnId.size() + kMaxPacketLenSize,
@@ -761,8 +770,8 @@ TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
           QuicVersion::MVFST),
       largestAcked,
       kDefaultUDPSendPacketLen);
-  builder->encodePacketHeader();
-  writeFrame(PingFrame(), *builder);
+  ASSERT_FALSE(builder->encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(PingFrame(), *builder).hasError());
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
   auto resultPacket = builtOut.packet;
@@ -794,10 +803,10 @@ TEST_P(QuicPacketBuilderTest, TestCipherOverhead) {
           QuicVersion::MVFST),
       largestAcked,
       kDefaultUDPSendPacketLen);
-  builder->encodePacketHeader();
+  ASSERT_FALSE(builder->encodePacketHeader().hasError());
   builder->accountForCipherOverhead(cipherOverhead);
   while (builder->canBuildPacket()) {
-    writeFrame(PingFrame(), *builder);
+    ASSERT_FALSE(writeFrame(PingFrame(), *builder).hasError());
   }
   auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;

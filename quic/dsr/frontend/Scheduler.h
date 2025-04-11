@@ -31,7 +31,8 @@ class DSRStreamFrameScheduler {
   };
 
   // Write a single stream's data into builder.
-  SchedulingResult writeStream(DSRPacketBuilderBase& builder);
+  [[nodiscard]] folly::Expected<SchedulingResult, QuicError> writeStream(
+      DSRPacketBuilderBase& builder);
 
  private:
   void enrichInstruction(

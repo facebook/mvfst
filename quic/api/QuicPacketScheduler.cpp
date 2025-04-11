@@ -227,12 +227,18 @@ FrameScheduler::scheduleFramesForPacket(
   const LongHeader* longHeader = builder.getPacketHeader().asLong();
   bool initialPacket =
       longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
-  builder.encodePacketHeader();
+  auto encodeRes = builder.encodePacketHeader();
+  if (encodeRes.hasError()) {
+    return folly::makeUnexpected(encodeRes.error());
+  }
   // Add fixed padding at start of short header packets if configured
   if (shortHeader && conn_.transportSettings.fixedShortHeaderPadding > 0) {
     for (size_t i = 0; i < conn_.transportSettings.fixedShortHeaderPadding;
          i++) {
-      writeFrame(PaddingFrame(), builder);
+      auto writeRes = writeFrame(PaddingFrame(), builder);
+      if (writeRes.hasError()) {
+        return folly::makeUnexpected(writeRes.error());
+      }
     }
     shortHeaderPadding = conn_.transportSettings.fixedShortHeaderPadding;
   }
@@ -246,7 +252,11 @@ FrameScheduler::scheduleFramesForPacket(
   bool cryptoDataWritten = false;
   bool rstWritten = false;
   if (cryptoStreamScheduler_ && cryptoStreamScheduler_->hasData()) {
-    cryptoDataWritten = cryptoStreamScheduler_->writeCryptoData(wrapper);
+    auto cryptoDataRes = cryptoStreamScheduler_->writeCryptoData(wrapper);
+    if (cryptoDataRes.hasError()) {
+      return folly::makeUnexpected(cryptoDataRes.error());
+    }
+    cryptoDataWritten = cryptoDataRes.value();
   }
   if (rstScheduler_ && rstScheduler_->hasPendingRsts()) {
     rstWritten = rstScheduler_->writeRsts(wrapper);
@@ -256,14 +266,20 @@ FrameScheduler::scheduleFramesForPacket(
     if (cryptoDataWritten || rstWritten) {
       // If packet has non ack data, it is subject to congestion control. We
       // need to use the wrapper/
-      ackScheduler_->writeNextAcks(wrapper);
+      auto writeAcksRes = ackScheduler_->writeNextAcks(wrapper);
+      if (writeAcksRes.hasError()) {
+        return folly::makeUnexpected(writeAcksRes.error());
+      }
     } else {
       // If we start with writing acks, we will let the ack scheduler write
       // up to the full packet space. If the ack bytes exceeds the writable
       // bytes, this will be a pure ack packet and it will skip congestion
       // controller. Otherwise, we will give other schedulers an opportunity to
       // write up to writable bytes.
-      ackScheduler_->writeNextAcks(builder);
+      auto writeAcksRes = ackScheduler_->writeNextAcks(builder);
+      if (writeAcksRes.hasError()) {
+        return folly::makeUnexpected(writeAcksRes.error());
+      }
     }
   }
   // Immediate ACK frames are subject to congestion control but should be sent
@@ -297,14 +313,20 @@ FrameScheduler::scheduleFramesForPacket(
   }
   if (datagramFrameScheduler_ &&
       datagramFrameScheduler_->hasPendingDatagramFrames()) {
-    datagramFrameScheduler_->writeDatagramFrames(wrapper);
+    auto datagramRes = datagramFrameScheduler_->writeDatagramFrames(wrapper);
+    if (datagramRes.hasError()) {
+      return folly::makeUnexpected(datagramRes.error());
+    }
   }
 
   if (builder.hasFramesPending()) {
     if (initialPacket) {
       // This is the initial packet, we need to fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
-        writeFrame(PaddingFrame(), builder);
+        auto writeRes = writeFrame(PaddingFrame(), builder);
+        if (writeRes.hasError()) {
+          return folly::makeUnexpected(writeRes.error());
+        }
       }
     }
     if (shortHeader) {
@@ -312,7 +334,10 @@ FrameScheduler::scheduleFramesForPacket(
       if (paddingModulo > 0) {
         size_t paddingIncrement = wrapper.remainingSpaceInPkt() % paddingModulo;
         for (size_t i = 0; i < paddingIncrement; i++) {
-          writeFrame(PaddingFrame(), builder);
+          auto writeRes = writeFrame(PaddingFrame(), builder);
+          if (writeRes.hasError()) {
+            return folly::makeUnexpected(writeRes.error());
+          }
         }
         shortHeaderPadding += paddingIncrement;
       }
@@ -627,7 +652,10 @@ bool PingFrameScheduler::hasPingFrame() const {
 }
 
 bool PingFrameScheduler::writePing(PacketBuilderInterface& builder) {
-  return 0 != writeFrame(PingFrame(), builder);
+  auto writeFrameResult = writeFrame(PingFrame(), builder);
+  // We shouldn't ever error on a PING.
+  CHECK(!writeFrameResult.hasError());
+  return writeFrameResult.value() != 0;
 }
 
 DatagramFrameScheduler::DatagramFrameScheduler(QuicConnectionStateBase& conn)
@@ -637,7 +665,7 @@ bool DatagramFrameScheduler::hasPendingDatagramFrames() const {
   return !conn_.datagramState.writeBuffer.empty();
 }
 
-bool DatagramFrameScheduler::writeDatagramFrames(
+folly::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     PacketBuilderInterface& builder) {
   bool sent = false;
   for (size_t i = 0; i <= conn_.datagramState.writeBuffer.size(); ++i) {
@@ -645,15 +673,26 @@ bool DatagramFrameScheduler::writeDatagramFrames(
     auto len = payload.chainLength();
     uint64_t spaceLeft = builder.remainingSpaceInPkt();
     QuicInteger frameTypeQuicInt(static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
+    auto frameTypeSize = frameTypeQuicInt.getSize();
+    if (frameTypeSize.hasError()) {
+      return folly::makeUnexpected(frameTypeSize.error());
+    }
     QuicInteger datagramLenInt(len);
+    auto datagramLenSize = datagramLenInt.getSize();
+    if (datagramLenSize.hasError()) {
+      return folly::makeUnexpected(datagramLenSize.error());
+    }
     auto datagramFrameLength =
-        frameTypeQuicInt.getSize() + len + datagramLenInt.getSize();
+        frameTypeSize.value() + len + datagramLenSize.value();
     if (folly::to<uint64_t>(datagramFrameLength) <= spaceLeft) {
       auto datagramFrame = DatagramFrame(len, payload.move());
       auto res = writeFrame(datagramFrame, builder);
+      if (res.hasError()) {
+        return folly::makeUnexpected(res.error());
+      }
       // Must always succeed since we have already checked that there is enough
       // space to write the frame
-      CHECK_GT(res, 0);
+      CHECK_GT(res.value(), 0);
       QUIC_STATS(conn_.statsCallback, onDatagramWrite, len);
       conn_.datagramState.writeBuffer.pop_front();
       sent = true;
@@ -734,7 +773,8 @@ CryptoStreamScheduler::CryptoStreamScheduler(
     const QuicCryptoStream& cryptoStream)
     : conn_(conn), cryptoStream_(cryptoStream) {}
 
-bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
+folly::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
+    PacketBuilderInterface& builder) {
   bool cryptoDataWritten = false;
   uint64_t writableData =
       folly::to<uint64_t>(cryptoStream_.pendingWrites.chainLength());
@@ -743,21 +783,27 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
   // will always take precedence over the crypto data.
   for (const auto& buffer : cryptoStream_.lossBuffer) {
     auto res = writeCryptoFrame(buffer.offset, buffer.data, builder);
-    if (!res) {
+    if (res.hasError()) {
+      return folly::makeUnexpected(res.error());
+    }
+    if (!res.value()) {
       return cryptoDataWritten;
     }
     VLOG(4) << "Wrote retransmitted crypto" << " offset=" << buffer.offset
-            << " bytes=" << res->len << " " << conn_;
+            << " bytes=" << res.value()->len << " " << conn_;
     cryptoDataWritten = true;
   }
 
   if (writableData != 0) {
     auto res = writeCryptoFrame(
         cryptoStream_.currentWriteOffset, cryptoStream_.pendingWrites, builder);
-    if (res) {
+    if (res.hasError()) {
+      return folly::makeUnexpected(res.error());
+    }
+    if (res.value()) {
       VLOG(4) << "Wrote crypto frame"
               << " offset=" << cryptoStream_.currentWriteOffset
-              << " bytesWritten=" << res->len << " " << conn_;
+              << " bytesWritten=" << res.value()->len << " " << conn_;
       cryptoDataWritten = true;
     }
   }
@@ -779,7 +825,10 @@ bool ImmediateAckFrameScheduler::hasPendingImmediateAckFrame() const {
 
 bool ImmediateAckFrameScheduler::writeImmediateAckFrame(
     PacketBuilderInterface& builder) {
-  return 0 != writeFrame(ImmediateAckFrame(), builder);
+  auto result = writeFrame(ImmediateAckFrame(), builder);
+  // We shouldn't ever error on an IMMEDIATE_ACK.
+  CHECK(!result.hasError());
+  return result.value() != 0;
 }
 
 CloningScheduler::CloningScheduler(
@@ -891,7 +940,10 @@ CloningScheduler::scheduleFramesForPacket(
     }
 
     internalBuilder->accountForCipherOverhead(cipherOverhead_);
-    internalBuilder->encodePacketHeader();
+    auto encodeRes = internalBuilder->encodePacketHeader();
+    if (encodeRes.hasError()) {
+      return folly::makeUnexpected(encodeRes.error());
+    }
     PacketRebuilder rebuilder(*internalBuilder, conn_);
 
     // TODO: It's possible we write out a packet that's larger than the

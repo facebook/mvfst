@@ -33,7 +33,7 @@ AckScheduler::AckScheduler(
     const AckState& ackState)
     : conn_(conn), ackState_(ackState) {}
 
-Optional<PacketNum> AckScheduler::writeNextAcks(
+folly::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
     PacketBuilderInterface& builder) {
   // Use default ack delay for long headers. Usually long headers are sent
   // before crypto negotiation, so the peer might not know about the ack delay
@@ -61,49 +61,56 @@ Optional<PacketNum> AckScheduler::writeNextAcks(
       conn_.connectionTime, /* connect timestamp */
   };
 
-  Optional<WriteAckFrameResult> ackWriteResult;
+  auto ackWriteResult =
+      [&]() -> folly::Expected<Optional<WriteAckFrameResult>, QuicError> {
+    uint64_t peerRequestedTimestampsCount =
+        conn_.maybePeerAckReceiveTimestampsConfig.has_value()
+        ? conn_.maybePeerAckReceiveTimestampsConfig.value()
+              .maxReceiveTimestampsPerAck
+        : 0;
 
-  uint64_t peerRequestedTimestampsCount =
-      conn_.maybePeerAckReceiveTimestampsConfig.has_value()
-      ? conn_.maybePeerAckReceiveTimestampsConfig.value()
-            .maxReceiveTimestampsPerAck
-      : 0;
+    if (conn_.negotiatedExtendedAckFeatures > 0) {
+      // The peer supports extended ACKs and we have them enabled.
+      return writeAckFrame(
+          meta,
+          builder,
+          FrameType::ACK_EXTENDED,
+          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+              .value_or(AckReceiveTimestampsConfig()),
+          peerRequestedTimestampsCount,
+          conn_.negotiatedExtendedAckFeatures);
+    } else if (
+        conn_.transportSettings.readEcnOnIngress &&
+        (meta.ackState.ecnECT0CountReceived ||
+         meta.ackState.ecnECT1CountReceived ||
+         meta.ackState.ecnCECountReceived)) {
+      // We have to report ECN counts, but we can't use the extended ACK
+      // frame. In this case, we give ACK_ECN precedence over
+      // ACK_RECEIVE_TIMESTAMPS.
+      return writeAckFrame(meta, builder, FrameType::ACK_ECN);
+    } else if (conn_.negotiatedAckReceiveTimestampSupport) {
+      // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the
+      // peer requests at least 1 timestamp
+      return writeAckFrame(
+          meta,
+          builder,
+          FrameType::ACK_RECEIVE_TIMESTAMPS,
+          conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+              .value(),
+          peerRequestedTimestampsCount);
+    } else {
+      return writeAckFrame(meta, builder, FrameType::ACK);
+    }
+  }();
 
-  if (conn_.negotiatedExtendedAckFeatures > 0) {
-    // The peer supports extended ACKs and we have them enabled.
-    ackWriteResult = writeAckFrame(
-        meta,
-        builder,
-        FrameType::ACK_EXTENDED,
-        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-            .value_or(AckReceiveTimestampsConfig()),
-        peerRequestedTimestampsCount,
-        conn_.negotiatedExtendedAckFeatures);
-  } else if (
-      conn_.transportSettings.readEcnOnIngress &&
-      (meta.ackState.ecnECT0CountReceived ||
-       meta.ackState.ecnECT1CountReceived ||
-       meta.ackState.ecnCECountReceived)) {
-    // We have to report ECN counts, but we can't use the extended ACK
-    // frame. In this case, we give ACK_ECN precedence over
-    // ACK_RECEIVE_TIMESTAMPS.
-    ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK_ECN);
-  } else if (conn_.negotiatedAckReceiveTimestampSupport) {
-    // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the
-    // peer requests at least 1 timestamp
-    ackWriteResult = writeAckFrame(
-        meta,
-        builder,
-        FrameType::ACK_RECEIVE_TIMESTAMPS,
-        conn_.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-            .value(),
-        peerRequestedTimestampsCount);
-  } else {
-    ackWriteResult = writeAckFrame(meta, builder, FrameType::ACK);
+  if (ackWriteResult.hasError()) {
+    return folly::makeUnexpected(ackWriteResult.error());
   }
-  if (!ackWriteResult) {
+
+  if (!ackWriteResult.value()) {
     return none;
   }
+
   return largestAckedPacketNum;
 }
 

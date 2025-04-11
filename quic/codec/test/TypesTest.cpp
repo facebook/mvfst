@@ -21,7 +21,7 @@ std::pair<uint8_t, Buf> encodeShortHeader(const ShortHeader& header) {
   ShortHeader headerCopy = header;
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(headerCopy), 0 /* largestAcked */);
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   auto packet = std::move(builder).buildPacket();
   Buf out;
   folly::io::Cursor cursor(&packet.header);
@@ -61,7 +61,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
       packetType == LongHeader::Types::Retry ? std::move(headerRetry)
                                              : std::move(headerRegular),
       0 /* largestAcked */);
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   auto packet = packetToBuf(std::move(builder).buildPacket());
   folly::io::Cursor cursor(packet.get());
   uint8_t initialByte = cursor.readBE<uint8_t>();

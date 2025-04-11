@@ -305,7 +305,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     builder.reset(new RegularQuicPacketBuilder(
         packetSizeLimit, std::move(header), largestAcked));
   }
-  builder->encodePacketHeader();
+  CHECK(!builder->encodePacketHeader().hasError());
   builder->accountForCipherOverhead(cipherOverhead);
   auto res = *writeStreamFrameHeader(
       *builder,
@@ -353,7 +353,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
   if (!builder) {
     builder = &fallbackBuilder;
   }
-  builder->encodePacketHeader();
+  CHECK(!builder->encodePacketHeader().hasError());
   builder->accountForCipherOverhead(aead.getCipherOverhead());
   auto res = writeCryptoFrame(offset, data, *builder);
   CHECK(res.hasValue()) << "failed to write crypto frame";
@@ -396,7 +396,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
   }
   RegularQuicPacketBuilder builder(
       packetSizeLimit, std::move(*header), largestAcked);
-  builder.encodePacketHeader();
+  CHECK(!builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(aead.getCipherOverhead());
   auto res = writeCryptoFrame(offset, data, builder);
   CHECK(res.hasValue()) << "failed to write crypto frame";

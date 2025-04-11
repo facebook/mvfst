@@ -9,7 +9,8 @@
 #include <quic/dsr/frontend/WriteCodec.h>
 
 namespace quic {
-uint32_t writeDSRStreamFrame(
+
+folly::Expected<uint32_t, QuicError> writeDSRStreamFrame(
     DSRPacketBuilderBase& packetBuilder,
     SendInstruction::Builder& instructionBuilder,
     StreamId id,
@@ -22,13 +23,17 @@ uint32_t writeDSRStreamFrame(
     return 0;
   }
   if (writeBufferLen == 0 && !fin) {
-    throw QuicInternalException(
-        "No data or fin supplied when writing stream.",
-        LocalErrorCode::INTERNAL_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "No data or fin supplied when writing stream."));
   }
 
   QuicInteger idInt(id);
-  uint64_t headerSize = sizeof(uint8_t) + idInt.getSize();
+  auto idIntSize = idInt.getSize();
+  if (idIntSize.hasError()) {
+    return folly::makeUnexpected(idIntSize.error());
+  }
+  uint64_t headerSize = sizeof(uint8_t) + idIntSize.value();
   if (packetBuilder.remainingSpace() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " limit=" << packetBuilder.remainingSpace();
@@ -37,7 +42,11 @@ uint32_t writeDSRStreamFrame(
 
   QuicInteger offsetInt(offset);
   if (offset != 0) {
-    headerSize += offsetInt.getSize();
+    auto offsetIntSize = offsetInt.getSize();
+    if (offsetIntSize.hasError()) {
+      return folly::makeUnexpected(offsetIntSize.error());
+    }
+    headerSize += offsetIntSize.value();
   }
   instructionBuilder.setStreamOffset(offset);
 

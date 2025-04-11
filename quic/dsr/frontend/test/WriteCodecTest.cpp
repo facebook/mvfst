@@ -41,19 +41,19 @@ class WriteCodecTest : public DSRCommonTestFixture {
 TEST_F(WriteCodecTest, NoPacketSize) {
   packetSize_ = 0;
   auto instructionBuilder = createBuilder();
-  EXPECT_EQ(
-      0,
-      writeDSRStreamFrame(
-          builder_, instructionBuilder, 0, 0, 100, 100, true, 3));
+  auto result = writeDSRStreamFrame(
+      builder_, instructionBuilder, 0, 0, 100, 100, true, 3);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteCodecTest, TooSmallPacketSize) {
   packetSize_ = 1;
   auto instructionBuilder = createBuilder();
-  EXPECT_EQ(
-      0,
-      writeDSRStreamFrame(
-          builder_, instructionBuilder, 0, 0, 100, 100, true, 1));
+  auto result = writeDSRStreamFrame(
+      builder_, instructionBuilder, 0, 0, 100, 100, true, 1);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteCodecTest, RegularWrite) {
@@ -73,8 +73,9 @@ TEST_F(WriteCodecTest, RegularWrite) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(dataLen, sendInstruction.len);
@@ -99,8 +100,9 @@ TEST_F(WriteCodecTest, PacketSizeLimit) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_GT(dataLen, sendInstruction.len);
@@ -125,8 +127,9 @@ TEST_F(WriteCodecTest, FlowControlLimit) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(flowControlLen, sendInstruction.len);
@@ -152,7 +155,8 @@ TEST_F(WriteCodecTest, NoSpaceForData) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
-  EXPECT_EQ(0, result);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteCodecTest, CanHaveOneByteData) {
@@ -173,8 +177,9 @@ TEST_F(WriteCodecTest, CanHaveOneByteData) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(1, sendInstruction.len);
@@ -191,17 +196,17 @@ TEST_F(WriteCodecTest, PacketSpaceEqStreamHeaderSize) {
   uint64_t bufMetaStartingOffset = 333;
   auto instructionBuilder = createBuilder();
   packetSize_ = 2;
-  EXPECT_EQ(
-      0,
-      writeDSRStreamFrame(
-          builder_,
-          instructionBuilder,
-          stream,
-          offset,
-          dataLen,
-          flowControlLen,
-          fin,
-          bufMetaStartingOffset));
+  auto result = writeDSRStreamFrame(
+      builder_,
+      instructionBuilder,
+      stream,
+      offset,
+      dataLen,
+      flowControlLen,
+      fin,
+      bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value());
 }
 
 TEST_F(WriteCodecTest, PacketSpaceEqStreamHeaderSizeWithFIN) {
@@ -222,8 +227,9 @@ TEST_F(WriteCodecTest, PacketSpaceEqStreamHeaderSizeWithFIN) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(0, sendInstruction.len);
@@ -248,8 +254,9 @@ TEST_F(WriteCodecTest, WriteFIN) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(10, sendInstruction.len);
@@ -274,8 +281,9 @@ TEST_F(WriteCodecTest, FINWithoutData) {
       flowControlLen,
       fin,
       bufMetaStartingOffset);
+  ASSERT_FALSE(result.hasError());
   auto sendInstruction = instructionBuilder.build();
-  EXPECT_GT(result, 0);
+  EXPECT_GT(result.value(), 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
   EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(0, sendInstruction.len);
@@ -291,16 +299,15 @@ TEST_F(WriteCodecTest, NoFINNoData) {
   uint64_t flowControlLen = 10;
   uint64_t bufMetaStartingOffset = 333;
   auto instructionBuilder = createBuilder();
-  EXPECT_THROW(
-      writeDSRStreamFrame(
-          builder_,
-          instructionBuilder,
-          stream,
-          offset,
-          dataLen,
-          flowControlLen,
-          fin,
-          bufMetaStartingOffset),
-      QuicInternalException);
+  EXPECT_TRUE(writeDSRStreamFrame(
+                  builder_,
+                  instructionBuilder,
+                  stream,
+                  offset,
+                  dataLen,
+                  flowControlLen,
+                  fin,
+                  bufMetaStartingOffset)
+                  .hasError());
 }
 } // namespace quic::test

@@ -94,7 +94,10 @@ TEST_P(QuicIntegerEncodeTest, GetSize) {
   auto size = getQuicIntegerSize(GetParam().decoded);
   if (GetParam().error) {
     EXPECT_TRUE(size.hasError());
-    EXPECT_EQ(size.error(), TransportErrorCode::INTERNAL_ERROR);
+    ASSERT_NE(size.error().code.asTransportErrorCode(), nullptr);
+    EXPECT_EQ(
+        *size.error().code.asTransportErrorCode(),
+        TransportErrorCode::INTERNAL_ERROR);
     return;
   }
   EXPECT_EQ(*size, GetParam().hexEncoded.size() / 2);
