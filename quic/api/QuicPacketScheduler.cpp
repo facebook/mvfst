@@ -259,7 +259,11 @@ FrameScheduler::scheduleFramesForPacket(
     cryptoDataWritten = cryptoDataRes.value();
   }
   if (rstScheduler_ && rstScheduler_->hasPendingRsts()) {
-    rstWritten = rstScheduler_->writeRsts(wrapper);
+    auto rstWrittenRes = rstScheduler_->writeRsts(wrapper);
+    if (rstWrittenRes.hasError()) {
+      return folly::makeUnexpected(rstWrittenRes.error());
+    }
+    rstWritten = rstWrittenRes.value();
   }
   // Long time ago we decided RST has higher priority than Acks.
   if (hasPendingAcks()) {
@@ -291,10 +295,16 @@ FrameScheduler::scheduleFramesForPacket(
   }
   if (windowUpdateScheduler_ &&
       windowUpdateScheduler_->hasPendingWindowUpdates()) {
-    windowUpdateScheduler_->writeWindowUpdates(wrapper);
+    auto result = windowUpdateScheduler_->writeWindowUpdates(wrapper);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   if (blockedScheduler_ && blockedScheduler_->hasPendingBlockedFrames()) {
-    blockedScheduler_->writeBlockedFrames(wrapper);
+    auto result = blockedScheduler_->writeBlockedFrames(wrapper);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   // Simple frames should be scheduled before stream frames and retx frames
   // because those frames might fill up all available bytes for writing.
@@ -593,7 +603,8 @@ bool RstStreamScheduler::hasPendingRsts() const {
   return !conn_.pendingEvents.resets.empty();
 }
 
-bool RstStreamScheduler::writeRsts(PacketBuilderInterface& builder) {
+folly::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
+    PacketBuilderInterface& builder) {
   bool rstWritten = false;
   for (const auto& resetStream : conn_.pendingEvents.resets) {
     auto streamId = resetStream.first;
@@ -608,8 +619,11 @@ bool RstStreamScheduler::writeRsts(PacketBuilderInterface& builder) {
       //    While this is not something that's mandated by the spec, we're doing
       //    it in this implementation because it dramatically simplifies flow
       //    control accounting.
-      auto bytesWritten = writeFrame(resetStream.second, builder);
-      if (!bytesWritten) {
+      auto bytesWrittenResult = writeFrame(resetStream.second, builder);
+      if (bytesWrittenResult.hasError()) {
+        return folly::makeUnexpected(bytesWrittenResult.error());
+      }
+      if (!bytesWrittenResult.value()) {
         break;
       }
       rstWritten = true;
@@ -713,13 +727,16 @@ bool WindowUpdateScheduler::hasPendingWindowUpdates() const {
       conn_.pendingEvents.connWindowUpdate;
 }
 
-void WindowUpdateScheduler::writeWindowUpdates(
-    PacketBuilderInterface& builder) {
+folly::Expected<folly::Unit, QuicError>
+WindowUpdateScheduler::writeWindowUpdates(PacketBuilderInterface& builder) {
   if (conn_.pendingEvents.connWindowUpdate) {
     auto maxDataFrame = generateMaxDataFrame(conn_);
     auto maximumData = maxDataFrame.maximumData;
-    auto bytes = writeFrame(std::move(maxDataFrame), builder);
-    if (bytes) {
+    auto bytesResult = writeFrame(std::move(maxDataFrame), builder);
+    if (bytesResult.hasError()) {
+      return folly::makeUnexpected(bytesResult.error());
+    }
+    if (bytesResult.value()) {
       VLOG(4) << "Wrote max_data=" << maximumData << " " << conn_;
     }
   }
@@ -730,13 +747,17 @@ void WindowUpdateScheduler::writeWindowUpdates(
     }
     auto maxStreamDataFrame = generateMaxStreamDataFrame(*stream);
     auto maximumData = maxStreamDataFrame.maximumData;
-    auto bytes = writeFrame(std::move(maxStreamDataFrame), builder);
-    if (!bytes) {
+    auto bytesResult = writeFrame(std::move(maxStreamDataFrame), builder);
+    if (bytesResult.hasError()) {
+      return folly::makeUnexpected(bytesResult.error());
+    }
+    if (!bytesResult.value()) {
       break;
     }
     VLOG(4) << "Wrote max_stream_data stream=" << stream->id
             << " maximumData=" << maximumData << " " << conn_;
   }
+  return folly::unit;
 }
 
 BlockedScheduler::BlockedScheduler(const QuicConnectionStateBase& conn)
@@ -747,25 +768,33 @@ bool BlockedScheduler::hasPendingBlockedFrames() const {
       conn_.pendingEvents.sendDataBlocked;
 }
 
-void BlockedScheduler::writeBlockedFrames(PacketBuilderInterface& builder) {
+folly::Expected<folly::Unit, QuicError> BlockedScheduler::writeBlockedFrames(
+    PacketBuilderInterface& builder) {
   if (conn_.pendingEvents.sendDataBlocked) {
     // Connection is write blocked due to connection level flow control.
     DataBlockedFrame blockedFrame(
         conn_.flowControlState.peerAdvertisedMaxOffset);
     auto result = writeFrame(blockedFrame, builder);
-    if (!result) {
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
+    if (!result.value()) {
       // If there is not enough room to write data blocked frame in the
       // current packet, we won't be able to write stream blocked frames either
       // so just return.
-      return;
+      return folly::unit;
     }
   }
   for (const auto& blockedStream : conn_.streamManager->blockedStreams()) {
-    auto bytesWritten = writeFrame(blockedStream.second, builder);
-    if (!bytesWritten) {
+    auto bytesWrittenResult = writeFrame(blockedStream.second, builder);
+    if (bytesWrittenResult.hasError()) {
+      return folly::makeUnexpected(bytesWrittenResult.error());
+    }
+    if (!bytesWrittenResult.value()) {
       break;
     }
   }
+  return folly::unit;
 }
 
 CryptoStreamScheduler::CryptoStreamScheduler(

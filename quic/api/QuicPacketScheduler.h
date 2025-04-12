@@ -134,7 +134,8 @@ class RstStreamScheduler {
 
   bool hasPendingRsts() const;
 
-  bool writeRsts(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<bool, QuicError> writeRsts(
+      PacketBuilderInterface& builder);
 
  private:
   const QuicConnectionStateBase& conn_;
@@ -187,7 +188,8 @@ class WindowUpdateScheduler {
 
   bool hasPendingWindowUpdates() const;
 
-  void writeWindowUpdates(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeWindowUpdates(
+      PacketBuilderInterface& builder);
 
  private:
   const QuicConnectionStateBase& conn_;
@@ -199,7 +201,8 @@ class BlockedScheduler {
 
   bool hasPendingBlockedFrames() const;
 
-  void writeBlockedFrames(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeBlockedFrames(
+      PacketBuilderInterface& builder);
 
  private:
   const QuicConnectionStateBase& conn_;

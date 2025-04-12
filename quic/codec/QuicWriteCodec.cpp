@@ -601,22 +601,13 @@ computeReceiveTimestampsMinimumSpace(
   }
 
   auto countRangesSize = getQuicIntegerSize(countTimestampRanges);
-  if (countRangesSize.hasError()) {
-    return folly::makeUnexpected(countRangesSize.error());
-  }
 
   auto lastPktNumSize = getQuicIntegerSize(maybeLastPktNum);
-  if (lastPktNumSize.hasError()) {
-    return folly::makeUnexpected(lastPktNumSize.error());
-  }
 
   auto lastPktTsDeltaSize = getQuicIntegerSize(maybeLastPktTsDelta.count());
-  if (lastPktTsDeltaSize.hasError()) {
-    return folly::makeUnexpected(lastPktTsDeltaSize.error());
-  }
 
-  return countRangesSize.value() + lastPktNumSize.value() +
-      lastPktTsDeltaSize.value();
+  return countRangesSize.value_or(0) + lastPktNumSize.value_or(0) +
+      lastPktTsDeltaSize.value_or(0);
 }
 
 static void writeECNFieldsToAck(

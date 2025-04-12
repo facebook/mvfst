@@ -560,7 +560,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(stream->id);
-  scheduler.writeWindowUpdates(builder);
+  ASSERT_FALSE(scheduler.writeWindowUpdates(builder).hasError());
   EXPECT_LT(builder.remainingSpaceInPkt(), originalSpace);
 }
 
@@ -585,7 +585,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
   PacketBuilderWrapper builderWrapper(builder, 2);
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(stream->id);
-  scheduler.writeWindowUpdates(builderWrapper);
+  ASSERT_FALSE(scheduler.writeWindowUpdates(builderWrapper).hasError());
   EXPECT_EQ(builder.remainingSpaceInPkt(), originalSpace);
 }
 
@@ -607,7 +607,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(nonExistentStream);
-  scheduler.writeWindowUpdates(builder);
+  ASSERT_FALSE(scheduler.writeWindowUpdates(builder).hasError());
   EXPECT_EQ(builder.remainingSpaceInPkt(), originalSpace);
 }
 
