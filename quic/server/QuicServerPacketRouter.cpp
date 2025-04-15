@@ -138,14 +138,16 @@ void TakeoverPacketHandler::forwardPacketToAnotherServer(
   auto bufSize = sizeof(TakeoverProtocolVersion) + sizeof(uint16_t) +
       peerAddress.getActualSize() + sizeof(uint64_t);
   Buf writeBuffer = folly::IOBuf::create(bufSize);
-  folly::io::Appender appender(writeBuffer.get(), bufSize);
-  appender.writeBE<uint32_t>(static_cast<uint32_t>(takeoverProtocol_));
+  BufWriter bufWriter(writeBuffer->writableData(), bufSize);
+  bufWriter.writeBE<uint32_t>(folly::to_underlying(takeoverProtocol_));
   sockaddr_storage addrStorage;
   uint16_t socklen = peerAddress.getAddress(&addrStorage);
-  appender.writeBE<uint16_t>(socklen);
-  appender.push((uint8_t*)&addrStorage, socklen);
+  bufWriter.writeBE<uint16_t>(socklen);
+  bufWriter.push((uint8_t*)&addrStorage, socklen);
   uint64_t tick = receiveTimePoint.time_since_epoch().count();
-  appender.writeBE<uint64_t>(tick);
+  bufWriter.writeBE<uint64_t>(tick);
+  writeBuffer->append(bufSize);
+
   writeBuffer->prependChain(std::move(buf));
   forwardPacket(std::move(writeBuffer));
 }
