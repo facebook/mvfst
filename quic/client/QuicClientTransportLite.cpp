@@ -2027,6 +2027,10 @@ bool QuicClientTransportLite::canRead() const {
   return socket_ && !socket_->isReadPaused();
 }
 
+std::optional<int32_t> QuicClientTransportLite::getHandshakeStatus() const {
+  return clientConn_->clientHandshakeLayer->getHandshakeStatus();
+}
+
 const std::shared_ptr<const folly::AsyncTransportCertificate>
 QuicClientTransportLite::getPeerCertificate() const {
   const auto clientHandshakeLayer = clientConn_->clientHandshakeLayer;

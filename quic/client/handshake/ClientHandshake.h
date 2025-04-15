@@ -118,6 +118,10 @@ class ClientHandshake : public Handshake {
     return 0;
   }
 
+  virtual std::optional<int32_t> getHandshakeStatus() const {
+    return std::nullopt;
+  }
+
   virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const = 0;
 
