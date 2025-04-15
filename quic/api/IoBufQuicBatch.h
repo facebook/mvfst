@@ -30,7 +30,7 @@ class IOBufQuicBatch {
   ~IOBufQuicBatch() = default;
 
   // returns true if it succeeds and false if the loop should end
-  bool write(std::unique_ptr<folly::IOBuf>&& buf, size_t encodedSize);
+  bool write(Buf&& buf, size_t encodedSize);
 
   bool flush();
 

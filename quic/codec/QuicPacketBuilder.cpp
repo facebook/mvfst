@@ -191,15 +191,13 @@ void RegularQuicPacketBuilder::appendBytes(
   remainingBytes_ -= byteNumber;
 }
 
-void RegularQuicPacketBuilder::insert(std::unique_ptr<folly::IOBuf> buf) {
+void RegularQuicPacketBuilder::insert(Buf buf) {
   remainingBytes_ -= buf->computeChainDataLength();
   bodyAppender_.insert(std::move(buf));
 }
 
-void RegularQuicPacketBuilder::insert(
-    std::unique_ptr<folly::IOBuf> buf,
-    size_t limit) {
-  std::unique_ptr<folly::IOBuf> streamData;
+void RegularQuicPacketBuilder::insert(Buf buf, size_t limit) {
+  Buf streamData;
   folly::io::Cursor cursor(buf.get());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
@@ -207,7 +205,7 @@ void RegularQuicPacketBuilder::insert(
 }
 
 void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
-  std::unique_ptr<folly::IOBuf> streamData;
+  Buf streamData;
   folly::io::Cursor cursor(buf.front());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
@@ -218,7 +216,7 @@ void RegularQuicPacketBuilder::insert(
     const ChainedByteRangeHead& buf,
     size_t limit) {
   limit = std::min(limit, buf.chainLength());
-  std::unique_ptr<folly::IOBuf> streamData = folly::IOBuf::wrapBuffer(
+  Buf streamData = folly::IOBuf::wrapBuffer(
       buf.getHead()->getRange().begin(),
       std::min(limit, buf.getHead()->length()));
   limit -= std::min(limit, buf.getHead()->length());
@@ -685,14 +683,12 @@ void InplaceQuicPacketBuilder::appendBytes(
   remainingBytes_ -= byteNumber;
 }
 
-void InplaceQuicPacketBuilder::insert(std::unique_ptr<folly::IOBuf> buf) {
+void InplaceQuicPacketBuilder::insert(Buf buf) {
   remainingBytes_ -= buf->computeChainDataLength();
   bufWriter_.insert(buf.get());
 }
 
-void InplaceQuicPacketBuilder::insert(
-    std::unique_ptr<folly::IOBuf> buf,
-    size_t limit) {
+void InplaceQuicPacketBuilder::insert(Buf buf, size_t limit) {
   remainingBytes_ -= limit;
   bufWriter_.insert(buf.get(), limit);
 }

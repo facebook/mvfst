@@ -531,7 +531,7 @@ void QuicServerWorker::handleNetworkData(
 void QuicServerWorker::recvmsgMultishotCallback(
     MultishotHdr* hdr,
     int res,
-    std::unique_ptr<folly::IOBuf> io_buf) {
+    Buf io_buf) {
   if (res < 0) {
     return;
   }

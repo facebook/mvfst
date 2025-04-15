@@ -148,8 +148,8 @@ struct NetworkData {
     return totalData_;
   }
 
-  std::unique_ptr<folly::IOBuf> moveAllData() && {
-    std::unique_ptr<folly::IOBuf> buf;
+  Buf moveAllData() && {
+    Buf buf;
     for (auto& packet : packets_) {
       if (buf) {
         buf->prependChain(packet.buf.move());

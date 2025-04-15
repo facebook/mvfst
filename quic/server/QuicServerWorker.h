@@ -146,10 +146,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       delete m;
     }
 
-    static void cb(
-        folly::EventRecvmsgMultishotCallback::Hdr* h,
-        int res,
-        std::unique_ptr<folly::IOBuf> io_buf) {
+    static void
+    cb(folly::EventRecvmsgMultishotCallback::Hdr* h, int res, Buf io_buf) {
       reinterpret_cast<QuicServerWorker*>(h->arg_)->recvmsgMultishotCallback(
           reinterpret_cast<MultishotHdr*>(h), res, std::move(io_buf));
     }
@@ -587,10 +585,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   std::string logRoutingInfo(const ConnectionId& connId) const;
 
   void eventRecvmsgCallback(MsgHdr* msgHdr, int res);
-  void recvmsgMultishotCallback(
-      MultishotHdr* msgHdr,
-      int res,
-      std::unique_ptr<folly::IOBuf> io_buf);
+  void recvmsgMultishotCallback(MultishotHdr* msgHdr, int res, Buf io_buf);
 
   bool hasTimestamping() {
     return (socket_ && (socket_->getTimestamping() > 0));

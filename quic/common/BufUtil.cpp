@@ -9,7 +9,7 @@
 
 namespace quic {
 
-size_t fillIovec(std::unique_ptr<folly::IOBuf>& buf, iovec (&vec)[16]) {
+size_t fillIovec(Buf& buf, iovec (&vec)[16]) {
   size_t iovec_len = buf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
   if (FOLLY_UNLIKELY(iovec_len == 0)) {
     buf->coalesce();
@@ -64,7 +64,7 @@ Buf BufQueue::splitAtMost(size_t len) {
   }
   // update chain_
   (void)chain_.release();
-  chain_ = std::unique_ptr<folly::IOBuf>(current);
+  chain_ = Buf(current);
   DCHECK_EQ(chainLength_, chain_ ? chain_->computeChainDataLength() : 0);
   return result;
 }
@@ -148,7 +148,7 @@ void BufAppender::push(const uint8_t* data, size_t len) {
   lastBufShared_ = false;
 }
 
-void BufAppender::insert(std::unique_ptr<folly::IOBuf> data) {
+void BufAppender::insert(Buf data) {
   // just skip the current buffer and append it to the end of the current
   // buffer.
   folly::IOBuf* dataPtr = data.get();

@@ -24,9 +24,7 @@ IOBufQuicBatch::IOBufQuicBatch(
       statsCallback_(statsCallback),
       happyEyeballsState_(happyEyeballsState) {}
 
-bool IOBufQuicBatch::write(
-    std::unique_ptr<folly::IOBuf>&& buf,
-    size_t encodedSize) {
+bool IOBufQuicBatch::write(Buf&& buf, size_t encodedSize) {
   result_.packetsSent++;
   result_.bytesSent += encodedSize;
 

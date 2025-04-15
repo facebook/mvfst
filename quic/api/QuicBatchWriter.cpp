@@ -19,7 +19,7 @@ void SinglePacketBatchWriter::reset() {
 }
 
 bool SinglePacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& buf,
+    Buf&& buf,
     size_t /*unused*/,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
@@ -43,7 +43,7 @@ void SinglePacketInplaceBatchWriter::reset() {
 }
 
 bool SinglePacketInplaceBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& /* buf */,
+    Buf&& /* buf */,
     size_t /*unused*/,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
@@ -94,7 +94,7 @@ void SinglePacketBackpressureBatchWriter::reset() {
 }
 
 bool SinglePacketBackpressureBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& buf,
+    Buf&& buf,
     size_t /* unused */,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
@@ -134,7 +134,7 @@ void SendmmsgPacketBatchWriter::reset() {
 }
 
 bool SendmmsgPacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& buf,
+    Buf&& buf,
     size_t size,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
@@ -243,7 +243,7 @@ void SendmmsgInplacePacketBatchWriter::reset() {
 }
 
 bool SendmmsgInplacePacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& /* buf */,
+    Buf&& /* buf */,
     size_t size,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {

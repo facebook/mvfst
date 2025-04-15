@@ -35,7 +35,7 @@ bool GSOPacketBatchWriter::needsFlush(size_t size) {
 }
 
 bool GSOPacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& buf,
+    Buf&& buf,
     size_t size,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
@@ -104,7 +104,7 @@ bool GSOInplacePacketBatchWriter::needsFlush(size_t size) {
 }
 
 bool GSOInplacePacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& /*buf*/,
+    Buf&& /*buf*/,
     size_t size,
     const folly::SocketAddress& /* addr */,
     QuicAsyncUDPSocket* /* sock */) {
@@ -235,7 +235,7 @@ void SendmmsgGSOPacketBatchWriter::reset() {
 }
 
 bool SendmmsgGSOPacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& buf,
+    Buf&& buf,
     size_t size,
     const folly::SocketAddress& addr,
     QuicAsyncUDPSocket* /*unused*/) {
@@ -337,7 +337,7 @@ void SendmmsgGSOInplacePacketBatchWriter::reset() {
 }
 
 bool SendmmsgGSOInplacePacketBatchWriter::append(
-    std::unique_ptr<folly::IOBuf>&& /* buf */,
+    Buf&& /* buf */,
     size_t size,
     const folly::SocketAddress& addr,
     QuicAsyncUDPSocket* /*unused*/) {

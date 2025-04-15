@@ -43,9 +43,7 @@ class ClientHandshake : public Handshake {
    * This can change the state of the transport which may result in ciphers
    * being initialized, bytes written out, or the write phase changing.
    */
-  virtual void doHandshake(
-      std::unique_ptr<folly::IOBuf> data,
-      EncryptionLevel encryptionLevel);
+  virtual void doHandshake(Buf data, EncryptionLevel encryptionLevel);
 
   /**
    * Provides facilities to get, put and remove a PSK from the cache in case the

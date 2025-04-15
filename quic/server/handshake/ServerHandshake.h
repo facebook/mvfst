@@ -92,9 +92,7 @@ class ServerHandshake : public Handshake {
    * Performs the handshake, after a handshake you should check whether or
    * not an event is available.
    */
-  virtual void doHandshake(
-      std::unique_ptr<folly::IOBuf> data,
-      EncryptionLevel encryptionLevel);
+  virtual void doHandshake(Buf data, EncryptionLevel encryptionLevel);
 
   /**
    * Writes a session ticket on the connection.

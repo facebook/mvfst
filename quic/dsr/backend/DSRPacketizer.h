@@ -57,7 +57,7 @@ class CipherBuilder {
   CipherPair buildCiphers(
       fizz::TrafficKey&& trafficKey,
       fizz::CipherSuite cipherSuite,
-      std::unique_ptr<folly::IOBuf> packetProtectionKey) {
+      Buf packetProtectionKey) {
     auto aead = FizzAead::wrap(deriveRecordAeadWithLabel(
         *quicFizzCryptoFactory_.getFizzFactory(),
         std::move(trafficKey),
@@ -86,7 +86,7 @@ class QuicPacketizer {
  public:
   virtual ~QuicPacketizer() = default;
 
-  virtual std::unique_ptr<folly::IOBuf> sendQuicPacket(
+  virtual Buf sendQuicPacket(
       ConnectionId dcid,
       const folly::SocketAddress& clientAddr,
       PacketNum packetNum,

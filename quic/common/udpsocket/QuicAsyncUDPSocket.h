@@ -210,7 +210,7 @@ class QuicAsyncUDPSocket {
   /**
    * Send the data in buffers to destination. Returns the return code from
    * ::sendmmsg.
-   * bufs is an array of std::unique_ptr<folly::IOBuf>
+   * bufs is an array of Buf
    * of size num
    * options is an array of WriteOptions or nullptr
    *  Before calling writeGSO with a positive value
@@ -218,7 +218,7 @@ class QuicAsyncUDPSocket {
    */
   virtual int writemGSO(
       folly::Range<folly::SocketAddress const*> addrs,
-      const std::unique_ptr<folly::IOBuf>* bufs,
+      const Buf* bufs,
       size_t count,
       const WriteOptions* options) = 0;
 

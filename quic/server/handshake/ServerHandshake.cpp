@@ -33,9 +33,7 @@ void ServerHandshake::initialize(
   initializeImpl(callback, std::move(validator));
 }
 
-void ServerHandshake::doHandshake(
-    std::unique_ptr<folly::IOBuf> data,
-    EncryptionLevel encryptionLevel) {
+void ServerHandshake::doHandshake(Buf data, EncryptionLevel encryptionLevel) {
   SCOPE_EXIT {
     inHandshakeStack_ = false;
   };

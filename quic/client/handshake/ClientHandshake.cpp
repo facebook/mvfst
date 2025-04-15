@@ -59,9 +59,7 @@ void ClientHandshake::connect(
   }
 }
 
-void ClientHandshake::doHandshake(
-    std::unique_ptr<folly::IOBuf> data,
-    EncryptionLevel encryptionLevel) {
+void ClientHandshake::doHandshake(Buf data, EncryptionLevel encryptionLevel) {
   if (!data) {
     return;
   }

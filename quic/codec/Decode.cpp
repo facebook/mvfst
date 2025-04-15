@@ -1208,7 +1208,7 @@ folly::Expected<QuicFrame, QuicError> parseFrame(
 folly::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
-    std::unique_ptr<folly::IOBuf> packetData) {
+    Buf packetData) {
   RegularQuicPacket packet(std::move(header));
   BufQueue queue;
   queue.append(std::move(packetData));

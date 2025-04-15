@@ -13,7 +13,7 @@
 
 namespace quic {
 
-size_t fillIovec(std::unique_ptr<folly::IOBuf>& buf, iovec (&vec)[16]);
+size_t fillIovec(Buf& buf, iovec (&vec)[16]);
 
 class BufQueue {
  public:
@@ -89,7 +89,7 @@ class BufAppender {
 
   void push(const uint8_t* data, size_t len);
 
-  void insert(std::unique_ptr<folly::IOBuf> data);
+  void insert(Buf data);
 
  private:
   folly::IOBuf* crtBuf_;
