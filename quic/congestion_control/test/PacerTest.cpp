@@ -146,16 +146,20 @@ TEST_F(TokenlessPacerTest, PendingCompensationDelayResetForExperimental) {
   // track of delay adjustment for the extra half packet; 11 instead of 10.5
   EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 2050us));
 
-  // 0.5 interval later, the pacer should sent a full burst and reset the
-  // pending delay adjustment.
-  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 2550us));
+  // 0.5 interval later, the pacer should send a half burst. The pending delay
+  // adjustment should not have changed.
+  EXPECT_EQ(5, pacer.updateAndGetWriteBatchSize(currentTime + 2550us));
+
+  // Another 1.05 intervals later, the pacer will use up the pending delay
+  // adjustment and send a full burst without additional compensation.
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 3600us));
 
   // Another 1.05 intervals later, the pacer will round up to 11 packets again
   // since there is no pending delay adjustment.
-  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 3600us));
+  EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 4650us));
 }
 
-TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDown) {
+TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDownToZero) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -177,10 +181,11 @@ TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDown) {
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
 
-  // 0.5 intervals later should return the full batchSize.
+  // 0.05 intervals later should return 1 packet rather than zero.
   // Reads earlier than the pacing rate interval are not triggered by the timer
-  // and should be allowed to use the full batchSize.
-  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1500us));
+  // and should be scaled down accordingly, but not to zero so we don't miss a
+  // write opportunity.
+  EXPECT_EQ(1, pacer.updateAndGetWriteBatchSize(currentTime + 1005us));
 }
 
 TEST_F(TokenlessPacerTest, ExperimentalDelayCompensationDoesNotUnderflow) {

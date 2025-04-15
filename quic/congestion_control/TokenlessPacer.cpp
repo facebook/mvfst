@@ -152,9 +152,9 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
       // 3. The maximum factor we can use for scaling up the burst is
       //    maxBurstIntervals.
       // 4. If the write happens earlier than expected (for example due to a
-      //    network read), we do not scale the burst size down. It's better to
-      //    err on being a bit more aggressive than missing potential
-      //    opportunities to send packets.
+      //    network read), scale the burst size down but send at least 1 packet.
+      //    It's better to err on being a bit more aggressive than missing
+      //    potential opportunities to send packets.
 
       if (timeSinceLastWrite / writeInterval_ >= maxBurstIntervals) {
         // The delay is too long. Just use the maximum burst factor allowed.
@@ -162,9 +162,7 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
         // Reset any record of pending delay for packets we already sent and are
         // trying to scale down for.
         pendingDelayAdjustment_ = 0us;
-      } else if (
-          timeSinceLastWrite > writeInterval_ ||
-          conn_.transportSettings.ccaConfig.scaleDownPacerEarlyBurst) {
+      } else {
         // Adjust batch size to compensate for a delayed write, taking the
         // any pending delay adjustment into consideration.
         // Keep track of any delay adjustment carried over
@@ -189,11 +187,6 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
           sendBatch += 1;
           pendingDelayAdjustment_ = writeInterval_ - pendingDelayAdjustment_;
         }
-      } else {
-        // The write function happened at exactly the time we expected.
-        // Reset any record of pending delay for packets we already sent and are
-        // trying to scale down for.
-        pendingDelayAdjustment_ = 0us;
       }
     }
   }
