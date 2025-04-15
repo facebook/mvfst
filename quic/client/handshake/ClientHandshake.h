@@ -122,6 +122,10 @@ class ClientHandshake : public Handshake {
     return std::nullopt;
   }
 
+  size_t getInitialReadBufferSize() const;
+  size_t getHandshakeReadBufferSize() const;
+  size_t getAppDataReadBufferSize() const;
+
   virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const = 0;
 

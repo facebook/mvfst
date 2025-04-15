@@ -133,6 +133,18 @@ Optional<bool> ClientHandshake::getCanResendZeroRtt() const {
   return canResendZeroRtt_;
 }
 
+size_t ClientHandshake::getInitialReadBufferSize() const {
+  return initialReadBuf_.chainLength();
+}
+
+size_t ClientHandshake::getHandshakeReadBufferSize() const {
+  return handshakeReadBuf_.chainLength();
+}
+
+size_t ClientHandshake::getAppDataReadBufferSize() const {
+  return appDataReadBuf_.chainLength();
+}
+
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(kind, secret);
   std::unique_ptr<PacketNumberCipher> packetNumberCipher =

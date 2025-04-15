@@ -243,6 +243,9 @@ class QuicClientTransportLite
   uint64_t getPacketsSentCount() const;
   bool canRead() const;
   std::optional<int32_t> getHandshakeStatus() const;
+  size_t getInitialReadBufferSize() const;
+  size_t getHandshakeReadBufferSize() const;
+  size_t getAppDataReadBufferSize() const;
 
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;
