@@ -352,14 +352,16 @@ def mu_cxx_library(
         labels = list(labels),
         fbandroid_labels = list(fbandroid_labels),
         fbobjc_labels = list(fbobjc_labels),
-        compiler_flags = kwargs.pop("compiler_flags", []) + CXXFLAGS,
+        compiler_flags = select({
+            "DEFAULT": kwargs.pop("compiler_flags", []) + CXXFLAGS,
+            "config//compiler:msvc": WINDOWS_MSVC_CXXFLAGS,
+        }),
         windows_compiler_flags = kwargs.pop("windows_compiler_flags", []) + CXXFLAGS + WINDOWS_CLANG_CXX_FLAGS,
         fbobjc_compiler_flags = kwargs.pop("fbobjc_compiler_flags", []) +
                                 FBOBJC_CXXFLAGS,
         fbcode_compiler_flags_override = kwargs.pop("fbcode_compiler_flags", []),
         fbandroid_compiler_flags = kwargs.pop("fbandroid_compiler_flags", []) +
                                    FBANDROID_CXXFLAGS,
-        windows_msvc_compiler_flags_override = kwargs.pop("windows_msvc_compiler_flags_override", WINDOWS_MSVC_CXXFLAGS),
         windows_preferred_linkage = "static",
         visibility = kwargs.pop("visibility", ["PUBLIC"]),
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
