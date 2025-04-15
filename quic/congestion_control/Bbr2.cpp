@@ -339,6 +339,15 @@ void Bbr2CongestionController::setPacing() {
         pacingWindow,
         conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss);
   }
+  if (state_ == State::Startup) {
+    conn_.pacer->setRttFactor(
+        conn_.transportSettings.startupRttFactor.first,
+        conn_.transportSettings.startupRttFactor.second);
+  } else {
+    conn_.pacer->setRttFactor(
+        conn_.transportSettings.defaultRttFactor.first,
+        conn_.transportSettings.defaultRttFactor.second);
+  }
   conn_.pacer->refreshPacingRate(pacingWindow, minRtt_);
 }
 
