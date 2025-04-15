@@ -126,6 +126,8 @@ class ClientHandshake : public Handshake {
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
 
+  bool waitingForData() const;
+
   virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const = 0;
 

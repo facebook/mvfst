@@ -2047,6 +2047,10 @@ EncryptionLevel QuicClientTransportLite::getReadEncryptionLevel() const {
   return clientConn_->clientHandshakeLayer->getReadRecordLayerEncryptionLevel();
 }
 
+bool QuicClientTransportLite::waitingForHandshakeData() const {
+  return clientConn_->clientHandshakeLayer->waitingForData();
+}
+
 const std::shared_ptr<const folly::AsyncTransportCertificate>
 QuicClientTransportLite::getPeerCertificate() const {
   const auto clientHandshakeLayer = clientConn_->clientHandshakeLayer;

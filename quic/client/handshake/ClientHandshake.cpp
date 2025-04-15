@@ -143,6 +143,10 @@ size_t ClientHandshake::getAppDataReadBufferSize() const {
   return appDataReadBuf_.chainLength();
 }
 
+bool ClientHandshake::waitingForData() const {
+  return waitForData_;
+}
+
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(kind, secret);
   std::unique_ptr<PacketNumberCipher> packetNumberCipher =
