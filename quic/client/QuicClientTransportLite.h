@@ -246,6 +246,7 @@ class QuicClientTransportLite
   size_t getInitialReadBufferSize() const;
   size_t getHandshakeReadBufferSize() const;
   size_t getAppDataReadBufferSize() const;
+  EncryptionLevel getReadEncryptionLevel() const;
 
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;

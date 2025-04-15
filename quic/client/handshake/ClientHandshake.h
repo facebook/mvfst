@@ -126,6 +126,8 @@ class ClientHandshake : public Handshake {
   size_t getHandshakeReadBufferSize() const;
   size_t getAppDataReadBufferSize() const;
 
+  virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
+
   virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const = 0;
 
@@ -188,7 +190,6 @@ class ClientHandshake : public Handshake {
   virtual Optional<CachedServerTransportParameters> connectImpl(
       Optional<std::string> hostname) = 0;
 
-  virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual bool matchEarlyParameters() = 0;
   virtual std::unique_ptr<Aead> buildAead(
