@@ -26,7 +26,7 @@ Buf FizzCryptoFactory::makeInitialTrafficSecret(
   auto trafficSecret = deriver->expandLabel(
       folly::range(initialSecret),
       label,
-      folly::IOBuf::create(0),
+      BufHelpers::create(0),
       fizz::Sha256::HashLen);
   return trafficSecret;
 }
@@ -43,12 +43,12 @@ std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
   auto key = deriver->expandLabel(
       trafficSecret->coalesce(),
       kQuicKeyLabel,
-      folly::IOBuf::create(0),
+      BufHelpers::create(0),
       aead->keyLength());
   auto iv = deriver->expandLabel(
       trafficSecret->coalesce(),
       kQuicIVLabel,
-      folly::IOBuf::create(0),
+      BufHelpers::create(0),
       aead->ivLength());
 
   fizz::TrafficKey trafficKey = {std::move(key), std::move(iv)};
@@ -63,7 +63,7 @@ std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
   auto deriver =
       fizzFactory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto pnKey = deriver->expandLabel(
-      baseSecret, kQuicPNLabel, folly::IOBuf::create(0), pnCipher->keyLength());
+      baseSecret, kQuicPNLabel, BufHelpers::create(0), pnCipher->keyLength());
   pnCipher->setKey(pnKey->coalesce());
   return pnCipher;
 }

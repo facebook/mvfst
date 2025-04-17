@@ -61,7 +61,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
   // If an error is received, the read callback should not be triggered
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
 
-  auto sendBuf = folly::IOBuf::copyBuffer("hey");
+  auto sendBuf = quic::BufHelpers::copyBuffer("hey");
   iovec vec[quic::kNumIovecBufferChains];
   size_t iovec_len =
       sendBuf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
@@ -82,7 +82,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
   EXPECT_CALL(this->errCb_, errMessage_(testing::_)).Times(0);
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
 
-  auto sendBuf = folly::IOBuf::copyBuffer("hey");
+  auto sendBuf = quic::BufHelpers::copyBuffer("hey");
   iovec vec[quic::kNumIovecBufferChains];
   size_t iovec_len =
       sendBuf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
@@ -130,7 +130,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
   // Since the socket is closed by the error callback, the read callback
   // should not be triggered
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
-  auto sendBuf = folly::IOBuf::copyBuffer("hey");
+  auto sendBuf = quic::BufHelpers::copyBuffer("hey");
   iovec vec[quic::kNumIovecBufferChains];
   size_t iovec_len =
       sendBuf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;

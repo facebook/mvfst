@@ -29,7 +29,7 @@ StatelessResetToken StatelessResetGenerator::generateToken(
   StatelessResetToken token;
   auto info = toData(connId);
   info.prependChain(
-      folly::IOBuf::wrapBuffer(addressStr_.data(), addressStr_.size()));
+      BufHelpers::wrapBuffer(addressStr_.data(), addressStr_.size()));
   auto out = hkdf_.expand(folly::range(extractedSecret_), info, token.size());
   out->coalesce();
   memcpy(token.data(), out->data(), out->length());

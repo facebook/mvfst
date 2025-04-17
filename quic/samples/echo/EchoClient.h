@@ -286,7 +286,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       // create new stream for each message
       auto streamId = client->createBidirectionalStream().value();
       client->setReadCallback(streamId, this);
-      pendingOutput_[streamId].append(folly::IOBuf::copyBuffer(message));
+      pendingOutput_[streamId].append(BufHelpers::copyBuffer(message));
       sendMessage(streamId, pendingOutput_[streamId]);
     };
 
@@ -297,7 +297,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       CHECK(streamId.hasValue())
           << "Failed to generate stream id in group: " << streamId.error();
       client->setReadCallback(*streamId, this);
-      pendingOutput_[*streamId].append(folly::IOBuf::copyBuffer(message));
+      pendingOutput_[*streamId].append(BufHelpers::copyBuffer(message));
       sendMessage(*streamId, pendingOutput_[*streamId]);
     };
 

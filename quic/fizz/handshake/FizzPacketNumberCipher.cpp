@@ -43,12 +43,12 @@ static HeaderProtectionMask maskImpl(
 }
 
 void Aes128PacketNumberCipher::setKey(folly::ByteRange key) {
-  pnKey_ = folly::IOBuf::copyBuffer(key);
+  pnKey_ = BufHelpers::copyBuffer(key);
   return setKeyImpl(encryptCtx_, EVP_aes_128_ecb(), key);
 }
 
 void Aes256PacketNumberCipher::setKey(folly::ByteRange key) {
-  pnKey_ = folly::IOBuf::copyBuffer(key);
+  pnKey_ = BufHelpers::copyBuffer(key);
   return setKeyImpl(encryptCtx_, EVP_aes_256_ecb(), key);
 }
 

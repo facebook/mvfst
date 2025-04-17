@@ -31,7 +31,7 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
         socket_(std::move(socket)) {}
 
   void getReadBuffer(void** buf, size_t* len) noexcept override {
-    readBuffer_ = folly::IOBuf::create(quic::kDefaultUDPReadBufferSize);
+    readBuffer_ = BufHelpers::create(quic::kDefaultUDPReadBufferSize);
     *buf = readBuffer_->writableData();
     *len = quic::kDefaultUDPReadBufferSize;
   }

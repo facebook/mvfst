@@ -79,7 +79,7 @@ inline std::ostream& operator<<(std::ostream& os, const ConnectionId& connId) {
 }
 
 inline folly::IOBuf toData(const ConnectionId& connId) {
-  return folly::IOBuf::wrapBufferAsValue(connId.data(), connId.size());
+  return BufHelpers::wrapBufferAsValue(connId.data(), connId.size());
 }
 
 struct ConnectionIdData {

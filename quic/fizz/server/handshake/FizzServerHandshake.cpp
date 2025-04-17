@@ -106,7 +106,7 @@ Buf FizzServerHandshake::getNextTrafficSecret(folly::ByteRange secret) const {
   auto deriver =
       state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
   auto nextSecret = deriver->expandLabel(
-      secret, kQuicKULabel, folly::IOBuf::create(0), secret.size());
+      secret, kQuicKULabel, BufHelpers::create(0), secret.size());
   return nextSecret;
 }
 

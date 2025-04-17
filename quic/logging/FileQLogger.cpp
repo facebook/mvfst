@@ -47,7 +47,7 @@ void FileQLogger::setupStream() {
   if (compress_) {
     compressionCodec_ =
         folly::compression::getStreamCodec(folly::compression::CodecType::GZIP);
-    compressionBuffer_ = folly::IOBuf::createCombined(kCompressionBufferSize);
+    compressionBuffer_ = BufHelpers::createCombined(kCompressionBufferSize);
   }
 
   // Create the base json

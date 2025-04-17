@@ -47,7 +47,7 @@ QuicAsyncUDPSocket::RecvResult QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     struct msghdr* msg = &msgs[i].msg_hdr;
 
     if (!readBuffer) {
-      readBuffer = folly::IOBuf::createCombined(readBufferSize);
+      readBuffer = BufHelpers::createCombined(readBufferSize);
       iovec.iov_base = readBuffer->writableData();
       iovec.iov_len = readBufferSize;
       msg->msg_iov = &iovec;

@@ -229,7 +229,7 @@ BufAccessor* XskPacketGroupWriter::getBufAccessor() {
     return nullptr;
   }
   currentXskBuffer_ = *maybeXskBuffer;
-  auto ioBuf = folly::IOBuf::takeOwnership(
+  auto ioBuf = BufHelpers::takeOwnership(
       currentXskBuffer_.buffer,
       kDefaultMaxUDPPayload,
       0,

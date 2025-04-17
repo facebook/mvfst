@@ -242,7 +242,7 @@ const folly::SocketAddress& QuicServerWorker::getAddress() const {
 
 void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
   auto readBufferSize = transportSettings_.maxRecvPacketSize * numGROBuffers_;
-  readBuffer_ = folly::IOBuf::createCombined(readBufferSize);
+  readBuffer_ = BufHelpers::createCombined(readBufferSize);
   *buf = readBuffer_->writableData();
   *len = readBufferSize;
 }
@@ -615,7 +615,7 @@ bool QuicServerWorker::tryHandlingAsHealthCheck(
     // request, so we are not creating an amplification vector. Also
     // ignore the error code.
     VLOG(4) << "Health check request, response=OK";
-    socket_->write(client, folly::IOBuf::copyBuffer("OK"));
+    socket_->write(client, BufHelpers::copyBuffer("OK"));
     return true;
   }
   return false;
@@ -1078,7 +1078,7 @@ bool QuicServerWorker::validRetryToken(
   RetryToken token(dstConnId, clientIp, 0);
 
   auto maybeDecryptedRetryTokenMs = tokenGenerator.decryptToken(
-      folly::IOBuf::copyBuffer(encryptedToken), token.genAeadAssocData());
+      BufHelpers::copyBuffer(encryptedToken), token.genAeadAssocData());
 
   return maybeDecryptedRetryTokenMs &&
       checkTokenAge(maybeDecryptedRetryTokenMs, kMaxRetryTokenValidMs);
@@ -1095,7 +1095,7 @@ bool QuicServerWorker::validNewToken(
   NewToken token(clientIp);
 
   auto maybeDecryptedNewTokenMs = tokenGenerator.decryptToken(
-      folly::IOBuf::copyBuffer(encryptedToken), token.genAeadAssocData());
+      BufHelpers::copyBuffer(encryptedToken), token.genAeadAssocData());
 
   return maybeDecryptedNewTokenMs &&
       checkTokenAge(maybeDecryptedNewTokenMs, kMaxNewTokenValidMs);
@@ -1135,7 +1135,7 @@ void QuicServerWorker::sendRetryPacket(
       srcConnId, /* dst conn id */
       dstConnId, /* original dst conn id */
       QuicVersion::MVFST_INVALID,
-      folly::IOBuf::copyBuffer(encryptedTokenStr));
+      BufHelpers::copyBuffer(encryptedTokenStr));
   Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTagBuf = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
@@ -1291,7 +1291,7 @@ void QuicServerWorker::setIsBlockListedSrcPort(
 
 void QuicServerWorker::setHealthCheckToken(
     const std::string& healthCheckToken) {
-  healthCheckToken_ = folly::IOBuf::copyBuffer(healthCheckToken);
+  healthCheckToken_ = BufHelpers::copyBuffer(healthCheckToken);
 }
 
 std::unique_ptr<FollyAsyncUDPSocketAlias> QuicServerWorker::makeSocket(

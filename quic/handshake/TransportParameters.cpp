@@ -67,7 +67,7 @@ Optional<StatelessResetToken> getStatelessResetTokenParameter(
 TransportParameter encodeIntegerParameter(
     TransportParameterId id,
     uint64_t value) {
-  Buf data = folly::IOBuf::create(8);
+  Buf data = BufHelpers::create(8);
   BufAppender appender(data.get(), 8);
   auto encoded = encodeQuicInteger(
       value, [appender = std::move(appender)](auto val) mutable {

@@ -197,7 +197,7 @@ Optional<std::vector<uint8_t>> ServerHandshake::getExportedKeyingMaterial(
       cipherSuite.value(),
       ems.value()->coalesce(),
       label,
-      context == none ? nullptr : folly::IOBuf::wrapBuffer(*context),
+      context == none ? nullptr : BufHelpers::wrapBuffer(*context),
       keyLength);
 
   std::vector<uint8_t> result(ekm->coalesce());
@@ -511,12 +511,12 @@ void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->handshakeWriteHeaderCipher = std::move(headerCipher);
       break;
     case CipherKind::OneRttRead:
-      readTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
+      readTrafficSecret_ = BufHelpers::copyBuffer(secret);
       oneRttReadCipher_ = std::move(aead);
       oneRttReadHeaderCipher_ = std::move(headerCipher);
       break;
     case CipherKind::OneRttWrite:
-      writeTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
+      writeTrafficSecret_ = BufHelpers::copyBuffer(secret);
       oneRttWriteCipher_ = std::move(aead);
       oneRttWriteHeaderCipher_ = std::move(headerCipher);
       break;

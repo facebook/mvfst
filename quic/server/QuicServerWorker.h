@@ -62,7 +62,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
     void reset() {
       len_ = getBuffSize();
-      ioBuf_ = folly::IOBuf::create(len_);
+      ioBuf_ = BufHelpers::create(len_);
       ::memset(&data_, 0, sizeof(data_));
       iov_.iov_base = ioBuf_->writableData();
       iov_.iov_len = len_;

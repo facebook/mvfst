@@ -238,7 +238,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // There should normally be some integrity tag at least in the data,
     // however allowing the aead to process the data even if the tag is not
     // present helps with writing tests.
-    encryptedData = folly::IOBuf::create(0);
+    encryptedData = BufHelpers::create(0);
   }
 
   Buf decrypted;
@@ -255,7 +255,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
 
   if (!decrypted) {
     // TODO better way of handling this (tests break without this)
-    decrypted = folly::IOBuf::create(0);
+    decrypted = BufHelpers::create(0);
   }
 
   auto packetRes =
@@ -354,8 +354,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
   // don't clone the buffer, the buffer will not show up as shared and we can
   // decrypt in-place.
   size_t aadLen = packetNumberOffset + packetNum.second;
-  folly::IOBuf headerData =
-      folly::IOBuf::wrapBufferAsValue(data->data(), aadLen);
+  folly::IOBuf headerData = BufHelpers::wrapBufferAsValue(data->data(), aadLen);
   data->trimStart(aadLen);
 
   Buf decrypted;
@@ -371,7 +370,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
   decrypted = std::move(*decryptAttempt);
   if (!decrypted) {
     // TODO better way of handling this (tests break without this)
-    decrypted = folly::IOBuf::create(0);
+    decrypted = BufHelpers::create(0);
   }
 
   if (peerKeyUpdateAttempt) {

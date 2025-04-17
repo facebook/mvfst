@@ -377,7 +377,7 @@ iobufChainBasedBuildScheduleEncrypt(
   packet->header.coalesce();
   auto headerLen = packet->header.length();
   auto bodyLen = packet->body.computeChainDataLength();
-  auto unencrypted = folly::IOBuf::createCombined(
+  auto unencrypted = BufHelpers::createCombined(
       headerLen + bodyLen + aead.getCipherOverhead());
   auto bodyCursor = folly::io::Cursor(&packet->body);
   bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);

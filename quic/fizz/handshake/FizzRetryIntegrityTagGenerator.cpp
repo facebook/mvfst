@@ -38,8 +38,8 @@ FizzRetryIntegrityTagGenerator::getRetryIntegrityTag(
   std::unique_ptr<fizz::Aead> retryCipher =
       fizz::openssl::OpenSSLEVPCipher::makeCipher<fizz::AESGCM128>();
   fizz::TrafficKey trafficKey;
-  trafficKey.key = folly::IOBuf::copyBuffer(retryPacketKey(version));
-  trafficKey.iv = folly::IOBuf::copyBuffer(retryPacketNonce(version));
+  trafficKey.key = BufHelpers::copyBuffer(retryPacketKey(version));
+  trafficKey.iv = BufHelpers::copyBuffer(retryPacketNonce(version));
   retryCipher->setKey(std::move(trafficKey));
 
   return retryCipher->encrypt(

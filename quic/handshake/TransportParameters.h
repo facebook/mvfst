@@ -89,7 +89,7 @@ struct TransportParameter {
   Buf encode() const {
     // reserve the exact size needed
     auto res =
-        folly::IOBuf::createCombined(static_cast<size_t>(getEncodedSize()));
+        BufHelpers::createCombined(static_cast<size_t>(getEncodedSize()));
 
     // write parameter; need to improve QuicInteger encoding methods
     BufWriter writer(res->writableData(), res->capacity());
@@ -147,21 +147,21 @@ TransportParameter encodeIntegerParameter(
 inline TransportParameter encodeEmptyParameter(TransportParameterId id) {
   TransportParameter param;
   param.parameter = id;
-  param.value = folly::IOBuf::create(0);
+  param.value = BufHelpers::create(0);
   return param;
 }
 
 inline TransportParameter encodeConnIdParameter(
     TransportParameterId id,
     const ConnectionId& connId) {
-  return {id, folly::IOBuf::copyBuffer(connId.data(), connId.size())};
+  return {id, BufHelpers::copyBuffer(connId.data(), connId.size())};
 }
 
 inline TransportParameter encodeStatelessResetToken(
     const StatelessResetToken& token) {
   TransportParameter statelessReset;
   statelessReset.parameter = TransportParameterId::stateless_reset_token;
-  statelessReset.value = folly::IOBuf::copyBuffer(token.data(), token.size());
+  statelessReset.value = BufHelpers::copyBuffer(token.data(), token.size());
   return statelessReset;
 }
 

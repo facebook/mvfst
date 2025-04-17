@@ -134,8 +134,8 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     : remainingBytes_(remainingBytes),
       largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
-      header_(folly::IOBuf::CreateOp::CREATE, kLongHeaderHeaderSize),
-      body_(folly::IOBuf::CreateOp::CREATE, kAppenderGrowthSize),
+      header_(BufHelpers::CreateOp::CREATE, kLongHeaderHeaderSize),
+      body_(BufHelpers::CreateOp::CREATE, kAppenderGrowthSize),
       headerAppender_(&header_, kLongHeaderHeaderSize),
       bodyAppender_(&body_, kAppenderGrowthSize) {
   if (frameHint) {
@@ -216,7 +216,7 @@ void RegularQuicPacketBuilder::insert(
     const ChainedByteRangeHead& buf,
     size_t limit) {
   limit = std::min(limit, buf.chainLength());
-  Buf streamData = folly::IOBuf::wrapBuffer(
+  Buf streamData = BufHelpers::wrapBuffer(
       buf.getHead()->getRange().begin(),
       std::min(limit, buf.getHead()->length()));
   limit -= std::min(limit, buf.getHead()->length());
@@ -225,7 +225,7 @@ void RegularQuicPacketBuilder::insert(
   while (limit > 0) {
     size_t amountToChopOff = std::min(limit, current->length());
     auto tempBuf =
-        folly::IOBuf::wrapBuffer(current->getRange().begin(), amountToChopOff);
+        BufHelpers::wrapBuffer(current->getRange().begin(), amountToChopOff);
     streamData->appendToChain(std::move(tempBuf));
     limit -= amountToChopOff;
     current = current->getNext();
@@ -354,7 +354,7 @@ void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
 
   LOG_IF(ERROR, packetLength > kDefaultUDPSendPacketLen)
       << "Retry packet length exceeds default packet length";
-  packetBuf_ = folly::IOBuf::create(packetLength);
+  packetBuf_ = BufHelpers::create(packetLength);
   BufWriter bufWriter(packetBuf_->writableData(), packetLength);
 
   // ODCID length
@@ -398,13 +398,13 @@ Buf PseudoRetryPacketBuilder::buildPacket() && {
 StatelessResetPacketBuilder::StatelessResetPacketBuilder(
     uint16_t maxPacketSize,
     const StatelessResetToken& resetToken)
-    : data_(folly::IOBuf::create(kAppenderGrowthSize)) {
+    : data_(BufHelpers::create(kAppenderGrowthSize)) {
   BufAppender appender(data_.get(), kAppenderGrowthSize);
   uint16_t randomOctetLength = maxPacketSize - resetToken.size() - 1;
   uint8_t initialByte =
       ShortHeader::kFixedBitMask | (0x3f & folly::Random::secureRand32());
   appender.writeBE<uint8_t>(initialByte);
-  auto randomOctets = folly::IOBuf::create(randomOctetLength);
+  auto randomOctets = BufHelpers::create(randomOctetLength);
   folly::Random::secureRandom(randomOctets->writableData(), randomOctetLength);
   appender.push(randomOctets->data(), randomOctetLength);
   appender.push(resetToken.data(), resetToken.size());
@@ -495,7 +495,7 @@ InplaceSizeEnforcedPacketBuilder::buildPacket() && {
   PacketBuilderInterface::Packet builtPacket(
       std::move(packet_),
       std::move(header_),
-      folly::IOBuf::wrapBufferAsValue(
+      BufHelpers::wrapBufferAsValue(
           body_.data(), bodyWriter.tail() - body_.data()));
 
   // Release internal iobuf
@@ -513,7 +513,7 @@ VersionNegotiationPacketBuilder::VersionNegotiationPacketBuilder(
           generateRandomPacketType(),
           sourceConnectionId,
           destinationConnectionId),
-      data_(folly::IOBuf::create(kAppenderGrowthSize)) {
+      data_(BufHelpers::create(kAppenderGrowthSize)) {
   writeVersionNegotiationPacket(versions);
 }
 
@@ -586,7 +586,7 @@ RetryPacketBuilder::RetryPacketBuilder(
 }
 
 folly::Expected<folly::Unit, QuicError> RetryPacketBuilder::writeRetryPacket() {
-  packetBuf_ = folly::IOBuf::create(kAppenderGrowthSize);
+  packetBuf_ = BufHelpers::create(kAppenderGrowthSize);
 
   // Encode the portion of the retry packet that comes before the
   // integrity tag.
@@ -771,13 +771,13 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
   // for encryption.
   if (bodyStart_) {
-    folly::IOBuf bodyBuf = folly::IOBuf::wrapBufferAsValue(
+    folly::IOBuf bodyBuf = BufHelpers::wrapBufferAsValue(
         bodyStart_, bufWriter_.tail() - bodyStart_ + cipherOverhead_);
     bodyBuf.trimEnd(cipherOverhead_);
 
     PacketBuilderInterface::Packet builtPacket(
         std::move(packet_),
-        folly::IOBuf::wrapBufferAsValue(
+        BufHelpers::wrapBufferAsValue(
             headerStart_, (bodyStart_ - headerStart_)),
         std::move(bodyBuf));
     releaseOutputBufferInternal();

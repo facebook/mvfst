@@ -328,16 +328,16 @@ StreamTypeField StreamTypeField::Builder::build() {
  */
 Buf QuicAddrValidationToken::getPlaintextToken() const {
   auto ts = folly::Endian::big(timestampInMs);
-  return folly::IOBuf::copyBuffer(&ts, sizeof(ts));
+  return BufHelpers::copyBuffer(&ts, sizeof(ts));
 }
 
 Buf RetryToken::genAeadAssocData() const {
-  return folly::IOBuf::copyBuffer(folly::to<std::string>(
+  return BufHelpers::copyBuffer(folly::to<std::string>(
       toString(tokenType), originalDstConnId.hex() + clientIp.str()));
 }
 
 Buf NewToken::genAeadAssocData() const {
-  return folly::IOBuf::copyBuffer(
+  return BufHelpers::copyBuffer(
       folly::to<std::string>(toString(tokenType), clientIp.str()));
 }
 

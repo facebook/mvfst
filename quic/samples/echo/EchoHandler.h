@@ -212,7 +212,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       // only echo when eof is present
       return;
     }
-    auto echoedData = folly::IOBuf::copyBuffer("echo ");
+    auto echoedData = BufHelpers::copyBuffer("echo ");
     echoedData->prependChain(data.first.move());
     auto res = sock->writeChain(id, std::move(echoedData), true, nullptr);
     if (res.hasError()) {
@@ -226,7 +226,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void echoDg(std::vector<quic::ReadDatagram> datagrams) {
     CHECK_GT(datagrams.size(), 0);
     for (const auto& datagram : datagrams) {
-      auto echoedData = folly::IOBuf::copyBuffer("echo ");
+      auto echoedData = BufHelpers::copyBuffer("echo ");
       echoedData->prependChain(datagram.bufQueue().front()->cloneCoalesced());
       auto res = sock->writeDatagram(std::move(echoedData));
       if (res.hasError()) {

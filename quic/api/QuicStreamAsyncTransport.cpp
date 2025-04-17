@@ -133,7 +133,7 @@ void QuicStreamAsyncTransport::write(
   if (handleWriteStateError(callback)) {
     return;
   }
-  writeBuf_.append(folly::IOBuf::wrapBuffer(buf, bytes));
+  writeBuf_.append(BufHelpers::wrapBuffer(buf, bytes));
   addWriteCallback(callback);
 }
 
@@ -146,7 +146,7 @@ void QuicStreamAsyncTransport::writev(
     return;
   }
   for (size_t i = 0; i < count; i++) {
-    writeBuf_.append(folly::IOBuf::wrapBuffer(vec[i].iov_base, vec[i].iov_len));
+    writeBuf_.append(BufHelpers::wrapBuffer(vec[i].iov_base, vec[i].iov_len));
   }
   addWriteCallback(callback);
 }

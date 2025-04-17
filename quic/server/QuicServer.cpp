@@ -603,7 +603,7 @@ void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
   checkRunningInThread(mainThreadId_);
   // Make sure the token satisfies the required properties, i.e. it is not a
   // valid quic header.
-  auto parsed = parseHeader(*folly::IOBuf::copyBuffer(healthCheckToken));
+  auto parsed = parseHeader(*BufHelpers::copyBuffer(healthCheckToken));
   CHECK(!parsed.hasValue());
   CHECK_GT(healthCheckToken.size(), kMinHealthCheckTokenSize);
   healthCheckToken_ = healthCheckToken;

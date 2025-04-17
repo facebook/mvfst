@@ -112,7 +112,7 @@ static void pushToTail(folly::IOBuf* dst, Buf src, size_t allocSize) {
         dst->appendChain(std::move(src));
         return;
       }
-      newBuf = folly::IOBuf::createCombined(allocSize);
+      newBuf = BufHelpers::createCombined(allocSize);
       dst->appendChain(std::move(newBuf));
       dst = dst->next();
     }

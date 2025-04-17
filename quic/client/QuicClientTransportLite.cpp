@@ -1167,7 +1167,7 @@ QuicClientTransportLite::startCryptoHandshake() {
   if (!conn_->transportSettings.flowPriming.empty() &&
       conn_->peerAddress.isInitialized()) {
     auto flowPrimingBuf =
-        folly::IOBuf::copyBuffer(conn_->transportSettings.flowPriming);
+        BufHelpers::copyBuffer(conn_->transportSettings.flowPriming);
     iovec vec[kNumIovecBufferChains];
     size_t iovec_len = fillIovec(flowPrimingBuf, vec);
     socket_->write(conn_->peerAddress, vec, iovec_len);
@@ -1297,7 +1297,7 @@ void QuicClientTransportLite::recvMsg(
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
-    Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
+    Buf readBuffer = BufHelpers::createCombined(readBufferSize);
     struct iovec vec;
     vec.iov_base = readBuffer->writableData();
     vec.iov_len = readBufferSize;
@@ -1439,7 +1439,7 @@ void QuicClientTransportLite::recvFrom(
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
-    Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
+    Buf readBuffer = BufHelpers::createCombined(readBufferSize);
 
     sockaddr* rawAddr{nullptr};
 
@@ -1520,7 +1520,7 @@ void QuicClientTransportLite::recvMmsg(
     struct msghdr* msg = &msgs[i].msg_hdr;
 
     if (!readBuffer) {
-      readBuffer = folly::IOBuf::createCombined(readBufferSize);
+      readBuffer = BufHelpers::createCombined(readBufferSize);
       iovec.iov_base = readBuffer->writableData();
       iovec.iov_len = readBufferSize;
       msg->msg_iov = &iovec;
@@ -1950,7 +1950,7 @@ void QuicClientTransportLite::maybeSendTransportKnobs() {
   if (!transportKnobsSent_ && hasWriteCipher()) {
     for (const auto& knob : conn_->transportSettings.knobs) {
       auto res =
-          setKnob(knob.space, knob.id, folly::IOBuf::copyBuffer(knob.blob));
+          setKnob(knob.space, knob.id, BufHelpers::copyBuffer(knob.blob));
       if (res.hasError()) {
         if (res.error() != LocalErrorCode::KNOB_FRAME_UNSUPPORTED) {
           LOG(ERROR) << "Unexpected error while sending knob frames";

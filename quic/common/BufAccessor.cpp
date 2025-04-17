@@ -15,7 +15,7 @@ BufAccessor::BufAccessor(Buf buf)
 }
 
 BufAccessor::BufAccessor(size_t capacity)
-    : BufAccessor(folly::IOBuf::createCombined(capacity)) {}
+    : BufAccessor(BufHelpers::createCombined(capacity)) {}
 
 Buf BufAccessor::obtain() {
   Buf ret;

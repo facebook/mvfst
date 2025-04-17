@@ -85,7 +85,7 @@ Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
       conn->earlyDataAppParamsValidator &&
       !conn->earlyDataAppParamsValidator(
           quicCachedPsk->cachedPsk.alpn,
-          folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
+          BufHelpers::copyBuffer(quicCachedPsk->appParams))) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
     // Do not remove psk here, will let application decide
   }
@@ -120,7 +120,7 @@ bool FizzClientHandshake::verifyRetryIntegrityTag(
       retryPacket.header.getDestinationConnId(),
       originalDstConnId,
       retryPacket.header.getVersion(),
-      folly::IOBuf::copyBuffer(retryPacket.header.getToken()));
+      BufHelpers::copyBuffer(retryPacket.header.getToken()));
 
   Buf pseudoRetryPacket = std::move(pseudoRetryPacketBuilder).buildPacket();
 
@@ -128,7 +128,7 @@ bool FizzClientHandshake::verifyRetryIntegrityTag(
   auto expectedIntegrityTag = retryIntegrityTagGenerator.getRetryIntegrityTag(
       retryPacket.header.getVersion(), pseudoRetryPacket.get());
 
-  folly::IOBuf integrityTagWrapper = folly::IOBuf::wrapBufferAsValue(
+  folly::IOBuf integrityTagWrapper = BufHelpers::wrapBufferAsValue(
       retryPacket.integrityTag.data(), retryPacket.integrityTag.size());
   return folly::IOBufEqualTo()(*expectedIntegrityTag, integrityTagWrapper);
 }
@@ -153,7 +153,7 @@ Optional<std::vector<uint8_t>> FizzClientHandshake::getExportedKeyingMaterial(
       cipherSuite.value(),
       ems.value()->coalesce(),
       label,
-      context == none ? nullptr : folly::IOBuf::wrapBuffer(*context),
+      context == none ? nullptr : BufHelpers::wrapBuffer(*context),
       keyLength);
 
   std::vector<uint8_t> result(ekm->coalesce());
@@ -206,7 +206,7 @@ Buf FizzClientHandshake::getNextTrafficSecret(folly::ByteRange secret) const {
   auto deriver =
       state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
   auto nextSecret = deriver->expandLabel(
-      secret, kQuicKULabel, folly::IOBuf::create(0), secret.size());
+      secret, kQuicKULabel, BufHelpers::create(0), secret.size());
   return nextSecret;
 }
 

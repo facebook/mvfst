@@ -346,7 +346,7 @@ struct ReadCryptoFrame {
       : offset(offsetIn), data(std::move(dataIn)) {}
 
   explicit ReadCryptoFrame(uint64_t offsetIn)
-      : offset(offsetIn), data(folly::IOBuf::create(0)) {}
+      : offset(offsetIn), data(BufHelpers::create(0)) {}
 
   // Stuff stored in a variant type needs to be copyable.
   ReadCryptoFrame(const ReadCryptoFrame& other) {
@@ -516,7 +516,7 @@ struct ReadStreamFrame {
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
         offset(offsetIn),
-        data(folly::IOBuf::create(0)),
+        data(BufHelpers::create(0)),
         fin(finIn) {}
 
   // Stuff stored in a variant type needs to be copyable.

@@ -73,7 +73,7 @@ int TakeoverHandlerCallback::getSocketFD() {
 }
 
 void TakeoverHandlerCallback::getReadBuffer(void** buf, size_t* len) noexcept {
-  readBuffer_ = folly::IOBuf::create(
+  readBuffer_ = BufHelpers::create(
       transportSettings_.maxRecvPacketSize +
       kMaxBufSizeForTakeoverEncapsulation);
   *buf = readBuffer_->writableData();
@@ -137,7 +137,7 @@ void TakeoverPacketHandler::forwardPacketToAnotherServer(
   // Serialize: version (4B), socket(2 + 16)B and time of ack (8B)
   auto bufSize = sizeof(TakeoverProtocolVersion) + sizeof(uint16_t) +
       peerAddress.getActualSize() + sizeof(uint64_t);
-  Buf writeBuffer = folly::IOBuf::create(bufSize);
+  Buf writeBuffer = BufHelpers::create(bufSize);
   BufWriter bufWriter(writeBuffer->writableData(), bufSize);
   bufWriter.writeBE<uint32_t>(folly::to_underlying(takeoverProtocol_));
   sockaddr_storage addrStorage;

@@ -100,7 +100,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     // stateless reset token
     params.parameters.push_back(TransportParameter(
         TransportParameterId::stateless_reset_token,
-        folly::IOBuf::copyBuffer(token_)));
+        BufHelpers::copyBuffer(token_)));
 
     if (disableMigration_) {
       params.parameters.push_back(

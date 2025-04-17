@@ -161,12 +161,12 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->readCodec->setHandshakeHeaderCipher(std::move(packetNumberCipher));
       break;
     case CipherKind::OneRttWrite:
-      writeTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
+      writeTrafficSecret_ = BufHelpers::copyBuffer(secret);
       conn_->oneRttWriteCipher = std::move(aead);
       conn_->oneRttWriteHeaderCipher = std::move(packetNumberCipher);
       break;
     case CipherKind::OneRttRead:
-      readTrafficSecret_ = folly::IOBuf::copyBuffer(secret);
+      readTrafficSecret_ = BufHelpers::copyBuffer(secret);
       conn_->readCodec->setOneRttReadCipher(std::move(aead));
       conn_->readCodec->setOneRttHeaderCipher(std::move(packetNumberCipher));
       conn_->readCodec->setNextOneRttReadCipher(getNextOneRttReadCipher());
