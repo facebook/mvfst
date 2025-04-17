@@ -36,7 +36,9 @@ using SystemClock = folly::chrono::SystemClock;
 namespace quic {
 
 using BufHelpers = folly::IOBuf; // For stuff like BufHelpers::create, etc.
-using Buf = std::unique_ptr<folly::IOBuf>;
+using RawBuf = folly::IOBuf; // Used when we're not wrapping the buffer in an
+                             // std::unique_ptr
+using Buf = std::unique_ptr<RawBuf>;
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 using DurationRep = std::chrono::microseconds::rep;

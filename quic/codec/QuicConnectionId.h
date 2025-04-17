@@ -78,7 +78,7 @@ inline std::ostream& operator<<(std::ostream& os, const ConnectionId& connId) {
   return os;
 }
 
-inline folly::IOBuf toData(const ConnectionId& connId) {
+inline RawBuf toData(const ConnectionId& connId) {
   return BufHelpers::wrapBufferAsValue(connId.data(), connId.size());
 }
 

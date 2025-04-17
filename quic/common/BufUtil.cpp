@@ -21,7 +21,7 @@ size_t fillIovec(Buf& buf, iovec (&vec)[16]) {
 }
 
 Buf BufQueue::splitAtMost(size_t len) {
-  folly::IOBuf* current = chain_.get();
+  RawBuf* current = chain_.get();
   // empty queue / requested 0 bytes
   if (current == nullptr || len == 0) {
     return BufHelpers::create(0);
@@ -70,7 +70,7 @@ Buf BufQueue::splitAtMost(size_t len) {
 }
 
 size_t BufQueue::trimStartAtMost(size_t amount) {
-  folly::IOBuf* current = chain_.get();
+  RawBuf* current = chain_.get();
   // empty queue / requested 0 bytes
   if (current == nullptr || amount == 0) {
     return 0;
@@ -133,13 +133,13 @@ void BufQueue::appendToChain(Buf& dst, Buf&& src) {
   }
 }
 
-BufAppender::BufAppender(folly::IOBuf* data, size_t appendLen)
+BufAppender::BufAppender(RawBuf* data, size_t appendLen)
     : crtBuf_(CHECK_NOTNULL(data)), head_(data), appendLen_(appendLen) {}
 
 void BufAppender::push(const uint8_t* data, size_t len) {
   if (crtBuf_->tailroom() < len || lastBufShared_) {
     auto newBuf = BufHelpers::createCombined(std::max(appendLen_, len));
-    folly::IOBuf* newBufPtr = newBuf.get();
+    RawBuf* newBufPtr = newBuf.get();
     head_->prependChain(std::move(newBuf));
     crtBuf_ = newBufPtr;
   }
@@ -151,7 +151,7 @@ void BufAppender::push(const uint8_t* data, size_t len) {
 void BufAppender::insert(Buf data) {
   // just skip the current buffer and append it to the end of the current
   // buffer.
-  folly::IOBuf* dataPtr = data.get();
+  RawBuf* dataPtr = data.get();
   // If the buffer is shared we do not want to overrwrite the tail of the
   // buffer.
   lastBufShared_ = data->isShared();
@@ -168,12 +168,12 @@ void BufWriter::push(const uint8_t* data, size_t len) {
   append(len);
 }
 
-void BufWriter::insert(const folly::IOBuf* data) {
+void BufWriter::insert(const RawBuf* data) {
   auto totalLength = data->computeChainDataLength();
   insert(data, totalLength);
 }
 
-void BufWriter::insert(const folly::IOBuf* data, size_t limit) {
+void BufWriter::insert(const RawBuf* data, size_t limit) {
   copy(data, limit);
 }
 
@@ -191,13 +191,13 @@ void BufWriter::append(size_t len) {
   appendCount_ += len;
 }
 
-void BufWriter::copy(const folly::IOBuf* data, size_t limit) {
+void BufWriter::copy(const RawBuf* data, size_t limit) {
   if (!limit) {
     return;
   }
   sizeCheck(limit);
   size_t totalInserted = 0;
-  const folly::IOBuf* curBuf = data;
+  const RawBuf* curBuf = data;
   auto remaining = limit;
   do {
     auto lenToCopy = std::min(curBuf->length(), remaining);

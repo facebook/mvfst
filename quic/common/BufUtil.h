@@ -59,7 +59,7 @@ class BufQueue {
     return chain_ ? chain_->clone() : nullptr;
   }
 
-  const folly::IOBuf* front() const {
+  const RawBuf* front() const {
     return chain_.get();
   }
 
@@ -79,7 +79,7 @@ class BufQueue {
 
 class BufAppender {
  public:
-  BufAppender(folly::IOBuf* data, size_t appendLen);
+  BufAppender(RawBuf* data, size_t appendLen);
 
   template <class T>
   void writeBE(T data) {
@@ -92,8 +92,8 @@ class BufAppender {
   void insert(Buf data);
 
  private:
-  folly::IOBuf* crtBuf_;
-  folly::IOBuf* head_;
+  RawBuf* crtBuf_;
+  RawBuf* head_;
   size_t appendLen_;
   bool lastBufShared_{false};
 };
@@ -122,8 +122,8 @@ class BufWriter {
 
   // TODO: OK, "insert" is a lie. Inside, we copy. But I'd like the BufWriter
   // to have the same interface as BufAppender during the transition period.
-  void insert(const folly::IOBuf* data);
-  void insert(const folly::IOBuf* data, size_t limit);
+  void insert(const RawBuf* data);
+  void insert(const RawBuf* data, size_t limit);
 
   void insert(const ChainedByteRangeHead* data);
   void insert(const ChainedByteRangeHead* data, size_t limit);
@@ -148,7 +148,7 @@ class BufWriter {
         << " written=" << written_ << " limit=" << most_;
   }
 
-  void copy(const folly::IOBuf* data, size_t limit);
+  void copy(const RawBuf* data, size_t limit);
   void copy(const ChainedByteRangeHead* data, size_t limit);
 
  private:

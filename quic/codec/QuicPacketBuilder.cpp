@@ -771,7 +771,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
   // for encryption.
   if (bodyStart_) {
-    folly::IOBuf bodyBuf = BufHelpers::wrapBufferAsValue(
+    RawBuf bodyBuf = BufHelpers::wrapBufferAsValue(
         bodyStart_, bufWriter_.tail() - bodyStart_ + cipherOverhead_);
     bodyBuf.trimEnd(cipherOverhead_);
 
@@ -784,7 +784,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
     return builtPacket;
   } else {
     PacketBuilderInterface::Packet builtPacket(
-        std::move(packet_), folly::IOBuf(), folly::IOBuf());
+        std::move(packet_), RawBuf(), RawBuf());
     releaseOutputBufferInternal();
     return builtPacket;
   }
