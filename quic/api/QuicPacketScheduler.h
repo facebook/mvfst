@@ -88,14 +88,19 @@ class StreamFrameScheduler {
       QuicStreamState& stream);
 
   /**
-   * Write a single stream's write buffer or loss buffer
+   * Writes a single stream's write buffer or loss buffer.
    *
-   * lossOnly: if only loss buffer should be written. This param may get mutated
-   *           inside the function.
+   * @param builder: The packet builder used to construct the packet.
+   * @param stream: The state of the QUIC stream being written.
+   * @param connWritableBytes: The number of writable bytes available in the
+   *                           connection. It can be 0 and still write loss data
+   *                           or stream FIN.  Mutated by this function
    *
-   * Return: true if write should continue after this stream, false otherwise.
+   * Return: StreamWriteResult indicating whether the packet is full, connection
+   * flow control limited, or not limited by connection flow control.
    */
-  bool writeSingleStream(
+  enum class StreamWriteResult { PACKET_FULL, NOT_LIMITED, CONN_FC_LIMITED };
+  StreamWriteResult writeSingleStream(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
       uint64_t& connWritableBytes);
@@ -110,6 +115,12 @@ class StreamFrameScheduler {
   void writeStreamsHelper(
       PacketBuilderInterface& builder,
       deprecated::PriorityQueue& writableStreams,
+      uint64_t& connWritableBytes,
+      bool streamPerPacket);
+
+  void writeStreamsHelper(
+      PacketBuilderInterface& builder,
+      PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 

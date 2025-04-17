@@ -463,6 +463,9 @@ struct TransportSettings {
   // Support "paused" requests which buffer on the server without streaming back
   // to the client.
   bool disablePausedPriority{false};
+
+  // Use the new priority queue and scheduling implementation
+  bool useNewPriorityQueue{false};
 };
 
 } // namespace quic

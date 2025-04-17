@@ -719,7 +719,10 @@ folly::Expected<folly::Unit, QuicError> updateConnection(
           conn.streamManager->addTx(writeStreamFrame.streamId);
           newStreamBytesSent += writeStreamFrame.len;
         }
-        conn.streamManager->updateWritableStreams(*stream);
+        // This call could take an argument whether the packet scheduler already
+        // removed stream from writeQueue
+        conn.streamManager->updateWritableStreams(
+            *stream, getSendConnFlowControlBytesWire(conn) > 0);
         streamBytesSent += writeStreamFrame.len;
         detailsPerStream.addFrame(writeStreamFrame, newStreamDataWritten);
         break;
@@ -1693,6 +1696,12 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
       writableBytes -= cipherOverhead;
     }
 
+    auto writeQueueTransaction =
+        connection.streamManager->writeQueue().beginTransaction();
+    auto guard = folly::makeGuard([&] {
+      connection.streamManager->writeQueue().rollbackTransaction(
+          std::move(writeQueueTransaction));
+    });
     const auto& dataPlaneFunc =
         connection.transportSettings.dataPathType == DataPathType::ChainedMemory
         ? iobufChainBasedBuildScheduleEncrypt
@@ -1732,6 +1741,10 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     }
 
     auto& result = ret->result;
+    // This call to updateConnection will attempt to erase streams from the
+    // write queue that have already been removed in QuicPacketScheduler.
+    // Removing non-existent streams can be O(N), consider passing the
+    // transaction set to skip this step
     auto updateConnResult = updateConnection(
         connection,
         std::move(result->clonedPacketIdentifier),
@@ -1743,6 +1756,9 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     if (updateConnResult.hasError()) {
       return folly::makeUnexpected(updateConnResult.error());
     }
+    guard.dismiss();
+    connection.streamManager->writeQueue().commitTransaction(
+        std::move(writeQueueTransaction));
 
     // if ioBufBatch.write returns false
     // it is because a flush() call failed

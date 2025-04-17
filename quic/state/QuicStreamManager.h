@@ -16,6 +16,7 @@
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 #include <numeric>
+#include <set>
 
 namespace quic {
 class QLogger;
@@ -218,6 +219,7 @@ class QuicStreamManager {
     unidirectionalReadableStreams_ =
         std::move(other.unidirectionalReadableStreams_);
     peekableStreams_ = std::move(other.peekableStreams_);
+    oldWriteQueue_ = std::move(other.oldWriteQueue_);
     writeQueue_ = std::move(other.writeQueue_);
     controlWriteQueue_ = std::move(other.controlWriteQueue_);
     writableStreams_ = std::move(other.writableStreams_);
@@ -309,7 +311,9 @@ class QuicStreamManager {
   /*
    * Update the current writable streams for the given stream state.
    */
-  void updateWritableStreams(QuicStreamState& stream);
+  void updateWritableStreams(
+      QuicStreamState& stream,
+      bool connFlowControlOpen = true);
 
   /*
    * Find a open and active (we have created state for it) stream and return its
@@ -442,10 +446,7 @@ class QuicStreamManager {
   }
 
   folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
-      std::unique_ptr<PriorityQueue>) {
-    LOG(ERROR) << "setPriorityQueue is not supported yet";
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
-  }
+      std::unique_ptr<PriorityQueue> queue);
 
   /**
    * Update stream priority if the stream indicated by id exists.
@@ -453,6 +454,7 @@ class QuicStreamManager {
   bool setStreamPriority(
       StreamId id,
       const PriorityQueue::Priority& priority,
+      bool connFlowControlOpen = true,
       const std::shared_ptr<QLogger>& qLogger = nullptr);
 
   auto& writableDSRStreams() {
@@ -464,11 +466,16 @@ class QuicStreamManager {
   }
 
   auto& writeQueue() {
-    return writeQueue_;
+    return *writeQueue_;
+  }
+
+  auto* oldWriteQueue() {
+    return oldWriteQueue_.get();
   }
 
   bool hasWritable() const {
-    return !writeQueue_.empty() || !controlWriteQueue_.empty();
+    return (oldWriteQueue_ && !oldWriteQueue_->empty()) ||
+        !writeQueue_->empty() || !controlWriteQueue_.empty();
   }
 
   [[nodiscard]] bool hasDSRWritable() const {
@@ -483,7 +490,12 @@ class QuicStreamManager {
     if (stream.isControl) {
       controlWriteQueue_.erase(stream.id);
     } else {
-      writeQueue_.erase(stream.id);
+      if (oldWriteQueue_) {
+        oldWriteQueue()->erase(stream.id);
+      } else {
+        writeQueue().erase(PriorityQueue::Identifier::fromStreamID(stream.id));
+        connFlowControlBlocked_.erase(stream.id);
+      }
     }
     writableStreams_.erase(stream.id);
     writableDSRStreams_.erase(stream.id);
@@ -494,7 +506,10 @@ class QuicStreamManager {
   void clearWritable() {
     writableStreams_.clear();
     writableDSRStreams_.clear();
-    writeQueue_.clear();
+    if (oldWriteQueue_) {
+      oldWriteQueue()->clear();
+    }
+    writeQueue().clear();
     controlWriteQueue_.clear();
   }
 
@@ -799,6 +814,25 @@ class QuicStreamManager {
 
   void setWriteQueueMaxNextsPerStream(uint64_t maxNextsPerStream);
 
+  void addConnFCBlockedStream(StreamId id) {
+    if (!oldWriteQueue_) {
+      connFlowControlBlocked_.insert(id);
+    }
+  }
+
+  void onMaxData() {
+    if (!oldWriteQueue_) {
+      for (auto id : connFlowControlBlocked_) {
+        auto stream = findStream(id);
+        if (stream) {
+          writeQueue().insertOrUpdate(
+              PriorityQueue::Identifier::fromStreamID(id), stream->priority);
+        }
+      }
+      connFlowControlBlocked_.clear();
+    }
+  }
+
  private:
   void updateAppIdleState();
 
@@ -872,13 +906,20 @@ class QuicStreamManager {
   folly::F14FastMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
   folly::F14FastSet<StreamId> windowUpdates_;
   folly::F14FastSet<StreamId> flowControlUpdated_;
+
+  // Streams that were removed from the write queue because they are blocked
+  // on connection flow control.
+  folly::F14FastSet<StreamId> connFlowControlBlocked_;
+
+  // Streams that have bytes in loss buffer
   folly::F14FastSet<StreamId> lossStreams_;
   folly::F14FastSet<StreamId> lossDSRStreams_;
   folly::F14FastSet<StreamId> readableStreams_;
   folly::F14FastSet<StreamId> unidirectionalReadableStreams_;
   folly::F14FastSet<StreamId> peekableStreams_;
 
-  deprecated::PriorityQueue writeQueue_;
+  std::unique_ptr<PriorityQueue> writeQueue_;
+  std::unique_ptr<deprecated::PriorityQueue> oldWriteQueue_;
   std::set<StreamId> controlWriteQueue_;
   folly::F14FastSet<StreamId> writableStreams_;
   folly::F14FastSet<StreamId> writableDSRStreams_;

@@ -426,21 +426,28 @@ bool StreamFrameScheduler::writeStreamLossBuffers(
 StreamFrameScheduler::StreamFrameScheduler(QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
-bool StreamFrameScheduler::writeSingleStream(
+StreamFrameScheduler::StreamWriteResult StreamFrameScheduler::writeSingleStream(
     PacketBuilderInterface& builder,
     QuicStreamState& stream,
     uint64_t& connWritableBytes) {
+  StreamWriteResult result = StreamWriteResult::NOT_LIMITED;
   if (!stream.lossBuffer.empty()) {
     if (!writeStreamLossBuffers(builder, stream)) {
-      return false;
+      return StreamWriteResult::PACKET_FULL;
     }
   }
-  if (stream.hasWritableData() && connWritableBytes > 0) {
-    if (!writeStreamFrame(builder, stream, connWritableBytes)) {
-      return false;
+  if (stream.hasWritableData(true)) {
+    if (connWritableBytes > 0 || stream.hasWritableData(false)) {
+      if (!writeStreamFrame(builder, stream, connWritableBytes)) {
+        return StreamWriteResult::PACKET_FULL;
+      }
+      result = (connWritableBytes == 0) ? StreamWriteResult::CONN_FC_LIMITED
+                                        : StreamWriteResult::NOT_LIMITED;
+    } else {
+      result = StreamWriteResult::CONN_FC_LIMITED;
     }
   }
-  return true;
+  return result;
 }
 
 StreamId StreamFrameScheduler::writeStreamsHelper(
@@ -458,7 +465,8 @@ StreamId StreamFrameScheduler::writeStreamsHelper(
   while (writableStreamItr != wrapper.cend()) {
     auto stream = conn_.streamManager->findStream(*writableStreamItr);
     CHECK(stream);
-    if (!writeSingleStream(builder, *stream, connWritableBytes)) {
+    auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
+    if (writeResult == StreamWriteResult::PACKET_FULL) {
       break;
     }
     writableStreamItr++;
@@ -494,7 +502,8 @@ void StreamFrameScheduler::writeStreamsHelper(
       }
       CHECK(stream) << "streamId=" << streamId
                     << "inc=" << uint64_t(level.incremental);
-      if (!writeSingleStream(builder, *stream, connWritableBytes)) {
+      if (writeSingleStream(builder, *stream, connWritableBytes) ==
+          StreamWriteResult::PACKET_FULL) {
         break;
       }
       auto remainingSpaceAfter = builder.remainingSpaceInPkt();
@@ -507,6 +516,54 @@ void StreamFrameScheduler::writeStreamsHelper(
         return;
       }
     } while (!level.iterator->end());
+  }
+}
+
+void StreamFrameScheduler::writeStreamsHelper(
+    PacketBuilderInterface& builder,
+    PriorityQueue& writableStreams,
+    uint64_t& connWritableBytes,
+    bool streamPerPacket) {
+  // Fill a packet with non-control stream data, in priority order
+  //
+  // The streams can have loss data or fresh data.  Once we run out of
+  // conn flow control, we can only write loss data.  In order to
+  // advance the write queue, we have to remove the elements.  Store
+  // them in QuicStreamManager and re-insert when more f/c arrives
+  while (!writableStreams.empty() && builder.remainingSpaceInPkt() > 0) {
+    auto id = writableStreams.peekNextScheduledID();
+    // we only support streams here for now
+    CHECK(id.isStreamID());
+    auto streamId = id.asStreamID();
+    auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
+    if (!stream->hasSchedulableData() && stream->hasSchedulableDsr()) {
+      // We hit a DSR stream
+      return;
+    }
+    CHECK(stream) << "streamId=" << streamId;
+    // TODO: this is counting STREAM frame overhead against the stream itself
+    auto lastWriteBytes = builder.remainingSpaceInPkt();
+    auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
+    if (writeResult == StreamWriteResult::PACKET_FULL) {
+      break;
+    }
+    auto remainingSpaceAfter = builder.remainingSpaceInPkt();
+    lastWriteBytes -= remainingSpaceAfter;
+    // If we wrote a stream frame and there's still space in the packet,
+    // that implies we ran out of data or flow control on the stream and
+    // we should erase the stream from writableStreams, the caller can rollback
+    // the transaction if the packet write fails
+    if (remainingSpaceAfter > 0) {
+      if (writeResult == StreamWriteResult::CONN_FC_LIMITED) {
+        conn_.streamManager->addConnFCBlockedStream(streamId);
+      }
+      writableStreams.erase(id);
+    } else { // the loop will break
+      writableStreams.consume(lastWriteBytes);
+    }
+    if (streamPerPacket) {
+      return;
+    }
   }
 }
 
@@ -523,23 +580,40 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
         connWritableBytes,
         conn_.transportSettings.streamFramePerPacket);
   }
-  auto& writeQueue = conn_.streamManager->writeQueue();
-  if (!writeQueue.empty()) {
-    writeStreamsHelper(
-        builder,
-        writeQueue,
-        connWritableBytes,
-        conn_.transportSettings.streamFramePerPacket);
-    // If the next non-control stream is DSR, record that fact in the scheduler
-    // so that we don't try to write a non DSR stream again. Note that this
-    // means that in the presence of many large control streams and DSR
-    // streams, we won't completely prioritize control streams but they
-    // will not be starved.
-    auto streamId = writeQueue.getNextScheduledStream();
-    auto stream = conn_.streamManager->findStream(streamId);
-    if (stream && !stream->hasSchedulableData()) {
-      nextStreamDsr_ = true;
+  auto* oldWriteQueue = conn_.streamManager->oldWriteQueue();
+  QuicStreamState* nextStream{nullptr};
+  if (oldWriteQueue) {
+    if (!oldWriteQueue->empty()) {
+      writeStreamsHelper(
+          builder,
+          *oldWriteQueue,
+          connWritableBytes,
+          conn_.transportSettings.streamFramePerPacket);
+      auto streamId = oldWriteQueue->getNextScheduledStream();
+      nextStream = conn_.streamManager->findStream(streamId);
     }
+  } else {
+    auto& writeQueue = conn_.streamManager->writeQueue();
+    if (!writeQueue.empty()) {
+      writeStreamsHelper(
+          builder,
+          writeQueue,
+          connWritableBytes,
+          conn_.transportSettings.streamFramePerPacket);
+      if (!writeQueue.empty()) {
+        auto id = writeQueue.peekNextScheduledID();
+        CHECK(id.isStreamID());
+        nextStream = conn_.streamManager->findStream(id.asStreamID());
+      }
+    }
+  }
+  // If the next non-control stream is DSR, record that fact in the
+  // scheduler so that we don't try to write a non DSR stream again.
+  // Note that this means that in the presence of many large control
+  // streams and DSR streams, we won't completely prioritize control
+  // streams but they will not be starved.
+  if (nextStream && !nextStream->hasSchedulableData()) {
+    nextStreamDsr_ = true;
   }
 }
 

@@ -47,6 +47,21 @@ class DSRStreamFrameScheduler {
       const deprecated::PriorityQueue::LevelItr&,
       QuicStreamState&);
 
+  SchedulingResult enrichAndAddSendInstruction(
+      uint32_t,
+      SchedulingResult,
+      DSRPacketBuilderBase&,
+      SendInstruction::Builder&,
+      const PriorityQueue&,
+      QuicStreamState&);
+
+  folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+  writeStreamImpl(
+      DSRPacketBuilderBase& builder,
+      const deprecated::PriorityQueue&);
+  folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+  writeStreamImpl(DSRPacketBuilderBase& builder, PriorityQueue&);
+
  private:
   QuicServerConnectionState& conn_;
   bool nextStreamNonDsr_{false};

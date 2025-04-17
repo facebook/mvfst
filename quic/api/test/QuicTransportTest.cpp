@@ -124,6 +124,14 @@ class QuicTransportTest : public Test {
     return MockByteEventCallback::getTxMatcher(id, offset);
   }
 
+  StreamId nextScheduledStreamID(QuicConnectionStateBase& conn) {
+    auto oldWriteQueue = conn.streamManager->oldWriteQueue();
+    if (oldWriteQueue) {
+      return oldWriteQueue->getNextScheduledStream();
+    }
+    return conn.streamManager->writeQueue().peekNextScheduledID().asStreamID();
+  }
+
  protected:
   folly::EventBase evb_;
   std::shared_ptr<FollyQuicEventBase> qEvb_;
@@ -4606,8 +4614,8 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   EXPECT_EQ(streamFrame->streamId, s1);
   conn.outstandings.reset();
 
-  // Start from stream2 instead of stream1
-  conn.streamManager->writeQueue().setNextScheduledStream(s2);
+  // Queue already points to stream2
+  EXPECT_EQ(nextScheduledStreamID(conn), stream2->id);
   writableBytes = kDefaultUDPSendPacketLen - 100;
 
   EXPECT_CALL(*socket_, write(_, _, _))
@@ -4633,8 +4641,13 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   EXPECT_EQ(streamFrame2->streamId, s2);
   conn.outstandings.reset();
 
-  // Test wrap around
-  conn.streamManager->writeQueue().setNextScheduledStream(s2);
+  // Test wrap around by skipping a stream
+  auto oldWriteQueue = conn.streamManager->oldWriteQueue();
+  if (oldWriteQueue) {
+    oldWriteQueue->setNextScheduledStream(s2);
+  } else {
+    conn.streamManager->writeQueue().getNextScheduledID(quic::none);
+  }
   writableBytes = kDefaultUDPSendPacketLen;
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));

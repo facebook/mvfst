@@ -831,7 +831,11 @@ QuicTransportBaseLite::setStreamPriority(
   }
   // It's not an error to prioritize a stream after it's sent its FIN - this
   // can reprioritize retransmissions.
-  conn_->streamManager->setStreamPriority(id, priority, conn_->qLogger);
+  conn_->streamManager->setStreamPriority(
+      id,
+      priority,
+      getSendConnFlowControlBytesWire(*conn_) > 0,
+      conn_->qLogger);
   return folly::unit;
 }
 

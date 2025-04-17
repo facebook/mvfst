@@ -106,19 +106,6 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
 
 using namespace quic::test;
 
-std::unique_ptr<QuicClientConnectionState>
-createConn(uint32_t maxStreams, uint64_t maxOffset, uint64_t initialMaxOffset) {
-  auto conn = std::make_unique<QuicClientConnectionState>(
-      FizzClientQuicHandshakeContext::Builder().build());
-  auto result =
-      conn->streamManager->setMaxLocalBidirectionalStreams(maxStreams);
-  CHECK(!result.hasError()) << "Failed to set max local bidirectional streams";
-  conn->flowControlState.peerAdvertisedMaxOffset = maxOffset;
-  conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-      initialMaxOffset;
-  return conn;
-}
-
 auto createStream(
     QuicClientConnectionState& conn,
     std::optional<HTTPPriorityQueue::Priority> priority = std::nullopt) {
@@ -236,13 +223,40 @@ namespace quic::test {
 class QuicPacketSchedulerTestBase {
  public:
   QuicVersion version{QuicVersion::MVFST};
+
+  std::unique_ptr<QuicClientConnectionState> createConn(
+      uint32_t maxStreams,
+      uint64_t maxOffset,
+      uint64_t initialMaxOffset,
+      bool useNewPriorityQueue = false) {
+    auto conn = std::make_unique<QuicClientConnectionState>(
+        FizzClientQuicHandshakeContext::Builder().build());
+    transportSettings.useNewPriorityQueue = useNewPriorityQueue;
+    auto result =
+        conn->streamManager->refreshTransportSettings(transportSettings);
+    CHECK(!result.hasError()) << "Failed to refresh transport settings";
+    result = conn->streamManager->setMaxLocalBidirectionalStreams(maxStreams);
+    CHECK(!result.hasError())
+        << "Failed to set max local bidirectional streams";
+    conn->flowControlState.peerAdvertisedMaxOffset = maxOffset;
+    conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+        initialMaxOffset;
+    return conn;
+  }
+
+  TransportSettings transportSettings;
 };
 
 class QuicPacketSchedulerTest : public QuicPacketSchedulerTestBase,
-                                public testing::Test {
+                                public testing::TestWithParam<bool> {
  public:
   StreamId nextScheduledStreamID(QuicConnectionStateBase& conn) {
-    return conn.streamManager->writeQueue().getNextScheduledStream();
+    auto oldWriteQueue = conn.streamManager->oldWriteQueue();
+    CHECK(oldWriteQueue || GetParam()) << "why old queue when using new";
+    if (oldWriteQueue) {
+      return oldWriteQueue->getNextScheduledStream();
+    }
+    return conn.streamManager->writeQueue().peekNextScheduledID().asStreamID();
   }
 };
 
@@ -280,7 +294,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
+TEST_P(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -314,7 +328,7 @@ TEST_F(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, InitialPaddingDoesNotUseWrapper) {
+TEST_P(QuicPacketSchedulerTest, InitialPaddingDoesNotUseWrapper) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -349,7 +363,7 @@ TEST_F(QuicPacketSchedulerTest, InitialPaddingDoesNotUseWrapper) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
+TEST_P(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -383,7 +397,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
+TEST_P(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -437,7 +451,7 @@ TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
+TEST_P(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -472,7 +486,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
+TEST_P(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -502,7 +516,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   EXPECT_TRUE(scheduler.writeCryptoData(builderWrapper));
 }
 
-TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
+TEST_P(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -540,7 +554,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   EXPECT_FALSE(conn.cryptoState->initialStream.lossBuffer.empty());
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -564,7 +578,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   EXPECT_LT(builder.remainingSpaceInPkt(), originalSpace);
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
+TEST_P(QuicPacketSchedulerTest, StreamFrameNoSpace) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -589,7 +603,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
   EXPECT_EQ(builder.remainingSpaceInPkt(), originalSpace);
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
@@ -611,7 +625,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   EXPECT_EQ(builder.remainingSpaceInPkt(), originalSpace);
 }
 
-TEST_F(QuicPacketSchedulerTest, NoCloningForDSR) {
+TEST_P(QuicPacketSchedulerTest, NoCloningForDSR) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -638,7 +652,7 @@ TEST_F(QuicPacketSchedulerTest, NoCloningForDSR) {
   EXPECT_FALSE(result->packet.hasValue());
 }
 
-TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
+TEST_P(QuicPacketSchedulerTest, CloningSchedulerTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -668,7 +682,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
   EXPECT_EQ(packetNum, result->clonedPacketIdentifier->packetNumber);
 }
 
-TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
+TEST_P(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -744,7 +758,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   }
 }
 
-TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
+TEST_P(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -780,8 +794,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
 }
 
 class CloneAllPacketsWithCryptoFrameTest
-    : public QuicPacketSchedulerTest,
-      public WithParamInterface<std::tuple<bool, bool>> {};
+    : public QuicPacketSchedulerTestBase,
+      public TestWithParam<std::tuple<bool, bool>> {};
 
 TEST_P(
     CloneAllPacketsWithCryptoFrameTest,
@@ -878,7 +892,7 @@ INSTANTIATE_TEST_SUITE_P(
     CloneAllPacketsWithCryptoFrameTest,
     Combine(Bool(), Bool()));
 
-TEST_F(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
+TEST_P(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.transportSettings.cloneAllPacketsWithCryptoFrame = true;
@@ -918,7 +932,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   EXPECT_EQ(firstPacketNum, result->clonedPacketIdentifier->packetNumber);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
+TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -941,7 +955,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
     There was a bug that would result in mvfst emit a "empty" PTO packet with
     acks; this is the test case to cover that scenario.
  */
-TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
+TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.version = QuicVersion::MVFST_EXPERIMENTAL2;
@@ -1019,7 +1033,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
   EXPECT_TRUE(hasCryptoFrame);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
+TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -1030,7 +1044,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
   EXPECT_TRUE(cloningScheduler.hasData());
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
+TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -1041,7 +1055,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
   EXPECT_TRUE(cloningScheduler.hasData());
 }
 
-TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
+TEST_P(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame", conn);
@@ -1071,7 +1085,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   EXPECT_EQ(expected, result->clonedPacketIdentifier->packetNumber);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
+TEST_P(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.version = QuicVersion::MVFST_EXPERIMENTAL2;
@@ -1127,7 +1141,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
       *folly::IOBuf::copyBuffer("I'm out of the game"), result->packet->body));
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
+TEST_P(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto result = conn.streamManager->setMaxLocalBidirectionalStreams(10);
@@ -1211,7 +1225,7 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   EXPECT_EQ(1, streamWindowUpdateCounter);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
+TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
@@ -1254,7 +1268,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
   EXPECT_GT(buf->length(), 10);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
+TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto streamResult = conn.streamManager->setMaxLocalBidirectionalStreams(10);
@@ -1339,7 +1353,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   EXPECT_EQ(buf->length(), conn.udpSendPacketLen);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
+TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.udpSendPacketLen = 1000;
@@ -1406,7 +1420,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
 
 class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};
 
-TEST_F(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
+TEST_P(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   EXPECT_FALSE(hasAcksToSchedule(*conn.ackStates.initialAckState));
@@ -1424,7 +1438,7 @@ TEST_F(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
   EXPECT_TRUE(hasAcksToSchedule(*conn.ackStates.handshakeAckState));
 }
 
-TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
+TEST_P(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   AckScheduler initialAckScheduler(
@@ -1448,7 +1462,7 @@ TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
-TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
+TEST_P(QuicPacketSchedulerTest, LargestAckToSend) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   EXPECT_EQ(none, largestAckToSend(*conn.ackStates.initialAckState));
@@ -1464,7 +1478,7 @@ TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
   EXPECT_EQ(none, largestAckToSend(conn.ackStates.appDataAckState));
 }
 
-TEST_F(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
+TEST_P(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
   // This covers the scheduler behavior when an IMMEDIATE_ACK frame is received.
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -1493,8 +1507,8 @@ TEST_F(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1509,11 +1523,15 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
   auto builder = setupMockPacketBuilder();
   scheduler.writeStreams(*builder);
   verifyStreamFrames(*builder, {f1, f2, f3});
-  EXPECT_EQ(nextScheduledStreamID(conn), 0);
+  if (GetParam()) {
+    EXPECT_TRUE(conn.streamManager->writeQueue().empty());
+  } else {
+    EXPECT_EQ(nextScheduledStreamID(conn), 0);
+  }
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1526,6 +1544,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   auto f2 = writeDataToStream(conn, stream2, "some data");
   auto f3 = writeDataToStream(conn, stream3, "some data");
 
+  // write a normal size packet from stream1
   auto builder = createPacketBuilder(conn);
   scheduler.writeStreams(builder);
 
@@ -1535,10 +1554,10 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   verifyStreamFrames(*builder2, {f2, f3, f1});
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
-  conn.streamManager->writeQueue().setMaxNextsPerStream(2);
+  conn.streamManager->setWriteQueueMaxNextsPerStream(2);
   StreamFrameScheduler scheduler(conn);
 
   auto stream1 = createStream(conn);
@@ -1567,8 +1586,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
   verifyStreamFrames(*builder2, {stream1, stream1, stream2, stream3, stream1});
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   conn.transportSettings.streamFramePerPacket = true;
   StreamFrameScheduler scheduler(conn);
@@ -1582,6 +1601,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   auto f2 = writeDataToStream(conn, stream2, "some data");
   auto f3 = writeDataToStream(conn, stream3, "some data");
 
+  // Write a normal size packet from stream1
   auto builder = createPacketBuilder(conn);
   scheduler.writeStreams(builder);
   EXPECT_EQ(nextScheduledStreamID(conn), stream2);
@@ -1596,10 +1616,10 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   verifyStreamFrames(*builder2, {f1});
 }
 
-TEST_F(
+TEST_P(
     QuicPacketSchedulerTest,
     StreamFrameSchedulerRoundRobinStreamPerPacketHitsDsr) {
-  auto connPtr = createConn(10, 100000, 100000);
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   conn.transportSettings.streamFramePerPacket = true;
   StreamFrameScheduler scheduler(conn);
@@ -1636,7 +1656,7 @@ TEST_F(
       dsrStream->pendingWrites)); // Move and destruct the pending writes
   conn.streamManager->updateWritableStreams(*dsrStream);
 
-  // The default is to wraparound initially.
+  // Write a normal size packet from stream1
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
@@ -1656,8 +1676,8 @@ TEST_F(
   verifyStreamFrames(*builder2, {f2, f3});
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1670,7 +1690,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
   auto f2 = writeDataToStream(conn, stream2, "some data");
   auto f3 = writeDataToStream(conn, stream3, "some data");
 
-  // The default is to wraparound initially.
+  // Write a normal size packet from stream1
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
@@ -1683,8 +1703,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
   verifyStreamFrames(*builder2, {f1, f2, f3});
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   conn.transportSettings.defaultPriority =
       HTTPPriorityQueue::Priority(0, false);
@@ -1699,6 +1719,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
   auto f2 = writeDataToStream(conn, stream2, "some data");
   auto f3 = writeDataToStream(conn, stream3, "some data");
 
+  // Write a normal size packet from stream1
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
@@ -1711,8 +1732,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
   verifyStreamFrames(*builder2, {f1, f2, f3});
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1732,24 +1753,30 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   auto f3 = writeDataToStream(conn, stream3, "some data");
   auto f4 = writeDataToStream(conn, stream4, "some data");
 
+  // This writes a normal size packet with 2, 4, 1
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
   EXPECT_EQ(nextScheduledStreamID(conn), stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
+  // 2 and 4 did not get removed from writable, so they get repeated here
   // Should write frames for stream2, stream4, followed by stream 3 then 1.
   auto builder2 = setupMockPacketBuilder();
   scheduler.writeStreams(*builder2);
 
   verifyStreamFrames(*builder2, {f2, f4, f3, f1});
 
-  EXPECT_EQ(nextScheduledStreamID(conn), stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
+  if (GetParam()) {
+    EXPECT_TRUE(conn.streamManager->writeQueue().empty());
+  } else {
+    EXPECT_EQ(nextScheduledStreamID(conn), stream3);
+  }
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1759,11 +1786,15 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   auto builder1 = createPacketBuilder(conn);
   scheduler.writeStreams(builder1);
 
-  EXPECT_EQ(nextScheduledStreamID(conn), 0);
+  if (GetParam()) {
+    EXPECT_TRUE(conn.streamManager->writeQueue().empty());
+  } else {
+    EXPECT_EQ(nextScheduledStreamID(conn), 0);
+  }
 }
 
-TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1778,15 +1809,17 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
   verifyStreamFrames(*builder, {f1, f2});
 
   // Manually remove a stream and set the next scheduled to that stream.
-  conn.streamManager->writeQueue().setNextScheduledStream(stream2);
-  conn.streamManager->removeWritable(*conn.streamManager->findStream(stream2));
+  conn.streamManager->removeWritable(*conn.streamManager->findStream(stream1));
+  // the queue is empty, reload it
+  conn.streamManager->updateWritableStreams(
+      *conn.streamManager->findStream(stream2));
 
   scheduler.writeStreams(*builder);
   ASSERT_EQ(builder->frames_.size(), 1);
-  verifyStreamFrames(*builder, {f1});
+  verifyStreamFrames(*builder, {f2});
 }
 
-TEST_F(
+TEST_P(
     QuicPacketSchedulerTest,
     CloningSchedulerWithInplaceBuilderDoNotEncodeHeaderWithoutBuild) {
   QuicClientConnectionState conn(
@@ -1831,7 +1864,7 @@ TEST_F(
   EXPECT_EQ(buf->length(), 0);
 }
 
-TEST_F(
+TEST_P(
     QuicPacketSchedulerTest,
     CloningSchedulerWithInplaceBuilderRollbackBufWhenFailToRebuild) {
   QuicClientConnectionState conn(
@@ -1872,8 +1905,8 @@ TEST_F(
   EXPECT_EQ(buf->length(), 0);
 }
 
-TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
-  auto connPtr = createConn(10, 100000, 100000);
+TEST_P(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -1895,7 +1928,7 @@ TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
   EXPECT_EQ(highPriStreamId, writeStreamFrame.streamId);
 }
 
-TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
+TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -1966,7 +1999,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
 }
 
-TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
+TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -2016,7 +2049,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   EXPECT_FALSE(scheduler.hasPendingData());
 }
 
-TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
+TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -2089,7 +2122,91 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
 }
 
-TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
+TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
+  auto connPtr = createConn(10, 1000, 2000, GetParam());
+  auto& conn = *connPtr;
+  conn.udpSendPacketLen = 2000;
+
+  auto highPriStreamId =
+      (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto lowPriStreamId =
+      (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto highPriStream = conn.streamManager->findStream(highPriStreamId);
+  auto lowPriStream = conn.streamManager->findStream(lowPriStreamId);
+
+  // Write new data to high priority stream in excess of max data
+  auto newData = buildRandomInputData(2000);
+  ASSERT_TRUE(writeDataToQuicStream(*highPriStream, std::move(newData), true));
+  conn.streamManager->updateWritableStreams(
+      *highPriStream, /*connFlowControlOpen=*/true);
+
+  // Fake a loss data for low priority stream
+  lowPriStream->currentWriteOffset = 201;
+  auto lossData = buildRandomInputData(200);
+  lowPriStream->lossBuffer.emplace_back(
+      ChainedByteRangeHead(lossData), 0, true);
+  conn.streamManager->updateWritableStreams(
+      *lowPriStream, /*connFlowControlOpen=*/true);
+
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  ASSERT_TRUE(builder1.encodePacketHeader());
+  scheduler.writeStreams(builder1);
+  auto packet1 = std::move(builder1).buildPacket().packet;
+  ASSERT_TRUE(updateConnection(
+      conn, none, packet1, Clock::now(), 1200, 0, false /* isDSR */));
+  ASSERT_EQ(2, packet1.frames.size());
+  auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(highPriStreamId, writeStreamFrame1.streamId);
+  EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
+  EXPECT_EQ(1000, highPriStream->pendingWrites.chainLength());
+  EXPECT_EQ(1, highPriStream->retransmissionBuffer.size());
+  EXPECT_EQ(1000, highPriStream->retransmissionBuffer[0]->data.chainLength());
+
+  auto& writeStreamFrame2 = *packet1.frames[1].asWriteStreamFrame();
+  EXPECT_EQ(lowPriStreamId, writeStreamFrame2.streamId);
+  EXPECT_EQ(200, writeStreamFrame2.len);
+  EXPECT_TRUE(lowPriStream->lossBuffer.empty());
+  EXPECT_EQ(1, lowPriStream->retransmissionBuffer.size());
+  EXPECT_EQ(200, lowPriStream->retransmissionBuffer[0]->data.chainLength());
+
+  // Simulate additional flow control granted
+  conn.flowControlState.peerAdvertisedMaxOffset = 2000;
+  conn.streamManager->onMaxData();
+  // Don't need to call updateWritableStreams, onMaxData updates the state for
+  // any stream blocked on conn flow control
+
+  // Write remaining data for high priority stream
+  ShortHeader shortHeader2(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(shortHeader2),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  ASSERT_TRUE(builder2.encodePacketHeader());
+  scheduler.writeStreams(builder2);
+  auto packet2 = std::move(builder2).buildPacket().packet;
+  ASSERT_TRUE(updateConnection(
+      conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */));
+  ASSERT_EQ(1, packet2.frames.size());
+  auto& writeStreamFrame3 = *packet2.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(highPriStreamId, writeStreamFrame3.streamId);
+  EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
+  EXPECT_EQ(
+      1000, highPriStream->retransmissionBuffer[1000]->data.chainLength());
+  EXPECT_EQ(1000, writeStreamFrame3.len);
+}
+
+TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -2145,7 +2262,7 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   EXPECT_EQ(200, stream2->retransmissionBuffer[0]->data.chainLength());
 }
 
-TEST_F(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
+TEST_P(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -2189,7 +2306,7 @@ TEST_F(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
   EXPECT_EQ(stream->currentWriteOffset, 6);
 }
 
-TEST_F(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
+TEST_P(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -2235,7 +2352,7 @@ TEST_F(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
   EXPECT_FALSE(scheduler2.hasPendingData());
 }
 
-TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
+TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
@@ -2263,7 +2380,7 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
   ASSERT_EQ(frames.size(), 2);
 }
 
-TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
+TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
@@ -2296,7 +2413,7 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
   ASSERT_EQ(frames.size(), 2);
 }
 
-TEST_F(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
+TEST_P(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
@@ -2327,7 +2444,7 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
   ASSERT_EQ(frames.size(), 1);
 }
 
-TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
+TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   size_t paddingModulo = 16;
@@ -2401,7 +2518,7 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   EXPECT_EQ(packetLength1, packetLength2);
 }
 
-TEST_F(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
+TEST_P(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.fixedShortHeaderPadding = 2;
@@ -2451,7 +2568,7 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
   EXPECT_TRUE(frames[2].asPaddingFrame());
 }
 
-TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
+TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.udpSendPacketLen = 1000;
@@ -2503,7 +2620,7 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
   EXPECT_EQ(packetLength, conn.udpSendPacketLen);
 }
 
-TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
+TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.udpSendPacketLen = 1000;
@@ -2554,7 +2671,7 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
   EXPECT_EQ(packetLength, conn.udpSendPacketLen);
 }
 
-TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerOnRequest) {
+TEST_P(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerOnRequest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.pendingEvents.requestImmediateAck = true;
@@ -2592,7 +2709,7 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerOnRequest) {
   EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
-TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
+TEST_P(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.pendingEvents.requestImmediateAck = false;
@@ -2632,7 +2749,7 @@ TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
   EXPECT_LT(packetLength, conn.udpSendPacketLen);
 }
 
-TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
+TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   ASSERT_FALSE(
@@ -2718,12 +2835,12 @@ TEST_F(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
 }
 
-TEST_F(QuicPacketSchedulerTest, PausedPriorityEnabled) {
+TEST_P(QuicPacketSchedulerTest, PausedPriorityEnabled) {
   static const auto kSequentialPriority = HTTPPriorityQueue::Priority(3, false);
   static const HTTPPriorityQueue::Priority kPausedPriority =
       HTTPPriorityQueue::Priority::PAUSED;
 
-  auto connPtr = createConn(10, 100000, 100000);
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
   StreamFrameScheduler scheduler(conn);
 
@@ -2753,14 +2870,14 @@ TEST_F(QuicPacketSchedulerTest, PausedPriorityEnabled) {
   ASSERT_FALSE(conn.streamManager->hasWritable());
 }
 
-TEST_F(QuicPacketSchedulerTest, PausedPriorityDisabled) {
+TEST_P(QuicPacketSchedulerTest, PausedPriorityDisabled) {
   static const auto kSequentialPriority = HTTPPriorityQueue::Priority(3, false);
   static const HTTPPriorityQueue::Priority kPausedPriority =
       HTTPPriorityQueue::Priority::PAUSED;
 
-  auto connPtr = createConn(10, 100000, 100000);
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
-  conn.transportSettings.disablePausedPriority = true;
+  transportSettings.disablePausedPriority = true;
   StreamFrameScheduler scheduler(conn);
 
   auto pausedStreamId = createStream(conn, kPausedPriority);
@@ -2774,7 +2891,7 @@ TEST_F(QuicPacketSchedulerTest, PausedPriorityDisabled) {
   verifyStreamFrames(*builder, {regularFrame, pausedFrame});
 }
 
-TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
+TEST_P(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.fixedShortHeaderPadding = 2;
@@ -2828,7 +2945,7 @@ TEST_F(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
 // This test class sets up a connection with all the fields that can be included
 // in an ACK. The fixtures for this class confirm that the scheduler writes the
 // correct frame type and fields enabled by the connection state.
-class QuicAckSchedulerTest : public Test {
+class QuicAckSchedulerTest : public QuicPacketSchedulerTestBase, public Test {
  protected:
   QuicAckSchedulerTest()
       : conn_(createConn(10, 100000, 100000)),
@@ -3246,5 +3363,10 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
   EXPECT_EQ(ackFrame->ecnECT1Count, 2);
   EXPECT_EQ(ackFrame->ecnCECount, 3);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicPacketSchedulerTest,
+    QuicPacketSchedulerTest,
+    ::testing::Values(false, true));
 
 } // namespace quic::test

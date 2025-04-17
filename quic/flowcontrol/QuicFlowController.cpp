@@ -412,7 +412,8 @@ void handleStreamWindowUpdate(
             stream.writeBufMeta.length) {
       updateFlowControlList(stream);
     }
-    stream.conn.streamManager->updateWritableStreams(stream);
+    stream.conn.streamManager->updateWritableStreams(
+        stream, getSendConnFlowControlBytesWire(stream.conn) > 0);
     if (stream.conn.qLogger) {
       stream.conn.qLogger->addTransportStateUpdate(
           getRxStreamWU(stream.id, packetNum, maximumData));
@@ -428,6 +429,7 @@ void handleConnWindowUpdate(
     PacketNum packetNum) {
   if (conn.flowControlState.peerAdvertisedMaxOffset <= frame.maximumData) {
     conn.flowControlState.peerAdvertisedMaxOffset = frame.maximumData;
+    conn.streamManager->onMaxData();
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(
           getRxConnWU(packetNum, frame.maximumData));

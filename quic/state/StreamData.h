@@ -524,10 +524,11 @@ struct QuicStreamState : public QuicStreamLike {
   // If the stream has writable data that's not backed by DSR. That is, in a
   // regular stream write, it will be able to write something. So it either
   // needs to have data in the pendingWrites chain, or it has EOF to send.
-  bool hasWritableData() const {
+  bool hasWritableData(bool connFlowControlOpen = true) const {
     if (!pendingWrites.empty()) {
       CHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
-      return flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
+      return connFlowControlOpen &&
+          flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
     }
     if (finalWriteOffset) {
       // We can only write a FIN with a non-DSR stream frame if there's no
@@ -539,21 +540,22 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   // Whether this stream has non-DSR data in the write buffer or loss buffer.
-  [[nodiscard]] bool hasSchedulableData() const {
-    return hasWritableData() || !lossBuffer.empty();
+  [[nodiscard]] bool hasSchedulableData(bool connFlowControlOpen = true) const {
+    return hasWritableData(connFlowControlOpen) || !lossBuffer.empty();
   }
 
-  [[nodiscard]] bool hasSchedulableDsr() const {
-    return hasWritableBufMeta() || !lossBufMetas.empty();
+  [[nodiscard]] bool hasSchedulableDsr(bool connFlowControlOpen = true) const {
+    return hasWritableBufMeta(connFlowControlOpen) || !lossBufMetas.empty();
   }
 
-  [[nodiscard]] bool hasWritableBufMeta() const {
+  [[nodiscard]] bool hasWritableBufMeta(bool connFlowControlOpen = true) const {
     if (writeBufMeta.offset == 0) {
       return false;
     }
     if (writeBufMeta.length > 0) {
       CHECK_GE(flowControlState.peerAdvertisedMaxOffset, writeBufMeta.offset);
-      return flowControlState.peerAdvertisedMaxOffset - writeBufMeta.offset > 0;
+      return connFlowControlOpen &&
+          flowControlState.peerAdvertisedMaxOffset - writeBufMeta.offset > 0;
     }
     if (finalWriteOffset) {
       return writeBufMeta.offset <= *finalWriteOffset;

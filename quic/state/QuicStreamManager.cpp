@@ -7,6 +7,7 @@
 
 #include <quic/logging/QLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
+#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/QuicTransportStatsCallback.h>
@@ -107,7 +108,11 @@ static LocalErrorCode openLocalStreamIfNotClosed(
 
 void QuicStreamManager::setWriteQueueMaxNextsPerStream(
     uint64_t maxNextsPerStream) {
-  writeQueue_.setMaxNextsPerStream(maxNextsPerStream);
+  if (oldWriteQueue_) {
+    oldWriteQueue_->setMaxNextsPerStream(maxNextsPerStream);
+  }
+  dynamic_cast<HTTPPriorityQueue&>(writeQueue())
+      .advanceAfterNext(maxNextsPerStream);
 }
 
 bool QuicStreamManager::streamExists(StreamId streamId) {
@@ -229,21 +234,35 @@ bool QuicStreamManager::consumeMaxLocalUnidirectionalStreamIdIncreased() {
   return res;
 }
 
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicStreamManager::setPriorityQueue(std::unique_ptr<PriorityQueue> queue) {
+  if (oldWriteQueue_) {
+    LOG(ERROR) << "Cannot change priority queue when the old queue is in use";
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  if (!writeQueue().empty()) {
+    LOG(ERROR) << "Cannot change priority queue when the queue is not empty";
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  writeQueue_ = std::move(queue);
+  return folly::unit;
+}
+
 bool QuicStreamManager::setStreamPriority(
     StreamId id,
     const PriorityQueue::Priority& newPriority,
+    bool connFlowControlOpen,
     const std::shared_ptr<QLogger>& qLogger) {
   auto stream = findStream(id);
   if (stream) {
-    static const HTTPPriorityQueue kPriorityQueue;
-    if (kPriorityQueue.equalPriority(stream->priority, newPriority)) {
+    if (writeQueue().equalPriority(stream->priority, newPriority)) {
       return false;
     }
     stream->priority = newPriority;
-    updateWritableStreams(*stream);
+    updateWritableStreams(*stream, connFlowControlOpen);
     if (qLogger) {
       qLogger->addPriorityUpdate(
-          id, kPriorityQueue.toLogFields(stream->priority));
+          id, writeQueue().toLogFields(stream->priority));
     }
     return true;
   }
@@ -265,6 +284,30 @@ QuicStreamManager::refreshTransportSettings(const TransportSettings& settings) {
     // Propagate the error
     return folly::makeUnexpected(resultUni.error());
   }
+
+  // TODO: The dependency on HTTPPriorityQueue here seems out of place in
+  // the long term
+  if (!writeQueue_) {
+    writeQueue_ = std::make_unique<HTTPPriorityQueue>();
+  }
+  if (!transportSettings_->useNewPriorityQueue && !oldWriteQueue_) {
+    if (writeQueue_->empty() && connFlowControlBlocked_.empty()) {
+      oldWriteQueue_ = std::make_unique<deprecated::PriorityQueue>();
+    } else {
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
+          "Cannot change priority queue when the queue is not empty"));
+    }
+  } else if (transportSettings_->useNewPriorityQueue && oldWriteQueue_) {
+    if (oldWriteQueue_->empty()) {
+      oldWriteQueue_.reset();
+    } else {
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
+          "Cannot change to new priority queue when the queue is not empty"));
+    }
+  } // else no change
+
   return folly::unit;
 }
 
@@ -742,7 +785,7 @@ folly::Expected<folly::Unit, QuicError> QuicStreamManager::removeClosedStream(
   windowUpdates_.erase(streamId);
   stopSendingStreams_.erase(streamId);
   flowControlUpdated_.erase(streamId);
-
+  connFlowControlBlocked_.erase(streamId);
   // Adjust control stream count if needed
   if (it->second.isControl) {
     DCHECK_GT(numControlStreams_, 0);
@@ -838,7 +881,9 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
   }
 }
 
-void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
+void QuicStreamManager::updateWritableStreams(
+    QuicStreamState& stream,
+    bool connFlowControlOpen) {
   // Check for terminal write errors first
   if (stream.streamWriteError.has_value() && !stream.reliableSizeToPeer) {
     CHECK(stream.lossBuffer.empty());
@@ -850,7 +895,8 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   // Check if paused
   // pausedButDisabled adds a hard dep on writeQueue being an HTTPPriorityQueue.
   auto httpPri = HTTPPriorityQueue::Priority(stream.priority);
-  if (httpPri->paused && !transportSettings_->disablePausedPriority) {
+  if (oldWriteQueue_ && httpPri->paused &&
+      !transportSettings_->disablePausedPriority) {
     removeWritable(stream);
     return;
   }
@@ -878,23 +924,39 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   }
 
   // Update the actual scheduling queues (PriorityQueue or control set)
-  if (stream.hasSchedulableData() || stream.hasSchedulableDsr()) {
+  connFlowControlOpen |= bool(oldWriteQueue_);
+  if (stream.hasSchedulableData(connFlowControlOpen) ||
+      stream.hasSchedulableDsr(connFlowControlOpen)) {
     if (stream.isControl) {
       controlWriteQueue_.emplace(stream.id);
     } else {
-      const static deprecated::Priority kPausedDisabledPriority(7, true);
-      auto oldPri = httpPri->paused
-          ? kPausedDisabledPriority
-          : deprecated::Priority(
-                httpPri->urgency, httpPri->incremental, httpPri->order);
-      writeQueue_.insertOrUpdate(stream.id, oldPri);
+      if (oldWriteQueue_) {
+        const static deprecated::Priority kPausedDisabledPriority(7, true);
+        auto oldPri = httpPri->paused
+            ? kPausedDisabledPriority
+            : deprecated::Priority(
+                  httpPri->urgency, httpPri->incremental, httpPri->order);
+        oldWriteQueue_->insertOrUpdate(stream.id, oldPri);
+      } else {
+        const static PriorityQueue::Priority kPausedDisabledPriority(
+            HTTPPriorityQueue::Priority(7, true));
+        writeQueue().insertOrUpdate(
+            PriorityQueue::Identifier::fromStreamID(stream.id),
+            httpPri->paused && transportSettings_->disablePausedPriority
+                ? kPausedDisabledPriority
+                : stream.priority);
+      }
     }
   } else {
     // Not schedulable, remove from queues
     if (stream.isControl) {
       controlWriteQueue_.erase(stream.id);
     } else {
-      writeQueue_.erase(stream.id);
+      if (oldWriteQueue_) {
+        oldWriteQueue_->erase(stream.id);
+      } else {
+        writeQueue().erase(PriorityQueue::Identifier::fromStreamID(stream.id));
+      }
     }
   }
 }

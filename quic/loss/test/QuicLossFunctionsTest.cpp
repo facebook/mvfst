@@ -177,6 +177,15 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     return MockLegacyObserver::getLossPacketMatcher(
         packetNum, lossByReorder, lossByTimeout);
   }
+
+  StreamId writeQueueContains(QuicConnectionStateBase& conn, StreamId id) {
+    auto oldWriteQueue = conn.streamManager->oldWriteQueue();
+    if (oldWriteQueue) {
+      return oldWriteQueue->count(id);
+    }
+    return conn.streamManager->writeQueue().contains(
+        PriorityQueue::Identifier::fromStreamID(id));
+  }
 };
 
 LossVisitor testingLossMarkFunc(std::vector<PacketNum>& lostPackets) {
@@ -2626,7 +2635,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_EQ(stream->streamLossCount, 1);
   EXPECT_FALSE(stream->hasWritableBufMeta());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
-  EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
+  EXPECT_TRUE(writeQueueContains(*conn, stream->id));
 
   // Lose the 3rd dsr packet:
   RegularQuicWritePacket packet3(PacketHeader(ShortHeader(
@@ -2646,7 +2655,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_TRUE(conn->streamManager->hasLoss());
   EXPECT_FALSE(stream->hasWritableBufMeta());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
-  EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
+  EXPECT_TRUE(writeQueueContains(*conn, stream->id));
 
   // Lose the 3rd dsr packet, it should be merged together with the first
   // element in the lossBufMetas:
@@ -2667,7 +2676,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_TRUE(conn->streamManager->hasLoss());
   EXPECT_FALSE(stream->hasWritableBufMeta());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
-  EXPECT_TRUE(conn->streamManager->writeQueue().count(stream->id));
+  EXPECT_TRUE(writeQueueContains(*conn, stream->id));
 }
 
 TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
