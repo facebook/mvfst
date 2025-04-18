@@ -20,8 +20,7 @@
 using namespace folly;
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 constexpr uint8_t kStreamIncrement = 0x04;
 
@@ -2635,5 +2634,4 @@ TEST_P(QuicStreamFunctionsTestBase, AckCryptoStreamOffsetLengthMismatch) {
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test
