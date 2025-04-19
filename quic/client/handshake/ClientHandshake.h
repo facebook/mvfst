@@ -131,10 +131,6 @@ class ClientHandshake : public Handshake {
   virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const = 0;
 
-  TLSSummary getTLSSummary() const override {
-    LOG(FATAL) << "Not implemented";
-  }
-
   ~ClientHandshake() override = default;
 
  protected:

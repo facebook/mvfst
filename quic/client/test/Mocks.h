@@ -97,6 +97,7 @@ class MockClientHandshake : public ClientHandshake {
       getPeerCertificate,
       (),
       (const));
+  MOCK_METHOD(Handshake::TLSSummary, getTLSSummary, (), (const));
 };
 
 class MockQuicConnectorCallback : public quic::QuicConnector::Callback {
