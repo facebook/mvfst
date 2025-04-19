@@ -189,12 +189,9 @@ TEST(ServerStateMachineTest, TestProcessMaxRecvPacketSizeParamBelowMin) {
       encodeIntegerParameter(TransportParameterId::max_packet_size, 1000));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  try {
-    processClientInitialParams(serverConn, clientTransportParams);
-    FAIL() << "Expect transport exception due to max packet size too small";
-  } catch (QuicTransportException& e) {
-    EXPECT_EQ(e.errorCode(), TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
-  }
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
 TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
@@ -206,13 +203,9 @@ TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
       kMaxDatagramPacketOverhead - 1));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  try {
-    processClientInitialParams(serverConn, clientTransportParams);
-    FAIL()
-        << "Expect transport exception due to max datagram frame size too small";
-  } catch (QuicTransportException& e) {
-    EXPECT_EQ(e.errorCode(), TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
-  }
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
 TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeOk) {
@@ -224,7 +217,8 @@ TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeOk) {
       kMaxDatagramPacketOverhead + 1));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(
       serverConn.datagramState.maxWriteFrameSize,
       kMaxDatagramPacketOverhead + 1);
@@ -238,7 +232,8 @@ TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
       encodeIntegerParameter(TransportParameterId::max_datagram_frame_size, 0));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(serverConn.datagramState.maxWriteFrameSize, 0);
 }
 
@@ -248,7 +243,8 @@ TEST(ServerStateMachineTest, TestProcessMinAckDelayNotSet) {
   std::vector<TransportParameter> transportParams;
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_FALSE(serverConn.peerMinAckDelay.has_value());
 }
 
@@ -260,7 +256,8 @@ TEST(ServerStateMachineTest, TestProcessMinAckDelaySet) {
       encodeIntegerParameter(TransportParameterId::min_ack_delay, 1000));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   ASSERT_TRUE(serverConn.peerMinAckDelay.has_value());
   ASSERT_EQ(
       serverConn.peerMinAckDelay.value(), std::chrono::microseconds(1000));
@@ -297,7 +294,8 @@ TEST(ServerStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
       encodeIntegerParameter(TransportParameterId::knob_frames_supported, 1));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_TRUE(serverConn.peerAdvertisedKnobFrameSupport);
 }
 
@@ -309,7 +307,8 @@ TEST(ServerStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
       encodeIntegerParameter(TransportParameterId::knob_frames_supported, 0));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_FALSE(serverConn.peerAdvertisedKnobFrameSupport);
 }
 
@@ -344,7 +343,8 @@ TEST(ServerStateMachineTest, TestProcessExtendedAckSupportParam) {
       encodeIntegerParameter(TransportParameterId::extended_ack_features, 7));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(serverConn.peerAdvertisedExtendedAckFeatures, 7);
 }
 
@@ -354,7 +354,8 @@ TEST(ServerStateMachineTest, TestProcessExtendedAckSupportParamNotSent) {
   std::vector<TransportParameter> transportParams;
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_EQ(serverConn.peerAdvertisedExtendedAckFeatures, 0);
 }
 
@@ -368,7 +369,8 @@ TEST(
       encodeEmptyParameter(TransportParameterId::reliable_stream_reset));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_TRUE(serverConn.peerAdvertisedReliableStreamResetSupport);
 }
 
@@ -380,7 +382,8 @@ TEST(
   std::vector<TransportParameter> transportParams;
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   EXPECT_FALSE(serverConn.peerAdvertisedReliableStreamResetSupport);
 }
 
@@ -392,9 +395,9 @@ TEST(ServerStateMachineTest, TestProcessReliableStreamResetNonEmptyParam) {
       encodeIntegerParameter(TransportParameterId::reliable_stream_reset, 0));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  EXPECT_THROW(
-      processClientInitialParams(serverConn, clientTransportParams),
-      QuicTransportException);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
 TEST(
@@ -434,7 +437,8 @@ TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitNotSet) {
   std::vector<TransportParameter> transportParams;
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   // Check that the value is the default specified in RFC9000 when the transport
   // parameter is absent
   // https://datatracker.ietf.org/doc/html/rfc9000#section-18.2-6.2.1
@@ -450,7 +454,8 @@ TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitSet) {
       kMaxActiveConnectionIdLimit + 1));
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
   // This tests for max + 1. The maximum value will be enforced on sending the
   // new connection id frames, not in parsing the parameters.
   EXPECT_EQ(
@@ -481,7 +486,8 @@ TEST_P(
   }
   ClientTransportParameters clientTransportParams = {
       std::move(transportParams)};
-  processClientInitialParams(serverConn, clientTransportParams);
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(
       serverConn.peerAdvertisedMaxStreamGroups,

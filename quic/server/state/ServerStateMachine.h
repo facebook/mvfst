@@ -9,7 +9,6 @@
 
 #include <glog/logging.h>
 #include <memory>
-#include <vector>
 
 #include <quic/QuicException.h>
 #include <quic/codec/Types.h>
@@ -195,15 +194,16 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 // Transition to error state on invalid state transition.
 void ServerInvalidStateHandler(QuicServerConnectionState& state);
 
-void onServerReadData(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> onServerReadData(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData);
 
-void onServerReadDataFromOpen(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData);
 
-void onServerReadDataFromClosed(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+onServerReadDataFromClosed(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData);
 
@@ -211,11 +211,13 @@ void onServerClose(QuicServerConnectionState& conn);
 
 void onServerCloseOpenState(QuicServerConnectionState& conn);
 
-void processClientInitialParams(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+processClientInitialParams(
     QuicServerConnectionState& conn,
     const ClientTransportParameters& clientParams);
 
-void updateHandshakeState(QuicServerConnectionState& conn);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> updateHandshakeState(
+    QuicServerConnectionState& conn);
 
 bool validateAndUpdateSourceToken(
     QuicServerConnectionState& conn,
@@ -227,7 +229,7 @@ void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
     const Optional<Buf>& appToken);
 
-void onConnectionMigration(
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,
     const folly::SocketAddress& newPeerAddress,
     bool isIntentional = false);

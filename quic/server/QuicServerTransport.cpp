@@ -167,7 +167,10 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
   uint64_t prevWritableBytes = serverConn_->writableBytesLimit
       ? *serverConn_->writableBytesLimit
       : std::numeric_limits<uint64_t>::max();
-  onServerReadData(*serverConn_, readData);
+  auto readDataResult = onServerReadData(*serverConn_, readData);
+  if (readDataResult.hasError()) {
+    return folly::makeUnexpected(readDataResult.error());
+  }
   processPendingData(true);
 
   if (closeState_ == CloseState::CLOSED) {
@@ -444,7 +447,11 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
       return;
     }
     [[maybe_unused]] auto self = sharedGuard();
-    updateHandshakeState(*serverConn_);
+    auto handshakeResult = updateHandshakeState(*serverConn_);
+    if (handshakeResult.hasError()) {
+      closeImpl(handshakeResult.error());
+      return;
+    }
     processPendingData(false);
     // pending data may contain connection close
     if (closeState_ == CloseState::CLOSED) {
