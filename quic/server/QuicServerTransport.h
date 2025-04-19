@@ -213,8 +213,9 @@ class QuicServerTransport
   // Made it protected for testing purpose
   void registerTransportKnobParamHandler(
       uint64_t paramId,
-      std::function<void(QuicServerTransport*, TransportKnobParam::Val)>&&
-          handler);
+      std::function<folly::Expected<folly::Unit, QuicError>(
+          QuicServerTransport*,
+          TransportKnobParam::Val)>&& handler);
 
  private:
   class QuicEventBaseAsFollyExecutor : public folly::Executor {
@@ -263,9 +264,11 @@ class QuicServerTransport
   Optional<TimePoint> newSessionTicketWrittenTimestamp_;
   Optional<uint64_t> newSessionTicketWrittenCwndHint_;
   QuicServerConnectionState* serverConn_;
-  std::unordered_map<
+  folly::F14FastMap<
       uint64_t,
-      std::function<void(QuicServerTransport*, TransportKnobParam::Val)>>
+      std::function<folly::Expected<folly::Unit, QuicError>(
+          QuicServerTransport*,
+          TransportKnobParam::Val)>>
       transportKnobParamHandlers_;
   mutable std::optional<QuicEventBaseAsFollyExecutor> eventBaseAsFollyExecutor_;
 

@@ -5102,11 +5102,15 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
       [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {
         EXPECT_EQ(std::get<uint64_t>(val), 10);
         flag = 1;
+        return folly::unit;
       });
   server->registerKnobParamHandler(
       200,
       [&](QuicServerTransport* /* server_conn */,
-          const TransportKnobParam::Val& /* val */) { flag = 2; });
+          const TransportKnobParam::Val& /* val */) {
+        flag = 2;
+        return folly::unit;
+      });
   server->handleKnobParams({
       {199, uint64_t{10}},
       {201, uint64_t{20}},
@@ -5120,6 +5124,7 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
       [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {
         EXPECT_EQ(std::get<uint64_t>(val), 30);
         flag = 3;
+        return folly::unit;
       });
 
   server->handleKnobParams({

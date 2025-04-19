@@ -112,8 +112,9 @@ class TestingQuicServerTransport : public QuicServerTransport {
 
   void registerKnobParamHandler(
       uint64_t paramId,
-      std::function<void(QuicServerTransport*, TransportKnobParam::Val)>&&
-          handler) {
+      std::function<folly::Expected<folly::Unit, QuicError>(
+          QuicServerTransport*,
+          TransportKnobParam::Val)>&& handler) {
     registerTransportKnobParamHandler(paramId, std::move(handler));
   }
 
