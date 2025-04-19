@@ -201,11 +201,13 @@ void UdpSocketPacketGroupWriter::rollback() {
 }
 
 bool UdpSocketPacketGroupWriter::send(uint32_t size) {
-  return ioBufBatch_.write(nullptr /* no need to pass buildBuf */, size);
+  auto result = ioBufBatch_.write(nullptr /* no need to pass buildBuf */, size);
+  CHECK(!result.hasError());
+  return result.value();
 }
 
 void UdpSocketPacketGroupWriter::flush() {
-  ioBufBatch_.flush();
+  CHECK(!ioBufBatch_.flush().hasError());
 }
 
 BufQuicBatchResult UdpSocketPacketGroupWriter::getResult() {

@@ -46,7 +46,10 @@ QuicTransportBase::QuicTransportBase(
     folly::Function<Optional<folly::SocketCmsgMap>()> func = [&]() {
       return getAdditionalCmsgsForAsyncUDPSocket();
     };
-    socket_->setAdditionalCmsgsFunc(std::move(func));
+    // TODO we probably should have a better way to return error from
+    // creating a connection.
+    // Can't really do anything with this at this point.
+    (void)socket_->setAdditionalCmsgsFunc(std::move(func));
   }
 }
 
@@ -791,11 +794,13 @@ QuicTransportBase::maybeResetStreamFromReadError(
 }
 
 void QuicTransportBase::setCmsgs(const folly::SocketCmsgMap& options) {
-  socket_->setCmsgs(options);
+  // TODO figure out what we want to do here in the unlikely error case.
+  (void)socket_->setCmsgs(options);
 }
 
 void QuicTransportBase::appendCmsgs(const folly::SocketCmsgMap& options) {
-  socket_->appendCmsgs(options);
+  // TODO figure out what we want to do here in the unlikely error case.
+  (void)socket_->appendCmsgs(options);
 }
 
 bool QuicTransportBase::checkCustomRetransmissionProfilesEnabled() const {

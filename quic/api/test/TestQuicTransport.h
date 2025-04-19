@@ -206,7 +206,7 @@ class TestQuicTransport
   }
 
   void validateECN() {
-    QuicTransportBase::validateECNState();
+    CHECK(!QuicTransportBase::validateECNState().hasError());
   }
 
   std::unique_ptr<Aead> aead;

@@ -777,7 +777,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * is not enabled or has already failed validation, this function does
    * nothing.
    */
-  void validateECNState();
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> validateECNState();
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;

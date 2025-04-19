@@ -163,6 +163,7 @@ TEST_F(QuicOpenStateTest, AckStream) {
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
+  ON_CALL(*sock, getGSO).WillByDefault(testing::Return(0));
 
   auto buf = IOBuf::copyBuffer("hello");
   writeQuicPacket(
@@ -200,6 +201,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
+  ON_CALL(*sock, getGSO).WillByDefault(testing::Return(0));
 
   auto buf = IOBuf::copyBuffer("hello");
   writeQuicPacket(
@@ -264,6 +266,7 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   quic::test::MockAsyncUDPSocket socket(qEvb);
+  ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
   Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
   serverChosenConnId.value().data()[0] ^= 0x01;
 
@@ -581,6 +584,7 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   auto sock = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
+  ON_CALL(*sock, getGSO).WillByDefault(testing::Return(0));
 
   auto buf = IOBuf::copyBuffer("hello");
   writeQuicPacket(

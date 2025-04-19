@@ -170,7 +170,12 @@ void QuicTransportBaseLite::onNetworkData(
 
       // If ECN is enabled, make sure that the packet marking is happening as
       // expected
-      validateECNState();
+      auto ecnResult = validateECNState();
+      if (ecnResult.hasError()) {
+        VLOG(4) << __func__ << " " << ecnResult.error().message << " " << *this;
+        exceptionCloseWhat_ = ecnResult.error().message;
+        closeImpl(ecnResult.error());
+      }
     } else {
       // In the closed state, we would want to write a close if possible
       // however the write looper will not be set.
@@ -1121,7 +1126,15 @@ void QuicTransportBaseLite::maybeStopWriteLooperAndArmSocketWritableEvent() {
     if (haveBufferToRetry || (haveNewDataToWrite && connHasWriteWindow)) {
       // Re-arm the write event and stop the write
       // looper.
-      socket_->resumeWrite(this);
+      auto resumeResult = socket_->resumeWrite(this);
+      if (resumeResult.hasError()) {
+        exceptionCloseWhat_ = resumeResult.error().message;
+        closeImpl(QuicError(
+            resumeResult.error().code,
+            std::string(
+                "maybeStopWriteLooperAndArmSocketWritableEvent() error")));
+        return;
+      }
       writeLooper_->stop();
     }
   }
@@ -2177,7 +2190,9 @@ void QuicTransportBaseLite::closeUdpSocket() {
   auto sock = std::move(socket_);
   socket_ = nullptr;
   sock->pauseRead();
-  sock->close();
+  auto closeResult = sock->close();
+  LOG_IF(ERROR, closeResult.hasError())
+      << "close hit an error: " << closeResult.error().message;
 }
 
 folly::Expected<StreamId, LocalErrorCode>
@@ -3114,22 +3129,27 @@ void QuicTransportBaseLite::updateSocketTosSettings(uint8_t dscpValue) {
 
   if (socket_ && socket_->isBound() &&
       conn_->socketTos.value != initialTosValue) {
-    socket_->setTosOrTrafficClass(conn_->socketTos.value);
+    auto tosResult = socket_->setTosOrTrafficClass(conn_->socketTos.value);
+    if (tosResult.hasError()) {
+      exceptionCloseWhat_ = tosResult.error().message;
+      return closeImpl(tosResult.error());
+    }
   }
 }
 
-void QuicTransportBaseLite::validateECNState() {
+folly::Expected<folly::Unit, QuicError>
+QuicTransportBaseLite::validateECNState() {
   if (conn_->ecnState == ECNState::NotAttempted ||
       conn_->ecnState == ECNState::FailedValidation) {
     // Verification not needed
-    return;
+    return folly::unit;
   }
   const auto& minExpectedMarkedPacketsCount =
       conn_->ackStates.appDataAckState.minimumExpectedEcnMarksEchoed;
   if (minExpectedMarkedPacketsCount < 10) {
     // We wait for 10 ack-eliciting app data packets to be marked before trying
     // to validate ECN.
-    return;
+    return folly::unit;
   }
   const auto& maxExpectedMarkedPacketsCount = conn_->lossState.totalPacketsSent;
 
@@ -3189,7 +3209,11 @@ void QuicTransportBaseLite::validateECNState() {
   if (conn_->ecnState == ECNState::FailedValidation) {
     conn_->socketTos.fields.ecn = 0;
     CHECK(socket_ && socket_->isBound());
-    socket_->setTosOrTrafficClass(conn_->socketTos.value);
+    auto result = socket_->setTosOrTrafficClass(conn_->socketTos.value);
+    if (result.hasError()) {
+      return result;
+    }
+
     VLOG(4) << "ECN validation failed. Disabling ECN";
     if (conn_->ecnL4sTracker) {
       conn_->packetProcessors.erase(
@@ -3201,6 +3225,7 @@ void QuicTransportBaseLite::validateECNState() {
       conn_->ecnL4sTracker.reset();
     }
   }
+  return folly::unit;
 }
 
 void QuicTransportBaseLite::scheduleAckTimeout() {
@@ -3335,7 +3360,7 @@ QuicSocketLite::TransportInfo QuicTransportBaseLite::getTransportInfo() const {
 }
 
 const folly::SocketAddress& QuicTransportBaseLite::getLocalAddress() const {
-  return socket_ && socket_->isBound() ? socket_->address()
+  return socket_ && socket_->isBound() ? socket_->addressRef()
                                        : localFallbackAddress;
 }
 

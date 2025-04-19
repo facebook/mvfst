@@ -67,7 +67,9 @@ QuicServerTransport::QuicServerTransport(
           .setFizzServerContext(ctx_)
           .setCryptoFactory(std::move(cryptoFactory))
           .build());
-  tempConn->serverAddr = socket_->address();
+  auto addrResult = socket_->address();
+  CHECK(addrResult.hasValue());
+  tempConn->serverAddr = addrResult.value();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());
   conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
@@ -465,7 +467,7 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     VLOG(4) << "onCryptoEventAvailable() error " << ex.what() << " " << *this;
     closeImpl(QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const std::exception& ex) {
-    VLOG(4) << "read() error " << ex.what() << " " << *this;
+    LOG(ERROR) << "read() error " << ex.what() << " " << *this;
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string(ex.what())));

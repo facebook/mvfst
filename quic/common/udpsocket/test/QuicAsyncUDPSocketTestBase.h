@@ -16,7 +16,7 @@ class QuicAsyncUDPSocketTestBase : public testing::Test {
   void SetUp() override {
     udpSocket_ = T::makeQuicAsyncUDPSocket();
     addr_ = folly::SocketAddress("127.0.0.1", 0);
-    udpSocket_->bind(addr_);
+    CHECK(!udpSocket_->bind(addr_).hasError());
 
     // For QUIC, we're only interested in the shouldOnlyNotify path.
     EXPECT_CALL(readCb_, shouldOnlyNotify())
@@ -40,7 +40,8 @@ TYPED_TEST_SUITE_P(QuicAsyncUDPSocketTest);
 TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   this->udpSocket_->resumeRead(&this->readCb_);
-  this->udpSocket_->setErrMessageCallback(&this->errCb_);
+  ASSERT_FALSE(
+      this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
 
   folly::SocketAddress addr("127.0.0.1", 10000);
   bool errRecvd = false;
@@ -76,8 +77,9 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   this->udpSocket_->resumeRead(&this->readCb_);
-  this->udpSocket_->setErrMessageCallback(&this->errCb_);
-  this->udpSocket_->setErrMessageCallback(nullptr);
+  ASSERT_FALSE(
+      this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
+  ASSERT_FALSE(this->udpSocket_->setErrMessageCallback(nullptr).hasError());
   folly::SocketAddress addr("127.0.0.1", 10000);
   EXPECT_CALL(this->errCb_, errMessage_(testing::_)).Times(0);
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
@@ -113,7 +115,8 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
 TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   this->udpSocket_->resumeRead(&this->readCb_);
-  this->udpSocket_->setErrMessageCallback(&this->errCb_);
+  ASSERT_FALSE(
+      this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
 
   folly::SocketAddress addr("127.0.0.1", 10000);
   bool errRecvd = false;
@@ -123,7 +126,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
   EXPECT_CALL(this->errCb_, errMessage_(testing::_))
       .WillOnce(testing::Invoke([this, &errRecvd, &evb](auto&) {
         errRecvd = true;
-        this->udpSocket_->close();
+        ASSERT_FALSE(this->udpSocket_->close().hasError());
         evb->terminateLoopSoon();
       }));
 

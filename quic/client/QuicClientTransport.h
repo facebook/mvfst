@@ -101,22 +101,22 @@ class QuicClientTransport : public QuicTransportBase,
     return wrappedObserverContainer_.getPtr();
   }
 
-  void readWithRecvmmsgWrapper(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmmsgWrapper(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
-  void readWithRecvmmsg(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
-  void readWithRecvfrom(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvfrom(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
-  void readWithRecvmsg(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);

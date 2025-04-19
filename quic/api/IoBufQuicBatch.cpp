@@ -24,14 +24,19 @@ IOBufQuicBatch::IOBufQuicBatch(
       statsCallback_(statsCallback),
       happyEyeballsState_(happyEyeballsState) {}
 
-bool IOBufQuicBatch::write(Buf&& buf, size_t encodedSize) {
+folly::Expected<bool, QuicError> IOBufQuicBatch::write(
+    Buf&& buf,
+    size_t encodedSize) {
   result_.packetsSent++;
   result_.bytesSent += encodedSize;
 
   // see if we need to flush the prev buffer(s)
   if (batchWriter_->needsFlush(encodedSize)) {
     // continue even if we get an error here
-    flush();
+    auto result = flush();
+    if (result.hasError()) {
+      return result;
+    }
   }
 
   // try to append the new buffers
@@ -43,8 +48,8 @@ bool IOBufQuicBatch::write(Buf&& buf, size_t encodedSize) {
   return true;
 }
 
-bool IOBufQuicBatch::flush() {
-  bool ret = flushInternal();
+folly::Expected<bool, QuicError> IOBufQuicBatch::flush() {
+  auto ret = flushInternal();
   reset();
 
   return ret;
@@ -58,7 +63,7 @@ bool IOBufQuicBatch::isRetriableError(int err) {
   return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS;
 }
 
-bool IOBufQuicBatch::flushInternal() {
+folly::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
   if (batchWriter_->empty()) {
     return true;
   }
@@ -148,13 +153,13 @@ bool IOBufQuicBatch::flushInternal() {
     // We can get write error for any reason, close the conn only if network
     // is unreachable, for all others, we throw a transport exception
     if (isNetworkUnreachable(errno)) {
-      throw QuicInternalException(
-          folly::to<std::string>("Error on socket write ", errorMsg),
-          LocalErrorCode::CONNECTION_ABANDONED);
+      return folly::makeUnexpected(QuicError(
+          LocalErrorCode::CONNECTION_ABANDONED,
+          folly::to<std::string>("Error on socket write ", errorMsg)));
     } else {
-      throw QuicTransportException(
-          folly::to<std::string>("Error on socket write ", errorMsg),
-          TransportErrorCode::INTERNAL_ERROR);
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::INTERNAL_ERROR,
+          folly::to<std::string>("Error on socket write ", errorMsg)));
     }
   }
 

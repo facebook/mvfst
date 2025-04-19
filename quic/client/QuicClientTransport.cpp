@@ -26,7 +26,7 @@ QuicClientTransport::~QuicClientTransport() {
   if (clientConn_->happyEyeballsState.secondSocket) {
     auto sock = std::move(clientConn_->happyEyeballsState.secondSocket);
     sock->pauseRead();
-    sock->close();
+    (void)sock->close();
   }
 }
 
@@ -43,20 +43,26 @@ void QuicClientTransport::onNotifyDataAvailable(
       ? conn_->transportSettings.readCoalescingSize
       : readBufferSize;
 
-  if (conn_->transportSettings.networkDataPerSocketRead) {
-    readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
-  } else if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
-    readWithRecvmmsgWrapper(sock, readAllocSize, numPackets);
-  } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
-    readWithRecvmmsg(sock, readAllocSize, numPackets);
-  } else if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
-    readWithRecvfrom(sock, readAllocSize, numPackets);
-  } else {
-    readWithRecvmsg(sock, readAllocSize, numPackets);
+  auto result = [&]() -> folly::Expected<folly::Unit, QuicError> {
+    if (conn_->transportSettings.networkDataPerSocketRead) {
+      return readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
+    } else if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
+      return readWithRecvmmsgWrapper(sock, readAllocSize, numPackets);
+    } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
+      return readWithRecvmmsg(sock, readAllocSize, numPackets);
+    } else if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
+      return readWithRecvfrom(sock, readAllocSize, numPackets);
+    } else {
+      return readWithRecvmsg(sock, readAllocSize, numPackets);
+    }
+  }();
+  if (result.hasError()) {
+    asyncClose(result.error());
   }
 }
 
-void QuicClientTransport::readWithRecvmmsgWrapper(
+folly::Expected<folly::Unit, QuicError>
+QuicClientTransport::readWithRecvmmsgWrapper(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -67,6 +73,10 @@ void QuicClientTransport::readWithRecvmmsgWrapper(
 
   const auto result = sock.recvmmsgNetworkData(
       readBufferSize, numPackets, networkData, server, totalData);
+
+  if (result.hasError()) {
+    return folly::makeUnexpected(result.error());
+  }
 
   // track the received packets
   for (const auto& packet : networkData.getPackets()) {
@@ -82,8 +92,8 @@ void QuicClientTransport::readWithRecvmmsgWrapper(
   // Propagate errors
   // TODO(bschlinker): Investigate generalization of loopDetectorCallback
   // TODO(bschlinker): Consider merging this into ReadCallback
-  if (result.maybeNoReadReason) {
-    const auto& noReadReason = result.maybeNoReadReason.value();
+  if (result->maybeNoReadReason) {
+    const auto& noReadReason = result->maybeNoReadReason.value();
     switch (noReadReason) {
       case NoReadReason::RETRIABLE_ERROR:
         if (conn_->loopDetectorCallback) {
@@ -109,10 +119,10 @@ void QuicClientTransport::readWithRecvmmsgWrapper(
         break;
     }
   }
-  processPackets(std::move(networkData), server);
+  return processPackets(std::move(networkData), server);
 }
 
-void QuicClientTransport::readWithRecvmmsg(
+folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -123,12 +133,16 @@ void QuicClientTransport::readWithRecvmmsg(
 
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   recvmmsgStorage_.resize(numPackets);
-  recvMmsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  auto recvResult = recvMmsg(
+      sock, readBufferSize, numPackets, networkData, server, totalData);
+  if (recvResult.hasError()) {
+    return recvResult;
+  }
 
-  processPackets(std::move(networkData), server);
+  return processPackets(std::move(networkData), server);
 }
 
-void QuicClientTransport::readWithRecvfrom(
+folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvfrom(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -136,11 +150,15 @@ void QuicClientTransport::readWithRecvfrom(
   networkData.reserve(numPackets);
   size_t totalData = 0;
   Optional<folly::SocketAddress> server;
-  recvFrom(sock, readBufferSize, numPackets, networkData, server, totalData);
-  processPackets(std::move(networkData), server);
+  auto recvResult = recvFrom(
+      sock, readBufferSize, numPackets, networkData, server, totalData);
+  if (recvResult.hasError()) {
+    return recvResult;
+  }
+  return processPackets(std::move(networkData), server);
 }
 
-void QuicClientTransport::readWithRecvmsg(
+folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -150,9 +168,13 @@ void QuicClientTransport::readWithRecvmsg(
   Optional<folly::SocketAddress> server;
 
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
-  recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  auto recvResult =
+      recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  if (recvResult.hasError()) {
+    return recvResult;
+  }
 
-  processPackets(std::move(networkData), server);
+  return processPackets(std::move(networkData), server);
 }
 
 } // namespace quic

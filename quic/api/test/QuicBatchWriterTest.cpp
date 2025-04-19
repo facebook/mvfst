@@ -65,8 +65,10 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBase) {
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
-  gsoSupported_ = sock.getGSO() >= 0;
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  auto gsoResult = sock.getGSO();
+  ASSERT_FALSE(gsoResult.hasError());
+  gsoSupported_ = gsoResult.value();
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -95,8 +97,10 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
-  gsoSupported_ = sock.getGSO() >= 0;
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  auto gsoResult = sock.getGSO();
+  ASSERT_FALSE(gsoResult.hasError());
+  gsoSupported_ = gsoResult.value();
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -137,8 +141,10 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
-  gsoSupported_ = sock.getGSO() >= 0;
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  auto gsoResult = sock.getGSO();
+  ASSERT_FALSE(gsoResult.hasError());
+  gsoSupported_ = gsoResult.value();
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -174,8 +180,10 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
-  gsoSupported_ = sock.getGSO() >= 0;
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  auto gsoResult = sock.getGSO();
+  ASSERT_FALSE(gsoResult.hasError());
+  gsoSupported_ = gsoResult.value();
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_GSO,
@@ -475,8 +483,10 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
-  gsoSupported_ = sock.getGSO() >= 0;
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  auto gsoResult = sock.getGSO();
+  ASSERT_FALSE(gsoResult.hasError());
+  gsoSupported_ = gsoResult.value();
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,
@@ -521,8 +531,10 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
   sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
-  gsoSupported_ = sock.getGSO() >= 0;
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  auto gsoResult = sock.getGSO();
+  ASSERT_FALSE(gsoResult.hasError());
+  gsoSupported_ = gsoResult.value();
 
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO,

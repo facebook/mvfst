@@ -34,20 +34,25 @@ class QuicClientTransportMock : public QuicClientTransport {
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets) {
-    QuicClientTransport::readWithRecvmsg(sock, readBufferSize, numPackets);
+    CHECK(
+        !QuicClientTransport::readWithRecvmsg(sock, readBufferSize, numPackets)
+             .hasError());
   }
 
   void readWithRecvmsgSinglePacketLoop(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize) {
-    QuicClientTransport::readWithRecvmsgSinglePacketLoop(sock, readBufferSize);
+    CHECK(!QuicClientTransport::readWithRecvmsgSinglePacketLoop(
+               sock, readBufferSize)
+               .hasError());
   }
 
-  void processPackets(
+  folly::Expected<folly::Unit, QuicError> processPackets(
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server) override {
     networkDataVec_.push_back(std::move(networkData));
     server_ = server;
+    return folly::unit;
   }
 
   QuicClientConnectionState* getClientConn() {
@@ -64,6 +69,44 @@ class QuicClientTransportTest : public Test {
     evb_ = std::make_shared<QuicEventBaseMock>();
     auto sock = std::make_unique<QuicAsyncUDPSocketMock>();
     sockPtr_ = sock.get();
+    ON_CALL(*sock, setReuseAddr(_)).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setAdditionalCmsgsFunc(_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setDFAndTurnOffPMTU())
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setErrMessageCallback(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setTosOrTrafficClass(_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, init(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, applyOptions(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, bind(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, connect(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, close()).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setGRO(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, getGRO()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, getGSO()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, setRecvTos(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, getRecvTos()).WillByDefault(testing::Return(false));
+    ON_CALL(*sock, setCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, appendCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, getTimestamping()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, setReusePort(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setRcvBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setSndBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setFD(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
 
     mockFactory_ = std::make_shared<MockClientHandshakeFactory>();
     EXPECT_CALL(*mockFactory_, _makeClientHandshake(_))

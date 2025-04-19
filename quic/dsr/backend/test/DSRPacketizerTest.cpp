@@ -92,7 +92,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
           dcid.size() /* dcid */ + 1 /* stream frame initial byte */ +
           1 /* stream id */ + length /* actual data */ +
           aead->getCipherOverhead());
-  packetGroupWriter.getIOBufQuicBatch().flush();
+  ASSERT_FALSE(packetGroupWriter.getIOBufQuicBatch().flush().hasError());
   EXPECT_EQ(1, packetGroupWriter.getIOBufQuicBatch().getPktSent());
 }
 
@@ -122,7 +122,7 @@ TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
       eof,
       folly::IOBuf::copyBuffer("Clif"));
   EXPECT_FALSE(ret);
-  packetGroupWriter.getIOBufQuicBatch().flush();
+  ASSERT_FALSE(packetGroupWriter.getIOBufQuicBatch().flush().hasError());
   EXPECT_EQ(0, packetGroupWriter.getIOBufQuicBatch().getPktSent());
 }
 
@@ -208,8 +208,8 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
       requests, [](const PacketizationRequest& req) {
         return buildRandomInputData(req.len);
       });
-  EXPECT_EQ(2, result.packetsSent);
-  EXPECT_EQ(2, sentData.size());
+  ASSERT_EQ(2, result.packetsSent);
+  ASSERT_EQ(2, sentData.size());
   EXPECT_GT(sentData[0]->computeChainDataLength(), 500);
   EXPECT_GT(sentData[1]->computeChainDataLength(), 500);
 }

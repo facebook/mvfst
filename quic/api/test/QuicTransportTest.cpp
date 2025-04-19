@@ -75,6 +75,23 @@ class QuicTransportTest : public Test {
     std::unique_ptr<MockAsyncUDPSocket> sock =
         std::make_unique<NiceMock<MockAsyncUDPSocket>>(qEvb_);
     socket_ = sock.get();
+    ON_CALL(*socket_, setAdditionalCmsgsFunc(_))
+        .WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setTosOrTrafficClass(_))
+        .WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, close()).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, getGSO()).WillByDefault(Return(0));
+    ON_CALL(*socket_, init(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, bind(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, connect(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setRecvTos(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setReuseAddr(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setReusePort(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setRcvBuf(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setSndBuf(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, setErrMessageCallback(_))
+        .WillByDefault(Return(folly::unit));
+    ON_CALL(*socket_, applyOptions(_, _)).WillByDefault(Return(folly::unit));
     transport_.reset(new TestQuicTransport(
         qEvb_, std::move(sock), &connSetupCallback_, &connCallback_));
     // Set the write handshake state to tell the client that the handshake has

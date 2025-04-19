@@ -18,7 +18,9 @@ class MockQuicAsyncUDPSocket : public quic::FollyQuicAsyncUDPSocket {
 
   MOCK_METHOD2(
       applyOptions,
-      void(const folly::SocketOptionMap&, folly::SocketOptionKey::ApplyPos));
+      folly::Expected<folly::Unit, quic::QuicError>(
+          const folly::SocketOptionMap&,
+          folly::SocketOptionKey::ApplyPos));
 };
 
 TEST(SocketUtilTest, applySocketOptions) {
@@ -75,12 +77,11 @@ TEST(SocketUtilTest, applySocketOptions) {
       {{IPPROTO_UDP, TCP_MAXSEG, folly::SocketOptionKey::ApplyPos::POST_BIND},
        576},
   };
-
   EXPECT_CALL(
       sock,
       applyOptions(
           expected_v4_prebind_opts, folly::SocketOptionKey::ApplyPos::PRE_BIND))
-      .Times(1);
+      .WillOnce(testing::Return(folly::unit));
   applySocketOptions(
       sock, opts, AF_INET, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   EXPECT_CALL(
@@ -88,14 +89,14 @@ TEST(SocketUtilTest, applySocketOptions) {
       applyOptions(
           expected_v4_postbind_opts,
           folly::SocketOptionKey::ApplyPos::POST_BIND))
-      .Times(1);
+      .WillOnce(testing::Return(folly::unit));
   applySocketOptions(
       sock, opts, AF_INET, folly::SocketOptionKey::ApplyPos::POST_BIND);
   EXPECT_CALL(
       sock,
       applyOptions(
           expected_v6_prebind_opts, folly::SocketOptionKey::ApplyPos::PRE_BIND))
-      .Times(1);
+      .WillOnce(testing::Return(folly::unit));
   applySocketOptions(
       sock, opts, AF_INET6, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   EXPECT_CALL(
@@ -103,7 +104,7 @@ TEST(SocketUtilTest, applySocketOptions) {
       applyOptions(
           expected_v6_postbind_opts,
           folly::SocketOptionKey::ApplyPos::POST_BIND))
-      .Times(1);
+      .WillOnce(testing::Return(folly::unit));
   applySocketOptions(
       sock, opts, AF_INET6, folly::SocketOptionKey::ApplyPos::POST_BIND);
 }

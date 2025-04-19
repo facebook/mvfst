@@ -165,6 +165,7 @@ class QuicClientTransportLite
   void unbindConnection() override;
   bool hasWriteCipher() const override;
   std::shared_ptr<QuicTransportBaseLite> sharedGuard() override;
+  std::shared_ptr<QuicClientTransportLite> sharedGuardClient();
 
   // QuicAsyncUDPSocket::ReadCallback
   void onReadClosed() noexcept override {}
@@ -283,8 +284,7 @@ class QuicClientTransportLite
       OnDataAvailableParams params) noexcept override;
   bool shouldOnlyNotify() override;
   void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
-
-  void recvFrom(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvFrom(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       int numPackets,
@@ -292,14 +292,15 @@ class QuicClientTransportLite
       Optional<folly::SocketAddress>& server,
       size_t& totalData);
 
-  void recvMsg(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvMsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       int numPackets,
       NetworkData& networkData,
       Optional<folly::SocketAddress>& server,
       size_t& totalData);
-  void recvMmsg(
+
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvMmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets,
@@ -353,11 +354,12 @@ class QuicClientTransportLite
       const QuicWriteFrame& packetFrame,
       const ReadAckFrame&);
 
-  virtual void processPackets(
+  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> processPackets(
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server);
 
-  void readWithRecvmsgSinglePacketLoop(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  readWithRecvmsgSinglePacketLoop(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize);
 
@@ -370,6 +372,8 @@ class QuicClientTransportLite
   void maybeQlogDatagram(size_t len);
 
   void trackDatagramsReceived(uint32_t totalPackets, uint32_t totalPacketLen);
+
+  void asyncClose(QuicError error);
 
   // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
   // supports GRO. otherwise kDefaultNumGROBuffers
@@ -394,13 +398,16 @@ class QuicClientTransportLite
   RecvmmsgStorage recvmmsgStorage_;
 
  private:
-  void adjustGROBuffers();
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> adjustGROBuffers();
+
+  void runOnEvbAsync(
+      folly::Function<void(std::shared_ptr<QuicClientTransportLite>)> func);
 
   /**
    * Send quic transport knobs defined by transportSettings.knobs to peer. This
    * calls setKnobs() internally.
    */
-  void maybeSendTransportKnobs();
+  folly::Expected<folly::Unit, QuicError> maybeSendTransportKnobs();
 
   bool replaySafeNotified_{false};
   // Set it QuicClientTransportLite is in a self owning mode. This will be

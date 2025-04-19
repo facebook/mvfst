@@ -5,15 +5,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/Expected.h>
+#include <folly/String.h>
+#include <folly/lang/Exception.h> // For folly::errnoStr
+#include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/Optional.h>
 #include <quic/common/udpsocket/LibevQuicAsyncUDPSocket.h>
 
 #include <cstring>
 
-#include <stdexcept>
-
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <sys/errno.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -34,7 +37,12 @@ LibevQuicAsyncUDPSocket::LibevQuicAsyncUDPSocket(
 
 LibevQuicAsyncUDPSocket::~LibevQuicAsyncUDPSocket() {
   if (fd_ != -1) {
-    LibevQuicAsyncUDPSocket::close();
+    // Use folly::Expected result even in destructor? Best effort close.
+    auto closeResult = LibevQuicAsyncUDPSocket::close();
+    if (closeResult.hasError()) {
+      LOG(ERROR) << "Error closing socket in destructor: "
+                 << closeResult.error().message;
+    }
   }
   if (evb_) {
     ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
@@ -58,10 +66,11 @@ void LibevQuicAsyncUDPSocket::resumeRead(ReadCallback* cb) {
   CHECK(cb) << "A non-null callback is required to resume read";
   readCallback_ = cb;
   addEvent(EV_READ);
+  // TODO: This should return Expected<Unit, QuicError>
 }
 
-folly::Expected<folly::Unit, folly::AsyncSocketException>
-LibevQuicAsyncUDPSocket::resumeWrite(WriteCallback* cob) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::resumeWrite(
+    WriteCallback* cob) {
   CHECK(!writeCallback_) << "A write callback is already installed";
   CHECK_NE(fd_, -1)
       << "Socket must be initialized before a write callback is attached";
@@ -81,8 +90,11 @@ ssize_t LibevQuicAsyncUDPSocket::write(
     const struct iovec* vec,
     size_t iovec_len) {
   if (fd_ == -1) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_OPEN, "socket is not initialized");
+    // Return error consistent with syscall failure on bad FD
+    errno = EBADF;
+    LOG(ERROR)
+        << "LibevQuicAsyncUDPSocket::write failed: socket not initialized";
+    return -1;
   }
   sockaddr_storage addrStorage;
   address.getAddress(&addrStorage);
@@ -94,9 +106,12 @@ ssize_t LibevQuicAsyncUDPSocket::write(
     msg.msg_namelen = address.getActualSize();
   } else {
     if (connectedAddress_ != address) {
-      throw folly::AsyncSocketException(
-          folly::AsyncSocketException::BAD_ARGS,
-          "wrong destination address for connected socket");
+      // Return error consistent with syscall failure for wrong address on
+      // connected socket
+      errno = EINVAL; // Or maybe EISCONN? EINVAL seems appropriate.
+      LOG(ERROR)
+          << "LibevQuicAsyncUDPSocket::write failed: wrong destination for connected socket";
+      return -1;
     }
     msg.msg_name = nullptr;
     msg.msg_namelen = 0;
@@ -111,36 +126,47 @@ ssize_t LibevQuicAsyncUDPSocket::write(
   return ::sendmsg(fd_, &msg, msg_flags);
 }
 
-int LibevQuicAsyncUDPSocket::getGSO() {
+folly::Expected<int, QuicError> LibevQuicAsyncUDPSocket::getGSO() {
   // TODO: Implement GSO
   return -1;
 }
 
 int LibevQuicAsyncUDPSocket::writem(
-    folly::Range<folly::SocketAddress const*>,
-    iovec*,
-    size_t*,
-    size_t) {
+    folly::Range<folly::SocketAddress const*> /*addrs*/,
+    iovec* /*iov*/,
+    size_t* /*numIovecsInBuffer*/,
+    size_t /*count*/) {
   LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
   return -1;
 }
 
-void LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
+folly::Expected<folly::Unit, QuicError>
+LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
     folly::Function<Optional<folly::SocketCmsgMap>()>&&
     /* additionalCmsgsFunc */) {
   LOG(WARNING)
       << "Setting an additional cmsgs function is not implemented for LibevQuicAsyncUDPSocket";
+  // Return success despite warning, or error if strictness needed
+  return folly::unit;
 }
 
 bool LibevQuicAsyncUDPSocket::isBound() const {
   return bound_;
 }
 
-const folly::SocketAddress& LibevQuicAsyncUDPSocket::address() const {
+folly::Expected<folly::SocketAddress, QuicError>
+LibevQuicAsyncUDPSocket::address() const {
   if (!bound_) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_OPEN, "socket is not bound");
+    // Return error if not bound
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "socket is not bound"));
   }
+  return localAddress_;
+}
+
+const folly::SocketAddress& LibevQuicAsyncUDPSocket::addressRef() const {
+  LOG_IF(FATAL, !bound_) << "socket is not bound";
   return localAddress_;
 }
 
@@ -154,7 +180,7 @@ LibevQuicAsyncUDPSocket::getEventBase() const {
   return evb_;
 }
 
-void LibevQuicAsyncUDPSocket::close() {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::close() {
   CHECK(evb_->isInEventBaseThread());
 
   if (readCallback_) {
@@ -167,88 +193,117 @@ void LibevQuicAsyncUDPSocket::close() {
   removeEvent(EV_READ | EV_WRITE);
 
   if (fd_ != -1 && ownership_ == FDOwnership::OWNS) {
-    ::close(fd_);
+    if (::close(fd_) != 0) {
+      int errnoCopy = errno;
+      fd_ = -1; // Mark as closed even if error occurred
+      std::string errorMsg =
+          "Failed to close socket: " + folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
+    }
   }
 
   fd_ = -1;
+  bound_ = false; // Reset state
+  connected_ = false;
+  return folly::unit;
 }
 
 void LibevQuicAsyncUDPSocket::detachEventBase() {
   LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
 }
 
-void LibevQuicAsyncUDPSocket::setCmsgs(
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::setCmsgs(
     const folly::SocketCmsgMap& /* cmsgs */) {
-  throw std::runtime_error("setCmsgs is not implemented.");
+  return folly::makeUnexpected(QuicError(
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+      "setCmsgs is not implemented."));
 }
 
-void LibevQuicAsyncUDPSocket::appendCmsgs(
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::appendCmsgs(
     const folly::SocketCmsgMap& /* cmsgs */) {
-  throw std::runtime_error("appendCmsgs is not implemented.");
+  return folly::makeUnexpected(QuicError(
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+      "appendCmsgs is not implemented."));
 }
 
-void LibevQuicAsyncUDPSocket::init(sa_family_t family) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::init(
+    sa_family_t family) {
   if (fd_ != -1) {
     // Socket already initialized.
-    return;
+    return folly::unit;
   }
 
   if (family != AF_INET && family != AF_INET6) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_SUPPORTED,
-        "address family not supported");
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "address family not supported"));
   }
 
   int fd = ::socket(family, SOCK_DGRAM, IPPROTO_UDP);
   if (fd == -1) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_OPEN, "error creating socket", errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "error creating socket: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
 
-  SCOPE_FAIL {
-    ::close(fd);
-  };
+  // Use RAII to ensure socket is closed on error
+  auto fdGuard = folly::makeGuard([fd] { ::close(fd); });
 
   int flags = fcntl(fd, F_GETFL, 0);
   if (flags == -1) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error getting socket flags",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "error getting socket flags: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
   if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) != 0) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error setting socket nonblocking flag",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "error setting socket nonblocking flag: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
 
   int sockOptVal = 1;
   if (reuseAddr_ &&
       ::setsockopt(
           fd, SOL_SOCKET, SO_REUSEADDR, &sockOptVal, sizeof(sockOptVal)) != 0) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error setting reuse address on socket",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "error setting reuse address on socket: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
   if (reusePort_ &&
       ::setsockopt(
           fd, SOL_SOCKET, SO_REUSEPORT, &sockOptVal, sizeof(sockOptVal)) != 0) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error setting reuse port on socket",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "error setting reuse port on socket: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
 
   if (rcvBuf_ > 0) {
     // Set the size of the buffer for the received messages in rx_queues.
     int value = rcvBuf_;
     if (::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value)) != 0) {
-      throw folly::AsyncSocketException(
-          folly::AsyncSocketException::NOT_OPEN,
-          "failed to set SO_RCVBUF on the socket",
-          errno);
+      int errnoCopy = errno;
+      std::string errorMsg = "failed to set SO_RCVBUF on the socket: " +
+          folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
     }
   }
 
@@ -256,28 +311,38 @@ void LibevQuicAsyncUDPSocket::init(sa_family_t family) {
     // Set the size of the buffer for the sent messages in tx_queues.
     int value = sndBuf_;
     if (::setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &value, sizeof(value)) != 0) {
-      throw folly::AsyncSocketException(
-          folly::AsyncSocketException::NOT_OPEN,
-          "failed to set SO_SNDBUF on the socket",
-          errno);
+      int errnoCopy = errno;
+      std::string errorMsg = "failed to set SO_SNDBUF on the socket: " +
+          folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
     }
   }
 
   fd_ = fd;
   ownership_ = FDOwnership::OWNS;
+  fdGuard.dismiss(); // Don't close the fd now that we've stored it
 
   // Update the watchers
   removeEvent(EV_READ | EV_WRITE);
   ev_io_set(&readWatcher_, fd_, EV_READ);
   ev_io_set(&writeWatcher_, fd_, EV_WRITE);
+
+  return folly::unit;
 }
 
-void LibevQuicAsyncUDPSocket::bind(const folly::SocketAddress& address) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::bind(
+    const folly::SocketAddress& address) {
   // TODO: remove dependency on folly::SocketAdress since this pulls in
   // folly::portability and other headers which should be avoidable.
   if (fd_ == -1) {
-    init(address.getFamily());
+    auto initResult = init(address.getFamily());
+    if (initResult.hasError()) {
+      return initResult;
+    }
   }
+
   // bind to the address
   sockaddr_storage addrStorage;
   address.getAddress(&addrStorage);
@@ -287,38 +352,50 @@ void LibevQuicAsyncUDPSocket::bind(const folly::SocketAddress& address) {
           (struct sockaddr*)&saddr,
           saddr.sa_family == AF_INET6 ? sizeof(sockaddr_in6)
                                       : sizeof(sockaddr_in)) != 0) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error binding socket to " + address.describe(),
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg = "error binding socket to " + address.describe() +
+        ": " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
 
   memset(&saddr, 0, sizeof(saddr));
   socklen_t len = sizeof(saddr);
   if (::getsockname(fd_, &saddr, &len) != 0) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error retrieving local address",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "error retrieving local address: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
 
   localAddress_.setFromSockaddr(&saddr, len);
   bound_ = true;
+
+  return folly::unit;
 }
 
-void LibevQuicAsyncUDPSocket::connect(const folly::SocketAddress& address) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::connect(
+    const folly::SocketAddress& address) {
   if (fd_ == -1) {
-    init(address.getFamily());
+    auto initResult = init(address.getFamily());
+    if (initResult.hasError()) {
+      return initResult;
+    }
   }
 
   sockaddr_storage addrStorage;
   address.getAddress(&addrStorage);
   auto saddr = reinterpret_cast<sockaddr&>(addrStorage);
   if (::connect(fd_, &saddr, sizeof(saddr)) != 0) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "error connecting UDP socket to " + address.describe(),
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg = "Libev connect failed to " + address.describe();
+    errorMsg += ": " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
 
   connected_ = true;
@@ -328,20 +405,26 @@ void LibevQuicAsyncUDPSocket::connect(const folly::SocketAddress& address) {
     memset(&saddr, 0, sizeof(saddr));
     socklen_t len = sizeof(saddr);
     if (::getsockname(fd_, &saddr, &len) != 0) {
-      throw folly::AsyncSocketException(
-          folly::AsyncSocketException::INTERNAL_ERROR,
-          "error retrieving local address",
-          errno);
+      int errnoCopy = errno;
+      std::string errorMsg = "Libev getsockname failed after connect: " +
+          folly::errnoStr(errnoCopy);
+      // Connect succeeded, but getsockname failed.
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
     }
 
     localAddress_.setFromSockaddr(&saddr, len);
   }
+  return folly::unit;
 }
 
-void LibevQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
+folly::Expected<folly::Unit, QuicError>
+LibevQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
   if (fd_ == -1) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_OPEN, "socket is not initialized");
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "socket is not initialized"));
   }
   int optname4 = 0;
   int optval4 = 0;
@@ -355,26 +438,44 @@ void LibevQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
   optname6 = IPV6_MTU_DISCOVER;
   optval6 = IPV6_PMTUDISC_PROBE;
 #endif
-  if (optname4 && optval4 && address().getFamily() == AF_INET) {
+  auto familyResult = address(); // address() now returns Expected
+  if (familyResult.hasError()) {
+    return folly::makeUnexpected(familyResult.error());
+  }
+  sa_family_t family = familyResult->getFamily();
+
+  if (optname4 && optval4 && family == AF_INET) {
     if (::setsockopt(fd_, IPPROTO_IP, optname4, &optval4, sizeof(optval4))) {
-      throw folly::AsyncSocketException(
-          folly::AsyncSocketException::NOT_OPEN,
-          "failed to turn off PMTU discovery (IPv4)",
-          errno);
+      int errnoCopy = errno;
+      std::string errorMsg = "failed to turn off PMTU discovery (IPv4): " +
+          folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
     }
   }
-  if (optname6 && optval6 && address().getFamily() == AF_INET6) {
+  if (optname6 && optval6 && family == AF_INET6) {
     if (::setsockopt(fd_, IPPROTO_IPV6, optname6, &optval6, sizeof(optval6))) {
-      throw folly::AsyncSocketException(
-          folly::AsyncSocketException::NOT_OPEN,
-          "failed to turn off PMTU discovery (IPv6)",
-          errno);
+      int errnoCopy = errno;
+      std::string errorMsg = "failed to turn off PMTU discovery (IPv6): " +
+          folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
     }
   }
+  // If options are not defined for the family, we succeed silently.
+  return folly::unit;
 }
 
-void LibevQuicAsyncUDPSocket::setErrMessageCallback(
+folly::Expected<folly::Unit, QuicError>
+LibevQuicAsyncUDPSocket::setErrMessageCallback(
     ErrMessageCallback* errMessageCallback) {
+  if (fd_ == -1) {
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "socket not initialized for setErrMessageCallback"));
+  }
   errMessageCallback_ = errMessageCallback;
   int optname4 = 0;
   int optname6 = 0;
@@ -384,25 +485,36 @@ void LibevQuicAsyncUDPSocket::setErrMessageCallback(
 #if defined(IPV6_RECVERR)
   optname6 = IPV6_RECVERR;
 #endif
+  auto familyResult = address(); // address() now returns Expected
+  if (familyResult.hasError()) {
+    return folly::makeUnexpected(familyResult.error());
+  }
+  sa_family_t family = familyResult->getFamily();
+
   errMessageCallback_ = errMessageCallback;
   int err = (errMessageCallback_ != nullptr);
-  if (optname4 && address().getFamily() == AF_INET &&
+  if (optname4 && family == AF_INET &&
       ::setsockopt(fd_, IPPROTO_IP, optname4, &err, sizeof(err))) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_OPEN,
-        "Failed to set IP_RECVERR",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "Failed to set IP_RECVERR: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
-  if (optname6 && address().getFamily() == AF_INET6 &&
+  if (optname6 && family == AF_INET6 &&
       ::setsockopt(fd_, IPPROTO_IPV6, optname6, &err, sizeof(err))) {
-    throw folly::AsyncSocketException(
-        folly::AsyncSocketException::NOT_OPEN,
-        "Failed to set IPV6_RECVERR",
-        errno);
+    int errnoCopy = errno;
+    std::string errorMsg =
+        "Failed to set IPV6_RECVERR: " + folly::errnoStr(errnoCopy);
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
   }
+  return folly::unit;
 }
 
-int LibevQuicAsyncUDPSocket::getGRO() {
+folly::Expected<int, QuicError> LibevQuicAsyncUDPSocket::getGRO() {
   return -1;
 }
 
@@ -452,13 +564,22 @@ int LibevQuicAsyncUDPSocket::recvmmsg(
   return static_cast<int>(vlen);
 }
 
-bool LibevQuicAsyncUDPSocket::setGRO(bool /* bVal */) {
-  return false;
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::setGRO(
+    bool /* bVal */) {
+  // Not supported, return error
+  return folly::makeUnexpected(QuicError(
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+      "setGRO not supported"));
 }
 
-void LibevQuicAsyncUDPSocket::applyOptions(
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::applyOptions(
     const folly::SocketOptionMap& options,
     folly::SocketOptionKey::ApplyPos pos) {
+  if (fd_ == -1) {
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "socket not initialized for applyOptions"));
+  }
   for (const auto& opt : options) {
     if (opt.first.applyPos_ == pos) {
       if (::setsockopt(
@@ -467,18 +588,37 @@ void LibevQuicAsyncUDPSocket::applyOptions(
               opt.first.optname,
               &opt.second,
               sizeof(opt.second)) != 0) {
-        throw folly::AsyncSocketException(
-            folly::AsyncSocketException::INTERNAL_ERROR,
-            "failed to apply socket options",
-            errno);
+        int errnoCopy = errno;
+        std::string errorMsg =
+            "failed to apply socket options: " + folly::errnoStr(errnoCopy);
+        return folly::makeUnexpected(QuicError(
+            QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+            std::move(errorMsg)));
       }
     }
   }
+  return folly::unit;
 }
 
-void LibevQuicAsyncUDPSocket::setFD(int fd, FDOwnership ownership) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::setFD(
+    int fd,
+    FDOwnership ownership) {
+  // TODO: Check if fd is valid? setsockopt?
+  // TODO: Close existing fd_ if owned?
+  if (fd_ != -1 && ownership_ == FDOwnership::OWNS) {
+    LOG(WARNING) << "Closing existing owned FD in setFD";
+    auto closeRes = close(); // Close existing owned FD
+    if (closeRes.hasError()) {
+      // Log error but continue trying to set the new FD
+      LOG(ERROR) << "Failed to close existing FD in setFD: "
+                 << closeRes.error().message;
+    }
+  }
+
   fd_ = fd;
   ownership_ = ownership;
+  bound_ = false; // Assume not bound until checked/bind called
+  connected_ = false; // Assume not connected
 
   // Update the watchers
   removeEvent(EV_READ | EV_WRITE);
@@ -491,6 +631,9 @@ void LibevQuicAsyncUDPSocket::setFD(int fd, FDOwnership ownership) {
   if (writeCallback_) {
     addEvent(EV_WRITE);
   }
+  // TODO: Check if the FD is actually usable? Maybe getsockopt?
+  // For now, assume success if we reach here.
+  return folly::unit;
 }
 
 int LibevQuicAsyncUDPSocket::getFD() {
@@ -628,12 +771,59 @@ void LibevQuicAsyncUDPSocket::sockEventsWatcherCallback(
   }
 }
 
-void LibevQuicAsyncUDPSocket::setRcvBuf(int rcvBuf) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::setRcvBuf(
+    int rcvBuf) {
   rcvBuf_ = rcvBuf;
+  if (fd_ != -1) {
+    // Apply immediately if socket exists
+    int value = rcvBuf_;
+    if (::setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value)) != 0) {
+      int errnoCopy = errno;
+      std::string errorMsg =
+          "failed to set SO_RCVBUF: " + folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
+    }
+  }
+  return folly::unit;
 }
 
-void LibevQuicAsyncUDPSocket::setSndBuf(int sndBuf) {
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::setSndBuf(
+    int sndBuf) {
   sndBuf_ = sndBuf;
+  if (fd_ != -1) {
+    // Apply immediately if socket exists
+    int value = sndBuf_;
+    if (::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &value, sizeof(value)) != 0) {
+      int errnoCopy = errno;
+      std::string errorMsg =
+          "failed to set SO_SNDBUF: " + folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
+    }
+  }
+  return folly::unit;
+}
+
+folly::Expected<folly::Unit, QuicError> LibevQuicAsyncUDPSocket::setReuseAddr(
+    bool reuseAddr) {
+  reuseAddr_ = reuseAddr;
+  if (fd_ != -1) {
+    int sockOptVal = reuseAddr ? 1 : 0;
+    if (::setsockopt(
+            fd_, SOL_SOCKET, SO_REUSEADDR, &sockOptVal, sizeof(sockOptVal)) !=
+        0) {
+      int errnoCopy = errno;
+      std::string errorMsg =
+          "failed to set SO_REUSEADDR: " + folly::errnoStr(errnoCopy);
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::move(errorMsg)));
+    }
+  }
+  return folly::unit;
 }
 
 bool LibevQuicAsyncUDPSocket::isWritableCallbackSet() const {

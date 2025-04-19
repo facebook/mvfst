@@ -92,6 +92,9 @@ void QuicServerWorker::setSocket(
 void QuicServerWorker::bind(
     const folly::SocketAddress& address,
     FollyAsyncUDPSocketAlias::BindOptions bindOptions) {
+  // TODO get rid of the temporary wrapper
+  FollyQuicAsyncUDPSocket tmpSock(
+      std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
   switch (setEventCallback_) {
@@ -108,7 +111,7 @@ void QuicServerWorker::bind(
   // bind, since bind creates the fd.
   if (socketOptions_) {
     applySocketOptions(
-        *socket_.get(),
+        tmpSock,
         *socketOptions_,
         address.getFamily(),
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
@@ -119,7 +122,7 @@ void QuicServerWorker::bind(
   socket_->bind(address, bindOptions);
   if (socketOptions_) {
     applySocketOptions(
-        *socket_.get(),
+        tmpSock,
         *socketOptions_,
         address.getFamily(),
         folly::SocketOptionKey::ApplyPos::POST_BIND);
@@ -146,14 +149,17 @@ void QuicServerWorker::bind(
 
 void QuicServerWorker::applyAllSocketOptions() {
   CHECK(socket_);
+  // TODO get rid of the temporary wrapper
+  FollyQuicAsyncUDPSocket tmpSock(
+      std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
   if (socketOptions_) {
     applySocketOptions(
-        *socket_,
+        tmpSock,
         *socketOptions_,
         getAddress().getFamily(),
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
     applySocketOptions(
-        *socket_,
+        tmpSock,
         *socketOptions_,
         getAddress().getFamily(),
         folly::SocketOptionKey::ApplyPos::POST_BIND);

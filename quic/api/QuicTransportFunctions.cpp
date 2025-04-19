@@ -272,7 +272,10 @@ continuousMemoryBuildScheduleEncrypt(
   auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
     rollbackBuf();
-    ioBufBatch.flush();
+    auto flushResult = ioBufBatch.flush();
+    if (flushResult.hasError()) {
+      return folly::makeUnexpected(flushResult.error());
+    }
     updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
@@ -282,7 +285,10 @@ continuousMemoryBuildScheduleEncrypt(
   if (packet->body.empty()) {
     // No more space remaining.
     rollbackBuf();
-    ioBufBatch.flush();
+    auto flushResult = ioBufBatch.flush();
+    if (flushResult.hasError()) {
+      return folly::makeUnexpected(flushResult.error());
+    }
     updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
@@ -327,10 +333,17 @@ continuousMemoryBuildScheduleEncrypt(
             << encodedSize;
   }
   // TODO: I think we should add an API that doesn't need a buffer.
-  bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
+  auto writeResult =
+      ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
+  if (writeResult.hasError()) {
+    return folly::makeUnexpected(writeResult.error());
+  }
   updateErrnoCount(connection, ioBufBatch);
   return DataPathResult::makeWriteResult(
-      ret, std::move(result.value()), encodedSize, encodedBodySize);
+      writeResult.value(),
+      std::move(result.value()),
+      encodedSize,
+      encodedBodySize);
 }
 
 [[nodiscard]] folly::Expected<DataPathResult, QuicError>
@@ -358,7 +371,10 @@ iobufChainBasedBuildScheduleEncrypt(
   }
   auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
-    ioBufBatch.flush();
+    auto flushResult = ioBufBatch.flush();
+    if (flushResult.hasError()) {
+      return folly::makeUnexpected(flushResult.error());
+    }
     updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
@@ -367,7 +383,10 @@ iobufChainBasedBuildScheduleEncrypt(
   }
   if (packet->body.empty()) {
     // No more space remaining.
-    ioBufBatch.flush();
+    auto flushResult = ioBufBatch.flush();
+    if (flushResult.hasError()) {
+      return folly::makeUnexpected(flushResult.error());
+    }
     updateErrnoCount(connection, ioBufBatch);
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
@@ -405,10 +424,16 @@ iobufChainBasedBuildScheduleEncrypt(
     VLOG(3) << "Quic sending pkt larger than limit, encodedSize=" << encodedSize
             << " encodedBodySize=" << encodedBodySize;
   }
-  bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
+  auto writeResult = ioBufBatch.write(std::move(packetBuf), encodedSize);
+  if (writeResult.hasError()) {
+    return folly::makeUnexpected(writeResult.error());
+  }
   updateErrnoCount(connection, ioBufBatch);
   return DataPathResult::makeWriteResult(
-      ret, std::move(result.value()), encodedSize, encodedBodySize);
+      writeResult.value(),
+      std::move(result.value()),
+      encodedSize,
+      encodedBodySize);
 }
 
 } // namespace
@@ -1610,7 +1635,12 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
            << connection;
 
   if (!connection.gsoSupported.has_value()) {
-    connection.gsoSupported = sock.getGSO() >= 0;
+    auto gsoResult = sock.getGSO();
+    if (gsoResult.hasError()) {
+      LOG(ERROR) << "Failed to get GSO: " << gsoResult.error().message;
+      return folly::makeUnexpected(gsoResult.error());
+    }
+    connection.gsoSupported = sock.getGSO().value() >= 0;
     if (!*connection.gsoSupported) {
       if (!useSinglePacketInplaceBatchWriter(
               connection.transportSettings.maxBatchSize,
@@ -1648,7 +1678,11 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
   // If we have a pending write to retry. Flush that first and make sure it
   // succeeds before scheduling any new data.
   if (pendingBufferedWrite) {
-    bool flushSuccess = ioBufBatch.flush();
+    auto flushResult = ioBufBatch.flush();
+    if (flushResult.hasError()) {
+      return folly::makeUnexpected(flushResult.error());
+    }
+    auto flushSuccess = flushResult.value();
     updateErrnoCount(connection, ioBufBatch);
     if (!flushSuccess) {
       // Could not flush retried data. Return empty write result and wait for
@@ -1725,7 +1759,10 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     if (!ret->buildSuccess) {
       // If we're returning because we couldn't schedule more packets,
       // make sure we flush the buffer in this function.
-      ioBufBatch.flush();
+      auto flushResult = ioBufBatch.flush();
+      if (flushResult.hasError()) {
+        return folly::makeUnexpected(flushResult.error());
+      }
       updateErrnoCount(connection, ioBufBatch);
       return WriteQuicDataResult{ioBufBatch.getPktSent(), 0, bytesWritten};
     }
@@ -1777,13 +1814,19 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
             connection.transportSettings.dataPathType)) {
       // With SinglePacketInplaceBatchWriter we always write one packet, and so
       // ioBufBatch needs a flush.
-      ioBufBatch.flush();
+      auto flushResult = ioBufBatch.flush();
+      if (flushResult.hasError()) {
+        return folly::makeUnexpected(flushResult.error());
+      }
       updateErrnoCount(connection, ioBufBatch);
     }
   }
 
   // Ensure that the buffer is flushed before returning
-  ioBufBatch.flush();
+  auto flushResult = ioBufBatch.flush();
+  if (flushResult.hasError()) {
+    return folly::makeUnexpected(flushResult.error());
+  }
   updateErrnoCount(connection, ioBufBatch);
 
   if (connection.transportSettings.dataPathType ==

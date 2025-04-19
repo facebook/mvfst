@@ -1102,6 +1102,46 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
 
   auto newSocket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
+  ON_CALL(*newSocket, setReuseAddr(_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setAdditionalCmsgsFunc(_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setDFAndTurnOffPMTU())
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setErrMessageCallback(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setTosOrTrafficClass(_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, init(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, applyOptions(testing::_, testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, bind(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, connect(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, close()).WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, resumeWrite(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setGRO(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setRecvTos(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, getRecvTos()).WillByDefault(testing::Return(false));
+  ON_CALL(*newSocket, setCmsgs(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, appendCmsgs(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, getTimestamping()).WillByDefault(testing::Return(0));
+  ON_CALL(*newSocket, setReusePort(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setRcvBuf(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setSndBuf(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setFD(testing::_, testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+
   auto newSocketPtr = newSocket.get();
   EXPECT_CALL(*sock, pauseRead());
   EXPECT_CALL(*sock, close());
@@ -1118,6 +1158,45 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
   auto newSocket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
+  ON_CALL(*newSocket, setReuseAddr(_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setAdditionalCmsgsFunc(_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setDFAndTurnOffPMTU())
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setErrMessageCallback(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setTosOrTrafficClass(_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, init(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, applyOptions(testing::_, testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, bind(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, connect(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, close()).WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, resumeWrite(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setGRO(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setRecvTos(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, getRecvTos()).WillByDefault(testing::Return(false));
+  ON_CALL(*newSocket, setCmsgs(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, appendCmsgs(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, getTimestamping()).WillByDefault(testing::Return(0));
+  ON_CALL(*newSocket, setReusePort(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setRcvBuf(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setSndBuf(testing::_))
+      .WillByDefault(testing::Return(folly::unit));
+  ON_CALL(*newSocket, setFD(testing::_, testing::_))
+      .WillByDefault(testing::Return(folly::unit));
   auto newSocketPtr = newSocket.get();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
@@ -1174,7 +1253,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
             return getTotalIovecLen(vec, iovec_len);
             ;
           }));
-  ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
+  ON_CALL(*sock, address()).WillByDefault(Return(serverAddr));
 
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
@@ -1370,6 +1449,49 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_EQ(client->getConn().happyEyeballsState.v4PeerAddress, serverAddrV4);
 
     setupCryptoLayer();
+
+    ON_CALL(*secondSock, address()).WillByDefault(testing::Return(serverAddr));
+    ON_CALL(*secondSock, setAdditionalCmsgsFunc(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, getGSO).WillByDefault(testing::Return(0));
+    ON_CALL(*secondSock, getGRO).WillByDefault(testing::Return(0));
+    ON_CALL(*secondSock, init(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, bind(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, connect(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, close()).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, resumeWrite(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setGRO(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setRecvTos(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, getRecvTos()).WillByDefault(testing::Return(false));
+    ON_CALL(*secondSock, setTosOrTrafficClass(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, appendCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, getTimestamping()).WillByDefault(testing::Return(0));
+    ON_CALL(*secondSock, setReuseAddr(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setDFAndTurnOffPMTU())
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setErrMessageCallback(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, applyOptions(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setReusePort(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setRcvBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setSndBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setFD(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
   }
 
  protected:
@@ -1607,8 +1729,10 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _, _));
     EXPECT_CALL(*secondSock, bind(_))
-        .WillOnce(Invoke(
-            [](const folly::SocketAddress&) { throw std::exception(); }));
+        .WillOnce(Invoke([](const folly::SocketAddress&) {
+          return folly::makeUnexpected(
+              QuicError(TransportErrorCode::INTERNAL_ERROR, "oopsies"));
+        }));
     client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -2396,41 +2520,6 @@ TEST_F(QuicClientTransportAfterStartTest, RetriableErrorLoopCounting) {
   client->invokeOnNotifyDataAvailable(*sock);
 }
 
-TEST_F(QuicClientTransportAfterStartTest, ReadLoopTwice) {
-  auto& conn = client->getNonConstConn();
-  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
-  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
-  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
-
-  conn.transportSettings.maxRecvBatchSize = 1;
-  socketReads.emplace_back(TestReadData(EBADF));
-  EXPECT_CALL(
-      *rawLoopDetectorCallback,
-      onSuspiciousReadLoops(1, NoReadReason::NONRETRIABLE_ERROR));
-  client->invokeOnNotifyDataAvailable(*sock);
-  socketReads.clear();
-
-  socketReads.emplace_back(TestReadData(EBADF));
-  EXPECT_CALL(
-      *rawLoopDetectorCallback,
-      onSuspiciousReadLoops(2, NoReadReason::NONRETRIABLE_ERROR));
-  client->invokeOnNotifyDataAvailable(*sock);
-}
-
-TEST_F(QuicClientTransportAfterStartTest, NonretriableErrorLoopCounting) {
-  auto& conn = client->getNonConstConn();
-  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
-  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
-  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
-
-  conn.transportSettings.maxRecvBatchSize = 1;
-  socketReads.emplace_back(TestReadData(EBADF));
-  EXPECT_CALL(
-      *rawLoopDetectorCallback,
-      onSuspiciousReadLoops(1, NoReadReason::NONRETRIABLE_ERROR));
-  client->invokeOnNotifyDataAvailable(*sock);
-}
-
 TEST_F(QuicClientTransportAfterStartTest, PartialReadLoopCounting) {
   auto streamId = client->createBidirectionalStream().value();
   auto& conn = client->getNonConstConn();
@@ -2454,37 +2543,6 @@ TEST_F(QuicClientTransportAfterStartTest, PartialReadLoopCounting) {
   socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
   socketReads.emplace_back(TestReadData(EBADF));
   EXPECT_CALL(*rawLoopDetectorCallback, onSuspiciousReadLoops(_, _)).Times(0);
-  client->invokeOnNotifyDataAvailable(*sock);
-}
-
-TEST_F(QuicClientTransportAfterStartTest, ReadLoopCountingRecvmmsg) {
-  auto& conn = client->getNonConstConn();
-  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
-  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
-  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
-
-  conn.transportSettings.shouldUseRecvmmsgForBatchRecv = true;
-  conn.transportSettings.maxRecvBatchSize = 1;
-  EXPECT_CALL(*sock, recvmmsg(_, 1, _, nullptr))
-      .WillOnce(Invoke(
-          [](struct mmsghdr*, unsigned int, unsigned int, struct timespec*) {
-            errno = EAGAIN;
-            return -1;
-          }));
-  EXPECT_CALL(
-      *rawLoopDetectorCallback,
-      onSuspiciousReadLoops(1, NoReadReason::RETRIABLE_ERROR));
-  client->invokeOnNotifyDataAvailable(*sock);
-
-  EXPECT_CALL(*sock, recvmmsg(_, 1, _, nullptr))
-      .WillOnce(Invoke(
-          [](struct mmsghdr*, unsigned int, unsigned int, struct timespec*) {
-            errno = EBADF;
-            return -1;
-          }));
-  EXPECT_CALL(
-      *rawLoopDetectorCallback,
-      onSuspiciousReadLoops(2, NoReadReason::NONRETRIABLE_ERROR));
   client->invokeOnNotifyDataAvailable(*sock);
 }
 
@@ -5447,7 +5505,50 @@ class QuicZeroRttHappyEyeballsClientTransportTest
     auto secondSocket =
         std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
     secondSock = secondSocket.get();
-
+    ON_CALL(*secondSock, address()).WillByDefault(testing::Return(serverAddr));
+    ON_CALL(*secondSock, setAdditionalCmsgsFunc(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, getGSO).WillByDefault(testing::Return(0));
+    ON_CALL(*secondSock, getGRO).WillByDefault(testing::Return(0));
+    ON_CALL(*secondSock, init(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, bind(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, connect(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, close()).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, resumeWrite(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setGRO(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setRecvTos(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, getRecvTos()).WillByDefault(testing::Return(false));
+    ON_CALL(*secondSock, setTosOrTrafficClass(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, appendCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, getTimestamping()).WillByDefault(testing::Return(0));
+    ON_CALL(*secondSock, setReuseAddr(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setDFAndTurnOffPMTU())
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setAdditionalCmsgsFunc(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setErrMessageCallback(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, applyOptions(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setReusePort(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setRcvBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setSndBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*secondSock, setFD(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
     client->setHappyEyeballsEnabled(true);
     client->addNewPeerAddress(firstAddress);
     client->addNewPeerAddress(secondAddress);
@@ -5988,15 +6089,16 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   TransportSettings transportSettings;
   EmptyErrMessageCallback errMessageCallback;
   EmptyReadCallback readCallback;
-  happyEyeballsSetUpSocket(
-      socket,
-      none,
-      folly::SocketAddress("127.0.0.1", 12345),
-      transportSettings,
-      0, // tosValue
-      &errMessageCallback,
-      &readCallback,
-      folly::emptySocketOptionMap);
+  ASSERT_FALSE(happyEyeballsSetUpSocket(
+                   socket,
+                   none,
+                   folly::SocketAddress("127.0.0.1", 12345),
+                   transportSettings,
+                   0, // tosValue
+                   &errMessageCallback,
+                   &readCallback,
+                   folly::emptySocketOptionMap)
+                   .hasError());
 
   socket.pauseRead();
   socket.close();

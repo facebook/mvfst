@@ -156,8 +156,48 @@ class QuicServerTransportTestBase : public virtual testing::Test {
               copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
           return getTotalIovecLen(vec, iovec_len);
         }));
-    EXPECT_CALL(*sock, address())
-        .WillRepeatedly(testing::ReturnRef(serverAddr));
+    ON_CALL(*sock, address()).WillByDefault(testing::Return(serverAddr));
+    ON_CALL(*sock, setAdditionalCmsgsFunc(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, getGSO).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, getGRO).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, init(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, bind(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, connect(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, close()).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, resumeWrite(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setGRO(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setRecvTos(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, getRecvTos()).WillByDefault(testing::Return(false));
+    ON_CALL(*sock, setTosOrTrafficClass(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, appendCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, getTimestamping()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, setReuseAddr(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setDFAndTurnOffPMTU())
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setErrMessageCallback(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, applyOptions(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setReusePort(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setRcvBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setSndBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setFD(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
     supportedVersions = {QuicVersion::MVFST};
     serverCtx = createServerCtx();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();

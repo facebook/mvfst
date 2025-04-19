@@ -651,6 +651,19 @@ class QuicTransportImplTest : public Test {
     qEvb = std::make_shared<FollyQuicEventBase>(fEvb.get());
     auto socket =
         std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+    ON_CALL(*socket, setAdditionalCmsgsFunc(_))
+        .WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, close()).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, resumeWrite(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, bind(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, connect(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, setReuseAddr(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, setReusePort(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, setRecvTos(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, getRecvTos()).WillByDefault(Return(false));
+    ON_CALL(*socket, getGSO()).WillByDefault(Return(0));
+    ON_CALL(*socket, setCmsgs(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, appendCmsgs(_)).WillByDefault(Return(folly::unit));
     socketPtr = socket.get();
     transport = std::make_shared<TestQuicTransport>(
         qEvb, std::move(socket), &connSetupCallback, &connCallback);
@@ -3378,7 +3391,7 @@ TEST_P(QuicTransportImplTestBase, UncleanShutdownEventBase) {
 TEST_P(QuicTransportImplTestBase, GetLocalAddressBoundSocket) {
   SocketAddress addr("127.0.0.1", 443);
   EXPECT_CALL(*socketPtr, isBound()).WillOnce(Return(true));
-  EXPECT_CALL(*socketPtr, address()).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(*socketPtr, addressRef()).WillRepeatedly(ReturnRef(addr));
   SocketAddress localAddr = transport->getLocalAddress();
   EXPECT_TRUE(localAddr == addr);
 }
@@ -4859,9 +4872,7 @@ TEST_P(
 
   // Write event is not armed.
   EXPECT_CALL(*socketPtr, isWritableCallbackSet()).WillOnce(Return(false));
-  EXPECT_CALL(*socketPtr, resumeWrite(_))
-      .WillOnce(Return(
-          folly::makeExpected<folly::AsyncSocketException>(folly::Unit())));
+  EXPECT_CALL(*socketPtr, resumeWrite(_)).WillOnce(Return(folly::unit));
   transport->maybeStopWriteLooperAndArmSocketWritableEvent();
   // Write looper is stopped.
   EXPECT_FALSE(transport->writeLooper()->isRunning());
@@ -5072,7 +5083,7 @@ TEST_P(
   EXPECT_CALL(*socketPtr, resumeWrite(_))
       .WillOnce(Invoke([&](QuicAsyncUDPSocket::WriteCallback*) {
         writeCallbackArmed = true;
-        return folly::makeExpected<folly::AsyncSocketException>(folly::Unit());
+        return folly::unit;
       }));
 
   // Fail the first write loop.

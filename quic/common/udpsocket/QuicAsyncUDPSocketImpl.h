@@ -13,7 +13,8 @@ namespace quic {
 
 class QuicAsyncUDPSocketImpl : public QuicAsyncUDPSocket {
  public:
-  QuicAsyncUDPSocket::RecvResult recvmmsgNetworkData(
+  folly::Expected<QuicAsyncUDPSocket::RecvResult, QuicError>
+  recvmmsgNetworkData(
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,

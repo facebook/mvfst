@@ -114,7 +114,7 @@ QuicClientTransportLite::~QuicClientTransportLite() {
   if (clientConn_->happyEyeballsState.secondSocket) {
     auto sock = std::move(clientConn_->happyEyeballsState.secondSocket);
     sock->pauseRead();
-    sock->close();
+    (void)sock->close();
   }
 }
 
@@ -970,11 +970,18 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::onReadData(
     replaySafeNotified_ = true;
     // We don't need this any more. Also unset it so that we don't allow random
     // middleboxes to shutdown our connection once we have crypto keys.
-    socket_->setErrMessageCallback(nullptr);
+    auto result = socket_->setErrMessageCallback(nullptr);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
     connSetupCallback_->onReplaySafe();
   }
 
-  maybeSendTransportKnobs();
+  auto result = maybeSendTransportKnobs();
+  if (result.hasError()) {
+    return result;
+  }
+
   return folly::unit;
 }
 
@@ -1204,6 +1211,11 @@ std::shared_ptr<QuicTransportBaseLite> QuicClientTransportLite::sharedGuard() {
   return shared_from_this();
 }
 
+std::shared_ptr<QuicClientTransportLite>
+QuicClientTransportLite::sharedGuardClient() {
+  return shared_from_this();
+}
+
 bool QuicClientTransportLite::isTLSResumed() const {
   return clientConn_->clientHandshakeLayer->isTLSResumed();
 }
@@ -1241,13 +1253,8 @@ void QuicClientTransportLite::errMessage(
     auto errStr = folly::errnoStr(serr->ee_errno);
     if (!happyEyeballsState.shouldWriteToFirstSocket &&
         !happyEyeballsState.shouldWriteToSecondSocket) {
-      runOnEvbAsync([errString = std::move(errStr)](auto self) mutable {
-        auto quicError = QuicError(
-            QuicErrorCode(LocalErrorCode::CONNECT_FAILED),
-            std::move(errString));
-        auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-        clientPtr->closeImpl(std::move(quicError), false, false);
-      });
+      asyncClose(QuicError(
+          QuicErrorCode(LocalErrorCode::CONNECT_FAILED), std::move(errStr)));
     }
   }
 #endif
@@ -1259,12 +1266,8 @@ void QuicClientTransportLite::onReadError(
     // closeNow will skip draining the socket. onReadError doesn't gets
     // triggered by retriable errors. If we are here, there is no point of
     // draining the socket.
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-      clientPtr->closeNow(QuicError(
-          QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
-          std::string(ex.what())));
-    });
+    asyncClose(QuicError(
+        QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED), ex.what()));
   }
 }
 
@@ -1286,7 +1289,7 @@ bool QuicClientTransportLite::shouldOnlyNotify() {
   return true;
 }
 
-void QuicClientTransportLite::recvMsg(
+folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     int numPackets,
@@ -1295,8 +1298,7 @@ void QuicClientTransportLite::recvMsg(
     size_t& totalData) {
   for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
-    // us to decrypt in place. If the fizz decrypt api could decrypt in-place
-    // even if shared, then we could allocate one giant IOBuf here.
+    // us to decrypt in place.
     Buf readBuffer = BufHelpers::createCombined(readBufferSize);
     struct iovec vec;
     vec.iov_base = readBuffer->writableData();
@@ -1308,7 +1310,15 @@ void QuicClientTransportLite::recvMsg(
 
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
-      rawAddr->sa_family = sock.getLocalAddressFamily();
+      auto familyResult = sock.getLocalAddressFamily();
+      if (familyResult.hasError()) {
+        return folly::makeUnexpected(QuicError(
+            QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+            folly::to<std::string>(
+                "Failed to get address family: ",
+                familyResult.error().message)));
+      }
+      rawAddr->sa_family = familyResult.value();
     }
 
     int flags = 0;
@@ -1321,9 +1331,35 @@ void QuicClientTransportLite::recvMsg(
     msg.msg_iov = &vec;
     msg.msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    bool useGRO = sock.getGRO() > 0;
-    bool useTs = sock.getTimestamping() > 0;
-    bool recvTos = sock.getRecvTos();
+    bool useGRO = false;
+    bool useTs = false;
+    bool recvTos = false;
+
+    auto groResult = sock.getGRO();
+    if (groResult.hasError()) {
+      // Non-fatal, just log and continue
+      LOG(WARNING) << "Failed to get GRO status: " << groResult.error().message;
+    } else {
+      useGRO = groResult.value() > 0;
+    }
+
+    auto tsResult = sock.getTimestamping();
+    if (tsResult.hasError()) {
+      // Non-fatal, just log and continue
+      LOG(WARNING) << "Failed to get timestamping status: "
+                   << tsResult.error().message;
+    } else {
+      useTs = tsResult.value() > 0;
+    }
+
+    auto tosResult = sock.getRecvTos();
+    if (tosResult.hasError()) {
+      // Non-fatal, just log and continue
+      LOG(WARNING) << "Failed to get TOS status: " << tosResult.error().message;
+    } else {
+      recvTos = tosResult.value();
+    }
+
     bool checkCmsgs = useGRO || useTs || recvTos;
     char control
         [QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace] =
@@ -1353,10 +1389,10 @@ void QuicClientTransportLite::recvMsg(
       if (conn_->loopDetectorCallback) {
         conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
       }
-      return onReadError(folly::AsyncSocketException(
-          folly::AsyncSocketException::INTERNAL_ERROR,
-          "::recvmsg() failed",
-          errno));
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
+          folly::to<std::string>(
+              "recvmsg() failed, errno=", errno, " ", folly::errnoStr(errno))));
     } else if (ret == 0) {
       break;
     }
@@ -1426,9 +1462,11 @@ void QuicClientTransportLite::recvMsg(
   }
   trackDatagramsReceived(
       networkData.getPackets().size(), networkData.getTotalData());
+
+  return folly::unit;
 }
 
-void QuicClientTransportLite::recvFrom(
+folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvFrom(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     int numPackets,
@@ -1447,7 +1485,15 @@ void QuicClientTransportLite::recvFrom(
 
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
-      rawAddr->sa_family = sock.getLocalAddressFamily();
+      auto familyResult = sock.getLocalAddressFamily();
+      if (familyResult.hasError()) {
+        return folly::makeUnexpected(QuicError(
+            QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+            folly::to<std::string>(
+                "Failed to get address family: ",
+                familyResult.error().message)));
+      }
+      rawAddr->sa_family = familyResult.value();
     }
 
     ssize_t ret =
@@ -1466,10 +1512,13 @@ void QuicClientTransportLite::recvFrom(
       if (conn_->loopDetectorCallback) {
         conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
       }
-      return onReadError(folly::AsyncSocketException(
-          folly::AsyncSocketException::INTERNAL_ERROR,
-          "::recvmsg() failed",
-          errno));
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          folly::to<std::string>(
+              "recvfrom() failed, errno=",
+              errno,
+              " ",
+              folly::errnoStr(errno))));
     } else if (ret == 0) {
       break;
     }
@@ -1487,9 +1536,11 @@ void QuicClientTransportLite::recvFrom(
   }
   trackDatagramsReceived(
       networkData.getPackets().size(), networkData.getTotalData());
+
+  return folly::unit;
 }
 
-void QuicClientTransportLite::recvMmsg(
+folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets,
@@ -1499,9 +1550,33 @@ void QuicClientTransportLite::recvMmsg(
   auto& msgs = recvmmsgStorage_.msgs;
   int flags = 0;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-  bool useGRO = sock.getGRO() > 0;
-  bool useTs = sock.getTimestamping() > 0;
-  bool recvTos = sock.getRecvTos();
+  auto groResult = sock.getGRO();
+  if (groResult.hasError()) {
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        folly::to<std::string>(
+            "Failed to get GRO status: ", groResult.error().message)));
+  }
+  bool useGRO = groResult.value() > 0;
+
+  auto tsResult = sock.getTimestamping();
+  if (tsResult.hasError()) {
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        folly::to<std::string>(
+            "Failed to get timestamping status: ", tsResult.error().message)));
+  }
+  bool useTs = tsResult.value() > 0;
+
+  auto tosResult = sock.getRecvTos();
+  if (tosResult.hasError()) {
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        folly::to<std::string>(
+            "Failed to get TOS status: ", tosResult.error().message)));
+  }
+  bool recvTos = tosResult.value();
+
   bool checkCmsgs = useGRO || useTs || recvTos;
   std::vector<std::array<
       char,
@@ -1529,7 +1604,14 @@ void QuicClientTransportLite::recvMmsg(
     CHECK(readBuffer != nullptr);
 
     auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
-    rawAddr->sa_family = sock.address().getFamily();
+    auto addrResult = sock.address();
+    if (addrResult.hasError()) {
+      return folly::makeUnexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          folly::to<std::string>(
+              "Failed to get socket address: ", addrResult.error().message)));
+    }
+    rawAddr->sa_family = addrResult.value().getFamily();
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
@@ -1548,7 +1630,7 @@ void QuicClientTransportLite::recvMmsg(
       if (conn_->loopDetectorCallback) {
         conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
       }
-      return;
+      return folly::unit;
     }
     // If we got a non-retriable error, we might have received
     // a packet that we could process, however let's just quit early.
@@ -1556,10 +1638,10 @@ void QuicClientTransportLite::recvMmsg(
     if (conn_->loopDetectorCallback) {
       conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
     }
-    return onReadError(folly::AsyncSocketException(
-        folly::AsyncSocketException::INTERNAL_ERROR,
-        "::recvmmsg() failed",
-        errno));
+    return folly::makeUnexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        folly::to<std::string>(
+            "recvmmsg() failed, errno=", errno, " ", folly::errnoStr(errno))));
   }
 
   CHECK_LE(numMsgsRecvd, numPackets);
@@ -1644,9 +1726,11 @@ void QuicClientTransportLite::recvMmsg(
   }
   trackDatagramsReceived(
       networkData.getPackets().size(), networkData.getTotalData());
+
+  return folly::unit;
 }
 
-void QuicClientTransportLite::processPackets(
+folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::processPackets(
     NetworkData&& networkData,
     const Optional<folly::SocketAddress>& server) {
   if (networkData.getPackets().empty()) {
@@ -1661,17 +1745,20 @@ void QuicClientTransportLite::processPackets(
             conn_->readDebugState.noReadReason);
       }
     }
-    return;
+    return folly::unit;
   }
   DCHECK(server.has_value());
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
   networkData.setReceiveTimePoint(packetReceiveTime);
+
   onNetworkData(*server, std::move(networkData));
+  return folly::unit;
 }
 
-void QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
+folly::Expected<folly::Unit, QuicError>
+QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize) {
   size_t totalData = 0;
@@ -1679,32 +1766,48 @@ void QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
   for (size_t i = 0; i < conn_->transportSettings.maxRecvBatchSize; i++) {
     auto networkDataSinglePacket = NetworkData();
     networkDataSinglePacket.reserve(1);
-    recvMsg(
+
+    auto recvResult = recvMsg(
         sock,
         readBufferSize,
         1 /* numPackets */,
         networkDataSinglePacket,
         server,
         totalData);
+
+    if (recvResult.hasError()) {
+      return recvResult;
+    }
+
     if (!socket_) {
       // Socket has been closed.
-      return;
+      return folly::unit;
     }
+
     if (networkDataSinglePacket.getPackets().size() == 0) {
       break;
     }
-    processPackets(std::move(networkDataSinglePacket), server);
+
+    auto processResult =
+        processPackets(std::move(networkDataSinglePacket), server);
+    if (processResult.hasError()) {
+      return processResult;
+    }
+
     if (!socket_) {
       // Socket has been closed.
-      return;
+      return folly::unit;
     }
   }
+
   // Call callbacks/updates manually because processPackets()/onNetworkData()
   // will not schedule it when transportSettings.networkDataPerSocketRead is on.
   processCallbacksAfterNetworkData();
   checkForClosedStream();
   updateReadLooper();
   updateWriteLooper(true);
+
+  return folly::unit;
 }
 
 void QuicClientTransportLite::onNotifyDataAvailable(
@@ -1719,7 +1822,10 @@ void QuicClientTransportLite::onNotifyDataAvailable(
       ? conn_->transportSettings.readCoalescingSize
       : readBufferSize;
 
-  readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
+  auto result = readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
+  if (result.hasError()) {
+    asyncClose(result.error());
+  }
 }
 
 void QuicClientTransportLite::
@@ -1764,45 +1870,32 @@ void QuicClientTransportLite::start(
 
   clientConn_->pendingOneRttData.reserve(
       conn_->transportSettings.maxPacketsToBuffer);
-  try {
-    happyEyeballsSetUpSocket(
-        *socket_,
-        conn_->localAddress,
-        conn_->peerAddress,
-        conn_->transportSettings,
-        conn_->socketTos.value,
-        this,
-        this,
-        socketOptions_);
-    // adjust the GRO buffers
-    adjustGROBuffers();
-    auto handshakeResult = startCryptoHandshake();
-    if (handshakeResult.hasError()) {
-      runOnEvbAsync([error = handshakeResult.error()](auto self) {
-        auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-        clientPtr->closeImpl(error);
-      });
-    }
-  } catch (const QuicTransportException& ex) {
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-      clientPtr->closeImpl(
-          QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
-    });
-  } catch (const QuicInternalException& ex) {
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-      clientPtr->closeImpl(
-          QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
-    });
-  } catch (const std::exception& ex) {
-    LOG(ERROR) << "Connect failed " << ex.what();
-    runOnEvbAsync([ex](auto self) {
-      auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-      clientPtr->closeImpl(QuicError(
-          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-          std::string(ex.what())));
-    });
+
+  auto socketResult = happyEyeballsSetUpSocket(
+      *socket_,
+      conn_->localAddress,
+      conn_->peerAddress,
+      conn_->transportSettings,
+      conn_->socketTos.value,
+      this,
+      this,
+      socketOptions_);
+
+  if (socketResult.hasError()) {
+    asyncClose(socketResult.error());
+    return;
+  }
+
+  auto adjustResult = adjustGROBuffers();
+  if (adjustResult.hasError()) {
+    asyncClose(adjustResult.error());
+    return;
+  }
+
+  auto handshakeResult = startCryptoHandshake();
+  if (handshakeResult.hasError()) {
+    asyncClose(handshakeResult.error());
+    return;
   }
 }
 
@@ -1855,13 +1948,26 @@ void QuicClientTransportLite::setSelfOwning() {
   selfOwning_ = shared_from_this();
 }
 
-void QuicClientTransportLite::adjustGROBuffers() {
+folly::Expected<folly::Unit, QuicError>
+QuicClientTransportLite::adjustGROBuffers() {
   if (socket_ && conn_) {
     if (conn_->transportSettings.numGROBuffers_ > kDefaultNumGROBuffers) {
-      socket_->setGRO(true);
-      auto ret = socket_->getGRO();
+      auto setResult = socket_->setGRO(true);
+      if (setResult.hasError()) {
+        // Not a fatal error, just log and continue with default buffers
+        LOG(WARNING) << "Failed to enable GRO: " << setResult.error().message;
+        return folly::unit;
+      }
 
-      if (ret > 0) {
+      auto groResult = socket_->getGRO();
+      if (groResult.hasError()) {
+        // Not a fatal error, just log and continue with default buffers
+        LOG(WARNING) << "Failed to get GRO status: "
+                     << groResult.error().message;
+        return folly::unit;
+      }
+
+      if (groResult.value() > 0) {
         numGROBuffers_ =
             (conn_->transportSettings.numGROBuffers_ < kMaxNumGROBuffers)
             ? conn_->transportSettings.numGROBuffers_
@@ -1869,6 +1975,7 @@ void QuicClientTransportLite::adjustGROBuffers() {
       }
     }
   }
+  return folly::unit;
 }
 
 void QuicClientTransportLite::closeTransport() {
@@ -1888,6 +1995,28 @@ void QuicClientTransportLite::setSupportedVersions(
   conn_->readCodec->setCodecParameters(params);
 }
 
+void QuicClientTransportLite::runOnEvbAsync(
+    folly::Function<void(std::shared_ptr<QuicClientTransportLite>)> func) {
+  auto evb = getEventBase();
+  evb->runInLoop(
+      [self = sharedGuardClient(), func = std::move(func), evb]() mutable {
+        if (self->getEventBase() != evb) {
+          // The eventbase changed between scheduling the loop and invoking
+          // the callback, ignore this
+          return;
+        }
+        func(std::move(self));
+      },
+      true);
+}
+
+void QuicClientTransportLite::asyncClose(QuicError error) {
+  runOnEvbAsync([error = std::move(error)](auto self) {
+    auto clientPtr = static_cast<QuicClientTransportLite*>(self.get());
+    clientPtr->closeImpl(std::move(error), false, false);
+  });
+}
+
 void QuicClientTransportLite::onNetworkSwitch(
     std::unique_ptr<QuicAsyncUDPSocket> newSock) {
   if (!conn_->oneRttWriteCipher) {
@@ -1896,14 +2025,24 @@ void QuicClientTransportLite::onNetworkSwitch(
   if (socket_ && newSock) {
     auto sock = std::move(socket_);
     socket_ = nullptr;
-    sock->setErrMessageCallback(nullptr);
+    if (auto err = sock->setErrMessageCallback(nullptr); err.hasError()) {
+      asyncClose(err.error());
+      return;
+    }
     sock->pauseRead();
-    sock->close();
+    if (auto err = sock->close(); err.hasError()) {
+      asyncClose(err.error());
+      return;
+    }
 
     socket_ = std::move(newSock);
-    socket_->setAdditionalCmsgsFunc(
-        [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
-    happyEyeballsSetUpSocket(
+    if (auto err = socket_->setAdditionalCmsgsFunc(
+            [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+        err.hasError()) {
+      asyncClose(err.error());
+      return;
+    }
+    auto setupResult = happyEyeballsSetUpSocket(
         *socket_,
         conn_->localAddress,
         conn_->peerAddress,
@@ -1912,12 +2051,18 @@ void QuicClientTransportLite::onNetworkSwitch(
         this,
         this,
         socketOptions_);
+    if (setupResult.hasError()) {
+      asyncClose(setupResult.error());
+      return;
+    }
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionMigrationUpdate(true);
     }
 
-    // adjust the GRO buffers
-    adjustGROBuffers();
+    auto adjustResult = adjustGROBuffers();
+    if (adjustResult.hasError()) {
+      asyncClose(adjustResult.error());
+    }
   }
 }
 
@@ -1946,7 +2091,8 @@ void QuicClientTransportLite::trackDatagramsReceived(
   QUIC_STATS(statsCallback_, onRead, totalPacketLen);
 }
 
-void QuicClientTransportLite::maybeSendTransportKnobs() {
+folly::Expected<folly::Unit, QuicError>
+QuicClientTransportLite::maybeSendTransportKnobs() {
   if (!transportKnobsSent_ && hasWriteCipher()) {
     for (const auto& knob : conn_->transportSettings.knobs) {
       auto res =
@@ -1954,6 +2100,9 @@ void QuicClientTransportLite::maybeSendTransportKnobs() {
       if (res.hasError()) {
         if (res.error() != LocalErrorCode::KNOB_FRAME_UNSUPPORTED) {
           LOG(ERROR) << "Unexpected error while sending knob frames";
+          return folly::makeUnexpected(QuicError(
+              QuicErrorCode(res.error()),
+              "Unexpected error while sending knob frames"));
         }
         // No point in keep trying if transport does not support knob frame
         break;
@@ -1961,6 +2110,7 @@ void QuicClientTransportLite::maybeSendTransportKnobs() {
     }
     transportKnobsSent_ = true;
   }
+  return folly::unit;
 }
 
 Optional<std::vector<TransportParameter>>

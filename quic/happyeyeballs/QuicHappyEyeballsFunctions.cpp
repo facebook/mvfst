@@ -93,18 +93,16 @@ void startHappyEyeballs(
 
     evb->scheduleTimeout(&connAttemptDelayTimeout, connAttempDelay);
 
-    try {
-      happyEyeballsSetUpSocket(
-          *connection.happyEyeballsState.secondSocket,
-          connection.localAddress,
-          connection.happyEyeballsState.secondPeerAddress,
-          connection.transportSettings,
-          connection.socketTos.value,
-          errMsgCallback,
-          readCallback,
-          options);
-    } catch (const std::exception&) {
-      // If second socket bind throws exception, give it up
+    auto res = happyEyeballsSetUpSocket(
+        *connection.happyEyeballsState.secondSocket,
+        connection.localAddress,
+        connection.happyEyeballsState.secondPeerAddress,
+        connection.transportSettings,
+        connection.socketTos.value,
+        errMsgCallback,
+        readCallback,
+        options);
+    if (res.hasError()) {
       connAttemptDelayTimeout.cancelTimerCallback();
       connection.happyEyeballsState.finished = true;
     }
@@ -121,7 +119,7 @@ void startHappyEyeballs(
   }
 }
 
-void happyEyeballsSetUpSocket(
+folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket& socket,
     Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
@@ -131,48 +129,88 @@ void happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
   auto sockFamily = localAddress.value_or(peerAddress).getFamily();
-  socket.setReuseAddr(false);
+  auto result = socket.setReuseAddr(false);
+  if (!result) {
+    return folly::makeUnexpected(result.error());
+  }
   if (transportSettings.readEcnOnIngress) {
-    socket.setRecvTos(true);
+    result = socket.setRecvTos(true);
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
 
-  auto initSockAndApplyOpts = [&]() {
-    socket.init(sockFamily);
-    applySocketOptions(
+  auto initSockAndApplyOpts = [&]() -> folly::Expected<folly::Unit, QuicError> {
+    auto initResult = socket.init(sockFamily);
+    if (!initResult) {
+      return folly::makeUnexpected(initResult.error());
+    }
+    auto applyResult = applySocketOptions(
         socket,
         options,
         sockFamily,
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
+    if (!applyResult) {
+      return folly::makeUnexpected(applyResult.error());
+    }
+    return folly::unit;
   };
 
   if (localAddress.has_value()) {
-    initSockAndApplyOpts();
-    socket.bind(*localAddress);
+    auto initResult = initSockAndApplyOpts();
+    if (!initResult) {
+      return folly::makeUnexpected(initResult.error());
+    }
+    result = socket.bind(*localAddress);
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   if (transportSettings.connectUDP) {
-    initSockAndApplyOpts();
-    socket.connect(peerAddress);
+    auto initResult = initSockAndApplyOpts();
+    if (!initResult) {
+      return folly::makeUnexpected(initResult.error());
+    }
+    result = socket.connect(peerAddress);
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   if (!socket.isBound()) {
     auto addr = folly::SocketAddress(
         peerAddress.getFamily() == AF_INET ? "0.0.0.0" : "::", 0);
-    initSockAndApplyOpts();
-    socket.bind(addr);
+    auto initResult = initSockAndApplyOpts();
+    if (!initResult) {
+      return folly::makeUnexpected(initResult.error());
+    }
+    result = socket.bind(addr);
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
   // This is called before applySocketOptions to allow the configured socket
   // options to override the ToS value from transport settings. This is
   // necessary for applications that currently rely on configuring DSCP through
   // socket options directly.
-  socket.setTosOrTrafficClass(socketTos);
+  result = socket.setTosOrTrafficClass(socketTos);
+  if (!result) {
+    return folly::makeUnexpected(result.error());
+  }
 
-  applySocketOptions(
+  auto applyResult = applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
+  if (!applyResult) {
+    return folly::makeUnexpected(applyResult.error());
+  }
 
 #ifdef SO_NOSIGPIPE
   folly::SocketOptionKey nopipeKey = {SOL_SOCKET, SO_NOSIGPIPE};
   if (!options.count(nopipeKey)) {
-    socket.applyOptions(
+    result = socket.applyOptions(
         {{nopipeKey, 1}}, folly::SocketOptionKey::ApplyPos::POST_BIND);
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
 #endif
 
@@ -181,13 +219,20 @@ void happyEyeballsSetUpSocket(
   }
 
   // never fragment, always turn off PMTU
-  socket.setDFAndTurnOffPMTU();
+  result = socket.setDFAndTurnOffPMTU();
+  if (!result) {
+    return folly::makeUnexpected(result.error());
+  }
 
   if (transportSettings.enableSocketErrMsgCallback) {
-    socket.setErrMessageCallback(errMsgCallback);
+    result = socket.setErrMessageCallback(errMsgCallback);
+    if (!result) {
+      return folly::makeUnexpected(result.error());
+    }
   }
 
   socket.resumeRead(readCallback);
+  return folly::unit;
 }
 
 void happyEyeballsStartSecondSocket(
@@ -217,7 +262,7 @@ void happyEyeballsOnDataReceived(
     connection.peerAddress = peerAddress;
   }
   connection.happyEyeballsState.secondSocket->pauseRead();
-  connection.happyEyeballsState.secondSocket->close();
+  (void)connection.happyEyeballsState.secondSocket->close();
   connection.happyEyeballsState.secondSocket.reset();
 }
 

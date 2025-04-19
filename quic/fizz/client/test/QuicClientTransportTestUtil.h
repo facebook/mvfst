@@ -440,6 +440,9 @@ class QuicClientTransportTestBase : public virtual testing::Test {
         std::make_unique<testing::NiceMock<quic::test::MockAsyncUDPSocket>>(
             qEvb_);
     sock = socket.get();
+    EXPECT_CALL(*sock, setAdditionalCmsgsFunc(testing::_))
+        .WillRepeatedly(testing::Return(folly::unit));
+    EXPECT_CALL(*sock, close()).WillRepeatedly(testing::Return(folly::unit));
 
     client = TestingQuicClientTransport::newClient<TestingQuicClientTransport>(
         qEvb_, std::move(socket), getFizzClientContext());
@@ -454,7 +457,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ON_CALL(*sock, resumeRead(testing::_))
         .WillByDefault(testing::SaveArg<0>(&networkReadCallback));
-    ON_CALL(*sock, address()).WillByDefault(testing::ReturnRef(serverAddr));
+    ON_CALL(*sock, address()).WillByDefault(testing::Return(serverAddr));
     ON_CALL(*sock, recvmsg(testing::_, testing::_))
         .WillByDefault(testing::Invoke([&](struct msghdr* msg, int) -> ssize_t {
           DCHECK_GT(msg->msg_iovlen, 0);
@@ -488,6 +491,44 @@ class QuicClientTransportTestBase : public virtual testing::Test {
           return testDataLen;
         }));
     ON_CALL(*sock, getRecvTos()).WillByDefault(testing::Return(true));
+    ON_CALL(*sock, getGSO()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, getGRO()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, getTimestamping()).WillByDefault(testing::Return(0));
+    ON_CALL(*sock, setTosOrTrafficClass(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, init(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, bind(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, connect(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, close()).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setReuseAddr(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setDFAndTurnOffPMTU())
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setErrMessageCallback(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, applyOptions(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setReusePort(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setRcvBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setSndBuf(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, resumeWrite(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setGRO(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setRecvTos(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, appendCmsgs(testing::_))
+        .WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setFD(testing::_, testing::_))
+        .WillByDefault(testing::Return(folly::unit));
     EXPECT_EQ(client->getConn().selfConnectionIds.size(), 1);
     EXPECT_EQ(
         client->getConn().selfConnectionIds[0].connId,
@@ -511,7 +552,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
               copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
           return getTotalIovecLen(vec, iovec_len);
         }));
-    ON_CALL(*sock, address()).WillByDefault(testing::ReturnRef(serverAddr));
+    ON_CALL(*sock, address()).WillByDefault(testing::Return(serverAddr));
 
     setupCryptoLayer();
     start();
