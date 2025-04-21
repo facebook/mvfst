@@ -45,9 +45,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   static int getUnfinishedHandshakeCount();
 
  private:
-  static TransportSettings validateTransportSettings(
-      TransportSettings transportSettings);
-
   struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
     static auto constexpr kBuffSize = 1024;
 

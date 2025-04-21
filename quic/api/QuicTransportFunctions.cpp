@@ -1641,20 +1641,6 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
       return folly::makeUnexpected(gsoResult.error());
     }
     connection.gsoSupported = sock.getGSO().value() >= 0;
-    if (!*connection.gsoSupported) {
-      if (!useSinglePacketInplaceBatchWriter(
-              connection.transportSettings.maxBatchSize,
-              connection.transportSettings.dataPathType) &&
-          (connection.transportSettings.dataPathType ==
-           DataPathType::ContinuousMemory)) {
-        // Change data path type to DataPathType::ChainedMemory.
-        // Continuous memory data path is only supported with working GSO or
-        // SinglePacketInplaceBatchWriter.
-        LOG(ERROR) << "Switching data path to ChainedMemory as "
-                   << "GSO is not supported on the socket";
-        connection.transportSettings.dataPathType = DataPathType::ChainedMemory;
-      }
-    }
   }
 
   auto batchWriter = BatchWriterFactory::makeBatchWriter(

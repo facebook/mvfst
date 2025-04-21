@@ -62,8 +62,7 @@ QuicServerWorker::QuicServerWorker(
     SetEventCallback ec)
     : callback_(std::move(callback)),
       setEventCallback_(ec),
-      transportSettings_(
-          validateTransportSettings(std::move(transportSettings))),
+      transportSettings_(std::move(transportSettings)),
       takeoverPktHandler_(this),
       observerList_(this) {
   pending0RttData_.setPruneHook(
@@ -1270,19 +1269,6 @@ void QuicServerWorker::setSupportedVersions(
 void QuicServerWorker::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
   ctx_ = ctx;
-}
-
-TransportSettings QuicServerWorker::validateTransportSettings(
-    TransportSettings transportSettings) {
-  if (transportSettings.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO &&
-      transportSettings.batchingMode !=
-          QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO) {
-    if (transportSettings.dataPathType == DataPathType::ContinuousMemory) {
-      LOG(ERROR) << "Unsupported data path type and batching mode combination";
-    }
-    transportSettings.dataPathType = DataPathType::ChainedMemory;
-  }
-  return transportSettings;
 }
 
 void QuicServerWorker::rejectNewConnections(
