@@ -297,8 +297,9 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     }
   }
 
-  void doHandshake(std::unique_ptr<folly::IOBuf> buf, EncryptionLevel level)
-      override {
+  folly::Expected<folly::Unit, QuicError> doHandshake(
+      std::unique_ptr<folly::IOBuf> buf,
+      EncryptionLevel level) override {
     EXPECT_EQ(writeBuf.get(), nullptr);
     QuicClientConnectionState* conn = getClientConn();
     if (!conn->oneRttWriteCipher) {
@@ -316,6 +317,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
       handshakeInitiated();
     }
     readBuffers[level].append(std::move(buf));
+    return folly::unit;
   }
 
   bool connectInvoked() {

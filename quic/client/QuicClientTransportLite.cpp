@@ -756,7 +756,11 @@ QuicClientTransportLite::processUdpPacketData(
       *getCryptoStream(*conn_->cryptoState, encryptionLevel));
   if (cryptoData) {
     bool hadOneRttKey = conn_->oneRttWriteCipher != nullptr;
-    handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
+    auto handshakeResult =
+        handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
+    if (handshakeResult.hasError()) {
+      return folly::makeUnexpected(handshakeResult.error());
+    }
     bool oneRttKeyDerivationTriggered = false;
     if (!hadOneRttKey && conn_->oneRttWriteCipher) {
       oneRttKeyDerivationTriggered = true;
@@ -1064,7 +1068,6 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::writeData() {
   // use.
   SCOPE_EXIT {
     conn_->pendingEvents.numProbePackets = {};
-    maybeInitiateKeyUpdate(*conn_);
   };
   if (conn_->initialWriteCipher) {
     const std::string& token = clientConn_->retryToken.empty()
@@ -1125,7 +1128,7 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::writeData() {
       return folly::makeUnexpected(result.error());
     }
   }
-  return folly::unit;
+  return maybeInitiateKeyUpdate(*conn_);
 }
 
 folly::Expected<folly::Unit, QuicError>
@@ -1179,7 +1182,11 @@ QuicClientTransportLite::startCryptoHandshake() {
     size_t iovec_len = fillIovec(flowPrimingBuf, vec);
     socket_->write(conn_->peerAddress, vec, iovec_len);
   }
-  handshakeLayer->connect(hostname_, std::move(paramsExtension));
+  auto connectResult =
+      handshakeLayer->connect(hostname_, std::move(paramsExtension));
+  if (connectResult.hasError()) {
+    return folly::makeUnexpected(connectResult.error());
+  }
 
   auto writeResult = writeSocketData();
   if (writeResult.hasError()) {

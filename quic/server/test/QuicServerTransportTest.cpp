@@ -1928,6 +1928,8 @@ class QuicServerTransportAllowMigrationTest
         false,
         false,
         GetParam().clientSentActiveConnIdTransportParam);
+    ON_CALL(*fakeHandshake, writeNewSessionTicket)
+        .WillByDefault(Return(folly::unit));
   }
 };
 
@@ -4772,6 +4774,8 @@ class QuicServerTransportPendingDataTest
         FizzServerQuicHandshakeContext::Builder().build(),
         GetParam().chloSync,
         GetParam().cfinSync);
+    ON_CALL(*fakeHandshake, writeNewSessionTicket)
+        .WillByDefault(testing::Return(folly::unit));
     if (GetParam().acceptZeroRtt) {
       fakeHandshake->allowZeroRttKeys();
     }
@@ -5011,6 +5015,7 @@ class QuicServerTransportHandshakeTest
 
           EXPECT_TRUE(folly::IOBufEqualTo()(
               appToken.appParams, folly::IOBuf::copyBuffer(appParams)));
+          return folly::unit;
         }));
   }
 

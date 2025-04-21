@@ -50,7 +50,6 @@ namespace quic {
  *  }
  * }
  */
-
 class ServerHandshake : public Handshake {
  public:
   class HandshakeCallback {
@@ -92,12 +91,15 @@ class ServerHandshake : public Handshake {
    * Performs the handshake, after a handshake you should check whether or
    * not an event is available.
    */
-  virtual void doHandshake(Buf data, EncryptionLevel encryptionLevel);
+  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> doHandshake(
+      Buf data,
+      EncryptionLevel encryptionLevel);
 
   /**
    * Writes a session ticket on the connection.
    */
-  virtual void writeNewSessionTicket(const AppToken& appToken);
+  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
+  writeNewSessionTicket(const AppToken& appToken);
 
   /**
    * Returns a reference to the CryptoFactory used internally.
@@ -108,64 +110,74 @@ class ServerHandshake : public Handshake {
    * An edge triggered API to get the handshakeReadCipher. Once you receive the
    * write cipher subsequent calls will return null.
    */
-  std::unique_ptr<Aead> getHandshakeReadCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getHandshakeReadCipher();
 
   /**
    * An edge triggered API to get the first oneRttWriteCipher. Once you receive
    * the write cipher subsequent calls will return null.
    */
-  std::unique_ptr<Aead> getFirstOneRttWriteCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getFirstOneRttWriteCipher();
 
   /**
    * An API to get oneRttWriteCiphers on key rotation. Each call will return a
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttWriteCipher() override;
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getNextOneRttWriteCipher() override;
 
   /**
    * An API to get oneRttReadCiphers. Each call will generate a one rtt
    * read cipher using the current traffic secret and advance the traffic
    * secret.
    */
-  std::unique_ptr<Aead> getFirstOneRttReadCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getFirstOneRttReadCipher();
 
   /**
    * An API to get oneRttReadCiphers on key rotation. Each call will return a
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttReadCipher() override;
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getNextOneRttReadCipher() override;
 
   /**
    * An edge triggered API to get the zeroRttReadCipher. Once you receive the
    * zero rtt read cipher subsequent calls will return null.
    */
-  std::unique_ptr<Aead> getZeroRttReadCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getZeroRttReadCipher();
 
   /**
    * An edge triggered API to get the one rtt read header cpher. Once you
    * receive the header cipher subsequent calls will return null.
    */
-  std::unique_ptr<PacketNumberCipher> getOneRttReadHeaderCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  getOneRttReadHeaderCipher();
 
   /**
    * An edge triggered API to get the one rtt write header cpher. Once you
    * receive the header cipher subsequent calls will return null.
    */
-  std::unique_ptr<PacketNumberCipher> getOneRttWriteHeaderCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  getOneRttWriteHeaderCipher();
 
   /**
    * An edge triggered API to get the handshake rtt read header cpher. Once you
    * receive the header cipher subsequent calls will return null.
    */
-  std::unique_ptr<PacketNumberCipher> getHandshakeReadHeaderCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  getHandshakeReadHeaderCipher();
 
   /**
    * An edge triggered API to get the zero rtt header cpher. Once you
    * receive the header cipher subsequent calls will return null.
    */
-  std::unique_ptr<PacketNumberCipher> getZeroRttReadHeaderCipher();
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  getZeroRttReadHeaderCipher();
 
   /**
    * The application will not get any more callbacks from the handshake layer

@@ -235,7 +235,8 @@ class QuicServerTransport
   void maybeNotifyTransportReady();
   void maybeNotifyConnectionIdRetired();
   void maybeNotifyConnectionIdBound();
-  void maybeWriteNewSessionTicket();
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  maybeWriteNewSessionTicket();
   void maybeIssueConnectionIds();
   void maybeNotifyHandshakeFinished();
   bool hasReadCipher() const;

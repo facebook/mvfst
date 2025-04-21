@@ -419,7 +419,10 @@ class FakeServerHandshake : public FizzServerHandshake {
 
   void accept(std::shared_ptr<ServerTransportParametersExtension>) override {}
 
-  MOCK_METHOD(void, writeNewSessionTicket, (const AppToken&));
+  MOCK_METHOD(
+      (folly::Expected<folly::Unit, QuicError>),
+      writeNewSessionTicket,
+      (const AppToken&));
 
   void onClientHello(bool chloWithCert = false) {
     // Do NOT invoke onCryptoEventAvailable callback
@@ -450,8 +453,9 @@ class FakeServerHandshake : public FizzServerHandshake {
     handshakeDone_ = true;
   }
 
-  void doHandshake(std::unique_ptr<folly::IOBuf> data, EncryptionLevel)
-      override {
+  folly::Expected<folly::Unit, QuicError> doHandshake(
+      std::unique_ptr<folly::IOBuf> data,
+      EncryptionLevel) override {
     folly::IOBufEqualTo eq;
     auto chlo = folly::IOBuf::copyBuffer("CHLO");
     auto chloWithCert = folly::IOBuf::copyBuffer("CHLO_CERT");
@@ -483,6 +487,7 @@ class FakeServerHandshake : public FizzServerHandshake {
         });
       }
     }
+    return folly::unit;
   }
 
   Optional<ClientTransportParameters> getClientTransportParams() override {

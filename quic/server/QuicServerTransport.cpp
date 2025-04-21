@@ -201,7 +201,10 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
     serverConn_->numProbesWritableBytesLimited = 0;
   }
 
-  maybeWriteNewSessionTicket();
+  auto sessionTicketResult = maybeWriteNewSessionTicket();
+  if (sessionTicketResult.hasError()) {
+    return sessionTicketResult;
+  }
   maybeNotifyConnectionIdBound();
   maybeNotifyHandshakeFinished();
   maybeNotifyConnectionIdRetired();
@@ -286,7 +289,6 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
   // use.
   SCOPE_EXIT {
     conn_->pendingEvents.numProbePackets = {};
-    maybeInitiateKeyUpdate(*conn_);
   };
   if (conn_->initialWriteCipher) {
     auto res = handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit);
@@ -377,7 +379,8 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
       }
     }
   }
-  return folly::unit;
+
+  return maybeInitiateKeyUpdate(*conn_);
 }
 
 void QuicServerTransport::closeTransport() {
@@ -456,7 +459,11 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     if (closeState_ == CloseState::CLOSED) {
       return;
     }
-    maybeWriteNewSessionTicket();
+    auto sessionTicketResult = maybeWriteNewSessionTicket();
+    if (sessionTicketResult.hasError()) {
+      closeImpl(sessionTicketResult.error());
+      return;
+    }
     maybeNotifyConnectionIdBound();
     maybeNotifyHandshakeFinished();
     maybeIssueConnectionIds();
@@ -572,7 +579,8 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
   return false;
 }
 
-void QuicServerTransport::maybeWriteNewSessionTicket() {
+folly::Expected<folly::Unit, QuicError>
+QuicServerTransport::maybeWriteNewSessionTicket() {
   if (shouldWriteNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     if (conn_->qLogger) {
@@ -615,8 +623,13 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     if (conn_->earlyDataAppParamsGetter) {
       appToken.appParams = conn_->earlyDataAppParamsGetter();
     }
-    serverConn_->serverHandshakeLayer->writeNewSessionTicket(appToken);
+    auto result =
+        serverConn_->serverHandshakeLayer->writeNewSessionTicket(appToken);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
   }
+  return folly::unit;
 }
 
 void QuicServerTransport::maybeNotifyConnectionIdRetired() {

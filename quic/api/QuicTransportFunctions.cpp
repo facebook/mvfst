@@ -2168,20 +2168,33 @@ void updateOneRttWriteCipher(
   conn.oneRttWritePacketsSentInCurrentPhase = 0;
 }
 
-void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn) {
+folly::Expected<folly::Unit, QuicError> maybeHandleIncomingKeyUpdate(
+    QuicConnectionStateBase& conn) {
   if (conn.readCodec->getCurrentOneRttReadPhase() != conn.oneRttWritePhase) {
     // Peer has initiated a key update.
+    auto nextOneRttWriteCipherResult =
+        conn.handshakeLayer->getNextOneRttWriteCipher();
+    if (nextOneRttWriteCipherResult.hasError()) {
+      return folly::makeUnexpected(nextOneRttWriteCipherResult.error());
+    }
     updateOneRttWriteCipher(
         conn,
-        conn.handshakeLayer->getNextOneRttWriteCipher(),
+        std::move(nextOneRttWriteCipherResult.value()),
         conn.readCodec->getCurrentOneRttReadPhase());
 
+    auto nextOneRttReadCipherResult =
+        conn.handshakeLayer->getNextOneRttReadCipher();
+    if (nextOneRttReadCipherResult.hasError()) {
+      return folly::makeUnexpected(nextOneRttReadCipherResult.error());
+    }
     conn.readCodec->setNextOneRttReadCipher(
-        conn.handshakeLayer->getNextOneRttReadCipher());
+        std::move(nextOneRttReadCipherResult.value()));
   }
+  return folly::unit;
 }
 
-void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
+folly::Expected<folly::Unit, QuicError> maybeInitiateKeyUpdate(
+    QuicConnectionStateBase& conn) {
   if (conn.transportSettings.initiateKeyUpdate) {
     auto packetsBeforeNextUpdate =
         conn.transportSettings.firstKeyUpdatePacketCount
@@ -2194,17 +2207,29 @@ void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn) {
       conn.readCodec->advanceOneRttReadPhase();
       conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
+      auto nextOneRttWriteCipherResult =
+          conn.handshakeLayer->getNextOneRttWriteCipher();
+      if (nextOneRttWriteCipherResult.hasError()) {
+        return folly::makeUnexpected(nextOneRttWriteCipherResult.error());
+      }
       updateOneRttWriteCipher(
           conn,
-          conn.handshakeLayer->getNextOneRttWriteCipher(),
+          std::move(nextOneRttWriteCipherResult.value()),
           conn.readCodec->getCurrentOneRttReadPhase());
+
+      auto nextOneRttReadCipherResult =
+          conn.handshakeLayer->getNextOneRttReadCipher();
+      if (nextOneRttReadCipherResult.hasError()) {
+        return folly::makeUnexpected(nextOneRttReadCipherResult.error());
+      }
       conn.readCodec->setNextOneRttReadCipher(
-          conn.handshakeLayer->getNextOneRttReadCipher());
+          std::move(nextOneRttReadCipherResult.value()));
       // Signal the transport that a key update has been initiated.
       conn.oneRttWritePendingVerification = true;
       conn.oneRttWritePendingVerificationPacketNumber.reset();
     }
   }
+  return folly::unit;
 }
 
 folly::Expected<folly::Unit, QuicError> maybeVerifyPendingKeyUpdate(

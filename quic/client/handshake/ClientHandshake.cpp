@@ -17,7 +17,7 @@ namespace quic {
 ClientHandshake::ClientHandshake(QuicClientConnectionState* conn)
     : conn_(conn) {}
 
-void ClientHandshake::connect(
+folly::Expected<folly::Unit, QuicError> ClientHandshake::connect(
     Optional<std::string> hostname,
     std::shared_ptr<ClientTransportParametersExtension> transportParams) {
   transportParams_ = std::move(transportParams);
@@ -25,7 +25,9 @@ void ClientHandshake::connect(
   Optional<CachedServerTransportParameters> cachedServerTransportParams =
       connectImpl(std::move(hostname));
 
-  throwOnError();
+  if (error_.hasError()) {
+    return error_;
+  }
 
   if (conn_->zeroRttWriteCipher) {
     if (conn_->qLogger) {
@@ -50,18 +52,19 @@ void ClientHandshake::connect(
         cachedServerTransportParams->extendedAckFeatures);
     auto result = updateTransportParamsFromCachedEarlyParams(
         *conn_, *cachedServerTransportParams);
-    // TODO remove throw
     if (result.hasError()) {
-      raiseError(QuicTransportException(
-          result.error().message, *result.error().code.asTransportErrorCode()));
-      return;
+      // Why are we not returning here?
+      error_ = folly::makeUnexpected(std::move(result.error()));
     }
   }
+  return folly::unit;
 }
 
-void ClientHandshake::doHandshake(Buf data, EncryptionLevel encryptionLevel) {
+folly::Expected<folly::Unit, QuicError> ClientHandshake::doHandshake(
+    Buf data,
+    EncryptionLevel encryptionLevel) {
   if (!data) {
-    return;
+    return folly::unit;
   }
   // TODO: deal with clear text alert messages. It's possible that a MITM who
   // mucks with the finished messages could cause the decryption to be invalid
@@ -106,8 +109,11 @@ void ClientHandshake::doHandshake(Buf data, EncryptionLevel encryptionLevel) {
       default:
         LOG(FATAL) << "Unhandled EncryptionLevel";
     }
-    throwOnError();
+    if (error_.hasError()) {
+      return std::move(error_);
+    }
   }
+  return folly::unit;
 }
 
 void ClientHandshake::handshakeConfirmed() {
@@ -165,12 +171,19 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->oneRttWriteCipher = std::move(aead);
       conn_->oneRttWriteHeaderCipher = std::move(packetNumberCipher);
       break;
-    case CipherKind::OneRttRead:
+    case CipherKind::OneRttRead: {
       readTrafficSecret_ = BufHelpers::copyBuffer(secret);
       conn_->readCodec->setOneRttReadCipher(std::move(aead));
       conn_->readCodec->setOneRttHeaderCipher(std::move(packetNumberCipher));
-      conn_->readCodec->setNextOneRttReadCipher(getNextOneRttReadCipher());
+      auto nextOneRttReadCipher = getNextOneRttReadCipher();
+      if (nextOneRttReadCipher.hasError()) {
+        error_ = folly::makeUnexpected(std::move(nextOneRttReadCipher.error()));
+        return;
+      }
+      conn_->readCodec->setNextOneRttReadCipher(
+          std::move(nextOneRttReadCipher.value()));
       break;
+    }
     case CipherKind::ZeroRttWrite:
       getClientConn()->zeroRttWriteCipher = std::move(aead);
       getClientConn()->zeroRttWriteHeaderCipher = std::move(packetNumberCipher);
@@ -181,8 +194,11 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
   }
 }
 
-std::unique_ptr<Aead> ClientHandshake::getNextOneRttWriteCipher() {
-  throwOnError();
+folly::Expected<std::unique_ptr<Aead>, QuicError>
+ClientHandshake::getNextOneRttWriteCipher() {
+  if (error_.hasError()) {
+    return folly::makeUnexpected(std::move(error_.error()));
+  }
 
   CHECK(writeTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
@@ -194,8 +210,11 @@ std::unique_ptr<Aead> ClientHandshake::getNextOneRttWriteCipher() {
   return cipher;
 }
 
-std::unique_ptr<Aead> ClientHandshake::getNextOneRttReadCipher() {
-  throwOnError();
+folly::Expected<std::unique_ptr<Aead>, QuicError>
+ClientHandshake::getNextOneRttReadCipher() {
+  if (error_.hasError()) {
+    return folly::makeUnexpected(std::move(error_.error()));
+  }
 
   CHECK(readTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
@@ -205,16 +224,6 @@ std::unique_ptr<Aead> ClientHandshake::getNextOneRttReadCipher() {
   auto cipher =
       buildAead(CipherKind::OneRttRead, readTrafficSecret_->coalesce());
   return cipher;
-}
-
-void ClientHandshake::raiseError(folly::exception_wrapper error) {
-  error_ = std::move(error);
-}
-
-void ClientHandshake::throwOnError() {
-  if (error_) {
-    error_.throw_exception();
-  }
 }
 
 void ClientHandshake::waitForData() {
@@ -261,6 +270,10 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // stream, the server would have also acked all the client initial packets.
   CHECK(phase_ == Phase::Handshake);
   phase_ = Phase::OneRttKeysDerived;
+}
+
+void ClientHandshake::setError(QuicError error) {
+  error_ = folly::makeUnexpected(std::move(error));
 }
 
 QuicClientConnectionState* ClientHandshake::getClientConn() {

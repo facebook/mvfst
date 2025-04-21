@@ -289,6 +289,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   virtual void initializeServerHandshake() {
     fakeHandshake = new FakeServerHandshake(
         server->getNonConstConn(), getFizzServerContext());
+    ON_CALL(*fakeHandshake, writeNewSessionTicket)
+        .WillByDefault(testing::Return(folly::unit));
   }
 
   virtual bool getDisableMigration() {

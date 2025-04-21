@@ -34,7 +34,7 @@ class ClientHandshake : public Handshake {
   /**
    * Initiate the handshake with the supplied parameters.
    */
-  void connect(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> connect(
       Optional<std::string> hostname,
       std::shared_ptr<ClientTransportParametersExtension> transportParams);
 
@@ -43,7 +43,9 @@ class ClientHandshake : public Handshake {
    * This can change the state of the transport which may result in ciphers
    * being initialized, bytes written out, or the write phase changing.
    */
-  virtual void doHandshake(Buf data, EncryptionLevel encryptionLevel);
+  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> doHandshake(
+      Buf data,
+      EncryptionLevel encryptionLevel);
 
   /**
    * Provides facilities to get, put and remove a PSK from the cache in case the
@@ -55,20 +57,21 @@ class ClientHandshake : public Handshake {
    * Returns a reference to the CryptoFactory used internally.
    */
   virtual const CryptoFactory& getCryptoFactory() const = 0;
-
   /**
    * An API to get oneRttWriteCiphers on key rotation. Each call will return a
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttWriteCipher() override;
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getNextOneRttWriteCipher() override;
 
   /**
    * An API to get oneRttReadCiphers on key rotation. Each call will return a
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  std::unique_ptr<Aead> getNextOneRttReadCipher() override;
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getNextOneRttReadCipher() override;
 
   /**
    * Triggered when we have received a handshake done frame from the server.
@@ -147,13 +150,12 @@ class ClientHandshake : public Handshake {
   /**
    * Various utilities for concrete implementations to use.
    */
-  void raiseError(folly::exception_wrapper error);
-  void throwOnError();
   void waitForData();
   void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
   void handshakeInitiated();
   void computeZeroRttCipher();
   void computeOneRttCipher(bool earlyDataAccepted);
+  void setError(QuicError error);
 
   /**
    * Accessor for the concrete implementation, so they can access data without
@@ -214,7 +216,7 @@ class ClientHandshake : public Handshake {
   // transport's read and write ciphers are likely out of sync.
   int8_t trafficSecretSync_{0};
 
-  folly::exception_wrapper error_;
+  folly::Expected<folly::Unit, QuicError> error_{folly::unit};
 };
 
 } // namespace quic

@@ -141,23 +141,29 @@ class ServerHandshakeTest : public Test {
   }
 
   void processCryptoEvents() {
-    try {
-      setHandshakeState();
-      waitForData = false;
-      do {
-        auto writableBytes = getHandshakeWriteBytes();
-        if (writableBytes->empty()) {
-          break;
-        }
-        VLOG(1) << "server->client bytes="
-                << writableBytes->computeChainDataLength();
-        clientReadBuffer.append(std::move(writableBytes));
-        fizzClient->newTransportData();
-      } while (!waitForData);
-    } catch (const QuicTransportException& e) {
-      VLOG(1) << "server exception " << e.what();
-      ex = std::make_exception_ptr(e);
+    auto handshakeStateResult = setHandshakeState();
+    if (handshakeStateResult.hasError()) {
+      VLOG(1) << "server exception " << handshakeStateResult.error().message;
+      ex = folly::makeUnexpected(handshakeStateResult.error());
+      if (!inRoundScope_ && !handshakeCv.ready()) {
+        VLOG(1) << "Posting handshake cv";
+        handshakeCv.post();
+      }
+      return;
     }
+
+    waitForData = false;
+    do {
+      auto writableBytes = getHandshakeWriteBytes();
+      if (writableBytes->empty()) {
+        break;
+      }
+      VLOG(1) << "server->client bytes="
+              << writableBytes->computeChainDataLength();
+      clientReadBuffer.append(std::move(writableBytes));
+      fizzClient->newTransportData();
+    } while (!waitForData);
+
     if (!inRoundScope_ && !handshakeCv.ready()) {
       VLOG(1) << "Posting handshake cv";
       handshakeCv.post();
@@ -170,18 +176,18 @@ class ServerHandshakeTest : public Test {
     };
     inRoundScope_ = true;
     evb.loop();
-    try {
-      for (auto& clientWrite : clientWrites) {
-        for (auto& content : clientWrite.contents) {
-          auto encryptionLevel =
-              getEncryptionLevelFromFizz(content.encryptionLevel);
-          handshake->doHandshake(std::move(content.data), encryptionLevel);
+    for (auto& clientWrite : clientWrites) {
+      for (auto& content : clientWrite.contents) {
+        auto encryptionLevel =
+            getEncryptionLevelFromFizz(content.encryptionLevel);
+        auto result =
+            handshake->doHandshake(std::move(content.data), encryptionLevel);
+        if (result.hasError()) {
+          ex = folly::makeUnexpected(result.error());
         }
       }
-      processCryptoEvents();
-    } catch (const QuicTransportException&) {
-      ex = std::current_exception();
     }
+    processCryptoEvents();
     evb.loopIgnoreKeepAlive();
   }
 
@@ -205,27 +211,40 @@ class ServerHandshakeTest : public Test {
     evb.loop();
   }
 
-  void setHandshakeState() {
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> setHandshakeState() {
     auto oneRttWriteCipherTmp = handshake->getFirstOneRttWriteCipher();
+    if (oneRttWriteCipherTmp.hasError()) {
+      return folly::makeUnexpected(oneRttWriteCipherTmp.error());
+    }
     auto oneRttReadCipherTmp = handshake->getFirstOneRttReadCipher();
+    if (oneRttReadCipherTmp.hasError()) {
+      return folly::makeUnexpected(oneRttReadCipherTmp.error());
+    }
     auto zeroRttReadCipherTmp = handshake->getZeroRttReadCipher();
+    if (zeroRttReadCipherTmp.hasError()) {
+      return folly::makeUnexpected(zeroRttReadCipherTmp.error());
+    }
     auto handshakeWriteCipherTmp = std::move(conn->handshakeWriteCipher);
     auto handshakeReadCipherTmp = handshake->getHandshakeReadCipher();
-    if (oneRttWriteCipherTmp) {
-      oneRttWriteCipher = std::move(oneRttWriteCipherTmp);
+    if (handshakeReadCipherTmp.hasError()) {
+      return folly::makeUnexpected(handshakeReadCipherTmp.error());
     }
-    if (oneRttReadCipherTmp) {
-      oneRttReadCipher = std::move(oneRttReadCipherTmp);
+    if (oneRttWriteCipherTmp.value()) {
+      oneRttWriteCipher = std::move(oneRttWriteCipherTmp.value());
     }
-    if (zeroRttReadCipherTmp) {
-      zeroRttReadCipher = std::move(zeroRttReadCipherTmp);
+    if (oneRttReadCipherTmp.value()) {
+      oneRttReadCipher = std::move(oneRttReadCipherTmp.value());
     }
-    if (handshakeReadCipherTmp) {
-      handshakeReadCipher = std::move(handshakeReadCipherTmp);
+    if (zeroRttReadCipherTmp.value()) {
+      zeroRttReadCipher = std::move(zeroRttReadCipherTmp.value());
+    }
+    if (handshakeReadCipherTmp.value()) {
+      handshakeReadCipher = std::move(handshakeReadCipherTmp.value());
     }
     if (handshakeWriteCipherTmp) {
       handshakeWriteCipher = std::move(handshakeWriteCipherTmp);
     }
+    return folly::unit;
   }
 
   void expectOneRttReadCipher(bool expected) {
@@ -359,7 +378,7 @@ class ServerHandshakeTest : public Test {
   std::unique_ptr<Aead> handshakeWriteCipher;
   std::unique_ptr<Aead> handshakeReadCipher;
 
-  std::exception_ptr ex;
+  folly::Expected<folly::Unit, QuicError> ex{folly::unit};
   std::string hostname;
   std::shared_ptr<fizz::test::MockCertificateVerifier> verifier;
   std::shared_ptr<fizz::client::FizzClientContext> clientCtx;
@@ -394,9 +413,7 @@ TEST_F(ServerHandshakeTest, TestHandshakeSuccess) {
   serverClientRound();
   clientServerRound();
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Established);
-  if (ex) {
-    std::rethrow_exception(ex);
-  }
+  ASSERT_FALSE(ex.hasError());
   expectOneRttCipher(true);
   EXPECT_EQ(handshake->getApplicationProtocol(), "quic_test");
   EXPECT_TRUE(handshakeSuccess);
@@ -415,9 +432,7 @@ TEST_F(ServerHandshakeTest, TestHandshakeSuccessIgnoreNonHandshake) {
   serverClientRound();
   clientServerRound();
   EXPECT_EQ(handshake->getPhase(), ServerHandshake::Phase::Established);
-  if (ex) {
-    std::rethrow_exception(ex);
-  }
+  ASSERT_FALSE(ex.hasError());
   expectOneRttCipher(true);
   EXPECT_EQ(handshake->getApplicationProtocol(), "quic_test");
   EXPECT_TRUE(handshakeSuccess);
@@ -434,7 +449,7 @@ TEST_F(ServerHandshakeTest, TestMalformedHandshakeMessage) {
   clientWrites.push_back(std::move(write));
   clientServerRound();
 
-  EXPECT_TRUE(ex);
+  EXPECT_TRUE(ex.hasError());
 }
 
 class AsyncRejectingTicketCipher : public fizz::server::TicketCipher {
@@ -536,7 +551,7 @@ TEST_F(ServerHandshakeWriteNSTTest, TestWriteNST) {
             folly::IOBufEqualTo()(resState.appToken, encodeAppToken(appToken)));
         return std::make_pair(folly::IOBuf::copyBuffer("appToken"), 100s);
       }));
-  handshake->writeNewSessionTicket(appToken);
+  ASSERT_FALSE(handshake->writeNewSessionTicket(appToken).hasError());
   processCryptoEvents();
   evb.loop();
   EXPECT_TRUE(cache_->getPsk(kTestHostname.str()));
@@ -707,9 +722,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestAsyncError) {
   bool error = false;
   EXPECT_CALL(serverCallback, onCryptoEventAvailable())
       .WillRepeatedly(Invoke([&] {
-        try {
-          handshake->getFirstOneRttReadCipher();
-        } catch (std::exception&) {
+        if (handshake->getFirstOneRttReadCipher().hasError()) {
           error = true;
         }
       }));
@@ -729,7 +742,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestCancelOnAsyncError) {
       }));
   promise.setValue();
   evb.loop();
-  EXPECT_THROW(handshake->getFirstOneRttReadCipher(), std::runtime_error);
+  EXPECT_TRUE(handshake->getFirstOneRttReadCipher().hasError());
 }
 
 TEST_F(ServerHandshakeAsyncErrorTest, TestCancelWhileWaitingAsyncError) {
@@ -740,7 +753,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestCancelWhileWaitingAsyncError) {
 
   promise.setValue();
   evb.loop();
-  EXPECT_THROW(handshake->getFirstOneRttReadCipher(), std::runtime_error);
+  EXPECT_TRUE(handshake->getFirstOneRttReadCipher().hasError());
 }
 
 class ServerHandshakeSyncErrorTest : public ServerHandshakePskTest {
@@ -759,7 +772,7 @@ TEST_F(ServerHandshakeSyncErrorTest, TestError) {
   // Make an async ticket decryption operation.
   clientServerRound();
   evb.loop();
-  EXPECT_THROW(handshake->getFirstOneRttReadCipher(), std::runtime_error);
+  EXPECT_TRUE(handshake->getFirstOneRttReadCipher().hasError());
 }
 
 class ServerHandshakeZeroRttDefaultAppTokenValidatorTest

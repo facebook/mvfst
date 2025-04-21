@@ -24,20 +24,21 @@ class Handshake {
   virtual ~Handshake() = default;
 
   virtual const Optional<std::string>& getApplicationProtocol() const = 0;
-
   /**
    * An API to get oneRttReadCiphers on key rotation. Each call will return a
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  virtual std::unique_ptr<Aead> getNextOneRttReadCipher() = 0;
+  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getNextOneRttReadCipher() = 0;
 
   /**
    * An API to get oneRttWriteCiphers on key rotation. Each call will return a
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  virtual std::unique_ptr<Aead> getNextOneRttWriteCipher() = 0;
+  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getNextOneRttWriteCipher() = 0;
 
   /*
    * Export the underlying TLS key material.

@@ -338,8 +338,10 @@ void updateOneRttWriteCipher(
     QuicConnectionStateBase& conn,
     std::unique_ptr<Aead> aead,
     ProtectionType oneRttPhase);
-void maybeHandleIncomingKeyUpdate(QuicConnectionStateBase& conn);
-void maybeInitiateKeyUpdate(QuicConnectionStateBase& conn);
+folly::Expected<folly::Unit, QuicError> maybeHandleIncomingKeyUpdate(
+    QuicConnectionStateBase& conn);
+[[nodiscard]] folly::Expected<folly::Unit, QuicError> maybeInitiateKeyUpdate(
+    QuicConnectionStateBase& conn);
 [[nodiscard]] folly::Expected<folly::Unit, QuicError>
 maybeVerifyPendingKeyUpdate(
     QuicConnectionStateBase& conn,

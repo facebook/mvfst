@@ -410,18 +410,49 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
   // Zero RTT read cipher is available after chlo is processed with the
   // condition that early data attempt is accepted.
   auto handshakeLayer = conn.serverHandshakeLayer;
-  auto zeroRttReadCipher = handshakeLayer->getZeroRttReadCipher();
-  auto zeroRttHeaderCipher = handshakeLayer->getZeroRttReadHeaderCipher();
+  auto zeroRttReadCipherResult = handshakeLayer->getZeroRttReadCipher();
+  if (zeroRttReadCipherResult.hasError()) {
+    return folly::makeUnexpected(zeroRttReadCipherResult.error());
+  }
+  auto zeroRttReadCipher = std::move(zeroRttReadCipherResult.value());
+
+  auto zeroRttHeaderCipherResult = handshakeLayer->getZeroRttReadHeaderCipher();
+  if (zeroRttHeaderCipherResult.hasError()) {
+    return folly::makeUnexpected(zeroRttHeaderCipherResult.error());
+  }
+  auto zeroRttHeaderCipher = std::move(zeroRttHeaderCipherResult.value());
+
   // One RTT write cipher is available at Fizz layer after chlo is processed.
   // However, the cipher is only exported to QUIC if early data attempt is
   // accepted. Otherwise, the cipher will be available after cfin is
   // processed.
-  auto oneRttWriteCipher = handshakeLayer->getFirstOneRttWriteCipher();
-  // One RTT read cipher is available after cfin is processed.
-  auto oneRttReadCipher = handshakeLayer->getFirstOneRttReadCipher();
+  auto oneRttWriteCipherResult = handshakeLayer->getFirstOneRttWriteCipher();
+  if (oneRttWriteCipherResult.hasError()) {
+    return folly::makeUnexpected(oneRttWriteCipherResult.error());
+  }
+  auto oneRttWriteCipher = std::move(oneRttWriteCipherResult.value());
 
-  auto oneRttWriteHeaderCipher = handshakeLayer->getOneRttWriteHeaderCipher();
-  auto oneRttReadHeaderCipher = handshakeLayer->getOneRttReadHeaderCipher();
+  // One RTT read cipher is available after cfin is processed.
+  auto oneRttReadCipherResult = handshakeLayer->getFirstOneRttReadCipher();
+  if (oneRttReadCipherResult.hasError()) {
+    return folly::makeUnexpected(oneRttReadCipherResult.error());
+  }
+  auto oneRttReadCipher = std::move(oneRttReadCipherResult.value());
+
+  auto oneRttWriteHeaderCipherResult =
+      handshakeLayer->getOneRttWriteHeaderCipher();
+  if (oneRttWriteHeaderCipherResult.hasError()) {
+    return folly::makeUnexpected(oneRttWriteHeaderCipherResult.error());
+  }
+  auto oneRttWriteHeaderCipher =
+      std::move(oneRttWriteHeaderCipherResult.value());
+
+  auto oneRttReadHeaderCipherResult =
+      handshakeLayer->getOneRttReadHeaderCipher();
+  if (oneRttReadHeaderCipherResult.hasError()) {
+    return folly::makeUnexpected(oneRttReadHeaderCipherResult.error());
+  }
+  auto oneRttReadHeaderCipher = std::move(oneRttReadHeaderCipherResult.value());
 
   if (zeroRttReadCipher) {
     conn.usedZeroRtt = true;
@@ -475,12 +506,27 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
     conn.isClientAddrVerified = true;
     conn.writableBytesLimit.reset();
     conn.readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
+    auto nextOneRttReadCipherResult = handshakeLayer->getNextOneRttReadCipher();
+    if (nextOneRttReadCipherResult.hasError()) {
+      return folly::makeUnexpected(nextOneRttReadCipherResult.error());
+    }
     conn.readCodec->setNextOneRttReadCipher(
-        handshakeLayer->getNextOneRttReadCipher());
+        std::move(nextOneRttReadCipherResult.value()));
   }
-  auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
-  auto handshakeReadHeaderCipher =
+  auto handshakeReadCipherResult = handshakeLayer->getHandshakeReadCipher();
+  if (handshakeReadCipherResult.hasError()) {
+    return folly::makeUnexpected(handshakeReadCipherResult.error());
+  }
+  auto handshakeReadCipher = std::move(handshakeReadCipherResult.value());
+
+  auto handshakeReadHeaderCipherResult =
       handshakeLayer->getHandshakeReadHeaderCipher();
+  if (handshakeReadHeaderCipherResult.hasError()) {
+    return folly::makeUnexpected(handshakeReadHeaderCipherResult.error());
+  }
+  auto handshakeReadHeaderCipher =
+      std::move(handshakeReadHeaderCipherResult.value());
+
   if (handshakeReadCipher) {
     CHECK(handshakeReadHeaderCipher);
     conn.readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
@@ -1466,7 +1512,11 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
     auto data = readDataFromCryptoStream(
         *getCryptoStream(*conn.cryptoState, encryptionLevel));
     if (data) {
-      conn.serverHandshakeLayer->doHandshake(std::move(data), encryptionLevel);
+      auto handshakeResult = conn.serverHandshakeLayer->doHandshake(
+          std::move(data), encryptionLevel);
+      if (handshakeResult.hasError()) {
+        return folly::makeUnexpected(handshakeResult.error());
+      }
       auto handshakeStateResult = updateHandshakeState(conn);
       if (handshakeStateResult.hasError()) {
         if (conn.qLogger) {

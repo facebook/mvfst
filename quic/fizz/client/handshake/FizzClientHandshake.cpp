@@ -267,9 +267,9 @@ class FizzClientHandshake::ActionMoveVisitor {
   explicit ActionMoveVisitor(FizzClientHandshake& client) : client_(client) {}
 
   void operator()(fizz::DeliverAppData&) {
-    client_.raiseError(folly::make_exception_wrapper<QuicTransportException>(
-        "Invalid app data on crypto stream",
-        TransportErrorCode::PROTOCOL_VIOLATION));
+    client_.setError(QuicError(
+        TransportErrorCode::PROTOCOL_VIOLATION,
+        "Invalid app data on crypto stream"));
   }
 
   void operator()(fizz::WriteToSocket& write) {
@@ -306,13 +306,13 @@ class FizzClientHandshake::ActionMoveVisitor {
               fe->getAlert().value());
       alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
           TransportErrorCode::CRYPTO_ERROR);
-      client_.raiseError(folly::make_exception_wrapper<QuicTransportException>(
-          errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum)));
+      client_.setError(QuicError(
+          static_cast<TransportErrorCode>(alertNum), errMsg.toStdString()));
     } else {
-      client_.raiseError(folly::make_exception_wrapper<QuicTransportException>(
-          errMsg.toStdString(),
+      client_.setError(QuicError(
           static_cast<TransportErrorCode>(
-              fizz::AlertDescription::internal_error)));
+              fizz::AlertDescription::internal_error),
+          errMsg.toStdString()));
     }
   }
 
@@ -329,8 +329,8 @@ class FizzClientHandshake::ActionMoveVisitor {
   }
 
   void operator()(fizz::EndOfData&) {
-    client_.raiseError(folly::make_exception_wrapper<QuicTransportException>(
-        "unexpected close notify", TransportErrorCode::INTERNAL_ERROR));
+    client_.setError(QuicError(
+        TransportErrorCode::INTERNAL_ERROR, "unexpected close notify"));
   }
 
   void operator()(fizz::SecretAvailable& secretAvailable) {
