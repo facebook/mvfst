@@ -22,9 +22,9 @@ class TokenGenerator {
  public:
   explicit TokenGenerator(TokenSecret secret);
 
-  Optional<Buf> encryptToken(const QuicAddrValidationToken& token);
+  Optional<BufPtr> encryptToken(const QuicAddrValidationToken& token);
 
-  uint64_t decryptToken(Buf encryptedToken, Buf aeadAssocData);
+  uint64_t decryptToken(BufPtr encryptedToken, BufPtr aeadAssocData);
 
  private:
   fizz::server::Aead128GCMTokenCipher cipher_;

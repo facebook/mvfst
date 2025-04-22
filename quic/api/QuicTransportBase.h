@@ -130,9 +130,9 @@ class QuicTransportBase : public QuicSocket,
   virtual void setAckRxTimestampsEnabled(bool enableAckRxTimestamps);
 
   void setEarlyDataAppParamsFunctions(
-      folly::Function<bool(const Optional<std::string>&, const Buf&) const>
+      folly::Function<bool(const Optional<std::string>&, const BufPtr&) const>
           validator,
-      folly::Function<Buf()> getter) final;
+      folly::Function<BufPtr()> getter) final;
 
   bool isDetachable() override;
 
@@ -188,7 +188,8 @@ class QuicTransportBase : public QuicSocket,
    * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
    * dropped, and a LocalErrorCode will be returned to caller.
    */
-  folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(Buf buf) override;
+  folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(
+      BufPtr buf) override;
 
   /**
    * Returns the currently available received Datagrams.
@@ -201,7 +202,7 @@ class QuicTransportBase : public QuicSocket,
    * Returns the currently available received Datagram IOBufs.
    * Returns all datagrams if atMost is 0.
    */
-  folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagramBufs(
+  folly::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) override;
 
   /**

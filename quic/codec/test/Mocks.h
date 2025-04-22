@@ -139,7 +139,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
     CHECK(false) << "Use buildTestPacket()";
   }
 
-  std::pair<RegularQuicWritePacket, Buf> buildTestPacket() && {
+  std::pair<RegularQuicWritePacket, BufPtr> buildTestPacket() && {
     ShortHeader header(
         ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01);
     RegularQuicWritePacket regularPacket(std::move(header));
@@ -147,7 +147,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
     return std::make_pair(std::move(regularPacket), std::move(data_));
   }
 
-  std::pair<RegularQuicWritePacket, Buf> buildLongHeaderPacket() && {
+  std::pair<RegularQuicWritePacket, BufPtr> buildLongHeaderPacket() && {
     ConnectionId connId = getTestConnectionId();
     PacketNum packetNum = 10;
     LongHeader header(

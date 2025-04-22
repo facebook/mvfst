@@ -771,7 +771,7 @@ TEST_P(QuicStreamManagerTest, RemoveResetsUponClosure) {
   EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
 }
 
-Buf createBuffer(uint32_t len) {
+BufPtr createBuffer(uint32_t len) {
   auto buf = folly::IOBuf::create(len);
   buf->append(len);
   return buf;

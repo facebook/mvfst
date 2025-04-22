@@ -9,7 +9,7 @@
 
 namespace quic {
 
-size_t fillIovec(Buf& buf, iovec (&vec)[16]) {
+size_t fillIovec(BufPtr& buf, iovec (&vec)[16]) {
   size_t iovec_len = buf->fillIov(vec, sizeof(vec) / sizeof(vec[0])).numIovecs;
   if (FOLLY_UNLIKELY(iovec_len == 0)) {
     buf->coalesce();
@@ -20,8 +20,8 @@ size_t fillIovec(Buf& buf, iovec (&vec)[16]) {
   return iovec_len;
 }
 
-Buf BufQueue::splitAtMost(size_t len) {
-  RawBuf* current = chain_.get();
+BufPtr BufQueue::splitAtMost(size_t len) {
+  Buf* current = chain_.get();
   // empty queue / requested 0 bytes
   if (current == nullptr || len == 0) {
     return BufHelpers::create(0);
@@ -32,7 +32,7 @@ Buf BufQueue::splitAtMost(size_t len) {
   }
 
   chainLength_ -= len;
-  Buf result;
+  BufPtr result;
   /**
    * Find the last IOBuf containing range requested. This will definitively
    * terminate without looping back to chain_ since we know chainLength_ > len.
@@ -59,18 +59,18 @@ Buf BufQueue::splitAtMost(size_t len) {
     if (current != chain_.get()) {
       result->appendToChain(
           current->separateChain(chain_.get(), current->prev()));
-      result = Buf(result.release()->next());
+      result = BufPtr(result.release()->next());
     }
   }
   // update chain_
   (void)chain_.release();
-  chain_ = Buf(current);
+  chain_ = BufPtr(current);
   DCHECK_EQ(chainLength_, chain_ ? chain_->computeChainDataLength() : 0);
   return result;
 }
 
 size_t BufQueue::trimStartAtMost(size_t amount) {
-  RawBuf* current = chain_.get();
+  Buf* current = chain_.get();
   // empty queue / requested 0 bytes
   if (current == nullptr || amount == 0) {
     return 0;
@@ -117,7 +117,7 @@ void BufQueue::trimStart(size_t amount) {
   }
 }
 
-void BufQueue::append(Buf&& buf) {
+void BufQueue::append(BufPtr&& buf) {
   if (!buf || buf->empty()) {
     return;
   }
@@ -125,7 +125,7 @@ void BufQueue::append(Buf&& buf) {
   appendToChain(chain_, std::move(buf));
 }
 
-void BufQueue::appendToChain(Buf& dst, Buf&& src) {
+void BufQueue::appendToChain(BufPtr& dst, BufPtr&& src) {
   if (dst == nullptr) {
     dst = std::move(src);
   } else {
@@ -133,13 +133,13 @@ void BufQueue::appendToChain(Buf& dst, Buf&& src) {
   }
 }
 
-BufAppender::BufAppender(RawBuf* data, size_t appendLen)
+BufAppender::BufAppender(Buf* data, size_t appendLen)
     : crtBuf_(CHECK_NOTNULL(data)), head_(data), appendLen_(appendLen) {}
 
 void BufAppender::push(const uint8_t* data, size_t len) {
   if (crtBuf_->tailroom() < len || lastBufShared_) {
     auto newBuf = BufHelpers::createCombined(std::max(appendLen_, len));
-    RawBuf* newBufPtr = newBuf.get();
+    Buf* newBufPtr = newBuf.get();
     head_->prependChain(std::move(newBuf));
     crtBuf_ = newBufPtr;
   }
@@ -148,10 +148,10 @@ void BufAppender::push(const uint8_t* data, size_t len) {
   lastBufShared_ = false;
 }
 
-void BufAppender::insert(Buf data) {
+void BufAppender::insert(BufPtr data) {
   // just skip the current buffer and append it to the end of the current
   // buffer.
-  RawBuf* dataPtr = data.get();
+  Buf* dataPtr = data.get();
   // If the buffer is shared we do not want to overrwrite the tail of the
   // buffer.
   lastBufShared_ = data->isShared();
@@ -168,12 +168,12 @@ void BufWriter::push(const uint8_t* data, size_t len) {
   append(len);
 }
 
-void BufWriter::insert(const RawBuf* data) {
+void BufWriter::insert(const Buf* data) {
   auto totalLength = data->computeChainDataLength();
   insert(data, totalLength);
 }
 
-void BufWriter::insert(const RawBuf* data, size_t limit) {
+void BufWriter::insert(const Buf* data, size_t limit) {
   copy(data, limit);
 }
 
@@ -191,13 +191,13 @@ void BufWriter::append(size_t len) {
   appendCount_ += len;
 }
 
-void BufWriter::copy(const RawBuf* data, size_t limit) {
+void BufWriter::copy(const Buf* data, size_t limit) {
   if (!limit) {
     return;
   }
   sizeCheck(limit);
   size_t totalInserted = 0;
-  const RawBuf* curBuf = data;
+  const Buf* curBuf = data;
   auto remaining = limit;
   do {
     auto lenToCopy = std::min(curBuf->length(), remaining);

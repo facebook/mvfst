@@ -293,7 +293,7 @@ bool QuicTransportBaseLite::isBidirectionalStream(StreamId stream) noexcept {
 
 QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     StreamId id,
-    Buf data,
+    BufPtr data,
     bool eof,
     ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
@@ -718,7 +718,7 @@ QuicTransportBaseLite::setReadCallback(
   return setReadCallbackInternal(id, cb, err);
 }
 
-folly::Expected<std::pair<Buf, bool>, LocalErrorCode>
+folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode>
 QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
   if (isSendingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
@@ -2848,7 +2848,7 @@ void QuicTransportBaseLite::notifyAppRateLimited() {
   }
 }
 
-void QuicTransportBaseLite::onTransportKnobs(Buf knobBlob) {
+void QuicTransportBaseLite::onTransportKnobs(BufPtr knobBlob) {
   // Not yet implemented,
   VLOG(4) << "Received transport knobs: "
           << std::string(
@@ -3067,7 +3067,7 @@ void QuicTransportBaseLite::addPacketProcessor(
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::setKnob(
     uint64_t knobSpace,
     uint64_t knobId,
-    Buf knobBlob) {
+    BufPtr knobBlob) {
   if (isKnobSupported()) {
     sendSimpleFrame(*conn_, KnobFrame(knobSpace, knobId, std::move(knobBlob)));
     return folly::unit;

@@ -25,7 +25,7 @@ class QuicClientTransportMock : public QuicClientTransport {
             std::move(handshakeFactory)) {}
 
   MOCK_METHOD(
-      (folly::Expected<std::pair<Buf, bool>, LocalErrorCode>),
+      (folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode>),
       read,
       (StreamId, size_t));
   MOCK_METHOD(
@@ -62,7 +62,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   MOCK_METHOD(
       (WriteResult),
       writeChain,
-      (StreamId, Buf, bool, ByteEventCallback*));
+      (StreamId, BufPtr, bool, ByteEventCallback*));
   MOCK_METHOD((uint64_t), maxWritableOnConn, (), (const));
 };
 

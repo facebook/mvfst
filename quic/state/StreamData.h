@@ -87,7 +87,7 @@ struct StreamBuffer {
   uint64_t offset;
   bool eof{false};
 
-  StreamBuffer(Buf dataIn, uint64_t offsetIn, bool eofIn = false) noexcept
+  StreamBuffer(BufPtr dataIn, uint64_t offsetIn, bool eofIn = false) noexcept
       : data(std::move(dataIn)), offset(offsetIn), eof(eofIn) {}
 
   StreamBuffer(StreamBuffer&& other) = default;

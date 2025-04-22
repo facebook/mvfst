@@ -42,7 +42,7 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
                    .hasError());
 
   std::string retxBufData = "How would I know?";
-  Buf retxBuf = folly::IOBuf::copyBuffer(retxBufData);
+  BufPtr retxBuf = folly::IOBuf::copyBuffer(retxBufData);
   stream.retransmissionBuffer.emplace(
       34,
       std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(retxBuf), 34));
@@ -84,7 +84,7 @@ TEST_F(StreamStateFunctionsTests, BasicReliableResetTest) {
                    .hasError());
 
   std::string retxBufData = "How would I know?";
-  Buf retxBuf = folly::IOBuf::copyBuffer(retxBufData);
+  BufPtr retxBuf = folly::IOBuf::copyBuffer(retxBufData);
   stream.retransmissionBuffer.emplace(
       34,
       std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(retxBuf), 34));

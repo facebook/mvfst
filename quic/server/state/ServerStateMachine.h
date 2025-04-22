@@ -227,7 +227,7 @@ void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn);
 
 void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
-    const Optional<Buf>& appToken);
+    const Optional<BufPtr>& appToken);
 
 [[nodiscard]] folly::Expected<folly::Unit, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,

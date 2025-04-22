@@ -61,7 +61,7 @@ folly::Expected<folly::Unit, QuicError> ClientHandshake::connect(
 }
 
 folly::Expected<folly::Unit, QuicError> ClientHandshake::doHandshake(
-    Buf data,
+    quic::BufPtr data,
     EncryptionLevel encryptionLevel) {
   if (!data) {
     return folly::unit;
@@ -232,7 +232,7 @@ void ClientHandshake::waitForData() {
 
 void ClientHandshake::writeDataToStream(
     EncryptionLevel encryptionLevel,
-    Buf data) {
+    BufPtr data) {
   if (encryptionLevel == EncryptionLevel::AppData) {
     // Don't write 1-rtt handshake data on the client.
     return;

@@ -56,9 +56,9 @@ struct ReceivedUdpPacket {
 
   ReceivedUdpPacket() = default;
 
-  explicit ReceivedUdpPacket(Buf&& bufIn) : buf(std::move(bufIn)) {}
+  explicit ReceivedUdpPacket(BufPtr&& bufIn) : buf(std::move(bufIn)) {}
 
-  ReceivedUdpPacket(Buf&& bufIn, Timings timingsIn, uint8_t tosValueIn)
+  ReceivedUdpPacket(BufPtr&& bufIn, Timings timingsIn, uint8_t tosValueIn)
       : buf(std::move(bufIn)),
         timings(std::move(timingsIn)),
         tosValue(tosValueIn) {}
@@ -74,7 +74,7 @@ struct NetworkData {
   NetworkData() = default;
 
   NetworkData(
-      Buf&& buf,
+      BufPtr&& buf,
       const TimePoint& receiveTimePointIn,
       uint8_t tosValueIn)
       : receiveTimePoint_(receiveTimePointIn) {
@@ -93,7 +93,7 @@ struct NetworkData {
   }
 
   NetworkData(
-      std::vector<Buf>&& packetBufs,
+      std::vector<BufPtr>&& packetBufs,
       const TimePoint& receiveTimePointIn)
       : receiveTimePoint_(receiveTimePointIn),
         packets_([&packetBufs, &receiveTimePointIn]() {
@@ -148,8 +148,8 @@ struct NetworkData {
     return totalData_;
   }
 
-  Buf moveAllData() && {
-    Buf buf;
+  BufPtr moveAllData() && {
+    BufPtr buf;
     for (auto& packet : packets_) {
       if (buf) {
         buf->prependChain(packet.buf.move());

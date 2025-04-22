@@ -191,13 +191,13 @@ void RegularQuicPacketBuilder::appendBytes(
   remainingBytes_ -= byteNumber;
 }
 
-void RegularQuicPacketBuilder::insert(Buf buf) {
+void RegularQuicPacketBuilder::insert(BufPtr buf) {
   remainingBytes_ -= buf->computeChainDataLength();
   bodyAppender_.insert(std::move(buf));
 }
 
-void RegularQuicPacketBuilder::insert(Buf buf, size_t limit) {
-  Buf streamData;
+void RegularQuicPacketBuilder::insert(BufPtr buf, size_t limit) {
+  BufPtr streamData;
   folly::io::Cursor cursor(buf.get());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
@@ -205,7 +205,7 @@ void RegularQuicPacketBuilder::insert(Buf buf, size_t limit) {
 }
 
 void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
-  Buf streamData;
+  BufPtr streamData;
   folly::io::Cursor cursor(buf.front());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
@@ -216,7 +216,7 @@ void RegularQuicPacketBuilder::insert(
     const ChainedByteRangeHead& buf,
     size_t limit) {
   limit = std::min(limit, buf.chainLength());
-  Buf streamData = BufHelpers::wrapBuffer(
+  BufPtr streamData = BufHelpers::wrapBuffer(
       buf.getHead()->getRange().begin(),
       std::min(limit, buf.getHead()->length()));
   limit -= std::min(limit, buf.getHead()->length());
@@ -332,7 +332,7 @@ PseudoRetryPacketBuilder::PseudoRetryPacketBuilder(
     ConnectionId destinationConnectionId,
     ConnectionId originalDestinationConnectionId,
     QuicVersion quicVersion,
-    Buf&& token)
+    BufPtr&& token)
     : initialByte_(initialByte),
       sourceConnectionId_(sourceConnectionId),
       destinationConnectionId_(destinationConnectionId),
@@ -391,7 +391,7 @@ void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
   packetBuf_->append(bufWriter.getBytesWritten());
 }
 
-Buf PseudoRetryPacketBuilder::buildPacket() && {
+BufPtr PseudoRetryPacketBuilder::buildPacket() && {
   return std::move(packetBuf_);
 }
 
@@ -410,7 +410,7 @@ StatelessResetPacketBuilder::StatelessResetPacketBuilder(
   appender.push(resetToken.data(), resetToken.size());
 }
 
-Buf StatelessResetPacketBuilder::buildPacket() && {
+BufPtr StatelessResetPacketBuilder::buildPacket() && {
   return std::move(data_);
 }
 
@@ -521,9 +521,9 @@ uint32_t VersionNegotiationPacketBuilder::remainingSpaceInPkt() {
   return remainingBytes_;
 }
 
-std::pair<VersionNegotiationPacket, Buf>
+std::pair<VersionNegotiationPacket, BufPtr>
 VersionNegotiationPacketBuilder::buildPacket() && {
-  return std::make_pair<VersionNegotiationPacket, Buf>(
+  return std::make_pair<VersionNegotiationPacket, BufPtr>(
       std::move(packet_), std::move(data_));
 }
 
@@ -621,7 +621,7 @@ bool RetryPacketBuilder::canBuildPacket() const noexcept {
   return remainingBytes_ != 0;
 }
 
-Buf RetryPacketBuilder::buildPacket() && {
+BufPtr RetryPacketBuilder::buildPacket() && {
   return std::move(packetBuf_);
 }
 
@@ -683,12 +683,12 @@ void InplaceQuicPacketBuilder::appendBytes(
   remainingBytes_ -= byteNumber;
 }
 
-void InplaceQuicPacketBuilder::insert(Buf buf) {
+void InplaceQuicPacketBuilder::insert(BufPtr buf) {
   remainingBytes_ -= buf->computeChainDataLength();
   bufWriter_.insert(buf.get());
 }
 
-void InplaceQuicPacketBuilder::insert(Buf buf, size_t limit) {
+void InplaceQuicPacketBuilder::insert(BufPtr buf, size_t limit) {
   remainingBytes_ -= limit;
   bufWriter_.insert(buf.get(), limit);
 }
@@ -771,7 +771,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
   // for encryption.
   if (bodyStart_) {
-    RawBuf bodyBuf = BufHelpers::wrapBufferAsValue(
+    Buf bodyBuf = BufHelpers::wrapBufferAsValue(
         bodyStart_, bufWriter_.tail() - bodyStart_ + cipherOverhead_);
     bodyBuf.trimEnd(cipherOverhead_);
 
@@ -784,7 +784,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
     return builtPacket;
   } else {
     PacketBuilderInterface::Packet builtPacket(
-        std::move(packet_), RawBuf(), RawBuf());
+        std::move(packet_), Buf(), Buf());
     releaseOutputBufferInternal();
     return builtPacket;
   }

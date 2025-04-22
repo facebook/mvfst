@@ -89,7 +89,7 @@ folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob len"));
   }
-  Buf knobBlob;
+  BufPtr knobBlob;
   cursor.cloneAtMost(knobBlob, knobLen->first);
   return QuicFrame(
       KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob)));
@@ -499,7 +499,7 @@ folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
   }
-  Buf data;
+  BufPtr data;
   if (cursor.totalLength() < dataLength->first) {
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
@@ -522,7 +522,7 @@ folly::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
   }
-  Buf token;
+  BufPtr token;
   if (cursor.totalLength() < tokenLength->first) {
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
@@ -579,7 +579,7 @@ folly::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
     }
   }
-  Buf data;
+  BufPtr data;
 
   // Calculate how much to trim from the start of the queue
   size_t trimAmount = cursor - queue.front();
@@ -1208,7 +1208,7 @@ folly::Expected<QuicFrame, QuicError> parseFrame(
 folly::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
-    Buf packetData) {
+    BufPtr packetData) {
   RegularQuicPacket packet(std::move(header));
   BufQueue queue;
   queue.append(std::move(packetData));
@@ -1404,7 +1404,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
 
-    Buf token;
+    BufPtr token;
     cursor.clone(token, cursor.totalLength() - kRetryIntegrityTagLen);
 
     return ParsedLongHeader(
@@ -1425,7 +1425,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
 
-  Buf token;
+  BufPtr token;
   if (type == LongHeader::Types::Initial) {
     auto tokenLen = decodeQuicInteger(cursor);
     if (!tokenLen) {
@@ -1438,7 +1438,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     }
 
     if (tokenLen->first > 0) {
-      Buf tokenBuf;
+      BufPtr tokenBuf;
       // If tokenLen > token's actual length then the cursor will throw.
       cursor.clone(tokenBuf, tokenLen->first);
       token = std::move(tokenBuf);

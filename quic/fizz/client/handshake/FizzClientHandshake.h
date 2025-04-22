@@ -79,7 +79,7 @@ class FizzClientHandshake : public ClientHandshake {
       override;
   std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
       folly::ByteRange secret) override;
-  Buf getNextTrafficSecret(folly::ByteRange secret) const override;
+  BufPtr getNextTrafficSecret(folly::ByteRange secret) const override;
 
   class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);

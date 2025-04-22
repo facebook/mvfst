@@ -241,7 +241,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     encryptedData = BufHelpers::create(0);
   }
 
-  Buf decrypted;
+  BufPtr decrypted;
   auto decryptAttempt = cipher->tryDecrypt(
       std::move(encryptedData), headerData.get(), packetNum.first);
   if (!decryptAttempt) {
@@ -269,7 +269,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
 }
 
 CodecResult QuicReadCodec::tryParseShortHeaderPacket(
-    Buf data,
+    BufPtr data,
     const AckStates& ackStates,
     size_t dstConnIdSize,
     folly::io::Cursor& cursor) {
@@ -357,7 +357,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
   folly::IOBuf headerData = BufHelpers::wrapBufferAsValue(data->data(), aadLen);
   data->trimStart(aadLen);
 
-  Buf decrypted;
+  BufPtr decrypted;
   auto decryptAttempt = oneRttReadCipherToUse->tryDecrypt(
       std::move(data), &headerData, packetNum.first);
   if (!decryptAttempt) {

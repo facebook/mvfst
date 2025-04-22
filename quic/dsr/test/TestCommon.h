@@ -126,7 +126,7 @@ class DSRCommonTestFixture : public testing::Test {
   std::unique_ptr<Aead> aead_;
   std::unordered_map<StreamId, size_t> instructionCounter_;
   std::vector<SendInstruction> pendingInstructions_;
-  Buf packetProtectionKey_;
+  BufPtr packetProtectionKey_;
   std::unique_ptr<FakeServerHandshake> serverHandshake_;
 };
 } // namespace quic::test

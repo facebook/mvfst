@@ -71,7 +71,7 @@ PacketNum rstStreamAndSendPacket(
 
 void writeStreamFrameData(
     PacketBuilderInterface& builder,
-    Buf writeBuffer,
+    BufPtr writeBuffer,
     uint64_t dataLen);
 
 // TODO: this is a really horrible API. User can easily pass srcConnId and
@@ -119,18 +119,18 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
     uint64_t offset = 0,
     uint64_t packetSizeLimit = kDefaultUDPSendPacketLen);
 
-Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet);
+BufPtr packetToBuf(const RegularQuicPacketBuilder::Packet& packet);
 
 ReceivedUdpPacket packetToReceivedUdpPacket(
     const RegularQuicPacketBuilder::Packet& packetIn);
 
-Buf packetToBufCleartext(
+BufPtr packetToBufCleartext(
     RegularQuicPacketBuilder::Packet& packet,
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum);
 
-Buf packetToBufCleartext(
+BufPtr packetToBufCleartext(
     RegularQuicPacketBuilder::Packet&& packet,
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
@@ -263,7 +263,7 @@ CongestionController::AckEvent makeAck(
     TimePoint ackedTime,
     TimePoint sendTime);
 
-BufQueue bufToQueue(Buf buf);
+BufQueue bufToQueue(BufPtr buf);
 
 StatelessResetToken generateStatelessResetToken();
 
@@ -318,9 +318,11 @@ auto findFrameInPacketFunc() {
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacketWrapper outstandingPacket);
 
-// A Buf based overload of writeCryptoFrame for test only
-Optional<WriteCryptoFrame>
-writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder);
+// A BufPtr based overload of writeCryptoFrame for test only
+Optional<WriteCryptoFrame> writeCryptoFrame(
+    uint64_t offsetIn,
+    BufPtr data,
+    PacketBuilderInterface& builder);
 
 void overridePacketWithToken(
     PacketBuilderInterface::Packet& packet,
@@ -555,7 +557,7 @@ class FakeServerHandshake : public FizzServerHandshake {
     return createNoOpAead();
   }
 
-  Buf getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
+  BufPtr getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
     return folly::IOBuf::copyBuffer(getRandSecret());
   }
 
@@ -593,6 +595,6 @@ class FakeServerHandshake : public FizzServerHandshake {
 
 size_t getTotalIovecLen(const struct iovec* vec, size_t iovec_len);
 
-Buf copyChain(Buf&& input);
+BufPtr copyChain(BufPtr&& input);
 
 } // namespace quic::test

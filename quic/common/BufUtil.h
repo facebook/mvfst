@@ -13,13 +13,13 @@
 
 namespace quic {
 
-size_t fillIovec(Buf& buf, iovec (&vec)[16]);
+size_t fillIovec(BufPtr& buf, iovec (&vec)[16]);
 
 class BufQueue {
  public:
   BufQueue() = default;
 
-  BufQueue(Buf chain) : chain_(std::move(chain)) {
+  BufQueue(BufPtr chain) : chain_(std::move(chain)) {
     if (chain_) {
       chainLength_ = chain_->computeChainDataLength();
     }
@@ -50,36 +50,36 @@ class BufQueue {
     return chainLength_ == 0;
   }
 
-  Buf move() {
+  BufPtr move() {
     chainLength_ = 0;
     return std::move(chain_);
   }
 
-  Buf clone() const {
+  BufPtr clone() const {
     return chain_ ? chain_->clone() : nullptr;
   }
 
-  const RawBuf* front() const {
+  const Buf* front() const {
     return chain_.get();
   }
 
-  Buf splitAtMost(size_t n);
+  BufPtr splitAtMost(size_t n);
 
   size_t trimStartAtMost(size_t amount);
 
   void trimStart(size_t amount);
 
-  void append(Buf&& buf);
+  void append(BufPtr&& buf);
 
  private:
-  void appendToChain(Buf& dst, Buf&& src);
-  Buf chain_;
+  void appendToChain(BufPtr& dst, BufPtr&& src);
+  BufPtr chain_;
   size_t chainLength_{0};
 };
 
 class BufAppender {
  public:
-  BufAppender(RawBuf* data, size_t appendLen);
+  BufAppender(Buf* data, size_t appendLen);
 
   template <class T>
   void writeBE(T data) {
@@ -89,11 +89,11 @@ class BufAppender {
 
   void push(const uint8_t* data, size_t len);
 
-  void insert(Buf data);
+  void insert(BufPtr data);
 
  private:
-  RawBuf* crtBuf_;
-  RawBuf* head_;
+  Buf* crtBuf_;
+  Buf* head_;
   size_t appendLen_;
   bool lastBufShared_{false};
 };
@@ -122,8 +122,8 @@ class BufWriter {
 
   // TODO: OK, "insert" is a lie. Inside, we copy. But I'd like the BufWriter
   // to have the same interface as BufAppender during the transition period.
-  void insert(const RawBuf* data);
-  void insert(const RawBuf* data, size_t limit);
+  void insert(const Buf* data);
+  void insert(const Buf* data, size_t limit);
 
   void insert(const ChainedByteRangeHead* data);
   void insert(const ChainedByteRangeHead* data, size_t limit);
@@ -148,7 +148,7 @@ class BufWriter {
         << " written=" << written_ << " limit=" << most_;
   }
 
-  void copy(const RawBuf* data, size_t limit);
+  void copy(const Buf* data, size_t limit);
   void copy(const ChainedByteRangeHead* data, size_t limit);
 
  private:

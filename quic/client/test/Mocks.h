@@ -87,7 +87,7 @@ class MockClientHandshake : public ClientHandshake {
       std::unique_ptr<PacketNumberCipher>,
       buildHeaderCipher,
       (folly::ByteRange secret));
-  MOCK_METHOD(Buf, getNextTrafficSecret, (folly::ByteRange secret), (const));
+  MOCK_METHOD(BufPtr, getNextTrafficSecret, (folly::ByteRange secret), (const));
   MOCK_METHOD(
       const Optional<std::string>&,
       getApplicationProtocol,

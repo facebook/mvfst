@@ -225,7 +225,7 @@ class QuicSocketLite {
      * Invoked when we receive a KnobFrame from the peer
      */
     virtual void
-    onKnob(uint64_t /*knobSpace*/, uint64_t /*knobId*/, Buf /*knobBlob*/) {}
+    onKnob(uint64_t /*knobSpace*/, uint64_t /*knobId*/, BufPtr /*knobBlob*/) {}
   };
 
   /**
@@ -348,7 +348,7 @@ class QuicSocketLite {
    * Calling read() when there is no data/eof to deliver will return an
    * EAGAIN-like error code.
    */
-  virtual folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
+  virtual folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxLen) = 0;
 
@@ -556,7 +556,7 @@ class QuicSocketLite {
   using WriteResult = folly::Expected<folly::Unit, LocalErrorCode>;
   virtual WriteResult writeChain(
       StreamId id,
-      Buf data,
+      BufPtr data,
       bool eof,
       ByteEventCallback* cb = nullptr) = 0;
 
@@ -776,7 +776,7 @@ class QuicSocketLite {
    * connection.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
-  setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) = 0;
+  setKnob(uint64_t knobSpace, uint64_t knobId, BufPtr knobBlob) = 0;
 
   /**
    * Can Knob Frames be exchanged with the peer on this connection?

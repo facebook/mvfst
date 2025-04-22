@@ -45,7 +45,7 @@ struct AckPacketBuilder : public AckPacketBuilderFields {
   Builder&& setAead(const Aead* aeadIn);
   Builder&& setShortHeaderProtectionType(ProtectionType protectionTypeIn);
   RegularQuicPacketBuilder::Packet build() &&;
-  quic::Buf buildBuf() &&;
+  quic::BufPtr buildBuf() &&;
   explicit AckPacketBuilder() = default;
 };
 

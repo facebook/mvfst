@@ -44,7 +44,7 @@ class ClientHandshake : public Handshake {
    * being initialized, bytes written out, or the write phase changing.
    */
   [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> doHandshake(
-      Buf data,
+      BufPtr data,
       EncryptionLevel encryptionLevel);
 
   /**
@@ -151,7 +151,7 @@ class ClientHandshake : public Handshake {
    * Various utilities for concrete implementations to use.
    */
   void waitForData();
-  void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
+  void writeDataToStream(EncryptionLevel encryptionLevel, BufPtr data);
   void handshakeInitiated();
   void computeZeroRttCipher();
   void computeOneRttCipher(bool earlyDataAccepted);
@@ -176,10 +176,10 @@ class ClientHandshake : public Handshake {
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
    * on key updates.
    */
-  virtual Buf getNextTrafficSecret(folly::ByteRange secret) const = 0;
+  virtual BufPtr getNextTrafficSecret(folly::ByteRange secret) const = 0;
 
-  Buf readTrafficSecret_;
-  Buf writeTrafficSecret_;
+  BufPtr readTrafficSecret_;
+  BufPtr writeTrafficSecret_;
 
   Optional<bool> zeroRttRejected_;
   Optional<bool> canResendZeroRtt_;

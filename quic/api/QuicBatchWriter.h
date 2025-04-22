@@ -42,7 +42,7 @@ class BatchWriter {
    * writer needs to be flushed
    */
   virtual bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t bufSize,
       const folly::SocketAddress& addr,
       QuicAsyncUDPSocket* sock) = 0;
@@ -65,7 +65,7 @@ class IOBufBatchWriter : public BatchWriter {
   }
 
  protected:
-  Buf buf_;
+  BufPtr buf_;
 };
 
 class SinglePacketBatchWriter : public IOBufBatchWriter {
@@ -75,7 +75,7 @@ class SinglePacketBatchWriter : public IOBufBatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t /*unused*/,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
@@ -97,7 +97,7 @@ class SinglePacketInplaceBatchWriter : public IOBufBatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& /* buf */,
+      BufPtr&& /* buf */,
       size_t /*unused*/,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
@@ -116,7 +116,7 @@ class SinglePacketBackpressureBatchWriter : public IOBufBatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
@@ -140,7 +140,7 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
@@ -156,7 +156,7 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   // size of data in all the buffers
   size_t currSize_{0};
   // array of IOBufs
-  std::vector<Buf> bufs_;
+  std::vector<BufPtr> bufs_;
 };
 
 class SendmmsgInplacePacketBatchWriter : public BatchWriter {
@@ -172,7 +172,7 @@ class SendmmsgInplacePacketBatchWriter : public BatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& /* buf */,
+      BufPtr&& /* buf */,
       size_t size,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;

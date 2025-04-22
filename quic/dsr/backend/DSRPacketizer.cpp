@@ -22,7 +22,7 @@ bool PacketGroupWriter::writeSingleQuicPacket(
     size_t offset,
     size_t length,
     bool eof,
-    Buf buf) {
+    BufPtr buf) {
   if (buf->computeChainDataLength() < length) {
     LOG(ERROR) << "Insufficient data buffer";
     return false;
@@ -113,7 +113,7 @@ bool PacketGroupWriter::writeSingleQuicPacket(
 
 BufQuicBatchResult PacketGroupWriter::writePacketsGroup(
     RequestGroup& reqGroup,
-    const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
+    const std::function<BufPtr(const PacketizationRequest& req)>& bufProvider) {
   if (reqGroup.requests.empty()) {
     LOG(ERROR) << "Empty packetization request";
     return {};

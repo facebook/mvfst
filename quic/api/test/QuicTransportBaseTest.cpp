@@ -46,7 +46,7 @@ enum class TestFrameType : uint8_t {
 };
 
 // A made up encoding decoding of a stream.
-Buf encodeStreamBuffer(
+BufPtr encodeStreamBuffer(
     StreamId id,
     StreamBuffer data,
     OptionalIntegral<StreamGroupId> groupId = std::nullopt) {
@@ -70,7 +70,7 @@ Buf encodeStreamBuffer(
   return buf;
 }
 
-Buf encodeCryptoBuffer(StreamBuffer data) {
+BufPtr encodeCryptoBuffer(StreamBuffer data) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
   appender.writeBE(static_cast<uint8_t>(TestFrameType::CRYPTO));
@@ -83,7 +83,7 @@ Buf encodeCryptoBuffer(StreamBuffer data) {
 }
 
 // A made up encoding of a MaxStreamsFrame.
-Buf encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
+BufPtr encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
   auto buf = IOBuf::create(25);
   folly::io::Appender appender(buf.get(), 25);
   appender.writeBE(static_cast<uint8_t>(TestFrameType::MAX_STREAMS));
@@ -93,7 +93,7 @@ Buf encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
 }
 
 // Build a datagram frame
-Buf encodeDatagramFrame(BufQueue data) {
+BufPtr encodeDatagramFrame(BufQueue data) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
   appender.writeBE(static_cast<uint8_t>(TestFrameType::DATAGRAM));
@@ -104,15 +104,15 @@ Buf encodeDatagramFrame(BufQueue data) {
   return buf;
 }
 
-std::pair<Buf, uint32_t> decodeDatagramFrame(folly::io::Cursor& cursor) {
-  Buf outData;
+std::pair<BufPtr, uint32_t> decodeDatagramFrame(folly::io::Cursor& cursor) {
+  BufPtr outData;
   auto len = cursor.readBE<uint32_t>();
   cursor.clone(outData, len);
   return std::make_pair(std::move(outData), len);
 }
 
-std::pair<Buf, uint64_t> decodeDataBuffer(folly::io::Cursor& cursor) {
-  Buf outData;
+std::pair<BufPtr, uint64_t> decodeDataBuffer(folly::io::Cursor& cursor) {
+  BufPtr outData;
   auto len = cursor.readBE<uint32_t>();
   cursor.clone(outData, len);
   uint64_t offset = cursor.readBE<uint64_t>();
@@ -470,7 +470,7 @@ class TestQuicTransport
     updateReadLooper();
   }
 
-  void addDatagram(Buf data, TimePoint recvTime = Clock::now()) {
+  void addDatagram(BufPtr data, TimePoint recvTime = Clock::now()) {
     auto buf = encodeDatagramFrame(std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
     onNetworkData(addr, NetworkData(std::move(buf), recvTime, 0));
@@ -1345,7 +1345,7 @@ TEST_P(QuicTransportImplTestBase, ReadData) {
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0));
   transport->driveReadCallbacks();
 
-  transport->read(stream1, 10).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 10).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     IOBufEqualTo eq;
     auto expected = readData->clone();
     expected->trimEnd(expected->length() - 10);
@@ -1354,7 +1354,7 @@ TEST_P(QuicTransportImplTestBase, ReadData) {
 
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->driveReadCallbacks();
-  transport->read(stream1, 100).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 100).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     IOBufEqualTo eq;
     auto expected = readData->clone();
     expected->trimStart(10);
@@ -1378,7 +1378,7 @@ TEST_P(QuicTransportImplTestBase, UnidirectionalReadData) {
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->driveReadCallbacks();
 
-  transport->read(stream1, 10).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 10).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     IOBufEqualTo eq;
     auto expected = readData->clone();
     expected->trimEnd(expected->length() - 10);
@@ -1387,7 +1387,7 @@ TEST_P(QuicTransportImplTestBase, UnidirectionalReadData) {
 
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->driveReadCallbacks();
-  transport->read(stream1, 100).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 100).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     IOBufEqualTo eq;
     auto expected = readData->clone();
     expected->trimStart(10);
@@ -1422,7 +1422,7 @@ TEST_P(QuicTransportImplTestBase, ReadDataNoCallback) {
 
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0, true));
   transport->driveReadCallbacks();
-  transport->read(stream1, 100).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 100).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     IOBufEqualTo eq;
     EXPECT_TRUE(eq(*data.first, *readData));
     EXPECT_TRUE(data.second);
@@ -1458,7 +1458,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackForClientOutOfOrderStream) {
 
   EXPECT_CALL(streamRead, readAvailable(clientOutOfOrderStream))
       .WillOnce(Invoke([&](StreamId id) {
-        transport->read(id, 100).thenOrThrow([&](std::pair<Buf, bool> data) {
+        transport->read(id, 100).thenOrThrow([&](std::pair<BufPtr, bool> data) {
           IOBufEqualTo eq;
           EXPECT_TRUE(eq(*data.first, *readData));
           EXPECT_TRUE(data.second);
@@ -1480,7 +1480,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackForClientOutOfOrderStream) {
 
   EXPECT_CALL(streamRead, readAvailable(clientOutOfOrderStream2))
       .WillOnce(Invoke([&](StreamId id) {
-        transport->read(id, 100).thenOrThrow([&](std::pair<Buf, bool> data) {
+        transport->read(id, 100).thenOrThrow([&](std::pair<BufPtr, bool> data) {
           IOBufEqualTo eq;
           EXPECT_TRUE(eq(*data.first, *readData));
           EXPECT_TRUE(data.second);
@@ -3904,7 +3904,7 @@ TEST_P(QuicTransportImplTestBase, PeekConsumeReadTest) {
   transport->driveReadCallbacks();
 
   // Read 10 bytes.
-  transport->read(stream1, 10).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 10).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     EXPECT_EQ("l stream d", data.first->to<std::string>());
   });
 
@@ -3961,7 +3961,7 @@ TEST_P(QuicTransportImplTestBase, PeekConsumeReadTest) {
   transport->driveReadCallbacks();
 
   // Read the rest of the buffer.
-  transport->read(stream1, 0).thenOrThrow([&](std::pair<Buf, bool> data) {
+  transport->read(stream1, 0).thenOrThrow([&](std::pair<BufPtr, bool> data) {
     EXPECT_EQ(
         " Here is my number, so call me maybe.", data.first->to<std::string>());
   });
@@ -4091,7 +4091,7 @@ TEST_P(QuicTransportImplTestBase, HandleKnobCallbacks) {
   uint64_t knobSpace = 0xfaceb00c;
   uint64_t knobId = 42;
   folly::StringPiece data = "test knob data";
-  Buf buf(folly::IOBuf::create(data.size()));
+  BufPtr buf(folly::IOBuf::create(data.size()));
   memcpy(buf->writableData(), data.data(), data.size());
   buf->append(data.size());
   conn->pendingEvents.knobs.emplace_back(

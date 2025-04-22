@@ -74,7 +74,7 @@ class PacketNumberCipher {
   /**
    * Get the packet protection key
    */
-  virtual const Buf& getKey() const = 0;
+  virtual const BufPtr& getKey() const = 0;
 
  protected:
   virtual void cipherHeader(

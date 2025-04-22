@@ -18,7 +18,7 @@ namespace quic {
  * @throws QuicTransportException on error.
  */
 [[nodiscard]] folly::Expected<folly::Unit, QuicError>
-writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof);
+writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof);
 
 /**
  * Adds data represented in the form of BufferMeta to the end of the Buffer
@@ -35,7 +35,7 @@ writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof);
  * Adds data to the end of the write buffer of the QUIC crypto stream. This
  * data will be written onto the socket.
  */
-void writeDataToQuicStream(QuicCryptoStream& stream, Buf data);
+void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data);
 
 /**
  * Process data received from the network to add it to the QUIC stream.
@@ -62,7 +62,7 @@ void writeDataToQuicStream(QuicCryptoStream& stream, Buf data);
  * Returns a pair of data and whether or not EOF was reached on the stream.
  * amount == 0 reads all the pending data in the stream.
  */
-folly::Expected<std::pair<Buf, bool>, QuicError> readDataFromQuicStream(
+folly::Expected<std::pair<BufPtr, bool>, QuicError> readDataFromQuicStream(
     QuicStreamState& state,
     uint64_t amount = 0);
 
@@ -70,7 +70,7 @@ folly::Expected<std::pair<Buf, bool>, QuicError> readDataFromQuicStream(
  * Reads data from the QUIC crypto data if data exists.
  * amount == 0 reads all the pending data in the stream.
  */
-Buf readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount = 0);
+BufPtr readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount = 0);
 
 /**
  * Peeks data from the QUIC stream if data exists.
@@ -152,7 +152,7 @@ appendDataToReadBufferCommon(
  * the buffer that was read and whether or not the FIN for the stream was read.
  * sinkData == true discards data instead of returning it.
  */
-std::pair<Buf, bool> readDataInOrderFromReadBuffer(
+std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
     QuicStreamLike& stream,
     uint64_t amount,
     bool sinkData = false);

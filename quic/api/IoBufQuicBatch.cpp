@@ -25,7 +25,7 @@ IOBufQuicBatch::IOBufQuicBatch(
       happyEyeballsState_(happyEyeballsState) {}
 
 folly::Expected<bool, QuicError> IOBufQuicBatch::write(
-    Buf&& buf,
+    BufPtr&& buf,
     size_t encodedSize) {
   result_.packetsSent++;
   result_.bytesSent += encodedSize;

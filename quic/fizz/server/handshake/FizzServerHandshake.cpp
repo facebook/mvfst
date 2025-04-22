@@ -102,7 +102,8 @@ std::unique_ptr<PacketNumberCipher> FizzServerHandshake::buildHeaderCipher(
   return cryptoFactory_->makePacketNumberCipher(secret);
 }
 
-Buf FizzServerHandshake::getNextTrafficSecret(folly::ByteRange secret) const {
+BufPtr FizzServerHandshake::getNextTrafficSecret(
+    folly::ByteRange secret) const {
   auto deriver =
       state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
   auto nextSecret = deriver->expandLabel(

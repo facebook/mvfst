@@ -30,7 +30,7 @@ namespace quic {
 struct CipherInfo {
   TrafficKey trafficKey;
   fizz::CipherSuite cipherSuite;
-  Buf packetProtectionKey;
+  BufPtr packetProtectionKey;
 };
 
 class QuicServerTransport
@@ -206,7 +206,7 @@ class QuicServerTransport
   // From ServerHandshake::HandshakeCallback
   virtual void onCryptoEventAvailable() noexcept override;
 
-  void onTransportKnobs(Buf knobBlob) override;
+  void onTransportKnobs(BufPtr knobBlob) override;
 
   void handleTransportKnobParams(const TransportKnobParams& params);
 

@@ -19,7 +19,7 @@ namespace quic {
  */
 class BufAccessor {
  public:
-  explicit BufAccessor(Buf buf);
+  explicit BufAccessor(BufPtr buf);
 
   // The result capacity could be higher than the desired capacity.
   explicit BufAccessor(size_t capacity);
@@ -28,18 +28,18 @@ class BufAccessor {
 
   // API will be removed once we make the BufAccessor work on a uint8_t* instead
   // of an IOBuf.
-  Buf& buf();
+  BufPtr& buf();
 
   // API will be removed once we make the BufAccessor work on a uint8_t* instead
   // of an IOBuf.
-  Buf obtain();
+  BufPtr obtain();
 
   /**
    * Caller releases the IOBuf back to the accessor to own. The capacity has to
    * match the original IOBuf. API will be removed once we make the BufAccessor
    * work on a uint8_t* instead of an IOBuf.
    */
-  void release(Buf buf);
+  void release(BufPtr buf);
 
   /**
    * Returns whether the BufAccessor currently owns an IOBuf.
@@ -67,7 +67,7 @@ class BufAccessor {
   void append(std::size_t amount);
 
  private:
-  Buf buf_;
+  BufPtr buf_;
   size_t capacity_;
 };
 } // namespace quic

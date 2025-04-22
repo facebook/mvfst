@@ -16,7 +16,7 @@ class FizzCryptoFactory : public CryptoFactory {
  public:
   FizzCryptoFactory() : fizzFactory_{std::make_shared<QuicFizzFactory>()} {}
 
-  Buf makeInitialTrafficSecret(
+  BufPtr makeInitialTrafficSecret(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const override;

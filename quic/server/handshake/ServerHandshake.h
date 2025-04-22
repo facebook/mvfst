@@ -92,7 +92,7 @@ class ServerHandshake : public Handshake {
    * not an event is available.
    */
   [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> doHandshake(
-      Buf data,
+      BufPtr data,
       EncryptionLevel encryptionLevel);
 
   /**
@@ -219,7 +219,7 @@ class ServerHandshake : public Handshake {
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
    * on key updates.
    */
-  virtual Buf getNextTrafficSecret(folly::ByteRange secret) const = 0;
+  virtual BufPtr getNextTrafficSecret(folly::ByteRange secret) const = 0;
 
   ~ServerHandshake() override = default;
 
@@ -255,7 +255,7 @@ class ServerHandshake : public Handshake {
   /**
    * Returns the AppToken seen in session ticket if the session was resumed.
    */
-  const Optional<Buf>& getAppToken() const;
+  const Optional<BufPtr>& getAppToken() const;
 
   TLSSummary getTLSSummary() const override;
 
@@ -294,8 +294,8 @@ class ServerHandshake : public Handshake {
   std::unique_ptr<Aead> oneRttWriteCipher_;
   std::unique_ptr<Aead> zeroRttReadCipher_;
 
-  Buf readTrafficSecret_;
-  Buf writeTrafficSecret_;
+  BufPtr readTrafficSecret_;
+  BufPtr writeTrafficSecret_;
 
   // This variable is incremented every time a read traffic secret is rotated,
   // and decremented for the write secret. Its value should be

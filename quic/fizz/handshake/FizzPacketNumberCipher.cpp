@@ -52,11 +52,11 @@ void Aes256PacketNumberCipher::setKey(folly::ByteRange key) {
   return setKeyImpl(encryptCtx_, EVP_aes_256_ecb(), key);
 }
 
-const Buf& Aes128PacketNumberCipher::getKey() const {
+const BufPtr& Aes128PacketNumberCipher::getKey() const {
   return pnKey_;
 }
 
-const Buf& Aes256PacketNumberCipher::getKey() const {
+const BufPtr& Aes256PacketNumberCipher::getKey() const {
   return pnKey_;
 }
 

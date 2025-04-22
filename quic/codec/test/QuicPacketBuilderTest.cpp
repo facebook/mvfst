@@ -24,7 +24,7 @@ using namespace testing;
 
 enum TestFlavor { Regular, Inplace };
 
-Buf packetToBuf(
+BufPtr packetToBuf(
     RegularQuicPacketBuilder::Packet& packet,
     Aead* aead = nullptr) {
   auto buf = folly::IOBuf::create(0);
@@ -605,7 +605,7 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   ConnectionId originalDestinationConnectionId(
       {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
   auto quicVersion = static_cast<QuicVersion>(0xff00001d);
-  Buf token = folly::IOBuf::copyBuffer(R"(token)");
+  BufPtr token = folly::IOBuf::copyBuffer(R"(token)");
 
   PseudoRetryPacketBuilder builder(
       initialByte,
@@ -615,11 +615,11 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
       quicVersion,
       std::move(token));
 
-  Buf pseudoRetryPacketBuf = std::move(builder).buildPacket();
+  BufPtr pseudoRetryPacketBuf = std::move(builder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTag = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
       quicVersion, pseudoRetryPacketBuf.get());
-  Buf expectedIntegrityTag = folly::IOBuf::copyBuffer(
+  BufPtr expectedIntegrityTag = folly::IOBuf::copyBuffer(
       "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49");
 
   folly::io::Cursor cursorActual(integrityTag.get());
@@ -636,7 +636,7 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacketLarge) {
   ConnectionId originalDestinationConnectionId(
       {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
   auto quicVersion = static_cast<QuicVersion>(0xff00001d);
-  Buf token = folly::IOBuf::create(500);
+  BufPtr token = folly::IOBuf::create(500);
   token->append(500);
 
   PseudoRetryPacketBuilder builder(
@@ -646,7 +646,7 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacketLarge) {
       originalDestinationConnectionId,
       quicVersion,
       std::move(token));
-  Buf pseudoRetryPacketBuf = std::move(builder).buildPacket();
+  BufPtr pseudoRetryPacketBuf = std::move(builder).buildPacket();
 }
 
 TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
@@ -675,7 +675,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
       srcConnId, dstConnId, quicVersion, std::string(retryToken), integrityTag);
 
   EXPECT_TRUE(builder.canBuildPacket());
-  Buf retryPacket = std::move(builder).buildPacket();
+  BufPtr retryPacket = std::move(builder).buildPacket();
 
   uint32_t expectedPacketLen = 1 /* initial byte */ + 4 /* version */ +
       1 /* dcid length */ + dstConnId.size() + 1 /* scid length */ +
@@ -709,14 +709,14 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(scidObtained, srcConnId);
 
   // retry token
-  Buf retryTokenObtained;
+  BufPtr retryTokenObtained;
   cursor.clone(
       retryTokenObtained, cursor.totalLength() - kRetryIntegrityTagLen);
   std::string retryTokenObtainedString = retryTokenObtained->to<std::string>();
   EXPECT_EQ(retryTokenObtainedString, retryToken);
 
   // integrity tag
-  Buf integrityTagObtained;
+  BufPtr integrityTagObtained;
   cursor.clone(integrityTagObtained, kRetryIntegrityTagLen);
   EXPECT_TRUE(folly::IOBufEqualTo()(
       *integrityTagObtained,

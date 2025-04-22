@@ -350,7 +350,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgNewlyAllocatedIovecMatches) {
   CHECK(batchWriter->empty());
   CHECK_EQ(batchWriter->size(), 0);
 
-  std::vector<Buf> buffers;
+  std::vector<BufPtr> buffers;
 
   size_t size = 0;
   for (auto& message : messages) {
@@ -1188,15 +1188,15 @@ TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
       conn_,
       gsoSupported_);
   auto buf = bufAccessor->obtain();
-  folly::IOBuf* rawBuf = buf.get();
+  folly::IOBuf* Buf = buf.get();
   bufAccessor->release(std::move(buf));
-  rawBuf->append(700);
+  Buf->append(700);
   ASSERT_FALSE(
       batchWriter->append(nullptr, 700, folly::SocketAddress(), nullptr));
 
   // There is a check against packet 10 bytes or more larger than the size limit
   size_t packetSizeBig = 1009;
-  rawBuf->append(packetSizeBig);
+  Buf->append(packetSizeBig);
   EXPECT_TRUE(batchWriter->needsFlush(packetSizeBig));
 
   EXPECT_CALL(sock, writeGSO(_, _, _, _))
@@ -1208,8 +1208,8 @@ TEST_F(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
           }));
   // No crash:
   EXPECT_EQ(700, batchWriter->write(sock, folly::SocketAddress()));
-  EXPECT_EQ(1009, rawBuf->length());
-  EXPECT_EQ(0, rawBuf->headroom());
+  EXPECT_EQ(1009, Buf->length());
+  EXPECT_EQ(0, Buf->headroom());
 }
 
 class SinglePacketInplaceBatchWriterTest : public ::testing::Test {
@@ -1290,13 +1290,13 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestReset) {
   CHECK(dynamic_cast<quic::SinglePacketInplaceBatchWriter*>(batchWriter.get()));
 
   auto buf = bufAccessor_->obtain();
-  folly::IOBuf* rawBuf = buf.get();
+  folly::IOBuf* Buf = buf.get();
   bufAccessor_->release(std::move(buf));
-  rawBuf->append(700);
+  Buf->append(700);
 
-  EXPECT_EQ(rawBuf->computeChainDataLength(), 700);
+  EXPECT_EQ(Buf->computeChainDataLength(), 700);
   batchWriter->reset();
-  EXPECT_EQ(rawBuf->computeChainDataLength(), 0);
+  EXPECT_EQ(Buf->computeChainDataLength(), 0);
 }
 
 TEST_F(SinglePacketInplaceBatchWriterTest, TestAppend) {
@@ -1319,11 +1319,11 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestEmpty) {
   EXPECT_TRUE(batchWriter->empty());
 
   auto buf = bufAccessor_->obtain();
-  folly::IOBuf* rawBuf = buf.get();
+  folly::IOBuf* Buf = buf.get();
   bufAccessor_->release(std::move(buf));
-  rawBuf->append(700);
+  Buf->append(700);
 
-  EXPECT_EQ(rawBuf->computeChainDataLength(), 700);
+  EXPECT_EQ(Buf->computeChainDataLength(), 700);
   EXPECT_FALSE(batchWriter->empty());
 
   batchWriter->reset();
@@ -1339,12 +1339,12 @@ TEST_F(SinglePacketInplaceBatchWriterTest, TestWrite) {
   EXPECT_TRUE(batchWriter->empty());
 
   auto buf = bufAccessor_->obtain();
-  folly::IOBuf* rawBuf = buf.get();
+  folly::IOBuf* Buf = buf.get();
   bufAccessor_->release(std::move(buf));
   const auto appendSize = conn_.udpSendPacketLen - 200;
-  rawBuf->append(appendSize);
+  Buf->append(appendSize);
 
-  EXPECT_EQ(rawBuf->computeChainDataLength(), appendSize);
+  EXPECT_EQ(Buf->computeChainDataLength(), appendSize);
   EXPECT_FALSE(batchWriter->empty());
 
   folly::EventBase evb;

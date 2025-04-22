@@ -74,8 +74,8 @@ class PacketBuilderInterface {
   appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber) = 0;
   virtual void
   appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber) = 0;
-  virtual void insert(Buf buf) = 0;
-  virtual void insert(Buf buf, size_t limit) = 0;
+  virtual void insert(BufPtr buf) = 0;
+  virtual void insert(BufPtr buf, size_t limit) = 0;
   virtual void insert(const ChainedByteRangeHead& buf, size_t limit) = 0;
   virtual void insert(const BufQueue& buf, size_t limit) = 0;
   virtual void push(const uint8_t* data, size_t len) = 0;
@@ -148,8 +148,8 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
 
   void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
       override;
-  void insert(Buf buf) override;
-  void insert(Buf buf, size_t limit) override;
+  void insert(BufPtr buf) override;
+  void insert(BufPtr buf, size_t limit) override;
   void insert(const ChainedByteRangeHead& buf, size_t limit) override;
   void insert(const BufQueue& buf, size_t limit) override;
   void push(const uint8_t* data, size_t len) override;
@@ -176,7 +176,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
 
  private:
   BufAccessor& bufAccessor_;
-  Buf iobuf_;
+  BufPtr iobuf_;
   BufWriter bufWriter_;
   uint32_t remainingBytes_;
   PacketNum largestAckedPacketNum_;
@@ -230,8 +230,8 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
     CHECK(false) << "Invalid BufWriter";
   }
 
-  void insert(Buf buf) override;
-  void insert(Buf buf, size_t limit) override;
+  void insert(BufPtr buf) override;
+  void insert(BufPtr buf, size_t limit) override;
   void insert(const BufQueue& buf, size_t limit) override;
   void insert(const ChainedByteRangeHead& buf, size_t limit) override;
 
@@ -350,7 +350,7 @@ class InplaceSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
 
  private:
   BufAccessor& bufAccessor_;
-  Buf iobuf_;
+  BufPtr iobuf_;
   RegularQuicWritePacket packet_;
   folly::IOBuf header_;
   folly::IOBuf body_;
@@ -368,7 +368,7 @@ class VersionNegotiationPacketBuilder {
   virtual ~VersionNegotiationPacketBuilder() = default;
 
   uint32_t remainingSpaceInPkt();
-  std::pair<VersionNegotiationPacket, Buf> buildPacket() &&;
+  std::pair<VersionNegotiationPacket, BufPtr> buildPacket() &&;
   /**
    * Whether the packet builder is able to build a packet. This should be
    * checked right after the creation of a packet builder object.
@@ -383,7 +383,7 @@ class VersionNegotiationPacketBuilder {
  private:
   uint32_t remainingBytes_;
   VersionNegotiationPacket packet_;
-  Buf data_;
+  BufPtr data_;
 };
 
 /*
@@ -398,21 +398,21 @@ class PseudoRetryPacketBuilder {
       ConnectionId destinationConnectionId,
       ConnectionId originalDestinationConnectionId,
       QuicVersion quicVersion,
-      Buf&& token);
+      BufPtr&& token);
 
-  Buf buildPacket() &&;
+  BufPtr buildPacket() &&;
 
  private:
   void writePseudoRetryPacket();
 
-  Buf packetBuf_;
+  BufPtr packetBuf_;
 
   uint8_t initialByte_;
   ConnectionId sourceConnectionId_;
   ConnectionId destinationConnectionId_;
   ConnectionId originalDestinationConnectionId_;
   QuicVersion quicVersion_;
-  Buf token_;
+  BufPtr token_;
 };
 
 class RetryPacketBuilder {
@@ -426,7 +426,7 @@ class RetryPacketBuilder {
 
   uint32_t remainingSpaceInPkt();
 
-  Buf buildPacket() &&;
+  BufPtr buildPacket() &&;
 
   /**
    * Whether the RetryPacketBuilder is able to build a packet. This should be
@@ -437,7 +437,7 @@ class RetryPacketBuilder {
  private:
   folly::Expected<folly::Unit, QuicError> writeRetryPacket();
 
-  Buf packetBuf_;
+  BufPtr packetBuf_;
 
   ConnectionId sourceConnectionId_;
   ConnectionId destinationConnectionId_;
@@ -454,10 +454,10 @@ class StatelessResetPacketBuilder {
       uint16_t maxPacketSize,
       const StatelessResetToken& resetToken);
 
-  Buf buildPacket() &&;
+  BufPtr buildPacket() &&;
 
  private:
-  Buf data_;
+  BufPtr data_;
 };
 
 /**
@@ -520,11 +520,11 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     builder.appendBytes(writer, value, byteNumber);
   }
 
-  void insert(Buf buf) override {
+  void insert(BufPtr buf) override {
     builder.insert(std::move(buf));
   }
 
-  void insert(Buf buf, size_t limit) override {
+  void insert(BufPtr buf, size_t limit) override {
     builder.insert(std::move(buf), limit);
   }
 

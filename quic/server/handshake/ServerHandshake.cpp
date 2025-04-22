@@ -34,7 +34,7 @@ void ServerHandshake::initialize(
 }
 
 folly::Expected<folly::Unit, QuicError> ServerHandshake::doHandshake(
-    Buf data,
+    BufPtr data,
     EncryptionLevel encryptionLevel) {
   SCOPE_EXIT {
     inHandshakeStack_ = false;
@@ -321,7 +321,7 @@ void ServerHandshake::processPendingEvents() {
   }
 }
 
-const Optional<Buf>& ServerHandshake::getAppToken() const {
+const Optional<BufPtr>& ServerHandshake::getAppToken() const {
   return state_.appToken();
 }
 

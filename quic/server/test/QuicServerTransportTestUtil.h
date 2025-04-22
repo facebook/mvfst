@@ -315,7 +315,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         *initialDestinationConnectionId, version);
   }
 
-  Buf recvEncryptedStream(
+  BufPtr recvEncryptedStream(
       StreamId streamId,
       folly::IOBuf& data,
       uint64_t offset = 0,
@@ -406,8 +406,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
   virtual void expectWriteNewSessionTicket() {
     server->setEarlyDataAppParamsFunctions(
-        [](const Optional<std::string>&, const Buf&) { return false; },
-        []() -> Buf { return nullptr; });
+        [](const Optional<std::string>&, const BufPtr&) { return false; },
+        []() -> BufPtr { return nullptr; });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(testing::_))
         .Times(1);
   }
@@ -539,7 +539,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   }
 
   void deliverDataWithoutErrorCheck(
-      Buf data,
+      BufPtr data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     data->coalesce();
@@ -567,7 +567,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   }
 
   void deliverData(
-      Buf data,
+      BufPtr data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     data->coalesce();
@@ -578,7 +578,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     evb.loopOnce(EVLOOP_NONBLOCK);
   }
 
-  Buf getCryptoStreamData() {
+  BufPtr getCryptoStreamData() {
     CHECK(!serverWrites.empty());
     auto cryptoBuf = folly::IOBuf::create(0);
     AckStates ackStates;
@@ -645,7 +645,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   Optional<ConnectionId> initialDestinationConnectionId;
   Optional<ConnectionId> serverConnectionId;
   std::unique_ptr<QuicReadCodec> clientReadCodec;
-  std::vector<Buf> serverWrites;
+  std::vector<BufPtr> serverWrites;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
 
   std::vector<QuicVersion> supportedVersions;

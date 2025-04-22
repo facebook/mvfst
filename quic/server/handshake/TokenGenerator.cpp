@@ -25,7 +25,7 @@ TokenGenerator::TokenGenerator(TokenSecret secret) : cipher_(kCipherContexts) {
   cipher_.setSecrets(secrets);
 }
 
-Optional<Buf> TokenGenerator::encryptToken(
+Optional<BufPtr> TokenGenerator::encryptToken(
     const QuicAddrValidationToken& token) {
   // Generate the retry token in plaintext
   auto plainTextToken = token.getPlaintextToken();
@@ -42,7 +42,9 @@ Optional<Buf> TokenGenerator::encryptToken(
   return maybeEncryptedToken;
 }
 
-uint64_t TokenGenerator::decryptToken(Buf encryptedToken, Buf aeadAssocData) {
+uint64_t TokenGenerator::decryptToken(
+    BufPtr encryptedToken,
+    BufPtr aeadAssocData) {
   auto maybeDecryptedToken =
       cipher_.decrypt(std::move(encryptedToken), aeadAssocData.get());
 

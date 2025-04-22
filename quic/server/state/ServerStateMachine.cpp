@@ -624,7 +624,7 @@ void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn) {
 
 void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
-    const Optional<Buf>& tokenBuf) {
+    const Optional<BufPtr>& tokenBuf) {
   if (!tokenBuf) {
     return;
   }

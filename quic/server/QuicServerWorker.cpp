@@ -260,7 +260,8 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     bool isInitial,
     LongHeaderInvariant& invariant,
     size_t datagramLen) {
-  Optional<std::pair<VersionNegotiationPacket, Buf>> versionNegotiationPacket;
+  Optional<std::pair<VersionNegotiationPacket, BufPtr>>
+      versionNegotiationPacket;
   if (isInitial && datagramLen < kMinInitialPacketSize) {
     VLOG(3) << "Dropping initial packet due to invalid size";
     QUIC_STATS(
@@ -361,7 +362,7 @@ void QuicServerWorker::onDataAvailable(
   // Move readBuffer_ first so that we can get rid
   // of it immediately so that if we return early,
   // we've flushed it.
-  Buf data = std::move(readBuffer_);
+  BufPtr data = std::move(readBuffer_);
 
   folly::Optional<ReceivedUdpPacket::Timings::SocketTimestampExt>
       maybeSockTsExt;
@@ -536,7 +537,7 @@ void QuicServerWorker::handleNetworkData(
 void QuicServerWorker::recvmsgMultishotCallback(
     MultishotHdr* hdr,
     int res,
-    Buf io_buf) {
+    BufPtr io_buf) {
   if (res < 0) {
     return;
   }
@@ -1141,7 +1142,7 @@ void QuicServerWorker::sendRetryPacket(
       dstConnId, /* original dst conn id */
       QuicVersion::MVFST_INVALID,
       BufHelpers::copyBuffer(encryptedTokenStr));
-  Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
+  BufPtr pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTagBuf = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
       QuicVersion::MVFST_INVALID, pseudoRetryPacketBuf.get());

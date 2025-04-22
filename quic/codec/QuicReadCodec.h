@@ -25,10 +25,10 @@ namespace quic {
  * use this to retry later once the cipher is available.
  */
 struct CipherUnavailable {
-  Buf packet;
+  BufPtr packet;
   ProtectionType protectionType;
 
-  CipherUnavailable(Buf packetIn, ProtectionType protectionTypeIn)
+  CipherUnavailable(BufPtr packetIn, ProtectionType protectionTypeIn)
       : packet(std::move(packetIn)), protectionType(protectionTypeIn) {}
 };
 
@@ -200,7 +200,7 @@ class QuicReadCodec {
 
  private:
   CodecResult tryParseShortHeaderPacket(
-      Buf data,
+      BufPtr data,
       const AckStates& ackStates,
       size_t dstConnIdSize,
       folly::io::Cursor& cursor);

@@ -29,7 +29,7 @@ namespace quic {
  */
 class TperfDSRSender : public DSRPacketizationRequestSender {
  public:
-  TperfDSRSender(Buf sendBuf, QuicAsyncUDPSocket& sock);
+  TperfDSRSender(BufPtr sendBuf, QuicAsyncUDPSocket& sock);
 
   bool addSendInstruction(const SendInstruction&) override;
 
@@ -43,7 +43,7 @@ class TperfDSRSender : public DSRPacketizationRequestSender {
   std::vector<SendInstruction> instructions_;
   QuicAsyncUDPSocket& sock_;
   CipherPair cipherPair_;
-  Buf buf_;
+  BufPtr buf_;
 };
 
 } // namespace quic

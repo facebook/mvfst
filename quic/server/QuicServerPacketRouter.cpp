@@ -93,7 +93,7 @@ void TakeoverHandlerCallback::onDataAvailable(
   // Move readBuffer_ first so that we can get rid
   // of it immediately so that if we return early,
   // we've flushed it.
-  Buf data = std::move(readBuffer_);
+  BufPtr data = std::move(readBuffer_);
   QUIC_STATS(worker_->getStatsCallback(), onForwardedPacketReceived);
   if (truncated) {
     // This is an error, drop the packet.
@@ -131,13 +131,13 @@ void TakeoverPacketHandler::forwardPacketToAnotherServer(
     const folly::SocketAddress& peerAddress,
     NetworkData&& networkData) {
   const TimePoint receiveTimePoint = networkData.getReceiveTimePoint();
-  Buf buf = std::move(networkData).moveAllData();
+  BufPtr buf = std::move(networkData).moveAllData();
 
   // create buffer for the peerAddress address and receiveTimePoint
   // Serialize: version (4B), socket(2 + 16)B and time of ack (8B)
   auto bufSize = sizeof(TakeoverProtocolVersion) + sizeof(uint16_t) +
       peerAddress.getActualSize() + sizeof(uint64_t);
-  Buf writeBuffer = BufHelpers::create(bufSize);
+  BufPtr writeBuffer = BufHelpers::create(bufSize);
   BufWriter bufWriter(writeBuffer->writableData(), bufSize);
   bufWriter.writeBE<uint32_t>(folly::to_underlying(takeoverProtocol_));
   sockaddr_storage addrStorage;
@@ -163,7 +163,7 @@ void TakeoverPacketHandler::setSocketFactory(QuicUDPSocketFactory* factory) {
   socketFactory_ = factory;
 }
 
-void TakeoverPacketHandler::forwardPacket(Buf writeBuffer) {
+void TakeoverPacketHandler::forwardPacket(BufPtr writeBuffer) {
   if (!pktForwardingSocket_) {
     CHECK(socketFactory_);
     pktForwardingSocket_ = socketFactory_->make(worker_->getEventBase(), -1);
@@ -181,7 +181,7 @@ std::unique_ptr<FollyAsyncUDPSocketAlias> TakeoverPacketHandler::makeSocket(
 
 void TakeoverPacketHandler::processForwardedPacket(
     const folly::SocketAddress& /*client*/,
-    Buf data) {
+    BufPtr data) {
   // The 'client' here is the local server that is taking over the port
   // First we decode the actual client and time from the packet
   // and send it to the worker_ to handle it properly

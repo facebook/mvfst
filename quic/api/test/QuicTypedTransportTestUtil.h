@@ -179,7 +179,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Deliver a single packet from the remote.
    */
   void deliverPacket(
-      Buf&& buf,
+      BufPtr&& buf,
       quic::TimePoint recvTime = TimePoint::clock::now(),
       uint8_t tosValue = 0,
       bool loopForWrites = true) {
@@ -191,7 +191,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Deliver a single packet from the remote, do not loop for writes.
    */
   void deliverPacketNoWrites(
-      Buf&& buf,
+      BufPtr&& buf,
       quic::TimePoint recvTime = TimePoint::clock::now(),
       uint8_t tosValue = 0) {
     deliverPacket(
@@ -202,7 +202,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Deliver multiple packets from the remote.
    */
   void deliverPackets(
-      std::vector<Buf>&& bufs,
+      std::vector<BufPtr>&& bufs,
       quic::TimePoint recvTime = TimePoint::clock::now(),
       uint8_t tosValue = 0,
       bool loopForWrites = true) {
@@ -224,7 +224,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Deliver multiple packets from the remote, do not loop for writes.
    */
   void deliverPacketsNoWrites(
-      std::vector<Buf>&& bufs,
+      std::vector<BufPtr>&& bufs,
       quic::TimePoint recvTime = TimePoint::clock::now()) {
     deliverPackets(std::move(bufs), recvTime, false /* loopForWrites */);
   }
@@ -232,9 +232,9 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with stream data from peer.
    */
-  quic::Buf buildPeerPacketWithStreamData(
+  quic::BufPtr buildPeerPacketWithStreamData(
       const quic::StreamId streamId,
-      Buf data,
+      BufPtr data,
       Optional<ProtectionType> shortHeaderProtectionOverride = none) {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
@@ -257,9 +257,9 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with stream data from peer.
    */
-  quic::Buf buildPeerPacketWithStreamDataAndEof(
+  quic::BufPtr buildPeerPacketWithStreamDataAndEof(
       const quic::StreamId streamId,
-      Buf data) {
+      BufPtr data) {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
@@ -278,7 +278,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with a StopSendingFrame from peer.
    */
-  quic::Buf buildPeerPacketWithStopSendingFrame(const quic::StreamId streamId) {
+  quic::BufPtr buildPeerPacketWithStopSendingFrame(
+      const quic::StreamId streamId) {
     ShortHeader header(
         ProtectionType::KeyPhaseZero,
         getDstConnectionId(),
@@ -300,7 +301,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with a RstStreamFrame from peer.
    */
-  quic::Buf buildPeerPacketWithRstStreamFrame(
+  quic::BufPtr buildPeerPacketWithRstStreamFrame(
       const quic::StreamId streamId,
       const uint64_t offset) {
     ShortHeader header(
@@ -324,7 +325,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet from peer with ACK frame for previously sent packets.
    */
-  quic::Buf buildAckPacketForSentPackets(
+  quic::BufPtr buildAckPacketForSentPackets(
       quic::PacketNumberSpace pnSpace,
       quic::AckBlocks acks,
       std::chrono::microseconds ackDelay = 0us) {
@@ -343,7 +344,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet from peer with ACK frame for previously sent packets.
    */
-  quic::Buf buildAckPacketForSentPackets(
+  quic::BufPtr buildAckPacketForSentPackets(
       quic::PacketNumberSpace pnSpace,
       quic::PacketNum intervalStart,
       quic::PacketNum intervalEnd,
@@ -355,7 +356,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet from peer with ACK frame for previously sent AppData pkts.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(
+  quic::BufPtr buildAckPacketForSentAppDataPackets(
       quic::AckBlocks acks,
       std::chrono::microseconds ackDelay = 0us) {
     return buildAckPacketForSentPackets(
@@ -365,7 +366,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with ACK frame for previously sent AppData packet.
    */
-  quic::Buf buildAckPacketForSentAppDataPacket(
+  quic::BufPtr buildAckPacketForSentAppDataPacket(
       quic::PacketNum packetNum,
       std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks = {{packetNum, packetNum}};
@@ -375,7 +376,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(
+  quic::BufPtr buildAckPacketForSentAppDataPackets(
       NewOutstandingPacketInterval writeInterval,
       std::chrono::microseconds ackDelay = 0us) {
     const quic::PacketNum firstPacketNum = writeInterval.start;
@@ -387,7 +388,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(
+  quic::BufPtr buildAckPacketForSentAppDataPackets(
       Optional<NewOutstandingPacketInterval> maybeWriteInterval,
       std::chrono::microseconds ackDelay = 0us) {
     CHECK(maybeWriteInterval.has_value());
@@ -398,7 +399,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(
+  quic::BufPtr buildAckPacketForSentAppDataPackets(
       std::vector<NewOutstandingPacketInterval> writeIntervals,
       std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks;
@@ -411,7 +412,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(
+  quic::BufPtr buildAckPacketForSentAppDataPackets(
       std::vector<Optional<NewOutstandingPacketInterval>> maybeWriteIntervals,
       std::chrono::microseconds ackDelay = 0us) {
     std::vector<NewOutstandingPacketInterval> writeIntervals;
@@ -425,7 +426,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(
+  quic::BufPtr buildAckPacketForSentAppDataPackets(
       const std::vector<quic::PacketNum>& packetNums,
       std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks;
@@ -450,7 +451,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
               quic::PacketNum>::value,
           void>,
       class = std::enable_if_t<are_same<T0, Ts...>::value, void>>
-  quic::Buf buildAckPacketForSentAppDataPackets(T0&& first, Ts&&... args) {
+  quic::BufPtr buildAckPacketForSentAppDataPackets(T0&& first, Ts&&... args) {
     std::vector<quic::PacketNum> packetNums{
         std::forward<T0>(first), std::forward<Ts>(args)...};
     return buildAckPacketForSentAppDataPackets(packetNums);

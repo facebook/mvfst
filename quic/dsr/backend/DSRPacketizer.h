@@ -57,7 +57,7 @@ class CipherBuilder {
   CipherPair buildCiphers(
       fizz::TrafficKey&& trafficKey,
       fizz::CipherSuite cipherSuite,
-      Buf packetProtectionKey) {
+      BufPtr packetProtectionKey) {
     auto aead = FizzAead::wrap(deriveRecordAeadWithLabel(
         *quicFizzCryptoFactory_.getFizzFactory(),
         std::move(trafficKey),
@@ -86,7 +86,7 @@ class QuicPacketizer {
  public:
   virtual ~QuicPacketizer() = default;
 
-  virtual Buf sendQuicPacket(
+  virtual BufPtr sendQuicPacket(
       ConnectionId dcid,
       const folly::SocketAddress& clientAddr,
       PacketNum packetNum,
@@ -143,7 +143,8 @@ class PacketGroupWriter {
 
   BufQuicBatchResult writePacketsGroup(
       RequestGroup& reqGroup,
-      const std::function<Buf(const PacketizationRequest& req)>& bufProvider);
+      const std::function<BufPtr(const PacketizationRequest& req)>&
+          bufProvider);
 
   bool writeSingleQuicPacket(
       BufAccessor& accessor,
@@ -156,7 +157,7 @@ class PacketGroupWriter {
       size_t offset,
       size_t length,
       bool eof,
-      Buf buf);
+      BufPtr buf);
 
  protected:
   uint32_t prevSize_{0};

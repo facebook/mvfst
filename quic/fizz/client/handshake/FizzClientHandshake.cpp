@@ -122,7 +122,7 @@ bool FizzClientHandshake::verifyRetryIntegrityTag(
       retryPacket.header.getVersion(),
       BufHelpers::copyBuffer(retryPacket.header.getToken()));
 
-  Buf pseudoRetryPacket = std::move(pseudoRetryPacketBuilder).buildPacket();
+  BufPtr pseudoRetryPacket = std::move(pseudoRetryPacketBuilder).buildPacket();
 
   FizzRetryIntegrityTagGenerator retryIntegrityTagGenerator;
   auto expectedIntegrityTag = retryIntegrityTagGenerator.getRetryIntegrityTag(
@@ -202,7 +202,8 @@ std::unique_ptr<PacketNumberCipher> FizzClientHandshake::buildHeaderCipher(
   return cryptoFactory_->makePacketNumberCipher(secret);
 }
 
-Buf FizzClientHandshake::getNextTrafficSecret(folly::ByteRange secret) const {
+BufPtr FizzClientHandshake::getNextTrafficSecret(
+    folly::ByteRange secret) const {
   auto deriver =
       state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
   auto nextSecret = deriver->expandLabel(

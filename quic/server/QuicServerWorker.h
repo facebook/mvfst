@@ -106,7 +106,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     }
 
     // data
-    Buf ioBuf_;
+    BufPtr ioBuf_;
     struct iovec iov_;
     size_t len_{0};
     // addr
@@ -144,7 +144,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     }
 
     static void
-    cb(folly::EventRecvmsgMultishotCallback::Hdr* h, int res, Buf io_buf) {
+    cb(folly::EventRecvmsgMultishotCallback::Hdr* h, int res, BufPtr io_buf) {
       reinterpret_cast<QuicServerWorker*>(h->arg_)->recvmsgMultishotCallback(
           reinterpret_cast<MultishotHdr*>(h), res, std::move(io_buf));
     }
@@ -582,7 +582,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   std::string logRoutingInfo(const ConnectionId& connId) const;
 
   void eventRecvmsgCallback(MsgHdr* msgHdr, int res);
-  void recvmsgMultishotCallback(MultishotHdr* msgHdr, int res, Buf io_buf);
+  void recvmsgMultishotCallback(MultishotHdr* msgHdr, int res, BufPtr io_buf);
 
   bool hasTimestamping() {
     return (socket_ && (socket_->getTimestamping() > 0));
@@ -640,7 +640,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   folly::F14FastMap<QuicServerTransport*, std::weak_ptr<QuicServerTransport>>
       boundServerTransports_;
 
-  Buf readBuffer_;
+  BufPtr readBuffer_;
   bool shutdown_{false};
   std::vector<QuicVersion> supportedVersions_;
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
@@ -648,7 +648,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // Same value as transportSettings_.numGROBuffers_ if the kernel
   // supports GRO. otherwise 1
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
-  Optional<Buf> healthCheckToken_;
+  Optional<BufPtr> healthCheckToken_;
   std::function<bool()> rejectNewConnections_{[]() { return false; }};
   std::function<bool(uint16_t)> isBlockListedSrcPort_{
       [](uint16_t) { return false; }};

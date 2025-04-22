@@ -1447,7 +1447,7 @@ void writeCloseCommon(
   increaseNextPacketNum(connection, pnSpace);
   // best effort writing to the socket, ignore any errors.
 
-  Buf packetBufPtr = packetBuf.clone();
+  BufPtr packetBufPtr = packetBuf.clone();
   iovec vec[kNumIovecBufferChains];
   size_t iovec_len = fillIovec(packetBufPtr, vec);
   auto ret = sock.write(connection.peerAddress, vec, iovec_len);

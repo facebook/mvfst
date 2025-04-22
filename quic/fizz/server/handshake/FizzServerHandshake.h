@@ -42,7 +42,7 @@ class FizzServerHandshake : public ServerHandshake {
   std::unique_ptr<Aead> buildAead(folly::ByteRange secret) override;
   std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
       folly::ByteRange secret) override;
-  Buf getNextTrafficSecret(folly::ByteRange secret) const override;
+  BufPtr getNextTrafficSecret(folly::ByteRange secret) const override;
 
   void processAccept() override;
   bool processPendingCryptoEvent() override;

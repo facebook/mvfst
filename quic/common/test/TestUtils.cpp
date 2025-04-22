@@ -95,7 +95,7 @@ PacketNum rstStreamAndSendPacket(
 
 void writeStreamFrameData(
     PacketBuilderInterface& builder,
-    Buf writeBuffer,
+    BufPtr writeBuffer,
     uint64_t dataLen) {
   ChainedByteRangeHead dataHead(writeBuffer);
   writeStreamFrameData(builder, dataHead, dataLen);
@@ -403,7 +403,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
   return std::move(builder).buildPacket();
 }
 
-Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
+BufPtr packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
   auto packetBuf = packet.header.clone();
   if (!packet.body.empty()) {
     packetBuf->prependChain(packet.body.clone());
@@ -417,7 +417,7 @@ ReceivedUdpPacket packetToReceivedUdpPacket(
   return packet;
 }
 
-Buf packetToBufCleartext(
+BufPtr packetToBufCleartext(
     RegularQuicPacketBuilder::Packet& packet,
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
@@ -425,7 +425,7 @@ Buf packetToBufCleartext(
   VLOG(10) << __func__ << " packet header: "
            << folly::hexlify(packet.header.clone()->moveToFbString());
   auto packetBuf = packet.header.clone();
-  Buf body;
+  BufPtr body;
   if (!packet.body.empty()) {
     packet.body.coalesce();
     body = packet.body.clone();
@@ -453,7 +453,7 @@ Buf packetToBufCleartext(
   return packetBuf;
 }
 
-Buf packetToBufCleartext(
+BufPtr packetToBufCleartext(
     RegularQuicPacketBuilder::Packet&& packet,
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
@@ -606,7 +606,7 @@ CongestionController::AckEvent makeAck(
   return ack;
 }
 
-BufQueue bufToQueue(Buf buf) {
+BufQueue bufToQueue(BufPtr buf) {
   BufQueue queue;
   buf->coalesce();
   queue.append(std::move(buf));
@@ -846,12 +846,14 @@ size_t getTotalIovecLen(const struct iovec* vec, size_t iovec_len) {
   return result;
 }
 
-Buf copyChain(Buf&& input) {
+BufPtr copyChain(BufPtr&& input) {
   folly::IOBuf* current = input.get();
-  Buf headCopy = folly::IOBuf::copyBuffer(current->data(), current->length());
+  BufPtr headCopy =
+      folly::IOBuf::copyBuffer(current->data(), current->length());
   current = current->next();
   while (current != input.get()) {
-    Buf currCopy = folly::IOBuf::copyBuffer(current->data(), current->length());
+    BufPtr currCopy =
+        folly::IOBuf::copyBuffer(current->data(), current->length());
     headCopy->appendToChain(std::move(currCopy));
     current = current->next();
   }

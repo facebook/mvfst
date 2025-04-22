@@ -13,7 +13,7 @@
 #include <algorithm>
 
 namespace {
-void prependToBuf(quic::Buf& buf, quic::Buf toAppend) {
+void prependToBuf(quic::BufPtr& buf, quic::BufPtr toAppend) {
   if (buf) {
     buf->prependChain(std::move(toAppend));
   } else {
@@ -24,7 +24,7 @@ void prependToBuf(quic::Buf& buf, quic::Buf toAppend) {
 
 namespace quic {
 folly::Expected<folly::Unit, QuicError>
-writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
+writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof) {
   auto neverWrittenBufMeta = (0 == stream.writeBufMeta.offset);
   uint64_t len = 0;
   if (data) {
@@ -87,7 +87,7 @@ folly::Expected<folly::Unit, QuicError> writeBufMetaToQuicStream(
   return folly::unit;
 }
 
-void writeDataToQuicStream(QuicCryptoStream& stream, Buf data) {
+void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data) {
   stream.pendingWrites.append(data);
   stream.writeBuffer.append(std::move(data));
 }
@@ -96,7 +96,7 @@ void writeDataToQuicStream(QuicCryptoStream& stream, Buf data) {
 // a logic IOBuf chain, buf. The function will pack data into the available
 // tail agressively, and allocate in terms of appendLen until the push is
 // complete.
-static void pushToTail(folly::IOBuf* dst, Buf src, size_t allocSize) {
+static void pushToTail(folly::IOBuf* dst, BufPtr src, size_t allocSize) {
   size_t appended = 0;
   auto len = src->length();
   auto data = src->data();
@@ -106,7 +106,7 @@ static void pushToTail(folly::IOBuf* dst, Buf src, size_t allocSize) {
     if (dst->tailroom() == 0 || dst->isSharedOne()) {
       // If the buffer we are pushing has tail room, just use that one.
       // Otherwise, we have to allocate one.
-      Buf newBuf;
+      BufPtr newBuf;
       if (src->tailroom() > 0 && !src->isSharedOne()) {
         src->trimStart(appended);
         dst->appendChain(std::move(src));
@@ -316,13 +316,13 @@ folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
       stream, std::move(buffer), 0, [](uint64_t, uint64_t) {});
 }
 
-std::pair<Buf, bool> readDataInOrderFromReadBuffer(
+std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
     QuicStreamLike& stream,
     uint64_t amount,
     bool sinkData) {
   auto remaining = amount;
   bool eof = false;
-  Buf data;
+  BufPtr data;
   while ((amount == 0 || remaining != 0) && !stream.readBuffer.empty()) {
     auto curr = stream.readBuffer.begin();
     if (curr->offset > stream.currentReadOffset) {
@@ -363,11 +363,11 @@ std::pair<Buf, bool> readDataInOrderFromReadBuffer(
   return std::make_pair(std::move(data), eof);
 }
 
-Buf readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount) {
+BufPtr readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount) {
   return readDataInOrderFromReadBuffer(stream, amount).first;
 }
 
-folly::Expected<std::pair<Buf, bool>, QuicError> readDataFromQuicStream(
+folly::Expected<std::pair<BufPtr, bool>, QuicError> readDataFromQuicStream(
     QuicStreamState& stream,
     uint64_t amount) {
   auto eof = stream.finalReadOffset &&
@@ -383,7 +383,7 @@ folly::Expected<std::pair<Buf, bool>, QuicError> readDataFromQuicStream(
 
   uint64_t lastReadOffset = stream.currentReadOffset;
 
-  Buf data;
+  BufPtr data;
   std::tie(data, eof) = readDataInOrderFromReadBuffer(stream, amount);
   // Update flow control before handling eof as eof is not subject to flow
   // control

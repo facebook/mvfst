@@ -15,14 +15,14 @@ using namespace testing;
 
 namespace quic::test {
 
-Buf createBuffer(uint32_t len) {
+BufPtr createBuffer(uint32_t len) {
   auto buf = folly::IOBuf::create(len);
   buf->append(len);
   return buf;
 }
 
 std::unique_ptr<WriteStreamBuffer>
-createWriteStreamBuffer(uint32_t offset, Buf& buf, bool eof) {
+createWriteStreamBuffer(uint32_t offset, BufPtr& buf, bool eof) {
   ChainedByteRangeHead cbrh(buf);
   return std::make_unique<WriteStreamBuffer>(std::move(cbrh), offset, eof);
 }
@@ -239,9 +239,9 @@ TEST(StreamDataTest, PendingWritesRemovalAll) {
   state.currentWriteOffset = 5;
 
   // [5, 12]
-  Buf buf1 = folly::IOBuf::create(3);
+  BufPtr buf1 = folly::IOBuf::create(3);
   buf1->append(3);
-  Buf buf2 = folly::IOBuf::create(5);
+  BufPtr buf2 = folly::IOBuf::create(5);
   buf2->append(5);
   buf1->appendChain(std::move(buf2));
 
@@ -255,9 +255,9 @@ TEST(StreamDataTest, PendingWritesRemoval) {
   state.currentWriteOffset = 5;
 
   // [5, 12]
-  Buf buf1 = folly::IOBuf::create(3);
+  BufPtr buf1 = folly::IOBuf::create(3);
   buf1->append(3);
-  Buf buf2 = folly::IOBuf::create(5);
+  BufPtr buf2 = folly::IOBuf::create(5);
   buf2->append(5);
   buf1->appendChain(std::move(buf2));
 
@@ -271,9 +271,9 @@ TEST(StreamDataTest, PendingWritesRemovalNoChange) {
   state.currentWriteOffset = 5;
 
   // [5, 12]
-  Buf buf1 = folly::IOBuf::create(3);
+  BufPtr buf1 = folly::IOBuf::create(3);
   buf1->append(3);
-  Buf buf2 = folly::IOBuf::create(5);
+  BufPtr buf2 = folly::IOBuf::create(5);
   buf2->append(5);
   buf1->appendChain(std::move(buf2));
 
@@ -550,15 +550,15 @@ TEST(StreamDataTest, ReadBufferRemovalAll) {
   QuicStreamState state(0, qcsb);
 
   // [1, 2] [5, 12] [17, 19]
-  Buf buf1 = folly::IOBuf::create(2);
+  BufPtr buf1 = folly::IOBuf::create(2);
   buf1->append(2);
   state.readBuffer.emplace_back(std::move(buf1), 1);
 
-  Buf buf2 = folly::IOBuf::create(8);
+  BufPtr buf2 = folly::IOBuf::create(8);
   buf2->append(8);
   state.readBuffer.emplace_back(std::move(buf2), 5);
 
-  Buf buf3 = folly::IOBuf::create(3);
+  BufPtr buf3 = folly::IOBuf::create(3);
   buf3->append(3);
   state.readBuffer.emplace_back(std::move(buf3), 17);
 
@@ -571,15 +571,15 @@ TEST(StreamDataTest, ReadBufferRemovalExactMatch) {
   QuicStreamState state(0, qcsb);
 
   // [1, 2] [5, 12] [17, 19]
-  Buf buf1 = folly::IOBuf::create(2);
+  BufPtr buf1 = folly::IOBuf::create(2);
   buf1->append(2);
   state.readBuffer.emplace_back(std::move(buf1), 1);
 
-  Buf buf2 = folly::IOBuf::create(8);
+  BufPtr buf2 = folly::IOBuf::create(8);
   buf2->append(8);
   state.readBuffer.emplace_back(std::move(buf2), 5);
 
-  Buf buf3 = folly::IOBuf::create(3);
+  BufPtr buf3 = folly::IOBuf::create(3);
   buf3->append(3);
   state.readBuffer.emplace_back(std::move(buf3), 17);
 
@@ -598,15 +598,15 @@ TEST(StreamDataTest, ReadBufferRemovalPartialMatch) {
   QuicStreamState state(0, qcsb);
 
   // [1, 2] [5, 12] [17, 19]
-  Buf buf1 = folly::IOBuf::create(2);
+  BufPtr buf1 = folly::IOBuf::create(2);
   buf1->append(2);
   state.readBuffer.emplace_back(std::move(buf1), 1);
 
-  Buf buf2 = folly::IOBuf::create(8);
+  BufPtr buf2 = folly::IOBuf::create(8);
   buf2->append(8);
   state.readBuffer.emplace_back(std::move(buf2), 5);
 
-  Buf buf3 = folly::IOBuf::create(3);
+  BufPtr buf3 = folly::IOBuf::create(3);
   buf3->append(3);
   state.readBuffer.emplace_back(std::move(buf3), 17);
 
@@ -625,15 +625,15 @@ TEST(StreamDataTest, ReadBufferRemovalNoMatch) {
   QuicStreamState state(0, qcsb);
 
   // [1, 2] [5, 12] [17, 19]
-  Buf buf1 = folly::IOBuf::create(2);
+  BufPtr buf1 = folly::IOBuf::create(2);
   buf1->append(2);
   state.readBuffer.emplace_back(std::move(buf1), 1);
 
-  Buf buf2 = folly::IOBuf::create(8);
+  BufPtr buf2 = folly::IOBuf::create(8);
   buf2->append(8);
   state.readBuffer.emplace_back(std::move(buf2), 5);
 
-  Buf buf3 = folly::IOBuf::create(3);
+  BufPtr buf3 = folly::IOBuf::create(3);
   buf3->append(3);
   state.readBuffer.emplace_back(std::move(buf3), 17);
 

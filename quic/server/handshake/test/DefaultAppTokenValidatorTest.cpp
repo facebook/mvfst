@@ -50,7 +50,7 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) { return true; };
+                                        const BufPtr&) { return true; };
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted());
   EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
@@ -84,7 +84,7 @@ TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) { return true; };
+                                        const BufPtr&) { return true; };
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(1);
   EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
@@ -120,7 +120,7 @@ TEST(
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) { return true; };
+                                        const BufPtr&) { return true; };
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
   EXPECT_CALL(*quicStats, onZeroRttAccepted());
@@ -142,7 +142,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
 
   ResumptionState resState;
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -163,7 +163,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -205,7 +205,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -245,7 +245,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
 //   resState.appToken = encodeAppToken(appToken);
 
 //   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-//                                         const Buf&) {
+//                                         const BufPtr&) {
 //     EXPECT_TRUE(false);
 //     return true;
 //   };
@@ -282,7 +282,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -314,7 +314,7 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -348,7 +348,7 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -382,7 +382,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidExtendedAckSupportChanged) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) {
+                                        const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
@@ -417,7 +417,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   resState.appToken = encodeAppToken(appToken);
 
   conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const Buf&) { return false; };
+                                        const BufPtr&) { return false; };
   DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
@@ -449,8 +449,10 @@ class SourceAddressTokenTest : public Test {
     ResumptionState resState;
     resState.appToken = encodeAppToken(appToken_);
 
-    conn_.earlyDataAppParamsValidator =
-        [=](const Optional<std::string>&, const Buf&) { return acceptZeroRtt; };
+    conn_.earlyDataAppParamsValidator = [=](const Optional<std::string>&,
+                                            const BufPtr&) {
+      return acceptZeroRtt;
+    };
     DefaultAppTokenValidator validator(&conn_);
     EXPECT_EQ(validator.validate(resState), acceptZeroRtt);
   }

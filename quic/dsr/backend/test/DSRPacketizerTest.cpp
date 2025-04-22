@@ -168,7 +168,7 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   EXPECT_EQ(expectedFirstFrame, *packet1.frames[0].asWriteStreamFrame());
   EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 
-  std::vector<Buf> sentData;
+  std::vector<BufPtr> sentData;
   auto sock = std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
   EXPECT_CALL(*sock, writeGSO(conn_.peerAddress, _, _, _))
       .WillRepeatedly(Invoke([&](const folly::SocketAddress&,

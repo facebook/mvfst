@@ -9,7 +9,7 @@
 
 namespace quic {
 
-BufAccessor::BufAccessor(Buf buf)
+BufAccessor::BufAccessor(BufPtr buf)
     : buf_(std::move(buf)), capacity_(buf_->capacity()) {
   CHECK(!buf_->isShared() && !buf_->isChained());
 }
@@ -17,21 +17,21 @@ BufAccessor::BufAccessor(Buf buf)
 BufAccessor::BufAccessor(size_t capacity)
     : BufAccessor(BufHelpers::createCombined(capacity)) {}
 
-Buf BufAccessor::obtain() {
-  Buf ret;
+BufPtr BufAccessor::obtain() {
+  BufPtr ret;
   buf_.swap(ret);
   return ret;
 }
 
-Buf& BufAccessor::buf() {
+BufPtr& BufAccessor::buf() {
   return buf_;
 }
 
-void BufAccessor::release(Buf buf) {
+void BufAccessor::release(BufPtr buf) {
   CHECK(!buf_) << "Can't override existing buf";
-  CHECK(buf) << "Invalid Buf being released";
+  CHECK(buf) << "Invalid BufPtr being released";
   CHECK_EQ(buf->capacity(), capacity_)
-      << "Buf has wrong capacity, capacit_=" << capacity_
+      << "BufPtr has wrong capacity, capacit_=" << capacity_
       << ", buf capacity=" << buf->capacity();
   CHECK(!buf->isChained()) << "Reject chained buf";
   buf_ = std::move(buf);

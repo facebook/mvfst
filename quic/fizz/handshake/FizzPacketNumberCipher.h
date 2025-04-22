@@ -19,7 +19,7 @@ class Aes128PacketNumberCipher : public PacketNumberCipher {
 
   void setKey(folly::ByteRange key) override;
 
-  const Buf& getKey() const override;
+  const BufPtr& getKey() const override;
 
   HeaderProtectionMask mask(folly::ByteRange sample) const override;
 
@@ -28,7 +28,7 @@ class Aes128PacketNumberCipher : public PacketNumberCipher {
  private:
   folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
 
-  Buf pnKey_;
+  BufPtr pnKey_;
 };
 
 class Aes256PacketNumberCipher : public PacketNumberCipher {
@@ -37,7 +37,7 @@ class Aes256PacketNumberCipher : public PacketNumberCipher {
 
   void setKey(folly::ByteRange key) override;
 
-  const Buf& getKey() const override;
+  const BufPtr& getKey() const override;
 
   HeaderProtectionMask mask(folly::ByteRange sample) const override;
 
@@ -46,7 +46,7 @@ class Aes256PacketNumberCipher : public PacketNumberCipher {
  private:
   folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
 
-  Buf pnKey_;
+  BufPtr pnKey_;
 };
 
 } // namespace quic

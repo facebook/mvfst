@@ -17,13 +17,13 @@ using namespace testing;
 
 namespace quic::test {
 
-std::pair<uint8_t, Buf> encodeShortHeader(const ShortHeader& header) {
+std::pair<uint8_t, BufPtr> encodeShortHeader(const ShortHeader& header) {
   ShortHeader headerCopy = header;
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(headerCopy), 0 /* largestAcked */);
   CHECK(!builder.encodePacketHeader().hasError());
   auto packet = std::move(builder).buildPacket();
-  Buf out;
+  BufPtr out;
   folly::io::Cursor cursor(&packet.header);
   auto initialByte = cursor.readBE<uint8_t>();
   cursor.clone(out, cursor.totalLength());

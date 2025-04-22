@@ -82,7 +82,7 @@ class TakeoverPacketHandler {
       const folly::SocketAddress& peerAddress,
       NetworkData&& networkData);
 
-  void processForwardedPacket(const folly::SocketAddress& client, Buf data);
+  void processForwardedPacket(const folly::SocketAddress& client, BufPtr data);
 
   void stop();
 
@@ -94,7 +94,7 @@ class TakeoverPacketHandler {
 
  private:
   std::unique_ptr<FollyAsyncUDPSocketAlias> makeSocket(folly::EventBase* evb);
-  void forwardPacket(Buf packet);
+  void forwardPacket(BufPtr packet);
   // prevent copying
   TakeoverPacketHandler(const TakeoverPacketHandler&);
   TakeoverPacketHandler& operator=(const TakeoverPacketHandler&);
@@ -161,6 +161,6 @@ class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
   const TransportSettings& transportSettings_;
   folly::SocketAddress address_;
   std::unique_ptr<FollyAsyncUDPSocketAlias> socket_;
-  Buf readBuffer_;
+  BufPtr readBuffer_;
 };
 } // namespace quic

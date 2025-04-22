@@ -115,13 +115,13 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
   }));
 
   EXPECT_CALL(pktBuilder, _insert(_))
-      .WillRepeatedly(WithArgs<0>(Invoke([&](Buf& buf) {
+      .WillRepeatedly(WithArgs<0>(Invoke([&](BufPtr& buf) {
         pktBuilder.remaining_ -= buf->computeChainDataLength();
         pktBuilder.appender_.insert(std::move(buf));
       })));
 
   EXPECT_CALL(pktBuilder, _insert(_, _))
-      .WillRepeatedly(WithArgs<0, 1>(Invoke([&](Buf& buf, size_t limit) {
+      .WillRepeatedly(WithArgs<0, 1>(Invoke([&](BufPtr& buf, size_t limit) {
         pktBuilder.remaining_ -= limit;
         std::unique_ptr<folly::IOBuf> cloneBuf;
         folly::io::Cursor cursor(buf.get());
@@ -939,7 +939,7 @@ TEST_F(QuicWriteCodecTest, TestWriteNoDataAndFin) {
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = true;
-  Buf empty;
+  BufPtr empty;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 0, 0, fin, none /* skipLenHint */);
   ASSERT_TRUE(res.hasValue());
@@ -954,7 +954,7 @@ TEST_F(QuicWriteCodecTest, TestWriteNoDataAndNoFin) {
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = false;
-  Buf empty;
+  BufPtr empty;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 0, 0, fin, none /* skipLenHint */);
   EXPECT_TRUE(res.hasError());

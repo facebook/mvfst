@@ -19,7 +19,7 @@ namespace quic::test {
 
 class QuicExtensionsTest : public testing::Test {
  protected:
-  Buf getBuf(folly::StringPiece hex) {
+  BufPtr getBuf(folly::StringPiece hex) {
     auto data = unhexlify(hex);
     return folly::IOBuf::copyBuffer(data.data(), data.size());
   }

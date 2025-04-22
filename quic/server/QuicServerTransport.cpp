@@ -741,7 +741,7 @@ QuicServerTransport::getSelfCertificate() const {
   return nullptr;
 }
 
-void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
+void QuicServerTransport::onTransportKnobs(BufPtr knobBlob) {
   if (knobBlob->length() > 0) {
     std::string serializedKnobs = std::string(
         reinterpret_cast<const char*>(knobBlob->data()), knobBlob->length());

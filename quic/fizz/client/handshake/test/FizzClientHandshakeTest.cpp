@@ -213,7 +213,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     expectOneRttCipher(expectOneRtt, true);
   }
 
-  Buf getHandshakeWriteBytes() {
+  BufPtr getHandshakeWriteBytes() {
     auto buf = folly::IOBuf::create(0);
     if (!cryptoState->initialStream.writeBuffer.empty()) {
       buf->prependChain(cryptoState->initialStream.writeBuffer.move());
@@ -463,7 +463,7 @@ TEST_F(ClientHandshakeCallbackTest, TestHandshakeSuccess) {
   clientServerRound();
 
   bool gotEarlyDataParams = false;
-  conn->earlyDataAppParamsGetter = [&]() -> Buf {
+  conn->earlyDataAppParamsGetter = [&]() -> BufPtr {
     gotEarlyDataParams = true;
     return {};
   };

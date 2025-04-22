@@ -14,7 +14,7 @@
 
 namespace quic {
 
-Buf FizzCryptoFactory::makeInitialTrafficSecret(
+BufPtr FizzCryptoFactory::makeInitialTrafficSecret(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {

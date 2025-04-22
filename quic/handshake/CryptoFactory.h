@@ -27,10 +27,10 @@ class CryptoFactory {
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
-  Buf makeServerInitialTrafficSecret(
+  BufPtr makeServerInitialTrafficSecret(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
-  Buf makeClientInitialTrafficSecret(
+  BufPtr makeClientInitialTrafficSecret(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
@@ -51,7 +51,7 @@ class CryptoFactory {
   /**
    * Crypto layer specific methods.
    */
-  virtual Buf makeInitialTrafficSecret(
+  virtual BufPtr makeInitialTrafficSecret(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const = 0;

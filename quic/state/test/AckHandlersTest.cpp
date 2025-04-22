@@ -4463,7 +4463,7 @@ class AckEventForAppDataTest : public Test {
 
   auto writeDataToQuicStreamAndGetFrame(
       QuicStreamState& stream,
-      Buf&& data,
+      BufPtr&& data,
       const bool eof) {
     const auto offset = getLargestWriteOffsetSeen(stream);
     const auto len = data->computeChainDataLength();
@@ -4473,7 +4473,7 @@ class AckEventForAppDataTest : public Test {
 
   auto writeDataToQuicStreamAndGetFrame(
       const StreamId streamId,
-      Buf&& data,
+      BufPtr&& data,
       const bool eof) {
     auto stream = conn_->streamManager->findStream(streamId);
     CHECK_NOTNULL(stream);

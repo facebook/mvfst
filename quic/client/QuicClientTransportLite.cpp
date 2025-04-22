@@ -1306,7 +1306,7 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMsg(
   for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place.
-    Buf readBuffer = BufHelpers::createCombined(readBufferSize);
+    BufPtr readBuffer = BufHelpers::createCombined(readBufferSize);
     struct iovec vec;
     vec.iov_base = readBuffer->writableData();
     vec.iov_len = readBufferSize;
@@ -1484,7 +1484,7 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvFrom(
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
-    Buf readBuffer = BufHelpers::createCombined(readBufferSize);
+    BufPtr readBuffer = BufHelpers::createCombined(readBufferSize);
 
     sockaddr* rawAddr{nullptr};
 

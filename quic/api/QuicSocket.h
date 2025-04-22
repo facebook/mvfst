@@ -78,9 +78,9 @@ class QuicSocket : virtual public QuicSocketLite {
    */
   virtual void setEarlyDataAppParamsFunctions(
       folly::Function<
-          bool(const Optional<std::string>& alpn, const Buf& appParams) const>
-          validator,
-      folly::Function<Buf()> getter) = 0;
+          bool(const Optional<std::string>& alpn, const BufPtr& appParams)
+              const> validator,
+      folly::Function<BufPtr()> getter) = 0;
 
   virtual ~QuicSocket() override = default;
 
@@ -402,7 +402,7 @@ class QuicSocket : virtual public QuicSocketLite {
    * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
    * dropped, and a LocalErrorCode will be returned to caller.
    */
-  virtual WriteResult writeDatagram(Buf buf) = 0;
+  virtual WriteResult writeDatagram(BufPtr buf) = 0;
 
   /**
    * Returns the currently available received Datagrams.
@@ -415,7 +415,7 @@ class QuicSocket : virtual public QuicSocketLite {
    * Returns the currently available received Datagram IOBufs.
    * Returns all datagrams if atMost is 0.
    */
-  virtual folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagramBufs(
+  virtual folly::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) = 0;
 
   /**

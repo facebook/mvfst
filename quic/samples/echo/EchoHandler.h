@@ -110,7 +110,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     if (input_.find(id) == input_.end()) {
       input_.emplace(id, std::make_pair(BufQueue(), false));
     }
-    quic::Buf data = std::move(res.value().first);
+    quic::BufPtr data = std::move(res.value().first);
     bool eof = res.value().second;
     auto dataLen = (data ? data->computeChainDataLength() : 0);
     LOG(INFO) << "Got len=" << dataLen << " eof=" << uint32_t(eof)
@@ -146,7 +146,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       streamData.emplace(id, std::make_pair(BufQueue(), false));
     }
 
-    quic::Buf data = std::move(res.value().first);
+    quic::BufPtr data = std::move(res.value().first);
     bool eof = res.value().second;
     auto dataLen = (data ? data->computeChainDataLength() : 0);
     LOG(INFO) << "Got len=" << dataLen << " eof=" << uint32_t(eof)

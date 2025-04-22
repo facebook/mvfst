@@ -282,7 +282,7 @@ class ServerHandshakeTest : public Test {
     }
   }
 
-  Buf getHandshakeWriteBytes() {
+  BufPtr getHandshakeWriteBytes() {
     auto buf = folly::IOBuf::create(0);
     switch (clientState.readRecordLayer()->getEncryptionLevel()) {
       case fizz::EncryptionLevel::Plaintext:

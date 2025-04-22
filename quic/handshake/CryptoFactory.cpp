@@ -23,14 +23,14 @@ std::unique_ptr<Aead> CryptoFactory::getServerInitialCipher(
   return makeInitialAead(kServerInitialLabel, clientDestinationConnId, version);
 }
 
-Buf CryptoFactory::makeServerInitialTrafficSecret(
+BufPtr CryptoFactory::makeServerInitialTrafficSecret(
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   return makeInitialTrafficSecret(
       kServerInitialLabel, clientDestinationConnId, version);
 }
 
-Buf CryptoFactory::makeClientInitialTrafficSecret(
+BufPtr CryptoFactory::makeClientInitialTrafficSecret(
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   return makeInitialTrafficSecret(

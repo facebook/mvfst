@@ -10,7 +10,7 @@
 
 namespace quic {
 
-TperfDSRSender::TperfDSRSender(Buf sendBuf, QuicAsyncUDPSocket& sock)
+TperfDSRSender::TperfDSRSender(BufPtr sendBuf, QuicAsyncUDPSocket& sock)
     : sock_(sock), buf_(std::move(sendBuf)) {}
 
 bool TperfDSRSender::addSendInstruction(const SendInstruction& instruction) {
@@ -43,7 +43,7 @@ bool TperfDSRSender::flush() {
   quic::UdpSocketPacketGroupWriter packetGroupWriter(sock_, prs.clientAddress);
   auto written = packetGroupWriter.writePacketsGroup(
       prs, [=](const PacketizationRequest& req) {
-        Buf buf;
+        BufPtr buf;
         uint64_t remainingLen = req.len;
         do {
           buf = buf_->clone();

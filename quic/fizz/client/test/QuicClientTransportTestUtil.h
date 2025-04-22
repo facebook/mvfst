@@ -329,7 +329,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return params_;
   }
 
-  Buf getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
+  BufPtr getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
     return folly::IOBuf::copyBuffer(getRandSecret());
   }
 

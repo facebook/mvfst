@@ -138,7 +138,7 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
     Optional<QuicInteger> streamId,
     Optional<QuicInteger> offset = none,
     Optional<QuicInteger> dataLength = none,
-    Buf data = nullptr,
+    BufPtr data = nullptr,
     bool useRealValuesForStreamId = false,
     Optional<QuicInteger> groupId = none) {
   std::unique_ptr<folly::IOBuf> streamFrame = folly::IOBuf::create(0);
@@ -169,7 +169,7 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
 std::unique_ptr<folly::IOBuf> createCryptoFrame(
     Optional<QuicInteger> offset = none,
     Optional<QuicInteger> dataLength = none,
-    Buf data = nullptr) {
+    BufPtr data = nullptr) {
   std::unique_ptr<folly::IOBuf> cryptoFrame = folly::IOBuf::create(0);
   BufAppender wcursor(cryptoFrame.get(), 10);
   auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
@@ -825,7 +825,7 @@ TEST_F(DecodeTest, StreamIncorrectDataLength) {
 TEST_F(DecodeTest, StreamNoRemainingData) {
   // assume after parsing the frame type (stream frame), there was no remaining
   // data
-  quic::Buf buf = folly::IOBuf::copyBuffer("test");
+  quic::BufPtr buf = folly::IOBuf::copyBuffer("test");
   BufQueue queue(std::move(buf));
   queue.trimStartAtMost(4);
 
@@ -839,7 +839,7 @@ TEST_F(DecodeTest, StreamNoRemainingData) {
 TEST_F(DecodeTest, DatagramNoRemainingData) {
   // assume after parsing the frame type (datagram frame), there was no
   // remaining data
-  quic::Buf buf = folly::IOBuf::copyBuffer("test");
+  quic::BufPtr buf = folly::IOBuf::copyBuffer("test");
   BufQueue queue(std::move(buf));
   queue.trimStartAtMost(4);
 
@@ -983,7 +983,7 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
 
 std::unique_ptr<folly::IOBuf> createNewTokenFrame(
     Optional<QuicInteger> tokenLength = none,
-    Buf token = nullptr) {
+    BufPtr token = nullptr) {
   std::unique_ptr<folly::IOBuf> newTokenFrame = folly::IOBuf::create(0);
   BufAppender wcursor(newTokenFrame.get(), 10);
   auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
@@ -1031,7 +1031,7 @@ TEST_F(DecodeTest, ParsePlaintextNewToken) {
           .count();
 
   NewToken newToken(clientIp, timestampInMs);
-  Buf plaintextNewToken = newToken.getPlaintextToken();
+  BufPtr plaintextNewToken = newToken.getPlaintextToken();
 
   folly::io::Cursor cursor(plaintextNewToken.get());
 
@@ -1052,7 +1052,7 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
           .count();
 
   RetryToken retryToken(odcid, clientIp, clientPort, timestampInMs);
-  Buf plaintextRetryToken = retryToken.getPlaintextToken();
+  BufPtr plaintextRetryToken = retryToken.getPlaintextToken();
 
   folly::io::Cursor cursor(plaintextRetryToken.get());
 

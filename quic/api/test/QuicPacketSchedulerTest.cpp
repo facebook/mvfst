@@ -474,7 +474,7 @@ TEST_P(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
               "CryptoOnlyScheduler")
               .cryptoFrames())
           .build();
-  Buf helloBuf = folly::IOBuf::copyBuffer("chlo");
+  BufPtr helloBuf = folly::IOBuf::copyBuffer("chlo");
   ChainedByteRangeHead clientHelloData(helloBuf);
   conn.cryptoState->initialStream.lossBuffer.push_back(
       WriteStreamBuffer{std::move(clientHelloData), 0, false});
@@ -505,8 +505,8 @@ TEST_P(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   CryptoStreamScheduler scheduler(
       conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake));
 
-  Buf helloBuf = folly::IOBuf::copyBuffer("shlo");
-  Buf certBuf = folly::IOBuf::copyBuffer(
+  BufPtr helloBuf = folly::IOBuf::copyBuffer("shlo");
+  BufPtr certBuf = folly::IOBuf::copyBuffer(
       "certificatethatisverylongseriouslythisisextremelylongandcannotfitintoapacket");
 
   conn.cryptoState->handshakeStream.lossBuffer.emplace_back(
@@ -540,7 +540,7 @@ TEST_P(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
               "CryptoOnlyScheduler")
               .cryptoFrames())
           .build();
-  Buf lossBuffer =
+  BufPtr lossBuffer =
       folly::IOBuf::copyBuffer("return the special duration value max");
   conn.cryptoState->initialStream.lossBuffer.emplace_back(
       ChainedByteRangeHead(lossBuffer), 0, false);
@@ -971,7 +971,7 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
 
   // Add some crypto data for the outstanding packet to make it look legit.
   // This is so cloning scheduler can actually copy something.
-  Buf cryptoBuf = folly::IOBuf::copyBuffer("test");
+  BufPtr cryptoBuf = folly::IOBuf::copyBuffer("test");
   ChainedByteRangeHead cryptoRch(cryptoBuf);
   getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake)
       ->retransmissionBuffer.emplace(

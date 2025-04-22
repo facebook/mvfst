@@ -19,7 +19,7 @@ namespace quic {
   return result;
 }
 
-ChainedByteRangeHead::ChainedByteRangeHead(const Buf& buf) {
+ChainedByteRangeHead::ChainedByteRangeHead(const BufPtr& buf) {
   if (!buf || buf->empty()) {
     return;
   }
@@ -59,7 +59,7 @@ ChainedByteRangeHead::~ChainedByteRangeHead() {
   resetChain();
 }
 
-void ChainedByteRangeHead::append(const Buf& buf) {
+void ChainedByteRangeHead::append(const BufPtr& buf) {
   if (!buf || buf->empty()) {
     return;
   }

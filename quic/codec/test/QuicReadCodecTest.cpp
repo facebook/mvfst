@@ -110,7 +110,7 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   std::string token = "fluffydog";
   std::string integrityTag = "MustBe16CharLong";
 
-  Buf retryPacketEncoded = std::make_unique<folly::IOBuf>();
+  BufPtr retryPacketEncoded = std::make_unique<folly::IOBuf>();
   BufAppender appender(retryPacketEncoded.get(), 100);
 
   appender.writeBE<uint8_t>(initialByte);

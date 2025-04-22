@@ -385,7 +385,7 @@ class QuicClientTransportLite
       struct sockaddr_storage addr;
       struct iovec iovec;
       // Buffers we pass to recvmmsg.
-      Buf readBuffer;
+      BufPtr readBuffer;
     };
 
     // Storage for the recvmmsg system call.

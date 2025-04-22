@@ -181,7 +181,7 @@ ssize_t FollyQuicAsyncUDPSocket::writeGSO(
 
 int FollyQuicAsyncUDPSocket::writemGSO(
     folly::Range<folly::SocketAddress const*> addrs,
-    const Buf* bufs,
+    const BufPtr* bufs,
     size_t count,
     const WriteOptions* options) {
   try {

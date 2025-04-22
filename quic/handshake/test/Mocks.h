@@ -26,7 +26,7 @@ class MockPacketNumberCipher : public PacketNumberCipher {
   MOCK_METHOD(void, setKey, (folly::ByteRange key));
   MOCK_METHOD(HeaderProtectionMask, mask, (folly::ByteRange), (const));
   MOCK_METHOD(size_t, keyLength, (), (const));
-  MOCK_METHOD(const Buf&, getKey, (), (const));
+  MOCK_METHOD(const BufPtr&, getKey, (), (const));
 
   void setDefaultKey() {
     packetProtectionKey_ = getProtectionKey();
@@ -35,7 +35,7 @@ class MockPacketNumberCipher : public PacketNumberCipher {
   }
 
  private:
-  Buf packetProtectionKey_;
+  BufPtr packetProtectionKey_;
 };
 
 class MockAead : public Aead {

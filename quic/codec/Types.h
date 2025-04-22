@@ -69,7 +69,7 @@ struct PingFrame {
 };
 
 struct KnobFrame {
-  KnobFrame(uint64_t knobSpaceIn, uint64_t idIn, Buf blobIn)
+  KnobFrame(uint64_t knobSpaceIn, uint64_t idIn, BufPtr blobIn)
       : knobSpace(knobSpaceIn), id(idIn), blob(std::move(blobIn)) {
     len = blob->length();
   }
@@ -113,7 +113,7 @@ struct KnobFrame {
   uint64_t knobSpace;
   uint64_t id;
   uint64_t len;
-  Buf blob;
+  BufPtr blob;
 };
 
 struct AckFrequencyFrame {
@@ -340,9 +340,9 @@ struct StopSendingFrame {
 
 struct ReadCryptoFrame {
   uint64_t offset;
-  Buf data;
+  BufPtr data;
 
-  ReadCryptoFrame(uint64_t offsetIn, Buf dataIn)
+  ReadCryptoFrame(uint64_t offsetIn, BufPtr dataIn)
       : offset(offsetIn), data(std::move(dataIn)) {}
 
   explicit ReadCryptoFrame(uint64_t offsetIn)
@@ -394,9 +394,9 @@ struct WriteCryptoFrame {
 };
 
 struct NewTokenFrame {
-  Buf token;
+  BufPtr token;
 
-  explicit NewTokenFrame(Buf tokenIn) : token(std::move(tokenIn)) {}
+  explicit NewTokenFrame(BufPtr tokenIn) : token(std::move(tokenIn)) {}
 
   NewTokenFrame(const NewTokenFrame& other) {
     if (other.token) {
@@ -411,9 +411,9 @@ struct NewTokenFrame {
 };
 
 struct ReadNewTokenFrame {
-  Buf token;
+  BufPtr token;
 
-  ReadNewTokenFrame(Buf tokenIn) : token(std::move(tokenIn)) {}
+  ReadNewTokenFrame(BufPtr tokenIn) : token(std::move(tokenIn)) {}
 
   // Stuff stored in a variant type needs to be copyable.
   ReadNewTokenFrame(const ReadNewTokenFrame& other) {
@@ -493,13 +493,13 @@ struct ReadStreamFrame {
   StreamId streamId;
   OptionalIntegral<StreamGroupId> streamGroupId;
   uint64_t offset;
-  Buf data;
+  BufPtr data;
   bool fin;
 
   ReadStreamFrame(
       StreamId streamIdIn,
       uint64_t offsetIn,
-      Buf dataIn,
+      BufPtr dataIn,
       bool finIn,
       OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
       : streamId(streamIdIn),
@@ -746,7 +746,7 @@ struct DatagramFrame {
   size_t length;
   BufQueue data;
 
-  explicit DatagramFrame(size_t len, Buf buf)
+  explicit DatagramFrame(size_t len, BufPtr buf)
       : length(len), data(std::move(buf)) {
     CHECK_EQ(length, data.chainLength());
   }
@@ -794,9 +794,9 @@ struct QuicAddrValidationToken {
   QuicAddrValidationToken& operator=(const QuicAddrValidationToken& other) =
       default;
 
-  [[nodiscard]] Buf getPlaintextToken() const;
+  [[nodiscard]] BufPtr getPlaintextToken() const;
   [[nodiscard]] virtual TokenType getTokenType() const = 0;
-  [[nodiscard]] virtual Buf genAeadAssocData() const = 0;
+  [[nodiscard]] virtual BufPtr genAeadAssocData() const = 0;
   virtual ~QuicAddrValidationToken() = default;
 
   folly::IPAddress clientIp;
@@ -824,7 +824,7 @@ struct RetryToken : QuicAddrValidationToken {
     return tokenType;
   }
 
-  [[nodiscard]] Buf genAeadAssocData() const override;
+  [[nodiscard]] BufPtr genAeadAssocData() const override;
 
   ConnectionId originalDstConnId;
   uint16_t clientPort;
@@ -849,7 +849,7 @@ struct NewToken : QuicAddrValidationToken {
     return tokenType;
   }
 
-  [[nodiscard]] Buf genAeadAssocData() const override;
+  [[nodiscard]] BufPtr genAeadAssocData() const override;
 
   bool operator==(const NewToken& other) const {
     return clientIp == other.clientIp && timestampInMs == other.timestampInMs;

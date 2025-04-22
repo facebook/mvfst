@@ -115,7 +115,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -135,7 +135,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0")};
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -157,7 +157,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
       folly::IPAddress("2401:db00:2111:7283:face::46:1"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -176,7 +176,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
       2 /* extendedAckSupport */);
   appToken.sourceAddresses = {folly::IPAddress("1.2.3.4")};
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -198,7 +198,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
       folly::IPAddress("1.2.3.5"),
       folly::IPAddress("1.2.3.6")};
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -220,7 +220,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -239,7 +239,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
       2 /* extendedAckSupport */);
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -262,7 +262,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }
@@ -282,7 +282,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeCwndHint) {
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.version = QuicVersion::MVFST;
-  Buf buf = encodeAppToken(appToken);
+  BufPtr buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
 }

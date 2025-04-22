@@ -546,9 +546,9 @@ void QuicTransportBase::setAckRxTimestampsEnabled(bool enableAckRxTimestamps) {
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(
-    folly::Function<bool(const Optional<std::string>&, const Buf&) const>
+    folly::Function<bool(const Optional<std::string>&, const BufPtr&) const>
         validator,
-    folly::Function<Buf()> getter) {
+    folly::Function<BufPtr()> getter) {
   conn_->earlyDataAppParamsValidator = std::move(validator);
   conn_->earlyDataAppParamsGetter = std::move(getter);
 }
@@ -614,7 +614,7 @@ uint16_t QuicTransportBase::getDatagramSizeLimit() const {
 }
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::writeDatagram(
-    Buf buf) {
+    BufPtr buf) {
   // TODO(lniccolini) update max datagram frame size
   // https://github.com/quicwg/datagram/issues/3
   // For now, max_datagram_size > 0 means the peer supports datagram frames
@@ -661,7 +661,7 @@ QuicTransportBase::readDatagrams(size_t atMost) {
   return retDatagrams;
 }
 
-folly::Expected<std::vector<Buf>, LocalErrorCode>
+folly::Expected<std::vector<BufPtr>, LocalErrorCode>
 QuicTransportBase::readDatagramBufs(size_t atMost) {
   CHECK(conn_);
   auto datagrams = &conn_->datagramState.readBuffer;
@@ -673,7 +673,7 @@ QuicTransportBase::readDatagramBufs(size_t atMost) {
   } else {
     atMost = std::min(atMost, datagrams->size());
   }
-  std::vector<Buf> retDatagrams;
+  std::vector<BufPtr> retDatagrams;
   retDatagrams.reserve(atMost);
   std::transform(
       datagrams->begin(),

@@ -14,7 +14,7 @@
 
 namespace {
 
-inline quic::Buf encodeVarintParams(
+inline quic::BufPtr encodeVarintParams(
     const std::vector<quic::TransportParameter>& parameters) {
   // chain all encodings
   quic::BufQueue queue;
@@ -76,7 +76,7 @@ inline void decodeVarintParams(
     if (!len) {
       throw std::runtime_error("Could not parse transport parameter length.");
     }
-    Buf val;
+    BufPtr val;
     cursor.clone(val, len.value().first);
     parameters.emplace_back(
         static_cast<TransportParameterId>(id.value().first), std::move(val));

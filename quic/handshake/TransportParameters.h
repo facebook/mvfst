@@ -48,11 +48,11 @@ enum class TransportParameterId : uint64_t {
 
 struct TransportParameter {
   TransportParameterId parameter;
-  Buf value;
+  BufPtr value;
 
   TransportParameter() = default;
 
-  TransportParameter(TransportParameterId p, Buf v)
+  TransportParameter(TransportParameterId p, BufPtr v)
       : parameter(p), value(v ? std::move(v) : nullptr) {}
 
   TransportParameter(const TransportParameter& other)
@@ -86,7 +86,7 @@ struct TransportParameter {
   }
 
   // Encodes TransportParameter as shown above (avoids reallocations)
-  Buf encode() const {
+  BufPtr encode() const {
     // reserve the exact size needed
     auto res =
         BufHelpers::createCombined(static_cast<size_t>(getEncodedSize()));

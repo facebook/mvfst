@@ -1846,7 +1846,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFrames) {
       0 /* largestAcked */);
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
-  Buf buf = packetToBuf(std::move(builder).buildPacket());
+  BufPtr buf = packetToBuf(std::move(builder).buildPacket());
 
   buf->coalesce();
   buf->reserve(0, 200);
@@ -1897,7 +1897,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
       0 /* largestAcked */);
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
-  Buf buf = packetToBuf(std::move(builder).buildPacket());
+  BufPtr buf = packetToBuf(std::move(builder).buildPacket());
   buf->coalesce();
   buf->reserve(0, 200);
   buf->append(dummyDataLen);
@@ -4671,7 +4671,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
   EXPECT_EQ(event->packetSize, 10);
 }
 
-Buf getHandshakePacketWithFrame(
+BufPtr getHandshakePacketWithFrame(
     QuicWriteFrame frame,
     ConnectionId connId,
     Aead& clientWriteCipher,
@@ -4953,8 +4953,8 @@ class QuicServerTransportHandshakeTest
   void expectWriteNewSessionTicket() override {
     std::string appParams("APP params");
     server->setEarlyDataAppParamsFunctions(
-        [](const Optional<std::string>&, const Buf&) { return false; },
-        [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams); });
+        [](const Optional<std::string>&, const BufPtr&) { return false; },
+        [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams); });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
         .WillOnce(Invoke([=](const AppToken& appToken) {
           auto& params = appToken.transportParams.parameters;

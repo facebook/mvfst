@@ -221,7 +221,7 @@ class QuicAsyncUDPSocket {
   /**
    * Send the data in buffers to destination. Returns the return code from
    * ::sendmmsg.
-   * bufs is an array of Buf
+   * bufs is an array of BufPtr
    * of size num
    * options is an array of WriteOptions or nullptr
    *  Before calling writeGSO with a positive value
@@ -229,7 +229,7 @@ class QuicAsyncUDPSocket {
    */
   virtual int writemGSO(
       folly::Range<folly::SocketAddress const*> addrs,
-      const Buf* bufs,
+      const BufPtr* bufs,
       size_t count,
       const WriteOptions* options) = 0;
 

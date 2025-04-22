@@ -62,7 +62,7 @@ class ChainedByteRangeHead {
   };
 
  public:
-  explicit ChainedByteRangeHead(const Buf& buf);
+  explicit ChainedByteRangeHead(const BufPtr& buf);
 
   ChainedByteRangeHead() = default;
 
@@ -93,7 +93,7 @@ class ChainedByteRangeHead {
 
   size_t trimStartAtMost(size_t len);
 
-  void append(const Buf& buf);
+  void append(const BufPtr& buf);
 
   void append(ChainedByteRangeHead&& chainHead);
 

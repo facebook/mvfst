@@ -212,7 +212,7 @@ class QuicServerWorkerTest : public Test {
       MockQuicTransport::Ptr transportOverride = nullptr);
 
   void testSendReset(
-      Buf packet,
+      BufPtr packet,
       ConnectionId connId,
       ShortHeader shortHeader,
       PacketDropReason dropReason);
@@ -325,7 +325,7 @@ void QuicServerWorkerTest::createQuicConnection(
 }
 
 void QuicServerWorkerTest::testSendReset(
-    Buf packet,
+    BufPtr packet,
     ConnectionId,
     ShortHeader shortHeader,
     PacketDropReason dropReason) {
@@ -1757,9 +1757,9 @@ class QuicServerWorkerTakeoverTest : public Test {
     takeoverWorker_->allowBeingTakenOver(std::move(takeoverSock), takeoverAddr);
   }
 
-  void testPacketForwarding(Buf data, size_t len, ConnectionId connId);
+  void testPacketForwarding(BufPtr data, size_t len, ConnectionId connId);
 
-  void testNoPacketForwarding(Buf data, size_t len, ConnectionId connId);
+  void testNoPacketForwarding(BufPtr data, size_t len, ConnectionId connId);
 
  protected:
   std::shared_ptr<MockWorkerCallback> takeoverWorkerCb_;
@@ -1841,7 +1841,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverNoForwarding) {
 }
 
 void QuicServerWorkerTakeoverTest::testNoPacketForwarding(
-    Buf /* data */,
+    BufPtr /* data */,
     size_t len,
     ConnectionId /* connId */) {
   auto cb = [&](const folly::SocketAddress& addr,
@@ -1897,7 +1897,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverForwarding) {
 }
 
 void QuicServerWorkerTakeoverTest::testPacketForwarding(
-    Buf data,
+    BufPtr data,
     size_t len,
     ConnectionId connId) {
   auto writeSock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&evb_);
@@ -2278,7 +2278,7 @@ class QuicServerTest : public Test {
         [&] { transport.reset(); });
   }
 
-  void testReset(Buf packet);
+  void testReset(BufPtr packet);
 
  protected:
   folly::ScopedEventBaseThread evbThread_;
@@ -2460,7 +2460,7 @@ class QuicServerTakeoverTest : public Test {
   std::shared_ptr<MockQuicTransport> initTransport(
       MockQuicServerTransportFactory* factory,
       ConnectionId& clientConnId,
-      Buf& data,
+      BufPtr& data,
       folly::Baton<>& baton) {
     std::shared_ptr<MockQuicTransport> transport;
     NiceMock<MockConnectionSetupCallback> connSetupCb;
@@ -2925,7 +2925,7 @@ TEST_F(QuicServerTest, NetworkTestHealthCheck) {
   EXPECT_THROW(reader->readOne().get(200ms), folly::FutureTimeout);
 }
 
-void QuicServerTest::testReset(Buf packet) {
+void QuicServerTest::testReset(BufPtr packet) {
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
   server_->waitUntilInitialized();
@@ -3146,7 +3146,7 @@ TEST_F(QuicServerTest, ZeroRttBeforeInitial) {
       clientConnId, serverConnId, id, *initialBuf, QuicVersion::MVFST);
   auto initialData = std::move(initialPacket);
 
-  std::vector<Buf> receivedData;
+  std::vector<BufPtr> receivedData;
   auto makeTransport =
       [&](folly::EventBase* eventBase,
           std::unique_ptr<FollyAsyncUDPSocketAlias>& socket,

@@ -71,7 +71,7 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
 [[nodiscard]] folly::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
-    Buf packetData);
+    BufPtr packetData);
 
 /**
  * Parses a single frame from the queue. Throws a QuicException if the frame

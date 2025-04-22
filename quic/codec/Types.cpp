@@ -326,17 +326,17 @@ StreamTypeField StreamTypeField::Builder::build() {
  * Plaintext contains only the timestamp in ms. Token specific data is used as
  * associated data during aead encryption/decryption.
  */
-Buf QuicAddrValidationToken::getPlaintextToken() const {
+BufPtr QuicAddrValidationToken::getPlaintextToken() const {
   auto ts = folly::Endian::big(timestampInMs);
   return BufHelpers::copyBuffer(&ts, sizeof(ts));
 }
 
-Buf RetryToken::genAeadAssocData() const {
+BufPtr RetryToken::genAeadAssocData() const {
   return BufHelpers::copyBuffer(folly::to<std::string>(
       toString(tokenType), originalDstConnId.hex() + clientIp.str()));
 }
 
-Buf NewToken::genAeadAssocData() const {
+BufPtr NewToken::genAeadAssocData() const {
   return BufHelpers::copyBuffer(
       folly::to<std::string>(toString(tokenType), clientIp.str()));
 }

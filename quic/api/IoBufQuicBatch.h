@@ -31,7 +31,7 @@ class IOBufQuicBatch {
 
   // returns true if it succeeds and false if the loop should end
   [[nodiscard]] folly::Expected<bool, QuicError> write(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t encodedSize);
 
   [[nodiscard]] folly::Expected<bool, QuicError> flush();

@@ -20,7 +20,7 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
   void reset() override;
   bool needsFlush(size_t size) override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t size,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
@@ -52,7 +52,7 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
   void reset() override;
   bool needsFlush(size_t size) override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t size,
       const folly::SocketAddress& addr,
       QuicAsyncUDPSocket* sock) override;
@@ -94,7 +94,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t size,
       const folly::SocketAddress& address,
       QuicAsyncUDPSocket* sock) override;
@@ -109,7 +109,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   // size of data in all the buffers
   size_t currSize_{0};
   // array of IOBufs
-  std::vector<Buf> bufs_;
+  std::vector<BufPtr> bufs_;
   std::vector<QuicAsyncUDPSocket::WriteOptions> options_;
   std::vector<size_t> prevSize_;
   std::vector<folly::SocketAddress> addrs_;
@@ -147,7 +147,7 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
 
   void reset() override;
   bool append(
-      Buf&& buf,
+      BufPtr&& buf,
       size_t size,
       const folly::SocketAddress& address,
       QuicAsyncUDPSocket* sock) override;

@@ -66,7 +66,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   WriteResult writeChain(
       StreamId id,
-      Buf data,
+      BufPtr data,
       bool eof,
       ByteEventCallback* cb = nullptr) override;
 
@@ -166,7 +166,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) override;
 
-  folly::Expected<std::pair<Buf, bool>, LocalErrorCode> read(
+  folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxLen) override;
 
@@ -207,7 +207,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * connection.
    */
   folly::Expected<folly::Unit, LocalErrorCode>
-  setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override;
+  setKnob(uint64_t knobSpace, uint64_t knobId, BufPtr knobBlob) override;
 
   /**
    * Can Knob Frames be exchanged with the peer on this connection?
@@ -744,7 +744,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   /**
    * Callback when we receive a transport knob
    */
-  virtual void onTransportKnobs(Buf knobBlob);
+  virtual void onTransportKnobs(BufPtr knobBlob);
 
   void processCallbacksAfterWriteData();
 
