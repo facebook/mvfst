@@ -16,3 +16,10 @@ mvfst_cpp_library(
         "optional_flag_manipulator_fwd.h",
     ],
 )
+
+mvfst_cpp_library(
+    name = "expected",
+    headers = [
+        "expected.hpp",
+    ],
+)
