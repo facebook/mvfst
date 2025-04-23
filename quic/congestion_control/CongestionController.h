@@ -118,8 +118,6 @@ struct CongestionController {
 
   /**
    * Return the congestion controller's bandwidth estimate, if available.
-   *
-   * Unit is bits-per-second (bps).
    */
   [[nodiscard]] virtual Optional<Bandwidth> getBandwidth() const {
     return none;
