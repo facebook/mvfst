@@ -442,7 +442,7 @@ folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::appendCmsgs(
 
 folly::Expected<folly::Unit, QuicError>
 FollyQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
-    folly::Function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc) {
+    std::function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc) {
   try {
     follySocket_.setAdditionalCmsgsFunc(std::move(additionalCmsgsFunc));
     return folly::unit;

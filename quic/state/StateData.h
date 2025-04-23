@@ -616,9 +616,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   /**
    * Eerie data app params functions.
    */
-  folly::Function<bool(const Optional<std::string>&, const BufPtr&) const>
+  std::function<bool(const Optional<std::string>&, const BufPtr&)>
       earlyDataAppParamsValidator;
-  folly::Function<BufPtr()> earlyDataAppParamsGetter;
+  std::function<BufPtr()> earlyDataAppParamsGetter;
 
   /**
    * Selects a previously unused peer-issued connection id to use.

@@ -82,7 +82,7 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
   MOCK_METHOD(
       (folly::Expected<folly::Unit, QuicError>),
       setAdditionalCmsgsFunc,
-      (folly::Function<Optional<folly::SocketCmsgMap>()>&&));
+      (std::function<Optional<folly::SocketCmsgMap>()>&&));
   MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setRcvBuf, (int));
   MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setSndBuf, (int));
   MOCK_METHOD((folly::Expected<int, QuicError>), getTimestamping, ());

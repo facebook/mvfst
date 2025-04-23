@@ -153,9 +153,9 @@ class MockQuicSocket : public QuicSocket {
       (folly::MaybeManagedPtr<ConnectionCallback>));
 
   void setEarlyDataAppParamsFunctions(
-      folly::Function<bool(const Optional<std::string>&, const BufPtr&) const>
+      std::function<bool(const Optional<std::string>&, const BufPtr&)>
           validator,
-      folly::Function<BufPtr()> getter) override {
+      std::function<BufPtr()> getter) override {
     earlyDataAppParamsValidator_ = std::move(validator);
     earlyDataAppParamsGetter_ = std::move(getter);
   }
@@ -351,9 +351,9 @@ class MockQuicSocket : public QuicSocket {
   ConnectionSetupCallback* setupCb_{nullptr};
   ConnectionCallback* connCb_{nullptr};
 
-  folly::Function<bool(const Optional<std::string>&, const BufPtr&)>
+  std::function<bool(const Optional<std::string>&, const BufPtr&)>
       earlyDataAppParamsValidator_;
-  folly::Function<BufPtr()> earlyDataAppParamsGetter_;
+  std::function<BufPtr()> earlyDataAppParamsGetter_;
 
   MOCK_METHOD(
       void,

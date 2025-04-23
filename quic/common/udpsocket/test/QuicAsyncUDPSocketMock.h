@@ -92,7 +92,7 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD(
       (folly::Expected<folly::Unit, QuicError>),
       setAdditionalCmsgsFunc,
-      (folly::Function<Optional<folly::SocketCmsgMap>()>&&));
+      (std::function<Optional<folly::SocketCmsgMap>()>&&));
   MOCK_METHOD((folly::Expected<int, QuicError>), getTimestamping, ());
   MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setReuseAddr, (bool));
   MOCK_METHOD(

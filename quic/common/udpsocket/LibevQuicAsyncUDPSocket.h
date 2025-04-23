@@ -153,7 +153,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   folly::Expected<folly::Unit, QuicError> appendCmsgs(
       const folly::SocketCmsgMap& cmsgs) override;
   folly::Expected<folly::Unit, QuicError> setAdditionalCmsgsFunc(
-      folly::Function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc)
+      std::function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc)
       override;
 
   /*

@@ -142,7 +142,7 @@ int LibevQuicAsyncUDPSocket::writem(
 
 folly::Expected<folly::Unit, QuicError>
 LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
-    folly::Function<Optional<folly::SocketCmsgMap>()>&&
+    std::function<Optional<folly::SocketCmsgMap>()>&&
     /* additionalCmsgsFunc */) {
   LOG(WARNING)
       << "Setting an additional cmsgs function is not implemented for LibevQuicAsyncUDPSocket";

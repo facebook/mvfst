@@ -330,7 +330,7 @@ class QuicAsyncUDPSocket {
   [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> appendCmsgs(
       const folly::SocketCmsgMap& /* cmsgs */) = 0;
   [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  setAdditionalCmsgsFunc(folly::Function<Optional<folly::SocketCmsgMap>()>&&
+  setAdditionalCmsgsFunc(std::function<Optional<folly::SocketCmsgMap>()>&&
                          /* additionalCmsgsFunc */) = 0;
 
   /*

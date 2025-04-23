@@ -77,10 +77,10 @@ class QuicSocket : virtual public QuicSocketLite {
    *       Encoded application parameters that will be written to cache.
    */
   virtual void setEarlyDataAppParamsFunctions(
-      folly::Function<
-          bool(const Optional<std::string>& alpn, const BufPtr& appParams)
-              const> validator,
-      folly::Function<BufPtr()> getter) = 0;
+      std::function<
+          bool(const Optional<std::string>& alpn, const BufPtr& appParams)>
+          validator,
+      std::function<BufPtr()> getter) = 0;
 
   virtual ~QuicSocket() override = default;
 

@@ -43,7 +43,7 @@ QuicTransportBase::QuicTransportBase(
           std::move(socket),
           useConnectionEndWithErrorCallback) {
   if (socket_) {
-    folly::Function<Optional<folly::SocketCmsgMap>()> func = [&]() {
+    std::function<Optional<folly::SocketCmsgMap>()> func = [&]() {
       return getAdditionalCmsgsForAsyncUDPSocket();
     };
     // TODO we probably should have a better way to return error from
@@ -546,9 +546,8 @@ void QuicTransportBase::setAckRxTimestampsEnabled(bool enableAckRxTimestamps) {
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(
-    folly::Function<bool(const Optional<std::string>&, const BufPtr&) const>
-        validator,
-    folly::Function<BufPtr()> getter) {
+    std::function<bool(const Optional<std::string>&, const BufPtr&)> validator,
+    std::function<BufPtr()> getter) {
   conn_->earlyDataAppParamsValidator = std::move(validator);
   conn_->earlyDataAppParamsGetter = std::move(getter);
 }

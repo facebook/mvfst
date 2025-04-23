@@ -401,7 +401,7 @@ class QuicClientTransportLite
   [[nodiscard]] folly::Expected<folly::Unit, QuicError> adjustGROBuffers();
 
   void runOnEvbAsync(
-      folly::Function<void(std::shared_ptr<QuicClientTransportLite>)> func);
+      std::function<void(std::shared_ptr<QuicClientTransportLite>)> func);
 
   /**
    * Send quic transport knobs defined by transportSettings.knobs to peer. This

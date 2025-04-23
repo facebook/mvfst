@@ -2003,7 +2003,7 @@ void QuicClientTransportLite::setSupportedVersions(
 }
 
 void QuicClientTransportLite::runOnEvbAsync(
-    folly::Function<void(std::shared_ptr<QuicClientTransportLite>)> func) {
+    std::function<void(std::shared_ptr<QuicClientTransportLite>)> func) {
   auto evb = getEventBase();
   evb->runInLoop(
       [self = sharedGuardClient(), func = std::move(func), evb]() mutable {
