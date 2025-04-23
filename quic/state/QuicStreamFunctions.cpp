@@ -128,7 +128,7 @@ folly::Expected<folly::Unit, QuicError> appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,
-    folly::Function<void(uint64_t, uint64_t)>&& connFlowControlVisitor) {
+    std::function<void(uint64_t, uint64_t)>&& connFlowControlVisitor) {
   auto& readBuffer = stream.readBuffer;
   auto it = readBuffer.begin();
 
