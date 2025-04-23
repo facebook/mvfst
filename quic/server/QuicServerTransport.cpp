@@ -510,8 +510,10 @@ void QuicServerTransport::handleTransportKnobParams(
 
 void QuicServerTransport::processPendingData(bool async) {
   // The case when both 0-rtt and 1-rtt pending data are ready to be processed
-  // but neither had been shouldn't happen
-  std::unique_ptr<std::vector<ServerEvents::ReadData>> pendingData;
+  // but neither had been shouldn't happen.
+  // This is shared pointer because the lamda below (auto func) does a copy
+  // for std::function for a reason not understood.
+  std::shared_ptr<std::vector<ServerEvents::ReadData>> pendingData;
   if (conn_->readCodec && conn_->readCodec->getOneRttReadCipher()) {
     pendingData = std::move(serverConn_->pendingOneRttData);
     // It's possible that 0-rtt packets are received after CFIN, we are not

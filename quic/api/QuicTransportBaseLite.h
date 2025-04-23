@@ -676,7 +676,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
   void runOnEvbAsync(
-      folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
+      std::function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
 
   void updateWriteLooper(bool thisIteration);
   void updateReadLooper();

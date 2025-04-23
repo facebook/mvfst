@@ -978,7 +978,7 @@ QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
 }
 
 void QuicTransportBaseLite::runOnEvbAsync(
-    folly::Function<void(std::shared_ptr<QuicTransportBaseLite>)> func) {
+    std::function<void(std::shared_ptr<QuicTransportBaseLite>)> func) {
   auto evb = getEventBase();
   evb->runInLoop(
       [self = sharedGuard(), func = std::move(func), evb]() mutable {
