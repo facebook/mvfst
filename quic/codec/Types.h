@@ -376,7 +376,7 @@ struct ReadCryptoFrame {
   }
 
   bool operator==(const ReadCryptoFrame& other) const {
-    folly::IOBufEqualTo eq;
+    BufEq eq;
     return offset == other.offset && eq(data, other.data);
   }
 };
@@ -405,7 +405,7 @@ struct NewTokenFrame {
   }
 
   bool operator==(const NewTokenFrame& rhs) const {
-    folly::IOBufEqualTo eq;
+    BufEq eq;
     return eq(token, rhs.token);
   }
 };
@@ -430,7 +430,7 @@ struct ReadNewTokenFrame {
   }
 
   bool operator==(const ReadNewTokenFrame& other) const {
-    folly::IOBufEqualTo eq;
+    BufEq eq;
     return eq(token, other.token);
   }
 };
@@ -559,7 +559,7 @@ struct ReadStreamFrame {
   }
 
   bool operator==(const ReadStreamFrame& other) const {
-    folly::IOBufEqualTo eq;
+    BufEq eq;
     return streamId == other.streamId && offset == other.offset &&
         fin == other.fin && eq(data, other.data) &&
         streamGroupId == other.streamGroupId;
@@ -766,7 +766,7 @@ struct DatagramFrame {
       return true;
     }
     CHECK(data.front() && other.data.front());
-    folly::IOBufEqualTo eq;
+    BufEq eq;
     return eq(*data.front(), *other.data.front());
   }
 };

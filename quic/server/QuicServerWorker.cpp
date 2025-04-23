@@ -613,7 +613,7 @@ bool QuicServerWorker::tryHandlingAsHealthCheck(
     return false;
   }
 
-  folly::IOBufEqualTo eq;
+  BufEq eq;
   // TODO: make this constant time, the token might be secret, but we're
   // current assuming it's not.
   if (eq(*healthCheckToken_.value(), data)) {

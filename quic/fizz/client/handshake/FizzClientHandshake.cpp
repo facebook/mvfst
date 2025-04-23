@@ -130,7 +130,7 @@ bool FizzClientHandshake::verifyRetryIntegrityTag(
 
   folly::IOBuf integrityTagWrapper = BufHelpers::wrapBufferAsValue(
       retryPacket.integrityTag.data(), retryPacket.integrityTag.size());
-  return folly::IOBufEqualTo()(*expectedIntegrityTag, integrityTagWrapper);
+  return BufEq()(*expectedIntegrityTag, integrityTagWrapper);
 }
 
 bool FizzClientHandshake::isTLSResumed() const {
