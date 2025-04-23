@@ -33,29 +33,29 @@ void FollyQuicEventBase::runInLoop(
 }
 
 void FollyQuicEventBase::runAfterDelay(
-    folly::Function<void()> cb,
+    std::function<void()> cb,
     uint32_t milliseconds) {
   return backingEvb_->runAfterDelay(std::move(cb), milliseconds);
 }
 
 void FollyQuicEventBase::runInEventBaseThreadAndWait(
-    folly::Function<void()> fn) noexcept {
+    std::function<void()> fn) noexcept {
   return backingEvb_->runInEventBaseThreadAndWait(std::move(fn));
 }
 
 void FollyQuicEventBase::runImmediatelyOrRunInEventBaseThreadAndWait(
-    folly::Function<void()> fn) noexcept {
+    std::function<void()> fn) noexcept {
   return backingEvb_->runImmediatelyOrRunInEventBaseThreadAndWait(
       std::move(fn));
 }
 
 void FollyQuicEventBase::runImmediatelyOrRunInEventBaseThread(
-    folly::Function<void()> fn) noexcept {
+    std::function<void()> fn) noexcept {
   return backingEvb_->runImmediatelyOrRunInEventBaseThread(std::move(fn));
 }
 
 void FollyQuicEventBase::runInEventBaseThread(
-    folly::Function<void()> fn) noexcept {
+    std::function<void()> fn) noexcept {
   return backingEvb_->runInEventBaseThread(std::move(fn));
 }
 

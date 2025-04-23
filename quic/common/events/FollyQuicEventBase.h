@@ -34,19 +34,17 @@ class FollyQuicEventBase : public QuicEventBase {
   void runInLoop(folly::Function<void()> cb, bool thisIteration = false)
       override;
 
-  void runAfterDelay(folly::Function<void()> cb, uint32_t milliseconds)
-      override;
+  void runAfterDelay(std::function<void()> cb, uint32_t milliseconds) override;
 
-  void runInEventBaseThreadAndWait(
-      folly::Function<void()> fn) noexcept override;
+  void runInEventBaseThreadAndWait(std::function<void()> fn) noexcept override;
 
   void runImmediatelyOrRunInEventBaseThreadAndWait(
-      folly::Function<void()> fn) noexcept override;
+      std::function<void()> fn) noexcept override;
 
-  void runInEventBaseThread(folly::Function<void()> fn) noexcept override;
+  void runInEventBaseThread(std::function<void()> fn) noexcept override;
 
   void runImmediatelyOrRunInEventBaseThread(
-      folly::Function<void()> fn) noexcept override;
+      std::function<void()> fn) noexcept override;
 
   [[nodiscard]] bool isInEventBaseThread() const override;
 

@@ -85,26 +85,26 @@ class LibevQuicEventBase
     return false;
   }
 
-  void runInEventBaseThread(folly::Function<void()> /*fn*/) noexcept override {
+  void runInEventBaseThread(std::function<void()> /*fn*/) noexcept override {
     LOG(FATAL) << __func__ << " not supported in LibevQuicEventBase";
   }
 
   void runInEventBaseThreadAndWait(
-      folly::Function<void()> /*fn*/) noexcept override {
+      std::function<void()> /*fn*/) noexcept override {
     LOG(FATAL) << __func__ << " not supported in LibevQuicEventBase";
   }
 
   void runImmediatelyOrRunInEventBaseThreadAndWait(
-      folly::Function<void()> /*fn*/) noexcept override {
+      std::function<void()> /*fn*/) noexcept override {
     LOG(FATAL) << __func__ << " not supported in LibevQuicEventBase";
   }
 
   void runImmediatelyOrRunInEventBaseThread(
-      folly::Function<void()> /*fn*/) noexcept override {
+      std::function<void()> /*fn*/) noexcept override {
     LOG(FATAL) << __func__ << " not supported in LibevQuicEventBase";
   }
 
-  void runAfterDelay(folly::Function<void()> /*cb*/, uint32_t /*milliseconds*/)
+  void runAfterDelay(std::function<void()> /*cb*/, uint32_t /*milliseconds*/)
       override {
     LOG(FATAL) << __func__ << " not supported in LibevQuicEventBase";
   }

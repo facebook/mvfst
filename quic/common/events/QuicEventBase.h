@@ -117,19 +117,19 @@ class QuicEventBase {
       bool thisIteration = false) = 0;
 
   virtual void runAfterDelay(
-      folly::Function<void()> cb,
+      std::function<void()> cb,
       uint32_t milliseconds) = 0;
 
   virtual void runInEventBaseThreadAndWait(
-      folly::Function<void()> fn) noexcept = 0;
+      std::function<void()> fn) noexcept = 0;
 
   virtual void runImmediatelyOrRunInEventBaseThreadAndWait(
-      folly::Function<void()> fn) noexcept = 0;
+      std::function<void()> fn) noexcept = 0;
 
-  virtual void runInEventBaseThread(folly::Function<void()> fn) noexcept = 0;
+  virtual void runInEventBaseThread(std::function<void()> fn) noexcept = 0;
 
   virtual void runImmediatelyOrRunInEventBaseThread(
-      folly::Function<void()> fn) noexcept = 0;
+      std::function<void()> fn) noexcept = 0;
 
   [[nodiscard]] virtual bool isInEventBaseThread() const = 0;
 
