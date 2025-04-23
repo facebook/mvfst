@@ -15,7 +15,7 @@ namespace quic {
  * Returns a pair consisting of the length of the burst interval and the number
  * of packets in a burst interval.
  */
-using PacingRateCalculator = folly::Function<PacingRate(
+using PacingRateCalculator = std::function<PacingRate(
     const QuicConnectionStateBase&,
     uint64_t cwndBytes,
     uint64_t minCwndInMss,

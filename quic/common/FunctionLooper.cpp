@@ -14,7 +14,7 @@ using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
     std::shared_ptr<QuicEventBase> evb,
-    folly::Function<void()>&& func,
+    std::function<void()>&& func,
     LooperType type)
     : evb_(std::move(evb)),
       func_(std::move(func)),
@@ -30,7 +30,7 @@ void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
 }
 
 void FunctionLooper::setPacingFunction(
-    folly::Function<std::chrono::microseconds()>&& pacingFunc) {
+    std::function<std::chrono::microseconds()>&& pacingFunc) {
   CHECK(pacingFunc);
   pacingFunc_ = std::move(pacingFunc);
 }

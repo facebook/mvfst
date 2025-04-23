@@ -17,7 +17,7 @@ class QuicAsyncTransportAcceptor : public quic::QuicServerTransportFactory {
   // Hook/Callback function to be invoked when a new connection is accepted and
   // passed in the associated AsyncTransport.
   using AsyncTransportHook =
-      folly::Function<void(folly::AsyncTransport::UniquePtr)>;
+      std::function<void(folly::AsyncTransport::UniquePtr)>;
 
   QuicAsyncTransportAcceptor(
       folly::EventBase* evb,

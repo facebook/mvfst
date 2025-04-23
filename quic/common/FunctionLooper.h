@@ -38,7 +38,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
 
   explicit FunctionLooper(
       std::shared_ptr<QuicEventBase> evb,
-      folly::Function<void()>&& func,
+      std::function<void()>&& func,
       LooperType type);
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
@@ -52,7 +52,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
   void run(bool thisIteration = false) noexcept;
 
   void setPacingFunction(
-      folly::Function<std::chrono::microseconds()>&& pacingFunc);
+      std::function<std::chrono::microseconds()>&& pacingFunc);
 
   /**
    * Stops running the loop in each loop iteration.
@@ -109,8 +109,8 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
   bool schedulePacingTimeout() noexcept;
 
   std::shared_ptr<QuicEventBase> evb_;
-  folly::Function<void()> func_;
-  folly::Function<std::chrono::microseconds()> pacingFunc_{nullptr};
+  std::function<void()> func_;
+  std::function<std::chrono::microseconds()> pacingFunc_{nullptr};
   QuicTimer::SharedPtr pacingTimer_;
   TimePoint nextPacingTime_;
   const LooperType type_;
