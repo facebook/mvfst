@@ -294,7 +294,7 @@ TEST_F(DecodeTest, ValidAckFrame) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -325,7 +325,7 @@ TEST_F(DecodeTest, AckEcnFrame) {
       false, // useRealValuesForLargestAcked
       false, // useRealValuesForAckDelay
       true); // addEcnCounts
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrameWithECN(
       cursor,
       makeHeader(),
@@ -362,7 +362,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithECN) {
       false, // useRealValuesForAckDelay
       true, // addEcnCounts
       true); // useExtendedAck
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto ackFrameRes = decodeAckExtendedFrame(
       cursor,
       makeHeader(),
@@ -406,7 +406,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithNoFeatures) {
       false, // useRealValuesForAckDelay
       false, // addEcnCounts
       true); // useExtendedAck
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto ackFrameRes = decodeAckExtendedFrame(
       cursor,
       makeHeader(),
@@ -444,7 +444,7 @@ TEST_F(DecodeTest, AckExtendedFrameThrowsWithUnsupportedFeatures) {
       false, // useRealValuesForAckDelay
       true, // addEcnCounts
       true); // useExtendedAck
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
 
   // Try to decode extended ack with ECN but we only support Timestamps
   auto decodeResult = decodeAckExtendedFrame(
@@ -474,7 +474,7 @@ TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {
       firstAckBlockLength,
       {},
       true);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -498,7 +498,7 @@ TEST_F(DecodeTest, AckFrameLargestAckInvalid) {
       firstAckBlockLength,
       {},
       true);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -521,7 +521,7 @@ TEST_F(DecodeTest, AckFrameDelayEncodingInvalid) {
       {},
       false,
       true);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -538,7 +538,7 @@ TEST_F(DecodeTest, AckFrameDelayExceedsRange) {
   QuicInteger firstAckBlockLength(10);
   auto result = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -562,7 +562,7 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksUnderflow) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -588,7 +588,7 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksOverflow) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   ASSERT_FALSE(
       decodeAckFrame(
           cursor,
@@ -609,7 +609,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result1 = createAckFrame(
       largestAcked, none, numAdditionalBlocks, firstAckBlockLength, ackBlocks);
-  folly::io::Cursor cursor1(result1.get());
+  Cursor cursor1(result1.get());
 
   auto res = decodeAckFrame(
       cursor1,
@@ -620,7 +620,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result2 = createAckFrame(
       largestAcked, ackDelay, none, firstAckBlockLength, ackBlocks);
-  folly::io::Cursor cursor2(result2.get());
+  Cursor cursor2(result2.get());
   res = decodeAckFrame(
       cursor2,
       makeHeader(),
@@ -630,7 +630,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result3 = createAckFrame(
       largestAcked, ackDelay, none, firstAckBlockLength, ackBlocks);
-  folly::io::Cursor cursor3(result3.get());
+  Cursor cursor3(result3.get());
   res = decodeAckFrame(
       cursor3,
       makeHeader(),
@@ -640,7 +640,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result4 = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, none, ackBlocks);
-  folly::io::Cursor cursor4(result4.get());
+  Cursor cursor4(result4.get());
   res = decodeAckFrame(
       cursor4,
       makeHeader(),
@@ -650,7 +650,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result5 = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength, {});
-  folly::io::Cursor cursor5(result5.get());
+  Cursor cursor5(result5.get());
   res = decodeAckFrame(
       cursor5,
       makeHeader(),
@@ -667,7 +667,7 @@ TEST_F(DecodeTest, AckFrameFirstBlockLengthInvalid) {
 
   auto result = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -692,7 +692,7 @@ TEST_F(DecodeTest, AckFrameBlockLengthInvalid) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -717,7 +717,7 @@ TEST_F(DecodeTest, AckFrameBlockGapInvalid) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -743,7 +743,7 @@ TEST_F(DecodeTest, AckFrameBlockLengthZero) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  folly::io::Cursor cursor(result.get());
+  Cursor cursor(result.get());
 
   auto res = decodeAckFrame(
       cursor,
@@ -863,12 +863,12 @@ std::unique_ptr<folly::IOBuf> CreateMaxStreamsIdFrame(
 void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
 
-  folly::io::Cursor cursorBiDi(buf.get());
+  Cursor cursorBiDi(buf.get());
   auto maxStreamsBiDiFrameRes = decodeBiDiMaxStreamsFrame(cursorBiDi);
   ASSERT_TRUE(maxStreamsBiDiFrameRes.hasValue());
   EXPECT_EQ(maxStreamsBiDiFrameRes->maxStreams, maxStreamsId);
 
-  folly::io::Cursor cursorUni(buf.get());
+  Cursor cursorUni(buf.get());
   auto maxStreamsUniFrameRes = decodeUniMaxStreamsFrame(cursorUni);
   ASSERT_TRUE(maxStreamsUniFrameRes.hasValue());
   EXPECT_EQ(maxStreamsUniFrameRes->maxStreams, maxStreamsId);
@@ -878,12 +878,12 @@ void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
 void MaxStreamsIdCheckInvalid(StreamId maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
 
-  folly::io::Cursor cursorBiDi(buf.get());
+  Cursor cursorBiDi(buf.get());
   auto bidiResult = decodeBiDiMaxStreamsFrame(cursorBiDi);
   EXPECT_TRUE(bidiResult.hasError());
   EXPECT_EQ(bidiResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 
-  folly::io::Cursor cursorUni(buf.get());
+  Cursor cursorUni(buf.get());
   auto uniResult = decodeUniMaxStreamsFrame(cursorUni);
   EXPECT_TRUE(uniResult.hasError());
   EXPECT_EQ(uniResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -904,7 +904,7 @@ TEST_F(DecodeTest, CryptoDecodeSuccess) {
   QuicInteger length(1);
   auto cryptoFrame =
       createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(cryptoFrame.get());
+  Cursor cursor(cryptoFrame.get());
   auto decodedFrame = decodeCryptoFrame(cursor);
   EXPECT_EQ(decodedFrame->offset, 10);
   EXPECT_EQ(decodedFrame->data->computeChainDataLength(), 1);
@@ -914,7 +914,7 @@ TEST_F(DecodeTest, CryptoOffsetNotPresent) {
   QuicInteger length(1);
   auto cryptoFrame =
       createCryptoFrame(none, length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(cryptoFrame.get());
+  Cursor cursor(cryptoFrame.get());
   auto result = decodeCryptoFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -923,7 +923,7 @@ TEST_F(DecodeTest, CryptoOffsetNotPresent) {
 TEST_F(DecodeTest, CryptoLengthNotPresent) {
   QuicInteger offset(0);
   auto cryptoFrame = createCryptoFrame(offset, none, nullptr);
-  folly::io::Cursor cursor(cryptoFrame.get());
+  Cursor cursor(cryptoFrame.get());
   auto result = decodeCryptoFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -934,7 +934,7 @@ TEST_F(DecodeTest, CryptoIncorrectDataLength) {
   QuicInteger length(10);
   auto cryptoFrame =
       createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(cryptoFrame.get());
+  Cursor cursor(cryptoFrame.get());
   auto result = decodeCryptoFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -945,14 +945,14 @@ TEST_F(DecodeTest, PaddingFrameTest) {
   buf->append(1);
   memset(buf->writableData(), 0, 1);
 
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
 }
 
 TEST_F(DecodeTest, PaddingFrameNoBytesTest) {
   auto buf = folly::IOBuf::create(sizeof(UnderlyingFrameType));
 
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
 }
 
@@ -964,7 +964,7 @@ TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
   // something which is not padding
   memset(buf->writableData() + 10, 5, 1);
 
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
   // If we encountered an interleaved frame, leave the whole thing
   // as is
@@ -976,7 +976,7 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
   buf->append(10);
   memset(buf->writableData(), 0, 10);
 
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
   EXPECT_EQ(cursor.totalLength(), 0);
 }
@@ -1000,14 +1000,14 @@ TEST_F(DecodeTest, NewTokenDecodeSuccess) {
   QuicInteger length(1);
   auto newTokenFrame =
       createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(newTokenFrame.get());
+  Cursor cursor(newTokenFrame.get());
   auto decodedFrame = decodeNewTokenFrame(cursor);
   EXPECT_EQ(decodedFrame->token->computeChainDataLength(), 1);
 }
 
 TEST_F(DecodeTest, NewTokenLengthNotPresent) {
   auto newTokenFrame = createNewTokenFrame(none, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(newTokenFrame.get());
+  Cursor cursor(newTokenFrame.get());
   auto result = decodeNewTokenFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1017,7 +1017,7 @@ TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
   QuicInteger length(10);
   auto newTokenFrame =
       createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(newTokenFrame.get());
+  Cursor cursor(newTokenFrame.get());
   auto result = decodeNewTokenFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1033,7 +1033,7 @@ TEST_F(DecodeTest, ParsePlaintextNewToken) {
   NewToken newToken(clientIp, timestampInMs);
   BufPtr plaintextNewToken = newToken.getPlaintextToken();
 
-  folly::io::Cursor cursor(plaintextNewToken.get());
+  Cursor cursor(plaintextNewToken.get());
 
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 
@@ -1054,7 +1054,7 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   RetryToken retryToken(odcid, clientIp, clientPort, timestampInMs);
   BufPtr plaintextRetryToken = retryToken.getPlaintextToken();
 
-  folly::io::Cursor cursor(plaintextRetryToken.get());
+  Cursor cursor(plaintextRetryToken.get());
 
   /**
    * Now we continue with the parsing logic here.
@@ -1107,7 +1107,7 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeValid) {
       sequenceNumber, packetTolerance, maxAckDelay, reorderThreshold);
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
-  folly::io::Cursor cursor(ackFrequencyFrame.get());
+  Cursor cursor(ackFrequencyFrame.get());
   auto res = decodeAckFrequencyFrame(cursor);
   EXPECT_TRUE(res.hasValue());
   auto decodedFrame = *res->asAckFrequencyFrame();
@@ -1125,7 +1125,7 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
       sequenceNumber, packetTolerance, maxAckDelay, none);
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
-  folly::io::Cursor cursor(ackFrequencyFrame.get());
+  Cursor cursor(ackFrequencyFrame.get());
   auto res = decodeAckFrequencyFrame(cursor);
   EXPECT_TRUE(res.hasError());
   EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);

@@ -104,14 +104,14 @@ BufPtr encodeDatagramFrame(BufQueue data) {
   return buf;
 }
 
-std::pair<BufPtr, uint32_t> decodeDatagramFrame(folly::io::Cursor& cursor) {
+std::pair<BufPtr, uint32_t> decodeDatagramFrame(Cursor& cursor) {
   BufPtr outData;
   auto len = cursor.readBE<uint32_t>();
   cursor.clone(outData, len);
   return std::make_pair(std::move(outData), len);
 }
 
-std::pair<BufPtr, uint64_t> decodeDataBuffer(folly::io::Cursor& cursor) {
+std::pair<BufPtr, uint64_t> decodeDataBuffer(Cursor& cursor) {
   BufPtr outData;
   auto len = cursor.readBE<uint32_t>();
   cursor.clone(outData, len);
@@ -119,8 +119,7 @@ std::pair<BufPtr, uint64_t> decodeDataBuffer(folly::io::Cursor& cursor) {
   return std::make_pair(std::move(outData), offset);
 }
 
-std::pair<StreamId, StreamBuffer> decodeStreamBuffer(
-    folly::io::Cursor& cursor) {
+std::pair<StreamId, StreamBuffer> decodeStreamBuffer(Cursor& cursor) {
   auto streamId = cursor.readBE<StreamId>();
   auto dataBuffer = decodeDataBuffer(cursor);
   bool eof = (bool)cursor.readBE<uint8_t>();
@@ -135,7 +134,7 @@ struct StreamGroupIdBuf {
   StreamBuffer buf;
 };
 
-StreamGroupIdBuf decodeStreamGroupBuffer(folly::io::Cursor& cursor) {
+StreamGroupIdBuf decodeStreamGroupBuffer(Cursor& cursor) {
   auto streamId = cursor.readBE<StreamId>();
   auto groupId = cursor.readBE<StreamGroupId>();
   auto dataBuffer = decodeDataBuffer(cursor);
@@ -146,12 +145,12 @@ StreamGroupIdBuf decodeStreamGroupBuffer(folly::io::Cursor& cursor) {
       StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof)};
 }
 
-StreamBuffer decodeCryptoBuffer(folly::io::Cursor& cursor) {
+StreamBuffer decodeCryptoBuffer(Cursor& cursor) {
   auto dataBuffer = decodeDataBuffer(cursor);
   return StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, false);
 }
 
-MaxStreamsFrame decodeMaxStreamsFrame(folly::io::Cursor& cursor) {
+MaxStreamsFrame decodeMaxStreamsFrame(Cursor& cursor) {
   bool isBidi = cursor.readBE<uint8_t>();
   auto maxStreams = cursor.readBE<uint64_t>();
   return MaxStreamsFrame(maxStreams, isBidi);
@@ -291,7 +290,7 @@ class TestQuicTransport
     if (udpPacket.buf.empty()) {
       return folly::unit;
     }
-    folly::io::Cursor cursor(udpPacket.buf.front());
+    Cursor cursor(udpPacket.buf.front());
     while (!cursor.isAtEnd()) {
       // create server chosen connId with processId = 0 and workerId = 0
       ServerConnectionIdParams params(0, 0, 0);

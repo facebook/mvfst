@@ -20,7 +20,7 @@ ParsedHeaderResult::ParsedHeaderResult(
 
 folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
     const folly::IOBuf& data) {
-  folly::io::Cursor cursor(&data);
+  Cursor cursor(&data);
   if (!cursor.canAdvance(sizeof(uint8_t))) {
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }

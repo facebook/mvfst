@@ -198,7 +198,7 @@ void RegularQuicPacketBuilder::insert(BufPtr buf) {
 
 void RegularQuicPacketBuilder::insert(BufPtr buf, size_t limit) {
   BufPtr streamData;
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
   insert(std::move(streamData));
@@ -206,7 +206,7 @@ void RegularQuicPacketBuilder::insert(BufPtr buf, size_t limit) {
 
 void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
   BufPtr streamData;
-  folly::io::Cursor cursor(buf.front());
+  Cursor cursor(buf.front());
   cursor.clone(streamData, limit);
   // reminaingBytes_ update is taken care of inside this insert call:
   insert(std::move(streamData));

@@ -622,8 +622,8 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   BufPtr expectedIntegrityTag = folly::IOBuf::copyBuffer(
       "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49");
 
-  folly::io::Cursor cursorActual(integrityTag.get());
-  folly::io::Cursor cursorExpected(expectedIntegrityTag.get());
+  Cursor cursorActual(integrityTag.get());
+  Cursor cursorExpected(expectedIntegrityTag.get());
 
   EXPECT_TRUE(folly::IOBufEqualTo()(*expectedIntegrityTag, *integrityTag));
 }
@@ -685,7 +685,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(retryPacket->computeChainDataLength(), expectedPacketLen);
 
   // initial byte
-  folly::io::Cursor cursor(retryPacket.get());
+  Cursor cursor(retryPacket.get());
   auto initialByte = cursor.readBE<uint8_t>();
   EXPECT_EQ(initialByte & 0xf0, 0xf0);
 

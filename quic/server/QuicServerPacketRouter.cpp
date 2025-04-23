@@ -186,7 +186,7 @@ void TakeoverPacketHandler::processForwardedPacket(
   // First we decode the actual client and time from the packet
   // and send it to the worker_ to handle it properly
 
-  folly::io::Cursor cursor(data.get());
+  Cursor cursor(data.get());
   if (!cursor.canAdvance(sizeof(TakeoverProtocolVersion))) {
     VLOG(4) << "Cannot read takeover protocol version. Dropping.";
     return;

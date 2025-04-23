@@ -16,7 +16,7 @@ namespace quic::test {
 TEST(ConnectionIdTest, TestConnidLen) {
   std::string out = folly::unhexlify("ffaabbee00");
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
-  folly::io::Cursor cursor(&buf);
+  Cursor cursor(&buf);
   ConnectionId connid(cursor, out.size());
   EXPECT_EQ(static_cast<size_t>(connid.size()), out.size());
   for (size_t i = 0; i < connid.size(); ++i) {
@@ -29,7 +29,7 @@ TEST(ConnectionIdTest, TestConnidLen) {
 TEST(ConnectionIdTest, TestZeroLenConnid) {
   std::string out;
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
-  folly::io::Cursor cursor(&buf);
+  Cursor cursor(&buf);
   ConnectionId connid(cursor, out.size());
   EXPECT_EQ(static_cast<size_t>(connid.size()), out.size());
 }

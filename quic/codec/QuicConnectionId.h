@@ -43,7 +43,7 @@ struct ConnectionId {
 
   explicit ConnectionId(const std::vector<uint8_t>& connidIn);
 
-  explicit ConnectionId(folly::io::Cursor& cursor, size_t len);
+  explicit ConnectionId(Cursor& cursor, size_t len);
 
   bool operator==(const ConnectionId& other) const;
   bool operator!=(const ConnectionId& other) const;

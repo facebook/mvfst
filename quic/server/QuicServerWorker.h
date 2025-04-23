@@ -540,7 +540,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * Tries to get the encrypted retry token from a client initial packet
    */
-  Optional<std::string> maybeGetEncryptedToken(folly::io::Cursor& cursor);
+  Optional<std::string> maybeGetEncryptedToken(Cursor& cursor);
 
   bool validRetryToken(
       std::string& encryptedToken,

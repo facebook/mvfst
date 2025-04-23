@@ -24,7 +24,7 @@ QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
 
 Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
     BufQueue& queue) {
-  folly::io::Cursor cursor(queue.front());
+  Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(uint8_t))) {
     return none;
   }
@@ -47,7 +47,7 @@ Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
 }
 
 folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     QuicNodeType nodeType) {
   if (cursor.isAtEnd() || !cursor.canAdvance(sizeof(uint8_t))) {
     return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
@@ -101,7 +101,7 @@ static PacketDropReason getDecryptErrorReason(ProtectionType protectionType) {
 CodecResult QuicReadCodec::parseLongHeaderPacket(
     BufQueue& queue,
     const AckStates& ackStates) {
-  folly::io::Cursor cursor(queue.front());
+  Cursor cursor(queue.front());
   const uint8_t initialByte = *cursor.peekBytes().data();
 
   auto res = tryParseLongHeader(cursor, nodeType_);
@@ -272,7 +272,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
     BufPtr data,
     const AckStates& ackStates,
     size_t dstConnIdSize,
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   // TODO: allow other connid lengths from the state.
   size_t packetNumberOffset = 1 + dstConnIdSize;
   PacketNum expectedNextPacketNum =
@@ -412,7 +412,7 @@ CodecResult QuicReadCodec::parsePacket(
     return CodecResult(Nothing());
   }
   DCHECK(!queue.front()->isChained());
-  folly::io::Cursor cursor(queue.front());
+  Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(uint8_t))) {
     return CodecResult(Nothing());
   }

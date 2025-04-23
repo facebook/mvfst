@@ -443,7 +443,7 @@ void QuicServerWorker::handleNetworkData(
 
   try {
     // check error conditions for packet drop & early return
-    folly::io::Cursor cursor(udpPacket.buf.front());
+    Cursor cursor(udpPacket.buf.front());
     if (shutdown_) {
       VLOG(4) << "Packet received after shutdown, dropping";
       packetDropReason = PacketDropReason::SERVER_SHUTDOWN;
@@ -945,7 +945,7 @@ void QuicServerWorker::dispatchPacketData(
 
   // If there is a token present, decrypt it (could be either a retry
   // token or a new token)
-  folly::io::Cursor cursor(networkData.getPackets().front().buf.front());
+  Cursor cursor(networkData.getPackets().front().buf.front());
   auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
   bool hasTokenSecret = transportSettings_.retryTokenSecret.hasValue();
 
@@ -1032,8 +1032,7 @@ void QuicServerWorker::sendResetPacket(
   QUIC_STATS(statsCallback_, onStatelessReset);
 }
 
-Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(
-    folly::io::Cursor& cursor) {
+Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(Cursor& cursor) {
   // Move cursor to the byte right after the initial byte
   if (!cursor.canAdvance(1)) {
     return none;
@@ -1146,7 +1145,7 @@ void QuicServerWorker::sendRetryPacket(
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTagBuf = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
       QuicVersion::MVFST_INVALID, pseudoRetryPacketBuf.get());
-  folly::io::Cursor cursor{integrityTagBuf.get()};
+  Cursor cursor{integrityTagBuf.get()};
 
   RetryPacket::IntegrityTagType integrityTag = {0};
   cursor.pull(integrityTag.data(), integrityTag.size());

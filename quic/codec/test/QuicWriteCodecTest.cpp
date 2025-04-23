@@ -124,7 +124,7 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
       .WillRepeatedly(WithArgs<0, 1>(Invoke([&](BufPtr& buf, size_t limit) {
         pktBuilder.remaining_ -= limit;
         std::unique_ptr<folly::IOBuf> cloneBuf;
-        folly::io::Cursor cursor(buf.get());
+        Cursor cursor(buf.get());
         cursor.clone(cloneBuf, limit);
         pktBuilder.appender_.insert(std::move(cloneBuf));
       })));
@@ -147,7 +147,7 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
           WithArgs<0, 1>(Invoke([&](const BufQueue& buf, size_t limit) {
             pktBuilder.remaining_ -= limit;
             std::unique_ptr<folly::IOBuf> cloneBuf;
-            folly::io::Cursor cursor(buf.front());
+            Cursor cursor(buf.front());
             cursor.clone(cloneBuf, limit);
             pktBuilder.appender_.insert(std::move(cloneBuf));
           })));
@@ -883,7 +883,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   auto wireBuf = std::move(builtOut.second);
-  folly::io::Cursor cursor(wireBuf.get());
+  Cursor cursor(wireBuf.get());
   BufQueue queue;
   queue.append(wireBuf->clone());
   auto decodedFrame = quic::parseFrame(
@@ -1582,7 +1582,7 @@ TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
   EXPECT_TRUE(ackFrameWriteResult.hasValue());
   auto builtOut = std::move(pktBuilder).buildLongHeaderPacket();
   auto wireBuf = std::move(builtOut.second);
-  folly::io::Cursor cursor(wireBuf.get());
+  Cursor cursor(wireBuf.get());
   BufQueue queue;
   queue.append(wireBuf->clone());
   auto decodedFrameResult = quic::parseFrame(
@@ -2182,7 +2182,7 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
-    folly::io::Cursor cursor(wireBuf.get());
+    Cursor cursor(wireBuf.get());
     BufQueue queue;
     queue.append(wireBuf->clone());
     QuicFrame decodedFrame = parseQuicFrame(queue);

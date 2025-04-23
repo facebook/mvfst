@@ -99,7 +99,7 @@ struct CodecResult {
  * Returns an error if parsing is unsuccessful.
  */
 folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     QuicNodeType nodeType);
 
 class QuicReadCodec {
@@ -202,7 +202,7 @@ class QuicReadCodec {
       BufPtr data,
       const AckStates& ackStates,
       size_t dstConnIdSize,
-      folly::io::Cursor& cursor);
+      Cursor& cursor);
   CodecResult parseLongHeaderPacket(
       BufQueue& queue,
       const AckStates& ackStates);

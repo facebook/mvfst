@@ -30,7 +30,7 @@ uint8_t decodeQuicIntegerLength(uint8_t firstByte) {
 }
 
 Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     uint64_t atMost) {
   // checks
   if (atMost == 0 || !cursor.canAdvance(1)) {

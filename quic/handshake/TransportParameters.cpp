@@ -19,7 +19,7 @@ Optional<uint64_t> getIntegerParameter(
   if (it == parameters.end()) {
     return none;
   }
-  auto parameterCursor = folly::io::Cursor(it->value.get());
+  auto parameterCursor = Cursor(it->value.get());
   auto parameter = decodeQuicInteger(parameterCursor);
   if (!parameter) {
     throw QuicTransportException(
@@ -39,7 +39,7 @@ Optional<ConnectionId> getConnIdParameter(
   }
 
   auto value = it->value->clone();
-  folly::io::Cursor cursor(value.get());
+  Cursor cursor(value.get());
 
   // Constructor may throw an exception if the input is invalid.
   return ConnectionId(cursor, value->length());

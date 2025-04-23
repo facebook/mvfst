@@ -38,7 +38,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
     wrappedEncoded->trimEnd(std::min(
         (unsigned long)(wrappedEncoded->computeChainDataLength()),
         (unsigned long)(GetParam().encodedLength - atMost)));
-    folly::io::Cursor cursor(wrappedEncoded.get());
+    Cursor cursor(wrappedEncoded.get());
     auto originalLength = cursor.length();
     auto decodedValue = decodeQuicInteger(cursor);
     if (GetParam().error || atMost != GetParam().encodedLength) {
@@ -57,7 +57,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
   auto wrappedEncoded = IOBuf::copyBuffer(encodedBytes);
 
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
-    folly::io::Cursor cursor(wrappedEncoded.get());
+    Cursor cursor(wrappedEncoded.get());
     auto originalLength = cursor.length();
     auto decodedValue = decodeQuicInteger(cursor, atMost);
     if (GetParam().error || atMost != GetParam().encodedLength) {

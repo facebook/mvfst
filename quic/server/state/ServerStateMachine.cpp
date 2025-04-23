@@ -826,7 +826,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
     firstPacketFromPeer = true;
-    folly::io::Cursor cursor(readData.udpPacket.buf.front());
+    Cursor cursor(readData.udpPacket.buf.front());
     auto initialByte = cursor.readBE<uint8_t>();
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {

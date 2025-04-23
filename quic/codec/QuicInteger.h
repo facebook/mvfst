@@ -101,7 +101,7 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
  * read the int. It only advances the cursor in case of success.
  */
 Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     uint64_t atMost = sizeof(uint64_t));
 
 /**

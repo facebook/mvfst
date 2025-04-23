@@ -24,7 +24,7 @@ std::pair<uint8_t, BufPtr> encodeShortHeader(const ShortHeader& header) {
   CHECK(!builder.encodePacketHeader().hasError());
   auto packet = std::move(builder).buildPacket();
   BufPtr out;
-  folly::io::Cursor cursor(&packet.header);
+  Cursor cursor(&packet.header);
   auto initialByte = cursor.readBE<uint8_t>();
   cursor.clone(out, cursor.totalLength());
   return std::make_pair(initialByte, std::move(out));
@@ -63,7 +63,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
       0 /* largestAcked */);
   CHECK(!builder.encodePacketHeader().hasError());
   auto packet = packetToBuf(std::move(builder).buildPacket());
-  folly::io::Cursor cursor(packet.get());
+  Cursor cursor(packet.get());
   uint8_t initialByte = cursor.readBE<uint8_t>();
   return parseLongHeader(initialByte, cursor);
 }
@@ -95,7 +95,7 @@ TEST_F(TypesTest, LongHeaderEmptyInput) {
   uint8_t versionNegotiation = LongHeader::kPacketTypeMask;
   auto buf = folly::IOBuf::create(0);
   buf->append(0);
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   EXPECT_FALSE(parseLongHeader(versionNegotiation, cursor).hasValue());
 }
 
@@ -114,7 +114,7 @@ TEST_F(TypesTest, LongHeaderSmallInput) {
   wcursor.writeBE<uint8_t>(2);
   wcursor.writeBE<uint8_t>(3);
 
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   EXPECT_FALSE(parseLongHeader(clientCleartext, cursor).hasValue());
 }
 
@@ -131,7 +131,7 @@ TEST_F(TypesTest, LongHeaderInvalid) {
   wcursor.writeBE<uint32_t>(1234);
   wcursor.writeBE<QuicVersionType>(static_cast<QuicVersionType>(version));
 
-  folly::io::Cursor cursor(buf.get());
+  Cursor cursor(buf.get());
   EXPECT_FALSE(parseLongHeader(badInitialValue, cursor).hasValue());
 }
 
@@ -140,7 +140,7 @@ TEST_F(TypesTest, ShortHeader) {
   auto connId = getTestConnectionId();
   ShortHeader testHeader1(ProtectionType::KeyPhaseZero, connId, packetNum);
   auto result1 = encodeShortHeader(testHeader1);
-  folly::io::Cursor cursor1(result1.second.get());
+  Cursor cursor1(result1.second.get());
   auto shortHeader1 = *parseShortHeader(result1.first, cursor1);
   EXPECT_EQ(ProtectionType::KeyPhaseZero, shortHeader1.getProtectionType());
   EXPECT_EQ(connId, shortHeader1.getConnectionId());
@@ -148,7 +148,7 @@ TEST_F(TypesTest, ShortHeader) {
   // Empty buffer
   auto buf4 = folly::IOBuf::create(0);
   buf4->append(0);
-  folly::io::Cursor cursor4(buf4.get());
+  Cursor cursor4(buf4.get());
   EXPECT_FALSE(parseShortHeader(0x01, cursor4).hasValue());
 }
 
@@ -165,7 +165,7 @@ TEST_F(TypesTest, ShortHeaderGetConnectionIdTest) {
 
   ShortHeader testHeader(ProtectionType::KeyPhaseZero, connId, packetNum);
   auto result = encodeShortHeader(testHeader);
-  folly::io::Cursor cursor(result.second.get());
+  Cursor cursor(result.second.get());
   auto shortHeader = *parseShortHeader(result.first, cursor);
   EXPECT_EQ(connId, shortHeader.getConnectionId());
 }

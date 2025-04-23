@@ -44,8 +44,7 @@ folly::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketLen(
 
 namespace quic {
 
-folly::Expected<PaddingFrame, QuicError> decodePaddingFrame(
-    folly::io::Cursor& cursor) {
+folly::Expected<PaddingFrame, QuicError> decodePaddingFrame(Cursor& cursor) {
   // we might have multiple padding frames in sequence in the common case.
   // Let's consume all the padding and return 1 padding frame for everything.
   static_assert(
@@ -68,12 +67,11 @@ folly::Expected<PaddingFrame, QuicError> decodePaddingFrame(
   return PaddingFrame();
 }
 
-folly::Expected<PingFrame, QuicError> decodePingFrame(folly::io::Cursor&) {
+folly::Expected<PingFrame, QuicError> decodePingFrame(Cursor&) {
   return PingFrame();
 }
 
-folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
-    folly::io::Cursor& cursor) {
+folly::Expected<QuicFrame, QuicError> decodeKnobFrame(Cursor& cursor) {
   auto knobSpace = decodeQuicInteger(cursor);
   if (!knobSpace) {
     return folly::makeUnexpected(QuicError(
@@ -96,7 +94,7 @@ folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
 }
 
 folly::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto sequenceNumber = decodeQuicInteger(cursor);
   if (!sequenceNumber) {
     return folly::makeUnexpected(QuicError(
@@ -129,8 +127,7 @@ folly::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
   return QuicSimpleFrame(frame);
 }
 
-folly::Expected<ImmediateAckFrame, QuicError> decodeImmediateAckFrame(
-    folly::io::Cursor&) {
+folly::Expected<ImmediateAckFrame, QuicError> decodeImmediateAckFrame(Cursor&) {
   return ImmediateAckFrame();
 }
 
@@ -162,7 +159,7 @@ folly::Expected<uint64_t, QuicError> convertEncodedDurationToMicroseconds(
 }
 
 folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType) {
@@ -252,7 +249,7 @@ folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
 
 static folly::Expected<folly::Unit, QuicError> decodeReceiveTimestampsInAck(
     ReadAckFrame& frame,
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     const CodecParameters& params) {
   auto latestRecvdPacketNum = decodeQuicInteger(cursor);
   if (!latestRecvdPacketNum) {
@@ -322,7 +319,7 @@ static folly::Expected<folly::Unit, QuicError> decodeReceiveTimestampsInAck(
 
 static folly::Expected<folly::Unit, QuicError> decodeEcnCountsInAck(
     ReadAckFrame& frame,
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto ect_0 = decodeQuicInteger(cursor);
   auto ect_1 = decodeQuicInteger(cursor);
   auto ce = decodeQuicInteger(cursor);
@@ -337,7 +334,7 @@ static folly::Expected<folly::Unit, QuicError> decodeEcnCountsInAck(
 }
 
 folly::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
   ReadAckFrame frame;
@@ -379,7 +376,7 @@ folly::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
 }
 
 folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType) {
@@ -401,7 +398,7 @@ folly::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
 }
 
 folly::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
   ReadAckFrame readAckFrame;
@@ -422,7 +419,7 @@ folly::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
 }
 
 folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     bool reliable) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
@@ -467,7 +464,7 @@ folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
 }
 
 folly::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     return folly::makeUnexpected(QuicError(
@@ -485,8 +482,7 @@ folly::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
   return StopSendingFrame(folly::to<StreamId>(streamId->first), errorCode);
 }
 
-folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
-    folly::io::Cursor& cursor) {
+folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(Cursor& cursor) {
   auto optionalOffset = decodeQuicInteger(cursor);
   if (!optionalOffset) {
     return folly::makeUnexpected(QuicError(
@@ -516,7 +512,7 @@ folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
 }
 
 folly::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto tokenLength = decodeQuicInteger(cursor);
   if (!tokenLength) {
     return folly::makeUnexpected(QuicError(
@@ -542,7 +538,7 @@ folly::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     BufQueue& queue,
     StreamTypeField frameTypeField,
     bool isGroupFrame) {
-  folly::io::Cursor cursor(queue.front());
+  Cursor cursor(queue.front());
 
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
@@ -621,8 +617,7 @@ folly::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
       groupId);
 }
 
-folly::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
-    folly::io::Cursor& cursor) {
+folly::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(Cursor& cursor) {
   auto maximumData = decodeQuicInteger(cursor);
   if (!maximumData) {
     return folly::makeUnexpected(QuicError(
@@ -632,7 +627,7 @@ folly::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
 }
 
 folly::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     return folly::makeUnexpected(QuicError(
@@ -648,7 +643,7 @@ folly::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
 }
 
 folly::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
     return folly::makeUnexpected(QuicError(
@@ -659,7 +654,7 @@ folly::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
 }
 
 folly::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
     return folly::makeUnexpected(QuicError(
@@ -670,7 +665,7 @@ folly::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
 }
 
 folly::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto dataLimit = decodeQuicInteger(cursor);
   if (!dataLimit) {
     return folly::makeUnexpected(QuicError(
@@ -680,7 +675,7 @@ folly::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
 }
 
 folly::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     return folly::makeUnexpected(QuicError(
@@ -696,7 +691,7 @@ folly::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
 }
 
 folly::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     return folly::makeUnexpected(QuicError(
@@ -708,7 +703,7 @@ folly::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
 }
 
 folly::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     return folly::makeUnexpected(QuicError(
@@ -720,7 +715,7 @@ folly::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
 }
 
 folly::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto sequenceNumber = decodeQuicInteger(cursor);
   if (!sequenceNumber) {
     return folly::makeUnexpected(QuicError(
@@ -766,7 +761,7 @@ folly::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
 }
 
 folly::Expected<RetireConnectionIdFrame, QuicError>
-decodeRetireConnectionIdFrame(folly::io::Cursor& cursor) {
+decodeRetireConnectionIdFrame(Cursor& cursor) {
   auto sequenceNum = decodeQuicInteger(cursor);
   if (!sequenceNum) {
     return folly::makeUnexpected(QuicError(
@@ -776,7 +771,7 @@ decodeRetireConnectionIdFrame(folly::io::Cursor& cursor) {
 }
 
 folly::Expected<PathChallengeFrame, QuicError> decodePathChallengeFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   if (!cursor.canAdvance(sizeof(uint64_t))) {
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -787,7 +782,7 @@ folly::Expected<PathChallengeFrame, QuicError> decodePathChallengeFrame(
 }
 
 folly::Expected<PathResponseFrame, QuicError> decodePathResponseFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   if (!cursor.canAdvance(sizeof(uint64_t))) {
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -798,7 +793,7 @@ folly::Expected<PathResponseFrame, QuicError> decodePathResponseFrame(
 }
 
 folly::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   TransportErrorCode errorCode{};
   auto varCode = decodeQuicInteger(cursor);
   if (!varCode) {
@@ -836,7 +831,7 @@ folly::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
 }
 
 folly::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   ApplicationErrorCode errorCode{};
   auto varCode = decodeQuicInteger(cursor);
   if (!varCode) {
@@ -866,7 +861,7 @@ folly::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
 }
 
 folly::Expected<HandshakeDoneFrame, QuicError> decodeHandshakeDoneFrame(
-    folly::io::Cursor& /*cursor*/) {
+    Cursor& /*cursor*/) {
   return HandshakeDoneFrame();
 }
 
@@ -876,7 +871,7 @@ folly::Expected<HandshakeDoneFrame, QuicError> decodeHandshakeDoneFrame(
  * associated data.
  */
 folly::Expected<uint64_t, TransportErrorCode> parsePlaintextRetryOrNewToken(
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   // Read in the timestamp
   if (!cursor.canAdvance(sizeof(uint64_t))) {
     return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
@@ -889,7 +884,7 @@ folly::Expected<uint64_t, TransportErrorCode> parsePlaintextRetryOrNewToken(
 folly::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
     BufQueue& queue,
     bool hasLen) {
-  folly::io::Cursor cursor(queue.front());
+  Cursor cursor(queue.front());
   size_t length = cursor.length();
   if (hasLen) {
     auto decodeLength = decodeQuicInteger(cursor);
@@ -911,7 +906,7 @@ folly::Expected<QuicFrame, QuicError> parseFrame(
     BufQueue& queue,
     const PacketHeader& header,
     const CodecParameters& params) {
-  folly::io::Cursor cursor(queue.front());
+  Cursor cursor(queue.front());
   auto frameTypeInt = decodeQuicInteger(cursor);
   if (!frameTypeInt) {
     return folly::makeUnexpected(QuicError(
@@ -1238,7 +1233,7 @@ folly::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
 
 Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     const ParsedLongHeaderInvariant& longHeaderInvariant,
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   auto cursorLength = cursor.totalLength();
 
   if (cursorLength < sizeof(QuicVersionType) ||
@@ -1277,7 +1272,7 @@ ParsedLongHeaderInvariant::ParsedLongHeaderInvariant(
       invariantLength(length) {}
 
 folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
-parseLongHeaderInvariant(uint8_t initialByte, folly::io::Cursor& cursor) {
+parseLongHeaderInvariant(uint8_t initialByte, Cursor& cursor) {
   size_t initialLength = cursor.totalLength();
   if (!cursor.canAdvance(sizeof(QuicVersionType))) {
     VLOG(5) << "Not enough input bytes to read Version or connection-id";
@@ -1355,7 +1350,7 @@ std::pair<PacketNum, size_t> parsePacketNumber(
 
 folly::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
     uint8_t initialByte,
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   if (getHeaderForm(initialByte) != HeaderForm::Long) {
     VLOG(5) << "Bad header form bit";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1393,7 +1388,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
 folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     LongHeader::Types type,
     ParsedLongHeaderInvariant parsedLongHeaderInvariant,
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     QuicNodeType nodeType) {
   if (type == LongHeader::Types::Retry) {
     // The integrity tag is kRetryIntegrityTagLen bytes in length, and the
@@ -1472,7 +1467,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 folly::Expected<ShortHeaderInvariant, TransportErrorCode>
 parseShortHeaderInvariants(
     uint8_t initialByte,
-    folly::io::Cursor& cursor,
+    Cursor& cursor,
     size_t dstConnIdSize) {
   if (getHeaderForm(initialByte) != HeaderForm::Short) {
     VLOG(5) << "Bad header form bit";
@@ -1492,10 +1487,8 @@ parseShortHeaderInvariants(
   return ShortHeaderInvariant(std::move(connId));
 }
 
-folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
-    uint8_t initialByte,
-    folly::io::Cursor& cursor,
-    size_t dstConnIdSize) {
+folly::Expected<ShortHeader, TransportErrorCode>
+parseShortHeader(uint8_t initialByte, Cursor& cursor, size_t dstConnIdSize) {
   if (getHeaderForm(initialByte) != HeaderForm::Short) {
     VLOG(5) << "Bad header form bit";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);

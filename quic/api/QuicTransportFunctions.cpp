@@ -398,7 +398,7 @@ iobufChainBasedBuildScheduleEncrypt(
   auto bodyLen = packet->body.computeChainDataLength();
   auto unencrypted = BufHelpers::createCombined(
       headerLen + bodyLen + aead.getCipherOverhead());
-  auto bodyCursor = folly::io::Cursor(&packet->body);
+  auto bodyCursor = Cursor(&packet->body);
   bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
   unencrypted->advance(headerLen);
   unencrypted->append(bodyLen);
@@ -406,7 +406,7 @@ iobufChainBasedBuildScheduleEncrypt(
       aead.inplaceEncrypt(std::move(unencrypted), &packet->header, packetNum);
   DCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
-  auto headerCursor = folly::io::Cursor(&packet->header);
+  auto headerCursor = Cursor(&packet->header);
   headerCursor.pull(packetBuf->writableData(), headerLen);
   packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
 

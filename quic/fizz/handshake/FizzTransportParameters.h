@@ -66,7 +66,7 @@ inline void removeDuplicateParams(std::vector<TransportParameter>& params) {
 
 inline void decodeVarintParams(
     std::vector<TransportParameter>& parameters,
-    folly::io::Cursor& cursor) {
+    Cursor& cursor) {
   while (!cursor.isAtEnd()) {
     auto id = decodeQuicInteger(cursor);
     if (!id) {
@@ -126,7 +126,7 @@ inline quic::Optional<quic::ClientTransportParameters> getClientExtension(
     return quic::none;
   }
   quic::ClientTransportParameters parameters;
-  folly::io::Cursor cursor(it->extension_data.get());
+  quic::Cursor cursor(it->extension_data.get());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
@@ -140,7 +140,7 @@ inline quic::Optional<quic::ServerTransportParameters> getServerExtension(
     return quic::none;
   }
   quic::ServerTransportParameters parameters;
-  folly::io::Cursor cursor(it->extension_data.get());
+  quic::Cursor cursor(it->extension_data.get());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
@@ -154,7 +154,7 @@ inline quic::Optional<quic::TicketTransportParameters> getTicketExtension(
     return quic::none;
   }
   quic::TicketTransportParameters parameters;
-  folly::io::Cursor cursor(it->extension_data.get());
+  quic::Cursor cursor(it->extension_data.get());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }

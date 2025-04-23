@@ -43,7 +43,7 @@ ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {
   }
 }
 
-ConnectionId::ConnectionId(folly::io::Cursor& cursor, size_t len) {
+ConnectionId::ConnectionId(Cursor& cursor, size_t len) {
   // Zero is special case for connids.
   if (len == 0) {
     connidLen = 0;

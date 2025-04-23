@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/chrono/Clock.h>
+#include <folly/io/Cursor.h>
 #include <folly/io/IOBuf.h>
 #include <quic/common/third-party/enum.h>
 #include <sys/types.h>
@@ -41,6 +42,7 @@ using Buf = folly::IOBuf; // Used when we're not wrapping the buffer in an
                           // std::unique_ptr
 using BufPtr = std::unique_ptr<Buf>;
 using BufEq = folly::IOBufEqualTo;
+using Cursor = folly::io::Cursor;
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 using DurationRep = std::chrono::microseconds::rep;

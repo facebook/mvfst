@@ -374,7 +374,7 @@ TEST(BufWriterTest, BasicWrite) {
   writer.writeBE(sixtyfour);
 
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(8, reader.template readBE<uint8_t>());
   EXPECT_EQ(16, reader.template readBE<uint16_t>());
   EXPECT_EQ(32, reader.template readBE<uint32_t>());
@@ -404,7 +404,7 @@ TEST(BufWriterTest, Push) {
       folly::IOBuf::copyBuffer("All you're gonna see it someday");
   writer.push(inputBuffer->data(), inputBuffer->computeChainDataLength());
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(
       "All you're gonna see it someday",
       reader.readFixedString(inputBuffer->computeChainDataLength()));
@@ -418,7 +418,7 @@ TEST(BufWriterTest, InsertSingle) {
   auto len = inputBuffer->computeChainDataLength();
   writer.insert(inputBuffer.get());
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(inputBuffer->to<string>(), reader.readFixedString(len));
 }
 
@@ -434,7 +434,7 @@ TEST(BufWriterTest, InsertChain) {
   auto len = inputBuffer->computeChainDataLength();
   writer.insert(inputBuffer.get());
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(
       "Cause I lost you and now what am i to do?"
       " Can't believe that we are through."
@@ -454,7 +454,7 @@ TEST(BufWriterTest, BackFill) {
   bufWriter.backFill(
       (uint8_t*)testInput3.data(), testInput3.size(), testInput1.size());
   testBuffer->append(bufWriter.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(
       "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15",
       reader.readFixedString(
@@ -468,7 +468,7 @@ TEST(BufWriterTest, BufQueueCopy) {
   BufWriter bufWriter(outputBuffer->writableTail(), 200);
   bufWriter.insert(queue.front(), queue.chainLength());
   outputBuffer->append(bufWriter.getBytesWritten());
-  folly::io::Cursor reader(outputBuffer.get());
+  Cursor reader(outputBuffer.get());
   EXPECT_EQ(
       "I feel like I'm drowning", reader.readFixedString(queue.chainLength()));
 }
@@ -480,7 +480,7 @@ TEST(BufWriterTest, BufQueueCopyPartial) {
   BufWriter bufWriter(outputBuffer->writableTail(), 200);
   bufWriter.insert(queue.front(), 6);
   outputBuffer->append(bufWriter.getBytesWritten());
-  folly::io::Cursor reader(outputBuffer.get());
+  Cursor reader(outputBuffer.get());
   EXPECT_EQ(
       "I feel", reader.readFixedString(outputBuffer->computeChainDataLength()));
 }
@@ -493,7 +493,7 @@ TEST(BufWriterTest, BufQueueChainCopy) {
   BufWriter bufWriter(outputBuffer->writableTail(), 1000);
   bufWriter.insert(queue.front(), queue.chainLength());
   outputBuffer->append(bufWriter.getBytesWritten());
-  folly::io::Cursor reader(outputBuffer.get());
+  Cursor reader(outputBuffer.get());
   EXPECT_EQ(
       "I'm a hotpot. You mere are hotpot soup base.",
       reader.readFixedString(queue.chainLength()));
@@ -509,7 +509,7 @@ TEST(BufWriterTest, BufQueueChainCopyPartial) {
   BufWriter bufWriter(outputBuffer->writableTail(), 1000);
   bufWriter.insert(queue.front(), testStr1.size() + 10);
   outputBuffer->append(bufWriter.getBytesWritten());
-  folly::io::Cursor reader(outputBuffer.get());
+  Cursor reader(outputBuffer.get());
   EXPECT_EQ(
       folly::to<std::string>(testStr1, "That you l"),
       reader.readFixedString(testStr1.size() + 10));
@@ -528,7 +528,7 @@ TEST(BufWriterTest, BufQueueChainCopyTooLargeLimit) {
   bufWriter.insert(
       queue.front(), (testStr1.size() + testStr2.size() + testStr3.size()) * 5);
   outputBuffer->append(bufWriter.getBytesWritten());
-  folly::io::Cursor reader(outputBuffer.get());
+  Cursor reader(outputBuffer.get());
   EXPECT_EQ(
       "I see trees of green. "
       "Red rose too. "
@@ -549,7 +549,7 @@ TEST(BufWriterTest, TwoWriters) {
   auto inputBuffer2 = folly::IOBuf::copyBuffer(" Saint");
   bufWriter2.insert(inputBuffer2.get());
   outputBuffer->append(bufWriter2.getBytesWritten());
-  folly::io::Cursor reader(outputBuffer.get());
+  Cursor reader(outputBuffer.get());
   EXPECT_EQ(15, outputBuffer->length());
   EXPECT_EQ("Destroyer Saint", reader.readFixedString(outputBuffer->length()));
 }
@@ -563,7 +563,7 @@ TEST(BufWriterTest, InsertSingleByteChainedRange) {
   ChainedByteRangeHead cbrh(inputBuffer);
   writer.insert(&cbrh);
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(
       inputBuffer->computeChainDataLength(),
       testBuffer->computeChainDataLength());
@@ -576,7 +576,7 @@ TEST(BufWriterTest, InsertZeroLen) {
   auto inputBuffer = folly::IOBuf::copyBuffer("");
   ChainedByteRangeHead cbrh(inputBuffer);
   writer.insert(&cbrh);
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(testBuffer->computeChainDataLength(), 0);
 }
 
@@ -588,7 +588,7 @@ TEST(BufWriterTest, InsertSingleByteChainedRangeWithLimit) {
   ChainedByteRangeHead cbrh(inputBuffer);
   writer.insert(&cbrh, 10);
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(testBuffer->computeChainDataLength(), 10);
   EXPECT_EQ("Steady on ", reader.readFixedString(10));
 }
@@ -606,7 +606,7 @@ TEST(BufWriterTest, InsertChainByteChainedRange) {
   ChainedByteRangeHead cbrh(inputBuffer);
   writer.insert(&cbrh);
   testBuffer->append(writer.getBytesWritten());
-  folly::io::Cursor reader(testBuffer.get());
+  Cursor reader(testBuffer.get());
   EXPECT_EQ(testBuffer->computeChainDataLength(), len);
   EXPECT_EQ(
       "Cause I lost you and now what am i to do?"
