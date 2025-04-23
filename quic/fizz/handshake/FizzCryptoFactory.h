@@ -27,12 +27,12 @@ class FizzCryptoFactory : public CryptoFactory {
       QuicVersion version) const override;
 
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      folly::ByteRange baseSecret) const override;
+      ByteRange baseSecret) const override;
 
   virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       fizz::CipherSuite cipher) const;
 
-  [[nodiscard]] std::function<bool(folly::ByteRange, folly::ByteRange)>
+  [[nodiscard]] std::function<bool(ByteRange, ByteRange)>
   getCryptoEqualFunction() const override;
 
   std::shared_ptr<fizz::Factory> getFizzFactory() {

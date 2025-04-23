@@ -62,9 +62,9 @@ class CryptoFactory {
       QuicVersion version) const = 0;
 
   virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      folly::ByteRange baseSecret) const = 0;
+      ByteRange baseSecret) const = 0;
 
-  [[nodiscard]] virtual std::function<bool(folly::ByteRange, folly::ByteRange)>
+  [[nodiscard]] virtual std::function<bool(ByteRange, ByteRange)>
   getCryptoEqualFunction() const = 0;
 
   virtual ~CryptoFactory() = default;

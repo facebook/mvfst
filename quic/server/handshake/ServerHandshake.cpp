@@ -207,7 +207,7 @@ const fizz::server::State& ServerHandshake::getState() const {
 
 Optional<std::vector<uint8_t>> ServerHandshake::getExportedKeyingMaterial(
     const std::string& label,
-    const Optional<folly::ByteRange>& context,
+    const Optional<ByteRange>& context,
     uint16_t keyLength) {
   const auto cipherSuite = state_.cipher();
   const auto& ems = state_.exporterMasterSecret();
@@ -521,7 +521,7 @@ void ServerHandshake::processActions(
   processPendingEvents();
 }
 
-void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
+void ServerHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(secret);
   std::unique_ptr<PacketNumberCipher> headerCipher = buildHeaderCipher(secret);
   switch (kind) {

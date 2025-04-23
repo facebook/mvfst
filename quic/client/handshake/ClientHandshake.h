@@ -145,7 +145,7 @@ class ClientHandshake : public Handshake {
     ZeroRttWrite,
   };
 
-  void computeCiphers(CipherKind kind, folly::ByteRange secret);
+  void computeCiphers(CipherKind kind, ByteRange secret);
 
   /**
    * Various utilities for concrete implementations to use.
@@ -176,7 +176,7 @@ class ClientHandshake : public Handshake {
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
    * on key updates.
    */
-  virtual BufPtr getNextTrafficSecret(folly::ByteRange secret) const = 0;
+  virtual BufPtr getNextTrafficSecret(ByteRange secret) const = 0;
 
   BufPtr readTrafficSecret_;
   BufPtr writeTrafficSecret_;
@@ -192,9 +192,9 @@ class ClientHandshake : public Handshake {
   virtual bool matchEarlyParameters() = 0;
   virtual std::unique_ptr<Aead> buildAead(
       CipherKind kind,
-      folly::ByteRange secret) = 0;
+      ByteRange secret) = 0;
   virtual std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
-      folly::ByteRange secret) = 0;
+      ByteRange secret) = 0;
 
   // Represents the packet type that should be used to write the data currently
   // in the stream.

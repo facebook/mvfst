@@ -39,10 +39,10 @@ class FizzServerHandshake : public ServerHandshake {
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;
-  std::unique_ptr<Aead> buildAead(folly::ByteRange secret) override;
+  std::unique_ptr<Aead> buildAead(ByteRange secret) override;
   std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
-      folly::ByteRange secret) override;
-  BufPtr getNextTrafficSecret(folly::ByteRange secret) const override;
+      ByteRange secret) override;
+  BufPtr getNextTrafficSecret(ByteRange secret) const override;
 
   void processAccept() override;
   bool processPendingCryptoEvent() override;

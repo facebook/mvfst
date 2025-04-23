@@ -127,7 +127,7 @@ ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
   if (head_.length() > len) {
     // Just need to trim a little off the head.
     ret.head_.range_ =
-        folly::ByteRange(head_.range_.begin(), head_.range_.begin() + len);
+        ByteRange(head_.range_.begin(), head_.range_.begin() + len);
     ret.head_.next_ = nullptr;
     ret.tail_ = &ret.head_;
     head_.trimStart(len);
@@ -184,9 +184,9 @@ ChainedByteRangeHead ChainedByteRangeHead::splitAtMost(size_t len) {
      */
     ret.head_.range_ = head_.range_;
     head_.range_ =
-        folly::ByteRange(current->range_.begin() + len, current->range_.end());
-    current->range_ = folly::ByteRange(
-        current->range_.begin(), current->range_.begin() + len);
+        ByteRange(current->range_.begin() + len, current->range_.end());
+    current->range_ =
+        ByteRange(current->range_.begin(), current->range_.begin() + len);
 
     ret.head_.next_ = head_.next_;
     ret.tail_ = current;

@@ -87,7 +87,7 @@ void FileQLogger::writeToStream(folly::StringPiece message) {
     bool inputConsumed = false;
     while (!inputConsumed) {
       compressionBuffer_->clear();
-      folly::ByteRange inputRange(message);
+      ByteRange inputRange(message);
       auto outputRange = folly::MutableByteRange(
           compressionBuffer_->writableData(), compressionBuffer_->capacity());
       compressionCodec_->compressStream(inputRange, outputRange);
@@ -148,7 +148,7 @@ void FileQLogger::finishStream() {
     bool ended = false;
     while (!ended) {
       compressionBuffer_->clear();
-      folly::ByteRange inputRange(folly::StringPiece(""));
+      ByteRange inputRange(folly::StringPiece(""));
       auto outputRange = folly::MutableByteRange(
           compressionBuffer_->writableData(), compressionBuffer_->capacity());
       ended = compressionCodec_->compressStream(

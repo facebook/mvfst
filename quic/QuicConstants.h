@@ -35,6 +35,7 @@ using SystemClock = folly::chrono::SystemClock;
 
 namespace quic {
 
+using ByteRange = folly::ByteRange;
 using BufHelpers = folly::IOBuf; // For stuff like BufHelpers::create, etc.
 using Buf = folly::IOBuf; // Used when we're not wrapping the buffer in an
                           // std::unique_ptr

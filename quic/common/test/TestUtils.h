@@ -354,11 +354,11 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
   MOCK_METHOD(
       std::unique_ptr<PacketNumberCipher>,
       _makePacketNumberCipher,
-      (folly::ByteRange),
+      (ByteRange),
       (const));
 
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      folly::ByteRange secret) const override;
+      ByteRange secret) const override;
 
   void setMockPacketNumberCipher(
       std::unique_ptr<PacketNumberCipher> packetNumberCipher);
@@ -553,11 +553,11 @@ class FakeServerHandshake : public FizzServerHandshake {
     writeTrafficSecret_ = folly::IOBuf::copyBuffer(getRandSecret());
   }
 
-  std::unique_ptr<Aead> buildAead(folly::ByteRange /*secret*/) override {
+  std::unique_ptr<Aead> buildAead(ByteRange /*secret*/) override {
     return createNoOpAead();
   }
 
-  BufPtr getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
+  BufPtr getNextTrafficSecret(ByteRange /*secret*/) const override {
     return folly::IOBuf::copyBuffer(getRandSecret());
   }
 

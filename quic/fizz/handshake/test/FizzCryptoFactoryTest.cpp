@@ -49,7 +49,7 @@ class FizzCryptoFactoryTest : public Test {
   std::unique_ptr<MockPacketNumberCipher> createMockPacketNumberCipher() {
     auto mockPacketNumberCipher = std::make_unique<MockPacketNumberCipher>();
     EXPECT_CALL(*mockPacketNumberCipher, setKey(_))
-        .WillOnce(Invoke([&](folly::ByteRange key) {
+        .WillOnce(Invoke([&](ByteRange key) {
           packetCipherKey_ = folly::IOBuf::copyBuffer(key);
         }));
     EXPECT_CALL(*mockPacketNumberCipher, keyLength())

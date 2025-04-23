@@ -181,7 +181,7 @@ class QuicServerTransport
    */
   Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const Optional<folly::ByteRange>& context,
+      const Optional<ByteRange>& context,
       uint16_t keyLength) const override {
     return serverConn_->serverHandshakeLayer->getExportedKeyingMaterial(
         label, context, keyLength);

@@ -25,7 +25,7 @@ uint8_t ConnectionId::size() const {
 }
 
 std::string ConnectionId::hex() const {
-  return folly::hexlify(folly::ByteRange(connid.data(), connidLen));
+  return folly::hexlify(ByteRange(connid.data(), connidLen));
 }
 
 ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {

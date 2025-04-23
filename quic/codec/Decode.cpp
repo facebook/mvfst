@@ -50,7 +50,7 @@ folly::Expected<PaddingFrame, QuicError> decodePaddingFrame(
   // Let's consume all the padding and return 1 padding frame for everything.
   static_assert(
       static_cast<int>(FrameType::PADDING) == 0, "Padding value is 0");
-  folly::ByteRange paddingBytes = cursor.peekBytes();
+  ByteRange paddingBytes = cursor.peekBytes();
   if (paddingBytes.size() == 0) {
     return PaddingFrame();
   }
@@ -1337,7 +1337,7 @@ size_t parsePacketNumberLength(uint8_t initialByte) {
  */
 std::pair<PacketNum, size_t> parsePacketNumber(
     uint8_t initialByte,
-    folly::ByteRange packetNumberRange,
+    ByteRange packetNumberRange,
     PacketNum expectedNextPacketNum) {
   size_t packetNumLen = parsePacketNumberLength(initialByte);
   uint32_t encodedPacketNum = 0;

@@ -778,7 +778,7 @@ FizzCryptoTestFactory::makePacketNumberCipher(fizz::CipherSuite) const {
 }
 
 std::unique_ptr<PacketNumberCipher>
-FizzCryptoTestFactory::makePacketNumberCipher(folly::ByteRange secret) const {
+FizzCryptoTestFactory::makePacketNumberCipher(ByteRange secret) const {
   return _makePacketNumberCipher(secret);
 }
 
@@ -789,7 +789,7 @@ void FizzCryptoTestFactory::setMockPacketNumberCipher(
 
 void FizzCryptoTestFactory::setDefault() {
   ON_CALL(*this, _makePacketNumberCipher(_))
-      .WillByDefault(Invoke([&](folly::ByteRange secret) {
+      .WillByDefault(Invoke([&](ByteRange secret) {
         return FizzCryptoFactory::makePacketNumberCipher(secret);
       }));
 }

@@ -23,8 +23,8 @@ class MockPacketNumberCipher : public PacketNumberCipher {
  public:
   virtual ~MockPacketNumberCipher() = default;
 
-  MOCK_METHOD(void, setKey, (folly::ByteRange key));
-  MOCK_METHOD(HeaderProtectionMask, mask, (folly::ByteRange), (const));
+  MOCK_METHOD(void, setKey, (ByteRange key));
+  MOCK_METHOD(HeaderProtectionMask, mask, (ByteRange), (const));
   MOCK_METHOD(size_t, keyLength, (), (const));
   MOCK_METHOD(const BufPtr&, getKey, (), (const));
 

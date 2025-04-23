@@ -17,11 +17,11 @@ class Aes128PacketNumberCipher : public PacketNumberCipher {
  public:
   ~Aes128PacketNumberCipher() override = default;
 
-  void setKey(folly::ByteRange key) override;
+  void setKey(ByteRange key) override;
 
   const BufPtr& getKey() const override;
 
-  HeaderProtectionMask mask(folly::ByteRange sample) const override;
+  HeaderProtectionMask mask(ByteRange sample) const override;
 
   size_t keyLength() const override;
 
@@ -35,11 +35,11 @@ class Aes256PacketNumberCipher : public PacketNumberCipher {
  public:
   ~Aes256PacketNumberCipher() override = default;
 
-  void setKey(folly::ByteRange key) override;
+  void setKey(ByteRange key) override;
 
   const BufPtr& getKey() const override;
 
-  HeaderProtectionMask mask(folly::ByteRange sample) const override;
+  HeaderProtectionMask mask(ByteRange sample) const override;
 
   size_t keyLength() const override;
 

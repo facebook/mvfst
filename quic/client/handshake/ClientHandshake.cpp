@@ -153,7 +153,7 @@ bool ClientHandshake::waitingForData() const {
   return waitForData_;
 }
 
-void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
+void ClientHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(kind, secret);
   std::unique_ptr<PacketNumberCipher> packetNumberCipher =
       buildHeaderCipher(secret);

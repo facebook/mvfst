@@ -48,7 +48,7 @@ class Handshake {
    */
   virtual Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const Optional<folly::ByteRange>& context,
+      const Optional<ByteRange>& context,
       uint16_t keyLength) = 0;
 
   virtual void handshakeConfirmed() {

@@ -20,9 +20,9 @@ class PacketNumberCipher {
  public:
   virtual ~PacketNumberCipher() = default;
 
-  virtual void setKey(folly::ByteRange key) = 0;
+  virtual void setKey(ByteRange key) = 0;
 
-  virtual HeaderProtectionMask mask(folly::ByteRange sample) const = 0;
+  virtual HeaderProtectionMask mask(ByteRange sample) const = 0;
 
   /**
    * Decrypts a long header from a sample.
@@ -31,7 +31,7 @@ class PacketNumberCipher {
    * packetNumberBytes should be supplied with at least 4 bytes.
    */
   virtual void decryptLongHeader(
-      folly::ByteRange sample,
+      ByteRange sample,
       folly::MutableByteRange initialByte,
       folly::MutableByteRange packetNumberBytes) const;
 
@@ -42,7 +42,7 @@ class PacketNumberCipher {
    * packetNumberBytes should be supplied with at least 4 bytes.
    */
   virtual void decryptShortHeader(
-      folly::ByteRange sample,
+      ByteRange sample,
       folly::MutableByteRange initialByte,
       folly::MutableByteRange packetNumberBytes) const;
 
@@ -52,7 +52,7 @@ class PacketNumberCipher {
    * initialByte is the initial byte.
    */
   virtual void encryptLongHeader(
-      folly::ByteRange sample,
+      ByteRange sample,
       folly::MutableByteRange initialByte,
       folly::MutableByteRange packetNumberBytes) const;
 
@@ -62,7 +62,7 @@ class PacketNumberCipher {
    * initialByte is the initial byte.
    */
   virtual void encryptShortHeader(
-      folly::ByteRange sample,
+      ByteRange sample,
       folly::MutableByteRange initialByte,
       folly::MutableByteRange packetNumberBytes) const;
 
@@ -78,14 +78,14 @@ class PacketNumberCipher {
 
  protected:
   virtual void cipherHeader(
-      folly::ByteRange sample,
+      ByteRange sample,
       folly::MutableByteRange initialByte,
       folly::MutableByteRange packetNumberBytes,
       uint8_t initialByteMask,
       uint8_t packetNumLengthMask) const;
 
   virtual void decipherHeader(
-      folly::ByteRange sample,
+      ByteRange sample,
       folly::MutableByteRange initialByte,
       folly::MutableByteRange packetNumberBytes,
       uint8_t initialByteMask,

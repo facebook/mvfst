@@ -20,7 +20,7 @@ const std::vector<std::string> kCipherContexts = {"RetryToken_V2"};
 namespace quic {
 
 TokenGenerator::TokenGenerator(TokenSecret secret) : cipher_(kCipherContexts) {
-  std::vector<folly::ByteRange> secrets;
+  std::vector<ByteRange> secrets;
   secrets.emplace_back(folly::range(secret));
   cipher_.setSecrets(secrets);
 }

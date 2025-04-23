@@ -290,8 +290,7 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
   folly::MutableByteRange initialByteRange(data->writableData(), 1);
   folly::MutableByteRange packetNumberByteRange(
       data->writableData() + packetNumberOffset, kMaxPacketNumEncodingSize);
-  folly::ByteRange sampleByteRange(
-      data->writableData() + sampleOffset, sample.size());
+  ByteRange sampleByteRange(data->writableData() + sampleOffset, sample.size());
 
   oneRttHeaderCipher_->decryptShortHeader(
       sampleByteRange, initialByteRange, packetNumberByteRange);
@@ -447,8 +446,8 @@ CodecResult QuicReadCodec::parsePacket(
       }
       // Only allocate & copy the token if it matches the token we have
       if (cryptoEqual_(
-              folly::ByteRange(tokenSource, sizeof(StatelessResetToken)),
-              folly::ByteRange(
+              ByteRange(tokenSource, sizeof(StatelessResetToken)),
+              ByteRange(
                   statelessResetToken_->data(), sizeof(StatelessResetToken)))) {
         token = StatelessResetToken();
         memcpy(token->data(), tokenSource, token->size());
@@ -569,7 +568,7 @@ void QuicReadCodec::setStatelessResetToken(
 }
 
 void QuicReadCodec::setCryptoEqual(
-    std::function<bool(folly::ByteRange, folly::ByteRange)> cryptoEqual) {
+    std::function<bool(ByteRange, ByteRange)> cryptoEqual) {
   cryptoEqual_ = std::move(cryptoEqual);
 }
 

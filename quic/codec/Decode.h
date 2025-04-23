@@ -242,7 +242,7 @@ size_t parsePacketNumberLength(uint8_t initialByte);
  */
 std::pair<PacketNum, size_t> parsePacketNumber(
     uint8_t initialByte,
-    folly::ByteRange packetNumberRange,
+    ByteRange packetNumberRange,
     PacketNum expectedNextPacketNum);
 
 // cursor: has to be point to the byte just past initialByte

@@ -140,7 +140,7 @@ bool FizzClientHandshake::isTLSResumed() const {
 
 Optional<std::vector<uint8_t>> FizzClientHandshake::getExportedKeyingMaterial(
     const std::string& label,
-    const Optional<folly::ByteRange>& context,
+    const Optional<ByteRange>& context,
     uint16_t keyLength) {
   const auto& ems = state_.exporterMasterSecret();
   const auto cipherSuite = state_.cipher();
@@ -176,7 +176,7 @@ bool FizzClientHandshake::matchEarlyParameters() {
 
 std::unique_ptr<Aead> FizzClientHandshake::buildAead(
     CipherKind kind,
-    folly::ByteRange secret) {
+    ByteRange secret) {
   bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
   fizz::CipherSuite cipher =
       isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
@@ -198,12 +198,11 @@ std::unique_ptr<Aead> FizzClientHandshake::buildAead(
 }
 
 std::unique_ptr<PacketNumberCipher> FizzClientHandshake::buildHeaderCipher(
-    folly::ByteRange secret) {
+    ByteRange secret) {
   return cryptoFactory_->makePacketNumberCipher(secret);
 }
 
-BufPtr FizzClientHandshake::getNextTrafficSecret(
-    folly::ByteRange secret) const {
+BufPtr FizzClientHandshake::getNextTrafficSecret(ByteRange secret) const {
   auto deriver =
       state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
   auto nextSecret = deriver->expandLabel(

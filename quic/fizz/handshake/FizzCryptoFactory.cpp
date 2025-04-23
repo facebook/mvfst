@@ -57,7 +57,7 @@ std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
 }
 
 std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
-    folly::ByteRange baseSecret) const {
+    ByteRange baseSecret) const {
   auto pnCipher =
       makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto deriver =
@@ -80,7 +80,7 @@ std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
   }
 }
 
-std::function<bool(folly::ByteRange, folly::ByteRange)>
+std::function<bool(ByteRange, ByteRange)>
 FizzCryptoFactory::getCryptoEqualFunction() const {
   return fizz::CryptoUtils::equal;
 }

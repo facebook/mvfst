@@ -14,7 +14,7 @@
 namespace quic {
 
 void PacketNumberCipher::decipherHeader(
-    folly::ByteRange sample,
+    ByteRange sample,
     folly::MutableByteRange initialByte,
     folly::MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
@@ -31,7 +31,7 @@ void PacketNumberCipher::decipherHeader(
 }
 
 void PacketNumberCipher::cipherHeader(
-    folly::ByteRange sample,
+    ByteRange sample,
     folly::MutableByteRange initialByte,
     folly::MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
@@ -47,7 +47,7 @@ void PacketNumberCipher::cipherHeader(
 }
 
 void PacketNumberCipher::decryptLongHeader(
-    folly::ByteRange sample,
+    ByteRange sample,
     folly::MutableByteRange initialByte,
     folly::MutableByteRange packetNumberBytes) const {
   decipherHeader(
@@ -59,7 +59,7 @@ void PacketNumberCipher::decryptLongHeader(
 }
 
 void PacketNumberCipher::decryptShortHeader(
-    folly::ByteRange sample,
+    ByteRange sample,
     folly::MutableByteRange initialByte,
     folly::MutableByteRange packetNumberBytes) const {
   decipherHeader(
@@ -71,7 +71,7 @@ void PacketNumberCipher::decryptShortHeader(
 }
 
 void PacketNumberCipher::encryptLongHeader(
-    folly::ByteRange sample,
+    ByteRange sample,
     folly::MutableByteRange initialByte,
     folly::MutableByteRange packetNumberBytes) const {
   cipherHeader(
@@ -83,7 +83,7 @@ void PacketNumberCipher::encryptLongHeader(
 }
 
 void PacketNumberCipher::encryptShortHeader(
-    folly::ByteRange sample,
+    ByteRange sample,
     folly::MutableByteRange initialByte,
     folly::MutableByteRange packetNumberBytes) const {
   cipherHeader(

@@ -603,7 +603,7 @@ class TestQuicTransport
 
   Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string&,
-      const Optional<folly::ByteRange>&,
+      const Optional<ByteRange>&,
       uint16_t) const override {
     return none;
   }

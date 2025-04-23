@@ -329,7 +329,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return params_;
   }
 
-  BufPtr getNextTrafficSecret(folly::ByteRange /*secret*/) const override {
+  BufPtr getNextTrafficSecret(ByteRange /*secret*/) const override {
     return folly::IOBuf::copyBuffer(getRandSecret());
   }
 
@@ -382,12 +382,11 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     throw std::runtime_error("matchEarlyParameters not implemented");
   }
 
-  std::unique_ptr<Aead> buildAead(CipherKind, folly::ByteRange) override {
+  std::unique_ptr<Aead> buildAead(CipherKind, ByteRange) override {
     return createNoOpAead();
   }
 
-  std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
-      folly::ByteRange) override {
+  std::unique_ptr<PacketNumberCipher> buildHeaderCipher(ByteRange) override {
     throw std::runtime_error("buildHeaderCipher not implemented");
   }
 };
@@ -405,7 +404,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     folly::SocketAddress addr;
     Optional<int> err;
 
-    TestReadData(folly::ByteRange dataIn, folly::SocketAddress addrIn)
+    TestReadData(ByteRange dataIn, folly::SocketAddress addrIn)
         : udpPacket(folly::IOBuf::copyBuffer(dataIn)),
           addr(std::move(addrIn)) {}
 
@@ -799,7 +798,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   void deliverDataWithoutErrorCheck(
       const folly::SocketAddress& addr,
-      folly::ByteRange data,
+      ByteRange data,
       bool writes = true) {
     ASSERT_TRUE(networkReadCallback);
     socketReads.emplace_back(data, addr);
@@ -810,7 +809,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   void deliverDataWithoutErrorCheck(
-      folly::ByteRange data,
+      ByteRange data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     deliverDataWithoutErrorCheck(
@@ -831,7 +830,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   void deliverData(
       const folly::SocketAddress& addr,
-      folly::ByteRange data,
+      ByteRange data,
       bool writes = true) {
     deliverDataWithoutErrorCheck(addr, data, writes);
     if (client->getConn().localConnectionError) {
@@ -849,7 +848,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   void deliverData(
-      folly::ByteRange data,
+      ByteRange data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     deliverData(peer == nullptr ? serverAddr : *peer, data, writes);

@@ -314,7 +314,7 @@ TEST_F(ClientHandshakeTest, TestGetExportedKeyingMaterial) {
   EXPECT_EQ(ekm->size(), 32);
 
   ekm = handshake->getExportedKeyingMaterial(
-      "EXPORTER-Some-Label", folly::ByteRange(), 32);
+      "EXPORTER-Some-Label", ByteRange(), 32);
   ASSERT_TRUE(ekm.has_value());
   EXPECT_EQ(ekm->size(), 32);
 }

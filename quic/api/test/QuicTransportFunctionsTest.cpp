@@ -293,15 +293,14 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_EQ(rt1.offset, 0);
   std::string expected = "hey w";
   EXPECT_EQ(
-      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      ByteRange((uint8_t*)expected.data(), expected.size()),
       rt1.data.getHead()->getRange());
 
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 1);
   auto& rt2 = *stream2->retransmissionBuffer.at(0);
   EXPECT_EQ(rt2.offset, 0);
   EXPECT_EQ(
-      folly::ByteRange(buf->buffer(), buf->length()),
-      rt2.data.getHead()->getRange());
+      ByteRange(buf->buffer(), buf->length()), rt2.data.getHead()->getRange());
   EXPECT_TRUE(rt2.eof);
 
   // Testing retransmission
@@ -358,13 +357,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto& rt3 = *stream1->retransmissionBuffer.at(5);
   expected = "hats up";
   EXPECT_EQ(
-      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      ByteRange((uint8_t*)expected.data(), expected.size()),
       rt3.data.getHead()->getRange());
 
   auto& rt4 = *stream1->retransmissionBuffer.at(0);
   expected = "hey w";
   EXPECT_EQ(
-      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      ByteRange((uint8_t*)expected.data(), expected.size()),
       rt4.data.getHead()->getRange());
 
   // loss buffer should be split into 2. Part in retransmission buffer and
@@ -374,7 +373,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto& rt5 = *stream2->retransmissionBuffer.at(0);
   expected = "hey wh";
   EXPECT_EQ(
-      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      ByteRange((uint8_t*)expected.data(), expected.size()),
       rt5.data.getHead()->getRange());
   EXPECT_EQ(rt5.offset, 0);
   EXPECT_EQ(rt5.eof, 0);
@@ -382,7 +381,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto& rt6 = stream2->lossBuffer.front();
   expected = "ats up";
   EXPECT_EQ(
-      folly::ByteRange((uint8_t*)expected.data(), expected.size()),
+      ByteRange((uint8_t*)expected.data(), expected.size()),
       rt6.data.getHead()->getRange());
   EXPECT_EQ(rt6.offset, 6);
   EXPECT_EQ(rt6.eof, 1);
@@ -494,8 +493,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
     auto& rt = *stream1->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
     EXPECT_EQ(
-        folly::ByteRange(buf->data(), buf->length()),
-        rt.data.getHead()->getRange());
+        ByteRange(buf->data(), buf->length()), rt.data.getHead()->getRange());
     EXPECT_TRUE(rt.eof);
     stream1->lossBuffer.push_back(std::move(rt));
   }
@@ -504,8 +502,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
     auto& rt = *stream2->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
     EXPECT_EQ(
-        folly::ByteRange(buf->data(), buf->length()),
-        rt.data.getHead()->getRange());
+        ByteRange(buf->data(), buf->length()), rt.data.getHead()->getRange());
     EXPECT_TRUE(rt.eof);
     stream2->lossBuffer.push_back(std::move(rt));
   }
@@ -670,8 +667,7 @@ TEST_F(
     auto& rt = *stream1->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
     EXPECT_EQ(
-        folly::ByteRange(buf->data(), buf->length()),
-        rt.data.getHead()->getRange());
+        ByteRange(buf->data(), buf->length()), rt.data.getHead()->getRange());
     EXPECT_TRUE(rt.eof);
     stream1->lossBuffer.push_back(std::move(rt));
   }
@@ -681,7 +677,7 @@ TEST_F(
     EXPECT_EQ(rt.offset, 0);
     auto expectedBuf = IOBuf::copyBuffer("hey w");
     EXPECT_EQ(
-        folly::ByteRange(expectedBuf->data(), expectedBuf->length()),
+        ByteRange(expectedBuf->data(), expectedBuf->length()),
         rt.data.getHead()->getRange());
     EXPECT_FALSE(rt.eof);
     stream2->lossBuffer.push_back(std::move(rt));
@@ -691,8 +687,7 @@ TEST_F(
     auto& rt = *stream3->retransmissionBuffer.at(0);
     EXPECT_EQ(rt.offset, 0);
     EXPECT_EQ(
-        folly::ByteRange(buf->data(), buf->length()),
-        rt.data.getHead()->getRange());
+        ByteRange(buf->data(), buf->length()), rt.data.getHead()->getRange());
     EXPECT_FALSE(rt.eof);
     stream3->lossBuffer.push_back(std::move(rt));
   }

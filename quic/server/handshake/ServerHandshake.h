@@ -207,7 +207,7 @@ class ServerHandshake : public Handshake {
    */
   Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& label,
-      const Optional<folly::ByteRange>& context,
+      const Optional<ByteRange>& context,
       uint16_t keyLength) override;
 
   /**
@@ -219,7 +219,7 @@ class ServerHandshake : public Handshake {
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
    * on key updates.
    */
-  virtual BufPtr getNextTrafficSecret(folly::ByteRange secret) const = 0;
+  virtual BufPtr getNextTrafficSecret(ByteRange secret) const = 0;
 
   ~ServerHandshake() override = default;
 
@@ -270,7 +270,7 @@ class ServerHandshake : public Handshake {
     ZeroRttRead,
   };
 
-  void computeCiphers(CipherKind kind, folly::ByteRange secret);
+  void computeCiphers(CipherKind kind, ByteRange secret);
 
   fizz::server::State state_;
   fizz::server::ServerStateMachine machine_;
@@ -321,9 +321,9 @@ class ServerHandshake : public Handshake {
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
-  virtual std::unique_ptr<Aead> buildAead(folly::ByteRange secret) = 0;
+  virtual std::unique_ptr<Aead> buildAead(ByteRange secret) = 0;
   virtual std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
-      folly::ByteRange secret) = 0;
+      ByteRange secret) = 0;
 
   virtual void processAccept() = 0;
   /*

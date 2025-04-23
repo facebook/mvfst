@@ -62,7 +62,7 @@ class MockClientHandshake : public ClientHandshake {
       Optional<std::vector<uint8_t>>,
       getExportedKeyingMaterial,
       (const std::string& label,
-       const Optional<folly::ByteRange>& context,
+       const Optional<ByteRange>& context,
        uint16_t keyLength),
       ());
   MOCK_METHOD(Optional<bool>, getZeroRttRejected, ());
@@ -82,12 +82,12 @@ class MockClientHandshake : public ClientHandshake {
   MOCK_METHOD(
       std::unique_ptr<Aead>,
       buildAead,
-      (ClientHandshake::CipherKind kind, folly::ByteRange secret));
+      (ClientHandshake::CipherKind kind, ByteRange secret));
   MOCK_METHOD(
       std::unique_ptr<PacketNumberCipher>,
       buildHeaderCipher,
-      (folly::ByteRange secret));
-  MOCK_METHOD(BufPtr, getNextTrafficSecret, (folly::ByteRange secret), (const));
+      (ByteRange secret));
+  MOCK_METHOD(BufPtr, getNextTrafficSecret, (ByteRange secret), (const));
   MOCK_METHOD(
       const Optional<std::string>&,
       getApplicationProtocol,

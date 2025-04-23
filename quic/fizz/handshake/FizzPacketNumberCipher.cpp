@@ -12,7 +12,7 @@ namespace quic {
 static void setKeyImpl(
     folly::ssl::EvpCipherCtxUniquePtr& context,
     const EVP_CIPHER* cipher,
-    folly::ByteRange key) {
+    ByteRange key) {
   DCHECK_EQ(key.size(), EVP_CIPHER_key_length(cipher));
   context.reset(EVP_CIPHER_CTX_new());
   if (context == nullptr) {
@@ -26,7 +26,7 @@ static void setKeyImpl(
 
 static HeaderProtectionMask maskImpl(
     const folly::ssl::EvpCipherCtxUniquePtr& context,
-    folly::ByteRange sample) {
+    ByteRange sample) {
   HeaderProtectionMask outMask;
   CHECK_EQ(sample.size(), outMask.size());
   int outLen = 0;
@@ -42,12 +42,12 @@ static HeaderProtectionMask maskImpl(
   return outMask;
 }
 
-void Aes128PacketNumberCipher::setKey(folly::ByteRange key) {
+void Aes128PacketNumberCipher::setKey(ByteRange key) {
   pnKey_ = BufHelpers::copyBuffer(key);
   return setKeyImpl(encryptCtx_, EVP_aes_128_ecb(), key);
 }
 
-void Aes256PacketNumberCipher::setKey(folly::ByteRange key) {
+void Aes256PacketNumberCipher::setKey(ByteRange key) {
   pnKey_ = BufHelpers::copyBuffer(key);
   return setKeyImpl(encryptCtx_, EVP_aes_256_ecb(), key);
 }
@@ -60,13 +60,11 @@ const BufPtr& Aes256PacketNumberCipher::getKey() const {
   return pnKey_;
 }
 
-HeaderProtectionMask Aes128PacketNumberCipher::mask(
-    folly::ByteRange sample) const {
+HeaderProtectionMask Aes128PacketNumberCipher::mask(ByteRange sample) const {
   return maskImpl(encryptCtx_, sample);
 }
 
-HeaderProtectionMask Aes256PacketNumberCipher::mask(
-    folly::ByteRange sample) const {
+HeaderProtectionMask Aes256PacketNumberCipher::mask(ByteRange sample) const {
   return maskImpl(encryptCtx_, sample);
 }
 

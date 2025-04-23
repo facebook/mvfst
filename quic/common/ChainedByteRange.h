@@ -30,7 +30,7 @@ class ChainedByteRangeHead {
    public:
     ChainedByteRange() = default;
 
-    explicit ChainedByteRange(folly::ByteRange range) : range_(range) {}
+    explicit ChainedByteRange(ByteRange range) : range_(range) {}
 
     /**
      * Returns the length only of this ChainedByteRange
@@ -47,7 +47,7 @@ class ChainedByteRangeHead {
       range_.advance(n);
     }
 
-    [[nodiscard]] folly::ByteRange getRange() const {
+    [[nodiscard]] ByteRange getRange() const {
       return range_;
     }
 
@@ -56,7 +56,7 @@ class ChainedByteRangeHead {
     }
 
    private:
-    folly::ByteRange range_;
+    ByteRange range_;
     ChainedByteRange* next_{nullptr};
     friend class ChainedByteRangeHead;
   };

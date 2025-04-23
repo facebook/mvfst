@@ -281,7 +281,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgInplaceIovecMatches) {
   size_t size = 0;
   for (auto& message : messages) {
     auto buf = folly::IOBuf::copyBuffer(
-        folly::ByteRange((unsigned char*)message.data(), message.size()));
+        ByteRange((unsigned char*)message.data(), message.size()));
     batchWriter->append(
         std::move(buf), message.size(), folly::SocketAddress(), nullptr);
     size += message.size();
@@ -306,7 +306,7 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgInplaceIovecMatches) {
           folly::IOBufEqualTo eq;
           EXPECT_TRUE(
               eq(wrappedIovBuffer,
-                 folly::IOBuf::copyBuffer(folly::ByteRange(
+                 folly::IOBuf::copyBuffer(ByteRange(
                      (unsigned char*)messages[i].data(), messages[i].size()))));
         }
 
@@ -356,8 +356,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgNewlyAllocatedIovecMatches) {
   for (auto& message : messages) {
     auto buf = std::make_unique<folly::IOBuf>();
     for (size_t j = 0; j < message.size(); j++) {
-      auto partBuf = folly::IOBuf::copyBuffer(folly::ByteRange(
-          (unsigned char*)message[j].data(), message[j].size()));
+      auto partBuf = folly::IOBuf::copyBuffer(
+          ByteRange((unsigned char*)message[j].data(), message[j].size()));
       buf->appendToChain(std::move(partBuf));
     }
     buffers.emplace_back(std::move(buf));

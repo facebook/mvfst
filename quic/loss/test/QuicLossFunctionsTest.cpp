@@ -544,8 +544,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   auto& buffer = stream1->lossBuffer.front();
   EXPECT_EQ(buffer.offset, 0);
   EXPECT_EQ(
-      folly::ByteRange(buf->data(), buf->length()),
-      buffer.data.getHead()->getRange());
+      ByteRange(buf->data(), buf->length()), buffer.data.getHead()->getRange());
 }
 
 bool areEqual(folly::IOBuf* ptr, ChainedByteRangeHead* rch) {
@@ -721,13 +720,13 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
   auto& buffer1 = stream1->lossBuffer[0];
   EXPECT_EQ(buffer1.offset, 0);
   EXPECT_EQ(
-      folly::ByteRange(buf1->data(), buf1->length()),
+      ByteRange(buf1->data(), buf1->length()),
       buffer1.data.getHead()->getRange());
 
   auto& buffer3 = stream1->lossBuffer[1];
   EXPECT_EQ(buffer3.offset, 40);
   EXPECT_EQ(
-      folly::ByteRange(buf3->data(), buf3->length()),
+      ByteRange(buf3->data(), buf3->length()),
       buffer3.data.getHead()->getRange());
 }
 
@@ -2557,7 +2556,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_FALSE(retxIter->second->eof);
   auto expectedBuf = folly::IOBuf::copyBuffer("grape");
   ASSERT_EQ(
-      folly::ByteRange(expectedBuf->buffer(), expectedBuf->length()),
+      ByteRange(expectedBuf->buffer(), expectedBuf->length()),
       retxIter->second->data.getHead()->getRange());
   ASSERT_EQ(stream->currentWriteOffset, bufMetaStartingOffset);
 

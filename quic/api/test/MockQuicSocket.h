@@ -51,7 +51,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(
       (Optional<std::vector<uint8_t>>),
       getExportedKeyingMaterial,
-      (const std::string&, const Optional<folly::ByteRange>&, uint16_t),
+      (const std::string&, const Optional<ByteRange>&, uint16_t),
       (const));
   MOCK_METHOD(std::shared_ptr<QuicEventBase>, getEventBase, (), (const));
   MOCK_METHOD(
