@@ -80,8 +80,8 @@ BufPtr readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount = 0);
 using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
 void peekDataFromQuicStream(
     QuicStreamState& state,
-    const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
-                              const>& peekCallback);
+    const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+        peekCallback);
 
 /**
  * Releases data from QUIC stream.

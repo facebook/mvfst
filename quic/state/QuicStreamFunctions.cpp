@@ -404,8 +404,8 @@ folly::Expected<std::pair<BufPtr, bool>, QuicError> readDataFromQuicStream(
 
 void peekDataFromQuicStream(
     QuicStreamState& stream,
-    const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
-                              const>& peekCallback) {
+    const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+        peekCallback) {
   if (peekCallback) {
     peekCallback(
         stream.id,

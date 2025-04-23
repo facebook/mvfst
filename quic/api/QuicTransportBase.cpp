@@ -340,8 +340,8 @@ QuicTransportBase::pauseOrResumePeek(StreamId id, bool resume) {
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
     StreamId id,
-    const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
-                              const>& peekCallback) {
+    const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+        peekCallback) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }

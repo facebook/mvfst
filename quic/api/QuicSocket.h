@@ -236,8 +236,8 @@ class QuicSocket : virtual public QuicSocketLite {
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> peek(
       StreamId id,
-      const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
-                                const>& peekCallback) = 0;
+      const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+          peekCallback) = 0;
 
   /**
    * Consumes data on the given stream, starting from currentReadOffset

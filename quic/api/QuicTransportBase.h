@@ -91,8 +91,8 @@ class QuicTransportBase : public QuicSocket,
 
   folly::Expected<folly::Unit, LocalErrorCode> peek(
       StreamId id,
-      const folly::Function<void(StreamId id, const folly::Range<PeekIterator>&)
-                                const>& peekCallback) override;
+      const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+          peekCallback) override;
 
   folly::Expected<folly::Unit, LocalErrorCode> consume(
       StreamId id,

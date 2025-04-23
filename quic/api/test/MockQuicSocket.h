@@ -325,8 +325,8 @@ class MockQuicSocket : public QuicSocket {
       (folly::Expected<folly::Unit, LocalErrorCode>),
       peek,
       (StreamId,
-       const folly::Function<void(StreamId, const folly::Range<PeekIterator>&)
-                                 const>&));
+       const std::function<
+           void(StreamId, const folly::Range<PeekIterator>&)>&));
 
   MOCK_METHOD(
       (folly::Expected<
