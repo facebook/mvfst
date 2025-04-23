@@ -218,7 +218,9 @@ BETTER_ENUM(
     // Controls pacer's min burst size.
     PACER_MIN_BURST_PACKETS = 0x1000B,
     // Controls max batch size and write connection data packets limit.
-    MAX_BATCH_PACKETS = 0x1000C)
+    MAX_BATCH_PACKETS = 0x1000C,
+    // Knob for using the new priority queue implementation
+    USE_NEW_PRIORITY_QUEUE = 0x1000D)
 FOLLY_POP_WARNING
 
 enum class FrameType : uint64_t {

@@ -5755,6 +5755,34 @@ TEST_F(QuicServerTransportTest, TestBurstSizeKnobHandlers) {
       kMaxWriteConnectionDataPacketLimit);
 }
 
+TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        uint64_t(1)}});
+  EXPECT_TRUE(transportSettings.useNewPriorityQueue);
+  EXPECT_EQ(server->getConn().streamManager->oldWriteQueue(), nullptr);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        uint64_t(0)}});
+  EXPECT_FALSE(transportSettings.useNewPriorityQueue);
+  EXPECT_NE(server->getConn().streamManager->oldWriteQueue(), nullptr);
+
+  // updating knob with writable streams fails
+  auto streamId = server->createBidirectionalStream().value();
+  auto buf = folly::IOBuf::create(1100);
+  buf->append(1100);
+  server->writeChain(streamId, std::move(buf), false);
+
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        uint64_t(1)}});
+  EXPECT_FALSE(transportSettings.useNewPriorityQueue);
+  EXPECT_NE(server->getConn().streamManager->oldWriteQueue(), nullptr);
+}
+
 TEST_F(QuicServerTransportTest, WriteDSR) {
   EXPECT_EQ(server->getConn().dsrPacketCount, 0);
   // Make sure we are post-handshake

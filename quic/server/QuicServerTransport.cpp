@@ -1262,6 +1262,31 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "MAX_BATCH_PACKETS KnobParam received: " << val;
         return folly::unit;
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        bool useNewPriorityQueue = static_cast<bool>(std::get<uint64_t>(value));
+        auto serverConn = serverTransport->serverConn_;
+        std::swap(
+            useNewPriorityQueue,
+            serverConn->transportSettings.useNewPriorityQueue);
+        VLOG(3) << "USE_NEW_PRIORITY_QUEUE KnobParam received: "
+                << useNewPriorityQueue;
+        serverConn->streamManager
+            ->refreshTransportSettings(serverConn->transportSettings)
+            .onError([&](auto) {
+              LOG(ERROR) << "Refresh transport settings failed";
+              std::swap(
+                  useNewPriorityQueue,
+                  serverConn->transportSettings.useNewPriorityQueue);
+              // TODO: return unexpected instead
+              throw QuicTransportException(
+                  "Refresh transport settings failed",
+                  TransportErrorCode::INTERNAL_ERROR);
+            });
+        return folly::unit;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
