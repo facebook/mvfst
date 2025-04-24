@@ -96,6 +96,7 @@ void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL2) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL4) {
+  } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL5) {
   }
 }
 

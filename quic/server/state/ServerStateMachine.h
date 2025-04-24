@@ -169,6 +169,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
          QuicVersion::MVFST_EXPERIMENTAL2,
          QuicVersion::MVFST_EXPERIMENTAL3,
          QuicVersion::MVFST_EXPERIMENTAL4,
+         QuicVersion::MVFST_EXPERIMENTAL5,
          QuicVersion::MVFST_ALIAS,
          QuicVersion::QUIC_V1,
          QuicVersion::QUIC_V1_ALIAS,

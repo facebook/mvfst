@@ -399,6 +399,7 @@ enum class QuicVersion : uint32_t {
   MVFST_EXPERIMENTAL3 = 0xfaceb013, // Experimental alias for MVFST
   // MVFST_EXPERIMENTAL4 uses a new salt
   MVFST_EXPERIMENTAL4 = 0xfaceb014,
+  MVFST_EXPERIMENTAL5 = 0xfaceb015,
 };
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;
