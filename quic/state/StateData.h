@@ -526,8 +526,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     uint64_t sumCurWriteOffset{0};
     // The sum of length of data in all the stream buffers.
     uint64_t sumCurStreamBufferLen{0};
-    // The packet number in which we got the last largest max data.
-    OptionalIntegral<PacketNum> largestMaxOffsetReceived;
     // The following are advertised by the peer, and are set to zero initially
     // so that we cannot send any data until we know the peer values.
     // The initial max stream offset for peer-initiated bidirectional streams.
