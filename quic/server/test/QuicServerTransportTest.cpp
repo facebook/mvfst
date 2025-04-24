@@ -4051,7 +4051,16 @@ TEST_F(
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
 }
 
-TEST_F(QuicUnencryptedServerTransportTest, TestSkipAckOnlyCryptoInitial) {
+class QuicServerTransportSendAckOnlyInitialTest
+    : public QuicUnencryptedServerTransportTest,
+      public testing::WithParamInterface<bool> {};
+
+TEST_P(
+    QuicServerTransportSendAckOnlyInitialTest,
+    TestSkipAckOnlyCryptoInitial) {
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.sendAckOnlyInitial = GetParam();
+  server->setTransportSettings(transportSettings);
   // start at some random packet number that isn't zero
   clientNextInitialPacketNum = folly::Random::rand32(1, 100);
 
@@ -4061,13 +4070,10 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSkipAckOnlyCryptoInitial) {
 
   // we expect nothing to be written as we're skipping the initial ack-only
   // packet
-  EXPECT_EQ(serverWrites.size(), 0);
+  EXPECT_EQ(serverWrites.size(), (size_t)transportSettings.sendAckOnlyInitial);
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
-  auto transportSettings = server->getTransportSettings();
-  server->setTransportSettings(transportSettings);
-
   recvClientHello();
 
   EXPECT_GE(serverWrites.size(), 1);
@@ -4098,6 +4104,11 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
     }
   }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicServerTransportSendAckOnlyInitialTests,
+    QuicServerTransportSendAckOnlyInitialTest,
+    Bool());
 
 TEST_F(QuicUnencryptedServerTransportTest, TestDuplicateCryptoInitialLogging) {
   auto transportSettings = server->getTransportSettings();

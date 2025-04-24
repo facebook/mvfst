@@ -466,6 +466,8 @@ struct TransportSettings {
 
   // Use the new priority queue and scheduling implementation
   bool useNewPriorityQueue{false};
+
+  bool sendAckOnlyInitial{false};
 };
 
 } // namespace quic

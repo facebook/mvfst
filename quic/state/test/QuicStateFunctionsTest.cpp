@@ -500,24 +500,6 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsCrypto) {
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
-TEST_P(
-    UpdateAckStateTest,
-    UpdateAckSendStateOnRecvPacketsInitCryptoExperimental) {
-  // Crypto data leads to immediate ack unless init packet space.
-  QuicConnectionStateBase conn(QuicNodeType::Server);
-
-  bool isInitPktNumSpace = GetParam() == PacketNumberSpace::Initial;
-
-  auto& ackState = getAckState(conn, GetParam());
-  updateAckSendStateOnRecvPacket(
-      conn, ackState, false, true, true, isInitPktNumSpace);
-
-  EXPECT_EQ(
-      verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState),
-      !isInitPktNumSpace);
-  EXPECT_EQ(verifyToScheduleAckTimeout(conn), isInitPktNumSpace);
-}
-
 TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxLimit) {
   // Retx packets reach thresh
   QuicConnectionStateBase conn(QuicNodeType::Client);
@@ -720,6 +702,40 @@ INSTANTIATE_TEST_SUITE_P(
         PacketNumberSpace::Initial,
         PacketNumberSpace::Handshake,
         PacketNumberSpace::AppData));
+
+class UpdateAckSendStateOnRecvPacketsInitCryptoTest
+    : public TestWithParam<std::tuple<PacketNumberSpace, bool>> {};
+
+TEST_P(
+    UpdateAckSendStateOnRecvPacketsInitCryptoTest,
+    UpdateAckSendStateOnRecvPacketsInitCrypto) {
+  // Crypto data leads to immediate ack unless init packet space.
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+
+  auto pktNumSpace = std::get<0>(GetParam());
+  bool isInitPktNumSpace = pktNumSpace == PacketNumberSpace::Initial;
+  conn.transportSettings.sendAckOnlyInitial = std::get<1>(GetParam());
+  bool sendAck =
+      !isInitPktNumSpace || conn.transportSettings.sendAckOnlyInitial;
+
+  auto& ackState = getAckState(conn, pktNumSpace);
+  updateAckSendStateOnRecvPacket(
+      conn, ackState, false, true, true, isInitPktNumSpace);
+
+  EXPECT_EQ(
+      verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState), sendAck);
+  EXPECT_EQ(verifyToScheduleAckTimeout(conn), !sendAck);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    UpdateAckSendStateOnRecvPacketsInitCryptoTests,
+    UpdateAckSendStateOnRecvPacketsInitCryptoTest,
+    Combine(
+        Values(
+            PacketNumberSpace::Initial,
+            PacketNumberSpace::Handshake,
+            PacketNumberSpace::AppData),
+        Bool()));
 
 class QuicStateFunctionsTest : public TestWithParam<PacketNumberSpace> {};
 
