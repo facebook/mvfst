@@ -496,10 +496,10 @@ void QuicServerTransport::handleTransportKnobParams(
       knobParamId = TransportKnobParamId::_from_integral(param.id);
     }
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
-      try {
-        (maybeParamHandler->second)(this, param.val);
+      auto result = (maybeParamHandler->second)(this, param.val);
+      if (result.hasValue()) {
         QUIC_STATS(conn_->statsCallback, onTransportKnobApplied, knobParamId);
-      } catch (const std::exception& /* ex */) {
+      } else {
         QUIC_STATS(conn_->statsCallback, onTransportKnobError, knobParamId);
       }
     } else {
@@ -836,7 +836,18 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
           -> folly::Expected<folly::Unit, QuicError> {
         CHECK(serverTransport);
-        auto val = std::get<uint64_t>(value);
+
+        // Safely check if value is a uint64_t
+        const uint64_t* valPtr = std::get_if<uint64_t>(&value);
+        if (!valPtr) {
+          auto errMsg =
+              "Received invalid type for MAX_PACING_RATE_KNOB KnobParam: expected uint64_t";
+          VLOG(3) << errMsg;
+          return folly::makeUnexpected(
+              QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
+        }
+
+        const uint64_t val = *valPtr;
 
         auto& maxPacingRateKnobState =
             serverTransport->serverConn_->maxPacingRateKnobState;
@@ -872,7 +883,18 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
           -> folly::Expected<folly::Unit, QuicError> {
         CHECK(serverTransport);
-        auto val = std::get<std::string>(value);
+
+        // Safely check if value is a string
+        const std::string* valPtr = std::get_if<std::string>(&value);
+        if (!valPtr) {
+          auto errMsg =
+              "Received invalid type for MAX_PACING_RATE_KNOB_SEQUENCED KnobParam: expected string";
+          VLOG(3) << errMsg;
+          return folly::makeUnexpected(
+              QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
+        }
+
+        const std::string& val = *valPtr;
         std::string rateBytesPerSecStr, seqNumStr;
         if (!folly::split(',', val, rateBytesPerSecStr, seqNumStr)) {
           std::string errMsg = fmt::format(
@@ -1029,7 +1051,17 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
           -> folly::Expected<folly::Unit, QuicError> {
         CHECK(serverTransport);
-        auto val = std::get<std::string>(value);
+
+        const std::string* valPtr = std::get_if<std::string>(&value);
+        if (!valPtr) {
+          auto errMsg =
+              "Received invalid type for ACK_FREQUENCY_POLICY KnobParam: expected string";
+          VLOG(3) << errMsg;
+          return folly::makeUnexpected(
+              QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
+        }
+
+        const std::string& val = *valPtr;
         CongestionControlConfig::AckFrequencyConfig ackFrequencyConfig;
         bool parseSuccess = false;
         try {
@@ -1153,10 +1185,17 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           -> folly::Expected<folly::Unit, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<std::string>(value);
-        serverTransport->conn_->transportSettings.ccaConfig =
-            parseCongestionControlConfig(val);
-        VLOG(3) << "CC_CONFIG KnobParam received: " << val;
-        return folly::unit;
+        try {
+          serverTransport->conn_->transportSettings.ccaConfig =
+              parseCongestionControlConfig(val);
+          VLOG(3) << "CC_CONFIG KnobParam received: " << val;
+          return folly::unit;
+        } catch (const std::exception& ex) {
+          std::string errorMsg = fmt::format(
+              "Failed to parse congestion control config: {}", ex.what());
+          return folly::makeUnexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR, std::move(errorMsg)));
+        }
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
@@ -1264,7 +1303,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
+          -> folly::Expected<folly::Unit, QuicError> {
         CHECK(serverTransport);
         bool useNewPriorityQueue = static_cast<bool>(std::get<uint64_t>(value));
         auto serverConn = serverTransport->serverConn_;
@@ -1273,18 +1313,18 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             serverConn->transportSettings.useNewPriorityQueue);
         VLOG(3) << "USE_NEW_PRIORITY_QUEUE KnobParam received: "
                 << useNewPriorityQueue;
-        serverConn->streamManager
-            ->refreshTransportSettings(serverConn->transportSettings)
-            .onError([&](auto) {
-              LOG(ERROR) << "Refresh transport settings failed";
-              std::swap(
-                  useNewPriorityQueue,
-                  serverConn->transportSettings.useNewPriorityQueue);
-              // TODO: return unexpected instead
-              throw QuicTransportException(
-                  "Refresh transport settings failed",
-                  TransportErrorCode::INTERNAL_ERROR);
-            });
+        auto refreshResult =
+            serverConn->streamManager->refreshTransportSettings(
+                serverConn->transportSettings);
+        if (refreshResult.hasError()) {
+          LOG(ERROR) << "Refresh transport settings failed";
+          std::swap(
+              useNewPriorityQueue,
+              serverConn->transportSettings.useNewPriorityQueue);
+          return folly::makeUnexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              "Refresh transport settings failed"));
+        }
         return folly::unit;
       });
 }
