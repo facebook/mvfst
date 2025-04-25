@@ -15,8 +15,8 @@ namespace quic {
 
 void PacketNumberCipher::decipherHeader(
     ByteRange sample,
-    folly::MutableByteRange initialByte,
-    folly::MutableByteRange packetNumberBytes,
+    MutableByteRange initialByte,
+    MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
     uint8_t /* packetNumLengthMask */) const {
   CHECK_EQ(packetNumberBytes.size(), kMaxPacketNumEncodingSize);
@@ -32,8 +32,8 @@ void PacketNumberCipher::decipherHeader(
 
 void PacketNumberCipher::cipherHeader(
     ByteRange sample,
-    folly::MutableByteRange initialByte,
-    folly::MutableByteRange packetNumberBytes,
+    MutableByteRange initialByte,
+    MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
     uint8_t /* packetNumLengthMask */) const {
   HeaderProtectionMask headerMask = mask(sample);
@@ -48,8 +48,8 @@ void PacketNumberCipher::cipherHeader(
 
 void PacketNumberCipher::decryptLongHeader(
     ByteRange sample,
-    folly::MutableByteRange initialByte,
-    folly::MutableByteRange packetNumberBytes) const {
+    MutableByteRange initialByte,
+    MutableByteRange packetNumberBytes) const {
   decipherHeader(
       sample,
       initialByte,
@@ -60,8 +60,8 @@ void PacketNumberCipher::decryptLongHeader(
 
 void PacketNumberCipher::decryptShortHeader(
     ByteRange sample,
-    folly::MutableByteRange initialByte,
-    folly::MutableByteRange packetNumberBytes) const {
+    MutableByteRange initialByte,
+    MutableByteRange packetNumberBytes) const {
   decipherHeader(
       sample,
       initialByte,
@@ -72,8 +72,8 @@ void PacketNumberCipher::decryptShortHeader(
 
 void PacketNumberCipher::encryptLongHeader(
     ByteRange sample,
-    folly::MutableByteRange initialByte,
-    folly::MutableByteRange packetNumberBytes) const {
+    MutableByteRange initialByte,
+    MutableByteRange packetNumberBytes) const {
   cipherHeader(
       sample,
       initialByte,
@@ -84,8 +84,8 @@ void PacketNumberCipher::encryptLongHeader(
 
 void PacketNumberCipher::encryptShortHeader(
     ByteRange sample,
-    folly::MutableByteRange initialByte,
-    folly::MutableByteRange packetNumberBytes) const {
+    MutableByteRange initialByte,
+    MutableByteRange packetNumberBytes) const {
   cipherHeader(
       sample,
       initialByte,

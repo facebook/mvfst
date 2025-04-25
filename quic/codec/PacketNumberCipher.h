@@ -32,8 +32,8 @@ class PacketNumberCipher {
    */
   virtual void decryptLongHeader(
       ByteRange sample,
-      folly::MutableByteRange initialByte,
-      folly::MutableByteRange packetNumberBytes) const;
+      MutableByteRange initialByte,
+      MutableByteRange packetNumberBytes) const;
 
   /**
    * Decrypts a short header from a sample.
@@ -43,8 +43,8 @@ class PacketNumberCipher {
    */
   virtual void decryptShortHeader(
       ByteRange sample,
-      folly::MutableByteRange initialByte,
-      folly::MutableByteRange packetNumberBytes) const;
+      MutableByteRange initialByte,
+      MutableByteRange packetNumberBytes) const;
 
   /**
    * Encrypts a long header from a sample.
@@ -53,8 +53,8 @@ class PacketNumberCipher {
    */
   virtual void encryptLongHeader(
       ByteRange sample,
-      folly::MutableByteRange initialByte,
-      folly::MutableByteRange packetNumberBytes) const;
+      MutableByteRange initialByte,
+      MutableByteRange packetNumberBytes) const;
 
   /**
    * Encrypts a short header from a sample.
@@ -63,8 +63,8 @@ class PacketNumberCipher {
    */
   virtual void encryptShortHeader(
       ByteRange sample,
-      folly::MutableByteRange initialByte,
-      folly::MutableByteRange packetNumberBytes) const;
+      MutableByteRange initialByte,
+      MutableByteRange packetNumberBytes) const;
 
   /**
    * Returns the length of key needed for the pn cipher.
@@ -79,15 +79,15 @@ class PacketNumberCipher {
  protected:
   virtual void cipherHeader(
       ByteRange sample,
-      folly::MutableByteRange initialByte,
-      folly::MutableByteRange packetNumberBytes,
+      MutableByteRange initialByte,
+      MutableByteRange packetNumberBytes,
       uint8_t initialByteMask,
       uint8_t packetNumLengthMask) const;
 
   virtual void decipherHeader(
       ByteRange sample,
-      folly::MutableByteRange initialByte,
-      folly::MutableByteRange packetNumberBytes,
+      MutableByteRange initialByte,
+      MutableByteRange packetNumberBytes,
       uint8_t initialByteMask,
       uint8_t packetNumLengthMask) const;
 };

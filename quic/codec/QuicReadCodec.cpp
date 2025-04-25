@@ -216,9 +216,8 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   if (largestRecvdPacketNum) {
     expectedNextPacketNum = 1 + *largestRecvdPacketNum;
   }
-  folly::MutableByteRange initialByteRange(
-      currentPacketData->writableData(), 1);
-  folly::MutableByteRange packetNumberByteRange(
+  MutableByteRange initialByteRange(currentPacketData->writableData(), 1);
+  MutableByteRange packetNumberByteRange(
       currentPacketData->writableData() + packetNumberOffset,
       kMaxPacketNumEncodingSize);
   headerCipher->decryptLongHeader(
@@ -287,8 +286,8 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
     return CodecResult(Nothing());
   }
 
-  folly::MutableByteRange initialByteRange(data->writableData(), 1);
-  folly::MutableByteRange packetNumberByteRange(
+  MutableByteRange initialByteRange(data->writableData(), 1);
+  MutableByteRange packetNumberByteRange(
       data->writableData() + packetNumberOffset, kMaxPacketNumEncodingSize);
   ByteRange sampleByteRange(data->writableData() + sampleOffset, sample.size());
 

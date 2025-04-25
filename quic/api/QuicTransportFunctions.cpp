@@ -1528,8 +1528,8 @@ void encryptPacketHeader(
   encryptedBody += sampleBytesToUse;
   memcpy(sample.data(), encryptedBody, sample.size());
 
-  folly::MutableByteRange initialByteRange(header, 1);
-  folly::MutableByteRange packetNumByteRange(
+  MutableByteRange initialByteRange(header, 1);
+  MutableByteRange packetNumByteRange(
       header + headerLen - packetNumberLength, packetNumberLength);
   if (headerForm == HeaderForm::Short) {
     headerCipher.encryptShortHeader(
