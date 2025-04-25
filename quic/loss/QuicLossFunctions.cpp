@@ -380,6 +380,13 @@ folly::Expected<bool, QuicError> processOutstandingsForLoss(
           std::min<uint32_t>(
               conn.outstandings.numOutstanding() / 2, kMaxReorderingThreshold));
     }
+    const auto& skippedPacketNum = getAckState(conn, pnSpace).skippedPacketNum;
+    if (skippedPacketNum && skippedPacketNum.value() >= currentPacketNum &&
+        skippedPacketNum.value() <= largestAckedForComparison) {
+      // A skipped packet number is in the distance we're measuring, so
+      // we account for it in the reordering threshold.
+      reorderingThreshold += 1;
+    }
     bool lostByReorder = reorderDistance > reorderingThreshold;
 
     if (!(lostByTimeout || lostByReorder)) {

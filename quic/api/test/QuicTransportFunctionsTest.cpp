@@ -200,6 +200,8 @@ class QuicTransportFunctionsTest : public Test {
                ->setMaxLocalUnidirectionalStreams(
                    kDefaultMaxStreamsUnidirectional)
                .hasError());
+    // Do not skip packet numbers for the tests.
+    conn->transportSettings.skipOneInNPacketSequenceNumber = 0;
     return conn;
   }
 
@@ -1220,6 +1222,70 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   EXPECT_TRUE(handshakeStream->lossBuffer.empty());
 }
 
+TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
+  auto conn = createConn();
+  auto data = IOBuf::copyBuffer("totally real crypto data");
+  data->coalesce();
+
+  auto initialStream =
+      getCryptoStream(*conn->cryptoState, EncryptionLevel::Initial);
+  ASSERT_TRUE(initialStream->pendingWrites.empty());
+  ASSERT_TRUE(initialStream->retransmissionBuffer.empty());
+  ASSERT_TRUE(initialStream->lossBuffer.empty());
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
+  packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
+  initialStream->pendingWrites.append(data);
+  initialStream->writeBuffer.append(data->clone());
+  auto result1 = updateConnection(
+      *conn,
+      none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+  ASSERT_FALSE(result1.hasError());
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+  EXPECT_EQ(1, initialStream->retransmissionBuffer.size());
+
+  // Skip a packet number
+  conn->ackStates.initialAckState->skippedPacketNum =
+      conn->ackStates.initialAckState->nextPacketNum;
+  increaseNextPacketNum(*conn, PacketNumberSpace::Initial);
+
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
+  packet.packet.frames.push_back(
+      WriteCryptoFrame(data->length(), data->length()));
+  packet.packet.frames.push_back(
+      WriteCryptoFrame(data->length() * 2, data->length()));
+  initialStream->pendingWrites.append(data);
+  initialStream->writeBuffer.append(data->clone());
+  initialStream->pendingWrites.append(data);
+  initialStream->writeBuffer.append(data->clone());
+  auto result2 = updateConnection(
+      *conn,
+      none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+  ASSERT_FALSE(result2.hasError());
+  EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(2, conn->outstandings.packets.size());
+  EXPECT_EQ(3, initialStream->retransmissionBuffer.size());
+  EXPECT_TRUE(initialStream->pendingWrites.empty());
+  EXPECT_TRUE(initialStream->lossBuffer.empty());
+
+  implicitAckCryptoStream(*conn, EncryptionLevel::Initial);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(0, conn->outstandings.packets.size());
+  EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
+  EXPECT_TRUE(initialStream->pendingWrites.empty());
+  EXPECT_TRUE(initialStream->lossBuffer.empty());
+}
+
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
@@ -1759,6 +1825,56 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   EXPECT_EQ(event->frames.size(), 1);
   auto frame = static_cast<MaxDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->maximumData, conn->flowControlState.advertisedMaxOffset);
+}
+
+TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("12345"), false)
+          .hasError());
+
+  // Packet with CryptoFrame in AppData pn space
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData, true);
+
+  WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
+  packet.packet.frames.push_back(std::move(writeStreamFrame));
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
+  ASSERT_FALSE(conn->ackStates.appDataAckState.skippedPacketNum.has_value());
+
+  // Force-skip a packet number
+  conn->transportSettings.skipOneInNPacketSequenceNumber = 1;
+
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("67890"), true)
+          .hasError());
+  WriteStreamFrame writeStreamFrame2(stream->id, 0, 5, false);
+  packet.packet.frames.push_back(std::move(writeStreamFrame2));
+  auto sentPacketNumber = conn->ackStates.appDataAckState.nextPacketNum;
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   none,
+                   packet.packet,
+                   TimePoint(),
+                   getEncodedSize(packet),
+                   getEncodedBodySize(packet),
+                   false /* isDSRPacket */)
+                   .hasError());
+
+  ASSERT_TRUE(conn->ackStates.appDataAckState.skippedPacketNum.has_value());
+  EXPECT_EQ(
+      conn->ackStates.appDataAckState.skippedPacketNum.value(),
+      sentPacketNumber + 1);
+  EXPECT_EQ(
+      conn->ackStates.appDataAckState.nextPacketNum, sentPacketNumber + 2);
 }
 
 TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {

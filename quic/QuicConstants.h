@@ -794,4 +794,8 @@ constexpr uint8_t kDefaultReceiveTimestampsExponent = 3;
 constexpr uint8_t kEcnECT1 = 0b01;
 constexpr uint8_t kEcnECT0 = 0b10;
 constexpr uint8_t kEcnCE = 0b11;
+
+// Config for randomly skipping one in N packet sequence numbers
+constexpr uint16_t kSkipOneInNPacketSequenceNumber = 1000;
+constexpr uint16_t kDistanceToClearSkippedPacketNumber = 1000;
 } // namespace quic

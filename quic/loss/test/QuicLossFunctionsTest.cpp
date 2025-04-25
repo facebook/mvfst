@@ -860,6 +860,58 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
   EXPECT_EQ(packetNum, 6);
 }
 
+TEST_F(QuicLossFunctionsTest, TestReorderingThresholdWithSkippedPacket) {
+  std::vector<PacketNum> lostPacket;
+  auto conn = createConn();
+
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
+      .WillRepeatedly(Return());
+
+  auto testingLossMarkFunc = [&lostPacket](auto& /*conn*/, auto& packet, bool) {
+    auto packetNum = packet.header.getPacketSequenceNum();
+    lostPacket.push_back(packetNum);
+    return folly::unit;
+  };
+
+  // Send 7 packets, with numbers 1,2,3,4,6,7,8
+  // Packet sequence number 5 is skipped
+  for (int i = 1; i <= 7; i++) {
+    if (i == 5) {
+      conn->ackStates.handshakeAckState->skippedPacketNum =
+          conn->ackStates.handshakeAckState->nextPacketNum;
+      increaseNextPacketNum(*conn, PacketNumberSpace::Handshake);
+    }
+    sendPacket(*conn, Clock::now(), none, PacketType::Handshake);
+  }
+
+  EXPECT_EQ(7, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
+  // Ack for packet 8 arrives
+  auto& ackState = getAckState(*conn, PacketNumberSpace::Handshake);
+  ackState.largestAckedByPeer =
+      ackState.largestNonDsrSequenceNumberAckedByPeer = 8;
+  auto lossResult = detectLossPackets(
+      *conn,
+      ackState,
+      testingLossMarkFunc,
+      TimePoint(90ms),
+      PacketNumberSpace::Handshake);
+  ASSERT_FALSE(lossResult.hasError());
+  auto& lossEvent = lossResult.value();
+  EXPECT_EQ(3, lossEvent->largestLostPacketNum.value());
+  EXPECT_EQ(TimePoint(90ms), lossEvent->lossTime);
+  // Packets 1,2,3 should be marked as loss
+  EXPECT_EQ(lostPacket.size(), 3);
+  EXPECT_EQ(lostPacket.front(), 1);
+  EXPECT_EQ(lostPacket.back(), 3);
+  // The reorder threshold is 3. Packet 4 would have been marked lost by reorder
+  // (8-3 > 4), but there is a skipped packet number in between (5), so the
+  // threshold is adjusted to 4 and that means Packet 4 does not exceed the
+  // reorder threshold anymore
+}
+
 TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   auto conn = createConn();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Server);

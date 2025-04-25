@@ -2131,9 +2131,10 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
 TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
+  auto pnSpace = GetParam().pnSpace;
   conn.congestionController = nullptr;
   WriteStreamFrame frame(0, 0, 0, true);
-  auto packetNum1 = conn.ackStates.appDataAckState.nextPacketNum;
+  auto packetNum1 = getAckState(conn, pnSpace).nextPacketNum++;
   auto regularPacket1 = createNewPacket(packetNum1, GetParam().pnSpace);
   regularPacket1.frames.push_back(frame);
   OutstandingPacketWrapper outstandingPacket1(
@@ -2149,8 +2150,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   outstandingPacket1.maybeClonedPacketIdentifier.emplace(
       GetParam().pnSpace, packetNum1);
 
-  conn.ackStates.appDataAckState.nextPacketNum++;
-  auto packetNum2 = conn.ackStates.appDataAckState.nextPacketNum;
+  auto packetNum2 = getAckState(conn, pnSpace).nextPacketNum++;
   auto regularPacket2 = createNewPacket(packetNum2, GetParam().pnSpace);
   regularPacket2.frames.push_back(frame);
   OutstandingPacketWrapper outstandingPacket2(
@@ -7456,6 +7456,145 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
                             s1f3.offset, s1f3.offset + s1f3.len - 1)
                         .build()))));
   }
+}
+
+TEST_P(AckHandlersTest, SkippedPacketAckedProtocolViolation) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto pnSpace = GetParam().pnSpace;
+  conn.congestionController = nullptr;
+  WriteStreamFrame frame(0, 0, 0, true);
+  auto packetNum1 = getAckState(conn, pnSpace).nextPacketNum++;
+  auto regularPacket1 = createNewPacket(packetNum1, GetParam().pnSpace);
+  regularPacket1.frames.push_back(frame);
+  OutstandingPacketWrapper outstandingPacket1(
+      std::move(regularPacket1),
+      Clock::now(),
+      1,
+      0,
+      1,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  outstandingPacket1.maybeClonedPacketIdentifier.emplace(
+      GetParam().pnSpace, packetNum1);
+
+  // Skip a packet number
+  getAckState(conn, pnSpace).skippedPacketNum =
+      getAckState(conn, pnSpace).nextPacketNum++;
+
+  auto packetNum2 = getAckState(conn, pnSpace).nextPacketNum++;
+  auto regularPacket2 = createNewPacket(packetNum2, GetParam().pnSpace);
+  regularPacket2.frames.push_back(frame);
+  OutstandingPacketWrapper outstandingPacket2(
+      std::move(regularPacket2),
+      Clock::now(),
+      1,
+      0,
+      1,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+
+  conn.outstandings
+      .packetCount[outstandingPacket1.packet.header.getPacketNumberSpace()]++;
+  conn.outstandings
+      .packetCount[outstandingPacket2.packet.header.getPacketNumberSpace()]++;
+  conn.outstandings.packets.push_back(std::move(outstandingPacket1));
+  conn.outstandings.packets.push_back(std::move(outstandingPacket2));
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = packetNum2;
+  ackFrame.ackBlocks.emplace_back(packetNum1, packetNum2);
+
+  auto result = processAckFrame(
+      conn,
+      GetParam().pnSpace,
+      ackFrame,
+      [](auto&) { return folly::unit; },
+      [](auto&, auto&) { return folly::unit; },
+      [&](auto&, auto&, bool) { return folly::unit; },
+      Clock::now());
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::PROTOCOL_VIOLATION);
+}
+
+TEST_P(AckHandlersTest, FuturePacketAckedProtocolViolation) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto pnSpace = GetParam().pnSpace;
+  conn.congestionController = nullptr;
+
+  auto packetNum1 = getAckState(conn, pnSpace).nextPacketNum;
+  auto packetNum2 = packetNum1 + 100;
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = packetNum2;
+  ackFrame.ackBlocks.emplace_back(packetNum1, packetNum2);
+
+  auto result = processAckFrame(
+      conn,
+      GetParam().pnSpace,
+      ackFrame,
+      [](auto&) { return folly::unit; },
+      [](auto&, auto&) { return folly::unit; },
+      [&](auto&, auto&, bool) { return folly::unit; },
+      Clock::now());
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::PROTOCOL_VIOLATION);
+}
+
+TEST_P(AckHandlersTest, SkippedPacketNumberClearedAfterDistance) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto pnSpace = GetParam().pnSpace;
+  conn.congestionController = nullptr;
+  WriteStreamFrame frame(0, 0, 0, true);
+
+  // Skip a packet number
+  getAckState(conn, pnSpace).skippedPacketNum =
+      getAckState(conn, pnSpace).nextPacketNum++;
+
+  getAckState(conn, pnSpace).nextPacketNum =
+      getAckState(conn, pnSpace).nextPacketNum +
+      kDistanceToClearSkippedPacketNumber;
+
+  auto packetNum1 = getAckState(conn, pnSpace).nextPacketNum++;
+  auto regularPacket1 = createNewPacket(packetNum1, GetParam().pnSpace);
+  regularPacket1.frames.push_back(frame);
+  OutstandingPacketWrapper outstandingPacket1(
+      std::move(regularPacket1),
+      Clock::now(),
+      1,
+      0,
+      1,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+
+  conn.outstandings
+      .packetCount[outstandingPacket1.packet.header.getPacketNumberSpace()]++;
+  conn.outstandings.packets.push_back(std::move(outstandingPacket1));
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = packetNum1;
+  ackFrame.ackBlocks.emplace_back(packetNum1, packetNum1);
+
+  auto result = processAckFrame(
+      conn,
+      GetParam().pnSpace,
+      ackFrame,
+      [](auto&) { return folly::unit; },
+      [](auto&, auto&) { return folly::unit; },
+      [&](auto&, auto&, bool) { return folly::unit; },
+      Clock::now());
+  ASSERT_FALSE(result.hasError());
+  // Acking a genuine packet at sufficient distance from the skipped packet
+  // should clear the skippedPacketNumber.
+  ASSERT_FALSE(getAckState(conn, pnSpace).skippedPacketNum.has_value());
 }
 
 INSTANTIATE_TEST_SUITE_P(

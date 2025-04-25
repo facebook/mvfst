@@ -468,6 +468,9 @@ struct TransportSettings {
   bool useNewPriorityQueue{false};
 
   bool sendAckOnlyInitial{false};
+
+  // Randomly skip one in N sequence numbers when sending packets.
+  uint16_t skipOneInNPacketSequenceNumber{kSkipOneInNPacketSequenceNumber};
 };
 
 } // namespace quic

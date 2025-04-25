@@ -3554,19 +3554,6 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
-  // This will clear out all the outstanding packets
-  AckBlocks sentPackets;
-  for (auto& packet : client->getNonConstConn().outstandings.packets) {
-    auto packetNum = packet.packet.header.getPacketSequenceNum();
-    sentPackets.insert(packetNum);
-  }
-  auto ackPacket = packetToBuf(createAckPacket(
-      client->getNonConstConn(),
-      ++appDataPacketNum,
-      sentPackets,
-      PacketNumberSpace::AppData));
-  deliverData(ackPacket->coalesce());
-
   // Clear out all the outstanding packets to simulate quiescent state.
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
   client->getNonConstConn().outstandings.reset();

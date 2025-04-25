@@ -67,7 +67,6 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
     const TimePoint& ackReceiveTime) {
   updateEcnCountEchoed(conn, pnSpace, frame);
 
-  // TODO: send error if we get an ack for a packet we've not sent t18721184
   auto ack = AckEvent::Builder()
                  .setAckTime(ackReceiveTime)
                  .setAdjustedAckTime(ackReceiveTime - frame.ackDelay)
@@ -78,6 +77,34 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
                  .setEcnCounts(
                      frame.ecnECT0Count, frame.ecnECT1Count, frame.ecnCECount)
                  .build();
+
+  if (frame.largestAcked >= getAckState(conn, pnSpace).nextPacketNum) {
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::PROTOCOL_VIOLATION, "Future packet number acked"));
+  }
+
+  // Verify that a skipped packet number is not acked
+  auto& skippedPacketNum = getAckState(conn, pnSpace).skippedPacketNum;
+  if (skippedPacketNum.has_value()) {
+    if (std::find_if(
+            frame.ackBlocks.begin(),
+            frame.ackBlocks.end(),
+            [skippedPacketNum](auto& block) {
+              return block.startPacket <= skippedPacketNum.value() &&
+                  block.endPacket >= skippedPacketNum.value();
+            }) != frame.ackBlocks.end()) {
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::PROTOCOL_VIOLATION,
+          "Skipped packet number acked"));
+    } else if (
+        !frame.ackBlocks.empty() &&
+        frame.ackBlocks.back().startPacket >
+            skippedPacketNum.value() + kDistanceToClearSkippedPacketNumber) {
+      // The skipped packet number is far enough in the past, we can stop
+      // checking it, or potentially skip another number.
+      skippedPacketNum = folly::none;
+    }
+  }
 
   FOLLY_SDT(
       quic,

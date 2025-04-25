@@ -900,9 +900,15 @@ folly::Expected<folly::Unit, QuicError> updateConnection(
   // This increments the next packet number and (potentially) the next non-DSR
   // packet sequence number. Capture the non DSR sequence number before
   // increment.
-  auto nonDsrPacketSequenceNumber =
-      getAckState(conn, packetNumberSpace).nonDsrPacketSequenceNumber;
+  auto& ackState = getAckState(conn, packetNumberSpace);
+  auto nonDsrPacketSequenceNumber = ackState.nonDsrPacketSequenceNumber;
   increaseNextPacketNum(conn, packetNumberSpace, isDSRPacket);
+  if (!ackState.skippedPacketNum.has_value() &&
+      folly::Random::oneIn(
+          conn.transportSettings.skipOneInNPacketSequenceNumber)) {
+    ackState.skippedPacketNum = ackState.nextPacketNum;
+    increaseNextPacketNum(conn, packetNumberSpace, isDSRPacket);
+  }
   conn.lossState.largestSent =
       std::max(conn.lossState.largestSent.value_or(packetNum), packetNum);
   // updateConnection may be called multiple times during write. If before or
@@ -2056,8 +2062,17 @@ void implicitAckCryptoStream(
   // If some of these have already been ACK'd then processAckFrame
   // should simply ignore them.
   implicitAck.largestAcked = ackBlocks.back().end;
-  implicitAck.ackBlocks.emplace_back(
-      ackBlocks.front().start, implicitAck.largestAcked);
+  if (ackState.skippedPacketNum &&
+      *ackState.skippedPacketNum > ackBlocks.front().start &&
+      *ackState.skippedPacketNum < implicitAck.largestAcked) {
+    implicitAck.ackBlocks.emplace_back(
+        *ackState.skippedPacketNum + 1, implicitAck.largestAcked);
+    implicitAck.ackBlocks.emplace_back(
+        ackBlocks.front().start, *ackState.skippedPacketNum - 1);
+  } else {
+    implicitAck.ackBlocks.emplace_back(
+        ackBlocks.front().start, implicitAck.largestAcked);
+  }
   auto result = processAckFrame(
       conn,
       packetNumSpace,
@@ -2095,7 +2110,7 @@ void implicitAckCryptoStream(
       },
       implicitAckTime);
   // TODO handle error
-  CHECK(result.hasValue());
+  CHECK(result.hasValue()) << result.error().message;
   // Clear our the loss buffer explicitly. The implicit ACK itself will not
   // remove data already in the loss buffer.
   auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
