@@ -27,7 +27,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":optional",
-        "//folly:function",
         "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic/common/events:eventbase",

@@ -7,7 +7,8 @@
 
 #pragma once
 
-#include <folly/Function.h>
+#include <functional>
+
 #include <folly/GLog.h>
 #include <chrono>
 #include <cstdint>

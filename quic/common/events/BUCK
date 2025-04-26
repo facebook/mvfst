@@ -9,7 +9,6 @@ mvfst_cpp_library(
         "QuicEventBase.h",
     ],
     exported_deps = [
-        "//folly:function",
         "//folly:glog",
     ],
 )

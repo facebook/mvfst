@@ -8,7 +8,6 @@
 #pragma once
 #include <ostream>
 
-#include <folly/Function.h>
 #include <folly/io/async/DelayedDestruction.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/Optional.h>

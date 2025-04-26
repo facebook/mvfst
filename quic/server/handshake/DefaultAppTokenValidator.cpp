@@ -15,7 +15,6 @@
 #include <quic/server/state/ServerStateMachine.h>
 
 #include <fizz/server/ResumptionState.h>
-#include <folly/Function.h>
 #include <folly/IPAddress.h>
 #include <quic/common/Optional.h>
 

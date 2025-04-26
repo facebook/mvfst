@@ -9,7 +9,6 @@
 
 #include <fizz/server/State.h>
 
-#include <folly/Function.h>
 #include <folly/io/IOBuf.h>
 #include <quic/common/Optional.h>
 

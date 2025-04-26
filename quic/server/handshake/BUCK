@@ -76,7 +76,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//fizz/server:protocol",
-        "//folly:function",
         "//folly/io:iobuf",
         "//quic/common:optional",
     ],
