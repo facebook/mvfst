@@ -19,7 +19,7 @@ class QuicEventBaseMock : public QuicEventBase {
   }
 
   MOCK_METHOD((void), runInLoopWithCbPtr, (QuicEventBaseLoopCallback*, bool));
-  MOCK_METHOD((void), runInLoop, (folly::Function<void()>, bool));
+  MOCK_METHOD((void), runInLoop, (std::function<void()>, bool));
   MOCK_METHOD((void), runAfterDelay, (std::function<void()>, uint32_t));
   MOCK_METHOD(
       (void),

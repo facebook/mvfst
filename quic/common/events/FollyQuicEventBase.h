@@ -31,8 +31,7 @@ class FollyQuicEventBase : public QuicEventBase {
       QuicEventBaseLoopCallback* callback,
       bool thisIteration = false) override;
 
-  void runInLoop(folly::Function<void()> cb, bool thisIteration = false)
-      override;
+  void runInLoop(std::function<void()> cb, bool thisIteration = false) override;
 
   void runAfterDelay(std::function<void()> cb, uint32_t milliseconds) override;
 

@@ -57,7 +57,7 @@ LibevQuicEventBase::~LibevQuicEventBase() {
 }
 
 void LibevQuicEventBase::runInLoop(
-    folly::Function<void()> cb,
+    std::function<void()> cb,
     bool thisIteration) {
   CHECK(isInEventBaseThread());
   auto wrapper = new FunctionLoopCallback(std::move(cb));

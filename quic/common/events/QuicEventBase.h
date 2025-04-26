@@ -113,7 +113,7 @@ class QuicEventBase {
       bool thisIteration = false) = 0;
 
   virtual void runInLoop(
-      folly::Function<void()> cb,
+      std::function<void()> cb,
       bool thisIteration = false) = 0;
 
   virtual void runAfterDelay(

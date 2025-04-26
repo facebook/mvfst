@@ -224,7 +224,7 @@ class QuicServerTransport
         : eventBase_(eventBase) {}
 
     void add(folly::Func f) override {
-      eventBase_->runInLoop(std::move(f));
+      eventBase_->runInLoop(std::move(f).asStdFunction());
     }
 
    private:

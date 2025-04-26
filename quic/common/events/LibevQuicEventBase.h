@@ -57,8 +57,7 @@ class LibevQuicEventBase
       QuicEventBaseLoopCallback* callback,
       bool thisIteration = false) override;
 
-  void runInLoop(folly::Function<void()> cb, bool thisIteration = false)
-      override;
+  void runInLoop(std::function<void()> cb, bool thisIteration = false) override;
 
   bool isInEventBaseThread() const override;
 
@@ -298,7 +297,7 @@ class LibevQuicEventBase
 
   class FunctionLoopCallback : public quic::QuicEventBaseLoopCallback {
    public:
-    explicit FunctionLoopCallback(folly::Function<void()>&& func)
+    explicit FunctionLoopCallback(std::function<void()>&& func)
         : func_(std::move(func)) {}
 
     void runLoopCallback() noexcept override {
@@ -309,7 +308,7 @@ class LibevQuicEventBase
     friend class LibevQuicEventBase;
 
    private:
-    folly::Function<void()> func_;
+    std::function<void()> func_;
     folly::IntrusiveListHook listHook_;
   };
 

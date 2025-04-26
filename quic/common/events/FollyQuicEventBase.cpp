@@ -27,7 +27,7 @@ void FollyQuicEventBase::runInLoop(
 }
 
 void FollyQuicEventBase::runInLoop(
-    folly::Function<void()> cb,
+    std::function<void()> cb,
     bool thisIteration) {
   return backingEvb_->runInLoop(std::move(cb), thisIteration);
 }
