@@ -239,16 +239,7 @@ struct OutstandingPacket {
 };
 
 struct OutstandingPacketWrapper : OutstandingPacket {
-  /**
-   * --NOTE--:
-   * std::function's move constructor behaves differently from folly::Function.
-   * An std::function that's been moved from can still return true via operator
-   * bool() for some implementations.
-   *
-   * From the cppref docs: "other is in a valid but unspecified state"
-   * https://en.cppreference.com/w/cpp/utility/functional/function/function
-   */
-  folly::Function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn_{
+  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn_{
       nullptr};
 
   OutstandingPacketWrapper(
@@ -262,7 +253,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       uint64_t writeCount,
       Metadata::DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecs = 0us,
-      folly::Function<void(const quic::OutstandingPacketWrapper&)>
+      std::function<void(const quic::OutstandingPacketWrapper&)>
           packetDestroyFn = nullptr)
       : OutstandingPacket(
             std::move(packetIn),
@@ -281,7 +272,10 @@ struct OutstandingPacketWrapper : OutstandingPacket {
   OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
 
   // TODO: bring noexcept back after retiring gcc 9: T202935929
-  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs) = default;
+  OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs)
+      : OutstandingPacket(std::move(rhs)) {
+    packetDestroyFn_ = std::exchange(rhs.packetDestroyFn_, nullptr);
+  }
 
   OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
     // If this->packetDestroyFn_ is populated, then this OutstandingPacket is
@@ -291,7 +285,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       packetDestroyFn_(*this);
     }
 
-    packetDestroyFn_ = std::move(rhs.packetDestroyFn_);
+    packetDestroyFn_ = std::exchange(rhs.packetDestroyFn_, nullptr);
     OutstandingPacket::operator=(std::move(rhs));
     return *this;
   }
