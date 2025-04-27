@@ -63,7 +63,7 @@ If on Linux or MacOS (with homebrew installed) you can install system dependenci
 
 If you'd like to see the packages before installing them:
 
-    ./build/fbcode_builder/getdeps.py install-system-deps --dry-run --recursive
+    ./build/fbcode_builder/getdeps.py install-system-deps --dry-run --recursive mvfst
 
 On other platforms or if on Linux and without system dependencies `getdeps.py` will mostly download and build them for you during the build step.
 
