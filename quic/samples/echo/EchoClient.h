@@ -104,6 +104,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
     // resetStream
+    handleError(std::move(error));
   }
 
   void readErrorWithGroup(
@@ -112,6 +113,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       QuicError error) noexcept override {
     LOG(ERROR) << "EchoClient failed read from stream=" << streamId
                << ", groupId=" << groupId << ", error=" << toString(error);
+    handleError(std::move(error));
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
@@ -167,19 +169,19 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   void onConnectionError(QuicError error) noexcept override {
     LOG(ERROR) << "EchoClient error: " << toString(error.code)
                << "; errStr=" << error.message;
-    startDone_.post();
+    handleError(std::move(error));
   }
 
   void onTransportReady() noexcept override {
     if (!connectOnly_) {
-      startDone_.post();
+      connectionBaton_.post();
     }
   }
 
   void onReplaySafe() noexcept override {
     if (connectOnly_) {
       VLOG(3) << "Connected successfully";
-      startDone_.post();
+      connectionBaton_.post();
     }
   }
 
@@ -194,6 +196,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       override {
     LOG(ERROR) << "EchoClient write error with stream=" << id
                << " error=" << toString(error);
+    handleError(std::move(error));
   }
 
   void onDatagramsAvailable() noexcept override {
@@ -210,7 +213,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     }
   }
 
-  void start(std::string token) {
+  void handleError(QuicError error) noexcept {
+    connectionError_ = std::move(error);
+    quicClient_->closeNow(std::move(error));
+    connectionBaton_.post();
+  }
+
+  folly::Expected<folly::Unit, QuicError> start(std::string token) {
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
     auto qEvb = std::make_shared<FollyQuicEventBase>(evb);
@@ -253,13 +262,17 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       quicClient_->start(this, this);
     });
 
-    startDone_.wait();
+    connectionBaton_.wait();
+    connectionBaton_.reset();
+
+    if (connectionError_.has_value()) {
+      return folly::makeUnexpected(connectionError_.value());
+    }
 
     if (connectOnly_) {
       evb->runInEventBaseThreadAndWait(
           [this] { quicClient_->closeNow(folly::none); });
-
-      return;
+      return folly::unit;
     }
 
     std::string message;
@@ -301,20 +314,30 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       sendMessage(*streamId, pendingOutput_[*streamId]);
     };
 
-    // loop until Ctrl+D
-    while (!closed && std::getline(std::cin, message)) {
-      if (message.empty()) {
-        continue;
-      }
-      evb->runInEventBaseThreadAndWait([=, this] {
-        if (enableStreamGroups_) {
-          sendMessageInStreamGroup();
-        } else {
-          sendMessageInStream();
+    std::thread input_thread([&]() {
+      // loop until Ctrl+D
+      while (!closed && std::getline(std::cin, message)) {
+        if (message.empty()) {
+          continue;
         }
-      });
-    }
+        evb->runInEventBaseThreadAndWait([=, this] {
+          if (enableStreamGroups_) {
+            sendMessageInStreamGroup();
+          } else {
+            sendMessageInStream();
+          }
+        });
+      };
+    });
+    input_thread.detach();
+
+    connectionBaton_.wait();
+
     LOG(INFO) << "EchoClient stopping client";
+
+    return connectionError_.has_value()
+        ? folly::makeUnexpected(connectionError_.value())
+        : folly::Expected<folly::Unit, QuicError>(folly::unit);
   }
 
   ~EchoClient() override = default;
@@ -378,7 +401,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;
-  folly::fibers::Baton startDone_;
+  folly::fibers::Baton connectionBaton_;
+  std::optional<QuicError> connectionError_;
   std::array<StreamGroupId, kNumTestStreamGroups> streamGroups_;
   size_t curGroupIdIdx_{0};
   std::vector<std::string> alpns_;

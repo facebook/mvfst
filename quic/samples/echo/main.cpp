@@ -93,7 +93,8 @@ int main(int argc, char* argv[]) {
         FLAGS_connect_only,
         FLAGS_client_cert_path,
         FLAGS_client_key_path);
-    client.start(FLAGS_token);
+    auto res = client.start(FLAGS_token);
+    return res.hasError() ? EXIT_FAILURE : EXIT_SUCCESS;
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
     return -1;
