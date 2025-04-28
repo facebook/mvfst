@@ -760,15 +760,16 @@ TEST_P(QuicStreamManagerTest, RemoveResetsUponClosure) {
   ASSERT_TRUE(streamResult.hasValue());
   auto* stream = streamResult.value();
 
+  auto streamId = stream->id;
   conn.pendingEvents.resets.emplace(
-      stream->id,
-      RstStreamFrame(stream->id, GenericApplicationErrorCode::NO_ERROR, 0));
+      streamId,
+      RstStreamFrame(streamId, GenericApplicationErrorCode::NO_ERROR, 0));
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
 
-  EXPECT_TRUE(conn.pendingEvents.resets.contains(stream->id));
-  ASSERT_FALSE(manager.removeClosedStream(stream->id).hasError());
-  EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
+  EXPECT_TRUE(conn.pendingEvents.resets.contains(streamId));
+  ASSERT_FALSE(manager.removeClosedStream(streamId).hasError());
+  EXPECT_FALSE(conn.pendingEvents.resets.contains(streamId));
 }
 
 BufPtr createBuffer(uint32_t len) {
