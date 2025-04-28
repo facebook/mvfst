@@ -13,6 +13,23 @@ constexpr size_t kDestroyIndexThreshold = 50;
 } // namespace
 
 namespace quic {
+
+/*implicit*/ HTTPPriorityQueue::Priority::Priority(
+    const PriorityQueue::Priority& basePriority)
+    : PriorityQueue::Priority(basePriority) {
+  if (!isInitialized()) {
+    getFields() = kDefaultPriority;
+  }
+}
+
+HTTPPriorityQueue::Priority::Priority(uint8_t u, bool i, OrderId o) {
+  auto& fields = getFields();
+  fields.urgency = u;
+  fields.incremental = i;
+  fields.order = (i ? 0 : o);
+  fields.paused = false;
+}
+
 PriorityQueue::PriorityLogFields HTTPPriorityQueue::toLogFields(
     const PriorityQueue::Priority& pri) const {
   // This is defined by the QLOG schema

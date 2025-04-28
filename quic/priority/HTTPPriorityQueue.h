@@ -41,20 +41,9 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     // TODO: change default priority to (3, false, false, 0) to match spec
     static constexpr HTTPPriority kDefaultPriority{3, false, true, 0};
 
-    /*implicit*/ Priority(const PriorityQueue::Priority& basePriority)
-        : PriorityQueue::Priority(basePriority) {
-      if (!isInitialized()) {
-        getFields() = kDefaultPriority;
-      }
-    }
+    /*implicit*/ Priority(const PriorityQueue::Priority& basePriority);
 
-    Priority(uint8_t u, bool i, OrderId o = 0) {
-      auto& fields = getFields();
-      fields.urgency = u;
-      fields.incremental = i;
-      fields.order = (i ? 0 : o);
-      fields.paused = false;
-    }
+    Priority(uint8_t u, bool i, OrderId o = 0);
 
     enum Paused { PAUSED };
 
@@ -66,7 +55,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     Priority& operator=(const Priority&) = default;
     Priority(Priority&&) = default;
     Priority& operator=(Priority&&) = default;
-    ~Priority() override = default;
+    ~Priority() = default;
 
     const HTTPPriority* operator->() const {
       return &getFields();
@@ -94,7 +83,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
 
     [[nodiscard]] uint64_t toUint64() const {
-      auto& fields = getFields();
+      const auto& fields = getFields();
       return (
           (uint64_t(fields.urgency) << 61) | (uint64_t(fields.paused) << 60) |
           (uint64_t(fields.incremental) << 59) | fields.order);
