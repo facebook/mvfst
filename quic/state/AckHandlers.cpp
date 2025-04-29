@@ -234,7 +234,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
   }
 
   // Store any (new) Rx timestamps reported by the peer.
-  folly::F14FastMap<PacketNum, uint64_t> packetReceiveTimeStamps;
+  UnorderedMap<PacketNum, uint64_t> packetReceiveTimeStamps;
   if (pnSpace == PacketNumberSpace::AppData) {
     parseAckReceiveTimestamps(
         conn, frame, packetReceiveTimeStamps, firstPacketNum);
@@ -482,7 +482,7 @@ void clearOldOutstandingPackets(
 void parseAckReceiveTimestamps(
     const QuicConnectionStateBase& conn,
     const quic::ReadAckFrame& frame,
-    folly::F14FastMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
+    UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
     Optional<PacketNum> firstPacketNum) {
   // Ignore if we didn't request packet receive timestamps from the peer.
   if (!conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer

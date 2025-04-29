@@ -7,12 +7,13 @@
 
 #pragma once
 
-#include <folly/container/F14Map.h>
-#include <folly/container/F14Set.h>
+#include <quic/mvfst-config.h>
+
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallCollections.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
+#include <quic/mvfst-config.h>
 #include <quic/priority/PriorityQueue.h>
 
 namespace quic {
@@ -136,7 +137,7 @@ struct QuicStreamLike {
   // are currently un-acked. Each one represents one StreamFrame that was
   // written. We need to buffer these because these might be retransmitted in
   // the future. These are associated with the starting offset of the buffer.
-  folly::F14FastMap<uint64_t, std::unique_ptr<WriteStreamBuffer>>
+  UnorderedMap<uint64_t, std::unique_ptr<WriteStreamBuffer>>
       retransmissionBuffer;
 
   // Tracks intervals which we have received ACKs for. E.g. in the case of all
@@ -312,7 +313,7 @@ struct QuicStreamLike {
   }
 
   void removeFromRetransmissionBufStartingAtOffset(uint64_t startingOffset) {
-    folly::F14FastSet<uint64_t> offsetsToRemove;
+    UnorderedSet<uint64_t> offsetsToRemove;
 
     for (auto& [offset, buf] : retransmissionBuffer) {
       if (offset >= startingOffset) {
@@ -613,7 +614,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   void removeFromRetransmissionBufMetasStartingAtOffset(
       uint64_t startingOffset) {
-    folly::F14FastSet<uint64_t> offsetsToRemove;
+    UnorderedSet<uint64_t> offsetsToRemove;
 
     for (auto& [offset, buf] : retransmissionBufMetas) {
       if (offset >= startingOffset) {
@@ -672,7 +673,7 @@ struct QuicStreamState : public QuicStreamLike {
   WriteBufferMeta writeBufMeta;
 
   // A map to store sent WriteBufferMetas for potential retransmission.
-  folly::F14FastMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
+  UnorderedMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
 
   // WriteBufferMetas that's already marked lost. They will be retransmitted.
   CircularDeque<WriteBufferMeta> lossBufMetas;

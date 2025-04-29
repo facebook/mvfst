@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/container/F14Map.h>
-#include <folly/container/F14Set.h>
+#include <quic/mvfst-config.h>
+
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/priority/PriorityQueue.h>
@@ -894,38 +894,38 @@ class QuicStreamManager {
   StreamIdSet openBidirectionalLocalStreamGroups_;
   StreamIdSet openUnidirectionalLocalStreamGroups_;
 
-  folly::F14FastMap<StreamId, QuicStreamState> streams_;
+  UnorderedMap<StreamId, QuicStreamState> streams_;
 
   std::vector<StreamId> newPeerStreams_;
   std::vector<StreamId> newGroupedPeerStreams_;
-  folly::F14FastSet<StreamGroupId> newPeerStreamGroups_;
+  UnorderedSet<StreamGroupId> newPeerStreamGroups_;
   StreamIdSet peerUnidirectionalStreamGroupsSeen_;
   StreamIdSet peerBidirectionalStreamGroupsSeen_;
 
-  folly::F14FastMap<StreamId, StreamDataBlockedFrame> blockedStreams_;
-  folly::F14FastMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
-  folly::F14FastSet<StreamId> windowUpdates_;
-  folly::F14FastSet<StreamId> flowControlUpdated_;
+  UnorderedMap<StreamId, StreamDataBlockedFrame> blockedStreams_;
+  UnorderedMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
+  UnorderedSet<StreamId> windowUpdates_;
+  UnorderedSet<StreamId> flowControlUpdated_;
 
   // Streams that were removed from the write queue because they are blocked
   // on connection flow control.
-  folly::F14FastSet<StreamId> connFlowControlBlocked_;
+  UnorderedSet<StreamId> connFlowControlBlocked_;
 
   // Streams that have bytes in loss buffer
-  folly::F14FastSet<StreamId> lossStreams_;
-  folly::F14FastSet<StreamId> lossDSRStreams_;
-  folly::F14FastSet<StreamId> readableStreams_;
-  folly::F14FastSet<StreamId> unidirectionalReadableStreams_;
-  folly::F14FastSet<StreamId> peekableStreams_;
+  UnorderedSet<StreamId> lossStreams_;
+  UnorderedSet<StreamId> lossDSRStreams_;
+  UnorderedSet<StreamId> readableStreams_;
+  UnorderedSet<StreamId> unidirectionalReadableStreams_;
+  UnorderedSet<StreamId> peekableStreams_;
 
   std::unique_ptr<PriorityQueue> writeQueue_;
   std::unique_ptr<deprecated::PriorityQueue> oldWriteQueue_;
   std::set<StreamId> controlWriteQueue_;
-  folly::F14FastSet<StreamId> writableStreams_;
-  folly::F14FastSet<StreamId> writableDSRStreams_;
-  folly::F14FastSet<StreamId> txStreams_;
-  folly::F14FastSet<StreamId> deliverableStreams_;
-  folly::F14FastSet<StreamId> closedStreams_;
+  UnorderedSet<StreamId> writableStreams_;
+  UnorderedSet<StreamId> writableDSRStreams_;
+  UnorderedSet<StreamId> txStreams_;
+  UnorderedSet<StreamId> deliverableStreams_;
+  UnorderedSet<StreamId> closedStreams_;
 
   bool isAppIdle_{false};
   const TransportSettings* FOLLY_NONNULL transportSettings_;

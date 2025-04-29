@@ -27,7 +27,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":priority_queue",
-        "//folly/container:f14_hash",
+        "//quic:config",
         "//quic/common:optional",
     ],
 )
@@ -43,6 +43,6 @@ mvfst_cpp_library(
     exported_deps = [
         ":priority_queue",
         ":round_robin",
-        "//folly/container:f14_hash",
+        "//quic:config",
     ],
 )

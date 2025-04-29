@@ -178,11 +178,11 @@ mvfst_cpp_test(
     deps = [
         ":mocks",
         "//folly:move_wrapper",
-        "//folly/container:f14_hash",
         "//folly/futures:core",
         "//folly/io/async/test:mocks",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
+        "//quic:config",
         "//quic/api:stream_async_transport",
         "//quic/client:client",
         "//quic/common/events:folly_eventbase",

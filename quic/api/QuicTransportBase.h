@@ -225,9 +225,10 @@ class QuicTransportBase : public QuicSocket,
       std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept
       override;
 
-  [[nodiscard]] const folly::
-      F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>&
-      getStreamGroupRetransmissionPolicies() const {
+  [[nodiscard]] const UnorderedMap<
+      StreamGroupId,
+      QuicStreamGroupRetransmissionPolicy>&
+  getStreamGroupRetransmissionPolicies() const {
     return conn_->retransmissionPolicies;
   }
 

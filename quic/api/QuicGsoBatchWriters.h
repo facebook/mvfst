@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <quic/mvfst-config.h>
+
 #include <quic/api/QuicBatchWriter.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 
@@ -131,7 +133,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
     int idx_ = -1;
   };
 
-  folly::F14FastMap<folly::SocketAddress, Index> addrMap_;
+  UnorderedMap<folly::SocketAddress, Index> addrMap_;
 };
 
 class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
@@ -183,7 +185,7 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
   // have a size of 1000, whereas the third has a size of 1200.
   // The first two would have the same index, with GSO enabled, while the third
   // would have a different index, with GSO disabled.
-  folly::F14FastMap<folly::SocketAddress, uint32_t> addrToMostRecentIndex_;
+  UnorderedMap<folly::SocketAddress, uint32_t> addrToMostRecentIndex_;
 };
 
 } // namespace quic

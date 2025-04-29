@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <folly/container/F14Map.h>
-#include <glog/logging.h>
 #include <set>
 
+#include <glog/logging.h>
 #include <quic/codec/Types.h>
+#include <quic/mvfst-config.h>
 
 namespace quic::deprecated {
 
@@ -181,7 +181,7 @@ struct PriorityQueue {
     }
 
    private:
-    folly::F14FastMap<StreamId, OrderId> streamToOrderId;
+    UnorderedMap<StreamId, OrderId> streamToOrderId;
   };
 
   std::vector<Level> levels;
@@ -310,7 +310,7 @@ struct PriorityQueue {
   }
 
  private:
-  folly::F14FastMap<StreamId, uint8_t> writableStreamsToLevel_;
+  UnorderedMap<StreamId, uint8_t> writableStreamsToLevel_;
   using WSIterator = decltype(writableStreamsToLevel_)::iterator;
 
   void eraseFromLevel(uint8_t levelIndex, StreamId id) {

@@ -68,14 +68,14 @@ void commonAckVisitorForAckFrame(
     const WriteAckFrame& frame);
 
 /**
- * Parse Receive timestamps from ACK frame into a folly::F14FastMap of packet
+ * Parse Receive timestamps from ACK frame into a UnorderedMap of packet
  * number to timestamps and return the latest received packet with timestamp if
  * any.
  */
 void parseAckReceiveTimestamps(
     const QuicConnectionStateBase& conn,
     const quic::ReadAckFrame& frame,
-    folly::F14FastMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
+    UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
     Optional<PacketNum> firstPacketNum);
 
 /**

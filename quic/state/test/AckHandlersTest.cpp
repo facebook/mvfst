@@ -14,6 +14,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
+#include <quic/mvfst-config.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/OutstandingPacket.h>
@@ -101,11 +102,11 @@ auto getAckPacketMatcher(
 
 auto testAckEventReceiveTimestampsAll(
     const AckEvent& ackEvent,
-    const folly::F14FastMap<PacketNum, uint64_t>& expectedReceiveTimestamps) {
+    const UnorderedMap<PacketNum, uint64_t>& expectedReceiveTimestamps) {
   // Lambda function to create a map from ackedPackets
   auto createReceiveTimestampsMap =
       [](const std::vector<AckEvent::AckPacket>& ackedPackets) {
-        folly::F14FastMap<PacketNum, uint64_t> receiveTimestampsMap;
+        UnorderedMap<PacketNum, uint64_t> receiveTimestampsMap;
         for (const auto& packet : ackedPackets) {
           if (packet.receiveRelativeTimeStampUsec.has_value()) {
             receiveTimestampsMap.emplace(
@@ -136,7 +137,7 @@ auto getNumAckReceiveTimestamps(const AckEvent& ackEvent) {
 // given timestamp range for later matching.
 uint64_t buildExpectedReceiveTimestamps(
     const RecvdPacketsTimestampsRange& timestampsRange,
-    folly::F14FastMap<PacketNum, uint64_t>& expectedReceiveTimestamps,
+    UnorderedMap<PacketNum, uint64_t>& expectedReceiveTimestamps,
     quic::PacketNum latestReceivedUdpPacketWithAddedGap,
     uint64_t lastReceiveTimestamp,
     uint64_t maxTimestamps) {
@@ -2756,7 +2757,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestamps) {
   ackFrame.ackDelay = 5ms;
   const auto ackTime = startTime + 10ms + ackFrame.ackDelay;
 
-  folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+  UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
         AckReceiveTimestampsConfig{
@@ -2821,7 +2822,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsGaps) {
   ackFrame.ackBlocks.emplace_back(4, 6);
   ackFrame.ackBlocks.emplace_back(0, 1);
   ackFrame.ackDelay = 5ms;
-  folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+  UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
 
   const auto ackTime = startTime + 10ms + ackFrame.ackDelay;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
@@ -2920,7 +2921,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
   auto ackTime = startTime + 10ms + ackFrame.ackDelay;
 
   // Build the expected received timestamps map.
-  folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+  UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
         AckReceiveTimestampsConfig{
@@ -3005,7 +3006,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
   // send 10 packets
   emplacePackets(conn, 10, startTime, GetParam().pnSpace);
   // Build the expected received timestamps map.
-  folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+  UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   {
     ReadAckFrame ackFrame;
     ackFrame.frameType = GetParam().frameType;
@@ -3090,7 +3091,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
           4);
     }
 
-    folly::F14FastMap<PacketNum, uint64_t> receivedTimestamps;
+    UnorderedMap<PacketNum, uint64_t> receivedTimestamps;
     parseAckReceiveTimestamps(conn, ackFrame2, receivedTimestamps, 6);
     // Ack Event will not have the old packets anyway so to unit-test
     // duplicate  detection, we will directly call parseAckReceiveTimestamps
@@ -3119,7 +3120,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
   // send 10 packets
   emplacePackets(conn, 10, startTime, GetParam().pnSpace);
   // Build the expected received timestamps map.
-  folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+  UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
 
   {
     // First send an ACK for (6-9) and not (0-5) with 6-9 timestamps. This is
@@ -3260,7 +3261,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsMaxCheck) {
   ackFrame.ackDelay = 5ms;
   const auto ackTime = startTime + 10ms + ackFrame.ackDelay;
   // Build the expected received timestamps map for all ACK frame types.
-  folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+  UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     // Set max requested receive timestamps to 5 and send more than that.
     conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
@@ -3348,7 +3349,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsInvalidCases) {
       ackFrame.maybeLatestRecvdPacketTime = 100ms;
     }
 
-    folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+    UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
 
     parseAckReceiveTimestamps(
         conn, ackFrame, expectedReceiveTimestamps, firstPacketNum);
@@ -3372,7 +3373,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsInvalidCases) {
       ackFrame.recvdPacketsTimestampRanges = {recvdPacketsTimestampsRange1};
     }
 
-    folly::F14FastMap<PacketNum, uint64_t> expectedReceiveTimestamps;
+    UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
     parseAckReceiveTimestamps(
         conn, ackFrame, expectedReceiveTimestamps, firstPacketNum);
     // No packets should be stored.

@@ -21,6 +21,7 @@
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/mvfst-config.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/test/Mocks.h>
@@ -194,7 +195,7 @@ class QuicStreamAsyncTransportTest : public Test {
   NiceMock<MockConnectionSetupCallback> serverConnectionSetupCB_;
   NiceMock<MockConnectionCallback> serverConnectionCB_;
   std::shared_ptr<quic::QuicSocket> serverSocket_;
-  folly::F14FastMap<quic::StreamId, std::unique_ptr<Stream>> streams_;
+  UnorderedMap<quic::StreamId, std::unique_ptr<Stream>> streams_;
 
   std::shared_ptr<QuicClientTransport> client_;
   folly::EventBase clientEvb_;

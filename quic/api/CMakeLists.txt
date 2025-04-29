@@ -28,6 +28,7 @@ add_dependencies(
   mvfst_batch_writer
   mvfst_async_udp_socket
   mvfst_events
+  mvfst_config
   mvfst_constants
   mvfst_state_machine
 )

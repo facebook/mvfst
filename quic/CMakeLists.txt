@@ -3,6 +3,16 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+set(MVFST_OSS_CONFIG_INPUT_FILE "${PROJECT_SOURCE_DIR}/quic/mvfst-oss-config.h")
+set(MVFST_OSS_CONFIG_OUTPUT_FILE "${PROJECT_SOURCE_DIR}/quic/mvfst-config.h")
+
+add_custom_target(mvfst_config
+  ${CMAKE_COMMAND} -E copy ${MVFST_OSS_CONFIG_INPUT_FILE}
+                                            ${MVFST_OSS_CONFIG_OUTPUT_FILE}
+)
+
+install(FILES mvfst-config.h DESTINATION include/quic/)
+
 add_library(
   mvfst_constants
   QuicConstants.cpp

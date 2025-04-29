@@ -7,7 +7,8 @@
 
 #pragma once
 
-#include <folly/container/F14Map.h>
+#include <quic/mvfst-config.h>
+
 #include <quic/priority/PriorityQueue.h>
 #include <quic/priority/RoundRobin.h>
 
@@ -23,8 +24,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     uint64_t index : 63;
   };
 
-  using IndexMap =
-      folly::F14ValueMap<Identifier, IndexMapElem, Identifier::hash>;
+  using IndexMap = ValueMap<Identifier, IndexMapElem, Identifier::hash>;
 
  public:
   class Priority : public quic::PriorityQueue::Priority {

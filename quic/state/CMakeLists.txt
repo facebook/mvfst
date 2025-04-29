@@ -37,6 +37,7 @@ add_dependencies(
   mvfst_codec_types
   mvfst_dsr_sender
   mvfst_handshake
+  mvfst_config
 )
 
 target_link_libraries(

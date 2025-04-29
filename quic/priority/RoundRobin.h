@@ -7,7 +7,8 @@
 
 #pragma once
 
-#include <folly/container/F14Map.h>
+#include <quic/mvfst-config.h>
+
 #include <quic/common/Optional.h>
 #include <quic/priority/PriorityQueue.h>
 #include <list>
@@ -37,7 +38,7 @@ class RoundRobin {
 
   ListType list_;
   ListType::iterator nextIt_{list_.end()};
-  folly::F14ValueMap<
+  ValueMap<
       PriorityQueue::Identifier,
       ListType::iterator,
       PriorityQueue::Identifier::hash>

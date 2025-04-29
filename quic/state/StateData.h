@@ -51,7 +51,7 @@ struct OutstandingsInfo {
   // All PacketEvents of this connection. If a OutstandingPacketWrapper doesn't
   // have an maybeClonedPacketIdentifier or if it's not in this set, there is no
   // need to process its frames upon ack or loss.
-  folly::F14FastSet<ClonedPacketIdentifier, ClonedPacketIdentifierHash>
+  UnorderedSet<ClonedPacketIdentifier, ClonedPacketIdentifierHash>
       clonedPacketIdentifiers;
 
   // Number of outstanding packets not including cloned
@@ -271,7 +271,7 @@ struct RstStreamEvent {
   ApplicationErrorCode errorCode;
 };
 
-using Resets = folly::F14FastMap<StreamId, RstStreamFrame>;
+using Resets = UnorderedMap<StreamId, RstStreamFrame>;
 
 using FrameList = std::vector<QuicSimpleFrame>;
 
@@ -713,7 +713,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   ExtendedAckFeatureMaskType negotiatedExtendedAckFeatures{0};
 
   // Retransmission policies map.
-  folly::F14FastMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
+  UnorderedMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
       retransmissionPolicies;
 
   struct SocketCmsgsState {

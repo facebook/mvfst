@@ -813,8 +813,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   DatagramCallback* datagramCallback_{nullptr};
 
-  folly::F14FastMap<StreamId, ReadCallbackData> readCallbacks_;
-  folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
+  UnorderedMap<StreamId, ReadCallbackData> readCallbacks_;
+  UnorderedMap<StreamId, PeekCallbackData> peekCallbacks_;
 
   ConnectionWriteCallback* connWriteCallback_{nullptr};
   std::map<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
@@ -827,7 +827,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     ByteEventCallback* callback;
   };
 
-  using ByteEventMap = folly::F14FastMap<StreamId, std::deque<ByteEventDetail>>;
+  using ByteEventMap = UnorderedMap<StreamId, std::deque<ByteEventDetail>>;
   ByteEventMap& getByteEventMap(const ByteEvent::Type type);
   [[nodiscard]] const ByteEventMap& getByteEventMapConst(
       const ByteEvent::Type type) const;
