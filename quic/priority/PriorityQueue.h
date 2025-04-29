@@ -133,14 +133,14 @@ class PriorityQueue {
 
     template <typename T>
     T& getPriority() {
-      static_assert(std::is_pod<T>::value, "T must be trivially copyable");
+      static_assert(std::is_pod<T>::value, "T must be pod");
       static_assert(sizeof(T) <= sizeof(StorageType), "T must fit in storage_");
       return *reinterpret_cast<T*>(storage_.data());
     }
 
     template <typename T>
     const T& getPriority() const {
-      static_assert(std::is_pod<T>::value, "T must be trivially copyable");
+      static_assert(std::is_pod<T>::value, "T must be a pod");
       static_assert(sizeof(T) <= sizeof(StorageType), "T must fit in storage_");
       return *reinterpret_cast<const T*>(storage_.data());
     }
@@ -151,7 +151,7 @@ class PriorityQueue {
       0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
       0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     // clang-format on
-    StorageType storage_;
+    alignas(sizeof(StorageType)) StorageType storage_;
   };
 
   virtual ~PriorityQueue() = default;
