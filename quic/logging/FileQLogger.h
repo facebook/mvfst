@@ -144,7 +144,7 @@ class FileQLogger : public BaseQLogger {
 
   std::string path_;
   std::string basePadding_ = "  ";
-  std::string eventsPadding_ = "";
+  std::string eventsPadding_;
   std::string eventLine_;
   std::string token_;
   std::string endLine_;
