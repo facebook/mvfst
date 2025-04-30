@@ -29,6 +29,7 @@ target_include_directories(
 add_dependencies(
   mvfst_dsr_types
   mvfst_codec_types
+  mvfst_config
 )
 
 target_link_libraries(
