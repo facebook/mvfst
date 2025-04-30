@@ -64,23 +64,26 @@ quic::CongestionControlConfig parseCongestionControlConfig(
   quic::CongestionControlConfig ccaConfig;
 
   // Parse known boolean fields
-  const std::array<std::pair<std::string_view, bool&>, 15> boolFields = {
-      {{"conservativeRecovery", ccaConfig.conservativeRecovery},
-       {"largeProbeRttCwnd", ccaConfig.largeProbeRttCwnd},
-       {"enableAckAggregationInStartup",
-        ccaConfig.enableAckAggregationInStartup},
-       {"probeRttDisabledIfAppLimited", ccaConfig.probeRttDisabledIfAppLimited},
-       {"drainToTarget", ccaConfig.drainToTarget},
-       {"additiveIncreaseAfterHystart", ccaConfig.additiveIncreaseAfterHystart},
-       {"onlyGrowCwndWhenLimited", ccaConfig.onlyGrowCwndWhenLimited},
-       {"leaveHeadroomForCwndLimited", ccaConfig.leaveHeadroomForCwndLimited},
-       {"ignoreInflightHi", ccaConfig.ignoreInflightHi},
-       {"ignoreLoss", ccaConfig.ignoreLoss},
-       {"enableRecoveryInStartup", ccaConfig.enableRecoveryInStartup},
-       {"enableRecoveryInProbeStates", ccaConfig.enableRecoveryInProbeStates},
-       {"exitStartupOnLoss", ccaConfig.exitStartupOnLoss},
-       {"enableRenoCoexistence", ccaConfig.enableRenoCoexistence},
-       {"paceInitCwnd", ccaConfig.paceInitCwnd}}};
+  const std::array<std::pair<std::string_view, bool&>, 17> boolFields = {{
+      {"conservativeRecovery", ccaConfig.conservativeRecovery},
+      {"largeProbeRttCwnd", ccaConfig.largeProbeRttCwnd},
+      {"enableAckAggregationInStartup",
+       ccaConfig.enableAckAggregationInStartup},
+      {"probeRttDisabledIfAppLimited", ccaConfig.probeRttDisabledIfAppLimited},
+      {"drainToTarget", ccaConfig.drainToTarget},
+      {"additiveIncreaseAfterHystart", ccaConfig.additiveIncreaseAfterHystart},
+      {"onlyGrowCwndWhenLimited", ccaConfig.onlyGrowCwndWhenLimited},
+      {"leaveHeadroomForCwndLimited", ccaConfig.leaveHeadroomForCwndLimited},
+      {"ignoreInflightHi", ccaConfig.ignoreInflightLongTerm},
+      {"ignoreLoss", ccaConfig.ignoreShortTerm},
+      {"enableRecoveryInStartup", ccaConfig.enableRecoveryInStartup},
+      {"enableRecoveryInProbeStates", ccaConfig.enableRecoveryInProbeStates},
+      {"exitStartupOnLoss", ccaConfig.exitStartupOnLoss},
+      {"enableRenoCoexistence", ccaConfig.enableRenoCoexistence},
+      {"paceInitCwnd", ccaConfig.paceInitCwnd},
+      {"ignoreInflightLongTerm", ccaConfig.ignoreInflightLongTerm},
+      {"ignoreShortTerm", ccaConfig.ignoreShortTerm},
+  }};
 
   for (const auto& [name, field] : boolFields) {
     if (auto val = ccaConfigDyn.get_ptr(name)) {
