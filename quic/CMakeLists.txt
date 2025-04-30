@@ -11,6 +11,16 @@ add_custom_target(mvfst_config_file_copy
                                             ${MVFST_OSS_CONFIG_OUTPUT_FILE}
 )
 
+add_custom_target(mvfst_config_file_copy2
+  ${CMAKE_COMMAND} -E copy ${MVFST_OSS_CONFIG_OUTPUT_FILE}
+                                            include/quic/
+)
+
+add_dependencies(
+  mvfst_config_file_copy2
+  mvfst_config_file_copy
+)
+
 add_library(mvfst_config INTERFACE)
 
 add_dependencies(
