@@ -25,6 +25,8 @@ target_include_directories(
   INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/mvfst-config.h
 )
 
+install(FILES mvfst-config.h DESTINATION include/quic/)
+
 add_library(
   mvfst_constants
   QuicConstants.cpp
