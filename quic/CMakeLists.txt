@@ -6,12 +6,24 @@
 set(MVFST_OSS_CONFIG_INPUT_FILE "${PROJECT_SOURCE_DIR}/quic/mvfst-oss-config.h")
 set(MVFST_OSS_CONFIG_OUTPUT_FILE "${PROJECT_SOURCE_DIR}/quic/mvfst-config.h")
 
-add_custom_target(mvfst_config
+add_custom_target(mvfst_config_file_copy
   ${CMAKE_COMMAND} -E copy ${MVFST_OSS_CONFIG_INPUT_FILE}
                                             ${MVFST_OSS_CONFIG_OUTPUT_FILE}
 )
 
-install(FILES mvfst-config.h DESTINATION include/quic/)
+add_library(mvfst_config INTERFACE)
+
+add_dependencies(
+  mvfst_config
+  mvfst_config_file_copy
+)
+
+set_property(TARGET mvfst_config PROPERTY VERSION ${PACKAGE_VERSION})
+
+target_include_directories(
+  mvfst_config
+  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/mvfst-config.h
+)
 
 add_library(
   mvfst_constants
