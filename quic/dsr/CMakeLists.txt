@@ -28,7 +28,6 @@ target_include_directories(
 
 add_dependencies(
   mvfst_dsr_types
-  mvfst_config
   mvfst_codec_types
 )
 
