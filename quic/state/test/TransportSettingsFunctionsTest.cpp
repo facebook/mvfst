@@ -64,8 +64,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"minRttDivisor\": 77, "
       "\"useSmallThresholdDuringStartup\": true"
       "},"
-      "\"ignoreInflightHi\": true, "
-      "\"ignoreLoss\": true, "
+      "\"ignoreInflightLongTerm\": true, "
+      "\"ignoreShortTerm\": true, "
       "\"exitStartupOnLoss\": false, "
       "\"enableRecoveryInStartup\": false, "
       "\"enableRecoveryInProbeStates\": false, "
@@ -85,8 +85,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.additiveIncreaseAfterHystart, true);
   EXPECT_EQ(config.onlyGrowCwndWhenLimited, true);
   EXPECT_EQ(config.leaveHeadroomForCwndLimited, true);
-  EXPECT_EQ(config.ignoreInflightHi, true);
-  EXPECT_EQ(config.ignoreLoss, true);
+  EXPECT_EQ(config.ignoreInflightLongTerm, true);
+  EXPECT_EQ(config.ignoreShortTerm, true);
   EXPECT_EQ(config.exitStartupOnLoss, false);
   EXPECT_EQ(config.enableRecoveryInStartup, false);
   EXPECT_EQ(config.enableRecoveryInProbeStates, false);
@@ -118,8 +118,8 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.enableAckAggregationInStartup, false);
   EXPECT_EQ(config.probeRttDisabledIfAppLimited, false);
   EXPECT_EQ(config.drainToTarget, false);
-  EXPECT_EQ(config.ignoreInflightHi, false);
-  EXPECT_EQ(config.ignoreLoss, false);
+  EXPECT_EQ(config.ignoreInflightLongTerm, false);
+  EXPECT_EQ(config.ignoreShortTerm, false);
   EXPECT_EQ(config.exitStartupOnLoss, true);
   EXPECT_EQ(config.enableRecoveryInStartup, true);
   EXPECT_EQ(config.enableRecoveryInProbeStates, true);
@@ -180,6 +180,30 @@ TEST_F(TransportSettingsFunctionsTest, IgnoreUnknownFields) {
       "}";
   auto config = parseCongestionControlConfig(testString);
   EXPECT_EQ(config.conservativeRecovery, true);
+}
+
+TEST_F(TransportSettingsFunctionsTest, OldAliases) {
+  std::string testString =
+      "{"
+      "\"ignoreInflightHi\": true, "
+      "\"ignoreLoss\": true"
+      "}";
+  auto config = parseCongestionControlConfig(testString);
+  EXPECT_EQ(config.ignoreInflightLongTerm, true);
+  EXPECT_EQ(config.ignoreShortTerm, true);
+}
+
+TEST_F(TransportSettingsFunctionsTest, NewAliasTakesPrecendence) {
+  std::string testString =
+      "{"
+      "\"ignoreInflightLongTerm\": false,"
+      "\"ignoreShortTerm\": false,"
+      "\"ignoreInflightHi\": true, "
+      "\"ignoreLoss\": true"
+      "}";
+  auto config = parseCongestionControlConfig(testString);
+  EXPECT_EQ(config.ignoreInflightLongTerm, false);
+  EXPECT_EQ(config.ignoreShortTerm, false);
 }
 
 } // namespace quic::test

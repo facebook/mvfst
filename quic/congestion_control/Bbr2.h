@@ -60,13 +60,13 @@ class Bbr2CongestionController : public CongestionController {
 
  private:
   void resetCongestionSignals();
-  void resetLowerBounds();
+  void resetShortTermModel();
   void updateLatestDeliverySignals();
   void updateCongestionSignals(const LossEvent* FOLLY_NULLABLE lossEvent);
   void updateAckAggregation();
   void advanceLatestDeliverySignals();
   void boundBwForModel();
-  void adaptUpperBounds();
+  void adaptLongTermModel();
 
   void startRound();
   void updateRound();
@@ -109,8 +109,8 @@ class Bbr2CongestionController : public CongestionController {
   bool checkInflightTooHigh();
   bool isInflightTooHigh();
   void handleInFlightTooHigh();
-  void raiseInflightHiSlope();
-  void probeInflightHiUpward();
+  void raiseInflightLongTermSlope();
+  void probeInflightLongTermUpward();
 
   void updatePacingAndCwndGain();
 
@@ -144,7 +144,7 @@ class Bbr2CongestionController : public CongestionController {
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>
       maxBwFilter_;
   Bandwidth bandwidth_;
-  Optional<Bandwidth> bandwidthLo_;
+  Optional<Bandwidth> bandwidthShortTerm_;
   uint64_t cycleCount_{0}; // TODO: this can be one bit
 
   // Data Volume Model Parameters
@@ -158,7 +158,7 @@ class Bbr2CongestionController : public CongestionController {
   bool probeRttExpired_{false};
 
   uint64_t sendQuantum_{64 * 1024};
-  Optional<uint64_t> inflightLo_, inflightHi_;
+  Optional<uint64_t> inflightShortTerm_, inflightLongTerm_;
   Optional<TimePoint> extraAckedStartTimestamp_;
   uint64_t extraAckedDelivered_{0};
   WindowedFilter<uint64_t, MaxFilter<uint64_t>, uint64_t, uint64_t>

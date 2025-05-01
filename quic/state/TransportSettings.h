@@ -69,12 +69,13 @@ struct CongestionControlConfig {
   Optional<AckFrequencyConfig> ackFrequencyConfig;
 
   // Used by: BBR2
-  // Whether BBR2 should not use inflightHi when settings its cwnd.
-  bool ignoreInflightHi{false};
+  // Whether BBR2 should ignore inflightLongTerm when setting its cwnd.
+  bool ignoreInflightLongTerm{false};
 
   // Used by: BBR2
-  // Whether BBR2 should ignore packet loss (i.e. act more like BBR1)
-  bool ignoreLoss{false};
+  // Whether BBR2 should ignore its short term model
+  // (inflight/bandwidth ShortTerm).
+  bool ignoreShortTerm{false};
 
   // Used by: BBR2
   // Whether BBR2 should check packet loss to exit startup
@@ -118,8 +119,8 @@ struct CongestionControlConfig {
   float l4sCETarget{0.0f};
 
   // Used by: BBR2
-  // If 0.5 <= values <= 1.0, use this value to scale down bandwidthLo in the
-  // short-term model. Otherwise, use the default kBeta
+  // If 0.5 <= values <= 1.0, use this value to scale down bandwidthShortTerm in
+  // the short-term model. Otherwise, use the default kBeta
   float overrideBwShortBeta{0.0f};
 };
 

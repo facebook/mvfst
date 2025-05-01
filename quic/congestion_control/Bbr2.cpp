@@ -54,7 +54,7 @@ Bbr2CongestionController::Bbr2CongestionController(
           conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss) {
   resetCongestionSignals();
   resetFullBw();
-  resetLowerBounds();
+  resetShortTermModel();
   // If we explicitly don't want to pace the init cwnd, reset the pacing rate.
   // Otherwise, leave it to the pacer's initial state.
   if (!conn_.transportSettings.ccaConfig.paceInitCwnd) {
@@ -110,13 +110,13 @@ void Bbr2CongestionController::onPacketAckOrLoss(
           kCongestionPacketAck,
           bbr2StateToString(state_));
       conn_.qLogger->addNetworkPathModelUpdate(
-          inflightHi_.value_or(0),
-          inflightLo_.value_or(0),
+          inflightLongTerm_.value_or(0),
+          inflightShortTerm_.value_or(0),
           0, // bandwidthHi_ no longer available.
           std::chrono::microseconds(1), // bandwidthHi_ no longer available.
-          bandwidthLo_.has_value() ? bandwidthLo_->units : 0,
-          bandwidthLo_.has_value() ? bandwidthLo_->interval
-                                   : std::chrono::microseconds(1));
+          bandwidthShortTerm_.has_value() ? bandwidthShortTerm_->units : 0,
+          bandwidthShortTerm_.has_value() ? bandwidthShortTerm_->interval
+                                          : std::chrono::microseconds(1));
     }
   };
   if (ackEvent) {
@@ -309,9 +309,9 @@ void Bbr2CongestionController::resetCongestionSignals() {
   inflightLatest_ = 0;
 }
 
-void Bbr2CongestionController::resetLowerBounds() {
-  bandwidthLo_.reset();
-  inflightLo_.reset();
+void Bbr2CongestionController::resetShortTermModel() {
+  bandwidthShortTerm_.reset();
+  inflightShortTerm_.reset();
 }
 
 void Bbr2CongestionController::enterStartup() {
@@ -393,17 +393,17 @@ void Bbr2CongestionController::setCwnd() {
 
   // BBRBoundCwndForModel()
   auto cap = std::numeric_limits<uint64_t>::max();
-  if (inflightHi_.has_value() &&
-      !conn_.transportSettings.ccaConfig.ignoreInflightHi) {
+  if (inflightLongTerm_.has_value() &&
+      !conn_.transportSettings.ccaConfig.ignoreInflightLongTerm) {
     if (isProbeBwState(state_) && state_ != State::ProbeBw_Cruise) {
-      cap = *inflightHi_;
+      cap = *inflightLongTerm_;
     } else if (state_ == State::ProbeRTT || state_ == State::ProbeBw_Cruise) {
       cap = getTargetInflightWithHeadroom();
     }
   }
-  if (inflightLo_.has_value() &&
-      !conn_.transportSettings.ccaConfig.ignoreLoss) {
-    cap = std::min(cap, *inflightLo_);
+  if (inflightShortTerm_.has_value() &&
+      !conn_.transportSettings.ccaConfig.ignoreShortTerm) {
+    cap = std::min(cap, *inflightShortTerm_);
   }
   cwndBytes_ = std::min(cwndBytes_, cap);
 
@@ -431,7 +431,7 @@ void Bbr2CongestionController::restoreCwnd() {
 }
 
 void Bbr2CongestionController::exitProbeRtt() {
-  resetLowerBounds();
+  resetShortTermModel();
   if (fullBwReached_) {
     startProbeBwDown();
     startProbeBwCruise();
@@ -497,11 +497,11 @@ void Bbr2CongestionController::updateCongestionSignals(
   }
   if (lossBytesInRound_ > 0 && !isProbingBandwidth(state_)) {
     // InitLowerBounds
-    if (!bandwidthLo_.has_value()) {
-      bandwidthLo_ = maxBwFilter_.GetBest();
+    if (!bandwidthShortTerm_.has_value()) {
+      bandwidthShortTerm_ = maxBwFilter_.GetBest();
     }
-    if (!inflightLo_.has_value()) {
-      inflightLo_ = cwndBytes_;
+    if (!inflightShortTerm_.has_value()) {
+      inflightShortTerm_ = cwndBytes_;
     }
 
     // LossLowerBounds
@@ -510,9 +510,10 @@ void Bbr2CongestionController::updateCongestionSignals(
          conn_.transportSettings.ccaConfig.overrideBwShortBeta > 1.0)
         ? kBeta
         : conn_.transportSettings.ccaConfig.overrideBwShortBeta;
-    bandwidthLo_ = std::max(bandwidthLatest_, *bandwidthLo_ * bwLoBeta);
-    inflightLo_ =
-        std::max(inflightLatest_, static_cast<uint64_t>(*inflightLo_ * kBeta));
+    bandwidthShortTerm_ =
+        std::max(bandwidthLatest_, *bandwidthShortTerm_ * bwLoBeta);
+    inflightShortTerm_ = std::max(
+        inflightLatest_, static_cast<uint64_t>(*inflightShortTerm_ * kBeta));
   }
 
   lossBytesInRound_ = 0;
@@ -567,7 +568,7 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   }
   if (lossPctInLastRound_ > kLossThreshold && lossEventsInLastRound_ >= 6) {
     fullBwReached_ = true;
-    inflightHi_ = std::max(getBDPWithGain(), inflightLatest_);
+    inflightLongTerm_ = std::max(getBDPWithGain(), inflightLatest_);
   }
 }
 
@@ -617,7 +618,7 @@ void Bbr2CongestionController::updateProbeBwCyclePhase() {
   if (!fullBwReached_) {
     return; /* only handling steady-state behavior here */
   }
-  adaptUpperBounds();
+  adaptLongTermModel();
   if (!isProbeBwState(state_)) {
     return; /* only handling ProbeBW states here: */
   }
@@ -657,22 +658,22 @@ void Bbr2CongestionController::updateProbeBwCyclePhase() {
   }
 }
 
-void Bbr2CongestionController::adaptUpperBounds() {
-  /* Update BBR.inflight_hi and BBR.bw_hi. */
+void Bbr2CongestionController::adaptLongTermModel() {
+  /* Update BBR.inflight_longterm */
 
   if (!checkInflightTooHigh()) {
-    if (!inflightHi_.has_value()) {
+    if (!inflightLongTerm_.has_value()) {
       // No loss has occurred yet so these values are not set and do not need to
       // be raised.
       return;
     }
     /* There is loss but it's at safe levels. The limits are populated so we
      * update them */
-    if (inflightBytesAtLastAckedPacket_ > *inflightHi_) {
-      inflightHi_ = inflightBytesAtLastAckedPacket_;
+    if (inflightBytesAtLastAckedPacket_ > *inflightLongTerm_) {
+      inflightLongTerm_ = inflightBytesAtLastAckedPacket_;
     }
     if (state_ == State::ProbeBw_Up) {
-      probeInflightHiUpward();
+      probeInflightLongTermUpward();
     }
   }
 }
@@ -697,8 +698,8 @@ bool Bbr2CongestionController::checkTimeToCruise() {
 }
 
 bool Bbr2CongestionController::checkTimeToGoDown() {
-  if (cwndLimitedInRound_ && inflightHi_.has_value() &&
-      getTargetInflightWithGain(1.25) >= inflightHi_.value()) {
+  if (cwndLimitedInRound_ && inflightLongTerm_.has_value() &&
+      getTargetInflightWithGain(1.25) >= inflightLongTerm_.value()) {
     resetFullBw();
     fullBw_ = maxBwFilter_.GetBest();
   } else if (fullBwNow_) {
@@ -734,7 +735,7 @@ bool Bbr2CongestionController::isInflightTooHigh() {
 void Bbr2CongestionController::handleInFlightTooHigh() {
   canUpdateLongtermLossModel_ = false;
   if (!lastAckedPacketAppLimited_) {
-    inflightHi_ = std::max(
+    inflightLongTerm_ = std::max(
         inflightBytesAtLastAckedPacket_,
         static_cast<uint64_t>(
             static_cast<float>(getTargetInflightWithGain()) * kBeta));
@@ -749,31 +750,31 @@ uint64_t Bbr2CongestionController::getTargetInflightWithHeadroom() const {
    * headroom in the bottleneck buffer or link for
    * other flows, for fairness convergence and lower
    * RTTs and loss */
-  if (!inflightHi_.has_value()) {
+  if (!inflightLongTerm_.has_value()) {
     return std::numeric_limits<uint64_t>::max();
   } else {
-    auto headroom = static_cast<uint64_t>(
-        std::max(1.0f, kHeadroomFactor * static_cast<float>(*inflightHi_)));
+    auto headroom = static_cast<uint64_t>(std::max(
+        1.0f, kHeadroomFactor * static_cast<float>(*inflightLongTerm_)));
     return std::max(
-        *inflightHi_ - headroom,
+        *inflightLongTerm_ - headroom,
         quic::kMinCwndInMssForBbr * conn_.udpSendPacketLen);
   }
 }
 
-void Bbr2CongestionController::probeInflightHiUpward() {
-  if (!inflightHi_.has_value() || !cwndLimitedInRound_ ||
-      cwndBytes_ < *inflightHi_) {
-    return; /* no inflight_hi set or not fully using inflight_hi, so don't grow
-               it */
+void Bbr2CongestionController::probeInflightLongTermUpward() {
+  if (!inflightLongTerm_.has_value() || !cwndLimitedInRound_ ||
+      cwndBytes_ < *inflightLongTerm_) {
+    return; /* no inflight_hi set or not fully using inflight_hi, so don't
+               grow it */
   }
   probeUpAcks_ += currentAckEvent_->ackedBytes;
   if (probeUpAcks_ >= probeUpCount_) {
     auto delta = probeUpAcks_ / probeUpCount_;
     probeUpAcks_ -= delta * probeUpCount_;
-    addAndCheckOverflow(*inflightHi_, delta);
+    addAndCheckOverflow(*inflightLongTerm_, delta);
   }
   if (roundStart_) {
-    raiseInflightHiSlope();
+    raiseInflightLongTermSlope();
   }
 }
 
@@ -864,9 +865,9 @@ void Bbr2CongestionController::boundBwForModel() {
   Bandwidth previousBw = bandwidth_;
   bandwidth_ = maxBwFilter_.GetBest();
   if (state_ != State::Startup) {
-    if (bandwidthLo_.has_value() &&
-        !conn_.transportSettings.ccaConfig.ignoreLoss) {
-      bandwidth_ = std::min(bandwidth_, *bandwidthLo_);
+    if (bandwidthShortTerm_.has_value() &&
+        !conn_.transportSettings.ccaConfig.ignoreShortTerm) {
+      bandwidth_ = std::min(bandwidth_, *bandwidthShortTerm_);
     }
   }
   if (conn_.qLogger && previousBw != bandwidth_) {
@@ -958,7 +959,7 @@ void Bbr2CongestionController::startProbeBwCruise() {
 }
 
 void Bbr2CongestionController::startProbeBwRefill() {
-  resetLowerBounds();
+  resetShortTermModel();
   probeUpRounds_ = 0;
   probeUpAcks_ = 0;
   state_ = State::ProbeBw_Refill;
@@ -972,10 +973,10 @@ void Bbr2CongestionController::startProbeBwUp() {
   updatePacingAndCwndGain();
   startRound();
   resetFullBw();
-  raiseInflightHiSlope();
+  raiseInflightLongTermSlope();
 }
 
-void Bbr2CongestionController::raiseInflightHiSlope() {
+void Bbr2CongestionController::raiseInflightLongTermSlope() {
   auto growthThisRound = conn_.udpSendPacketLen << probeUpRounds_;
   probeUpRounds_ = std::min(probeUpRounds_ + 1, decltype(probeUpRounds_)(30));
   probeUpCount_ =
