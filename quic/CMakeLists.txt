@@ -6,10 +6,16 @@
 set(MVFST_OSS_CONFIG_INPUT_FILE "${PROJECT_SOURCE_DIR}/quic/mvfst-oss-config.h")
 set(MVFST_OSS_CONFIG_OUTPUT_FILE "${PROJECT_SOURCE_DIR}/quic/mvfst-config.h")
 
-add_custom_target(mvfst_config
-  ${CMAKE_COMMAND} -E copy ${MVFST_OSS_CONFIG_INPUT_FILE}
-                                            ${MVFST_OSS_CONFIG_OUTPUT_FILE}
+# Use add_custom_command to generate the file
+add_custom_command(
+  OUTPUT ${MVFST_OSS_CONFIG_OUTPUT_FILE}
+  COMMAND ${CMAKE_COMMAND} -E copy ${MVFST_OSS_CONFIG_INPUT_FILE} ${MVFST_OSS_CONFIG_OUTPUT_FILE}
+  DEPENDS ${MVFST_OSS_CONFIG_INPUT_FILE}
+  COMMENT "Generating mvfst-config.h"
 )
+
+# Create a target that depends on the generated file
+add_custom_target(mvfst_config ALL DEPENDS ${MVFST_OSS_CONFIG_OUTPUT_FILE})
 
 install(FILES mvfst-config.h DESTINATION include/quic/)
 
