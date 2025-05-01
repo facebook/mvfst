@@ -8,8 +8,6 @@ add_library(
   RoundRobin.cpp
 )
 
-add_dependencies(mvfst_round_robin mvfst_config)
-
 target_include_directories(
   mvfst_round_robin PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
@@ -48,8 +46,6 @@ add_library(
   mvfst_http_priority_queue
   HTTPPriorityQueue.cpp
 )
-
-add_dependencies(mvfst_http_priority_queue mvfst_config)
 
 target_include_directories(
   mvfst_http_priority_queue PUBLIC
