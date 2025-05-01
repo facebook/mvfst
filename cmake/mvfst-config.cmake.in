@@ -39,6 +39,7 @@ set(mvfst_LIBRARIES
   mvfst::mvfst_codec_pktrebuilder
   mvfst::mvfst_codec_packet_number_cipher
   mvfst::mvfst_codec
+  mvfst::mvfst_config
   mvfst::mvfst_looper
   mvfst::mvfst_buf_accessor
   mvfst::mvfst_bufutil
