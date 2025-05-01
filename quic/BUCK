@@ -27,8 +27,8 @@ mvfst_cpp_library(
     headers = select({
         "DEFAULT": select({
             # @oss-only: "DEFAULT": {"mvfst-config.h": "//:mvfst-config.h"},
-            "DEFAULT": {"mvfst-config.h": "facebook/mvfst-config.h"},  # @fb-only
-            "ovr_config//runtime:fbcode": {"mvfst-config.h": "facebook/mvfst-config.h"},  # @fb-only
+            "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
+            "ovr_config//runtime:fbcode": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
         }),
         "fbsource//xplat/quic:config-mobile": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
     }),
