@@ -1,26 +1,6 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
-load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
 
 oncall("traffic_protocols")
-
-fb_native.constraint_setting(
-    name = "constraint-profile",
-    visibility = ["PUBLIC"],
-)
-
-fb_native.constraint_value(
-    name = "constraint-mobile",
-    constraint_setting = ":constraint-profile",
-    visibility = ["PUBLIC"],
-)
-
-fb_native.config_setting(
-    name = "config-mobile",
-    constraint_values = [
-        "fbsource//xplat/quic:constraint-mobile",
-    ],
-    visibility = ["PUBLIC"],
-)
 
 mvfst_cpp_library(
     name = "config",
@@ -28,15 +8,16 @@ mvfst_cpp_library(
         "DEFAULT": select({
             # @oss-only: "DEFAULT": {"mvfst-config.h": "//:mvfst-config.h"},
             "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
-            "ovr_config//runtime:fbcode": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
+            "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+            "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
         }),
-        "fbsource//xplat/quic:config-mobile": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
     }),
     exported_deps = select({
         "DEFAULT": [
             "//folly/container:f14_hash",
         ],
-        "fbsource//xplat/quic:config-mobile": [],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
     }),
 )
 
