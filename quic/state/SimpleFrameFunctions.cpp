@@ -56,6 +56,7 @@ void updateSimpleFrameOnPacketSent(
     case QuicSimpleFrame::Type::PathChallengeFrame:
       conn.outstandingPathValidation =
           std::move(conn.pendingEvents.pathChallenge);
+      conn.pendingEvents.pathChallenge.reset();
       conn.pendingEvents.schedulePathValidationTimeout = true;
       // Start the clock to measure Rtt
       conn.pathChallengeStartTime = Clock::now();
