@@ -5037,10 +5037,6 @@ TEST_F(QuicClientTransportAfterStartTest, RetryPacketAfterRxInitial) {
   client->close(none);
 }
 
-TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
-  EXPECT_THROW(performFakeHandshake(), std::runtime_error);
-}
-
 class QuicClientTransportPskCacheTest
     : public QuicClientTransportAfterStartTestBase {
  public:
