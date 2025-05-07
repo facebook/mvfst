@@ -64,6 +64,21 @@ void QuicBuffer::appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
   prev_ = otherTail;
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::separateChain(
+    QuicBuffer* head,
+    QuicBuffer* tail) {
+  CHECK_NE(head, this);
+  CHECK_NE(tail, this);
+
+  head->prev_->next_ = tail->next_;
+  tail->next_->prev_ = head->prev_;
+
+  head->prev_ = tail;
+  tail->next_ = head;
+
+  return std::unique_ptr<QuicBuffer>(head);
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::unlink() {
   next_->prev_ = prev_;
   prev_->next_ = next_;

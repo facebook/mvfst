@@ -48,4 +48,41 @@ TEST(QuicBufferTest, TestAppendToChain) {
   EXPECT_EQ(quicBufferRawPtr3->prev(), quicBufferRawPtr2);
 }
 
+TEST(QuicBufferTest, TestSeparateChain) {
+  auto quicBuffer1 = QuicBuffer::create(100);
+  QuicBuffer* quicBufferRawPtr1 = quicBuffer1.get();
+  auto quicBuffer2 = QuicBuffer::create(100);
+  QuicBuffer* quicBufferRawPtr2 = quicBuffer2.get();
+  auto quicBuffer3 = QuicBuffer::create(100);
+  QuicBuffer* quicBufferRawPtr3 = quicBuffer3.get();
+  auto quicBuffer4 = QuicBuffer::create(100);
+  QuicBuffer* quicBufferRawPtr4 = quicBuffer4.get();
+  auto quicBuffer5 = QuicBuffer::create(100);
+  QuicBuffer* quicBufferRawPtr5 = quicBuffer5.get();
+  auto quicBuffer6 = QuicBuffer::create(100);
+  QuicBuffer* quicBufferRawPtr6 = quicBuffer6.get();
+
+  // Make the chain like
+  // 1->2->3->4->5->6
+  quicBuffer5->appendToChain(std::move(quicBuffer6));
+  quicBuffer4->appendToChain(std::move(quicBuffer5));
+  quicBuffer3->appendToChain(std::move(quicBuffer4));
+  quicBuffer2->appendToChain(std::move(quicBuffer3));
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+
+  // The below separateChain call should make things look like:
+  // 2->3->4 and 1->5->6
+  auto returnedChain =
+      quicBuffer1->separateChain(quicBufferRawPtr2, quicBufferRawPtr4);
+
+  EXPECT_EQ(quicBufferRawPtr2->next(), quicBufferRawPtr3);
+  EXPECT_EQ(quicBufferRawPtr3->next(), quicBufferRawPtr4);
+  EXPECT_EQ(quicBufferRawPtr4->next(), quicBufferRawPtr2);
+
+  EXPECT_EQ(returnedChain.get(), quicBufferRawPtr2);
+  EXPECT_EQ(quicBufferRawPtr1->next(), quicBufferRawPtr5);
+  EXPECT_EQ(quicBufferRawPtr5->next(), quicBufferRawPtr6);
+  EXPECT_EQ(quicBufferRawPtr6->next(), quicBufferRawPtr1);
+}
+
 } // namespace quic

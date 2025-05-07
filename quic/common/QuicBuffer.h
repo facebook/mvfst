@@ -100,6 +100,13 @@ class QuicBuffer {
 
   void appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer);
 
+  /*
+   * If you have a chain (A, B, C, D, E, F), and you call A->separateChain(B,
+   * D), then you will be returned the chain (B, C, D) and the current
+   * QuicBuffer chain will change to (A, E, F).
+   */
+  std::unique_ptr<QuicBuffer> separateChain(QuicBuffer* head, QuicBuffer* tail);
+
  protected:
   QuicBuffer(
       std::size_t capacity,
