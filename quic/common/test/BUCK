@@ -151,6 +151,17 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "QuicBufferTest",
+    srcs = [
+        "QuicBufferTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/common:quic_buffer",
+    ],
+)
+
+mvfst_cpp_test(
     name = "TransportKnobsTest",
     srcs = [
         "TransportKnobsTest.cpp",

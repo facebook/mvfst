@@ -15,6 +15,23 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "quic_buffer",
+    srcs = [
+        "QuicBuffer.cpp",
+    ],
+    headers = [
+        "QuicBuffer.h",
+    ],
+    deps = [
+    ],
+    exported_deps = [
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
     name = "looper",
     srcs = [
         "FunctionLooper.cpp",
