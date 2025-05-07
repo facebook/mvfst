@@ -26,7 +26,7 @@ TEST(BufAccessor, BasicAccess) {
 TEST(BufAccessor, CapacityMatch) {
   BufAccessor accessor(1000);
   auto buf = accessor.obtain();
-  buf = folly::IOBuf::create(2000);
+  buf = folly::IOBuf::create(500);
   EXPECT_DEATH(accessor.release(std::move(buf)), "");
 }
 

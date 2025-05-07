@@ -30,7 +30,7 @@ BufPtr& BufAccessor::buf() {
 void BufAccessor::release(BufPtr buf) {
   CHECK(!buf_) << "Can't override existing buf";
   CHECK(buf) << "Invalid BufPtr being released";
-  CHECK_EQ(buf->capacity(), capacity_)
+  CHECK_GE(buf->capacity(), capacity_)
       << "BufPtr has wrong capacity, capacit_=" << capacity_
       << ", buf capacity=" << buf->capacity();
   CHECK(!buf->isChained()) << "Reject chained buf";

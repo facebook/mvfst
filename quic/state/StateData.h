@@ -745,6 +745,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Number of QUIC unique crypto frame received with initial package.
   uint16_t uniqueInitialCryptoFramesReceived{0};
+
+  // In priming mode data is written here instead of on the network
+  std::vector<std::unique_ptr<folly::IOBuf>> primingData_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

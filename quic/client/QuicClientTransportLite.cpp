@@ -1201,6 +1201,13 @@ QuicClientTransportLite::startCryptoHandshake() {
         clientPtr->connSetupCallback_->onTransportReady();
       }
     });
+  } else if (clientConn_->transportSettings.isPriming) {
+    auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
+    if (clientPtr->connSetupCallback_) {
+      clientPtr->connSetupCallback_->onConnectionSetupError(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          "Priming error: Zero-RTT not available"));
+    }
   }
 
   return folly::unit;

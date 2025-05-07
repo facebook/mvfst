@@ -1321,6 +1321,10 @@ QuicTransportBaseLite::writeSocketData() {
     if (result.hasError()) {
       return result;
     }
+    if (conn_->transportSettings.isPriming && conn_->primingData_.size() > 0) {
+      connSetupCallback_->onPrimingDataAvailable(
+          std::move(conn_->primingData_));
+    }
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
         return folly::makeUnexpected(QuicError(

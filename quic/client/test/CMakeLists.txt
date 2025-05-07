@@ -11,6 +11,7 @@ quic_add_test(TARGET ClientStateMachineTest
   SOURCES
   ClientStateMachineTest.cpp
   QuicClientTransportTest.cpp
+  QuicClientTransportLiteTest.cpp
   QuicConnectorTest.cpp
   DEPENDS
   Folly::folly

@@ -79,3 +79,19 @@ mvfst_cpp_test(
         "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",
     ],
 )
+
+mvfst_cpp_test(
+    name = "QuicClientTransportLiteTest",
+    srcs = [
+        "QuicClientTransportLiteTest.cpp",
+    ],
+    deps = [
+        "//quic/api/test:mocks",
+        "//quic/client:client",
+        "//quic/client/test:mocks",
+        "//quic/common/events:folly_eventbase",
+        "//quic/common/events/test:QuicEventBaseMock",
+        "//quic/common/test:test_utils",
+        "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",
+    ],
+)

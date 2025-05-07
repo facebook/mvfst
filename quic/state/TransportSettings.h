@@ -472,6 +472,10 @@ struct TransportSettings {
 
   // Randomly skip one in N sequence numbers when sending packets.
   uint16_t skipOneInNPacketSequenceNumber{kSkipOneInNPacketSequenceNumber};
+
+  // When set to true it creates a transport for the sole purpose of
+  // retrieving 0-RTT data to a given destination
+  bool isPriming{false};
 };
 
 } // namespace quic

@@ -327,6 +327,14 @@ continuousMemoryBuildScheduleEncrypt(
   auto encodedBodySize = encodedSize - headerLen;
   // Include previous packets back.
   packetBuf->prepend(prevSize);
+  if (connection.transportSettings.isPriming && packetBuf) {
+    packetBuf->coalesce();
+    connection.bufAccessor->release(
+        folly::IOBuf::create(packetBuf->capacity()));
+    connection.primingData_.emplace_back(std::move(packetBuf));
+    return DataPathResult::makeWriteResult(
+        true, std::move(result.value()), encodedSize, encodedBodySize);
+  }
   connection.bufAccessor->release(std::move(packetBuf));
   if (encodedSize > connection.udpSendPacketLen) {
     VLOG(3) << "Quic sending pkt larger than limit, encodedSize="
@@ -423,6 +431,12 @@ iobufChainBasedBuildScheduleEncrypt(
   if (encodedSize > connection.udpSendPacketLen) {
     VLOG(3) << "Quic sending pkt larger than limit, encodedSize=" << encodedSize
             << " encodedBodySize=" << encodedBodySize;
+  }
+  if (connection.transportSettings.isPriming && packetBuf) {
+    packetBuf->coalesce();
+    connection.primingData_.emplace_back(std::move(packetBuf));
+    return DataPathResult::makeWriteResult(
+        true, std::move(result.value()), encodedSize, encodedBodySize);
   }
   auto writeResult = ioBufBatch.write(std::move(packetBuf), encodedSize);
   if (writeResult.hasError()) {

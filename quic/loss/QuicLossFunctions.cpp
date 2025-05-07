@@ -48,6 +48,10 @@ bool isPersistentCongestion(
 folly::Expected<folly::Unit, QuicError> onPTOAlarm(
     QuicConnectionStateBase& conn) {
   VLOG(10) << __func__ << " " << conn;
+  if (conn.transportSettings.isPriming) {
+    // No retransmits in Priming mode
+    return folly::unit;
+  }
   QUIC_STATS(conn.statsCallback, onPTO);
   conn.lossState.ptoCount++;
   conn.lossState.totalPTOCount++;

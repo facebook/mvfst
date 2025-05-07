@@ -114,6 +114,14 @@ class QuicSocketLite {
      * onTransportReady(), signifies full crypto handshake finished.
      */
     virtual void onFullHandshakeDone() noexcept {}
+
+    /**
+     * Client only.
+     * Called when the transport is in priming mode and 0-RTT packets are
+     * available
+     */
+    virtual void onPrimingDataAvailable(
+        std::vector<quic::BufPtr>&& /* data */) noexcept {}
   };
 
   /**
