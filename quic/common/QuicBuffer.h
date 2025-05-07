@@ -94,6 +94,12 @@ class QuicBuffer {
     return capacity_;
   }
 
+  /*
+   * Operations to append, split, clone, etc.
+   */
+
+  void appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer);
+
  protected:
   QuicBuffer(
       std::size_t capacity,

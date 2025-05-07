@@ -46,6 +46,24 @@ QuicBuffer::~QuicBuffer() {
   }
 }
 
+void QuicBuffer::appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
+  // Take ownership of the specified IOBuf
+  QuicBuffer* other = quicBuffer.release();
+
+  // Remember the pointer to the tail of the other chain
+  QuicBuffer* otherTail = other->prev_;
+
+  // Hook up prev_->next_ to point at the start of the other chain,
+  // and other->prev_ to point at prev_
+  prev_->next_ = other;
+  other->prev_ = prev_;
+
+  // Hook up otherTail->next_ to point at us,
+  // and prev_ to point back at otherTail,
+  otherTail->next_ = this;
+  prev_ = otherTail;
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::unlink() {
   next_->prev_ = prev_;
   prev_->next_ = next_;
