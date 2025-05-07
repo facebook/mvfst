@@ -129,7 +129,7 @@ void BufQueue::appendToChain(BufPtr& dst, BufPtr&& src) {
   if (dst == nullptr) {
     dst = std::move(src);
   } else {
-    dst->prependChain(std::move(src));
+    dst->appendToChain(std::move(src));
   }
 }
 
@@ -140,7 +140,7 @@ void BufAppender::push(const uint8_t* data, size_t len) {
   if (crtBuf_->tailroom() < len || lastBufShared_) {
     auto newBuf = BufHelpers::createCombined(std::max(appendLen_, len));
     Buf* newBufPtr = newBuf.get();
-    head_->prependChain(std::move(newBuf));
+    head_->appendToChain(std::move(newBuf));
     crtBuf_ = newBufPtr;
   }
   memcpy(crtBuf_->writableTail(), data, len);
@@ -155,7 +155,7 @@ void BufAppender::insert(BufPtr data) {
   // If the buffer is shared we do not want to overrwrite the tail of the
   // buffer.
   lastBufShared_ = data->isShared();
-  head_->prependChain(std::move(data));
+  head_->appendToChain(std::move(data));
   crtBuf_ = dataPtr;
 }
 

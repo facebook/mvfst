@@ -28,7 +28,7 @@ StatelessResetToken StatelessResetGenerator::generateToken(
     const ConnectionId& connId) const {
   StatelessResetToken token;
   auto info = toData(connId);
-  info.prependChain(
+  info.appendToChain(
       BufHelpers::wrapBuffer(addressStr_.data(), addressStr_.size()));
   auto out = hkdf_.expand(folly::range(extractedSecret_), info, token.size());
   out->coalesce();

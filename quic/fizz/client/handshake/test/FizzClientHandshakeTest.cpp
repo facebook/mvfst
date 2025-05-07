@@ -216,13 +216,13 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   BufPtr getHandshakeWriteBytes() {
     auto buf = folly::IOBuf::create(0);
     if (!cryptoState->initialStream.writeBuffer.empty()) {
-      buf->prependChain(cryptoState->initialStream.writeBuffer.move());
+      buf->appendToChain(cryptoState->initialStream.writeBuffer.move());
     }
     if (!cryptoState->handshakeStream.writeBuffer.empty()) {
-      buf->prependChain(cryptoState->handshakeStream.writeBuffer.move());
+      buf->appendToChain(cryptoState->handshakeStream.writeBuffer.move());
     }
     if (!cryptoState->oneRttStream.writeBuffer.empty()) {
-      buf->prependChain(cryptoState->oneRttStream.writeBuffer.move());
+      buf->appendToChain(cryptoState->oneRttStream.writeBuffer.move());
     }
     return buf;
   }

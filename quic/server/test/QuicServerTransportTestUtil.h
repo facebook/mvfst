@@ -590,7 +590,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         if (frame.type() != QuicFrame::Type::ReadCryptoFrame) {
           continue;
         }
-        cryptoBuf->prependChain(frame.asReadCryptoFrame()->data->clone());
+        cryptoBuf->appendToChain(frame.asReadCryptoFrame()->data->clone());
       }
     }
     return cryptoBuf;

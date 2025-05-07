@@ -427,9 +427,9 @@ TEST(BufWriterTest, InsertChain) {
   BufWriter writer(testBuffer->writableTail(), 1000);
   auto inputBuffer =
       folly::IOBuf::copyBuffer("Cause I lost you and now what am i to do?");
-  inputBuffer->prependChain(
+  inputBuffer->appendToChain(
       folly::IOBuf::copyBuffer(" Can't believe that we are through."));
-  inputBuffer->prependChain(
+  inputBuffer->appendToChain(
       folly::IOBuf::copyBuffer(" While the memory of you linger like a song."));
   auto len = inputBuffer->computeChainDataLength();
   writer.insert(inputBuffer.get());
@@ -598,9 +598,9 @@ TEST(BufWriterTest, InsertChainByteChainedRange) {
   BufWriter writer(testBuffer->writableTail(), 1000);
   auto inputBuffer =
       folly::IOBuf::copyBuffer("Cause I lost you and now what am i to do?");
-  inputBuffer->prependChain(
+  inputBuffer->appendToChain(
       folly::IOBuf::copyBuffer(" Can't believe that we are through."));
-  inputBuffer->prependChain(
+  inputBuffer->appendToChain(
       folly::IOBuf::copyBuffer(" While the memory of you linger like a song."));
   auto len = inputBuffer->computeChainDataLength();
   ChainedByteRangeHead cbrh(inputBuffer);

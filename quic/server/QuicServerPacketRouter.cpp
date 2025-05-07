@@ -148,7 +148,7 @@ void TakeoverPacketHandler::forwardPacketToAnotherServer(
   bufWriter.writeBE<uint64_t>(tick);
   writeBuffer->append(bufSize);
 
-  writeBuffer->prependChain(std::move(buf));
+  writeBuffer->appendToChain(std::move(buf));
   forwardPacket(std::move(writeBuffer));
 }
 

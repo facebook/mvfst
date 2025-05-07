@@ -33,7 +33,7 @@ TEST(BufAccessor, CapacityMatch) {
 TEST(BufAccessor, RefuseChainedBuf) {
   BufAccessor accessor(1000);
   auto buf = accessor.obtain();
-  buf->prependChain(folly::IOBuf::create(0));
+  buf->appendToChain(folly::IOBuf::create(0));
   EXPECT_DEATH(accessor.release(std::move(buf)), "");
 }
 } // namespace quic

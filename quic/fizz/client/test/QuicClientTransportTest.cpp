@@ -353,7 +353,7 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 }
 
@@ -374,7 +374,7 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
   memset(data->writableData(), 'a', data->length());
 
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 }
 
@@ -450,7 +450,7 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 }
 
@@ -472,7 +472,7 @@ TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   settings.connectUDP = false;
   client->setTransportSettings(settings);
@@ -524,7 +524,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
@@ -602,7 +602,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
 
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).WillOnce(Invoke([&] {
     EXPECT_TRUE(!client->getConn().retryToken.empty());
@@ -635,7 +635,7 @@ TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
   EXPECT_FALSE(newToken->empty());
@@ -657,7 +657,7 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
   EXPECT_FALSE(newToken->empty());
@@ -744,7 +744,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   // Rejection means that we will unset the zero rtt cipher.
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
@@ -791,7 +791,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
@@ -834,7 +834,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
@@ -868,7 +868,7 @@ TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->isDetachable());
   client->detachEventBase();
@@ -908,7 +908,7 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
   // change the address to a new server which does not have the connection.
@@ -953,7 +953,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
   // change the address to a new server which does not have the connection.
@@ -2554,7 +2554,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
   auto data = IOBuf::copyBuffer("hello");
 
   auto expected = data->clone();
-  expected->prependChain(data->clone());
+  expected->appendToChain(data->clone());
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
@@ -5770,7 +5770,7 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
       0 /* largestAcked */);
   auto packetData = packetToBufCleartext(
       packet, aead, getInitialHeaderCipher(), nextPacketNum);
-  packetData->prependChain(IOBuf::copyBuffer("garbage in"));
+  packetData->appendToChain(IOBuf::copyBuffer("garbage in"));
   deliverData(serverAddr, packetData->coalesce());
   verifyTransportParameters(
       kDefaultConnectionFlowControlWindow,
@@ -5894,7 +5894,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       mockClientHandshake->readBuffers[EncryptionLevel::Handshake].empty());
   auto handshakeReadData =
       mockClientHandshake->readBuffers[EncryptionLevel::Handshake].move();
-  cryptoData->prependChain(cryptoData->clone());
+  cryptoData->appendToChain(cryptoData->clone());
   EXPECT_TRUE(folly::IOBufEqualTo()(*cryptoData, *handshakeReadData));
 }
 

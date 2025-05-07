@@ -1073,7 +1073,7 @@ TYPED_TEST(
   this->getTransport()->writeChain(streamId, data2->clone(), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
-  data1->prependChain(std::move(data2));
+  data1->appendToChain(std::move(data2));
   auto combined = std::move(data1);
 
   // should have sent two packets

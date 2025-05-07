@@ -1441,7 +1441,7 @@ void writeCloseCommon(
       bufUniquePtr->length(),
       headerCipher);
   folly::IOBuf packetBuf(std::move(packet.header));
-  packetBuf.prependChain(std::move(bufUniquePtr));
+  packetBuf.appendToChain(std::move(bufUniquePtr));
   auto packetSize = packetBuf.computeChainDataLength();
   if (connection.qLogger) {
     connection.qLogger->addPacket(packet.packet, packetSize);

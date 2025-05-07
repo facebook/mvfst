@@ -138,7 +138,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestWriteStream) {
   ASSERT_FALSE(writeDataToQuicStream(*stream, buf2->clone(), false).hasError());
 
   IOBufEqualTo eq;
-  buf1->prependChain(std::move(buf2));
+  buf1->appendToChain(std::move(buf2));
 
   EXPECT_TRUE(eq(stream->writeBuffer.move(), buf1));
 }
@@ -148,10 +148,10 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataWrittenInOrder) {
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
   auto buf1 = IOBuf::copyBuffer("I just met you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->appendToChain(IOBuf::copyBuffer("and this is crazy. "));
 
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
-  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+  buf2->appendToChain(IOBuf::copyBuffer("so call me maybe"));
 
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
                    .hasError());
@@ -187,10 +187,10 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeContiguousData) {
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
   auto buf1 = IOBuf::copyBuffer("I just met you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->appendToChain(IOBuf::copyBuffer("and this is crazy. "));
 
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
-  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+  buf2->appendToChain(IOBuf::copyBuffer("so call me maybe"));
 
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
                    .hasError());
@@ -238,10 +238,10 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
   auto buf1 = IOBuf::copyBuffer("I just met you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->appendToChain(IOBuf::copyBuffer("and this is crazy. "));
 
   auto buf2 = IOBuf::copyBuffer("'s my number ");
-  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+  buf2->appendToChain(IOBuf::copyBuffer("so call me maybe"));
 
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 0))
                    .hasError());
@@ -373,10 +373,10 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeEmptyDataEof) {
 TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufs) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->appendToChain(IOBuf::copyBuffer("and this is crazy. "));
 
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
-  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+  buf2->appendToChain(IOBuf::copyBuffer("so call me maybe"));
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
@@ -407,11 +407,11 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufs) {
 TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufsShared) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->appendToChain(IOBuf::copyBuffer("and this is crazy. "));
   buf1->coalesceWithHeadroomTailroom(0, 8000);
 
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
-  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+  buf2->appendToChain(IOBuf::copyBuffer("so call me maybe"));
 
   // Manually share the buffers like multiple stream frames in a packet.
   auto buf3 = buf1->clone();
@@ -454,10 +454,10 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataFromMultipleBufsShared) {
 TEST_P(QuicStreamFunctionsTestBase, TestReadDataOutOfOrder) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer(" you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this is crazy. "));
+  buf1->appendToChain(IOBuf::copyBuffer("and this is crazy. "));
 
   auto buf2 = IOBuf::copyBuffer("Here's my number ");
-  buf2->prependChain(IOBuf::copyBuffer("so call me maybe"));
+  buf2->appendToChain(IOBuf::copyBuffer("so call me maybe"));
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
 
@@ -496,13 +496,13 @@ TEST_P(QuicStreamFunctionsTestBase, TestReadDataOutOfOrder) {
 TEST_P(QuicStreamFunctionsTestBase, TestReadOverlappingData) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you ");
-  buf1->prependChain(IOBuf::copyBuffer("and this"));
+  buf1->appendToChain(IOBuf::copyBuffer("and this"));
 
   auto buf2 = IOBuf::copyBuffer("met you and this is crazy. ");
-  buf2->prependChain(IOBuf::copyBuffer("Here's my number"));
+  buf2->appendToChain(IOBuf::copyBuffer("Here's my number"));
 
   auto buf3 = IOBuf::copyBuffer("Here's my number, ");
-  buf3->prependChain(IOBuf::copyBuffer("so call me maybe."));
+  buf3->appendToChain(IOBuf::copyBuffer("so call me maybe."));
 
   auto streamLastMaxOffset = stream->maxOffsetObserved;
   auto connLastMaxOffset = conn.flowControlState.sumMaxObservedOffset;
@@ -737,7 +737,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestInsertVariations) {
   auto buf6 = IOBuf::copyBuffer(" me maybe");
   auto buf7 = IOBuf::copyBuffer("this is crazy. Here's my number so call");
   auto buf8 = IOBuf::copyBuffer("I just met you");
-  buf8->prependChain(IOBuf::copyBuffer(" and this"));
+  buf8->appendToChain(IOBuf::copyBuffer(" and this"));
   auto buf9 = IOBuf::copyBuffer("Here's my number so call me maybe");
   auto buf10 = IOBuf::copyBuffer("I ");
 

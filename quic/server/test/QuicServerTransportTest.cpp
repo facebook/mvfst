@@ -4668,7 +4668,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
       0 /* largestAcked */);
   auto packetData =
       packetToBufCleartext(packet, *aead, *headerCipher, nextPacket);
-  packetData->prependChain(IOBuf::copyBuffer("garbage in"));
+  packetData->appendToChain(IOBuf::copyBuffer("garbage in"));
   deliverData(std::move(packetData));
   EXPECT_NE(server->getConn().readCodec, nullptr);
   EXPECT_NE(server->getConn().initialWriteCipher, nullptr);

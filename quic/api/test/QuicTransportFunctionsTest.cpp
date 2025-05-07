@@ -3285,7 +3285,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
-          pktBodyCaptured.prependChain(buf->clone());
+          pktBodyCaptured.appendToChain(buf->clone());
           return buf->clone();
         } else {
           return folly::IOBuf::create(0);
@@ -3299,7 +3299,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
-          secondBodyCaptured.prependChain(buf->clone());
+          secondBodyCaptured.appendToChain(buf->clone());
           return buf->clone();
         } else {
           return folly::IOBuf::create(0);
@@ -3332,7 +3332,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
-          pktBodyCaptured.prependChain(buf->clone());
+          pktBodyCaptured.appendToChain(buf->clone());
           return buf->clone();
         } else {
           return folly::IOBuf::create(0);
@@ -3352,7 +3352,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
-          secondBodyCaptured.prependChain(buf->clone());
+          secondBodyCaptured.appendToChain(buf->clone());
           return buf->clone();
         } else {
           return folly::IOBuf::create(0);

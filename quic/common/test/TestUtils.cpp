@@ -406,7 +406,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
 BufPtr packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
   auto packetBuf = packet.header.clone();
   if (!packet.body.empty()) {
-    packetBuf->prependChain(packet.body.clone());
+    packetBuf->appendToChain(packet.body.clone());
   }
   return packetBuf;
 }
@@ -436,7 +436,7 @@ BufPtr packetToBufCleartext(
   packet.header.coalesce();
   auto tagLen = cleartextCipher.getCipherOverhead();
   if (body->tailroom() < tagLen) {
-    body->prependChain(folly::IOBuf::create(tagLen));
+    body->appendToChain(folly::IOBuf::create(tagLen));
   }
   body->coalesce();
   auto encryptedBody = cleartextCipher.inplaceEncrypt(
@@ -449,7 +449,7 @@ BufPtr packetToBufCleartext(
       encryptedBody->data(),
       encryptedBody->length(),
       headerCipher);
-  packetBuf->prependChain(std::move(encryptedBody));
+  packetBuf->appendToChain(std::move(encryptedBody));
   return packetBuf;
 }
 

@@ -44,14 +44,14 @@ chunkIOBuf(std::unique_ptr<IOBuf> input, size_t chunks, BufCreator creator) {
     if (!chunked) {
       chunked = std::move(buf);
     } else {
-      chunked->prependChain(std::move(buf));
+      chunked->appendToChain(std::move(buf));
     }
   }
 
   size_t remainLen = inputLen - (chunks - 1) * chunkLen;
   auto remain = creator(remainLen, chunks - 1);
   remain->append(remainLen);
-  chunked->prependChain(std::move(remain));
+  chunked->appendToChain(std::move(remain));
 
   transformBuffer(
       *input, *chunked, [](uint8_t* out, const uint8_t* in, size_t len) {

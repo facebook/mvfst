@@ -642,7 +642,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
   EXPECT_EQ(stream1->streamLossCount, 2);
 
   auto combined = buf1->clone();
-  combined->prependChain(buf2->clone());
+  combined->appendToChain(buf2->clone());
   auto& buffer = stream1->lossBuffer.front();
   EXPECT_EQ(buffer.offset, 0);
   EXPECT_TRUE(areEqual(combined.get(), &buffer.data));

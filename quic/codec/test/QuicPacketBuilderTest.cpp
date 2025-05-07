@@ -31,7 +31,7 @@ BufPtr packetToBuf(
   // This does not matter.
   PacketNum num = 10;
   if (!packet.header.empty()) {
-    buf->prependChain(packet.header.clone());
+    buf->appendToChain(packet.header.clone());
   }
   std::unique_ptr<folly::IOBuf> body = folly::IOBuf::create(0);
   if (!packet.body.empty()) {
@@ -43,7 +43,7 @@ BufPtr packetToBuf(
     EXPECT_GT(body->computeChainDataLength(), bodySize);
   }
   if (body) {
-    buf->prependChain(std::move(body));
+    buf->appendToChain(std::move(body));
   }
   return buf;
 }
@@ -296,7 +296,7 @@ TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
         auto overhead = folly::IOBuf::create(1000);
         overhead->append(cipherOverhead);
         auto clone = buf->clone();
-        clone->prependChain(std::move(overhead));
+        clone->appendToChain(std::move(overhead));
         return std::move(clone);
       }));
 

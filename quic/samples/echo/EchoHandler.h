@@ -213,7 +213,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       return;
     }
     auto echoedData = BufHelpers::copyBuffer("echo ");
-    echoedData->prependChain(data.first.move());
+    echoedData->appendToChain(data.first.move());
     auto res = sock->writeChain(id, std::move(echoedData), true, nullptr);
     if (res.hasError()) {
       LOG(ERROR) << "write error=" << toString(res.error());
@@ -227,7 +227,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     CHECK_GT(datagrams.size(), 0);
     for (const auto& datagram : datagrams) {
       auto echoedData = BufHelpers::copyBuffer("echo ");
-      echoedData->prependChain(datagram.bufQueue().front()->cloneCoalesced());
+      echoedData->appendToChain(datagram.bufQueue().front()->cloneCoalesced());
       auto res = sock->writeDatagram(std::move(echoedData));
       if (res.hasError()) {
         LOG(ERROR) << "writeDatagram error=" << toString(res.error());

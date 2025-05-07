@@ -15,7 +15,7 @@
 namespace {
 void prependToBuf(quic::BufPtr& buf, quic::BufPtr toAppend) {
   if (buf) {
-    buf->prependChain(std::move(toAppend));
+    buf->appendToChain(std::move(toAppend));
   } else {
     buf = std::move(toAppend);
   }

@@ -152,7 +152,7 @@ struct NetworkData {
     BufPtr buf;
     for (auto& packet : packets_) {
       if (buf) {
-        buf->prependChain(packet.buf.move());
+        buf->appendToChain(packet.buf.move());
       } else {
         buf = packet.buf.move();
       }

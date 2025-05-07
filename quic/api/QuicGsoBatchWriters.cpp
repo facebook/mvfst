@@ -51,7 +51,7 @@ bool GSOPacketBatchWriter::append(
 
   // now we've got an additional buffer
   // append it to the chain
-  buf_->prependChain(std::move(buf));
+  buf_->appendToChain(std::move(buf));
   currBufs_++;
 
   // see if we've added a different size
@@ -252,7 +252,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
         // we can append
         options_[idx].gso = prevSize_[idx];
         prevSize_[idx] = size;
-        bufs_[idx]->prependChain(std::move(buf));
+        bufs_[idx]->appendToChain(std::move(buf));
         currBufs_++;
 
         // flush if we reach maxBufs_

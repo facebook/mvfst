@@ -287,18 +287,18 @@ class ServerHandshakeTest : public Test {
     switch (clientState.readRecordLayer()->getEncryptionLevel()) {
       case fizz::EncryptionLevel::Plaintext:
         if (!cryptoState->initialStream.writeBuffer.empty()) {
-          buf->prependChain(cryptoState->initialStream.writeBuffer.move());
+          buf->appendToChain(cryptoState->initialStream.writeBuffer.move());
         }
         break;
       case fizz::EncryptionLevel::Handshake:
       case fizz::EncryptionLevel::EarlyData:
         if (!cryptoState->handshakeStream.writeBuffer.empty()) {
-          buf->prependChain(cryptoState->handshakeStream.writeBuffer.move());
+          buf->appendToChain(cryptoState->handshakeStream.writeBuffer.move());
         }
         break;
       case fizz::EncryptionLevel::AppTraffic:
         if (!cryptoState->oneRttStream.writeBuffer.empty()) {
-          buf->prependChain(cryptoState->oneRttStream.writeBuffer.move());
+          buf->appendToChain(cryptoState->oneRttStream.writeBuffer.move());
         }
     }
     return buf;
