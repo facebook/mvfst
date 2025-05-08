@@ -97,7 +97,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
              << (lastSentPacketTime + alarmDuration).time_since_epoch().count()
              << " " << conn;
   }
-  DCHECK(alarmMethod.hasValue()) << "Alarm method must have a value";
+  DCHECK(alarmMethod.has_value()) << "Alarm method must have a value";
   return std::make_pair(adjustedAlarmDuration, *alarmMethod);
 }
 
@@ -252,7 +252,7 @@ template <class ClockType = Clock>
     if (conn.congestionController && lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       conn.congestionController->onPacketAckOrLoss(
-          nullptr, lossEvent.get_pointer());
+          nullptr, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     }
   } else {
     auto result = onPTOAlarm(conn);
@@ -343,7 +343,7 @@ template <class ClockType = Clock>
   }
 
   conn.lossState.rtxCount += lossEvent.lostPackets;
-  if (conn.congestionController && lossEvent.largestLostPacketNum.hasValue()) {
+  if (conn.congestionController && lossEvent.largestLostPacketNum.has_value()) {
     conn.congestionController->onRemoveBytesFromInflight(lossEvent.lostBytes);
   }
   VLOG(10) << __func__ << " marked=" << lossEvent.lostPackets;

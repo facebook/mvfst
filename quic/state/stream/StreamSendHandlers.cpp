@@ -206,13 +206,13 @@ folly::Expected<folly::Unit, QuicError> sendAckSMHandler(
 
 folly::Expected<folly::Unit, QuicError> sendRstAckSMHandler(
     QuicStreamState& stream,
-    folly::Optional<uint64_t> reliableSize) {
+    Optional<uint64_t> reliableSize) {
   switch (stream.sendState) {
     case StreamSendState::ResetSent: {
       VLOG(10) << "ResetSent: Transition to closed stream=" << stream.id << " "
                << stream.conn;
       // Note that we set minReliableSizeAcked to 0 for non-reliable resets.
-      if (!stream.minReliableSizeAcked.hasValue()) {
+      if (!stream.minReliableSizeAcked.has_value()) {
         stream.minReliableSizeAcked = reliableSize.value_or(0);
       } else {
         stream.minReliableSizeAcked =

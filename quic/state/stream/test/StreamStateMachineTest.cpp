@@ -101,7 +101,7 @@ TEST_F(QuicOpenStateTest, InvalidEvent) {
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
   RstStreamFrame frame(1, GenericApplicationErrorCode::UNKNOWN, 0);
-  auto result = sendRstAckSMHandler(stream, folly::none);
+  auto result = sendRstAckSMHandler(stream, std::nullopt);
   ASSERT_TRUE(result.hasError());
   EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
@@ -321,7 +321,7 @@ TEST_F(QuicResetSentStateTest, RstAck) {
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  auto result = sendRstAckSMHandler(stream, folly::none);
+  auto result = sendRstAckSMHandler(stream, std::nullopt);
   ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
@@ -418,7 +418,7 @@ TEST_F(QuicResetSentStateTest, RstAfterReliableRst) {
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  auto result = sendRstAckSMHandler(stream, folly::none);
+  auto result = sendRstAckSMHandler(stream, std::nullopt);
   ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
@@ -504,7 +504,7 @@ TEST_F(QuicClosedStateTest, RstAck) {
   QuicStreamState stream(id, *conn);
   stream.sendState = StreamSendState::Closed;
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  auto result = sendRstAckSMHandler(stream, folly::none);
+  auto result = sendRstAckSMHandler(stream, std::nullopt);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
 }

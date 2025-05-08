@@ -29,7 +29,7 @@ Optional<uint64_t> calculateNewWindowUpdate(
   auto nextAdvertisedOffset = curReadOffset + windowSize;
   if (nextAdvertisedOffset == curAdvertisedOffset) {
     // No change in flow control
-    return none;
+    return std::nullopt;
   }
   bool enoughTimeElapsed = lastSendTime && updateTime > *lastSendTime &&
       (updateTime - *lastSendTime) >
@@ -53,7 +53,7 @@ Optional<uint64_t> calculateNewWindowUpdate(
   if (enoughWindowElapsed) {
     return nextAdvertisedOffset;
   }
-  return none;
+  return std::nullopt;
 }
 
 template <typename T>
@@ -223,7 +223,7 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
   uint64_t diff = 0;
   if (stream.reliableSizeFromPeer &&
       stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
-    CHECK(stream.finalReadOffset.hasValue())
+    CHECK(stream.finalReadOffset.has_value())
         << "We got a reset from the peer, but the finalReadOffset is not set.";
     // We've read all reliable bytes, so we can advance the currentReadOffset
     // to the final size.
@@ -255,10 +255,10 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
 folly::Expected<folly::Unit, QuicError> updateFlowControlOnReceiveReset(
     QuicStreamState& stream,
     TimePoint resetTime) {
-  CHECK(stream.reliableSizeFromPeer.hasValue())
+  CHECK(stream.reliableSizeFromPeer.has_value())
       << "updateFlowControlOnReceiveReset has been called, "
       << "but reliableSizeFromPeer has not been set";
-  CHECK(stream.finalReadOffset.hasValue())
+  CHECK(stream.finalReadOffset.has_value())
       << "updateFlowControlOnReceiveReset has been called, "
       << "but finalReadOffset has not been set";
   if (stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
@@ -313,7 +313,7 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnWriteToStream(
 
 folly::Expected<folly::Unit, QuicError> updateFlowControlOnResetStream(
     QuicStreamState& stream,
-    folly::Optional<uint64_t> reliableSize) {
+    Optional<uint64_t> reliableSize) {
   uint64_t decrementAmount = 0;
   if (reliableSize && *reliableSize > 0) {
     // This is the amount of pending data that we are "throwing away"

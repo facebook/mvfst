@@ -61,7 +61,7 @@ quic::Optional<HTTPPriorityQueue::FindResult> HTTPPriorityQueue::find(
       }
     }
   }
-  return quic::none;
+  return std::nullopt;
 }
 
 void HTTPPriorityQueue::addIndex(Identifier id, IndexMapElem indexElem) {

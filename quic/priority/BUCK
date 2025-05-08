@@ -43,6 +43,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":priority_queue",
         ":round_robin",
+        "//folly:cpp_attributes",
         "//quic:config",
     ],
 )

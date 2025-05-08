@@ -87,7 +87,7 @@ folly::Expected<uint64_t, QuicError> writePacketizationRequest(
     // of addSendInstruction() call.
     auto updateResult = updateConnection(
         connection,
-        none /* Packet Event */,
+        std::nullopt /* Packet Event */,
         packet.packet,
         Clock::now(),
         packet.encodedSize + cipherOverhead,

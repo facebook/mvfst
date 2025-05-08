@@ -57,8 +57,13 @@ class FizzAead final : public Aead {
       uint64_t seqNum) const override {
     fizz::Aead::AeadOptions options;
     options.bufferOpt = fizz::Aead::BufferOption::AllowInPlace;
-    return fizzAead->tryDecrypt(
+    auto result = fizzAead->tryDecrypt(
         std::move(ciphertext), associatedData, seqNum, options);
+    if (result.has_value()) {
+      return Optional<std::unique_ptr<folly::IOBuf>>(std::move(result.value()));
+    } else {
+      return Optional<std::unique_ptr<folly::IOBuf>>();
+    }
   }
 
   size_t getCipherOverhead() const override {

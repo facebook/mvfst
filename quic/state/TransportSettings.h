@@ -403,7 +403,7 @@ struct TransportSettings {
   // Whether to initiate key updates
   bool initiateKeyUpdate{false};
   // How many packets to send before initiating the first key update.
-  // This is reset to none after the first key update is initiated.
+  // This is reset to std::nullopt after the first key update is initiated.
   OptionalIntegral<uint64_t> firstKeyUpdatePacketCount{
       kFirstKeyUpdatePacketCount};
   // How many packets to send before initiating periodic key updates

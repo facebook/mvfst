@@ -530,7 +530,7 @@ Optional<uint64_t> getLargestWriteOffsetTxed(const QuicStreamState& stream) {
   // currentWriteOffset is really nextWriteOffset
   // when 0, it indicates nothing has been written yet
   if (stream.currentWriteOffset == 0 && stream.writeBufMeta.offset == 0) {
-    return none;
+    return std::nullopt;
   }
   uint64_t currentWriteOffset =
       std::max<uint64_t>(stream.currentWriteOffset, stream.writeBufMeta.offset);
@@ -543,7 +543,7 @@ Optional<uint64_t> getLargestDeliverableOffset(const QuicStreamState& stream) {
   // zero then we cannot deliver any offsets.
   if (stream.ackedIntervals.empty() ||
       stream.ackedIntervals.front().start != 0) {
-    return none;
+    return std::nullopt;
   }
   return stream.ackedIntervals.front().end;
 }

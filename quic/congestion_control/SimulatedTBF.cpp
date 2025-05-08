@@ -16,7 +16,7 @@ SimulatedTBF::SimulatedTBF(Config config) : config_(std::move(config)) {
     EmptyIntervalState emptyIntervalState = {};
     emptyIntervalState.emptyBucketTimeIntervals_ =
         std::make_shared<std::deque<TimeInterval>>();
-    maybeEmptyIntervalState_.assign(emptyIntervalState);
+    maybeEmptyIntervalState_ = emptyIntervalState;
   }
 }
 
@@ -36,8 +36,7 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
         sendTime >=
             emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.value());
     if (!emptyIntervalState.maybeLastForgetEmptyIntervalTime_.has_value()) {
-      emptyIntervalState.maybeLastForgetEmptyIntervalTime_.assign(
-          sendTime - 1us);
+      emptyIntervalState.maybeLastForgetEmptyIntervalTime_ = sendTime - 1us;
     }
   }
 
@@ -53,7 +52,7 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
       config_.rateBytesPerSecond, config_.burstSizeBytes, sendTimeDouble);
   if (config_.trackEmptyIntervals && numTokensAvailable > 0) {
     auto& emptyIntervalState = getEmptyIntervalState();
-    emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.assign(sendTime);
+    emptyIntervalState.maybeLastSendTimeBucketNotEmpty_ = sendTime;
   }
 
   // If the amount of debt is limited, check if we can consume.
@@ -73,12 +72,12 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
   }
 
   // Send (consume tokens) and determine if any new debt.
-  Optional<double> maybeDebtPayOffTimeDouble = consumeWithBorrowNonBlocking(
+  auto maybeDebtPayOffTimeDouble = consumeWithBorrowNonBlocking(
       toConsume,
       config_.rateBytesPerSecond,
       config_.burstSizeBytes,
       sendTimeDouble);
-  DCHECK(maybeDebtPayOffTimeDouble.hasValue());
+  DCHECK(maybeDebtPayOffTimeDouble.has_value());
   if (maybeDebtPayOffTimeDouble.value() > 0) {
     // Bucket is in debt now after consuming toConsume tokens
     const auto debtPayOffTimeUs =
@@ -154,7 +153,7 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 void SimulatedTBF::forgetEmptyIntervalsPriorTo(const TimePoint& time) {
   auto& emptyIntervalState = getEmptyIntervalState(); // throws if not tracked
 
-  emptyIntervalState.maybeLastForgetEmptyIntervalTime_.assign(time);
+  emptyIntervalState.maybeLastForgetEmptyIntervalTime_ = time;
   while (!emptyIntervalState.emptyBucketTimeIntervals_->empty()) {
     if (emptyIntervalState.emptyBucketTimeIntervals_->front().start > time) {
       return;

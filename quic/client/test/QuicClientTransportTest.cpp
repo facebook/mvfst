@@ -127,7 +127,7 @@ class QuicClientTransportTest : public Test {
   }
 
   void TearDown() override {
-    quicClient_->closeNow(folly::none);
+    quicClient_->closeNow(std::nullopt);
   }
 
   std::shared_ptr<QuicEventBaseMock> evb_;

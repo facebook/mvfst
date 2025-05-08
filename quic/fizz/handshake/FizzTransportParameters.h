@@ -123,7 +123,7 @@ inline quic::Optional<quic::ClientTransportParameters> getClientExtension(
   auto extensionType = getQuicTransportParametersExtention(encodingVersion);
   auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
-    return quic::none;
+    return std::nullopt;
   }
   quic::ClientTransportParameters parameters;
   quic::Cursor cursor(it->extension_data.get());
@@ -137,7 +137,7 @@ inline quic::Optional<quic::ServerTransportParameters> getServerExtension(
   auto extensionType = getQuicTransportParametersExtention(encodingVersion);
   auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
-    return quic::none;
+    return std::nullopt;
   }
   quic::ServerTransportParameters parameters;
   quic::Cursor cursor(it->extension_data.get());
@@ -151,7 +151,7 @@ inline quic::Optional<quic::TicketTransportParameters> getTicketExtension(
   auto extensionType = getQuicTransportParametersExtention(encodingVersion);
   auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
-    return quic::none;
+    return std::nullopt;
   }
   quic::TicketTransportParameters parameters;
   quic::Cursor cursor(it->extension_data.get());

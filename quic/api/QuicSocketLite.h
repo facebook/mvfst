@@ -369,7 +369,7 @@ class QuicSocketLite {
    * StopSending. By default when cb is nullptr this function will cause the
    * transport to send a StopSending frame with
    * GenericApplicationErrorCode::NO_ERROR. If err is specified to be
-   * none, no StopSending will be sent.
+   * std::nullopt, no StopSending will be sent.
    *
    * Users should remove the callback via setReadCallback(id, nullptr) after
    * reading an error or eof to allow streams to be reaped by the transport.
@@ -730,7 +730,7 @@ class QuicSocketLite {
    */
   virtual void cancelByteEventCallbacksForStream(
       const StreamId id,
-      const Optional<uint64_t>& offset = none) = 0;
+      const Optional<uint64_t>& offset = std::nullopt) = 0;
 
   /**
    * Cancel byte event callbacks for given type and stream.
@@ -741,7 +741,7 @@ class QuicSocketLite {
   virtual void cancelByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id,
-      const Optional<uint64_t>& offset = none) = 0;
+      const Optional<uint64_t>& offset = std::nullopt) = 0;
 
   /**
    * Sets the size of the given stream's receive window, or the connection
@@ -879,7 +879,7 @@ class QuicSocketLite {
 
   /**
    * Get the negotiated ALPN. If called before the transport is ready
-   * returns none
+   * returns std::nullopt
    */
   virtual Optional<std::string> getAppProtocol() const = 0;
 
@@ -888,7 +888,7 @@ class QuicSocketLite {
    */
   virtual uint64_t getConnectionBufferAvailable() const = 0;
 
-  // Returns none before the handshake is complete, otherwise is always
+  // Returns std::nullopt before the handshake is complete, otherwise is always
   // non-empty.
   virtual Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const = 0;

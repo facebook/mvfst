@@ -39,7 +39,7 @@ class FizzClientQuicHandshakeContext
     return verifier_;
   }
 
-  Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname);
+  folly::Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname);
   void putPsk(
       const Optional<std::string>& hostname,
       QuicCachedPsk quicCachedPsk);

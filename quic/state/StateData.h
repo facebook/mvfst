@@ -437,7 +437,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // number and stateless reset token for itself, and if successful, returns it
   // and updates the connection's state to ensure its peer can use it.
   virtual Optional<ConnectionIdData> createAndAddNewSelfConnId() {
-    return none;
+    return std::nullopt;
   }
 
   uint64_t nextSelfConnectionIdSequence{0};

@@ -367,7 +367,7 @@ class QuicStreamManager {
     const auto next = nextAcceptablePeerBidirectionalStreamId_;
     CHECK_GE(max, next);
     if (max == next) {
-      return none;
+      return std::nullopt;
     }
     return next;
   }
@@ -377,7 +377,7 @@ class QuicStreamManager {
     const auto next = nextAcceptablePeerUnidirectionalStreamId_;
     CHECK_GE(max, next);
     if (max == next) {
-      return none;
+      return std::nullopt;
     }
     return next;
   }
@@ -387,7 +387,7 @@ class QuicStreamManager {
     const auto next = nextAcceptableLocalBidirectionalStreamId_;
     CHECK_GE(max, next);
     if (max == next) {
-      return none;
+      return std::nullopt;
     }
     return next;
   }
@@ -397,7 +397,7 @@ class QuicStreamManager {
     const auto next = nextAcceptableLocalUnidirectionalStreamId_;
     CHECK_GE(max, next);
     if (max == next) {
-      return none;
+      return std::nullopt;
     }
     return next;
   }
@@ -620,7 +620,7 @@ class QuicStreamManager {
   Optional<StreamId> popDeliverable() {
     auto itr = deliverableStreams_.begin();
     if (itr == deliverableStreams_.end()) {
-      return none;
+      return std::nullopt;
     }
     StreamId ret = *itr;
     deliverableStreams_.erase(itr);
@@ -650,7 +650,7 @@ class QuicStreamManager {
   Optional<StreamId> popTx() {
     auto itr = txStreams_.begin();
     if (itr == txStreams_.end()) {
-      return none;
+      return std::nullopt;
     } else {
       StreamId ret = *itr;
       txStreams_.erase(itr);
@@ -696,7 +696,7 @@ class QuicStreamManager {
   Optional<StreamId> popFlowControlUpdated() {
     auto itr = flowControlUpdated_.begin();
     if (itr == flowControlUpdated_.end()) {
-      return none;
+      return std::nullopt;
     } else {
       StreamId ret = *itr;
       flowControlUpdated_.erase(itr);

@@ -401,7 +401,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   //                                     ||   [ Value Expected ]   |
   //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
   //  -----|-------------|---------------||------- |----------------|----------
-  //    1  | 25ms (26 ms)|     25ms      ||   25   |  none   | (1)
+  //    1  | 25ms (26 ms)|     25ms      ||   25   |  std::nullopt   | (1)
   {
     const auto rtt = 25ms;
     const auto ackDelay = 26ms;
@@ -928,10 +928,9 @@ TYPED_TEST(
   auto rawPacketProcessor = mockPacketProcessor.get();
   this->getNonConstConn().packetProcessors.push_back(
       std::move(mockPacketProcessor));
-
   EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
     PacketProcessor::PrewriteRequest req;
-    req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}});
+    req.cmsgs = {{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}};
     return req;
   });
 
@@ -943,7 +942,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*rawPacketProcessor2, prewrite()).Times(1).WillOnce([]() {
     PacketProcessor::PrewriteRequest req;
-    req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_DONTFRAG}, 1}});
+    req.cmsgs = {{{IPPROTO_IPV6, IPV6_DONTFRAG}, 1}};
     return req;
   });
 
@@ -956,7 +955,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*rawPacketProcessor3, prewrite()).Times(1).WillOnce([]() {
     PacketProcessor::PrewriteRequest req;
-    req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_DONTFRAG}, 0}});
+    req.cmsgs = {{{IPPROTO_IPV6, IPV6_DONTFRAG}, 0}};
     return req;
   });
 
@@ -993,7 +992,7 @@ TYPED_TEST(
     // Send two packets with the same marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
       PacketProcessor::PrewriteRequest req;
-      req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}});
+      req.cmsgs = {{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}};
       return req;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -1014,7 +1013,7 @@ TYPED_TEST(
   {
     // Send two packets with no marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
-      return none;
+      return std::nullopt;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();
     const auto bufLength = 1700; // Two packets
@@ -1035,7 +1034,7 @@ TYPED_TEST(
     // Send two packets with the same marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
       PacketProcessor::PrewriteRequest req;
-      req.cmsgs.assign({{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}});
+      req.cmsgs = {{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}};
       return req;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -1252,7 +1251,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, HandleIncomingKeyUpdate) {
         // // the following technically ignores lost ACK packets from peer, but
         // // should meet the needs of the majority of tests...
         // getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(0),
-        none /* longHeaderOverride */,
+        std::nullopt /* longHeaderOverride */,
         false /* eof */,
         ProtectionType::KeyPhaseZero));
     pktBuf->coalesce();
@@ -1874,12 +1873,13 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{std::nullopt}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{defaultError}))));
   EXPECT_CALL(*observer, closing(transport, _));
-  transport->close(none);
+  transport->close(std::nullopt);
   Mock::VerifyAndClearExpectations(observer.get());
   EXPECT_CALL(*observer, destroyed(transport, IsNull()));
   this->destroyTransport();
@@ -1913,11 +1913,12 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{std::nullopt}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{defaultError}))));
-  transport->close(none);
+  transport->close(std::nullopt);
 
   // wait for the drain
   EXPECT_CALL(*observer, closing(transport, _));
@@ -1962,11 +1963,12 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{std::nullopt}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{defaultError}))));
-  transport->close(none);
+  transport->close(std::nullopt);
   Mock::VerifyAndClearExpectations(observer.get());
 
   // destroy transport without waiting for drain
@@ -2002,7 +2004,8 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{std::nullopt}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{testError}))));
@@ -2043,7 +2046,8 @@ TYPED_TEST(
           transport,
           AllOf(
               // should not be equal to an empty event
-              testing::Ne(SocketObserverInterface::CloseStartedEvent{none}),
+              testing::Ne(
+                  SocketObserverInterface::CloseStartedEvent{std::nullopt}),
               // should be equal to a populated event with default error
               testing::Eq(
                   SocketObserverInterface::CloseStartedEvent{testError}))));
@@ -3864,10 +3868,10 @@ TYPED_TEST(
             testing::Eq(writeCount)),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
-            testing::Eq(Optional<uint64_t>(none))),
+            testing::Eq(Optional<uint64_t>(std::nullopt))),
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
-            testing::Eq(Optional<uint64_t>(none))),
+            testing::Eq(Optional<uint64_t>(std::nullopt))),
         testing::Field(
             &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),

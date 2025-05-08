@@ -14,7 +14,7 @@
 namespace quic {
 
 void FileQLogger::setDcid(Optional<ConnectionId> connID) {
-  if (connID.hasValue()) {
+  if (connID.has_value()) {
     dcid = connID.value();
     if (streaming_) {
       setupStream();
@@ -23,14 +23,14 @@ void FileQLogger::setDcid(Optional<ConnectionId> connID) {
 }
 
 void FileQLogger::setScid(Optional<ConnectionId> connID) {
-  if (connID.hasValue()) {
+  if (connID.has_value()) {
     scid = connID.value();
   }
 }
 
 void FileQLogger::setupStream() {
   // create the output file
-  if (!dcid.hasValue()) {
+  if (!dcid.has_value()) {
     LOG(ERROR) << "Error: No dcid found";
     return;
   }
@@ -543,7 +543,7 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   if (streaming_) {
     return;
   }
-  if (!dcid.hasValue()) {
+  if (!dcid.has_value()) {
     LOG(ERROR) << "Error: No dcid found";
     return;
   }

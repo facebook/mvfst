@@ -23,7 +23,7 @@ void populateAckFrequencyConfig(
 quic::CongestionControlConfig parseCongestionControlConfig(
     const std::string& ccaConfigJson);
 
-// Same as parse function but returns none on error instead of throwing.
+// Same as parse function but returns std::nullopt on error instead of throwing.
 Optional<quic::CongestionControlConfig> tryParseCongestionControlConfig(
     const std::string& ccaConfigJson);
 } // namespace quic

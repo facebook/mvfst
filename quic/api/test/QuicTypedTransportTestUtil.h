@@ -52,7 +52,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    *
    * If new AppData packets written, returns packet numbers in interval.
    *
-   * @return    Interval of newly written AppData packet numbers, or none.
+   * @return    Interval of newly written AppData packet numbers, or
+   * std::nullopt.
    */
   Optional<NewOutstandingPacketInterval> loopForWrites() {
     // store the next packet number
@@ -72,7 +73,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         true /* includeDeclaredLost */);
 
     if (it == getConn().outstandings.packets.rend()) {
-      return none;
+      return std::nullopt;
     }
     const auto& packet = it->packet;
     const auto& metadata = it->metadata;
@@ -82,7 +83,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     // if packet number of last AppData packet < nextAppDataPacketNum, then
     // we sent nothing new and we have nothing to do...
     if (lastAppDataPacketNum < preSendNextAppDataPacketNum) {
-      return none;
+      return std::nullopt;
     }
 
     // we sent new AppData packets
@@ -235,7 +236,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   quic::BufPtr buildPeerPacketWithStreamData(
       const quic::StreamId streamId,
       BufPtr data,
-      Optional<ProtectionType> shortHeaderProtectionOverride = none) {
+      Optional<ProtectionType> shortHeaderProtectionOverride = std::nullopt) {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
@@ -247,7 +248,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         // // the following technically ignores lost ACK packets from peer, but
         // // should meet the needs of the majority of tests...
         // getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(0),
-        none /* longHeaderOverride */,
+        std::nullopt /* longHeaderOverride */,
         false /* eof */,
         shortHeaderProtectionOverride));
     buf->coalesce();
@@ -268,7 +269,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         *data /* stream data */,
         0 /* cipherOverhead */,
         0 /* largest acked */,
-        none /* longHeaderOverride */,
+        std::nullopt /* longHeaderOverride */,
         true /* eof */));
 
     buf->coalesce();
@@ -467,7 +468,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         getNonConstConn().outstandings.packets.end(),
         findFrameInPacketFunc<Type>());
     if (packetItr == getNonConstConn().outstandings.packets.end()) {
-      return none;
+      return std::nullopt;
     }
     return packetItr->packet.header.getPacketSequenceNum();
   }
@@ -503,8 +504,12 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     auto go() && {
       uint64_t sum = 0;
 
-      const auto& streamId = *CHECK_NOTNULL(maybeStreamId.get_pointer());
-      const auto& packetNums = *CHECK_NOTNULL(maybePacketNums.get_pointer());
+      CHECK(maybeStreamId.has_value()) << "Stream ID must be set";
+      const auto& streamId = maybeStreamId.value();
+
+      CHECK(maybePacketNums.has_value()) << "Packet numbers must be set";
+      const auto& packetNums = maybePacketNums.value();
+
       for (const auto& packetNum : packetNums) {
         const auto packetItr = std::find_if(
             testObj->getNonConstConn().outstandings.packets.begin(),

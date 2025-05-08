@@ -43,7 +43,7 @@ class FileQLogger : public BaseQLogger {
         compress_{compress} {}
 
   ~FileQLogger() override {
-    if (streaming_ && dcid.hasValue()) {
+    if (streaming_ && dcid.has_value()) {
       finishStream();
     }
   }

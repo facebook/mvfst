@@ -124,7 +124,7 @@ class QuicReadCodec {
   /**
    * Tries to parse the packet and returns whether or not
    * it is a version negotiation packet.
-   * This returns none if the packet is either not
+   * This returns std::nullopt if the packet is either not
    * a VN packet or is invalid.
    */
   Optional<VersionNegotiationPacket> tryParsingVersionNegotiation(

@@ -37,10 +37,10 @@ static inline void processQueueIncremental(
     for (size_t i = 0;
          i < (numConcurrentStreams / 8 + shift) * (packetsPerStream - 1);
          i++) {
-      (void)pq.getNextScheduledID(quic::none);
+      (void)pq.getNextScheduledID(std::nullopt);
     }
     for (size_t i = 0; i < (numConcurrentStreams / 8); i++) {
-      auto id = pq.getNextScheduledID(quic::none);
+      auto id = pq.getNextScheduledID(std::nullopt);
       // LOG(INFO) << id.asStreamID();
       pq.erase(id);
     }
@@ -55,7 +55,7 @@ static inline void processQueueSequential(
   for (size_t i = 0; i < numConcurrentStreams; i++) {
     quic::PriorityQueue::Identifier id;
     for (size_t p = 0; p < packetsPerStream; p++) {
-      id = pq.getNextScheduledID(quic::none);
+      id = pq.getNextScheduledID(std::nullopt);
       // LOG(INFO) << id.asStreamID();
     }
     pq.erase(id);
@@ -158,7 +158,7 @@ BENCHMARK(eraseSequential, n) {
       insert(pq, nStreams, false);
     }
     while (!pq.empty()) {
-      pq.erase(pq.getNextScheduledID(quic::none));
+      pq.erase(pq.getNextScheduledID(std::nullopt));
     }
   }
 }
@@ -172,7 +172,7 @@ BENCHMARK(eraseIncremental, n) {
       insert(pq, nStreams, true);
     }
     while (!pq.empty()) {
-      pq.erase(pq.getNextScheduledID(quic::none));
+      pq.erase(pq.getNextScheduledID(std::nullopt));
     }
   }
 }

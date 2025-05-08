@@ -26,22 +26,22 @@ Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
     BufQueue& queue) {
   Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(uint8_t))) {
-    return none;
+    return std::nullopt;
   }
   uint8_t initialByte = cursor.readBE<uint8_t>();
   auto headerForm = getHeaderForm(initialByte);
   if (headerForm != HeaderForm::Long) {
-    return none;
+    return std::nullopt;
   }
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
   if (!longHeaderInvariant) {
     // if it is an invalid packet, it's definitely not a VN packet, so ignore
     // it.
-    return none;
+    return std::nullopt;
   }
   if (longHeaderInvariant->invariant.version !=
       QuicVersion::VERSION_NEGOTIATION) {
-    return none;
+    return std::nullopt;
   }
   return decodeVersionNegotiation(*longHeaderInvariant, cursor);
 }

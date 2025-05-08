@@ -87,7 +87,7 @@ class ClientHandshake : public Handshake {
 
   /**
    * Edge triggered api to obtain whether or not zero rtt data was rejected.
-   * If zero rtt was never attempted, then this will return none. Once
+   * If zero rtt was never attempted, then this will return std::nullopt. Once
    * the result is obtained, the result is cleared out.
    */
   Optional<bool> getZeroRttRejected();

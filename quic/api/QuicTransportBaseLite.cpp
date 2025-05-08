@@ -373,7 +373,7 @@ Optional<LocalErrorCode> QuicTransportBaseLite::shutdownWrite(StreamId id) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return LocalErrorCode::INVALID_OPERATION;
   }
-  return none;
+  return std::nullopt;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -698,7 +698,7 @@ Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
   auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
   CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   conn_->streamManager->setStreamAsControl(*stream);
-  return none;
+  return std::nullopt;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -1222,7 +1222,7 @@ void QuicTransportBaseLite::checkForClosedStream() {
 
   if (closeState_ == CloseState::GRACEFUL_CLOSING &&
       conn_->streamManager->streamCount() == 0) {
-    closeImpl(none);
+    closeImpl(std::nullopt);
   }
 }
 
@@ -1716,7 +1716,7 @@ QuicTransportBaseLite::resetStreamInternal(
       // We can't change the error code across resets for a stream
       return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
-    folly::Optional<uint64_t> maybeReliableSize = folly::none;
+    Optional<uint64_t> maybeReliableSize = std::nullopt;
     if (reliable) {
       maybeReliableSize = stream->reliableResetCheckpoint;
     }
@@ -2544,21 +2544,21 @@ QuicConnectionStats QuicTransportBaseLite::getConnectionsStats() const {
     connStats.numStreams = conn_->streamManager->streams().size();
   }
 
-  if (conn_->clientChosenDestConnectionId.hasValue()) {
+  if (conn_->clientChosenDestConnectionId.has_value()) {
     connStats.clientChosenDestConnectionId =
         conn_->clientChosenDestConnectionId->hex();
   }
-  if (conn_->clientConnectionId.hasValue()) {
+  if (conn_->clientConnectionId.has_value()) {
     connStats.clientConnectionId = conn_->clientConnectionId->hex();
   }
-  if (conn_->serverConnectionId.hasValue()) {
+  if (conn_->serverConnectionId.has_value()) {
     connStats.serverConnectionId = conn_->serverConnectionId->hex();
   }
 
   connStats.totalBytesSent = conn_->lossState.totalBytesSent;
   connStats.totalBytesReceived = conn_->lossState.totalBytesRecvd;
   connStats.totalBytesRetransmitted = conn_->lossState.totalBytesRetransmitted;
-  if (conn_->version.hasValue()) {
+  if (conn_->version.has_value()) {
     connStats.version = static_cast<uint32_t>(*conn_->version);
   }
   return connStats;
@@ -2752,7 +2752,7 @@ QuicTransportBaseLite::getAdditionalCmsgsForAsyncUDPSocket() {
     DCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
     return conn_->socketCmsgsState.additionalCmsgs;
   }
-  return none;
+  return std::nullopt;
 }
 
 void QuicTransportBaseLite::notifyStartWritingFromAppRateLimited() {
@@ -2773,12 +2773,12 @@ void QuicTransportBaseLite::notifyStartWritingFromAppRateLimited() {
                          conn_->congestionController
                              ? Optional<uint64_t>(conn_->congestionController
                                                       ->getCongestionWindow())
-                             : none)
+                             : std::nullopt)
                      .setWritableBytes(
                          conn_->congestionController
                              ? Optional<uint64_t>(conn_->congestionController
                                                       ->getWritableBytes())
-                             : none)
+                             : std::nullopt)
                      .build()](auto observer, auto observed) {
               observer->startWritingFromAppLimited(observed, event);
             });
@@ -2806,12 +2806,12 @@ void QuicTransportBaseLite::notifyPacketsWritten(
                          conn_->congestionController
                              ? Optional<uint64_t>(conn_->congestionController
                                                       ->getCongestionWindow())
-                             : none)
+                             : std::nullopt)
                      .setWritableBytes(
                          conn_->congestionController
                              ? Optional<uint64_t>(conn_->congestionController
                                                       ->getWritableBytes())
-                             : none)
+                             : std::nullopt)
                      .setNumPacketsWritten(numPacketsWritten)
                      .setNumAckElicitingPacketsWritten(
                          numAckElicitingPacketsWritten)
@@ -2840,12 +2840,12 @@ void QuicTransportBaseLite::notifyAppRateLimited() {
                          conn_->congestionController
                              ? Optional<uint64_t>(conn_->congestionController
                                                       ->getCongestionWindow())
-                             : none)
+                             : std::nullopt)
                      .setWritableBytes(
                          conn_->congestionController
                              ? Optional<uint64_t>(conn_->congestionController
                                                       ->getWritableBytes())
-                             : none)
+                             : std::nullopt)
                      .build()](auto observer, auto observed) {
               observer->appRateLimited(observed, event);
             });
@@ -2881,12 +2881,12 @@ void QuicTransportBaseLite::processCallbacksAfterWriteData() {
       auto txCallbacksForStreamIt = txCallbacks_.find(streamId);
       if (txCallbacksForStreamIt == txCallbacks_.end() ||
           txCallbacksForStreamIt->second.empty()) {
-        return none;
+        return std::nullopt;
       }
 
       auto& txCallbacksForStream = txCallbacksForStreamIt->second;
       if (txCallbacksForStream.front().offset > *largestOffsetTxed) {
-        return none;
+        return std::nullopt;
       }
 
       // extract the callback, pop from the queue, then check for cleanup

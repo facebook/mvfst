@@ -648,8 +648,8 @@ TEST_P(QuicPacketSchedulerTest, NoCloningForDSR) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   ASSERT_FALSE(result.hasError());
-  EXPECT_FALSE(result->clonedPacketIdentifier.hasValue());
-  EXPECT_FALSE(result->packet.hasValue());
+  EXPECT_FALSE(result->clonedPacketIdentifier.has_value());
+  EXPECT_FALSE(result->packet.has_value());
 }
 
 TEST_P(QuicPacketSchedulerTest, CloningSchedulerTest) {
@@ -731,7 +731,7 @@ TEST_P(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
       std::move(regularBuilder), kDefaultUDPSendPacketLen);
   ASSERT_FALSE(result.hasError());
   EXPECT_TRUE(
-      result->clonedPacketIdentifier.hasValue() && result->packet.hasValue());
+      result->clonedPacketIdentifier.has_value() && result->packet.has_value());
   EXPECT_EQ(packetNum, result->clonedPacketIdentifier->packetNumber);
   // written packet should not have any frame in the builder
   auto& writtenPacket = *result->packet;
@@ -1113,7 +1113,7 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
                 folly::IOBuf(
                     folly::IOBuf::CopyBufferOp::COPY_BUFFER,
                     "I'm out of the game"));
-            return SchedulingResult(none, std::move(builtPacket));
+            return SchedulingResult(std::nullopt, std::move(builtPacket));
           }));
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
@@ -1122,7 +1122,7 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   ASSERT_FALSE(result.hasError());
-  EXPECT_EQ(none, result->clonedPacketIdentifier);
+  EXPECT_EQ(std::nullopt, result->clonedPacketIdentifier);
   EXPECT_EQ(result->packet->packet.header.getHeaderForm(), HeaderForm::Short);
   ShortHeader& shortHeader = *result->packet->packet.header.asShort();
   EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader.getProtectionType());
@@ -1312,7 +1312,7 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   EXPECT_EQ(conn.udpSendPacketLen, bufferLength);
   auto updateResult = updateConnection(
       conn,
-      none,
+      std::nullopt,
       result->packet->packet,
       Clock::now(),
       bufferLength,
@@ -1390,7 +1390,7 @@ TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   EXPECT_EQ(encodedSize, conn.udpSendPacketLen);
   auto updateResult = updateConnection(
       conn,
-      none,
+      std::nullopt,
       packetResult->packet->packet,
       Clock::now(),
       encodedSize,
@@ -1414,8 +1414,8 @@ TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   auto cloneResult = cloningScheduler.scheduleFramesForPacket(
       std::move(throwawayBuilder), kDefaultUDPSendPacketLen);
   ASSERT_FALSE(cloneResult.hasError());
-  EXPECT_FALSE(cloneResult->packet.hasValue());
-  EXPECT_FALSE(cloneResult->clonedPacketIdentifier.hasValue());
+  EXPECT_FALSE(cloneResult->packet.has_value());
+  EXPECT_FALSE(cloneResult->clonedPacketIdentifier.has_value());
 }
 
 class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};
@@ -1434,7 +1434,7 @@ TEST_P(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
   conn.ackStates.handshakeAckState->largestAckScheduled = 200;
   EXPECT_FALSE(hasAcksToSchedule(*conn.ackStates.handshakeAckState));
 
-  conn.ackStates.handshakeAckState->largestAckScheduled = none;
+  conn.ackStates.handshakeAckState->largestAckScheduled = std::nullopt;
   EXPECT_TRUE(hasAcksToSchedule(*conn.ackStates.handshakeAckState));
 }
 
@@ -1458,16 +1458,16 @@ TEST_P(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
   conn.ackStates.handshakeAckState->largestAckScheduled = 200;
   EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
 
-  conn.ackStates.handshakeAckState->largestAckScheduled = none;
+  conn.ackStates.handshakeAckState->largestAckScheduled = std::nullopt;
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
 TEST_P(QuicPacketSchedulerTest, LargestAckToSend) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  EXPECT_EQ(none, largestAckToSend(*conn.ackStates.initialAckState));
-  EXPECT_EQ(none, largestAckToSend(*conn.ackStates.handshakeAckState));
-  EXPECT_EQ(none, largestAckToSend(conn.ackStates.appDataAckState));
+  EXPECT_EQ(std::nullopt, largestAckToSend(*conn.ackStates.initialAckState));
+  EXPECT_EQ(std::nullopt, largestAckToSend(*conn.ackStates.handshakeAckState));
+  EXPECT_EQ(std::nullopt, largestAckToSend(conn.ackStates.appDataAckState));
 
   conn.ackStates.initialAckState->acks.insert(0, 50);
   conn.ackStates.handshakeAckState->acks.insert(0, 50);
@@ -1475,7 +1475,7 @@ TEST_P(QuicPacketSchedulerTest, LargestAckToSend) {
 
   EXPECT_EQ(50, *largestAckToSend(*conn.ackStates.initialAckState));
   EXPECT_EQ(150, *largestAckToSend(*conn.ackStates.handshakeAckState));
-  EXPECT_EQ(none, largestAckToSend(conn.ackStates.appDataAckState));
+  EXPECT_EQ(std::nullopt, largestAckToSend(conn.ackStates.appDataAckState));
 }
 
 TEST_P(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
@@ -1503,7 +1503,7 @@ TEST_P(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
   conn.ackStates.handshakeAckState->largestAckScheduled = 200;
   EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
 
-  conn.ackStates.handshakeAckState->largestAckScheduled = none;
+  conn.ackStates.handshakeAckState->largestAckScheduled = std::nullopt;
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
@@ -1958,7 +1958,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          conn, std::nullopt, packet1, Clock::now(), 1000, 0, false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -1988,7 +1988,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */)
+          conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
@@ -2036,7 +2036,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          conn, std::nullopt, packet1, Clock::now(), 1000, 0, false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2081,7 +2081,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, none, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          conn, std::nullopt, packet1, Clock::now(), 1000, 0, false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2111,7 +2111,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */)
+          conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
@@ -2161,7 +2161,7 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_TRUE(updateConnection(
-      conn, none, packet1, Clock::now(), 1200, 0, false /* isDSR */));
+      conn, std::nullopt, packet1, Clock::now(), 1200, 0, false /* isDSR */));
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(highPriStreamId, writeStreamFrame1.streamId);
@@ -2196,7 +2196,7 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
   scheduler.writeStreams(builder2);
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_TRUE(updateConnection(
-      conn, none, packet2, Clock::now(), 1000, 0, false /* isDSR */));
+      conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */));
   ASSERT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame3 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(highPriStreamId, writeStreamFrame3.streamId);
@@ -2244,7 +2244,7 @@ TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, none, packet1, Clock::now(), 1200, 0, false /* isDSR */)
+          conn, std::nullopt, packet1, Clock::now(), 1200, 0, false /* isDSR */)
           .hasError());
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2277,7 +2277,7 @@ TEST_P(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
   stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   BufferMeta bufferMeta(5000);
   ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
-  EXPECT_TRUE(stream->finalWriteOffset.hasValue());
+  EXPECT_TRUE(stream->finalWriteOffset.has_value());
 
   stream->writeBufMeta.split(5000);
   ASSERT_EQ(0, stream->writeBufMeta.length);
@@ -2321,7 +2321,7 @@ TEST_P(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
   stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   BufferMeta bufferMeta(5000);
   ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
-  EXPECT_TRUE(stream->finalWriteOffset.hasValue());
+  EXPECT_TRUE(stream->finalWriteOffset.has_value());
   PacketNum packetNum = 0;
   ShortHeader header(
       ProtectionType::KeyPhaseOne,
@@ -2560,7 +2560,7 @@ TEST_P(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
   ASSERT_FALSE(result.hasError());
 
   // Verify padding frames were added at start
-  EXPECT_TRUE(result.value().packet.hasValue());
+  EXPECT_TRUE(result.value().packet.has_value());
   const auto& frames = result.value().packet->packet.frames;
   ASSERT_EQ(frames.size(), 3);
   EXPECT_TRUE(frames[0].asPaddingFrame());
@@ -2792,7 +2792,7 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
       cipherOverhead;
   ASSERT_FALSE(updateConnection(
                    conn,
-                   none,
+                   std::nullopt,
                    packetResult1.value().packet->packet,
                    Clock::now(),
                    encodedSize1,
@@ -2822,7 +2822,7 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
       cipherOverhead;
   ASSERT_FALSE(updateConnection(
                    conn,
-                   none,
+                   std::nullopt,
                    packetResult2.value().packet->packet,
                    Clock::now(),
                    encodedSize2,
@@ -2935,7 +2935,7 @@ TEST_P(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
 
   // Verify padding frames were added
   // at start
-  EXPECT_TRUE(result.value().packet.hasValue());
+  EXPECT_TRUE(result.value().packet.has_value());
   const auto& frames = result.value().packet->packet.frames;
   ASSERT_EQ(frames.size(), 2);
   EXPECT_TRUE(frames[0].asPaddingFrame());
@@ -2992,7 +2992,7 @@ TEST_F(QuicAckSchedulerTest, DefaultAckFrame) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3019,7 +3019,7 @@ TEST_F(QuicAckSchedulerTest, WriteAckEcnWhenReadingEcnOnEgress) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3051,7 +3051,7 @@ TEST_F(QuicAckSchedulerTest, WriteAckReceiveTimestampsWhenEnabled) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3083,7 +3083,7 @@ TEST_F(QuicAckSchedulerTest, AckEcnTakesPrecedenceOverReceiveTimestamps) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3115,7 +3115,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfNotSupported) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3146,7 +3146,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfNotEnabled) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3177,7 +3177,8 @@ TEST_F(
   // Peer sent ART config
   conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
   // We don't have an ART config (i.e. we can't sent ART)
-  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer = none;
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      std::nullopt;
   updateNegotiatedAckFeatures(*conn_);
 
   AckScheduler ackScheduler(*conn_, ackState_);
@@ -3185,7 +3186,7 @@ TEST_F(
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3222,7 +3223,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfECNFeatureNotSupported) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3263,7 +3264,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedWithAllFeatures) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3304,7 +3305,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverECN) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();
@@ -3345,7 +3346,7 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
 
   auto writeResult = ackScheduler.writeNextAcks(*builder_);
   ASSERT_FALSE(writeResult.hasError());
-  ASSERT_TRUE(writeResult.value() != none);
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
   ASSERT_EQ(builder_->frames_.size(), 1);
 
   auto ackFrame = builder_->frames_[0].asWriteAckFrame();

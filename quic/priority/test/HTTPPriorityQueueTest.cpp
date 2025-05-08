@@ -52,7 +52,7 @@ TEST_F(HTTPPriorityQueueTest, InsertSingleElement) {
   auto priority = HTTPPriorityQueue::Priority(0, false);
   queue_.insertOrUpdate(id, priority);
   EXPECT_FALSE(queue_.empty());
-  EXPECT_EQ(queue_.getNextScheduledID(quic::none), id);
+  EXPECT_EQ(queue_.getNextScheduledID(std::nullopt), id);
 }
 
 TEST_F(HTTPPriorityQueueTest, InsertMultipleElements) {
@@ -62,10 +62,10 @@ TEST_F(HTTPPriorityQueueTest, InsertMultipleElements) {
   auto priority2 = HTTPPriorityQueue::Priority(1, false);
   queue_.insertOrUpdate(id1, priority1);
   queue_.insertOrUpdate(id2, priority2);
-  EXPECT_EQ(queue_.getNextScheduledID(quic::none), id1);
-  EXPECT_EQ(queue_.getNextScheduledID(quic::none), id1);
+  EXPECT_EQ(queue_.getNextScheduledID(std::nullopt), id1);
+  EXPECT_EQ(queue_.getNextScheduledID(std::nullopt), id1);
   queue_.erase(id1);
-  EXPECT_EQ(queue_.getNextScheduledID(quic::none), id2);
+  EXPECT_EQ(queue_.getNextScheduledID(std::nullopt), id2);
 }
 
 TEST_F(HTTPPriorityQueueTest, UpdatePriority) {
@@ -74,9 +74,9 @@ TEST_F(HTTPPriorityQueueTest, UpdatePriority) {
   queue_.insertOrUpdate(id, priority);
   auto newPriority = HTTPPriorityQueue::Priority(1, false);
   queue_.updateIfExist(id, newPriority);
-  EXPECT_EQ(queue_.getNextScheduledID(quic::none), id);
+  EXPECT_EQ(queue_.getNextScheduledID(std::nullopt), id);
   queue_.updateIfExist(id, newPriority);
-  EXPECT_EQ(queue_.getNextScheduledID(quic::none), id);
+  EXPECT_EQ(queue_.getNextScheduledID(std::nullopt), id);
 }
 
 TEST_F(HTTPPriorityQueueTest, EraseElement) {
@@ -100,7 +100,7 @@ TEST_F(HTTPPriorityQueueTest, HeapUpOnErase) {
     if (i == 5) {
       continue;
     }
-    EXPECT_EQ(queue_.getNextScheduledID(quic::none).asUint64(), i);
+    EXPECT_EQ(queue_.getNextScheduledID(std::nullopt).asUint64(), i);
     queue_.erase(Identifier::fromStreamID(i));
   }
   EXPECT_TRUE(queue_.empty());
@@ -115,9 +115,9 @@ TEST_F(HTTPPriorityQueueTest, UpdateIncrementalToNonIncremental) {
 
   // Update from incremental to non-incremental (updateIfExist)
   queue_.updateIfExist(id, HTTPPriorityQueue::Priority(0, false));
-  EXPECT_TRUE(queue_.getNextScheduledID(quic::none) == id);
+  EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id);
   queue_.erase(id);
-  EXPECT_TRUE(queue_.getNextScheduledID(quic::none) == id2);
+  EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id2);
   // Update from incremental to non-incremental (insertOrUpdate)
   queue_.insertOrUpdate(id2, HTTPPriorityQueue::Priority(0, false));
   EXPECT_TRUE(queue_.headPriority() == HTTPPriorityQueue::Priority(0, false));
@@ -134,8 +134,8 @@ TEST_F(HTTPPriorityQueueTest, UpdateNonIncrementalToIncremental) {
   priority = HTTPPriorityQueue::Priority(0, true);
   queue_.updateIfExist(id, priority);
   EXPECT_TRUE(queue_.contains(id));
-  EXPECT_TRUE(queue_.getNextScheduledID(quic::none) == id2);
-  EXPECT_TRUE(queue_.getNextScheduledID(quic::none) == id);
+  EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id2);
+  EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id);
 }
 
 TEST_F(HTTPPriorityQueueTest, UpdateIncrementalUrgency) {
@@ -147,7 +147,7 @@ TEST_F(HTTPPriorityQueueTest, UpdateIncrementalUrgency) {
   priority = HTTPPriorityQueue::Priority(1, true);
   queue_.updateIfExist(id, priority);
   EXPECT_TRUE(queue_.contains(id));
-  EXPECT_TRUE(queue_.getNextScheduledID(quic::none) == id);
+  EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id);
   EXPECT_TRUE(queue_.headPriority() == HTTPPriorityQueue::Priority(1, true));
 }
 
@@ -159,7 +159,7 @@ TEST_F(HTTPPriorityQueueTest, InsertOrUpdateNoOp) {
   // Update urgency of incremental priority from 0 -> 1
   queue_.updateIfExist(id, HTTPPriorityQueue::Priority(1, true));
   EXPECT_TRUE(queue_.contains(id));
-  EXPECT_TRUE(queue_.getNextScheduledID(quic::none) == id);
+  EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id);
   EXPECT_TRUE(queue_.headPriority() == HTTPPriorityQueue::Priority(1, true));
 }
 
@@ -274,7 +274,7 @@ TEST_F(HTTPPriorityQueueTest, ComplexOperations) {
     CHECK(lastPriority == headPriority || lastPriority < headPriority);
     lastPriority = headPriority;
     auto nextId = queue_.peekNextScheduledID();
-    queue_.consume(quic::none);
+    queue_.consume(std::nullopt);
     CHECK_EQ(nextId.asUint64(), expectedOrder.front());
     expectedOrder.pop_front();
     auto expectedPri = ids[nextId.asUint64()];

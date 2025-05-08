@@ -469,7 +469,7 @@ constexpr std::string_view kCongestionControlCopaStr = "copa";
 constexpr std::string_view kCongestionControlCopa2Str = "copa2";
 constexpr std::string_view kCongestionControlNewRenoStr = "newreno";
 constexpr std::string_view kCongestionControlStaticCwndStr = "staticcwnd";
-constexpr std::string_view kCongestionControlNoneStr = "none";
+constexpr std::string_view kCongestionControlNoneStr = "std::nullopt";
 
 constexpr DurationRep kPersistentCongestionThreshold = 3;
 enum class CongestionControlType : uint8_t {

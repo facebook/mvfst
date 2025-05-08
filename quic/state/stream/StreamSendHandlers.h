@@ -18,7 +18,7 @@ namespace quic {
 [[nodiscard]] folly::Expected<folly::Unit, QuicError> sendRstSMHandler(
     QuicStreamState& stream,
     ApplicationErrorCode errorCode,
-    const Optional<uint64_t>& reliableSize = folly::none);
+    const Optional<uint64_t>& reliableSize = std::nullopt);
 
 [[nodiscard]] folly::Expected<folly::Unit, QuicError> sendAckSMHandler(
     QuicStreamState& stream,
@@ -26,6 +26,6 @@ namespace quic {
 
 [[nodiscard]] folly::Expected<folly::Unit, QuicError> sendRstAckSMHandler(
     QuicStreamState& stream,
-    folly::Optional<uint64_t> reliableSize);
+    Optional<uint64_t> reliableSize);
 
 } // namespace quic

@@ -25,7 +25,7 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
  public:
   explicit SimpleThrottlingSignalProvider(
       SimulatedTBF::Config config,
-      Optional<uint64_t> burstRateBytesPerSecond = none)
+      Optional<uint64_t> burstRateBytesPerSecond = std::nullopt)
       : stbf_(std::move(config)),
         burstRateBytesPerSecond_(std::move(burstRateBytesPerSecond)) {}
 
@@ -42,10 +42,10 @@ class SimpleThrottlingSignalProvider : public PacketProcessor,
     ThrottlingSignal signal = {};
     signal.state = availTokens > 0 ? ThrottlingSignal::State::Burst
                                    : ThrottlingSignal::State::Throttled;
-    signal.maybeBytesToSend.assign((uint64_t)availTokens);
-    signal.maybeThrottledRateBytesPerSecond.assign(
-        (uint64_t)stbf_.getRateBytesPerSecond());
-    signal.maybeBurstRateBytesPerSecond.assign(burstRateBytesPerSecond_);
+    signal.maybeBytesToSend = (uint64_t)availTokens;
+    signal.maybeThrottledRateBytesPerSecond =
+        (uint64_t)stbf_.getRateBytesPerSecond();
+    signal.maybeBurstRateBytesPerSecond = burstRateBytesPerSecond_;
     return signal;
   }
 
@@ -158,7 +158,7 @@ TEST(
     bbr.onPacketAckOrLoss(
         makeAck(
             pn, 2000, now + std::chrono::milliseconds{5}, packet.metadata.time),
-        none);
+        std::nullopt);
     auto maybeSignal = signalProvider->getCurrentThrottlingSignal();
     ASSERT_TRUE(maybeSignal.has_value());
     ASSERT_TRUE(bbr.getBandwidth().has_value());

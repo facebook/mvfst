@@ -28,24 +28,24 @@ class RoundRobinTest : public ::testing::Test {
 TEST_F(RoundRobinTest, AdvanceAfterNext) {
   rr_.advanceAfterBytes(3); // force 100% coverage in next call
   rr_.advanceAfterNext(3);
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(3));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(3));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
 }
 
 TEST_F(RoundRobinTest, AdvanceAfterBytes) {
   rr_.advanceAfterBytes(10);
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
   EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
   EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
   EXPECT_EQ(rr_.getNext(10), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
 }
 
 TEST_F(RoundRobinTest, Empty) {
@@ -59,13 +59,13 @@ TEST_F(RoundRobinTest, Erase) {
   EXPECT_FALSE(rr_.erase(Identifier())); // doesn't match anything
 
   auto id1 = Identifier::fromStreamID(1);
-  EXPECT_EQ(rr_.getNext(quic::none), id1);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id1);
   EXPECT_TRUE(rr_.erase(id1));
   // erase head resets current - id2 gets two nexts
 
   auto id2 = Identifier::fromStreamID(2);
-  EXPECT_EQ(rr_.getNext(quic::none), id2);
-  EXPECT_EQ(rr_.getNext(quic::none), id2);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id2);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id2);
   // erase head - 1
   EXPECT_TRUE(rr_.erase(id2));
   rr_.insert(id1);
@@ -74,28 +74,28 @@ TEST_F(RoundRobinTest, Erase) {
   EXPECT_TRUE(rr_.erase(id1));
 
   auto id3 = Identifier::fromStreamID(3);
-  EXPECT_EQ(rr_.getNext(quic::none), id3);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id3);
 
   EXPECT_TRUE(rr_.erase(id3));
   EXPECT_TRUE(rr_.empty());
 }
 
 TEST_F(RoundRobinTest, EraseInMiddleBeforeHead) {
-  rr_.getNext(quic::none);
-  rr_.getNext(quic::none);
+  rr_.getNext(std::nullopt);
+  rr_.getNext(std::nullopt);
 
   auto id2 = Identifier::fromStreamID(2);
   EXPECT_TRUE(rr_.erase(id2));
 
   auto id3 = Identifier::fromStreamID(3);
-  EXPECT_EQ(rr_.getNext(quic::none), id3);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id3);
 
   auto id1 = Identifier::fromStreamID(1);
-  EXPECT_EQ(rr_.getNext(quic::none), id1);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id1);
 }
 
 TEST_F(RoundRobinTest, GetNext) {
-  EXPECT_EQ(rr_.getNext(quic::none), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
 }
 
 TEST_F(RoundRobinTest, PeekAndClear) {
@@ -128,7 +128,7 @@ TEST_F(RoundRobinTest, Index) {
     rr_.insert(Identifier::fromStreamID(i));
   }
   for (size_t i = 0; i < 20; i++) {
-    rr_.getNext(quic::none);
+    rr_.getNext(std::nullopt);
   }
   for (size_t i = 1; i < 20; i++) {
     EXPECT_TRUE(rr_.erase(Identifier::fromStreamID(i)));

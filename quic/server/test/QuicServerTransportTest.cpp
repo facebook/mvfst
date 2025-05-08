@@ -46,14 +46,14 @@ Optional<QuicFrame> getFrameIfPresent(
       return frame;
     }
   }
-  return none;
+  return std::nullopt;
 }
 
 bool verifyFramePresent(
     std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
     QuicReadCodec& readCodec,
     QuicFrame::Type frameType) {
-  return getFrameIfPresent(socketWrites, readCodec, frameType).hasValue();
+  return getFrameIfPresent(socketWrites, readCodec, frameType).has_value();
 }
 
 struct MigrationParam {
@@ -95,7 +95,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   ASSERT_TRUE(res.hasValue());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
@@ -109,7 +109,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   ASSERT_TRUE(res.hasValue());
   dataLen = *res;
   ASSERT_TRUE(dataLen);
@@ -121,13 +121,13 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   // Clear out the existing acks to make sure that we are the cause of the acks.
   server->getNonConstConn().ackStates.initialAckState->acks.clear();
   server->getNonConstConn().ackStates.initialAckState->largestRecvdPacketTime =
-      none;
+      std::nullopt;
   server->getNonConstConn().ackStates.handshakeAckState->acks.clear();
   server->getNonConstConn()
-      .ackStates.handshakeAckState->largestRecvdPacketTime = none;
+      .ackStates.handshakeAckState->largestRecvdPacketTime = std::nullopt;
   server->getNonConstConn().ackStates.appDataAckState.acks.clear();
   server->getNonConstConn().ackStates.appDataAckState.largestRecvdPacketTime =
-      none;
+      std::nullopt;
 
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2); // for x08, x0C
   deliverData(packetToBuf(packet));
@@ -564,7 +564,7 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
                    buf->computeChainDataLength(),
                    buf->computeChainDataLength(),
                    true,
-                   none /* skipLenHint */)
+                   std::nullopt /* skipLenHint */)
                    .hasError());
   writeStreamFrameData(builder, buf->clone(), buf->computeChainDataLength());
   std::string errMsg = "Mind the gap";
@@ -783,7 +783,7 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
                    data->computeChainDataLength(),
                    data->computeChainDataLength(),
                    false,
-                   none /* skipLenHint */)
+                   std::nullopt /* skipLenHint */)
                    .hasError());
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
@@ -1100,7 +1100,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       0,
       10,
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   ASSERT_TRUE(res.hasValue());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen.has_value());
@@ -1207,7 +1207,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   EXPECT_CALL(
       connCallback, onStopSending(_, GenericApplicationErrorCode::UNKNOWN))
       .WillOnce(Invoke([&](StreamId /*sid*/, ApplicationErrorCode /*e*/) {
-        server->close(none);
+        server->close(std::nullopt);
       }));
   EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
 }
@@ -1937,7 +1937,7 @@ INSTANTIATE_TEST_SUITE_P(
     QuicServerTransportMigrationTests,
     QuicServerTransportAllowMigrationTest,
     Values(
-        MigrationParam{none},
+        MigrationParam{std::nullopt},
         MigrationParam{2},
         MigrationParam{4},
         MigrationParam{9},
@@ -3182,7 +3182,7 @@ TEST_F(QuicServerTransportTest, ImmediateAckValid) {
   ASSERT_NO_THROW(deliverData(packetToBuf(packet)));
   // An ACK has been scheduled for AppData number space.
   EXPECT_TRUE(server->getConn()
-                  .ackStates.appDataAckState.largestAckScheduled.hasValue());
+                  .ackStates.appDataAckState.largestAckScheduled.has_value());
   EXPECT_EQ(
       server->getConn().ackStates.appDataAckState.largestAckScheduled.value_or(
           packetNum + 1),
@@ -3210,7 +3210,7 @@ TEST_F(QuicServerTransportTest, ImmediateAckProtocolViolation) {
   auto packet = std::move(builder).buildPacket();
   // This should throw a protocol violation error
   ASSERT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
-  // Verify that none of the ack states have changed
+  // Verify that std::nullopt of the ack states have changed
   EXPECT_FALSE(
       server->getConn().ackStates.initialAckState->needsToSendAckImmediately);
   EXPECT_FALSE(
@@ -3531,7 +3531,7 @@ TEST_F(QuicServerTransportTest, InvokeTxCallbacksSingleByteDSR) {
   // an error. So, onByteEventCanceled should be called only once.
   EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 2)))
       .Times(1);
-  server->close(none);
+  server->close(std::nullopt);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
 
@@ -3589,7 +3589,7 @@ TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
   // unsentByteDeliveryCb::onByteEvent will never get called
   // cancel gets called instead
   EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 2)).Times(1);
-  server->close(none);
+  server->close(std::nullopt);
   Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
 }
 
@@ -3880,8 +3880,8 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       /*fin=*/true,
-      /*skipLenHint=*/none);
-  ASSERT_TRUE(res.hasValue());
+      /*skipLenHint=*/std::nullopt);
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   writeStreamFrameData(
       builder,
@@ -3924,8 +3924,8 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       /*eof=*/true,
-      /*skipLenHint=*/none);
-  ASSERT_TRUE(res.hasValue());
+      /*skipLenHint=*/std::nullopt);
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   writeStreamFrameData(
       builder,
@@ -3969,8 +3969,8 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       /*eof=*/true,
-      /*skipLenHint=*/none);
-  ASSERT_TRUE(res.hasValue());
+      /*skipLenHint=*/std::nullopt);
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   writeStreamFrameData(
       builder,
@@ -4567,7 +4567,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
       QuicFrame::Type::ReadNewTokenFrame);
 
   EXPECT_TRUE(
-      clientParsedFrame.hasValue() && clientParsedFrame->asReadNewTokenFrame());
+      clientParsedFrame.has_value() &&
+      clientParsedFrame->asReadNewTokenFrame());
 
   auto clientReadNewTokenFrame = clientParsedFrame->asReadNewTokenFrame();
 
@@ -4860,7 +4861,7 @@ TEST_P(
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       false));
   deliverData(std::move(packetData));
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);

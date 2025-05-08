@@ -102,7 +102,7 @@ void updateAckSendStateOnRecvPacket(
   DCHECK(!pktHasCryptoData || pktHasRetransmittableData);
   auto thresh = kNonRtxRxPacketsPendingBeforeAck;
   if (pktHasRetransmittableData || ackState.numRxPacketsRecvd) {
-    if (ackState.tolerance.hasValue()) {
+    if (ackState.tolerance.has_value()) {
       thresh = ackState.tolerance.value();
     } else {
       thresh = ackState.largestRecvdPacketNum.value_or(0) >
@@ -373,7 +373,7 @@ std::pair<Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
     const EnumArray<PacketNumberSpace, Optional<TimePoint>>& times,
     bool considerAppData) noexcept {
   std::pair<Optional<TimePoint>, PacketNumberSpace> res = {
-      none, PacketNumberSpace::Initial};
+      std::nullopt, PacketNumberSpace::Initial};
   for (PacketNumberSpace pns : times.keys()) {
     if (!times[pns]) {
       continue;
@@ -417,7 +417,7 @@ uint64_t addPacketToAckState(
   }
   static_assert(Clock::is_steady, "Needs steady clock");
 
-  ackState.lastRecvdPacketInfo.assign({packetNum, udpPacket.timings});
+  ackState.lastRecvdPacketInfo = {packetNum, udpPacket.timings};
 
   if (packetNum >= expectedNextPacket) {
     if (ackState.recvdPacketInfos.size() ==

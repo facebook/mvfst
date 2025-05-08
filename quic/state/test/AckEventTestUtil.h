@@ -35,8 +35,9 @@ struct AckEventStreamDetailsMatcherBuilder {
   Builder&& clearDupAckedStreamIntervals();
 
   auto build() && {
+    CHECK(maybeStreamId.has_value());
     return ::testing::Pair(
-        *CHECK_NOTNULL(maybeStreamId.get_pointer()),
+        maybeStreamId.value(),
         ::testing::Field(
             &AckEvent::AckPacket::StreamDetails::dupAckedStreamIntervals,
             dupAckedStreamIntervals));

@@ -34,7 +34,7 @@ TEST_F(CubicTest, AckIncreaseWritable) {
 
   // Acking 50, now inflight become 50. Cwnd is init + 50
   cubic.onPacketAckOrLoss(
-      makeAck(0, 50, Clock::now(), packet.metadata.time), none);
+      makeAck(0, 50, Clock::now(), packet.metadata.time), std::nullopt);
   EXPECT_EQ(initCwnd, cubic.getWritableBytes());
 }
 
@@ -50,7 +50,7 @@ TEST_F(CubicTest, PersistentCongestion) {
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet);
   loss.persistentCongestion = true;
-  cubic.onPacketAckOrLoss(none, std::move(loss));
+  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
   // Cwnd should be dropped to minCwnd:
   EXPECT_EQ(
@@ -61,7 +61,8 @@ TEST_F(CubicTest, PersistentCongestion) {
   auto packet2 = makeTestingWritePacket(1, initCwnd / 2, initCwnd / 2 + 1000);
   cubic.onPacketSent(packet2);
   cubic.onPacketAckOrLoss(
-      makeAck(1, initCwnd / 2, Clock::now(), packet2.metadata.time), none);
+      makeAck(1, initCwnd / 2, Clock::now(), packet2.metadata.time),
+      std::nullopt);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
   // Verify both lastMaxCwndBytes and lastReductionTime are also reset in
@@ -72,7 +73,7 @@ TEST_F(CubicTest, PersistentCongestion) {
   auto packet3 = makeTestingWritePacket(2, 3000, initCwnd / 2 + 1000 + 3000);
   cubic.onPacketSent(packet3);
   cubic.onPacketAckOrLoss(
-      makeAck(2, 3000, Clock::now(), packet3.metadata.time), none);
+      makeAck(2, 3000, Clock::now(), packet3.metadata.time), std::nullopt);
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
@@ -126,7 +127,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   conn.lossState.largestSent = 0;
   cubic.onPacketSent(packet0);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet0.metadata.time), none);
+      makeAck(0, 1000, Clock::now(), packet0.metadata.time), std::nullopt);
   // Cwnd increased by 1000, inflight = 0:
   EXPECT_EQ(3000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Steady, cubic.state());
@@ -143,17 +144,17 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   EXPECT_EQ(0, cubic.getWritableBytes());
 
   cubic.onPacketAckOrLoss(
-      makeAck(1, 1000, Clock::now(), packet1.metadata.time), none);
+      makeAck(1, 1000, Clock::now(), packet1.metadata.time), std::nullopt);
   // Cwnd >= 3000, inflight = 2000:
   EXPECT_GE(cubic.getWritableBytes(), 1000);
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet2);
-  cubic.onPacketAckOrLoss(none, std::move(loss));
+  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
   // Cwnd >= 2100, inflight = 1000:
   EXPECT_GE(cubic.getWritableBytes(), 1100);
   // This won't bring state machine back to Steady since endOfRecovery = 3
   cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, Clock::now(), packet3.metadata.time), none);
+      makeAck(3, 1000, Clock::now(), packet3.metadata.time), std::nullopt);
   // Cwnd no change, inflight = 0:
   EXPECT_GE(cubic.getWritableBytes(), 2100);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
@@ -163,7 +164,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   cubic.onPacketSent(packet4);
   // This will bring state machine back to steady
   cubic.onPacketAckOrLoss(
-      makeAck(4, 1000, Clock::now(), packet4.metadata.time), none);
+      makeAck(4, 1000, Clock::now(), packet4.metadata.time), std::nullopt);
   EXPECT_GE(cubic.getWritableBytes(), 2100);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
@@ -189,7 +190,7 @@ TEST_F(CubicTest, AppIdle) {
   auto maxCwnd = cubic.getCongestionWindow();
   CongestionController::LossEvent loss(reductionTime);
   loss.addLostPacket(packet);
-  cubic.onPacketAckOrLoss(none, std::move(loss));
+  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
   auto timeToOrigin = ::cbrt(
       (maxCwnd - cubic.getCongestionWindow()) * 1000 * 1000 /
       conn.udpSendPacketLen * 2500);
@@ -198,7 +199,8 @@ TEST_F(CubicTest, AppIdle) {
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   cubic.onPacketSent(packet1);
   cubic.onPacketAckOrLoss(
-      makeAck(1, 1000, reductionTime + 1000ms, packet1.metadata.time), none);
+      makeAck(1, 1000, reductionTime + 1000ms, packet1.metadata.time),
+      std::nullopt);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
   EXPECT_GT(cubic.getCongestionWindow(), cwnd);
   cwnd = cubic.getCongestionWindow();
@@ -208,7 +210,8 @@ TEST_F(CubicTest, AppIdle) {
   auto packet2 = makeTestingWritePacket(2, 1000, 3000);
   cubic.onPacketSent(packet2);
   cubic.onPacketAckOrLoss(
-      makeAck(2, 1000, reductionTime + 2000ms, packet2.metadata.time), none);
+      makeAck(2, 1000, reductionTime + 2000ms, packet2.metadata.time),
+      std::nullopt);
   EXPECT_EQ(cubic.getCongestionWindow(), cwnd);
 
   // 1 seconds of quiescence
@@ -217,7 +220,8 @@ TEST_F(CubicTest, AppIdle) {
   auto packet3 = makeTestingWritePacket(3, 1000, 4000);
   cubic.onPacketSent(packet3);
   cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, reductionTime + 3000ms, packet3.metadata.time), none);
+      makeAck(3, 1000, reductionTime + 3000ms, packet3.metadata.time),
+      std::nullopt);
   EXPECT_GT(cubic.getCongestionWindow(), cwnd);
 
   auto expectedDelta = static_cast<int64_t>(std::floor(
@@ -258,7 +262,7 @@ TEST_F(CubicTest, PacingGain) {
             EXPECT_EQ(cubic.getCongestionWindow() * 2, cwndBytes);
           }));
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1500, Clock::now(), packet.metadata.time), none);
+      makeAck(0, 1500, Clock::now(), packet.metadata.time), std::nullopt);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 
   auto packet1 = makeTestingWritePacket(1, 1500, 3000);
@@ -274,7 +278,7 @@ TEST_F(CubicTest, PacingGain) {
                 static_cast<uint64_t>(cubic.getCongestionWindow() * 1.25),
                 cwndBytes);
           }));
-  cubic.onPacketAckOrLoss(none, loss);
+  cubic.onPacketAckOrLoss(std::nullopt, loss);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 
   auto packet2 = makeTestingWritePacket(2, 1500, 4500);
@@ -286,7 +290,7 @@ TEST_F(CubicTest, PacingGain) {
             EXPECT_EQ(cubic.getCongestionWindow(), cwndBytes);
           }));
   cubic.onPacketAckOrLoss(
-      makeAck(2, 1500, Clock::now(), packet2.metadata.time), none);
+      makeAck(2, 1500, Clock::now(), packet2.metadata.time), std::nullopt);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
   std::vector<int> indices =
@@ -309,7 +313,7 @@ TEST_F(CubicTest, PacetLossInvokesPacer) {
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
-  cubic.onPacketAckOrLoss(none, lossEvent);
+  cubic.onPacketAckOrLoss(std::nullopt, lossEvent);
 }
 
 TEST_F(CubicTest, InitCwnd) {

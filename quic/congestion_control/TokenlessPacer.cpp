@@ -127,7 +127,7 @@ std::chrono::microseconds TokenlessPacer::getTimeUntilNextWrite(
 
 uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   auto sendBatch = batchSize_;
-  if (lastWriteTime_.hasValue() && writeInterval_ > 0us &&
+  if (lastWriteTime_.has_value() && writeInterval_ > 0us &&
       conn_.congestionController &&
       !conn_.congestionController->isAppLimited()) {
     // The pacer timer is expected to trigger every writeInterval_
@@ -190,7 +190,7 @@ uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
       }
     }
   }
-  if (!lastWriteTime_.hasValue() || sendBatch > 0) {
+  if (!lastWriteTime_.has_value() || sendBatch > 0) {
     lastWriteTime_ = currentTime;
   }
   return sendBatch;

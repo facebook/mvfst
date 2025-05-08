@@ -154,8 +154,8 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
  public:
   ~AcceptingTicketCipher() override = default;
 
-  folly::SemiFuture<
-      Optional<std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
+  folly::SemiFuture<folly::Optional<
+      std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
   encrypt(fizz::server::ResumptionState) const override {
     // Fake handshake, no need todo anything here.
     return std::make_pair(folly::IOBuf::create(0), 2s);
@@ -193,7 +193,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
   }
 
   folly::SemiFuture<
-      std::pair<fizz::PskType, Optional<fizz::server::ResumptionState>>>
+      std::pair<fizz::PskType, folly::Optional<fizz::server::ResumptionState>>>
   decrypt(std::unique_ptr<folly::IOBuf>) const override {
     return std::make_pair(fizz::PskType::Resumption, createResumptionState());
   }
@@ -314,8 +314,8 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
       data.computeChainDataLength(),
       data.computeChainDataLength(),
       eof,
-      none /* skipLenHint */);
-  CHECK(res.hasValue()) << "failed to write stream frame header";
+      std::nullopt /* skipLenHint */);
+  CHECK(res.has_value()) << "failed to write stream frame header";
   auto dataLen = *res;
   auto dataBuf = data.clone();
   writeStreamFrameData(
@@ -738,8 +738,8 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
           outstandingPacket.packet.header.getPacketSequenceNum())
       .setOutstandingPacketMetadata(outstandingPacket.metadata)
       .setLastAckedPacketInfo(
-          outstandingPacket.lastAckedPacketInfo
-              ? &*outstandingPacket.lastAckedPacketInfo
+          outstandingPacket.lastAckedPacketInfo.has_value()
+              ? &outstandingPacket.lastAckedPacketInfo.value()
               : nullptr)
       .setAppLimited(outstandingPacket.isAppLimited)
       .setDetailsPerStream(

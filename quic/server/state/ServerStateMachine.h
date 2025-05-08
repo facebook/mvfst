@@ -151,7 +151,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   MaxPacingRateKnobState maxPacingRateKnobState{};
 
   // Sequence number of the last received MAX_PACING_RATE_KNOB_SEQUENCED.
-  Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{none};
+  Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{std::nullopt};
 
   Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 

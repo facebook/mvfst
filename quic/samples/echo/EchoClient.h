@@ -271,7 +271,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     if (connectOnly_) {
       evb->runInEventBaseThreadAndWait(
-          [this] { quicClient_->closeNow(folly::none); });
+          [this] { quicClient_->closeNow(std::nullopt); });
       return folly::unit;
     }
 
@@ -291,7 +291,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     auto sendMessageInStream = [&]() {
       if (message == "/close") {
-        quicClient_->close(none);
+        quicClient_->close(std::nullopt);
         closed = true;
         return;
       }

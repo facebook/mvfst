@@ -28,7 +28,9 @@ class Copa2 : public CongestionController {
       const LossEvent* FOLLY_NULLABLE) override;
 
   void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
-    onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
+    onPacketAckOrLoss(
+        ack.has_value() ? &ack.value() : nullptr,
+        loss.has_value() ? &loss.value() : nullptr);
   }
 
   [[nodiscard]] uint64_t getWritableBytes() const noexcept override;

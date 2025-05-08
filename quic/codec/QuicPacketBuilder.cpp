@@ -108,7 +108,7 @@ Optional<PacketNumEncodingResult> encodeShortHeaderHelper(
   if (spaceCounter <
       1U + packetNumberEncoding.length + shortHeader.getConnectionId().size()) {
     spaceCounter = 0;
-    return none;
+    return std::nullopt;
   }
   uint8_t initialByte =
       ShortHeader::kFixedBitMask | (packetNumberEncoding.length - 1);
@@ -254,7 +254,7 @@ void RegularQuicPacketBuilder::markNonEmpty() {
 }
 
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
-  CHECK(packetNumberEncoding_.hasValue());
+  CHECK(packetNumberEncoding_.has_value());
   // at this point everything should been set in the packet_
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
@@ -313,7 +313,7 @@ void RegularQuicPacketBuilder::push(const uint8_t* data, size_t len) {
 }
 
 bool RegularQuicPacketBuilder::canBuildPacket() const noexcept {
-  return remainingBytes_ != 0 && packetNumberEncoding_.hasValue();
+  return remainingBytes_ != 0 && packetNumberEncoding_.has_value();
 }
 
 const PacketHeader& RegularQuicPacketBuilder::getPacketHeader() const {
@@ -729,7 +729,7 @@ const PacketHeader& InplaceQuicPacketBuilder::getPacketHeader() const {
 }
 
 PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
-  CHECK(packetNumberEncoding_.hasValue());
+  CHECK(packetNumberEncoding_.has_value());
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
@@ -802,7 +802,7 @@ void InplaceQuicPacketBuilder::push(const uint8_t* data, size_t len) {
 }
 
 bool InplaceQuicPacketBuilder::canBuildPacket() const noexcept {
-  return remainingBytes_ != 0 && packetNumberEncoding_.hasValue();
+  return remainingBytes_ != 0 && packetNumberEncoding_.has_value();
 }
 
 uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
@@ -840,7 +840,7 @@ InplaceQuicPacketBuilder::~InplaceQuicPacketBuilder() {
 
 folly::Expected<folly::Unit, QuicError>
 RegularQuicPacketBuilder::encodePacketHeader() {
-  CHECK(!packetNumberEncoding_.hasValue());
+  CHECK(!packetNumberEncoding_.has_value());
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     auto result = encodeLongHeader(longHeader, largestAckedPacketNum_);
@@ -856,7 +856,7 @@ RegularQuicPacketBuilder::encodePacketHeader() {
 
 folly::Expected<folly::Unit, QuicError>
 InplaceQuicPacketBuilder::encodePacketHeader() {
-  CHECK(!packetNumberEncoding_.hasValue());
+  CHECK(!packetNumberEncoding_.has_value());
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     auto encodingResult = encodeLongHeaderHelper(

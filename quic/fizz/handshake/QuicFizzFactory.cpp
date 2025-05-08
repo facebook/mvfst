@@ -18,7 +18,7 @@ class QuicPlaintextReadRecordLayer : public fizz::PlaintextReadRecordLayer {
       folly::IOBufQueue& buf,
       fizz::Aead::AeadOptions) override {
     if (buf.empty()) {
-      return quic::none;
+      return folly::none;
     }
     fizz::TLSMessage msg;
     msg.type = fizz::ContentType::handshake;
@@ -38,7 +38,7 @@ class QuicEncryptedReadRecordLayer : public fizz::EncryptedReadRecordLayer {
       folly::IOBufQueue& buf,
       fizz::Aead::AeadOptions) override {
     if (buf.empty()) {
-      return quic::none;
+      return folly::none;
     }
     fizz::TLSMessage msg;
     msg.type = fizz::ContentType::handshake;

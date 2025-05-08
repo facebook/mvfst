@@ -102,7 +102,7 @@ void appendPendingStreamReset(
     QuicConnectionStateBase& conn,
     const QuicStreamState& stream,
     ApplicationErrorCode errorCode,
-    Optional<uint64_t> reliableSize = folly::none);
+    Optional<uint64_t> reliableSize = std::nullopt);
 
 /**
  * Get the largest write offset the stream has seen
@@ -112,7 +112,7 @@ uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream);
 /**
  * Get the largest write offset the stream has transmitted / written to socket.
  *
- * If no bytes have been written to the socket yet, returns none.
+ * If no bytes have been written to the socket yet, returns std::nullopt.
  */
 Optional<uint64_t> getLargestWriteOffsetTxed(const QuicStreamState& stream);
 

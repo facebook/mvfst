@@ -35,6 +35,10 @@ struct QuicError {
     return code == other.code && message == other.message;
   }
 
+  bool operator!=(const QuicError& other) const {
+    return !(*this == other);
+  }
+
   QuicErrorCode code;
   std::string message;
 };

@@ -120,7 +120,7 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
       detailsPerStream.value(),
       lastAckedPacketInfo ? Optional<OutstandingPacket::LastAckedPacketInfo>(
                                 *lastAckedPacketInfo)
-                          : none,
+                          : std::nullopt,
       isAppLimited,
       std::move(receiveRelativeTimeStampUsec));
 }
@@ -137,7 +137,7 @@ void AckEvent::AckPacket::Builder::buildInto(
       detailsPerStream.value(),
       lastAckedPacketInfo ? Optional<OutstandingPacket::LastAckedPacketInfo>(
                                 *lastAckedPacketInfo)
-                          : none,
+                          : std::nullopt,
       isAppLimited,
       std::move(receiveRelativeTimeStampUsec));
 }
@@ -191,14 +191,26 @@ AckEvent AckEvent::Builder::build() && {
 }
 
 AckEvent::AckEvent(AckEvent::BuilderFields&& builderFields)
-    : ackTime(*CHECK_NOTNULL(builderFields.maybeAckTime.get_pointer())),
-      adjustedAckTime(
-          *CHECK_NOTNULL(builderFields.maybeAdjustedAckTime.get_pointer())),
-      ackDelay(builderFields.maybeAckDelay.value()),
-      packetNumberSpace(
-          *CHECK_NOTNULL(builderFields.maybePacketNumberSpace.get_pointer())),
-      largestAckedPacket(
-          *CHECK_NOTNULL(builderFields.maybeLargestAckedPacket.get_pointer())),
+    : ackTime([&]() {
+        CHECK(builderFields.maybeAckTime.has_value());
+        return builderFields.maybeAckTime.value();
+      }()),
+      adjustedAckTime([&]() {
+        CHECK(builderFields.maybeAdjustedAckTime.has_value());
+        return builderFields.maybeAdjustedAckTime.value();
+      }()),
+      ackDelay([&]() {
+        CHECK(builderFields.maybeAckDelay.has_value());
+        return builderFields.maybeAckDelay.value();
+      }()),
+      packetNumberSpace([&]() {
+        CHECK(builderFields.maybePacketNumberSpace.has_value());
+        return builderFields.maybePacketNumberSpace.value();
+      }()),
+      largestAckedPacket([&]() {
+        CHECK(builderFields.maybeLargestAckedPacket.has_value());
+        return builderFields.maybeLargestAckedPacket.value();
+      }()),
       ecnECT0Count(builderFields.ecnECT0Count),
       ecnECT1Count(builderFields.ecnECT1Count),
       ecnCECount(builderFields.ecnCECount),

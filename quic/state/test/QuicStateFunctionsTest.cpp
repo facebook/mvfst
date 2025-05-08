@@ -965,12 +965,12 @@ TEST_F(QuicStateFunctionsTest, RttCalculationExtraRttMetricsStoredInLossState) {
   //    1  | 31ms (5 ms) |     26ms      ||   31   |       26       | (both)
   //    2  | 30ms (3 ms) |     27ms      ||   30   |       26       | (1)
   //    3  | 30ms (8 ms) |     22ms      ||   30   |       22       | (2)
-  //    4  | 37ms (8 ms) |     29ms      ||   30   |       22       | (none)
-  //    5  | 25ms (0 ms) |     29ms      ||   25   |       22       | (1)
-  //    6  | 25ms (4 ms) |     29ms      ||   25   |       21       | (2)
-  //    7  | 20ms (0 ms) |     29ms      ||   20   |       20       | (both)
-  //    8  | 0ms (0 ms)  |     0ms       ||   0    |       0        | (both)
-  //    9  | 0ms (10 ms) |     0ms       ||   0    |       0        | (none)
+  //    4  | 37ms (8 ms) |     29ms      ||   30   |       22       |
+  //    (std::nullopt) 5  | 25ms (0 ms) |     29ms      ||   25   |       22 |
+  //    (1) 6  | 25ms (4 ms) |     29ms      ||   25   |       21       | (2) 7
+  //    | 20ms (0 ms) |     29ms      ||   20   |       20       | (both) 8  |
+  //    0ms (0 ms)  |     0ms       ||   0    |       0        | (both) 9  | 0ms
+  //    (10 ms) |     0ms       ||   0    |       0        | (std::nullopt)
 
   // case 1
   updateRtt(conn, 31ms /* RTT sample */, 5ms /* ack delay */);
@@ -1075,7 +1075,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
       FizzServerQuicHandshakeContext::Builder().build());
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
-  auto result = sendRstAckSMHandler(stream, folly::none);
+  auto result = sendRstAckSMHandler(stream, std::nullopt);
   ASSERT_TRUE(result.hasError());
   ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
   EXPECT_EQ(

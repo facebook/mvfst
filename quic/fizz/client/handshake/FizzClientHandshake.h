@@ -62,7 +62,8 @@ class FizzClientHandshake : public ClientHandshake {
   TLSSummary getTLSSummary() const override;
 
  protected:
-  Optional<QuicCachedPsk> getPsk(const Optional<std::string>& hostname) const;
+  folly::Optional<QuicCachedPsk> getPsk(
+      const Optional<std::string>& hostname) const;
 
   void onNewCachedPsk(fizz::client::NewCachedPsk& newCachedPsk) noexcept;
 

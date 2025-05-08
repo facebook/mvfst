@@ -15,7 +15,7 @@ namespace quic {
 [[nodiscard]] folly::Expected<folly::Unit, QuicError> resetQuicStream(
     QuicStreamState& stream,
     ApplicationErrorCode error,
-    Optional<uint64_t> reliableSize = folly::none);
+    Optional<uint64_t> reliableSize = std::nullopt);
 
 // Common operations to conduct on QuicStreamState when receive reset on it
 [[nodiscard]] folly::Expected<folly::Unit, QuicError> onResetQuicStream(

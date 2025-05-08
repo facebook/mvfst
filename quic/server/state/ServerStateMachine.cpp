@@ -355,10 +355,10 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
-  if (minAckDelay.hasValue()) {
+  if (minAckDelay.has_value()) {
     conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
   }
-  if (maxDatagramFrameSize.hasValue()) {
+  if (maxDatagramFrameSize.has_value()) {
     if (maxDatagramFrameSize.value() > 0 &&
         maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
       return folly::makeUnexpected(QuicError(
@@ -390,14 +390,14 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       isAckReceiveTimestampsEnabled.value() == 1) {
     if (maxReceiveTimestampsPerAck.has_value() &&
         receiveTimestampsExponent.has_value()) {
-      conn.maybePeerAckReceiveTimestampsConfig.assign(
-          {std::min(
-               static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
-               static_cast<uint8_t>(
-                   conn.transportSettings.maxReceiveTimestampsPerAckStored)),
-           std::max(
-               static_cast<uint8_t>(receiveTimestampsExponent.value()),
-               static_cast<uint8_t>(0))});
+      conn.maybePeerAckReceiveTimestampsConfig = {
+          std::min(
+              static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
+              static_cast<uint8_t>(
+                  conn.transportSettings.maxReceiveTimestampsPerAckStored)),
+          std::max(
+              static_cast<uint8_t>(receiveTimestampsExponent.value()),
+              static_cast<uint8_t>(0))};
     }
   }
 
@@ -1242,7 +1242,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         }
         case QuicFrame::Type::RstStreamFrame: {
           RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
-          if (frame.reliableSize.hasValue()) {
+          if (frame.reliableSize.has_value()) {
             return folly::makeUnexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Reliable resets not supported"));
@@ -1752,7 +1752,7 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   LOG_IF(ERROR, encodedTimes == kConnIdEncodingRetryLimit)
       << "Quic CIDRejector rejected all conneectionIDs";
   if (encodedCid.hasError()) {
-    return none;
+    return std::nullopt;
   }
   QUIC_STATS(statsCallback, onConnectionIdCreated, encodedTimes);
   auto newConnIdData =

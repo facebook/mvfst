@@ -28,7 +28,7 @@ TEST_F(RetryTokenGeneratorTest, EncryptDecryptRetryToken) {
   TokenGenerator tokenGenerator(secret);
   RetryToken token(connId, clientIp, clientPort);
   auto maybeEncryptedToken = tokenGenerator.encryptToken(token);
-  ASSERT_TRUE(maybeEncryptedToken.hasValue());
+  ASSERT_TRUE(maybeEncryptedToken.has_value());
 
   // Decrypt the token using another generator
   TokenGenerator tokenGenerator1(secret);
@@ -52,7 +52,7 @@ TEST_F(RetryTokenGeneratorTest, EncryptDecryptNewToken) {
   TokenGenerator tokenGenerator(secret);
   NewToken token(clientIp);
   auto maybeEncryptedToken = tokenGenerator.encryptToken(token);
-  ASSERT_TRUE(maybeEncryptedToken.hasValue());
+  ASSERT_TRUE(maybeEncryptedToken.has_value());
 
   // Decrypt the token using another generator
   TokenGenerator tokenGenerator1(secret);

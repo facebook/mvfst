@@ -91,7 +91,7 @@ QuicAsyncUDPSocket::convertToSocketTimestampExt(
   std::chrono::nanoseconds duration = std::chrono::seconds(ts[0].tv_sec) +
       std::chrono::nanoseconds(ts[0].tv_nsec);
   if (duration == duration.zero()) {
-    return none;
+    return std::nullopt;
   }
 
   ReceivedUdpPacket::Timings::SocketTimestampExt sockTsExt;

@@ -37,7 +37,7 @@ void QuicStreamAsyncTransport::setSocket(
 }
 
 void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
-  CHECK(!id_.hasValue()) << "stream id can only be set once";
+  CHECK(!id_.has_value()) << "stream id can only be set once";
   CHECK(state_ == CloseState::OPEN) << "Current state: " << (int)state_;
 
   id_ = id;
@@ -238,7 +238,7 @@ bool QuicStreamAsyncTransport::isPending() const {
 }
 
 bool QuicStreamAsyncTransport::connecting() const {
-  return !id_.hasValue() && (state_ == CloseState::OPEN);
+  return !id_.has_value() && (state_ == CloseState::OPEN);
 }
 
 bool QuicStreamAsyncTransport::error() const {

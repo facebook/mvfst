@@ -148,8 +148,8 @@ TEST_F(Bbr2Test, GracefullyHandleMissingFields) {
   Bbr2CongestionController bbr2(*conn_);
 
   auto packet = makeTestingWritePacket(0, 0, 0, testStart_);
-  packet.lastAckedPacketInfo.clear();
-  packet.maybeClonedPacketIdentifier.clear();
+  packet.lastAckedPacketInfo.reset();
+  packet.maybeClonedPacketIdentifier.reset();
   EXPECT_NO_THROW(bbr2.onPacketSent(packet));
 
   EXPECT_NO_THROW(bbr2.onPacketAckOrLoss(nullptr, nullptr));

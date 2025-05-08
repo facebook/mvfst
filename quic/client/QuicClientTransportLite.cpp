@@ -534,7 +534,7 @@ QuicClientTransportLite::processUdpPacketData(
         RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
         VLOG(10) << "Client received reset stream=" << frame.streamId << " "
                  << *this;
-        if (frame.reliableSize.hasValue()) {
+        if (frame.reliableSize.has_value()) {
           // We're not yet supporting the handling of RESET_STREAM_AT frames
           return folly::makeUnexpected(QuicError(
               TransportErrorCode::PROTOCOL_VIOLATION,
@@ -2136,7 +2136,7 @@ QuicClientTransportLite::getPeerTransportParams() const {
       return maybeParams->parameters;
     }
   }
-  return none;
+  return std::nullopt;
 }
 
 void QuicClientTransportLite::setCongestionControl(CongestionControlType type) {

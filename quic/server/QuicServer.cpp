@@ -110,7 +110,7 @@ void QuicServer::setRateLimit(
     std::function<uint64_t()> count,
     std::chrono::seconds window) {
   checkRunningInThread(mainThreadId_);
-  rateLimit_ = folly::make_optional<RateLimit>(std::move(count), window);
+  rateLimit_ = tiny::make_optional<RateLimit>(std::move(count), window);
 }
 
 void QuicServer::setUnfinishedHandshakeLimit(std::function<int()> limitFn) {

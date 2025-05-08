@@ -102,7 +102,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
             skippedPacketNum.value() + kDistanceToClearSkippedPacketNumber) {
       // The skipped packet number is far enough in the past, we can stop
       // checking it, or potentially skip another number.
-      skippedPacketNum = folly::none;
+      skippedPacketNum = std::nullopt;
     }
   }
 
@@ -119,8 +119,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   Optional<PacketNum> firstPacketNum =
       (firstOutstandingPacket != conn.outstandings.packets.end())
-      ? folly::make_optional(firstOutstandingPacket->getPacketSequenceNum())
-      : none;
+      ? tiny::make_optional(firstOutstandingPacket->getPacketSequenceNum())
+      : std::nullopt;
 
   uint64_t dsrPacketsAcked = 0;
   Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
@@ -295,7 +295,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
               const auto& packetFrame) -> Optional<PreAckVisitorState> {
         // check if it's a WriteStreamFrame being ACKed
         if (packetFrame.type() != QuicWriteFrame::Type::WriteStreamFrame) {
-          return none;
+          return std::nullopt;
         }
 
         // check if the stream is alive (could be ACK for dead stream)
@@ -303,7 +303,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
         maybeAckedStreamState =
             conn.streamManager->findStream(ackedFrame.streamId);
         if (!maybeAckedStreamState) {
-          return none;
+          return std::nullopt;
         }
 
         // stream is alive and frame is WriteStreamFrame
@@ -411,7 +411,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
         QUIC_STATS(conn.statsCallback, onPersistentCongestion);
       }
     }
-    conn.congestionController->onPacketAckOrLoss(&ack, lossEvent.get_pointer());
+    conn.congestionController->onPacketAckOrLoss(
+        &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     for (auto& packetProcessor : conn.packetProcessors) {
       packetProcessor->onPacketAck(&ack);
     }

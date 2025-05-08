@@ -44,7 +44,7 @@ class BasicQuicPskCache : public QuicPskCache {
     if (result != cache_.end()) {
       return result->second;
     }
-    return none;
+    return std::nullopt;
   }
 
   void putPsk(const std::string& identity, QuicCachedPsk psk) override {

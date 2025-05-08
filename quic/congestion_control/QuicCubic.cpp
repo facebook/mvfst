@@ -330,8 +330,8 @@ void Cubic::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
   // TODO: current code in detectLossPackets only gives back a loss event when
-  // largestLostPacketNum isn't a none. But we should probably also check
-  // against it here anyway just in case the loss code is changed in the
+  // largestLostPacketNum isn't a std::nullopt. But we should probably also
+  // check against it here anyway just in case the loss code is changed in the
   // future.
   if (lossEvent) {
     onPacketLoss(*lossEvent);

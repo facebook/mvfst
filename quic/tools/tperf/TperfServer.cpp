@@ -394,9 +394,9 @@ class TperfStaticCwndCongestionControllerFactory
     } else if (pacerIntervalSource == "lrtt") {
       pacerIntervalSource_ =
           StaticCwndCongestionController::PacerIntervalSource::LatestRtt;
-    } else if (pacerIntervalSource != "none") {
+    } else if (pacerIntervalSource != "std::nullopt") {
       throw std::runtime_error(fmt::format(
-          "Invalid pacer interval source: {}. Valid values are mrtt, srtt, lrtt, none for min rtt, smoothed rtt, latest rtt, and no pacing respectively.",
+          "Invalid pacer interval source: {}. Valid values are mrtt, srtt, lrtt, std::nullopt for min rtt, smoothed rtt, latest rtt, and no pacing respectively.",
           pacerIntervalSource));
     }
   }
@@ -583,8 +583,8 @@ TPerfServer::TPerfServer(
   settings.copaDeltaParam = latencyFactor_;
   if (useAckReceiveTimestamps_) {
     LOG(INFO) << " Using ACK receive timestamps on server";
-    settings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
-        {maxAckReceiveTimestampsToSend_, kDefaultReceiveTimestampsExponent});
+    settings.maybeAckReceiveTimestampsConfigSentToPeer = {
+        maxAckReceiveTimestampsToSend_, kDefaultReceiveTimestampsExponent};
   }
 
   if (useL4sEcn_) {

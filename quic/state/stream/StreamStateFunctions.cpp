@@ -30,7 +30,7 @@ folly::Expected<folly::Unit, QuicError> resetQuicStream(
     stream.removeFromLossBufMetasStartingAtOffset(*reliableSize);
     stream.streamWriteError = error;
   } else {
-    stream.reliableSizeToPeer = folly::none;
+    stream.reliableSizeToPeer = std::nullopt;
     stream.retransmissionBuffer.clear();
     stream.writeBuffer.move();
     ChainedByteRangeHead(std::move(stream.pendingWrites)); // Will be destructed
@@ -81,7 +81,7 @@ folly::Expected<folly::Unit, QuicError> onResetQuicStream(
   }
 
   stream.reliableSizeFromPeer =
-      frame.reliableSize.hasValue() ? *frame.reliableSize : 0;
+      frame.reliableSize.has_value() ? *frame.reliableSize : 0;
   // Mark eofoffset:
   if (stream.maxOffsetObserved > frame.finalSize) {
     return folly::makeUnexpected(QuicError(

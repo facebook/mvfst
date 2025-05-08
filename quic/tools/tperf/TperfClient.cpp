@@ -55,7 +55,7 @@ TPerfClient::TPerfClient(
 }
 
 void TPerfClient::timeoutExpired() noexcept {
-  quicClient_->closeNow(none);
+  quicClient_->closeNow(std::nullopt);
   constexpr double bytesPerMegabit = 131072;
   LOG(INFO) << "Received " << receivedBytes_ << " bytes in "
             << duration_.count() << " seconds.";
@@ -212,8 +212,8 @@ void TPerfClient::start() {
   if (useAckReceiveTimestamps_) {
     LOG(INFO) << " Using ACK receive timestamps on client";
 
-    settings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
-        {maxAckReceiveTimestampsToSend_, kDefaultReceiveTimestampsExponent});
+    settings.maybeAckReceiveTimestampsConfigSentToPeer = {
+        maxAckReceiveTimestampsToSend_, kDefaultReceiveTimestampsExponent};
   }
   if (useInplaceWrite_) {
     settings.maxBatchSize = 1;

@@ -37,7 +37,9 @@ class Copa : public CongestionController {
       const LossEvent* FOLLY_NULLABLE) override;
 
   void onPacketAckOrLoss(Optional<AckEvent> ack, Optional<LossEvent> loss) {
-    onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
+    onPacketAckOrLoss(
+        ack.has_value() ? &ack.value() : nullptr,
+        loss.has_value() ? &loss.value() : nullptr);
   }
 
   uint64_t getWritableBytes() const noexcept override;
@@ -72,7 +74,7 @@ class Copa : public CongestionController {
     uint64_t numTimesDirectionSame{0};
     // updated every srtt
     uint64_t lastRecordedCwndBytes;
-    Optional<TimePoint> lastCwndRecordTime{none};
+    Optional<TimePoint> lastCwndRecordTime{std::nullopt};
   };
 
   void checkAndUpdateDirection(const TimePoint ackTime);
@@ -84,7 +86,7 @@ class Copa : public CongestionController {
 
   bool isSlowStart_;
   // time at which cwnd was last doubled during slow start
-  Optional<TimePoint> lastCwndDoubleTime_{none};
+  Optional<TimePoint> lastCwndDoubleTime_{std::nullopt};
 
   WindowedFilter<
       std::chrono::microseconds,

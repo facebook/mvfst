@@ -288,14 +288,14 @@ folly::Expected<folly::Unit, QuicError> processServerInitialParams(
       isAckReceiveTimestampsEnabled.value() == 1) {
     if (maxReceiveTimestampsPerAck.has_value() &&
         receiveTimestampsExponent.has_value()) {
-      conn.maybePeerAckReceiveTimestampsConfig.assign(
-          {std::min(
-               static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
-               static_cast<uint8_t>(
-                   conn.transportSettings.maxReceiveTimestampsPerAckStored)),
-           std::max(
-               static_cast<uint8_t>(receiveTimestampsExponent.value()),
-               static_cast<uint8_t>(0))});
+      conn.maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig{
+          std::min(
+              static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
+              static_cast<uint8_t>(
+                  conn.transportSettings.maxReceiveTimestampsPerAckStored)),
+          std::max(
+              static_cast<uint8_t>(receiveTimestampsExponent.value()),
+              static_cast<uint8_t>(0))};
     }
   }
 
@@ -335,16 +335,16 @@ void cacheServerInitialParams(
       peerAdvertisedReliableStreamResetSupport;
 
   if (peerAdvertisedAckReceiveTimestampsEnabled) {
-    conn.maybePeerAckReceiveTimestampsConfig.assign(
-        {std::min(
-             static_cast<uint8_t>(peerAdvertisedMaxReceiveTimestampsPerAck),
-             static_cast<uint8_t>(
-                 conn.transportSettings.maxReceiveTimestampsPerAckStored)),
-         std::max(
-             static_cast<uint8_t>(peerAdvertisedReceiveTimestampsExponent),
-             static_cast<uint8_t>(0))});
+    conn.maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig{
+        std::min(
+            static_cast<uint8_t>(peerAdvertisedMaxReceiveTimestampsPerAck),
+            static_cast<uint8_t>(
+                conn.transportSettings.maxReceiveTimestampsPerAckStored)),
+        std::max(
+            static_cast<uint8_t>(peerAdvertisedReceiveTimestampsExponent),
+            static_cast<uint8_t>(0))};
   } else {
-    conn.maybePeerAckReceiveTimestampsConfig.clear();
+    conn.maybePeerAckReceiveTimestampsConfig = std::nullopt;
   }
   conn.peerAdvertisedExtendedAckFeatures = peerAdvertisedExtendedAckFeatures;
 }
@@ -411,16 +411,16 @@ updateTransportParamsFromCachedEarlyParams(
   conn.peerAdvertisedReliableStreamResetSupport =
       transportParams.reliableStreamResetSupport;
   if (transportParams.ackReceiveTimestampsEnabled) {
-    conn.maybePeerAckReceiveTimestampsConfig.assign(
-        {std::min(
-             static_cast<uint8_t>(transportParams.maxReceiveTimestampsPerAck),
-             static_cast<uint8_t>(
-                 conn.transportSettings.maxReceiveTimestampsPerAckStored)),
-         std::max(
-             static_cast<uint8_t>(transportParams.receiveTimestampsExponent),
-             static_cast<uint8_t>(0))});
+    conn.maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig{
+        std::min(
+            static_cast<uint8_t>(transportParams.maxReceiveTimestampsPerAck),
+            static_cast<uint8_t>(
+                conn.transportSettings.maxReceiveTimestampsPerAckStored)),
+        std::max(
+            static_cast<uint8_t>(transportParams.receiveTimestampsExponent),
+            static_cast<uint8_t>(0))};
   } else {
-    conn.maybePeerAckReceiveTimestampsConfig.clear();
+    conn.maybePeerAckReceiveTimestampsConfig = std::nullopt;
   }
   conn.peerAdvertisedExtendedAckFeatures = transportParams.extendedAckFeatures;
   return folly::unit;

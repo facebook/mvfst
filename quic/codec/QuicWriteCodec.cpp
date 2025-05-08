@@ -37,7 +37,7 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     OptionalIntegral<StreamGroupId> streamGroupId,
     bool appendFrame) {
   if (builder.remainingSpaceInPkt() == 0) {
-    return none;
+    return std::nullopt;
   }
   if (writeBufferLen == 0 && !fin) {
     return folly::makeUnexpected(QuicError(
@@ -71,7 +71,7 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
-    return none;
+    return std::nullopt;
   }
   QuicInteger offsetInt(offset);
   if (offset != 0) {
@@ -124,7 +124,7 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
         headerSize + dataLenLen >= builder.remainingSpaceInPkt()) {
       VLOG(4) << "No space in packet for stream header. stream=" << id
               << " remaining=" << builder.remainingSpaceInPkt();
-      return none;
+      return std::nullopt;
     }
     // We have to encode the actual data length in the header.
     headerSize += dataLenLen;
@@ -135,12 +135,12 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   bool shouldSetFin = fin && dataLen == writeBufferLen;
   if (dataLen == 0 && !shouldSetFin) {
     // This would be an empty non-fin stream frame.
-    return none;
+    return std::nullopt;
   }
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
-    return none;
+    return std::nullopt;
   }
 
   // Done with the accounting, set the bits and write the actual frame header.
@@ -173,7 +173,7 @@ folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   } else {
     builder.markNonEmpty();
   }
-  return folly::make_optional(dataLen);
+  return dataLen;
 }
 
 void writeStreamFrameData(
@@ -209,7 +209,7 @@ folly::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
   if (spaceLeftInPkt <= cryptoFrameHeaderSize) {
     VLOG(3) << "No space left in packet to write cryptoFrame header of size: "
             << cryptoFrameHeaderSize << ", space left=" << spaceLeftInPkt;
-    return Optional<WriteCryptoFrame>(none);
+    return Optional<WriteCryptoFrame>(std::nullopt);
   }
   size_t spaceRemaining = spaceLeftInPkt - cryptoFrameHeaderSize;
   size_t dataLength = data.chainLength();
@@ -511,7 +511,7 @@ maybeWriteAckBaseFields(
       firstAckBlockLengthIntSize.value();
 
   if (spaceLeft < headerSize) {
-    return Optional<WriteAckFrame>(none);
+    return Optional<WriteAckFrame>(std::nullopt);
   }
   WriteAckFrame ackFrame;
   ackFrame.frameType = frameType;
@@ -713,7 +713,7 @@ folly::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
     uint64_t maxRecvTimestampsToSend,
     ExtendedAckFeatureMaskType extendedAckFeatures) {
   if (ackFrameMetaData.ackState.acks.empty()) {
-    return Optional<WriteAckFrameResult>(none);
+    return Optional<WriteAckFrameResult>(std::nullopt);
   }
   uint64_t beginningSpace = builder.remainingSpaceInPkt();
   uint64_t spaceLeft = beginningSpace;
@@ -738,7 +738,7 @@ folly::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
     }
     auto extendedAckRequiredSpace = extendedAckRequiredSpaceResult.value();
     if (spaceLeft < extendedAckRequiredSpace) {
-      return Optional<WriteAckFrameResult>(none);
+      return Optional<WriteAckFrameResult>(std::nullopt);
     }
     spaceLeft -= extendedAckRequiredSpace;
   }
@@ -751,7 +751,7 @@ folly::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
     }
     auto ecnRequiredSpace = ecnRequiredSpaceResult.value();
     if (spaceLeft < ecnRequiredSpace) {
-      return Optional<WriteAckFrameResult>(none);
+      return Optional<WriteAckFrameResult>(std::nullopt);
     }
     spaceLeft -= ecnRequiredSpace;
   }
@@ -766,7 +766,7 @@ folly::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
     auto receiveTimestampsMinimumSpace =
         receiveTimestampsMinimumSpaceResult.value();
     if (spaceLeft < receiveTimestampsMinimumSpace) {
-      return Optional<WriteAckFrameResult>(none);
+      return Optional<WriteAckFrameResult>(std::nullopt);
     }
     spaceLeft -= receiveTimestampsMinimumSpace;
   }
@@ -780,8 +780,8 @@ folly::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
     return folly::makeUnexpected(maybeAckFrameResult.error());
   }
   auto& maybeAckFrame = maybeAckFrameResult.value();
-  if (!maybeAckFrame.hasValue()) {
-    return Optional<WriteAckFrameResult>(none);
+  if (!maybeAckFrame.has_value()) {
+    return Optional<WriteAckFrameResult>(std::nullopt);
   }
   auto& ackFrame = maybeAckFrame.value();
 
@@ -1158,7 +1158,7 @@ folly::Expected<size_t, QuicError> writeFrame(
       QuicInteger streamId(rstStreamFrame.streamId);
       QuicInteger finalSize(rstStreamFrame.finalSize);
       QuicInteger errorCode(static_cast<uint64_t>(rstStreamFrame.errorCode));
-      folly::Optional<QuicInteger> maybeReliableSize = folly::none;
+      Optional<QuicInteger> maybeReliableSize = std::nullopt;
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
         return folly::makeUnexpected(intFrameTypeSize.error());

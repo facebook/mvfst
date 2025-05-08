@@ -381,10 +381,10 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
 TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
-    client->close(none);
+    client->close(std::nullopt);
     eventbase_.terminateLoopSoon();
   }));
-  ASSERT_EQ(client->getAppProtocol(), none);
+  ASSERT_EQ(client->getAppProtocol(), std::nullopt);
   client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 }
@@ -401,13 +401,13 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
         const TransportErrorCode* transportError =
             errorCode.code.asTransportErrorCode();
         EXPECT_NE(transportError, nullptr);
-        client->close(none);
+        client->close(std::nullopt);
         this->checkTransportSummaryEvent(qLogger);
 
         eventbase_.terminateLoopSoon();
       }));
 
-  ASSERT_EQ(client->getAppProtocol(), none);
+  ASSERT_EQ(client->getAppProtocol(), std::nullopt);
 
   client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
@@ -1054,7 +1054,7 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   deliverData(serverAddr, oneMoreAckPacket->coalesce());
   EXPECT_FALSE(client->hasWriteCipher());
 
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
@@ -1079,7 +1079,7 @@ TEST_F(QuicClientTransportTest, AddNewPeerAddressSetsPacketSize) {
   client->addNewPeerAddress(v6Address);
   EXPECT_EQ(kDefaultV6UDPSendPacketLen, client->getConn().udpSendPacketLen);
 
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
@@ -1089,7 +1089,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
 
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
   client->onNetworkSwitch(nullptr);
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
@@ -1152,7 +1152,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true));
   client->onNetworkSwitch(std::move(newSocket));
 
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
@@ -1202,7 +1202,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
   EXPECT_CALL(*newSocketPtr, bind(_)).Times(0);
   client->onNetworkSwitch(std::move(newSocket));
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
@@ -1215,7 +1215,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
         : socket_(std::move(socket)) {}
 
     void onTransportReady() noexcept override {
-      socket_->close(none);
+      socket_->close(std::nullopt);
       socket_.reset();
       onTransportReadyMock();
     }
@@ -1327,7 +1327,7 @@ TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
   EXPECT_CALL(
       *mockQLogger, setDcid(client->getConn().clientChosenDestConnectionId));
   client->setQLogger(mockQLogger);
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
@@ -1359,7 +1359,7 @@ TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
   client->setQLogger(nullptr);
   CHECK(client->getQLogger() == nullptr);
 
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
@@ -1372,7 +1372,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
   EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
   EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
@@ -1397,7 +1397,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
   auto replacedCid = conn.serverConnectionId;
   EXPECT_NE(originalCid.connId, *replacedCid);
   EXPECT_EQ(secondCid.connId, *replacedCid);
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
@@ -1426,7 +1426,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
   auto replacedCid = conn.serverConnectionId;
   EXPECT_NE(originalCid.connId, *replacedCid);
   EXPECT_EQ(secondCid.connId, *replacedCid);
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 enum class ServerFirstPacketType : uint8_t { ServerHello, Retry };
@@ -2470,7 +2470,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, CleanupReadLoopCounting) {
@@ -2572,7 +2572,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none /* longHeaderOverride */,
+      std::nullopt /* longHeaderOverride */,
       false /* eof */));
   auto packet2 = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -2582,9 +2582,9 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none /* longHeaderOverride */,
+      std::nullopt /* longHeaderOverride */,
       true /* eof */,
-      none /* shortHeaderOverride */,
+      std::nullopt /* shortHeaderOverride */,
       data->length() /* offset */));
 
   socketReads.emplace_back(TestReadData(packet1->coalesce(), serverAddr));
@@ -2593,7 +2593,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithRetriableError) {
@@ -2603,7 +2603,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithRetriableError) {
   EXPECT_CALL(readCb, readError(_, _)).Times(0);
   deliverNetworkError(EAGAIN);
   client->setReadCallback(streamId, nullptr);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithNonRetriableError) {
@@ -2614,7 +2614,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithNonRetriableError) {
   EXPECT_CALL(readCb, readError(_, _)).Times(0);
   deliverNetworkError(EBADF);
   client->setReadCallback(streamId, nullptr);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(
@@ -2649,7 +2649,7 @@ TEST_F(
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(
@@ -2930,7 +2930,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(none);
+  client->close(std::nullopt);
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
   EXPECT_EQ(indices.size(), 1);
@@ -2980,7 +2980,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   auto data = packets.move();
   deliverData(data->coalesce());
   eventbase_->loopOnce();
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeNoAvailablePeerIds) {
@@ -3105,7 +3105,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true));
   socketWrites.clear();
   deliverData(packet->coalesce());
@@ -3174,12 +3174,12 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true));
   socketWrites.clear();
   deliverData(packet->coalesce());
   EXPECT_CALL(readCb, readError(streamId, _));
-  client->close(none);
+  client->close(std::nullopt);
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
       *makeEncryptedCodec(),
@@ -3229,7 +3229,7 @@ TEST_P(
     EXPECT_TRUE(event->sendCloseImmediately);
 
   } else {
-    client->close(none);
+    client->close(std::nullopt);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
@@ -3371,7 +3371,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true));
   deliverData(packet->coalesce());
   socketWrites.clear();
@@ -3384,7 +3384,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
         *makeHandshakeCodec(),
         QuicFrame::Type::ConnectionCloseFrame));
   } else {
-    client->close(none);
+    client->close(std::nullopt);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
@@ -3420,7 +3420,7 @@ TEST_P(
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true));
   deliverData(packet->coalesce());
   EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
@@ -3494,7 +3494,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
@@ -3518,7 +3518,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("how about no")));
   } else {
-    client->close(none);
+    client->close(std::nullopt);
   }
   client->idleTimeout().cancelTimerCallback();
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
@@ -3550,7 +3550,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
-  client->closeNow(none);
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
@@ -3734,7 +3734,7 @@ TEST_F(
       data->computeChainDataLength(),
       data->computeChainDataLength(),
       false,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));
@@ -3784,7 +3784,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   deliverData(packet2->coalesce());
 
   EXPECT_TRUE(client->getReadCallbacks().empty());
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(
@@ -3832,7 +3832,7 @@ TEST_F(
       client->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_FALSE(streamResult.hasError());
   ASSERT_EQ(streamResult.value(), nullptr);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
@@ -3871,7 +3871,7 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
       client->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_FALSE(streamResult.hasError());
   ASSERT_EQ(streamResult.value(), nullptr);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
@@ -3895,7 +3895,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 0, _)).Times(1);
   deliverData(packet->coalesce());
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
@@ -3918,7 +3918,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, _, _)).Times(1);
   deliverData(packet->coalesce());
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackRange) {
@@ -3951,7 +3951,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackRange) {
       PacketNumberSpace::AppData));
 
   deliverData(packet->coalesce());
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(
@@ -3981,7 +3981,7 @@ TEST_F(
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 0, _)).Times(1);
   client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
   eventbase_->loopOnce();
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
@@ -4007,7 +4007,7 @@ TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
   // DeliveryCallback is called, and offset delivered is 10:
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 10, _)).Times(1);
   deliverData(packet->coalesce());
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
@@ -4015,7 +4015,7 @@ TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
   EXPECT_CALL(writeCallback, onConnectionWriteReady(_));
   client->notifyPendingWriteOnConnection(&writeCallback);
   loopForWrites();
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
@@ -4027,7 +4027,7 @@ TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
   client->detachEventBase();
   client->attachEventBase(qEvb2);
   loopForWrites();
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
@@ -4038,7 +4038,7 @@ TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
 
   // Make the decrypt fail
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return none; }));
+      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return std::nullopt; }));
 
   auto token = *client->getConn().statelessResetToken;
   StatelessResetPacketBuilder builder(kDefaultUDPSendPacketLen, token);
@@ -4064,9 +4064,9 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
 
   // Make the decrypt fail
   ON_CALL(*currentOneRttReadCipherRawPtr, _tryDecrypt(_, _, _))
-      .WillByDefault(Invoke([&](auto&, auto, auto) { return none; }));
+      .WillByDefault(Invoke([&](auto&, auto, auto) { return std::nullopt; }));
   ON_CALL(*nextOneRttReadCipherRawPtr, _tryDecrypt(_, _, _))
-      .WillByDefault(Invoke([&](auto&, auto, auto) { return none; }));
+      .WillByDefault(Invoke([&](auto&, auto, auto) { return std::nullopt; }));
   // Alter the expected token so it definitely won't match the one in conn
   auto token = *client->getConn().statelessResetToken;
   token[0] = ~token[0];
@@ -4142,7 +4142,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   EXPECT_EQ(header.getDestinationConnId(), serverCid);
 
   eventbase_->loopOnce();
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(
@@ -4169,7 +4169,7 @@ TEST_F(
   EXPECT_EQ(client->getConn().oneRttWriteCipher.get(), nullptr);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).Times(0);
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(
@@ -4189,7 +4189,7 @@ TEST_F(
                     {QuicVersion::MVFST})
                     .buildPacket();
   EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedStreamData) {
@@ -4332,7 +4332,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
   deliverData(packet->coalesce());
   // Stream is not yet closed because ingress state machine is open
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  client->close(none);
+  client->close(std::nullopt);
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4362,7 +4362,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   SCOPE_EXIT {
-    client->close(none);
+    client->close(std::nullopt);
   };
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
@@ -4383,7 +4383,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   SCOPE_EXIT {
-    client->close(none);
+    client->close(std::nullopt);
   };
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
@@ -4430,7 +4430,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   deliverData(packet->coalesce());
   // Stream still exists since ingress state machine is still open
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  client->close(none);
+  client->close(std::nullopt);
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4481,7 +4481,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
   EXPECT_EQ(1, readCbs.count(streamId));
   EXPECT_EQ(0, conn.streamManager->readableStreams().count(streamId));
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  client->close(none);
+  client->close(std::nullopt);
   EXPECT_EQ(0, readCbs.count(streamId));
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(client->isClosed());
@@ -4536,7 +4536,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
   deliverData(packet->coalesce());
   // Stream should be closed after it received the ack for rst
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
-  client->close(none);
+  client->close(std::nullopt);
   EXPECT_TRUE(client->isClosed());
 }
 
@@ -4589,7 +4589,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   EXPECT_FALSE(conn.streamManager->hasDeliverable());
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
   EXPECT_EQ(readCbs.count(streamId), 1);
-  client->close(none);
+  client->close(std::nullopt);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_EQ(readCbs.count(streamId), 0);
   EXPECT_TRUE(client->isClosed());
@@ -4719,7 +4719,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyWhileDraining) {
 
   EXPECT_CALL(deliveryCallback, onCanceled(_, _));
   EXPECT_CALL(readCb, readError(_, _));
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
@@ -4989,7 +4989,7 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   client->close(QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str()));
-  EXPECT_TRUE(conn.lastCloseSentTime.hasValue());
+  EXPECT_TRUE(conn.lastCloseSentTime.has_value());
   Mock::VerifyAndClearExpectations(sock);
 
   // Then received some server packet, which won't trigger another close
@@ -5034,7 +5034,7 @@ TEST_F(QuicClientTransportAfterStartTest, RetryPacketAfterRxInitial) {
   loopForWrites();
   // validate we dropped the retry packet via retryToken str
   EXPECT_TRUE(client->getConn().retryToken.empty());
-  client->close(none);
+  client->close(std::nullopt);
 }
 
 class QuicClientTransportPskCacheTest
@@ -6074,7 +6074,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   EmptyReadCallback readCallback;
   ASSERT_FALSE(happyEyeballsSetUpSocket(
                    socket,
-                   none,
+                   std::nullopt,
                    folly::SocketAddress("127.0.0.1", 12345),
                    transportSettings,
                    0, // tosValue

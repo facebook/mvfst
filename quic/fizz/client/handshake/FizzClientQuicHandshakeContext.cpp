@@ -57,36 +57,47 @@ FizzClientQuicHandshakeContext::makeClientHandshake(
   return handshake;
 }
 
-Optional<QuicCachedPsk> FizzClientQuicHandshakeContext::getPsk(
+folly::Optional<QuicCachedPsk> FizzClientQuicHandshakeContext::getPsk(
     const Optional<std::string>& hostname) {
   if (!hostname || !pskCache_) {
-    return none;
+    return folly::none;
   }
 
-  return pskCache_->getPsk(*hostname);
+  auto res = pskCache_->getPsk(hostname.value());
+  if (res) {
+    return res.value();
+  } else {
+    return folly::none;
+  }
 }
 
 void FizzClientQuicHandshakeContext::putPsk(
     const Optional<std::string>& hostname,
     QuicCachedPsk quicCachedPsk) {
   if (hostname && pskCache_) {
-    pskCache_->putPsk(*hostname, std::move(quicCachedPsk));
+    pskCache_->putPsk(hostname.value(), std::move(quicCachedPsk));
   }
 }
 
 void FizzClientQuicHandshakeContext::removePsk(
     const Optional<std::string>& hostname) {
   if (hostname && pskCache_) {
-    pskCache_->removePsk(*hostname);
+    pskCache_->removePsk(hostname.value());
   }
 }
 
 Optional<std::vector<fizz::ech::ECHConfig>>
 FizzClientQuicHandshakeContext::getECHConfigs(const std::string& sni) const {
   if (!echPolicy_) {
-    return none;
+    return std::nullopt;
   }
-  return echPolicy_->getConfig(sni);
+  auto result = echPolicy_->getConfig(sni);
+  if (result.has_value()) {
+    return Optional<std::vector<fizz::ech::ECHConfig>>(
+        std::move(result.value()));
+  } else {
+    return std::nullopt;
+  }
 }
 
 std::shared_ptr<FizzClientQuicHandshakeContext>

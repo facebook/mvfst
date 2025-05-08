@@ -150,7 +150,10 @@ bool DefaultAppTokenValidator::validate(
   // If application did not set validator, it's valid.
   if (conn_->earlyDataAppParamsValidator &&
       !conn_->earlyDataAppParamsValidator(
-          resumptionState.alpn, appToken->appParams)) {
+          resumptionState.alpn
+              ? quic::Optional<std::string>(*resumptionState.alpn)
+              : std::nullopt,
+          appToken->appParams)) {
     VLOG(10) << "Invalid app params";
     return validated = false;
   }

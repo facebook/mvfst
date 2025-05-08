@@ -586,7 +586,7 @@ detectLossPackets(
     getLossTime(conn, pnSpace) = delayUntilLost + earliest->metadata.time;
   }
 
-  if (lossEvent.largestLostPacketNum.hasValue()) {
+  if (lossEvent.largestLostPacketNum.has_value()) {
     DCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
     if (conn.qLogger) {
       conn.qLogger->addPacketsLost(
@@ -600,7 +600,7 @@ detectLossPackets(
       return lossEvent;
     }
   }
-  return none;
+  return std::nullopt;
 }
 
 folly::Expected<Optional<CongestionController::LossEvent>, QuicError>

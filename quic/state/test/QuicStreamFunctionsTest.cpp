@@ -1727,7 +1727,7 @@ TEST_P(
   EXPECT_EQ(0us, stream->totalHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  // uRL 0.1 - expected state transition: none
+  // uRL 0.1 - expected state transition: std::nullopt
   conn.streamManager->updateReadableStreams(*stream);
 
   EXPECT_EQ(lastHolbTimeMark, stream->lastHolbTime);
@@ -1746,7 +1746,7 @@ TEST_P(
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  // uRL 1.1 - expected state transition: none
+  // uRL 1.1 - expected state transition: std::nullopt
   conn.streamManager->updateReadableStreams(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
@@ -1764,7 +1764,7 @@ TEST_P(
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
-  // uRL 2.1 - expected state transition: none
+  // uRL 2.1 - expected state transition: std::nullopt
   conn.streamManager->updateReadableStreams(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
@@ -1779,7 +1779,7 @@ TEST_P(
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
   auto lastHolbTimeMark2 = stream->lastHolbTime;
 
-  // uRL 3.1 - expected state transition: none
+  // uRL 3.1 - expected state transition: std::nullopt
   conn.streamManager->updateReadableStreams(*stream);
   EXPECT_EQ(lastHolbTimeMark2, stream->lastHolbTime);
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
@@ -1802,7 +1802,7 @@ TEST_P(
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(2, stream->holbCount);
 
-  // uRL 4.1 - expected state change: none
+  // uRL 4.1 - expected state change: std::nullopt
   conn.streamManager->updateReadableStreams(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(2, stream->holbCount);
@@ -2431,7 +2431,7 @@ TEST_P(QuicStreamFunctionsTestBase, StreamLargestWriteOffsetTxedNothingTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 0;
   stream.writeBufMeta.offset = 0;
-  EXPECT_EQ(none, getLargestWriteOffsetTxed(stream));
+  EXPECT_EQ(std::nullopt, getLargestWriteOffsetTxed(stream));
 }
 
 TEST_F(
@@ -2507,7 +2507,7 @@ TEST_F(
 TEST_P(QuicStreamFunctionsTestBase, StreamNextOffsetToDeliverNothingAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
-  EXPECT_EQ(none, getLargestDeliverableOffset(stream));
+  EXPECT_EQ(std::nullopt, getLargestDeliverableOffset(stream));
 }
 
 TEST_P(QuicStreamFunctionsTestBase, StreamNextOffsetToDeliverAllAcked) {

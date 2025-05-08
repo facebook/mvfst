@@ -109,19 +109,22 @@ TEST_F(NewRenoTest, TestLoss) {
   EXPECT_EQ(reno.getBytesInFlight(), 41);
   auto originalWritableBytes = reno.getWritableBytes();
 
-  reno.onPacketAckOrLoss(none, createLossEvent({std::make_pair(loss1, 11)}));
+  reno.onPacketAckOrLoss(
+      std::nullopt, createLossEvent({std::make_pair(loss1, 11)}));
   EXPECT_EQ(reno.getBytesInFlight(), 30);
 
   EXPECT_FALSE(reno.inSlowStart());
   auto newWritableBytes1 = reno.getWritableBytes();
   EXPECT_LE(newWritableBytes1, originalWritableBytes + 11);
 
-  reno.onPacketAckOrLoss(none, createLossEvent({std::make_pair(loss2, 10)}));
+  reno.onPacketAckOrLoss(
+      std::nullopt, createLossEvent({std::make_pair(loss2, 10)}));
   auto newWritableBytes2 = reno.getWritableBytes();
   EXPECT_LE(newWritableBytes2, newWritableBytes1 + 10);
   EXPECT_EQ(reno.getBytesInFlight(), 20);
 
-  reno.onPacketAckOrLoss(none, createLossEvent({std::make_pair(loss3, 20)}));
+  reno.onPacketAckOrLoss(
+      std::nullopt, createLossEvent({std::make_pair(loss3, 20)}));
   auto newWritableBytes3 = reno.getWritableBytes();
   EXPECT_LE(newWritableBytes3, newWritableBytes2 + 20);
   EXPECT_EQ(reno.getBytesInFlight(), 0);
@@ -140,7 +143,7 @@ TEST_F(NewRenoTest, SendMoreThanWritable) {
   EXPECT_EQ(reno.getBytesInFlight(), originalWritableBytes + 20);
   EXPECT_EQ(reno.getWritableBytes(), 0);
   reno.onPacketAckOrLoss(
-      none,
+      std::nullopt,
       createLossEvent({std::make_pair(loss, originalWritableBytes + 20)}));
   EXPECT_LT(reno.getWritableBytes(), originalWritableBytes);
 }
@@ -159,7 +162,8 @@ TEST_F(NewRenoTest, TestSlowStartAck) {
   reno.onPacketSent(packet);
   EXPECT_EQ(reno.getBytesInFlight(), ackedSize);
   reno.onPacketAckOrLoss(
-      createAckEvent(ackPacketNum1, ackedSize, packet.metadata.time), none);
+      createAckEvent(ackPacketNum1, ackedSize, packet.metadata.time),
+      std::nullopt);
   EXPECT_TRUE(reno.inSlowStart());
   auto newWritableBytes = reno.getWritableBytes();
 
@@ -176,7 +180,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   auto originalWritableBytes = reno.getWritableBytes();
   PacketNum loss1 = 4;
   reno.onPacketSent(createPacket(loss1, 10, Clock::now()));
-  reno.onPacketAckOrLoss(none, createLossEvent({std::make_pair(loss1, 10)}));
+  reno.onPacketAckOrLoss(
+      std::nullopt, createLossEvent({std::make_pair(loss1, 10)}));
   EXPECT_FALSE(reno.inSlowStart());
   auto newWritableBytes1 = reno.getWritableBytes();
   EXPECT_LT(newWritableBytes1, originalWritableBytes);
@@ -187,7 +192,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
       ackPacketNum1, ackedSize, Clock::now() - std::chrono::milliseconds(10));
   reno.onPacketSent(packet1);
   reno.onPacketAckOrLoss(
-      createAckEvent(ackPacketNum1, ackedSize, packet1.metadata.time), none);
+      createAckEvent(ackPacketNum1, ackedSize, packet1.metadata.time),
+      std::nullopt);
   EXPECT_FALSE(reno.inSlowStart());
 
   auto newWritableBytes2 = reno.getWritableBytes();
@@ -197,7 +203,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   auto packet2 = createPacket(ackPacketNum2, ackedSize, Clock::now());
   reno.onPacketSent(packet2);
   reno.onPacketAckOrLoss(
-      createAckEvent(ackPacketNum2, ackedSize, packet2.metadata.time), none);
+      createAckEvent(ackPacketNum2, ackedSize, packet2.metadata.time),
+      std::nullopt);
   EXPECT_FALSE(reno.inSlowStart());
 
   auto newWritableBytes3 = reno.getWritableBytes();
@@ -237,7 +244,7 @@ TEST_F(NewRenoTest, PersistentCongestion) {
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
-  reno.onPacketAckOrLoss(none, loss);
+  reno.onPacketAckOrLoss(std::nullopt, loss);
   EXPECT_EQ(
       reno.getWritableBytes(),
       conn.transportSettings.minCwndInMss * conn.udpSendPacketLen);

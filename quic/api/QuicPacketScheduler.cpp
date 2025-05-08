@@ -355,7 +355,7 @@ FrameScheduler::scheduleFramesForPacket(
   }
 
   return SchedulingResult(
-      none, std::move(builder).buildPacket(), shortHeaderPadding);
+      std::nullopt, std::move(builder).buildPacket(), shortHeaderPadding);
 }
 
 bool FrameScheduler::hasData() const {
@@ -401,7 +401,7 @@ bool StreamFrameScheduler::writeStreamLossBuffers(
         bufferLen, // writeBufferLen -- only the len of the single buffer.
         bufferLen, // flowControlLen -- not relevant, already flow controlled.
         buffer->eof,
-        none /* skipLenHint */,
+        std::nullopt /* skipLenHint */,
         stream.groupId);
     if (res.hasError()) {
       throw QuicInternalException(
@@ -650,7 +650,7 @@ bool StreamFrameScheduler::writeStreamFrame(
       bufferLen,
       flowControlLen,
       canWriteFin,
-      none /* skipLenHint */,
+      std::nullopt /* skipLenHint */,
       stream.groupId);
   if (res.hasError()) {
     throw QuicInternalException(
@@ -1085,7 +1085,7 @@ CloningScheduler::scheduleFramesForPacket(
       conn_.bufAccessor->trimEnd(conn_.bufAccessor->length() - prevSize);
     }
   }
-  return SchedulingResult(none, none, 0);
+  return SchedulingResult(std::nullopt, std::nullopt, 0);
 }
 
 folly::StringPiece CloningScheduler::name() const {

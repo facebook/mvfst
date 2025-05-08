@@ -172,14 +172,18 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   Optional<CachedServerTransportParameters> connectImpl(
       Optional<std::string> hostname) override {
     // Look up psk
-    Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
+    auto quicCachedPsk = getPsk(hostname);
 
     Optional<CachedServerTransportParameters> transportParams;
     if (quicCachedPsk) {
       transportParams = quicCachedPsk->transportParams;
     }
 
-    const_cast<fizz::client::State&>(getState()).sni() = hostname;
+    if (hostname.has_value()) {
+      const_cast<fizz::client::State&>(getState()).sni() = hostname.value();
+    } else {
+      const_cast<fizz::client::State&>(getState()).sni() = folly::none;
+    }
 
     connected_ = true;
     writeDataToQuicStream(
@@ -352,7 +356,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   std::unique_ptr<Aead> oneRttWriteCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
-  Optional<std::string> alpn_{folly::none};
+  Optional<std::string> alpn_{std::nullopt};
 
   FizzCryptoFactory cryptoFactory_;
 
@@ -715,7 +719,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     recvServerHello(serverAddr);
   }
 
-  void recvTicket(Optional<uint64_t> offsetOverride = none) {
+  void recvTicket(Optional<uint64_t> offsetOverride = std::nullopt) {
     auto negotiatedVersion = *client->getConn().version;
     auto ticket = folly::IOBuf::copyBuffer("NST");
     ChainedByteRangeHead ticketRch(ticket);

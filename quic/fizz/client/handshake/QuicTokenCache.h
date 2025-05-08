@@ -36,7 +36,7 @@ class BasicQuicTokenCache : public QuicTokenCache {
     if (res != cache_.end()) {
       return res->second;
     }
-    return none;
+    return std::nullopt;
   }
 
   void putToken(const std::string& hostname, std::string token) override {

@@ -27,7 +27,7 @@ class PacketProcessor {
    * will apply to that write loop only.
    */
   virtual Optional<PrewriteRequest> prewrite() {
-    return none;
+    return std::nullopt;
   }
 
   /**

@@ -6,8 +6,6 @@
  */
 
 #pragma once
-#include <folly/Optional.h>
-
 #define TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS 1
 #include <quic/common/third-party/optional.h>
 
@@ -15,9 +13,7 @@
 
 namespace quic {
 template <class T>
-using Optional = folly::Optional<T>;
-
-constexpr folly::None none{folly::None::_secret::_token};
+using Optional = tiny::optional<T>;
 
 template <class T>
 using OptionalIntegral = tiny::optional_aip<T>;

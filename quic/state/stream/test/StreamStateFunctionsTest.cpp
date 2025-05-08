@@ -287,7 +287,7 @@ TEST_F(StreamStateFunctionsTests, SendResetDSRStream) {
   ASSERT_FALSE(
       resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN).hasError());
   EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow);
-  EXPECT_TRUE(stream.streamWriteError.hasValue());
+  EXPECT_TRUE(stream.streamWriteError.has_value());
   EXPECT_TRUE(stream.writeBuffer.empty());
   EXPECT_EQ(0, stream.writeBufMeta.length);
   EXPECT_TRUE(stream.lossBufMetas.empty());

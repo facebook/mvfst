@@ -99,7 +99,7 @@ DSRStreamFrameScheduler::writeStreamImpl(
   auto txn = writeQueue.beginTransaction();
   auto guard =
       folly::makeGuard([&] { writeQueue.rollbackTransaction(std::move(txn)); });
-  auto id = writeQueue.getNextScheduledID(quic::none);
+  auto id = writeQueue.getNextScheduledID(std::nullopt);
   CHECK(id.isStreamID());
   auto streamId = id.asStreamID();
   auto stream = conn_.streamManager->findStream(streamId);

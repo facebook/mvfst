@@ -34,9 +34,9 @@ FizzClientHandshake::FizzClientHandshake(
 Optional<CachedServerTransportParameters> FizzClientHandshake::connectImpl(
     Optional<std::string> hostname) {
   // Look up psk
-  Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
+  auto quicCachedPsk = getPsk(hostname);
 
-  Optional<fizz::client::CachedPsk> cachedPsk;
+  folly::Optional<fizz::client::CachedPsk> cachedPsk;
   Optional<CachedServerTransportParameters> transportParams;
   if (quicCachedPsk) {
     cachedPsk = std::move(quicCachedPsk->cachedPsk);
@@ -53,41 +53,53 @@ Optional<CachedServerTransportParameters> FizzClientHandshake::connectImpl(
   context->setOmitEarlyRecordLayer(true);
 
   Optional<std::vector<fizz::ech::ECHConfig>> echConfigs;
-  if (hostname.hasValue()) {
-    echConfigs = fizzContext_->getECHConfigs(*hostname);
+  if (hostname.has_value()) {
+    std::string hostnameStr = hostname.value();
+    echConfigs = fizzContext_->getECHConfigs(hostnameStr);
   }
 
+  folly::Optional<std::string> follyHostname;
+  if (hostname.has_value()) {
+    follyHostname = hostname.value();
+  }
+  folly::Optional<std::vector<fizz::ech::ECHConfig>> follyECHConfigs;
+  if (echConfigs.has_value()) {
+    follyECHConfigs = std::move(echConfigs.value());
+  }
   processActions(machine_.processConnect(
       state_,
       std::move(context),
       fizzContext_->getCertificateVerifier(),
-      std::move(hostname),
+      std::move(follyHostname),
       std::move(cachedPsk),
       std::make_shared<FizzClientExtensions>(
           getClientTransportParameters(), fizzContext_->getChloPaddingBytes()),
-      std::move(echConfigs)));
+      std::move(follyECHConfigs)));
 
   return transportParams;
 }
 
-Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
+folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
     const Optional<std::string>& hostname) const {
   auto quicCachedPsk = fizzContext_->getPsk(hostname);
   if (!quicCachedPsk) {
-    return none;
+    return folly::none;
   }
 
   // TODO T32658838 better API to disable early data for current connection
   const QuicClientConnectionState* conn = getClientConn();
   if (!conn->transportSettings.attemptEarlyData) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
-  } else if (
-      conn->earlyDataAppParamsValidator &&
-      !conn->earlyDataAppParamsValidator(
-          quicCachedPsk->cachedPsk.alpn,
-          BufHelpers::copyBuffer(quicCachedPsk->appParams))) {
-    quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
-    // Do not remove psk here, will let application decide
+  } else if (conn->earlyDataAppParamsValidator) {
+    Optional<std::string> alpn;
+    if (quicCachedPsk->cachedPsk.alpn.has_value()) {
+      alpn = quicCachedPsk->cachedPsk.alpn.value();
+    }
+    if (!conn->earlyDataAppParamsValidator(
+            alpn, BufHelpers::copyBuffer(quicCachedPsk->appParams))) {
+      quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
+      // Do not remove psk here, will let application decide
+    }
   }
 
   return quicCachedPsk;
@@ -103,11 +115,17 @@ const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
 
 const Optional<std::string>& FizzClientHandshake::getApplicationProtocol()
     const {
+  static thread_local Optional<std::string> result;
   auto& earlyDataParams = state_.earlyDataParams();
-  if (earlyDataParams) {
-    return earlyDataParams->alpn;
+  if (earlyDataParams && earlyDataParams->alpn.has_value()) {
+    result = earlyDataParams->alpn.value();
+    return result;
+  } else if (state_.alpn().has_value()) {
+    result = state_.alpn().value();
+    return result;
   } else {
-    return state_.alpn();
+    static Optional<std::string> empty;
+    return empty;
   }
 }
 
@@ -144,8 +162,8 @@ Optional<std::vector<uint8_t>> FizzClientHandshake::getExportedKeyingMaterial(
     uint16_t keyLength) {
   const auto& ems = state_.exporterMasterSecret();
   const auto cipherSuite = state_.cipher();
-  if (!ems.hasValue() || !cipherSuite.hasValue()) {
-    return none;
+  if (!ems.has_value() || !cipherSuite.has_value()) {
+    return std::nullopt;
   }
 
   auto ekm = fizz::Exporter::getExportedKeyingMaterial(
@@ -153,7 +171,7 @@ Optional<std::vector<uint8_t>> FizzClientHandshake::getExportedKeyingMaterial(
       cipherSuite.value(),
       ems.value()->coalesce(),
       label,
-      context == none ? nullptr : BufHelpers::wrapBuffer(*context),
+      context == std::nullopt ? nullptr : BufHelpers::wrapBuffer(*context),
       keyLength);
 
   std::vector<uint8_t> result(ekm->coalesce());
@@ -227,7 +245,11 @@ void FizzClientHandshake::onNewCachedPsk(
     }
   }
 
-  fizzContext_->putPsk(state_.sni(), std::move(quicCachedPsk));
+  Optional<std::string> sni;
+  if (state_.sni().has_value()) {
+    sni = state_.sni().value();
+  }
+  fizzContext_->putPsk(sni, std::move(quicCachedPsk));
 }
 
 void FizzClientHandshake::echRetryAvailable(
@@ -244,18 +266,18 @@ FizzClientHandshake::getPeerCertificate() const {
 
 Handshake::TLSSummary FizzClientHandshake::getTLSSummary() const {
   Handshake::TLSSummary summary;
-  if (state_.alpn().hasValue()) {
+  if (state_.alpn().has_value()) {
     summary.alpn = state_.alpn().value();
   }
-  if (state_.group().hasValue()) {
+  if (state_.group().has_value()) {
     summary.namedGroup =
         folly::to<std::string>(fizz::toString(state_.group().value()));
   }
-  if (state_.pskType().hasValue()) {
+  if (state_.pskType().has_value()) {
     summary.pskType =
         folly::to<std::string>(fizz::toString(state_.pskType().value()));
   }
-  if (state_.echState().hasValue()) {
+  if (state_.echState().has_value()) {
     summary.echStatus =
         fizz::client::toString(state_.echState().value().status);
   }

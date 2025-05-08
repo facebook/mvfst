@@ -17,7 +17,7 @@ Optional<uint64_t> getIntegerParameter(
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
-    return none;
+    return std::nullopt;
   }
   auto parameterCursor = Cursor(it->value.get());
   auto parameter = decodeQuicInteger(parameterCursor);
@@ -35,7 +35,7 @@ Optional<ConnectionId> getConnIdParameter(
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
-    return none;
+    return std::nullopt;
   }
 
   auto value = it->value->clone();
@@ -50,7 +50,7 @@ Optional<StatelessResetToken> getStatelessResetTokenParameter(
   auto it =
       findParameter(parameters, TransportParameterId::stateless_reset_token);
   if (it == parameters.end()) {
-    return none;
+    return std::nullopt;
   }
 
   auto value = it->value->clone();

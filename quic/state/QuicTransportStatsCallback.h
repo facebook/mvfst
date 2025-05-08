@@ -102,7 +102,8 @@ class QuicTransportStatsCallback {
   // connection level metrics:
   virtual void onNewConnection() = 0;
 
-  virtual void onConnectionClose(Optional<QuicErrorCode> code = none) = 0;
+  virtual void onConnectionClose(
+      Optional<QuicErrorCode> code = std::nullopt) = 0;
 
   virtual void onConnectionCloseZeroBytesWritten() = 0;
 

@@ -211,8 +211,8 @@ Optional<std::vector<uint8_t>> ServerHandshake::getExportedKeyingMaterial(
     uint16_t keyLength) {
   const auto cipherSuite = state_.cipher();
   const auto& ems = state_.exporterMasterSecret();
-  if (!ems.hasValue() || !cipherSuite.hasValue()) {
-    return none;
+  if (!ems.has_value() || !cipherSuite.has_value()) {
+    return std::nullopt;
   }
 
   auto ekm = fizz::Exporter::getExportedKeyingMaterial(
@@ -220,7 +220,7 @@ Optional<std::vector<uint8_t>> ServerHandshake::getExportedKeyingMaterial(
       cipherSuite.value(),
       ems.value()->coalesce(),
       label,
-      context == none ? nullptr : BufHelpers::wrapBuffer(*context),
+      context == std::nullopt ? nullptr : BufHelpers::wrapBuffer(*context),
       keyLength);
 
   std::vector<uint8_t> result(ekm->coalesce());
@@ -228,7 +228,13 @@ Optional<std::vector<uint8_t>> ServerHandshake::getExportedKeyingMaterial(
 }
 
 const Optional<std::string>& ServerHandshake::getApplicationProtocol() const {
-  return state_.alpn();
+  static Optional<std::string> empty;
+  if (!state_.alpn().has_value()) {
+    return empty;
+  }
+  static thread_local Optional<std::string> result;
+  result = state_.alpn().value();
+  return result;
 }
 
 void ServerHandshake::onError(
@@ -322,23 +328,29 @@ void ServerHandshake::processPendingEvents() {
 }
 
 const Optional<BufPtr>& ServerHandshake::getAppToken() const {
-  return state_.appToken();
+  static Optional<BufPtr> empty;
+  if (!state_.appToken().has_value()) {
+    return empty;
+  }
+  static thread_local Optional<BufPtr> result;
+  result = state_.appToken().value()->clone();
+  return result;
 }
 
 Handshake::TLSSummary ServerHandshake::getTLSSummary() const {
   Handshake::TLSSummary summary;
-  if (state_.alpn().hasValue()) {
+  if (state_.alpn().has_value()) {
     summary.alpn = state_.alpn().value();
   }
-  if (state_.group().hasValue()) {
+  if (state_.group().has_value()) {
     summary.namedGroup =
         folly::to<std::string>(fizz::toString(state_.group().value()));
   }
-  if (state_.pskType().hasValue()) {
+  if (state_.pskType().has_value()) {
     summary.pskType =
         folly::to<std::string>(fizz::toString(state_.pskType().value()));
   }
-  if (state_.echState().hasValue()) {
+  if (state_.echState().has_value()) {
     summary.echStatus = fizz::server::toString(state_.echStatus());
   }
   return summary;

@@ -83,8 +83,8 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   client_->transportSettings.canIgnorePathMTU = true;
   client_->peerAdvertisedKnobFrameSupport = false;
   client_->peerAdvertisedExtendedAckFeatures = 0;
-  client_->maybePeerAckReceiveTimestampsConfig.assign(
-      {.maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0});
+  client_->maybePeerAckReceiveTimestampsConfig = {
+      .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0};
 
   ASSERT_FALSE(
       updateTransportParamsFromCachedEarlyParams(*client_, kParams).hasError());

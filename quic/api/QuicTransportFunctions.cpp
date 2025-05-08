@@ -55,12 +55,12 @@ std::string largestAckScheduledToString(
       optionalToString(
           conn.ackStates.initialAckState
               ? conn.ackStates.initialAckState->largestAckScheduled
-              : quic::none),
+              : std::nullopt),
       ",",
       optionalToString(
           conn.ackStates.handshakeAckState
               ? conn.ackStates.handshakeAckState->largestAckScheduled
-              : quic::none),
+              : std::nullopt),
       ",",
       optionalToString(conn.ackStates.appDataAckState.largestAckScheduled),
       "]");
@@ -73,12 +73,12 @@ std::string largestAckToSendToString(
       optionalToString(
           conn.ackStates.initialAckState
               ? largestAckToSend(*conn.ackStates.initialAckState)
-              : quic::none),
+              : std::nullopt),
       ",",
       optionalToString(
           conn.ackStates.handshakeAckState
               ? largestAckToSend(*conn.ackStates.handshakeAckState)
-              : quic::none),
+              : std::nullopt),
       ",",
       optionalToString(largestAckToSend(conn.ackStates.appDataAckState)),
       "]");

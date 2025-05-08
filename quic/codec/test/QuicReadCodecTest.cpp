@@ -304,7 +304,7 @@ TEST_F(QuicReadCodecTest, PacketDecryptFail) {
 
   auto aead = std::make_unique<MockAead>();
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillOnce(Invoke([](auto&, const auto, auto) { return none; }));
+      .WillOnce(Invoke([](auto&, const auto, auto) { return std::nullopt; }));
   auto data = folly::IOBuf::copyBuffer("hello");
   auto streamPacket = createStreamPacket(
       connId,
@@ -407,7 +407,7 @@ TEST_F(QuicReadCodecTest, KeyPhaseOnePacket) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseOne);
   AckStates ackStates;
@@ -433,7 +433,8 @@ TEST_F(QuicReadCodecTest, BadResetFirstTwoBits) {
       QuicNodeType::Client);
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(AtMost(1))
-      .WillRepeatedly(Invoke([](auto&, const auto&, auto) { return none; }));
+      .WillRepeatedly(
+          Invoke([](auto&, const auto&, auto) { return std::nullopt; }));
   PacketNum packetNum = 1;
   StreamId streamId = 2;
   auto data = folly::IOBuf::create(30);
@@ -446,7 +447,7 @@ TEST_F(QuicReadCodecTest, BadResetFirstTwoBits) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   overridePacketWithToken(streamPacket, tok);
@@ -479,7 +480,8 @@ TEST_F(QuicReadCodecTest, RandomizedShortHeaderLeadsToReset) {
       QuicNodeType::Client);
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(AtMost(1))
-      .WillRepeatedly(Invoke([](auto&, const auto&, auto) { return none; }));
+      .WillRepeatedly(
+          Invoke([](auto&, const auto&, auto) { return std::nullopt; }));
   PacketNum packetNum = 1;
   StreamId streamId = 2;
   auto data = folly::IOBuf::create(30);
@@ -492,7 +494,7 @@ TEST_F(QuicReadCodecTest, RandomizedShortHeaderLeadsToReset) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   overridePacketWithToken(streamPacket, tok);
@@ -523,7 +525,7 @@ TEST_F(QuicReadCodecTest, StatelessResetTokenMismatch) {
       QuicNodeType::Client);
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([](auto&, const auto&, auto) { return none; }));
+      .WillOnce(Invoke([](auto&, const auto&, auto) { return std::nullopt; }));
   PacketNum packetNum = 1;
   StreamId streamId = 2;
   auto data = folly::IOBuf::create(30);
@@ -536,7 +538,7 @@ TEST_F(QuicReadCodecTest, StatelessResetTokenMismatch) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   tok[0] ^= tok[0];
@@ -571,7 +573,7 @@ TEST_F(QuicReadCodecTest, NoOneRttCipherNoReset) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   overridePacketWithToken(streamPacket, tok);
@@ -599,7 +601,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
 
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([](auto&, const auto&, auto) { return none; }));
+      .WillOnce(Invoke([](auto&, const auto&, auto) { return std::nullopt; }));
   PacketNum packetNum = 1;
   StreamId streamId = 2;
   auto data = folly::IOBuf::create(30);
@@ -637,7 +639,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
 
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([](auto&, const auto&, auto) { return none; }));
+      .WillOnce(Invoke([](auto&, const auto&, auto) { return std::nullopt; }));
   PacketNum packetNum = 1;
   StreamId streamId = 2;
   auto data = folly::IOBuf::create(30);
@@ -650,7 +652,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   AckStates ackStates;
@@ -880,7 +882,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   AckStates ackStates;
@@ -907,7 +909,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -943,7 +945,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseZero);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -975,7 +977,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1007,7 +1009,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingValid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseZero);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1067,7 +1069,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   AckStates ackStates;
@@ -1086,7 +1088,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         .Times(1)
         .WillOnce(Invoke([](std::unique_ptr<folly::IOBuf>&, const auto&, auto) {
           // Failed decryption
-          return none;
+          return std::nullopt;
         }));
     packetNum = 3;
     streamPacket = createStreamPacket(
@@ -1097,7 +1099,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1128,7 +1130,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1153,7 +1155,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         .Times(1)
         .WillOnce(Invoke([](std::unique_ptr<folly::IOBuf>&, const auto&, auto) {
           // Failed decryption
-          return none;
+          return std::nullopt;
         }));
     packetNum = 1;
     streamPacket = createStreamPacket(
@@ -1164,7 +1166,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1185,7 +1187,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         .Times(1)
         .WillOnce(Invoke([](std::unique_ptr<folly::IOBuf>&, const auto&, auto) {
           // Failed decryption
-          return none;
+          return std::nullopt;
         }));
     packetNum = 5;
     streamPacket = createStreamPacket(
@@ -1196,7 +1198,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateIncomingInvalid) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseZero);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1247,7 +1249,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateCipherUnavailable) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   AckStates ackStates;
@@ -1271,7 +1273,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateCipherUnavailable) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1295,7 +1297,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateCipherUnavailable) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));
@@ -1349,7 +1351,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateInitiate) {
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none,
+      std::nullopt,
       true,
       ProtectionType::KeyPhaseZero);
   AckStates ackStates;
@@ -1395,7 +1397,7 @@ TEST_F(QuicReadCodecTest, KeyUpdateInitiate) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none,
+        std::nullopt,
         true,
         ProtectionType::KeyPhaseOne);
     packetQueue = bufToQueue(packetToBuf(streamPacket));

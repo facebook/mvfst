@@ -79,8 +79,7 @@ class QLoggerCommon : public quic::BaseQLogger {
   void addStreamStateUpdate(
       quic::StreamId id,
       std::string update,
-      folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation)
-      override;
+      Optional<std::chrono::milliseconds> timeSinceStreamCreation) override;
   void addConnectionMigrationUpdate(bool intentionalMigration) override;
   void addPathValidationEvent(bool success) override;
   void addPriorityUpdate(
@@ -95,8 +94,8 @@ class QLoggerCommon : public quic::BaseQLogger {
       std::chrono::microseconds bandwidthHiInterval,
       uint64_t bandwidthLoBytes,
       std::chrono::microseconds bandwidthLoInterval) override;
-  void setDcid(folly::Optional<quic::ConnectionId> connID) override;
-  void setScid(folly::Optional<quic::ConnectionId> connID) override;
+  void setDcid(Optional<quic::ConnectionId> connID) override;
+  void setScid(Optional<quic::ConnectionId> connID) override;
 
   virtual void logTrace(std::unique_ptr<quic::QLogEvent> event) = 0;
 };

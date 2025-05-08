@@ -39,13 +39,13 @@ class RstStreamFrameLog : public QLogFrame {
   StreamId streamId;
   ApplicationErrorCode errorCode;
   uint64_t offset;
-  folly::Optional<uint64_t> reliableOffset;
+  Optional<uint64_t> reliableOffset;
 
   RstStreamFrameLog(
       StreamId streamIdIn,
       ApplicationErrorCode errorCodeIn,
       uint64_t offsetIn,
-      folly::Optional<uint64_t> reliableOffsetIn = folly::none)
+      Optional<uint64_t> reliableOffsetIn = std::nullopt)
       : streamId{streamIdIn},
         errorCode{errorCodeIn},
         offset{offsetIn},

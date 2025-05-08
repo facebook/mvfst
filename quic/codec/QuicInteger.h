@@ -97,7 +97,7 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
 
 /**
  * Reads an integer out of the cursor and returns a pair with the integer and
- * the numbers of bytes read, or none if there are not enough bytes to
+ * the numbers of bytes read, or std::nullopt if there are not enough bytes to
  * read the int. It only advances the cursor in case of success.
  */
 Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(

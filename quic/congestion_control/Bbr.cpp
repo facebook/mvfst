@@ -634,7 +634,7 @@ Optional<Bandwidth> BbrCongestionController::getBandwidth() const noexcept {
   if (bandwidthSampler_) {
     return bandwidthSampler_->getBandwidth();
   }
-  return none;
+  return std::nullopt;
 }
 
 void BbrCongestionController::detectBottleneckBandwidth(bool appLimitedSample) {

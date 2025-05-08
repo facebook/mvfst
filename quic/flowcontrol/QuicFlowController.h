@@ -61,7 +61,7 @@ updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
 [[nodiscard]] folly::Expected<folly::Unit, QuicError>
 updateFlowControlOnResetStream(
     QuicStreamState& stream,
-    folly::Optional<uint64_t> reliableSize = folly::none);
+    Optional<uint64_t> reliableSize = std::nullopt);
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream);
 

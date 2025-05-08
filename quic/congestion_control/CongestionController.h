@@ -50,7 +50,7 @@ struct CongestionController {
   struct State {
     uint64_t writableBytes{0};
     uint64_t congestionWindowBytes{0};
-    Optional<uint64_t> maybeBandwidthBitsPerSec{none};
+    Optional<uint64_t> maybeBandwidthBitsPerSec{std::nullopt};
   };
 
   // Helper struct to group multiple lost packets into one event
@@ -120,7 +120,7 @@ struct CongestionController {
    * Return the congestion controller's bandwidth estimate, if available.
    */
   [[nodiscard]] virtual Optional<Bandwidth> getBandwidth() const {
-    return none;
+    return std::nullopt;
   }
 
   /**

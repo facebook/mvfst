@@ -182,7 +182,8 @@ struct QuicStreamLike {
   Optional<uint64_t> finalReadOffset;
 
   // This is set if we send a RELIABLE_RESET_STREAM frame to the peer. If we
-  // subsequently send a RESET_STREAM frame, we reset this value to none.
+  // subsequently send a RESET_STREAM frame, we reset this value to
+  // std::nullopt.
   Optional<uint64_t> reliableSizeToPeer;
 
   // When the application calls updateReliableDeliveryCheckpoint() on the

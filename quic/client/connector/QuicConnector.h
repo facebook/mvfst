@@ -56,7 +56,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
       std::chrono::milliseconds connectTimeout =
           std::chrono::milliseconds(1000),
       const folly::SocketOptionMap& socketOptions = folly::emptySocketOptionMap,
-      const Optional<std::string>& sni = none,
+      const Optional<std::string>& sni = std::nullopt,
       std::shared_ptr<quic::QLogger> qLogger = nullptr,
       std::shared_ptr<quic::LoopDetectorCallback> quicLoopDetectorCallback =
           nullptr,

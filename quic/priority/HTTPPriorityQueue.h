@@ -9,6 +9,7 @@
 
 #include <quic/mvfst-config.h>
 
+#include <folly/CppAttributes.h>
 #include <quic/priority/PriorityQueue.h>
 #include <quic/priority/RoundRobin.h>
 
@@ -126,7 +127,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
       const PriorityQueue::Priority& pri) const override;
 
   [[nodiscard]] bool contains(Identifier id) const override {
-    return find(id) != quic::none;
+    return find(id) != std::nullopt;
   }
 
   void insertOrUpdate(Identifier id, PriorityQueue::Priority priority) override;

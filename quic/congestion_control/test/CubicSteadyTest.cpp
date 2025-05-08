@@ -28,7 +28,7 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   conn.lossState.largestSent = 0;
   cubic.onPacketSent(packet0);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet0.metadata.time), none);
+      makeAck(0, 1000, Clock::now(), packet0.metadata.time), std::nullopt);
   EXPECT_EQ(3000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
@@ -39,7 +39,7 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   cubic.onPacketSent(packet1);
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet1);
-  cubic.onPacketAckOrLoss(none, std::move(loss));
+  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
   EXPECT_EQ(2100, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }

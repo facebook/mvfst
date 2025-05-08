@@ -203,7 +203,7 @@ TEST_F(SimulatedTBFTest, MultiConsumeWithEmptyInterval) {
 
 /*
  * Check the size and content of the deque after multiple consumes at increasing
- * time intervals, where none of them put the bucket in debt.
+ * time intervals, where std::nullopt of them put the bucket in debt.
  */
 TEST_F(SimulatedTBFTest, MultiConsumeNoEmptyInterval) {
   SimulatedTBF::Config config;

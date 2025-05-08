@@ -308,13 +308,13 @@ struct RstStreamFrame {
   StreamId streamId;
   ApplicationErrorCode errorCode;
   uint64_t finalSize;
-  folly::Optional<uint64_t> reliableSize;
+  Optional<uint64_t> reliableSize;
 
   RstStreamFrame(
       StreamId streamIdIn,
       ApplicationErrorCode errorCodeIn,
       uint64_t finalSizeIn,
-      folly::Optional<uint64_t> reliableSizeIn = folly::none)
+      Optional<uint64_t> reliableSizeIn = std::nullopt)
       : streamId(streamIdIn),
         errorCode(errorCodeIn),
         finalSize(finalSizeIn),

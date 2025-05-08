@@ -127,7 +127,7 @@ void QuicServerTransport::setOriginalPeerAddress(
 
 void QuicServerTransport::setServerConnectionIdParams(
     ServerConnectionIdParams params) noexcept {
-  serverConn_->serverConnIdParams.assign(std::move(params));
+  serverConn_->serverConnIdParams = std::move(params);
 }
 
 void QuicServerTransport::setTransportStatsCallback(
@@ -431,14 +431,14 @@ std::shared_ptr<QuicTransportBaseLite> QuicServerTransport::sharedGuard() {
 
 void QuicServerTransport::setClientConnectionId(
     const ConnectionId& clientConnectionId) {
-  conn_->clientConnectionId.assign(clientConnectionId);
+  conn_->clientConnectionId = clientConnectionId;
   conn_->peerConnectionIds.emplace_back(
       clientConnectionId, kInitialSequenceNumber);
 }
 
 void QuicServerTransport::setClientChosenDestConnectionId(
     const ConnectionId& clientChosenDestConnectionId) {
-  conn_->clientChosenDestConnectionId.assign(clientChosenDestConnectionId);
+  conn_->clientChosenDestConnectionId = clientChosenDestConnectionId;
 }
 
 void QuicServerTransport::onCryptoEventAvailable() noexcept {
@@ -589,7 +589,7 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
       conn_->qLogger->addTransportStateUpdate(kWriteNst);
     }
     newSessionTicketWrittenTimestamp_ = Clock::now();
-    Optional<uint64_t> cwndHint = none;
+    Optional<uint64_t> cwndHint = std::nullopt;
     if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
         conn_->congestionController) {
       const auto& bdp = conn_->congestionController->getBDP();
@@ -647,7 +647,8 @@ void QuicServerTransport::maybeNotifyConnectionIdRetired() {
 
 void QuicServerTransport::maybeNotifyConnectionIdBound() {
   // make this connId bound only when the keys are available
-  if (!notifiedConnIdBound_ && routingCb_ && conn_->serverConnectionId &&
+  if (!notifiedConnIdBound_ && routingCb_ &&
+      conn_->serverConnectionId.has_value() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     notifiedConnIdBound_ = true;
     routingCb_->onConnectionIdBound(shared_from_this());
@@ -749,7 +750,7 @@ void QuicServerTransport::onTransportKnobs(BufPtr knobBlob) {
         reinterpret_cast<const char*>(knobBlob->data()), knobBlob->length());
     VLOG(4) << "Received transport knobs: " << serializedKnobs;
     auto params = parseTransportKnobs(serializedKnobs);
-    if (params.hasValue()) {
+    if (params.has_value()) {
       handleTransportKnobParams(*params);
     } else {
       QUIC_STATS(
@@ -924,7 +925,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         }
 
         if (serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum >=
-            folly::make_optional(expectedSeqNum.value())) {
+            tiny::make_optional(expectedSeqNum.value())) {
           QUIC_STATS(
               serverTransport->serverConn_->statsCallback,
               onTransportKnobOutOfOrder,
@@ -1542,7 +1543,7 @@ QuicServerTransport::getPeerTransportParams() const {
       return maybeParams->parameters;
     }
   }
-  return none;
+  return std::nullopt;
 }
 
 void QuicServerTransport::setCongestionControl(CongestionControlType type) {

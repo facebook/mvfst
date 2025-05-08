@@ -86,9 +86,9 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     uint8_t cipherOverhead,
     PacketNum largestAcked,
     Optional<std::pair<LongHeader::Types, QuicVersion>> longHeaderOverride =
-        none,
+        std::nullopt,
     bool eof = true,
-    Optional<ProtectionType> shortHeaderOverride = none,
+    Optional<ProtectionType> shortHeaderOverride = std::nullopt,
     uint64_t offset = 0,
     uint64_t packetSizeLimit = kDefaultUDPSendPacketLen);
 
@@ -408,7 +408,7 @@ class FakeServerHandshake : public FizzServerHandshake {
       std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext,
       bool chloSync = false,
       bool cfinSync = false,
-      Optional<uint64_t> clientActiveConnectionIdLimit = none)
+      Optional<uint64_t> clientActiveConnectionIdLimit = std::nullopt)
       : FizzServerHandshake(
             &conn,
             std::move(fizzContext),

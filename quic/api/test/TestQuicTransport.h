@@ -65,7 +65,7 @@ class TestQuicTransport
 
   Optional<std::vector<TransportParameter>> getPeerTransportParams()
       const override {
-    return none;
+    return std::nullopt;
   }
 
   QuicVersion getVersion() {
@@ -202,7 +202,7 @@ class TestQuicTransport
       const std::string&,
       const Optional<ByteRange>&,
       uint16_t) const override {
-    return none;
+    return std::nullopt;
   }
 
   void validateECN() {

@@ -294,7 +294,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
       VersionNegotiationPacketBuilder builder(
           invariant.dstConnId, invariant.srcConnId, supportedVersions_);
       versionNegotiationPacket =
-          folly::make_optional(std::move(builder).buildPacket());
+          tiny::make_optional(std::move(builder).buildPacket());
     }
   }
   if (versionNegotiationPacket) {
@@ -364,8 +364,7 @@ void QuicServerWorker::onDataAvailable(
   // we've flushed it.
   BufPtr data = std::move(readBuffer_);
 
-  folly::Optional<ReceivedUdpPacket::Timings::SocketTimestampExt>
-      maybeSockTsExt;
+  Optional<ReceivedUdpPacket::Timings::SocketTimestampExt> maybeSockTsExt;
   if (params.ts.has_value()) {
     maybeSockTsExt =
         QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
@@ -474,12 +473,12 @@ void QuicServerWorker::handleNetworkData(
             false, /* isInitial */
             false, /* is0Rtt */
             std::move(maybeParsedShortHeader->destinationConnId),
-            none);
+            std::nullopt);
         return forwardNetworkData(
             client,
             std::move(routingData),
             NetworkData(std::move(udpPacket)),
-            none, /* quicVersion */
+            std::nullopt, /* quicVersion */
             isForwardedData);
       }
     } else if (
@@ -947,7 +946,7 @@ void QuicServerWorker::dispatchPacketData(
   // token or a new token)
   Cursor cursor(networkData.getPackets().front().buf.front());
   auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
-  bool hasTokenSecret = transportSettings_.retryTokenSecret.hasValue();
+  bool hasTokenSecret = transportSettings_.retryTokenSecret.has_value();
 
   // If the retryTokenSecret is not set, just skip evaluating validity of
   // token and assume true
@@ -1035,19 +1034,19 @@ void QuicServerWorker::sendResetPacket(
 Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(Cursor& cursor) {
   // Move cursor to the byte right after the initial byte
   if (!cursor.canAdvance(1)) {
-    return none;
+    return std::nullopt;
   }
   auto initialByte = cursor.readBE<uint8_t>();
 
   // We already know this is an initial packet, which uses a long header
   auto parsedLongHeader = parseLongHeader(initialByte, cursor);
   if (!parsedLongHeader || !parsedLongHeader->parsedLongHeader.has_value()) {
-    return none;
+    return std::nullopt;
   }
 
   auto header = parsedLongHeader->parsedLongHeader.value().header;
   if (!header.hasToken()) {
-    return none;
+    return std::nullopt;
   }
   return header.getToken();
 }
@@ -1075,7 +1074,7 @@ bool QuicServerWorker::validRetryToken(
     std::string& encryptedToken,
     const ConnectionId& dstConnId,
     const folly::IPAddress& clientIp) {
-  CHECK(transportSettings_.retryTokenSecret.hasValue());
+  CHECK(transportSettings_.retryTokenSecret.has_value());
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
@@ -1092,7 +1091,7 @@ bool QuicServerWorker::validRetryToken(
 bool QuicServerWorker::validNewToken(
     std::string& encryptedToken,
     const folly::IPAddress& clientIp) {
-  CHECK(transportSettings_.retryTokenSecret.hasValue());
+  CHECK(transportSettings_.retryTokenSecret.has_value());
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
@@ -1110,7 +1109,7 @@ void QuicServerWorker::sendRetryPacket(
     const folly::SocketAddress& client,
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
-  if (!transportSettings_.retryTokenSecret.hasValue()) {
+  if (!transportSettings_.retryTokenSecret.has_value()) {
     VLOG(4) << "Not sending retry packet since retry token secret is not set";
     return;
   }

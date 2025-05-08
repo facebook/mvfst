@@ -23,7 +23,8 @@ struct CodecParameters {
   // This must not be set to zero.
   uint8_t peerAckDelayExponent{kDefaultAckDelayExponent};
   QuicVersion version{QuicVersion::MVFST};
-  Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig = none;
+  Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig =
+      std::nullopt;
   ExtendedAckFeatureMaskType extendedAckFeatures{0};
 
   CodecParameters() = default;
@@ -55,7 +56,7 @@ struct ParsedLongHeaderInvariant {
 };
 
 /**
- * Decodes a version negotiation packet. Returns a none, if it cannot
+ * Decodes a version negotiation packet. Returns a std::nullopt, if it cannot
  * decode the packet.
  */
 Optional<VersionNegotiationPacket> decodeVersionNegotiation(

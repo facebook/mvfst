@@ -50,8 +50,8 @@ class Aead {
   }
 
   /**
-   * Decrypt ciphertext. Will return none if the ciphertext does not decrypt
-   * successfully. May still throw from errors unrelated to ciphertext.
+   * Decrypt ciphertext. Will return std::nullopt if the ciphertext does not
+   * decrypt successfully. May still throw from errors unrelated to ciphertext.
    */
   virtual Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,

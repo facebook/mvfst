@@ -655,9 +655,9 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
       *buf,
       0 /* cipherOverhead */,
       0 /* largestAcked */,
-      none /* longHeaderOverride */,
+      std::nullopt /* longHeaderOverride */,
       fin,
-      none /* shortHeaderOverride */,
+      std::nullopt /* shortHeaderOverride */,
       offset);
 
   auto regularQuicPacket = packet.packet;
@@ -1210,7 +1210,7 @@ TEST_F(
 ])");
 
   FileQLogger q(VantagePoint::Client);
-  q.addStreamStateUpdate(streamId, kOnEOM, none);
+  q.addStreamStateUpdate(streamId, kOnEOM, std::nullopt);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

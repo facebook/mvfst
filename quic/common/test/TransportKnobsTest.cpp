@@ -22,9 +22,9 @@ struct QuicKnobsParsingTestFixture {
 void run(const QuicKnobsParsingTestFixture& fixture) {
   auto result = parseTransportKnobs(fixture.serializedKnobs);
   if (fixture.expectError) {
-    EXPECT_FALSE(result.hasValue());
+    EXPECT_FALSE(result.has_value());
   } else {
-    ASSERT_TRUE(result.hasValue());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->size(), fixture.expectParams.size());
     for (size_t i = 0; i < result->size(); i++) {
       auto& actualKnob = (*result)[i];

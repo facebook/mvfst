@@ -302,14 +302,15 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
 TEST_F(ClientHandshakeTest, TestGetExportedKeyingMaterial) {
   // Sanity check. getExportedKeyingMaterial () should return nullptr prior to
   // an handshake.
-  auto ekm =
-      handshake->getExportedKeyingMaterial("EXPORTER-Some-Label", none, 32);
+  auto ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", std::nullopt, 32);
   EXPECT_TRUE(!ekm.has_value());
 
   clientServerRound();
   serverClientRound();
   handshake->handshakeConfirmed();
-  ekm = handshake->getExportedKeyingMaterial("EXPORTER-Some-Label", none, 32);
+  ekm = handshake->getExportedKeyingMaterial(
+      "EXPORTER-Some-Label", std::nullopt, 32);
   ASSERT_TRUE(ekm.has_value());
   EXPECT_EQ(ekm->size(), 32);
 

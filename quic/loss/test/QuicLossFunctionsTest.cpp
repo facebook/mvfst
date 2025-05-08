@@ -95,7 +95,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
       TimePoint time,
       Optional<ClonedPacketIdentifier> maybeClonedPacketIdentifier,
       PacketType packetType,
-      Optional<uint16_t> forcedSize = none,
+      Optional<uint16_t> forcedSize = std::nullopt,
       bool isDsr = false);
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
@@ -352,7 +352,7 @@ TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
 TEST_F(QuicLossFunctionsTest, HasDataToWrite) {
   auto conn = createConn();
   // There needs to be at least one outstanding packet.
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   conn->streamManager->addLoss(1);
   conn->pendingEvents.setLossDetectionAlarm = true;
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(2);
@@ -368,9 +368,9 @@ TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {
   conn->lossState.lrtt = 1s;
   auto currentTime = Clock::now();
   auto firstPacketNum =
-      sendPacket(*conn, currentTime, none, PacketType::Initial);
+      sendPacket(*conn, currentTime, std::nullopt, PacketType::Initial);
   auto secondPacketNum =
-      sendPacket(*conn, currentTime, none, PacketType::Initial);
+      sendPacket(*conn, currentTime, std::nullopt, PacketType::Initial);
   ASSERT_GT(secondPacketNum, firstPacketNum);
   ASSERT_EQ(2, conn->outstandings.packets.size());
   // detectLossPackets will set lossTime on Initial space.
@@ -419,7 +419,7 @@ TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {
                    .hasError());
 
   // Send out a AppData packet that isn't retransmittable
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   conn->pendingEvents.setLossDetectionAlarm = false;
 
   // setLossDetectionAlarm will cancel loss timer, and not schedule another one.
@@ -439,7 +439,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .WillRepeatedly(Return());
 
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   MockClock::mockNow = []() { return TimePoint(123ms); };
   std::vector<PacketNum> lostPacket;
   MockClock::mockNow = []() { return TimePoint(23ms); };
@@ -456,7 +456,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
 
   MockClock::mockNow = []() { return TimePoint(3ms); };
   EXPECT_CALL(*quicStats_, onPTO());
-  sendPacket(*conn, TimePoint(), none, PacketType::OneRtt);
+  sendPacket(*conn, TimePoint(), std::nullopt, PacketType::OneRtt);
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
   ASSERT_FALSE(
@@ -812,7 +812,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
     return folly::unit;
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::Handshake);
+    sendPacket(*conn, Clock::now(), std::nullopt, PacketType::Handshake);
   }
   EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   // Assume some packets are already acked
@@ -884,7 +884,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdWithSkippedPacket) {
           conn->ackStates.handshakeAckState->nextPacketNum;
       increaseNextPacketNum(*conn, PacketNumberSpace::Handshake);
     }
-    sendPacket(*conn, Clock::now(), none, PacketType::Handshake);
+    sendPacket(*conn, Clock::now(), std::nullopt, PacketType::Handshake);
   }
 
   EXPECT_EQ(7, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
@@ -978,7 +978,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
   conn->lossState.ptoCount = 10;
   conn->lossState.reorderingThreshold = 10;
 
-  sendPacket(*conn, TimePoint(), none, PacketType::OneRtt);
+  sendPacket(*conn, TimePoint(), std::nullopt, PacketType::OneRtt);
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = conn->lossState.largestSent.value_or(0);
@@ -1092,7 +1092,8 @@ TEST_F(QuicLossFunctionsTest, ReorderingThresholdChecksSamePacketNumberSpace) {
       };
   PacketNum latestSent = 0;
   for (size_t i = 0; i < conn->lossState.reorderingThreshold + 1; i++) {
-    latestSent = sendPacket(*conn, Clock::now(), none, PacketType::Handshake);
+    latestSent =
+        sendPacket(*conn, Clock::now(), std::nullopt, PacketType::Handshake);
   }
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
@@ -1158,8 +1159,8 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
 
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 100ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 100ms), std::nullopt, PacketType::OneRtt);
   }
   // Some packets are already acked
   conn->lossState.srtt = 400ms;
@@ -1208,9 +1209,9 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
       500ms / conn->transportSettings.timeReorderingThreshDivisor;
   auto sendTime = Clock::now();
   // Send two:
-  sendPacket(*conn, sendTime, none, PacketType::Handshake);
+  sendPacket(*conn, sendTime, std::nullopt, PacketType::Handshake);
   PacketNum second =
-      sendPacket(*conn, sendTime + 1ms, none, PacketType::Handshake);
+      sendPacket(*conn, sendTime + 1ms, std::nullopt, PacketType::Handshake);
   auto lossTime = sendTime + 50ms;
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::Handshake);
@@ -1269,7 +1270,7 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
   MockClock::mockNow = [&]() { return startTime; };
   std::vector<PacketNum> lostPackets;
   for (auto i = 0; i < kPacketToSendForPTO + 10; i++) {
-    sendPacket(*conn, startTime, none, PacketType::OneRtt);
+    sendPacket(*conn, startTime, std::nullopt, PacketType::OneRtt);
     setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
     startTime += 1ms;
   }
@@ -1303,7 +1304,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
     auto sentPacketNum = sendPacket(
         *conn,
         TimePoint(100ms),
-        none,
+        std::nullopt,
         (i % 2 ? PacketType::OneRtt : PacketType::Handshake));
     expectedLargestLostNum = std::max(
         expectedLargestLostNum, i % 2 ? sentPacketNum : expectedLargestLostNum);
@@ -1463,7 +1464,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationHasLossTime) {
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 
-  sendPacket(*conn, lastPacketSentTime, none, PacketType::OneRtt);
+  sendPacket(*conn, lastPacketSentTime, std::nullopt, PacketType::OneRtt);
   auto duration = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(100ms, duration.first);
   EXPECT_EQ(
@@ -1482,7 +1483,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationLossTimeIsZero) {
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 
-  sendPacket(*conn, lastPacketSentTime, none, PacketType::OneRtt);
+  sendPacket(*conn, lastPacketSentTime, std::nullopt, PacketType::OneRtt);
   auto duration = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(0ms, duration.first);
   EXPECT_EQ(
@@ -1496,7 +1497,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationNonHandshakeOutstanding) {
   conn->lossState.maxAckDelay = 25ms;
   TimePoint lastPacketSentTime = Clock::now();
   MockClock::mockNow = [=]() { return lastPacketSentTime; };
-  sendPacket(*conn, lastPacketSentTime, none, PacketType::OneRtt);
+  sendPacket(*conn, lastPacketSentTime, std::nullopt, PacketType::OneRtt);
   auto duration = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(duration.second, LossState::AlarmMethod::PTO);
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
@@ -1524,7 +1525,8 @@ TEST_F(QuicLossFunctionsTest, NoSkipLossVisitor) {
   // Send 5 packets, so when we ack the last one, we mark the first one loss
   PacketNum lastSent;
   for (size_t i = 0; i < 5; i++) {
-    lastSent = sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+    lastSent =
+        sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   }
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
@@ -1592,7 +1594,7 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
   // Send 6 packets, so when we ack the last one, we mark the first two loss
   EXPECT_EQ(1, conn->ackStates.appDataAckState.nextPacketNum);
   PacketNum lastSent;
-  lastSent = sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  lastSent = sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   ClonedPacketIdentifier clonedPacketIdentifier(
       PacketNumberSpace::AppData, lastSent);
@@ -1633,10 +1635,11 @@ TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
   sendPacket(*conn, Clock::now(), clonedPacketIdentifier1, PacketType::OneRtt);
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
-  auto ackedPacket = sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
+  auto ackedPacket =
+      sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   auto noopLossMarker = [](auto&, auto&, bool) { return folly::unit; };
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
@@ -1748,7 +1751,8 @@ TEST_F(QuicLossFunctionsTest, TotalLossCount) {
   conn->congestionController = nullptr;
   PacketNum largestSent = 0;
   for (int i = 0; i < 10; i++) {
-    largestSent = sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+    largestSent =
+        sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   }
   EXPECT_EQ(10, conn->outstandings.packets.size());
   uint32_t lostPackets = 0;
@@ -1786,8 +1790,8 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejected) {
   // outstandings.clonedPacketIdentifiers, they are all processed and will skip
   // lossVisitor
   for (auto i = 0; i < 2; i++) {
-    sendPacket(*conn, TimePoint(), none, PacketType::OneRtt);
-    sendPacket(*conn, TimePoint(), none, PacketType::ZeroRtt);
+    sendPacket(*conn, TimePoint(), std::nullopt, PacketType::OneRtt);
+    sendPacket(*conn, TimePoint(), std::nullopt, PacketType::ZeroRtt);
   }
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(4, conn->outstandings.packets.size());
@@ -1834,7 +1838,7 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
     zeroRttPackets.emplace(packetNum);
   }
   zeroRttPackets.emplace(
-      sendPacket(*conn, TimePoint(), none, PacketType::ZeroRtt));
+      sendPacket(*conn, TimePoint(), std::nullopt, PacketType::ZeroRtt));
   for (auto zeroRttPacketNum : zeroRttPackets) {
     ClonedPacketIdentifier zeroRttPacketEvent(
         PacketNumberSpace::AppData, zeroRttPacketNum);
@@ -1890,11 +1894,11 @@ TEST_F(QuicLossFunctionsTest, TimeThreshold) {
   conn->lossState.srtt = 10ms;
   auto referenceTime = Clock::now();
   auto packet1 =
-      sendPacket(*conn, referenceTime - 10ms, none, PacketType::OneRtt);
+      sendPacket(*conn, referenceTime - 10ms, std::nullopt, PacketType::OneRtt);
   auto packet2 = sendPacket(
       *conn,
       referenceTime + conn->lossState.srtt / 2,
-      none,
+      std::nullopt,
       PacketType::OneRtt);
   auto lossVisitor = [&](const auto& /*conn*/, const auto& packet, bool) {
     EXPECT_EQ(packet1, packet.header.getPacketSequenceNum());
@@ -1919,7 +1923,8 @@ TEST_F(QuicLossFunctionsTest, OutstandingInitialCounting) {
   conn->lossState.srtt = 100s;
   PacketNum largestSent = 0;
   while (largestSent < 10) {
-    largestSent = sendPacket(*conn, Clock::now(), none, PacketType::Initial);
+    largestSent =
+        sendPacket(*conn, Clock::now(), std::nullopt, PacketType::Initial);
   }
   EXPECT_EQ(10, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   auto noopLossVisitor =
@@ -1946,7 +1951,8 @@ TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
   conn->lossState.srtt = 100s;
   PacketNum largestSent = 0;
   while (largestSent < 10) {
-    largestSent = sendPacket(*conn, Clock::now(), none, PacketType::Handshake);
+    largestSent =
+        sendPacket(*conn, Clock::now(), std::nullopt, PacketType::Handshake);
   }
   EXPECT_EQ(10, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   auto noopLossVisitor =
@@ -1971,7 +1977,7 @@ TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
   conn->outstandings.reset();
   conn->lossState.ptoCount =
       std::numeric_limits<decltype(conn->lossState.ptoCount)>::max();
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   calculateAlarmDuration(*conn);
 }
 
@@ -2133,8 +2139,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
   // Some packets are already acked
   conn->outstandings.packets.erase(
@@ -2218,8 +2224,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
 
   // setting a very high reordering threshold to force loss by timeout only
@@ -2325,8 +2331,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
 
   // Some packets are already acked
@@ -2412,8 +2418,8 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
 
   // Some packets are already acked
@@ -2443,8 +2449,8 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {
                    .hasError());
 
   // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
-  // 0, 1, and 5 should be marked lost due to reordering, none due to timeout
-  // 6 is outstanding / on the wire still (no determination made)
+  // 0, 1, and 5 should be marked lost due to reordering, std::nullopt due to
+  // timeout 6 is outstanding / on the wire still (no determination made)
   EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLost);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
@@ -2457,8 +2463,8 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeout) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
 
   // setting a very high reordering threshold to force loss by timeout only
@@ -2495,8 +2501,8 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutPartial) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
 
   // Some packets are already acked
@@ -2526,7 +2532,8 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutPartial) {
                    .hasError());
 
   // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
-  // 0, 1, 5, and 6 should be marked lost due to timeout, none due to reordering
+  // 0, 1, 5, and 6 should be marked lost due to timeout, std::nullopt due to
+  // reordering
   EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
   EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
@@ -2539,8 +2546,8 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutAndReordering) {
   // send 7 packets
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
-    largestSent =
-        sendPacket(*conn, TimePoint(i * 10ms), none, PacketType::OneRtt);
+    largestSent = sendPacket(
+        *conn, TimePoint(i * 10ms), std::nullopt, PacketType::OneRtt);
   }
 
   // Some packets are already acked
@@ -2754,7 +2761,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
     return folly::unit;
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        true);
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
@@ -2852,7 +2865,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
     return folly::unit;
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        true);
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
@@ -2931,7 +2950,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
     return folly::unit;
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        true);
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
@@ -2947,7 +2972,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
     conn->outstandings.dsrCount++;
   }
   // Add another non-DSR after
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   EXPECT_EQ(7, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   // Assume some packets are already acked
   for (auto iter =
@@ -3031,7 +3056,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
     return folly::unit;
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+    sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   }
   EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   // Assume some packets are already acked
@@ -3110,7 +3135,7 @@ TEST_F(
     return folly::unit;
   };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+    sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   }
   EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   // Assume some packets are already acked
@@ -3195,7 +3220,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
     return folly::unit;
   };
   for (int i = 0; i < 4; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        true);
   }
   // Add some DSR frames and build the ACK
   auto ack = AckEvent::Builder()
@@ -3232,7 +3263,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
   }
   // Add another non-DSR burst and ACK all of them
   for (int i = 0; i < 4; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, false);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        false);
     auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
     ack.ackedPackets.emplace_back(
         CongestionController::AckEvent::AckPacket::Builder()
@@ -3244,7 +3281,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
             .build());
   }
   // Add one more DSR packet from the same stream, ACKed
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
+  sendPacket(
+      *conn,
+      Clock::now(),
+      std::nullopt,
+      PacketType::OneRtt,
+      std::nullopt,
+      true);
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame f{0, 10, 100, false, true, std::nullopt, 5};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;
@@ -3309,7 +3352,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
     return folly::unit;
   };
   for (int i = 0; i < 4; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, false);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        false);
   }
   // Add some non-DSR frames and build the ACK
   auto ack = AckEvent::Builder()
@@ -3338,7 +3387,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
   }
   // Add a DSR burst and ACK all of them
   for (int i = 0; i < 4; ++i) {
-    sendPacket(*conn, Clock::now(), none, PacketType::OneRtt, none, true);
+    sendPacket(
+        *conn,
+        Clock::now(),
+        std::nullopt,
+        PacketType::OneRtt,
+        std::nullopt,
+        true);
     auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
     WriteStreamFrame f{
         4, 10, 100, false, true, std::nullopt, conn->outstandings.dsrCount++};
@@ -3355,7 +3410,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
     op.isDSRPacket = true;
   }
   // Add one more non-DSR packet from the same stream, ACKed
-  sendPacket(*conn, Clock::now(), none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame f{0, 10, 100, false, false, std::nullopt, 0};
   AckEvent::AckPacket::DetailsPerStream detailsPerStream;

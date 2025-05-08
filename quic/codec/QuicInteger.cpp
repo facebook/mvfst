@@ -36,7 +36,7 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
   if (atMost == 0 || !cursor.canAdvance(1)) {
     VLOG(10) << "Not enough bytes to decode integer, cursor len="
              << cursor.totalLength();
-    return none;
+    return std::nullopt;
   }
 
   // get 2 msb of first byte that determines variable-length size expected
@@ -53,7 +53,7 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
   // not enough bytes to decode, undo cursor
   if (!cursor.canAdvance(bytesExpected) || atMost < bytesExpected) {
     VLOG(10) << "Could not decode integer numBytes=" << bytesExpected;
-    return none;
+    return std::nullopt;
   }
   // result storage
   uint64_t result{0};

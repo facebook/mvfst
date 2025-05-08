@@ -23,7 +23,7 @@ Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     case QuicSimpleFrame::Type::StopSendingFrame:
       if (!conn.streamManager->streamExists(
               frame.asStopSendingFrame()->streamId)) {
-        return none;
+        return std::nullopt;
       }
       return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathChallengeFrame:
@@ -31,7 +31,7 @@ Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       // or a different path validation was scheduled
       if (!conn.outstandingPathValidation ||
           *frame.asPathChallengeFrame() != *conn.outstandingPathValidation) {
-        return none;
+        return std::nullopt;
       }
       return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathResponseFrame:
@@ -145,7 +145,7 @@ folly::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
       const PathResponseFrame& pathResponse = *frame.asPathResponseFrame();
-      // Ignore the response if outstandingPathValidation is none or
+      // Ignore the response if outstandingPathValidation is std::nullopt or
       // the path data doesn't match what's in outstandingPathValidation
       if (fromChangedPeerAddress || !conn.outstandingPathValidation ||
           pathResponse.pathData != conn.outstandingPathValidation->pathData) {

@@ -220,7 +220,13 @@ TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
   packet.packet.frames.push_back(PingFrame());
   EXPECT_EQ(0, conn->outstandings.packets.size());
   auto result = updateConnection(
-      *conn, none, packet.packet, Clock::now(), 50, 0, false /* isDSRPacket */);
+      *conn,
+      std::nullopt,
+      packet.packet,
+      Clock::now(),
+      50,
+      0,
+      false /* isDSRPacket */);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
@@ -267,7 +273,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       .WillOnce(Return(true));
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint{},
       getEncodedSize(packet),
@@ -332,7 +338,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       .WillOnce(Return(false));
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet2.packet,
       TimePoint(),
       getEncodedSize(packet2),
@@ -464,7 +470,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       .WillOnce(Return(true));
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet1.packet,
       TimePoint{},
       getEncodedSize(packet1),
@@ -529,7 +535,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       .WillOnce(Return(false));
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet2.packet,
       TimePoint(),
       getEncodedSize(packet2),
@@ -637,7 +643,7 @@ TEST_F(
       .WillOnce(Return(true));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet1.packet,
                    TimePoint{},
                    getEncodedSize(packet1),
@@ -727,7 +733,7 @@ TEST_F(
       .WillOnce(Return(false));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
@@ -797,7 +803,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    handshakePacket.packet,
                    TimePoint{},
                    getEncodedSize(handshakePacket),
@@ -806,7 +812,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    .hasError());
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    initialPacket.packet,
                    TimePoint{},
                    getEncodedSize(initialPacket),
@@ -815,7 +821,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    .hasError());
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    appDataPacket.packet,
                    TimePoint{},
                    getEncodedSize(appDataPacket),
@@ -868,7 +874,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   packet.packet.frames.push_back(WriteStreamFrame(stream1->id, 0, 0, true));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -920,7 +926,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
       WriteStreamFrame(stream1->id, 0, buf->computeChainDataLength(), false));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -969,7 +975,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
       conn->ackStates.handshakeAckState->largestAckScheduled;
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1009,7 +1015,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   packet.packet.frames.push_back(std::move(ackFrame));
   auto result2 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1030,7 +1036,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
 
   auto result4 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet2.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1064,7 +1070,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   packet.packet.frames.push_back(PaddingFrame());
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1103,7 +1109,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->writeBuffer.append(data->clone());
   auto result1 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1126,7 +1132,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->writeBuffer.append(data->clone());
   auto result2 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1159,7 +1165,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   handshakeStream->writeBuffer.append(data->clone());
   auto result3 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1178,7 +1184,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   handshakeStream->writeBuffer.append(data->clone());
   auto result4 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1238,7 +1244,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
   initialStream->writeBuffer.append(data->clone());
   auto result1 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1265,7 +1271,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
   initialStream->writeBuffer.append(data->clone());
   auto result2 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1303,7 +1309,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   auto result2 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1327,7 +1333,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       WriteStreamFrame(stream1->id, 0, 0, true));
   auto result4 = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       nonHandshake.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1382,7 +1388,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -1401,7 +1407,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
       WriteStreamFrame(stream1->id, 0, 0, true));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    nonHandshake.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -1466,7 +1472,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -1519,7 +1525,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   conn->lossState.totalAckElicitingPacketsSent = 15;
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    555,
@@ -1609,7 +1615,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithAppLimitedStats) {
   // record the packet as having been sent
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    555,
@@ -1670,7 +1676,7 @@ TEST_F(
   // record the packet as having been sent
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    555,
@@ -1764,7 +1770,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   packet.packet.frames.push_back(std::move(streamWindowUpdate));
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1801,7 +1807,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   packet.packet.frames.push_back(std::move(connWindowUpdate));
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1841,7 +1847,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -1861,7 +1867,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
   auto sentPacketNumber = conn->ackStates.appDataAckState.nextPacketNum;
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -1882,7 +1888,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1903,7 +1909,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
   packet.packet.frames.push_back(PingFrame());
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1925,7 +1931,7 @@ TEST_F(QuicTransportFunctionsTest, TestPingFrameCounter) {
   packet.packet.frames.push_back(PingFrame());
   auto result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1950,7 +1956,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
   packet.packet.frames.push_back(writeStreamFrame);
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -1994,7 +2000,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
   packet.packet.frames.push_back(writeStreamFrame2);
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -2036,7 +2042,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame1);
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -2074,7 +2080,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame1);
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -2119,7 +2125,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame2);
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -2159,7 +2165,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame2);
   result = updateConnection(
       *conn,
-      none,
+      std::nullopt,
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
@@ -2210,7 +2216,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   packet1.packet.frames.push_back(frame1);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
@@ -2227,7 +2233,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   packet2.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
@@ -2278,7 +2284,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   packet3.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet3.packet,
                    TimePoint(),
                    getEncodedSize(packet3),
@@ -2332,7 +2338,7 @@ TEST_F(
   packet1.packet.frames.push_back(frame1);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
@@ -2349,7 +2355,7 @@ TEST_F(
   packet2.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
@@ -2366,7 +2372,7 @@ TEST_F(
   packet3.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet3.packet,
                    TimePoint(),
                    getEncodedSize(packet3),
@@ -2426,7 +2432,7 @@ TEST_F(
   packet4.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet4.packet,
                    TimePoint(),
                    getEncodedSize(packet4),
@@ -2481,7 +2487,7 @@ TEST_F(
   packet1.packet.frames.push_back(frame1);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
@@ -2499,7 +2505,7 @@ TEST_F(
   packet2.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
@@ -2517,7 +2523,7 @@ TEST_F(
   packet3.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet3.packet,
                    TimePoint(),
                    getEncodedSize(packet3),
@@ -2577,7 +2583,7 @@ TEST_F(
   packet4.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet4.packet,
                    TimePoint(),
                    getEncodedSize(packet4),
@@ -2655,7 +2661,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
@@ -2726,7 +2732,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
@@ -4119,7 +4125,7 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
   conn->streamManager->queueBlocked(stream->id, 1000);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -4167,7 +4173,7 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
   EXPECT_DEATH(
       (void)updateConnection(
           *conn,
-          none,
+          std::nullopt,
           packet.packet,
           TimePoint(),
           getEncodedSize(packet),
@@ -4189,7 +4195,7 @@ TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -4209,7 +4215,7 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
   conn->pendingEvents.resets.emplace(stream->id, rstStreamFrame);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -4253,7 +4259,7 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint{},
                    4321,
@@ -4271,7 +4277,7 @@ TEST_F(QuicTransportFunctionsTest, TotalPacketsSentUpdate) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint{},
                    4321,
@@ -4880,7 +4886,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
@@ -4910,7 +4916,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   retxPacket.packet.frames.push_back(writeStreamFrame);
   ASSERT_FALSE(updateConnection(
                    *conn,
-                   none,
+                   std::nullopt,
                    retxPacket.packet,
                    TimePoint(),
                    getEncodedSize(retxPacket),
@@ -4941,7 +4947,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_FALSE(updateConnection(
                      *conn,
-                     none,
+                     std::nullopt,
                      packet.packet,
                      TimePoint(),
                      getEncodedSize(packet),
@@ -4958,7 +4964,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_TRUE(updateConnection(
                     *conn,
-                    none,
+                    std::nullopt,
                     packet.packet,
                     TimePoint(),
                     getEncodedSize(packet),
@@ -4984,7 +4990,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_FALSE(updateConnection(
                      *conn,
-                     none,
+                     std::nullopt,
                      packet.packet,
                      TimePoint(),
                      getEncodedSize(packet),
@@ -5006,7 +5012,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_TRUE(updateConnection(
                     *conn,
-                    none,
+                    std::nullopt,
                     packet.packet,
                     TimePoint(),
                     getEncodedSize(packet),
@@ -5032,7 +5038,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_FALSE(updateConnection(
                      *conn,
-                     none,
+                     std::nullopt,
                      packet.packet,
                      TimePoint(),
                      getEncodedSize(packet),
@@ -5049,7 +5055,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_TRUE(updateConnection(
                     *conn,
-                    none,
+                    std::nullopt,
                     packet.packet,
                     TimePoint(),
                     getEncodedSize(packet),

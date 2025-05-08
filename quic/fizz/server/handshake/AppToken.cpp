@@ -44,7 +44,7 @@ Optional<AppToken> decodeAppToken(const folly::IOBuf& buf) {
     fizz::detail::read(appToken.version, cursor);
     fizz::detail::readBuf<uint16_t>(appToken.appParams, cursor);
   } catch (const std::exception&) {
-    return none;
+    return std::nullopt;
   }
   return appToken;
 }

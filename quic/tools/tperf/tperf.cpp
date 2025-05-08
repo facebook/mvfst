@@ -24,7 +24,7 @@ DEFINE_uint64(
 DEFINE_uint64(writes_per_loop, 44, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 1024 * 1024, "Flow control window size");
 DEFINE_bool(autotune_window, true, "Automatically increase the receive window");
-DEFINE_string(congestion, "cubic", "newreno/cubic/bbr/none");
+DEFINE_string(congestion, "cubic", "newreno/cubic/bbr/std::nullopt");
 DEFINE_bool(pacing, false, "Enable pacing");
 DEFINE_uint64(
     max_pacing_rate,
@@ -52,8 +52,8 @@ DEFINE_uint64(
     "0 (the default) means the stream lives for the whole duration of the test.");
 DEFINE_string(
     pacing_observer,
-    "none",
-    "none/time/rtt/ack: Pacing observer bucket type: per 3ms, per rtt or per ack");
+    "std::nullopt",
+    "std::nullopt/time/rtt/ack: Pacing observer bucket type: per 3ms, per rtt or per ack");
 DEFINE_uint32(
     max_receive_packet_size,
     quic::kDefaultMaxUDPPayload,
@@ -101,8 +101,8 @@ DEFINE_uint64(
     "If the StaticCwnd congestion controller is used, this is the static cwnd in bytes");
 DEFINE_string(
     pacer_interval_source,
-    "none",
-    "If the StaticCwnd congestion controller is used with a pacer, this is the rtt that will be used to updated the pacer. (mrtt, lrtt, srtt, none)");
+    "std::nullopt",
+    "If the StaticCwnd congestion controller is used with a pacer, this is the rtt that will be used to updated the pacer. (mrtt, lrtt, srtt, std::nullopt)");
 DEFINE_bool(experimental_pacer, false, "Whether to use the experimental pacer");
 
 namespace quic::tperf {

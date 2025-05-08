@@ -23,7 +23,7 @@ bool hasAcksToSchedule(const AckState& ackState) {
 
 Optional<PacketNum> largestAckToSend(const AckState& ackState) {
   if (ackState.acks.empty()) {
-    return none;
+    return std::nullopt;
   }
   return ackState.acks.back().end;
 }
@@ -44,7 +44,7 @@ folly::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
       : conn_.transportSettings.ackDelayExponent;
   auto largestAckedPacketNum = *largestAckToSend(ackState_);
   auto ackingTime = Clock::now();
-  DCHECK(ackState_.largestRecvdPacketTime.hasValue())
+  DCHECK(ackState_.largestRecvdPacketTime.has_value())
       << "Missing received time for the largest acked packet";
   // assuming that we're going to ack the largest received with highest pri
   auto receivedTime = *ackState_.largestRecvdPacketTime;
@@ -108,7 +108,7 @@ folly::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
   }
 
   if (!ackWriteResult.value()) {
-    return none;
+    return std::nullopt;
   }
 
   return largestAckedPacketNum;

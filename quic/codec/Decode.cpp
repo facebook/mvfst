@@ -440,7 +440,7 @@ folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
-  folly::Optional<std::pair<uint64_t, size_t>> reliableSize = folly::none;
+  Optional<std::pair<uint64_t, size_t>> reliableSize = std::nullopt;
   if (reliable) {
     reliableSize = decodeQuicInteger(cursor);
     if (!reliableSize) {
@@ -459,8 +459,7 @@ folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
       folly::to<StreamId>(streamId->first),
       errorCode,
       finalSize->first,
-      reliableSize ? folly::Optional<uint64_t>(reliableSize->first)
-                   : folly::none);
+      reliableSize ? Optional<uint64_t>(reliableSize->first) : std::nullopt);
 }
 
 folly::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
@@ -1239,7 +1238,7 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
   if (cursorLength < sizeof(QuicVersionType) ||
       cursorLength % sizeof(QuicVersionType)) {
     VLOG(4) << "Version negotiation packet invalid";
-    return none;
+    return std::nullopt;
   }
 
   VersionNegotiationPacket packet(
@@ -1375,7 +1374,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
 
   auto version = parsedLongHeaderInvariant->invariant.version;
   if (version == QuicVersion::VERSION_NEGOTIATION) {
-    return ParsedLongHeaderResult(true, none);
+    return ParsedLongHeaderResult(true, std::nullopt);
   }
   auto parsedHeader = parseLongHeaderVariants(
       type, std::move(*parsedLongHeaderInvariant), cursor);

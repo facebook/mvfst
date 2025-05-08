@@ -109,7 +109,7 @@ void QuicTransportBase::closeGracefully() {
       QuicError(QuicErrorCode(LocalErrorCode::NO_ERROR), "Graceful Close"));
   // All streams are closed, close the transport for realz.
   if (conn_->streamManager->streamCount() == 0) {
-    closeImpl(none);
+    closeImpl(std::nullopt);
   }
 }
 
@@ -391,7 +391,7 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
   using ConsumeError = std::pair<LocalErrorCode, Optional<uint64_t>>;
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(
-        ConsumeError{LocalErrorCode::CONNECTION_CLOSED, none});
+        ConsumeError{LocalErrorCode::CONNECTION_CLOSED, std::nullopt});
   }
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
@@ -419,11 +419,11 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
     if (stream->streamReadError) {
       switch (stream->streamReadError->type()) {
         case QuicErrorCode::Type::LocalErrorCode:
-          return folly::makeUnexpected(
-              ConsumeError{*stream->streamReadError->asLocalErrorCode(), none});
+          return folly::makeUnexpected(ConsumeError{
+              *stream->streamReadError->asLocalErrorCode(), std::nullopt});
         default:
           return folly::makeUnexpected(
-              ConsumeError{LocalErrorCode::INTERNAL_ERROR, none});
+              ConsumeError{LocalErrorCode::INTERNAL_ERROR, std::nullopt});
       }
     }
 
@@ -541,7 +541,8 @@ void QuicTransportBase::schedulePingTimeout(
 
 void QuicTransportBase::setAckRxTimestampsEnabled(bool enableAckRxTimestamps) {
   if (!enableAckRxTimestamps) {
-    conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.clear();
+    conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+        std::nullopt;
   }
 }
 

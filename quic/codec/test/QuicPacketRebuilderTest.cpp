@@ -84,7 +84,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildSmallInitial) {
   ASSERT_FALSE(regularBuilder2.encodePacketHeader().hasError());
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
   auto rebuilt = std::move(regularBuilder2).buildPacket();
   EXPECT_FALSE(rebuilt.header.empty());
   ASSERT_EQ(rebuilt.packet.frames.size(), 3);
@@ -144,7 +144,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   ASSERT_FALSE(writeFrame(maxDataFrame, regularBuilder1).hasError());
@@ -167,8 +167,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
           ChainedByteRangeHead(cryptoBuf), 0, true)));
   // Write an updated ackState that should be used when rebuilding the AckFrame
   conn.ackStates.appDataAckState.acks.insert(1000, 1200);
-  conn.ackStates.appDataAckState.largestRecvdPacketTime.assign(
-      quic::Clock::now());
+  conn.ackStates.appDataAckState.largestRecvdPacketTime = quic::Clock::now();
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -180,7 +179,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size());
@@ -280,7 +279,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
@@ -298,7 +297,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  EXPECT_FALSE(rebuildResult.value().hasValue());
+  EXPECT_FALSE(rebuildResult.value().has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
@@ -316,7 +315,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
 
   // Write them with a regular builder
   writeStreamFrameHeader(
-      regularBuilder1, streamId, 0, 0, 0, true, none /* skipLenHint */);
+      regularBuilder1, streamId, 0, 0, 0, true, std::nullopt /* skipLenHint */);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
@@ -334,7 +333,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 2000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size());
   EXPECT_TRUE(
@@ -375,7 +374,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   ASSERT_FALSE(
@@ -402,7 +401,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size() + 1);
@@ -451,7 +450,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  EXPECT_FALSE(rebuildResult.value().hasValue());
+  EXPECT_FALSE(rebuildResult.value().has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
@@ -495,7 +494,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
@@ -520,7 +519,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstanding);
   ASSERT_FALSE(rebuildResult.hasError());
-  EXPECT_FALSE(rebuildResult.value().hasValue());
+  EXPECT_FALSE(rebuildResult.value().has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, CloneCounter) {
@@ -567,7 +566,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
   EXPECT_TRUE(outstandingPacket.maybeClonedPacketIdentifier.has_value());
   EXPECT_EQ(1, conn.outstandings.numClonedPackets());
 }
@@ -595,7 +594,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       false,
-      none);
+      std::nullopt);
   writeStreamFrameData(
       regularBuilder, buf1->clone(), buf1->computeChainDataLength());
   writeStreamFrameHeader(
@@ -605,7 +604,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       buf2->computeChainDataLength(),
       buf2->computeChainDataLength(),
       true,
-      none);
+      std::nullopt);
   writeStreamFrameData(
       regularBuilder, buf2->clone(), buf2->computeChainDataLength());
   auto packet = std::move(regularBuilder).buildPacket();
@@ -649,7 +648,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   PacketRebuilder rebuilder(mockBuilder, conn);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
@@ -674,7 +673,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
       false,
-      none);
+      std::nullopt);
   writeStreamFrameData(
       regularBuilder, buf1->clone(), buf1->computeChainDataLength());
   writeStreamFrameHeader(
@@ -684,7 +683,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       0,
       0,
       true,
-      none);
+      std::nullopt);
   writeStreamFrameData(regularBuilder, ChainedByteRangeHead(), 0);
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1200);
@@ -728,6 +727,6 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   PacketRebuilder rebuilder(mockBuilder, conn);
   auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
   ASSERT_FALSE(rebuildResult.hasError());
-  ASSERT_TRUE(rebuildResult.value().hasValue());
+  ASSERT_TRUE(rebuildResult.value().has_value());
 }
 } // namespace quic::test

@@ -233,7 +233,7 @@ void QLoggerCommon::addMetricUpdate(
 void QLoggerCommon::addStreamStateUpdate(
     quic::StreamId id,
     std::string update,
-    folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) {
+    Optional<std::chrono::milliseconds> timeSinceStreamCreation) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
@@ -297,14 +297,14 @@ void QLoggerCommon::addNetworkPathModelUpdate(
       refTime));
 }
 
-void QLoggerCommon::setDcid(folly::Optional<quic::ConnectionId> connID) {
-  if (connID.hasValue()) {
+void QLoggerCommon::setDcid(Optional<quic::ConnectionId> connID) {
+  if (connID.has_value()) {
     dcid = connID;
   }
 }
 
-void QLoggerCommon::setScid(folly::Optional<quic::ConnectionId> connID) {
-  if (connID.hasValue()) {
+void QLoggerCommon::setScid(Optional<quic::ConnectionId> connID) {
+  if (connID.has_value()) {
     scid = connID;
   }
 }

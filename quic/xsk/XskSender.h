@@ -58,8 +58,8 @@ struct SharedState {
   // XskSender. The members are initialized by the primary XskSender (the one
   // with an ownerId of 0).
   //
-  // What must hold though, is that either all members are initialized, or none
-  // are.
+  // What must hold though, is that either all members are initialized, or
+  // std::nullopt are.
   void* sharedUmemAddr{nullptr};
   void* sharedCxMap{nullptr};
   int sharedXskFd{-1};

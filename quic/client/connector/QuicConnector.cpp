@@ -71,7 +71,7 @@ void QuicConnector::connect(
       0 /* connectionIdSize */);
   quicClient_->setHostname(sni.value_or(connectAddr.getAddressStr()));
   quicClient_->addNewPeerAddress(connectAddr);
-  if (localAddr.hasValue()) {
+  if (localAddr.has_value()) {
     quicClient_->setLocalAddress(*localAddr);
   }
   quicClient_->setCongestionControllerFactory(

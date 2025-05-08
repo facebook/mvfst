@@ -117,7 +117,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   void cancelByteEventCallbacksForStream(
       const StreamId id,
-      const Optional<uint64_t>& offsetUpperBound = none) override;
+      const Optional<uint64_t>& offsetUpperBound = std::nullopt) override;
 
   /**
    * Cancel byte event callbacks for given type and stream.
@@ -128,7 +128,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void cancelByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id,
-      const Optional<uint64_t>& offsetUpperBound = none) override;
+      const Optional<uint64_t>& offsetUpperBound = std::nullopt) override;
 
   /**
    * Register a byte event to be triggered when specified event type occurs for

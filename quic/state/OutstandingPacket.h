@@ -179,7 +179,7 @@ struct OutstandingPacket {
   Optional<LastAckedPacketInfo> lastAckedPacketInfo;
 
   // ClonedPacketIdentifier associated with this OutstandingPacketWrapper. This
-  // will be a none if the packet isn't a clone and hasn't been cloned.
+  // will be a std::nullopt if the packet isn't a clone and hasn't been cloned.
   Optional<ClonedPacketIdentifier> maybeClonedPacketIdentifier;
 
   OptionalIntegral<uint64_t> nonDsrPacketSequenceNumber;

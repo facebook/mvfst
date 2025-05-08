@@ -523,7 +523,7 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
       serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
 
   ASSERT_TRUE(manager.createStream(serverStreamId2).hasValue());
-  EXPECT_EQ(none, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(std::nullopt, manager.nextAcceptableLocalUnidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
@@ -541,7 +541,7 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
       serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
 
   ASSERT_TRUE(manager.createStream(serverStreamId2).hasValue());
-  EXPECT_EQ(none, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(std::nullopt, manager.nextAcceptableLocalBidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
@@ -598,7 +598,7 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
       clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
 
   ASSERT_TRUE(manager.getStream(clientStreamId2).hasValue());
-  EXPECT_EQ(none, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(std::nullopt, manager.nextAcceptablePeerUnidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
@@ -616,7 +616,7 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
   EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
 
   ASSERT_TRUE(manager.getStream(clientStreamId2).hasValue());
-  EXPECT_EQ(none, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(std::nullopt, manager.nextAcceptablePeerBidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, TestClearActionable) {

@@ -329,9 +329,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         data,
         0 /* cipherOverhead */,
         0 /* largestAcked */,
-        none /* longHeaderOverride */,
+        std::nullopt /* longHeaderOverride */,
         eof,
-        none,
+        std::nullopt,
         offset));
     deliverData(packetData->clone());
     return packetData;

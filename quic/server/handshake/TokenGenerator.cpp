@@ -36,10 +36,11 @@ Optional<BufPtr> TokenGenerator::encryptToken(
   if (!maybeEncryptedToken) {
     LOG(ERROR) << "Failed to encypt addr validation token with IP "
                << token.clientIp.str();
+    return Optional<BufPtr>();
   }
 
-  // If the encryption failed, this will be empty optional
-  return maybeEncryptedToken;
+  // Convert folly::Optional to quic::Optional (tiny::optional)
+  return Optional<BufPtr>(std::move(maybeEncryptedToken.value()));
 }
 
 uint64_t TokenGenerator::decryptToken(

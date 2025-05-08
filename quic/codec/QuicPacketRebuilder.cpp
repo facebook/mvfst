@@ -257,7 +257,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
       }
     }
     if (!writeSuccess) {
-      return none;
+      return std::nullopt;
     }
   }
 
@@ -282,7 +282,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
   // (2) we should write window update, but didn't, and wrote nothing else.
   if (!notPureAck ||
       (shouldWriteWindowUpdate && !windowUpdateWritten && !writeSuccess)) {
-    return none;
+    return std::nullopt;
   }
 
   if (encryptionLevel == EncryptionLevel::Initial) {

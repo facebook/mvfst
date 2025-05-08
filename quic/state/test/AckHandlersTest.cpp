@@ -2480,7 +2480,8 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(std::nullopt));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled
@@ -2497,12 +2498,8 @@ TEST_P(AckHandlersTest, AckEventCreation) {
   auto ackEvent = ackEventResult.value();
   checkAck(ackEvent);
   ASSERT_TRUE(ackEvent.ccState.has_value());
-  EXPECT_EQ(
-      writableBytes,
-      CHECK_NOTNULL(ackEvent.ccState.get_pointer())->writableBytes);
-  EXPECT_EQ(
-      congestionWindow,
-      CHECK_NOTNULL(ackEvent.ccState.get_pointer())->congestionWindowBytes);
+  EXPECT_EQ(writableBytes, ackEvent.ccState.value().writableBytes);
+  EXPECT_EQ(congestionWindow, ackEvent.ccState.value().congestionWindowBytes);
 }
 
 TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
@@ -2610,7 +2607,8 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(std::nullopt));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled
@@ -2627,12 +2625,8 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
   auto ackEvent = ackEventResult.value();
   checkAck(ackEvent);
   ASSERT_TRUE(ackEvent.ccState.has_value());
-  EXPECT_EQ(
-      writableBytes,
-      CHECK_NOTNULL(ackEvent.ccState.get_pointer())->writableBytes);
-  EXPECT_EQ(
-      congestionWindow,
-      CHECK_NOTNULL(ackEvent.ccState.get_pointer())->congestionWindowBytes);
+  EXPECT_EQ(writableBytes, ackEvent.ccState.value().writableBytes);
+  EXPECT_EQ(congestionWindow, ackEvent.ccState.value().congestionWindowBytes);
 }
 
 TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
@@ -2759,9 +2753,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestamps) {
 
   UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
         AckReceiveTimestampsConfig{
-            .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3});
+            .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3};
     ackFrame.maybeLatestRecvdPacketNum = 9;
     ackFrame.maybeLatestRecvdPacketTime = 500ms;
     RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
@@ -2826,9 +2820,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsGaps) {
 
   const auto ackTime = startTime + 10ms + ackFrame.ackDelay;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
         AckReceiveTimestampsConfig{
-            .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3});
+            .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3};
     ackFrame.maybeLatestRecvdPacketNum = 9;
     ackFrame.maybeLatestRecvdPacketTime = 500ms;
     RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
@@ -2923,9 +2917,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
   // Build the expected received timestamps map.
   UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
         AckReceiveTimestampsConfig{
-            .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3});
+            .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3};
     ackFrame.maybeLatestRecvdPacketNum = 9;
     ackFrame.maybeLatestRecvdPacketTime = 500ms;
     RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
@@ -3016,10 +3010,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
     auto ackTime = startTime + 10ms + ackFrame.ackDelay;
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
           AckReceiveTimestampsConfig{
-              .maxReceiveTimestampsPerAck = 10,
-              .receiveTimestampsExponent = 3});
+              .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3};
       ackFrame.maybeLatestRecvdPacketNum = 5;
       ackFrame.maybeLatestRecvdPacketTime = 500ms;
       RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
@@ -3134,9 +3127,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
     auto ackTime = startTime + 10ms + ackFrame.ackDelay;
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
           AckReceiveTimestampsConfig{
-              .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3});
+              .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3};
       ackFrame.maybeLatestRecvdPacketNum = 9;
       ackFrame.maybeLatestRecvdPacketTime = 500ms;
       RecvdPacketsTimestampsRange recvdPacketsTimestampsRange1 = {
@@ -3264,9 +3257,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsMaxCheck) {
   UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
   if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     // Set max requested receive timestamps to 5 and send more than that.
-    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+    conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
         AckReceiveTimestampsConfig{
-            .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3});
+            .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3};
     ackFrame.maybeLatestRecvdPacketNum = 9;
     ackFrame.maybeLatestRecvdPacketTime = 100ms;
     // Send 10 timestamps, more than requested.
@@ -3341,10 +3334,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsInvalidCases) {
     ackFrame.ackDelay = 5ms;
 
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
-      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.assign(
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
           AckReceiveTimestampsConfig{
-              .maxReceiveTimestampsPerAck = 10,
-              .receiveTimestampsExponent = 3});
+              .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3};
       ackFrame.maybeLatestRecvdPacketNum = 5;
       ackFrame.maybeLatestRecvdPacketTime = 100ms;
     }
@@ -3470,7 +3462,8 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(std::nullopt));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   ASSERT_FALSE(processAckFrame(
@@ -3571,7 +3564,8 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(std::nullopt));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   ASSERT_FALSE(processAckFrame(
@@ -3699,7 +3693,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(none));
+        .WillOnce(Return(std::nullopt));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     ASSERT_FALSE(processAckFrame(
@@ -3756,7 +3750,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(none));
+        .WillOnce(Return(std::nullopt));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     ASSERT_FALSE(processAckFrame(
@@ -3813,7 +3807,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(none));
+        .WillOnce(Return(std::nullopt));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     ASSERT_FALSE(processAckFrame(
@@ -3933,7 +3927,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
     EXPECT_CALL(*rawCongestionController, getBandwidth())
-        .WillOnce(Return(none));
+        .WillOnce(Return(std::nullopt));
     EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     ASSERT_FALSE(processAckFrame(
@@ -4059,7 +4053,8 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
-  EXPECT_CALL(*rawCongestionController, getBandwidth()).WillOnce(Return(none));
+  EXPECT_CALL(*rawCongestionController, getBandwidth())
+      .WillOnce(Return(std::nullopt));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   ASSERT_FALSE(processAckFrame(
@@ -4557,7 +4552,7 @@ class AckEventForAppDataTest : public Test {
       const TimePoint timepoint = Clock::now()) {
     CHECK(!updateConnection(
                *conn_,
-               none,
+               std::nullopt,
                packet.packet,
                timepoint,
                getEncodedSize(packet),

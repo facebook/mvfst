@@ -50,8 +50,8 @@ quic::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
 
   auto maybeFreeUmemLoc = getFreeUmemIndex();
 
-  if (!maybeFreeUmemLoc.hasValue()) {
-    return quic::none;
+  if (!maybeFreeUmemLoc.has_value()) {
+    return std::nullopt;
   }
 
   XskBuffer xskBuffer;
@@ -151,7 +151,7 @@ SendResult XskSender::writeUdpPacket(
 
   guard.release();
 
-  if (!freeUmemLoc.hasValue()) {
+  if (!freeUmemLoc.has_value()) {
     return SendResult::NO_FREE_DESCRIPTORS;
   }
 
@@ -413,7 +413,7 @@ xdp_desc* XskSender::getTxDescriptor() {
 
 quic::Optional<uint32_t> XskSender::getFreeUmemIndex() {
   if (freeUmemIndices_.empty()) {
-    return quic::none;
+    return std::nullopt;
   }
   uint32_t freeLoc = freeUmemIndices_.front();
   freeUmemIndices_.pop();

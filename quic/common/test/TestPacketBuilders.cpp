@@ -61,19 +61,20 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   // This function sends ACK to dstConn
   auto srcConnId =
       (CHECK_NOTNULL(dstConn)->nodeType == QuicNodeType::Client
-           ? *CHECK_NOTNULL(
-                 CHECK_NOTNULL(dstConn)->serverConnectionId.get_pointer())
-           : *CHECK_NOTNULL(
-                 CHECK_NOTNULL(dstConn)->clientConnectionId.get_pointer()));
+           ? (CHECK(CHECK_NOTNULL(dstConn)->serverConnectionId.has_value()),
+              CHECK_NOTNULL(dstConn)->serverConnectionId.value())
+           : (CHECK(CHECK_NOTNULL(dstConn)->clientConnectionId.has_value()),
+              CHECK_NOTNULL(dstConn)->clientConnectionId.value()));
   auto dstConnId =
       (CHECK_NOTNULL(dstConn)->nodeType == QuicNodeType::Client
-           ? *CHECK_NOTNULL(
-                 CHECK_NOTNULL(dstConn)->clientConnectionId.get_pointer())
-           : *CHECK_NOTNULL(
-                 CHECK_NOTNULL(dstConn)->serverConnectionId.get_pointer()));
+           ? (CHECK(CHECK_NOTNULL(dstConn)->clientConnectionId.has_value()),
+              CHECK_NOTNULL(dstConn)->clientConnectionId.value())
+           : (CHECK(CHECK_NOTNULL(dstConn)->serverConnectionId.has_value()),
+              CHECK_NOTNULL(dstConn)->serverConnectionId.value()));
   Optional<PacketHeader> header;
 
-  const auto ackPnSpace = *CHECK_NOTNULL(maybePnSpace.get_pointer());
+  const auto ackPnSpace =
+      (CHECK(maybePnSpace.has_value()), maybePnSpace.value());
   const auto ackPacketNum = [this, &ackPnSpace]() {
     Optional<quic::PacketNum> maybeAckPacketNum;
     if (this->ackPacketNumStore) {
@@ -138,7 +139,7 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   }
   DCHECK(builder.canBuildPacket());
   WriteAckFrameState ackState;
-  ackState.acks = *CHECK_NOTNULL(maybeAckBlocks.get_pointer());
+  ackState.acks = (CHECK(maybeAckBlocks.has_value()), maybeAckBlocks.value());
   WriteAckFrameMetaData ackData = {
       ackState,
       maybeAckDelay.value(),
@@ -225,16 +226,17 @@ OutstandingPacketBuilder::setTotalAppLimitedTimeUsecs(
 
 OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
   return OutstandingPacketWrapper{
-      *CHECK_NOTNULL(maybePacket.get_pointer()),
-      *CHECK_NOTNULL(maybeTime.get_pointer()),
-      *CHECK_NOTNULL(maybeEncodedSize.get_pointer()),
-      *CHECK_NOTNULL(maybeEncodedBodySize.get_pointer()),
-      *CHECK_NOTNULL(maybeTotalBytesSent.get_pointer()),
-      *CHECK_NOTNULL(maybeInflightBytes.get_pointer()),
-      CHECK_NOTNULL(maybeLossState.get_pointer())->get(),
-      *CHECK_NOTNULL(maybeWriteCount.get_pointer()),
+      (CHECK(maybePacket.has_value()), maybePacket.value()),
+      (CHECK(maybeTime.has_value()), maybeTime.value()),
+      (CHECK(maybeEncodedSize.has_value()), maybeEncodedSize.value()),
+      (CHECK(maybeEncodedBodySize.has_value()), maybeEncodedBodySize.value()),
+      (CHECK(maybeTotalBytesSent.has_value()), maybeTotalBytesSent.value()),
+      (CHECK(maybeInflightBytes.has_value()), maybeInflightBytes.value()),
+      (CHECK(maybeLossState.has_value()), maybeLossState.value().get()),
+      (CHECK(maybeWriteCount.has_value()), maybeWriteCount.value()),
       OutstandingPacketWrapper::Metadata::DetailsPerStream(
-          *CHECK_NOTNULL(maybeDetailsPerStream.get_pointer())),
+          (CHECK(maybeDetailsPerStream.has_value()),
+           maybeDetailsPerStream.value())),
       maybeTotalAppLimitedTimeUsecs.value()};
 }
 

@@ -343,7 +343,8 @@ void QuicServerWorkerTest::testSendReset(
         auto aead = createNoOpAead();
         // Make the decrypt fail
         EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-            .WillRepeatedly(Invoke([&](auto&, auto, auto) { return none; }));
+            .WillRepeatedly(
+                Invoke([&](auto&, auto, auto) { return std::nullopt; }));
         codec.setOneRttReadCipher(std::move(aead));
         codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
         StatelessResetToken token = generateStatelessResetToken();
@@ -359,12 +360,16 @@ void QuicServerWorkerTest::testSendReset(
       }));
 
   RoutingData routingData(
-      HeaderForm::Short, false, false, shortHeader.getConnectionId(), none);
+      HeaderForm::Short,
+      false,
+      false,
+      shortHeader.getConnectionId(),
+      std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
       NetworkData(packet->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -414,12 +419,12 @@ TEST_F(QuicServerWorkerTest, SmallPacketTestNoReset) {
       false,
       false,
       shortHeaderConnId.getConnectionId(),
-      none);
+      std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -706,12 +711,13 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_CALL(
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
-  RoutingData routingData2(HeaderForm::Short, false, false, connId, none);
+  RoutingData routingData2(
+      HeaderForm::Short, false, false, connId, std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 
   auto connId2 = connId;
@@ -723,12 +729,13 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_CALL(
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
-  RoutingData routingData3(HeaderForm::Short, false, false, connId2, none);
+  RoutingData routingData3(
+      HeaderForm::Short, false, false, connId2, std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData3),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
@@ -823,12 +830,12 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       false,
       false,
       shortHeaderConnId.getConnectionId(),
-      none);
+      std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 
   ConnectionId newConnId = getTestConnectionId(hostId_);
@@ -857,12 +864,12 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       false,
       false,
       shortHeaderConnId.getConnectionId(),
-      none);
+      std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 
   // routing by address after transport_'s connid available, but before
@@ -894,12 +901,12 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       false,
       false,
       shortHeaderConnId2.getConnectionId(),
-      none);
+      std::nullopt);
   worker_->dispatchPacketData(
       clientAddr2,
       std::move(routingData3),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
@@ -1428,12 +1435,12 @@ TEST_F(QuicServerWorkerTest, PacketWithZeroHostIdFromExistingConnection) {
       false,
       false,
       shortHeaderConnId.getConnectionId(),
-      none);
+      std::nullopt);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
       NetworkData(data->clone(), Clock::now(), 0),
-      none);
+      std::nullopt);
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
 }
@@ -1468,7 +1475,7 @@ auto createInitialStream(
       streamData->computeChainDataLength(),
       streamData->computeChainDataLength(),
       true,
-      none /* skipLenHint */);
+      std::nullopt /* skipLenHint */);
   EXPECT_TRUE(res.hasValue());
   auto dataLen = *res;
   EXPECT_TRUE(dataLen);
@@ -2951,7 +2958,7 @@ void QuicServerTest::testReset(BufPtr packet) {
   auto aead = createNoOpAead();
   // Make the decrypt fail
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return none; }));
+      .WillRepeatedly(Invoke([&](auto&, auto, auto) { return std::nullopt; }));
   codec.setOneRttReadCipher(std::move(aead));
   codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
   StatelessResetToken token = generateStatelessResetToken();
