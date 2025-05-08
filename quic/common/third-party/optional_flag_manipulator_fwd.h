@@ -1,5 +1,5 @@
-#ifndef TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
-#define TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
+#ifndef QUIC_DETAIL_TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
+#define QUIC_DETAIL_TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
 
 /*
 Boost Software License - Version 1.0 - August 17th, 2003
@@ -31,6 +31,9 @@ DEALINGS IN THE SOFTWARE.
 Original repository: https://github.com/Sedeniono/tiny-optional
 */
 
+namespace quic {
+namespace detail {
+
 namespace tiny
 {
 // Forward declaration of optional_flag_manipulator, which is a user customization point.
@@ -38,5 +41,8 @@ namespace tiny
 template <class PayloadType, class Enable = void>
 struct optional_flag_manipulator;
 } // namespace tiny
+
+} // namespace detail
+} // namespace quic
 
 #endif

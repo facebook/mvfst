@@ -294,7 +294,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
       VersionNegotiationPacketBuilder builder(
           invariant.dstConnId, invariant.srcConnId, supportedVersions_);
       versionNegotiationPacket =
-          tiny::make_optional(std::move(builder).buildPacket());
+          quic::make_optional(std::move(builder).buildPacket());
     }
   }
   if (versionNegotiationPacket) {

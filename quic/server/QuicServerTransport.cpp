@@ -925,7 +925,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         }
 
         if (serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum >=
-            tiny::make_optional(expectedSeqNum.value())) {
+            make_optional(expectedSeqNum.value())) {
           QUIC_STATS(
               serverTransport->serverConn_->statsCallback,
               onTransportKnobOutOfOrder,

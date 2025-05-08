@@ -119,7 +119,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   Optional<PacketNum> firstPacketNum =
       (firstOutstandingPacket != conn.outstandings.packets.end())
-      ? tiny::make_optional(firstOutstandingPacket->getPacketSequenceNum())
+      ? make_optional(firstOutstandingPacket->getPacketSequenceNum())
       : std::nullopt;
 
   uint64_t dsrPacketsAcked = 0;

@@ -37,7 +37,7 @@ Original repository: https://github.com/Sedeniono/tiny-optional
 #include <functional> // Required for std::hash and std::invoke
 #include <limits> // Required for std::numeric_limits
 #include <optional> // Required for std::nullopt etc.
-#include <type_traits>
+#include <type_traits> // For std::hash conditions
 
 // In principle the following headers are required, but we rely on the standard header <optional> to include the
 // necessary pieces from the omitted headers. This is a build performance optimization, especially when using gcc's
@@ -48,11 +48,11 @@ Original repository: https://github.com/Sedeniono/tiny-optional
 // #include <utility> // Required for std::move, std::swap, etc.
 
 
-// TINY_OPTIONAL_VERSION % 100 is the patch level
-// TINY_OPTIONAL_VERSION / 100 % 1000 is the minor version
-// TINY_OPTIONAL_VERSION / 100000 is the major version
+// QUIC_TINY_OPTIONAL_VERSION % 100 is the patch level
+// QUIC_TINY_OPTIONAL_VERSION / 100 % 1000 is the minor version
+// QUIC_TINY_OPTIONAL_VERSION / 100000 is the major version
 // So the format is:          MmmmPP, where 'M'=major, 'm'=minor and 'P'=patch.
-#define TINY_OPTIONAL_VERSION 100300
+#define QUIC_TINY_OPTIONAL_VERSION 100300
 
 
 #if (!defined(__cplusplus) || __cplusplus < 201703L) && (!defined(_MSVC_LANG) || _MSVC_LANG < 201703L)
@@ -60,74 +60,78 @@ Original repository: https://github.com/Sedeniono/tiny-optional
 #endif
 
 #if (defined(__cplusplus) && __cplusplus >= 202002L) || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)
-  #define TINY_OPTIONAL_CPP20
+  #define QUIC_TINY_OPTIONAL_CPP20
 #endif
 
 // https://stackoverflow.com/a/66249936
 #if (defined(__x86_64__) || defined(_M_X64)) /* Is it x64?*/
-  #define TINY_OPTIONAL_x64
+  #define QUIC_TINY_OPTIONAL_x64
 #elif (defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)) /*Is it x86?*/
-  #define TINY_OPTIONAL_x86
+  #define QUIC_TINY_OPTIONAL_x86
 #endif
 
-// The user can define TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS to disable the exploits of undefined
+// The user can define QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS to disable the exploits of undefined
 // behavior. This allows compilation on non x86/x64 platforms. This means that the only remaining feature of this
 // library that sets it apart from std::optional is the ability to use a custom sentinel (and the stuff with
 // optional_flag_manipulator).
-#ifdef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS
+#ifdef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS
 // Disable exploits of unused bits e.g. for double, pointers, etc, and use a separate bool instead.
-  #ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
-    #define TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
+  #ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
+    #define QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
   #endif
 // Disable storing the empty state in members and use a separate bool instead.
-  #ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
-    #define TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+  #ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+    #define QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
   #endif
 #endif
 
 #ifdef __cpp_lib_three_way_comparison
-  #define TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON
+  #define QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON
   #if !defined(__clang__) && (defined(__GNUC__) || defined(__GNUG__))
     // With C++20, most of the comparison operators (==, <=, etc) that compare with a std::nullopt are no longer defined
     // in the standard. Instead, the code relies on the C++20 reversal of arguments or the three way comparison
     // operator. Unfortunately, gcc (at least up to and including gcc 13.2) does not implemented CWG 2445, meaning that
     // e.g. std::nullopt==someOptional calls the wrong function. See https://stackoverflow.com/q/74330356/3740047.
     // To work around this issue, we define all operators for gcc.
-    #define TINY_OPTIONAL_GCC_WORKAROUND_CWG2445
+    #define QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445
   #endif
 #endif
 
 #if defined(__cpp_concepts) && defined(__cpp_lib_concepts)
   // The implementation of or_else() uses C++20 concepts.
-  #define TINY_OPTIONAL_ENABLE_ORELSE
+  #define QUIC_TINY_OPTIONAL_ENABLE_ORELSE
 #endif
 
 
-#ifdef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
-  #define TINY_OPTIONAL_UNUSED_BITS_NS_PART noBit
+#ifdef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
+  #define QUIC_TINY_OPTIONAL_UNUSED_BITS_NS_PART noBit
 #else
-  #define TINY_OPTIONAL_UNUSED_BITS_NS_PART bit
+  #define QUIC_TINY_OPTIONAL_UNUSED_BITS_NS_PART bit
 #endif
 
-#ifdef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
-  #define TINY_OPTIONAL_MEMBER_NS_PART noMem
+#ifdef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+  #define QUIC_TINY_OPTIONAL_MEMBER_NS_PART noMem
 #else
-  #define TINY_OPTIONAL_MEMBER_NS_PART mem
+  #define QUIC_TINY_OPTIONAL_MEMBER_NS_PART mem
 #endif
 
-#define TINY_OPTIONAL_CONCAT_NS_IMPL(a, b, c) tiny##a##_##b##_##c
-#define TINY_OPTIONAL_CONCAT_NS(a, b, c) TINY_OPTIONAL_CONCAT_NS_IMPL(a, b, c)
+#define QUIC_TINY_OPTIONAL_CONCAT_NS_IMPL(a, b, c) quic_tiny_opt_##a##_##b##_##c
+#define QUIC_TINY_OPTIONAL_CONCAT_NS(a, b, c) QUIC_TINY_OPTIONAL_CONCAT_NS_IMPL(a, b, c)
 
 // We use an inline namespace to prevent mixing of symbols from different versions of the library or
-// different TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS settings.
-#define TINY_OPTIONAL_INLINE_NS_BEGIN                                                                                  \
-  inline namespace TINY_OPTIONAL_CONCAT_NS(                                                                            \
-      TINY_OPTIONAL_VERSION,                                                                                           \
-      TINY_OPTIONAL_UNUSED_BITS_NS_PART,                                                                               \
-      TINY_OPTIONAL_MEMBER_NS_PART)                                                                                    \
+// different QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS settings.
+#define QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN                                                                            \
+  inline namespace QUIC_TINY_OPTIONAL_CONCAT_NS(                                                                      \
+      QUIC_TINY_OPTIONAL_VERSION,                                                                                     \
+      QUIC_TINY_OPTIONAL_UNUSED_BITS_NS_PART,                                                                         \
+      QUIC_TINY_OPTIONAL_MEMBER_NS_PART)                                                                              \
   {
 
-#define TINY_OPTIONAL_INLINE_NS_END }
+#define QUIC_TINY_OPTIONAL_INLINE_NS_END }
+
+
+namespace quic {
+namespace detail {
 
 
 #if defined(__GNUG__) && !defined(__clang__)
@@ -146,19 +150,14 @@ Original repository: https://github.com/Sedeniono/tiny-optional
 // every user to handle 2 files, not just 1, even if the user never wants to specialize the flag manipulator. At the
 // same time, we do need the forward declaration below (because of the default argument). Solution: We forward declare
 // it only if it wasn't already declared, which is checked by the #ifndef.
-#ifndef TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
-  #define TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
-namespace tiny
-{
-template <class PayloadType, class Enable = void>
-struct optional_flag_manipulator;
-}
+#ifndef QUIC_DETAIL_TINY_OPTIONAL_FLAG_MANIPULATOR_ALREADY_DECLARED
+  #include "optional_flag_manipulator_fwd.h"
 #endif
 
 
 namespace tiny
 {
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 // Special type and value to indicate that the user did not specify a certain template parameter type/value.
 enum UseDefaultType
 {
@@ -178,7 +177,7 @@ namespace impl
   {
   };
 } // namespace impl
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 // The user can specialize the optional_flag_manipulator template to 'inject' a custom FlagManipulator for some
@@ -212,15 +211,15 @@ TINY_OPTIONAL_INLINE_NS_END
 // at once satisfying a common concept. Compare the library's specialization for floating point types. Note that it has
 // the default value 'void' (defined at the declaration of the template).
 //
-// Note: Outside of the inline namespace (TINY_OPTIONAL_INLINE_NS_BEGIN) because we don't want to add a dependency on
+// Note: Outside of the inline namespace (QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN) because we don't want to add a dependency on
 // the version and configuration to the optional_flag_manipulator_fwd.h file.
-template <class PayloadType, class Enable>
+template <class PayloadType, class Enable = void>
 struct optional_flag_manipulator : impl::NoCustomInplaceFlagManipulator
 {
 };
 
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 // Helper to allow the user to implement an optional_flag_manipulator specialization more easily in case it is a simple
 // comparison with a sentinel value. This can be especially useful for enumerations: Instead of writing e.g.
 // tiny::optional<EnumType, EnumType::InvalidValue> always, the user can simply once define the specialization
@@ -267,13 +266,13 @@ namespace impl
 // (i.e. tiny::optional, tiny::optional_inplace, tiny::optional_aip or tiny::optional_sentinel_via_type).
 template <class U>
 inline constexpr bool is_tiny_optional_v = impl::IsTinyOptionalHelper<U>(nullptr);
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 } // namespace tiny
 
 
 namespace tiny
 {
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
 
@@ -312,17 +311,6 @@ namespace impl
   // parameter not used or deducible in partial specialization'.
   template <class Type, class>
   using ConditionalIdentity = Type;
-
-  // clang-format off
-  template <class Type, class TypeToCheckForHashable>
-  using EnableHashHelper = ConditionalIdentity<
-    Type,
-    std::enable_if_t< 
-      std::is_default_constructible_v<std::hash<std::remove_const_t<TypeToCheckForHashable>>> 
-    >
-  >;
-  // clang-format on
-
 
   // Helper to check whether some type T is a std::optional.
   template <class T>
@@ -408,11 +396,11 @@ namespace impl
   };
 
 
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
 
   // So far the implementation defined exploits are only implemented and tested for x64 and x86.
-  #if !defined(TINY_OPTIONAL_x86) && !defined(TINY_OPTIONAL_x64)
-    #error Exploiting of unused bits is not implemented for the target architecture. Note that you can disable UB-tricks via TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS. See Readme.
+  #if !defined(QUIC_TINY_OPTIONAL_x86) && !defined(QUIC_TINY_OPTIONAL_x64)
+    #error Exploiting of unused bits is not implemented for the target architecture. Note that you can disable UB-tricks via QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS. See Readme.
   #endif
 
 
@@ -487,10 +475,10 @@ namespace impl
     //   not divisible by 4, or even better not divisible by 2, we minimize the chance that the chosen sentinel value is
     //   encountered as valid address in practice.
 
-  #ifdef TINY_OPTIONAL_x64
+  #ifdef QUIC_TINY_OPTIONAL_x64
     // We simply use the highest non-canonical address on 64 bit.
     static constexpr std::uintptr_t value = 0xffff'8000'0000'0000ull - 1;
-  #elif defined(TINY_OPTIONAL_x86)
+  #elif defined(QUIC_TINY_OPTIONAL_x86)
     // >= 0xffff'ffff-5 are not possible due to the pseudo handles on Windows. 0xffff'ffff-6 would be possible. Just to
     // get a bit more distance to the space of pseudo handles (in case another one will be introduced), we use
     // 0xffff'ffff-8. The value 0xffff'ffff-7 is not used to satisfy the note about alignment above.
@@ -504,7 +492,7 @@ namespace impl
     // Cross-check the thoughts about alignment explained above: Value should not be divisible by 2.
     static_assert(value % 2 == 1);
   };
-#endif // #ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
+#endif // #ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
 
 
   //====================================================================================
@@ -555,11 +543,11 @@ namespace impl
    * - The payload type, i.e. the type that the user actually wanted to store in the optional.
    *
    * - The StoredType indicates the type that the optional is actually storing internally. So
-   *   this is basically the type containing both the PayloadType and the IsEmptyFlagType.
-   *   Note that they might be identical.
+   * this is basically the type containing both the PayloadType and the IsEmptyFlagType.
+   * Note that they might be identical.
    *
    * - The type of the IsEmptyFlagType, i.e. the type of the variable storing the IsEmpty-flag.
-   *   This is not explicity defined via a 'using' but by the return value of GetIsEmptyFlag().
+   * This is not explicity defined via a 'using' but by the return value of GetIsEmptyFlag().
    *
    * - GetIsEmptyFlag(): Given the StoredType, returns a mutable reference to the IsEmpty-flag.
    *
@@ -608,7 +596,7 @@ namespace impl
   };
 
 
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
   // Decomposition used when the StoredType and the PayloadType are the same and identify a class/struct,
   // where the 'IsEmpty'-flag is stored inplace of one of the member variables of that class/struct.
   // This member variable is identified by the member pointer 'memPtrToIsEmptyFlag'.
@@ -624,8 +612,8 @@ namespace impl
   struct InplaceDecompositionViaMemPtr
   {
   // As explained above, we exploit undefined behavior here. I have tested this only on x86/x64 platforms.
-  #if !defined(TINY_OPTIONAL_x86) && !defined(TINY_OPTIONAL_x64)
-    #error Storing the empty state in a member is not supported on the target architecture. Note that you can disable UB-tricks via TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS. See Readme.
+  #if !defined(QUIC_TINY_OPTIONAL_x86) && !defined(QUIC_TINY_OPTIONAL_x64)
+    #error Storing the empty state in a member is not supported on the target architecture. Note that you can disable UB-tricks via QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS. See Readme.
   #endif
 
     static_assert(std::is_member_object_pointer_v<decltype(memPtrToIsEmptyFlag)>);
@@ -656,18 +644,18 @@ namespace impl
    * a given 'IsEmpty'-flag. Functions:
    *
    * - init_empty_flag(): This function receives the address of the already allocated
-   *   memory that should contain the 'IsEmpty'-flag. The function must initialize this memory
-   *   such that the flag indicates an empty state.
+   * memory that should contain the 'IsEmpty'-flag. The function must initialize this memory
+   * such that the flag indicates an empty state.
    *
    * - invalidate_empty_flag(): This function receives the flag (which currently indicates
-   *   the empty state, i.e. is_empty() returns true for it). The function is called just before
-   *   the payload is constructed. It must deconstruct the value such that after the payload
-   *   has been constructed the 'IsEmpty'-flag must indicate that some value is set.
-   *   Note: It must NOT free the memory!
+   * the empty state, i.e. is_empty() returns true for it). The function is called just before
+   * the payload is constructed. It must deconstruct the value such that after the payload
+   * has been constructed the 'IsEmpty'-flag must indicate that some value is set.
+   * Note: It must NOT free the memory!
    *
    * - is_empty(): This function receives a const-ref to the flag and must return 'true' if it
-   *   indicates that the optional contains no value, and 'false' if it indicates that some
-   *   value is set.
+   * indicates that the optional contains no value, and 'false' if it indicates that some
+   * value is set.
    *
    * We are using snake_case for the function names since users of the library might need to use
    * the concept (via tiny::optional_flag_manipulator or optional_inplace), and the whole public
@@ -849,21 +837,21 @@ namespace impl
     }
   };
 } // namespace impl
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 //====================================================================================
 // optional_flag_manipulator: Library specialization and helpers
 //====================================================================================
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
   // True if the tiny optional library knows a special sentinel for the given payload type that exploits the type's
   // unused bit patterns to represent the empty state.
   template <class PayloadType>
   inline constexpr bool SentinelForExploitingUnusedBitsIsKnown =
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UNUSED_BITS
       (std::is_floating_point_v<PayloadType> && !std::is_same_v<std::remove_cv_t<PayloadType>, long double>)
       || std::is_same_v<std::remove_cv_t<PayloadType>, bool>
       || std::is_pointer_v<PayloadType>; // Pointers and function pointers, but not member pointers or member
@@ -872,7 +860,7 @@ namespace impl
       false;
 #endif
 } // namespace impl
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 // Specialization of optional_flag_manipulator for floats, doubles, bools, pointers and functions pointers. The
@@ -889,7 +877,7 @@ struct optional_flag_manipulator<
 };
 
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
   // True if there is a custom flag manipulator was 'registered' for the given payload type.
@@ -897,14 +885,14 @@ namespace impl
   inline constexpr bool HasCustomInplaceFlagManipulator
       = !std::is_base_of_v<NoCustomInplaceFlagManipulator, optional_flag_manipulator<PayloadType>>;
 } // namespace impl
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 //====================================================================================
 // StorageBase
 //====================================================================================
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
   // This is the lowest base for TinyOptionalImpl and contains the actual data and some basic manipulation functions.
@@ -961,7 +949,6 @@ namespace impl
     template <class... ArgsT>
     explicit StorageBase(std::in_place_t, ArgsT &&... args)
     {
-      // Initialize the IsEmpty flag first since invalidate_empty_flag() might depend on it.
       FlagManipulator::init_empty_flag(GetIsEmptyFlag());
       ConstructPayload(std::forward<ArgsT>(args)...);
     }
@@ -969,7 +956,6 @@ namespace impl
     template <class FuncT, class ArgT>
     StorageBase(DirectInitializationFromFunctionTag, FuncT && func, ArgT && arg)
     {
-      // Initialize the IsEmpty flag first since invalidate_empty_flag() might depend on it.
       FlagManipulator::init_empty_flag(GetIsEmptyFlag());
       ConstructPayloadFromFunction(std::forward<FuncT>(func), std::forward<ArgT>(arg));
     }
@@ -1415,6 +1401,7 @@ namespace impl
 
 
   protected:
+    // Helper for assignment operator from type U.
     template <class TinyOptionalType, class U>
     using EnableConvertingAssignment = std::bool_constant<
         !std::is_same_v<my_remove_cvref_t<U>, TinyOptionalType> && std::is_constructible_v<PayloadType, U>
@@ -1746,10 +1733,11 @@ namespace impl
       // we simply use the generic one of this library, i.e. tiny::optional. The user can always simply use and_then()
       // to return a specific optional type.
       if (has_value()) {
-        return ::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), **this);
+        // Note: Using fully qualified name for the returned optional type
+        return ::quic::detail::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), **this);
       }
       else {
-        return ::tiny::optional<U>();
+        return ::quic::detail::tiny::optional<U>();
       }
     }
 
@@ -1764,12 +1752,12 @@ namespace impl
           std::is_object_v<U> && !std::is_array_v<U>,
           "The standard requires 'f' to return a non-array object type.");
 
-      // Regarding the return of ::tiny::optional, see first overload.
+      // Regarding the return of ::quic::detail::tiny::optional, see first overload.
       if (has_value()) {
-        return ::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), **this);
+        return ::quic::detail::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), **this);
       }
       else {
-        return ::tiny::optional<U>();
+        return ::quic::detail::tiny::optional<U>();
       }
     }
 
@@ -1784,12 +1772,12 @@ namespace impl
           std::is_object_v<U> && !std::is_array_v<U>,
           "The standard requires 'f' to return a non-array object type.");
 
-      // Regarding the return of ::tiny::optional, see first overload.
+      // Regarding the return of ::quic::detail::tiny::optional, see first overload.
       if (has_value()) {
-        return ::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), std::move(**this));
+        return ::quic::detail::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), std::move(**this));
       }
       else {
-        return ::tiny::optional<U>();
+        return ::quic::detail::tiny::optional<U>();
       }
     }
 
@@ -1804,17 +1792,17 @@ namespace impl
           std::is_object_v<U> && !std::is_array_v<U>,
           "The standard requires 'f' to return a non-array object type.");
 
-      // Regarding the return of ::tiny::optional, see first overload.
+      // Regarding the return of ::quic::detail::tiny::optional, see first overload.
       if (has_value()) {
-        return ::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), std::move(**this));
+        return ::quic::detail::tiny::optional<U>(DirectInitializationFromFunctionTag{}, std::forward<F>(f), std::move(**this));
       }
       else {
-        return ::tiny::optional<U>();
+        return ::quic::detail::tiny::optional<U>();
       }
     }
 
 
-#ifdef TINY_OPTIONAL_ENABLE_ORELSE
+#ifdef QUIC_TINY_OPTIONAL_ENABLE_ORELSE
     template <class F>
       requires(std::invocable<F> && std::copy_constructible<value_type>)
     constexpr TinyOptionalImpl or_else(F && f) const &
@@ -1843,12 +1831,12 @@ namespace impl
       class StoredTypeDecomposition,
       class FlagManipulator,
       std::enable_if_t<
-          std::is_move_constructible_v<typename StoredTypeDecomposition::PayloadType> 
+          std::is_move_constructible_v<typename StoredTypeDecomposition::PayloadType>
           && std::is_swappable_v<typename StoredTypeDecomposition::PayloadType>,
         int> = 0>
   void swap(
       TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator> & lhs,
-      TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator> & rhs) 
+      TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator> & rhs)
     noexcept(noexcept(lhs.swap(rhs)))
   {
     lhs.swap(rhs);
@@ -1856,14 +1844,14 @@ namespace impl
   // clang-format on
 
 } // namespace impl
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 //====================================================================================
 // SelectDecomposition
 //====================================================================================
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
 
@@ -1973,7 +1961,7 @@ namespace impl
       UseDefaultType,
       memPtrToFlag,
       std::enable_if_t<
-          std::is_member_object_pointer_v<decltype(memPtrToFlag)> 
+          std::is_member_object_pointer_v<decltype(memPtrToFlag)>
           && HasCustomInplaceFlagManipulator<typename MemberPointerFragments<memPtrToFlag>::VariableType>>>
   // clang-format on
   {
@@ -1984,7 +1972,7 @@ namespace impl
         "The flag given by the member-pointer is not a member of the payload type.");
     using MemVarType = typename MemberPointerFragments<memPtrToFlag>::VariableType;
 
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
     using StoredTypeDecomposition = InplaceDecompositionViaMemPtr<PayloadType, memPtrToFlag>;
     using FlagManipulator = optional_flag_manipulator<MemVarType>;
 #else
@@ -2001,11 +1989,11 @@ namespace impl
       UseDefaultType,
       memPtrToFlag,
       std::enable_if_t<
-          std::is_member_object_pointer_v<decltype(memPtrToFlag)> 
+          std::is_member_object_pointer_v<decltype(memPtrToFlag)>
           && !HasCustomInplaceFlagManipulator<typename MemberPointerFragments<memPtrToFlag>::VariableType>>>
   // clang-format on
   {
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
     // The empty state cannot be stored in a member variable if we do not know a sentinel value (i.e. if the assert
     // triggers, we do know neither a builtin sentinel nor the user specified a custom one).
     static_assert(
@@ -2030,7 +2018,7 @@ namespace impl
       SentinelValue,
       memPtrToFlag,
       std::enable_if_t<
-          !std::is_same_v<SentinelValue, UseDefaultType> 
+          !std::is_same_v<SentinelValue, UseDefaultType>
           && std::is_member_object_pointer_v<decltype(memPtrToFlag)>
           && HasCustomInplaceFlagManipulator<typename MemberPointerFragments<memPtrToFlag>::VariableType>>>
   // clang-format on
@@ -2049,7 +2037,7 @@ namespace impl
         "The flag given by the member-pointer is not a member of the payload type.");
     using MemVarType = typename MemberPointerFragments<memPtrToFlag>::VariableType;
 
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
     using StoredTypeDecomposition = InplaceDecompositionViaMemPtr<PayloadType, memPtrToFlag>;
     using FlagManipulator = AssignmentFlagManipulator<MemVarType, SentinelValue>;
 #else
@@ -2066,8 +2054,8 @@ namespace impl
       SentinelValue,
       memPtrToFlag,
       std::enable_if_t<
-          !std::is_same_v<SentinelValue, UseDefaultType> 
-          && std::is_member_object_pointer_v<decltype(memPtrToFlag)> 
+          !std::is_same_v<SentinelValue, UseDefaultType>
+          && std::is_member_object_pointer_v<decltype(memPtrToFlag)>
           && !HasCustomInplaceFlagManipulator<typename MemberPointerFragments<memPtrToFlag>::VariableType>>>
   // clang-format on
   {
@@ -2078,7 +2066,7 @@ namespace impl
         "The flag given by the member-pointer is not a member of the payload type.");
     using MemVarType = typename MemberPointerFragments<memPtrToFlag>::VariableType;
 
-#ifndef TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
+#ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_MEMBER
     using StoredTypeDecomposition = InplaceDecompositionViaMemPtr<PayloadType, memPtrToFlag>;
     using FlagManipulator = AssignmentFlagManipulator<MemVarType, SentinelValue>;
 #else
@@ -2130,14 +2118,14 @@ namespace impl
             value;
   };
 } // namespace impl
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 //====================================================================================
 // optional_sentinel_via_type
 //====================================================================================
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
 
@@ -2154,14 +2142,14 @@ namespace impl
 template <class PayloadType, class SentinelValue, auto memPtr = UseDefaultValue>
 using optional_sentinel_via_type
     = impl::TinyOptionalImplCombined<impl::SelectDecomposition<PayloadType, SentinelValue, memPtr>>;
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 
 
 //====================================================================================
 // optional
 //====================================================================================
 
-TINY_OPTIONAL_INLINE_NS_BEGIN
+QUIC_TINY_OPTIONAL_INLINE_NS_BEGIN
 namespace impl
 {
   // Shortcut for optional definition below so that the SelectSentinelValueAndMemPtrFromConstants
@@ -2194,8 +2182,8 @@ namespace impl
 // re-use various functions, such as the comparison operators, without re-defining them for all possible combinations.
 template <
     class PayloadType_,
-    auto sentinelOrMemPtr /*= UseDefaultValue (template default value defined at first declaration)*/,
-    auto irrelevantOrSentinel /*= UseDefaultValue (template default value defined at first declaration)*/>
+    auto sentinelOrMemPtr /* = UseDefaultValue */,
+    auto irrelevantOrSentinel /* = UseDefaultValue */>
 class optional
   : public impl::TinyOptionalFromSelection<
         impl::SelectSentinelValueAndMemPtrFromConstants<PayloadType_, sentinelOrMemPtr, irrelevantOrSentinel>>
@@ -2247,7 +2235,7 @@ public:
   }
 
 
-#ifdef TINY_OPTIONAL_ENABLE_ORELSE
+#ifdef QUIC_TINY_OPTIONAL_ENABLE_ORELSE
   template <class F>
     requires(std::invocable<F> && std::copy_constructible<value_type>)
   constexpr optional or_else(F && f) const &
@@ -2395,7 +2383,7 @@ using optional_aip = optional<PayloadType, sentinelValue>;
 // that compares a std::optional with any value U.
 // I guess, the amount of copy & paste code justifies a macro here.
 // clang-format off
-#define TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(Op, code)                                                           \
+#define QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(Op, code)                                                      \
   namespace impl                                                                                                         \
   {                                                                                                                      \
     template <class D1, class F1, class D2, class F2>                                                                    \
@@ -2434,8 +2422,8 @@ using optional_aip = optional<PayloadType, sentinelValue>;
 // operator==
 
 // clang-format off
-TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
-  ==, 
+QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
+  ==,
   bool const lhsHasValue = lhs.has_value();
   return lhsHasValue == rhs.has_value() && (!lhsHasValue || *lhs == *rhs);
 )
@@ -2449,7 +2437,7 @@ namespace impl
     return !lhs.has_value();
   }
 
-#if !defined(TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
+#if !defined(QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
   template <class D1, class F1>
   [[nodiscard]] bool operator==(std::nullopt_t, TinyOptionalImpl<D1, F1> const & rhs) noexcept
   {
@@ -2479,8 +2467,8 @@ namespace impl
 // operator!=
 
 // clang-format off
-TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
-  !=, 
+QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
+  !=,
   bool const lhsHasValue = lhs.has_value();
   return lhsHasValue != rhs.has_value() || (lhsHasValue && *lhs != *rhs);
 )
@@ -2488,7 +2476,7 @@ TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
 
 namespace impl
 {
-#if !defined(TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
+#if !defined(QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
   template <class D1, class F1>
   [[nodiscard]] bool operator!=(TinyOptionalImpl<D1, F1> const & lhs, std::nullopt_t) noexcept
   {
@@ -2524,15 +2512,15 @@ namespace impl
 // operator<
 
 // clang-format off
-TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
-  <, 
+QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
+  <,
   return rhs.has_value() && (!lhs.has_value() || *lhs < *rhs);
 )
 // clang-format on
 
 namespace impl
 {
-#if !defined(TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
+#if !defined(QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
   template <class D1, class F1>
   [[nodiscard]] bool operator<(TinyOptionalImpl<D1, F1> const &, std::nullopt_t) noexcept
   {
@@ -2568,15 +2556,15 @@ namespace impl
 // operator<=
 
 // clang-format off
-TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
-  <=, 
+QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
+  <=,
   return !lhs.has_value() || (rhs.has_value() && *lhs <= *rhs);
 )
 // clang-format on
 
 namespace impl
 {
-#if !defined(TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
+#if !defined(QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
   template <class D1, class F1>
   [[nodiscard]] bool operator<=(TinyOptionalImpl<D1, F1> const & lhs, std::nullopt_t) noexcept
   {
@@ -2612,15 +2600,15 @@ namespace impl
 // operator>
 
 // clang-format off
-TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
-  >, 
+QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
+  >,
   return lhs.has_value() && (!rhs.has_value() || *lhs > *rhs);
 )
 // clang-format on
 
 namespace impl
 {
-#if !defined(TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
+#if !defined(QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
   template <class D1, class F1>
   [[nodiscard]] bool operator>(TinyOptionalImpl<D1, F1> const & lhs, std::nullopt_t) noexcept
   {
@@ -2656,15 +2644,15 @@ namespace impl
 // operator>=
 
 // clang-format off
-TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
-  >=, 
+QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS(
+  >=,
   return !rhs.has_value() || (lhs.has_value() && *lhs >= *rhs);
 )
 // clang-format on
 
 namespace impl
 {
-#if !defined(TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
+#if !defined(QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON) || defined(QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445)
   template <class D1, class F1>
   [[nodiscard]] bool operator>=(TinyOptionalImpl<D1, F1> const &, std::nullopt_t) noexcept
   {
@@ -2699,8 +2687,8 @@ namespace impl
 //-----------------------
 // operator<=>
 
-#ifdef TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON
-// See TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS() for the reason of defining
+#ifdef QUIC_TINY_OPTIONAL_ENABLE_THREEWAY_COMPARISON
+// See QUIC_TINY_OPTIONAL_IMPL_COMPARE_BETWEEN_OPTIONALS() for the reason of defining
 // all the operator<=>(SomeOptional, SomeOptional)
 namespace impl
 {
@@ -2734,7 +2722,7 @@ template <class P, auto e, auto i, std::three_way_comparable_with<P> U>
   return (lhs && rhs) ? (*lhs <=> *rhs) : (lhs.has_value() <=> rhs.has_value());
 }
 
-  #ifdef TINY_OPTIONAL_GCC_WORKAROUND_CWG2445
+  #ifdef QUIC_TINY_OPTIONAL_GCC_WORKAROUND_CWG2445
 template <class U, std::three_way_comparable_with<U> P, auto e, auto i>
 [[nodiscard]] std::compare_three_way_result_t<U, P> operator<=>(
     std::optional<U> const & lhs,
@@ -2764,51 +2752,75 @@ namespace impl
 } // namespace impl
 
 #endif
-TINY_OPTIONAL_INLINE_NS_END
+QUIC_TINY_OPTIONAL_INLINE_NS_END
 } // namespace tiny
+
+} // namespace detail
+} // namespace quic
 
 
 //====================================================================================
 // std::hash specializations
 //====================================================================================
 
-namespace std
-{
-// clang-format off
-template <class StoredTypeDecomposition, class FlagManipulator>
-struct hash<
-  tiny::impl::EnableHashHelper<
-    tiny::impl::TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator>,
-    typename StoredTypeDecomposition::PayloadType
-  >
->
-{
-  size_t operator()(tiny::impl::TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator> const & o) const
-  {
-    return o.has_value() ? hash<std::remove_const_t<typename StoredTypeDecomposition::PayloadType>>{}(*o) : 0;
-  }
-};
 
-  
-template <class PayloadType, auto sentinelOrMemPtr, auto irrelevantOrSentinel>
-struct hash<
-  tiny::impl::EnableHashHelper<
-    tiny::optional<PayloadType, sentinelOrMemPtr, irrelevantOrSentinel>,
-    PayloadType
-  >
->
-{
-  size_t operator()(tiny::optional<PayloadType, sentinelOrMemPtr, irrelevantOrSentinel> const & o) const
-  {
-    return o.has_value() ? hash<std::remove_const_t<PayloadType>>{}(*o) : 0;
-  }
-};
+namespace std {
 
-// clang-format on
+    template <class StoredTypeDecomposition>
+    inline constexpr bool quic_detail_is_tiny_impl_payload_hashable_v =
+        std::is_default_constructible_v<
+            std::hash<
+                std::remove_const_t<
+                    typename StoredTypeDecomposition::PayloadType // Get payload type
+                >
+            >
+        >;
+
+    template <class PayloadType>
+    inline constexpr bool quic_detail_is_tiny_opt_payload_hashable_v =
+        std::is_default_constructible_v<
+            std::hash<std::remove_const_t<PayloadType>>
+        >;
+
+    // Specialization for quic::detail::tiny::impl::TinyOptionalImpl
+    template <class StoredTypeDecomposition, class FlagManipulator>
+    struct hash< // Specializing hash for ONE template argument
+        ::quic::detail::tiny::impl::TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator>
+    > {
+        // Define operator() directly
+        size_t operator()(const ::quic::detail::tiny::impl::TinyOptionalImpl<StoredTypeDecomposition, FlagManipulator>& o) const
+        {
+            // Check hashability inside the operator() using static_assert
+            static_assert(quic_detail_is_tiny_impl_payload_hashable_v<StoredTypeDecomposition>,
+                          "Payload type must be hashable for optional hash specialization.");
+
+            using PayloadType = typename StoredTypeDecomposition::PayloadType;
+            // Use std::hash from the global namespace
+            return o.has_value() ? ::std::hash<std::remove_const_t<PayloadType>>{}(*o) : 0;
+        }
+    };
+
+    // Specialization for quic::detail::tiny::optional
+    template <class PayloadType, auto S, auto I>
+    struct hash< // Specializing hash for ONE template argument
+        ::quic::detail::tiny::optional<PayloadType, S, I>
+    > {
+        // Define operator() directly
+        size_t operator()(const ::quic::detail::tiny::optional<PayloadType, S, I>& o) const
+        {
+            // Check hashability inside the operator() using static_assert
+            static_assert(quic_detail_is_tiny_opt_payload_hashable_v<PayloadType>,
+                          "Payload type must be hashable for optional hash specialization.");
+
+            // Use std::hash from the global namespace
+            return o.has_value() ? ::std::hash<std::remove_const_t<PayloadType>>{}(*o) : 0;
+        }
+    };
 
 } // namespace std
 
-#if defined(__GNUG__) && !defined(__clang__)
-  // Pop "-Wmaybe-uninitialized"
-  #pragma GCC diagnostic pop
-#endif
+
+  #if defined(__GNUG__) && !defined(__clang__)
+    // Pop "-Wmaybe-uninitialized"
+    #pragma GCC diagnostic pop
+  #endif
