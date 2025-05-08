@@ -69,7 +69,7 @@ class QuicClientTransportLiteTest : public Test {
 
   void TearDown() override {
     EXPECT_CALL(*sockPtr_, close()).WillRepeatedly(Return(folly::unit));
-    quicClient_->closeNow(folly::none);
+    quicClient_->closeNow(std::nullopt);
   }
 
   folly::EventBase evb_;
