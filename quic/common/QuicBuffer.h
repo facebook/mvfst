@@ -9,6 +9,7 @@
 
 #include <cstring>
 #include <memory>
+#include <span>
 
 namespace quic {
 
@@ -28,7 +29,7 @@ class QuicBuffer {
   ~QuicBuffer();
 
   static std::unique_ptr<QuicBuffer> create(std::size_t capacity) {
-    return std::make_unique<QuicBuffer>(capacity);
+    return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(capacity));
   }
 
   // TODO: In folly, the createCombined call is optimized so that both the
@@ -38,6 +39,24 @@ class QuicBuffer {
   static std::unique_ptr<QuicBuffer> createCombined(std::size_t capacity) {
     return create(capacity);
   }
+
+  static std::unique_ptr<QuicBuffer> copyBuffer(
+      std::span<const uint8_t> span,
+      std::size_t headroom = 0,
+      std::size_t minTailroom = 0);
+
+  static std::unique_ptr<QuicBuffer> copyBuffer(
+      const std::string& input,
+      std::size_t headroom = 0,
+      std::size_t minTailroom = 0);
+
+  static std::unique_ptr<QuicBuffer> copyBuffer(
+      const void* data,
+      std::size_t size,
+      std::size_t headroom = 0,
+      std::size_t minTailroom = 0);
+
+  void advance(std::size_t amount) noexcept;
 
   /*
    * Basic getters

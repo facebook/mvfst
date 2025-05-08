@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/portability/GTest.h>
+#include <gtest/gtest.h>
 #include <quic/common/QuicBuffer.h>
 
 namespace quic {
@@ -114,6 +114,54 @@ TEST(QuicBufferTest, TestClone) {
     ptr1 = ptr1->next();
     ptr2 = ptr2->next();
   }
+}
+
+TEST(QuicBufferTest, TestAdvance) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer1 = QuicBuffer::create(100);
+  memcpy(quicBuffer1->writableData(), data, 5);
+  quicBuffer1->append(5);
+  const uint8_t* prevData = quicBuffer1->data();
+  quicBuffer1->advance(10);
+  EXPECT_EQ(quicBuffer1->data(), prevData + 10);
+  EXPECT_EQ(memcmp(quicBuffer1->data(), "hello", 5), 0);
+}
+
+TEST(QuicBufferTest, TestAdvanceNotEnoughRoom) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer1 = QuicBuffer::create(6);
+  memcpy(quicBuffer1->writableData(), data, 5);
+  quicBuffer1->append(5);
+  quicBuffer1->advance(1); // Should succeed
+  EXPECT_DEATH(quicBuffer1->advance(1), "");
+}
+
+TEST(QuicBufferTest, TestCopyBufferSpan) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  std::span range(data, 5);
+  auto quicBuffer =
+      QuicBuffer::copyBuffer(range, 1 /*headroom*/, 3 /*tailroom*/);
+  EXPECT_EQ(quicBuffer->length(), 5);
+  EXPECT_EQ(quicBuffer->capacity(), 9);
+  EXPECT_EQ(memcmp(quicBuffer->data(), data, 5), 0);
+}
+
+TEST(QuicBufferTest, TestCopyBufferString) {
+  std::string input("hello");
+  auto quicBuffer =
+      QuicBuffer::copyBuffer(input, 1 /*headroom*/, 3 /*tailroom*/);
+  EXPECT_EQ(quicBuffer->length(), 5);
+  EXPECT_EQ(quicBuffer->capacity(), 9);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "hello", 5), 0);
+}
+
+TEST(QuicBufferTest, TestCopyBufferPointerAndSize) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer =
+      QuicBuffer::copyBuffer(data, 5 /*size*/, 1 /*headroom*/, 3 /*tailroom*/);
+  EXPECT_EQ(quicBuffer->length(), 5);
+  EXPECT_EQ(quicBuffer->capacity(), 9);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "hello", 5), 0);
 }
 
 } // namespace quic

@@ -46,6 +46,36 @@ QuicBuffer::~QuicBuffer() {
   }
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
+    std::span<const uint8_t> span,
+    std::size_t headroom,
+    std::size_t minTailroom) {
+  return copyBuffer(
+      span.data(), (span.end() - span.begin()), headroom, minTailroom);
+}
+
+std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
+    const std::string& input,
+    std::size_t headroom,
+    std::size_t minTailroom) {
+  return copyBuffer(input.data(), input.size(), headroom, minTailroom);
+}
+
+std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
+    const void* data,
+    std::size_t size,
+    std::size_t headroom,
+    std::size_t minTailroom) {
+  std::size_t capacity = size + headroom + minTailroom;
+  std::unique_ptr<QuicBuffer> quicBuffer = create(capacity);
+  quicBuffer->advance(headroom);
+  if (size != 0) {
+    memcpy(quicBuffer->writableData(), data, size);
+  }
+  quicBuffer->append(size);
+  return quicBuffer;
+}
+
 void QuicBuffer::appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
   // Take ownership of the specified IOBuf
   QuicBuffer* other = quicBuffer.release();
@@ -77,6 +107,15 @@ std::unique_ptr<QuicBuffer> QuicBuffer::separateChain(
   tail->next_ = head;
 
   return std::unique_ptr<QuicBuffer>(head);
+}
+
+void QuicBuffer::advance(std::size_t amount) noexcept {
+  CHECK_LE(amount, tailroom())
+      << "Not enough room to advance data in QuicBuffer";
+  if (length_ > 0) {
+    memmove(data_ + amount, data_, length_);
+  }
+  data_ += amount;
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
