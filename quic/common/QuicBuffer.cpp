@@ -79,6 +79,21 @@ std::unique_ptr<QuicBuffer> QuicBuffer::separateChain(
   return std::unique_ptr<QuicBuffer>(head);
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
+  auto tmp = cloneOneImpl();
+
+  for (QuicBuffer* current = next_; current != this; current = current->next_) {
+    tmp->appendToChain(current->cloneOneImpl());
+  }
+
+  return tmp;
+}
+
+std::unique_ptr<QuicBuffer> QuicBuffer::cloneOneImpl() const {
+  return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
+      capacity_, data_, buf_, length_, sharedBuffer_));
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::unlink() {
   next_->prev_ = prev_;
   prev_->next_ = next_;

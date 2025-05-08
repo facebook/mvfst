@@ -85,4 +85,35 @@ TEST(QuicBufferTest, TestSeparateChain) {
   EXPECT_EQ(quicBufferRawPtr6->next(), quicBufferRawPtr1);
 }
 
+TEST(QuicBufferTest, TestCloneOne) {
+  auto quicBuffer1 = QuicBuffer::create(100);
+  quicBuffer1->append(10);
+
+  auto quicBuffer2 = quicBuffer1->cloneOne();
+  EXPECT_EQ(quicBuffer1->length(), quicBuffer2->length());
+  EXPECT_EQ(quicBuffer1->capacity(), quicBuffer2->capacity());
+  EXPECT_EQ(quicBuffer1->data(), quicBuffer2->data());
+}
+
+TEST(QuicBufferTest, TestClone) {
+  auto quicBuffer1 = QuicBuffer::create(100);
+  quicBuffer1->append(10);
+  auto quicBuffer2 = QuicBuffer::create(100);
+  quicBuffer2->append(20);
+  auto quicBuffer3 = QuicBuffer::create(100);
+  quicBuffer3->append(30);
+
+  auto clonedBuffer = quicBuffer1->clone();
+  QuicBuffer* ptr1 = quicBuffer1.get();
+  QuicBuffer* ptr2 = clonedBuffer.get();
+
+  for (int i = 0; i < 3; i++) {
+    EXPECT_EQ(ptr1->length(), ptr2->length());
+    EXPECT_EQ(ptr1->capacity(), ptr2->capacity());
+    EXPECT_EQ(ptr1->data(), ptr2->data());
+    ptr1 = ptr1->next();
+    ptr2 = ptr2->next();
+  }
+}
+
 } // namespace quic

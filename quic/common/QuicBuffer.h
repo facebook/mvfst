@@ -107,6 +107,12 @@ class QuicBuffer {
    */
   std::unique_ptr<QuicBuffer> separateChain(QuicBuffer* head, QuicBuffer* tail);
 
+  std::unique_ptr<QuicBuffer> clone() const;
+
+  std::unique_ptr<QuicBuffer> cloneOne() const {
+    return cloneOneImpl();
+  }
+
  protected:
   QuicBuffer(
       std::size_t capacity,
@@ -117,6 +123,8 @@ class QuicBuffer {
 
  private:
   std::unique_ptr<QuicBuffer> unlink();
+
+  std::unique_ptr<QuicBuffer> cloneOneImpl() const;
 
   // This is set if the underlying buffer is shared.
   // Otherwise, if the buffer is owned externally, this is
