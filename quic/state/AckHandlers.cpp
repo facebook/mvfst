@@ -154,8 +154,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
     conn.outstandings.scheduledForDestructionCount++;
     VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
              << " space=" << currentPacketNumberSpace << conn;
-    // If we hit a packet which has been lost we need to count the spurious
-    // loss and ignore all other processing.
+    // If we hit a packet which has been declared lost we need to count the
+    // spurious loss and ignore all other processing.
     if (ackedPacketIterator->declaredLost) {
       modifyStateForSpuriousLoss(conn, *ackedPacketIterator);
       QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
@@ -168,6 +168,14 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
       ackedPacketIterator.next();
       continue;
     }
+    // needsProcess dictates whether or not we call the ackedFrameVisitor on the
+    // non-write stream frames within the packet. It is false under the
+    // following circumstances:
+    // 1. The packet is a cloned packet, and one of its clones has already been
+    //    processed.
+    // 2. The packet is a cloned packet, and one of the clones has been declared
+    //    lost. In this case, the processing would happen on the ACK of the
+    //    retransmitted data, if and when it arrives.
     bool needsProcess = !ackedPacketIterator->maybeClonedPacketIdentifier ||
         conn.outstandings.clonedPacketIdentifiers.count(
             *ackedPacketIterator->maybeClonedPacketIdentifier);
@@ -190,7 +198,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
     }
 
     // Remove this ClonedPacketIdentifier from the
-    // outstandings.clonedPacketIdentifiers set
+    // outstandings.clonedPacketIdentifiers set, so that the frames in
+    // equivalent packets won't be unnecessarily processed in the future.
     if (ackedPacketIterator->maybeClonedPacketIdentifier) {
       conn.outstandings.clonedPacketIdentifiers.erase(
           *ackedPacketIterator->maybeClonedPacketIdentifier);
