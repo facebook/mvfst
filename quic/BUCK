@@ -14,10 +14,10 @@ mvfst_cpp_library(
     }),
     exported_deps = select({
         "DEFAULT": [
-            "//folly/container:f14_hash",
+            "//folly/container:f14_hash",  # @manual
         ],
-        "ovr_config//os/constraints:android": [],
-        "ovr_config//os/constraints:iphoneos": [],
+        "ovr_config//os/constraints:android": [],  # @manual
+        "ovr_config//os/constraints:iphoneos": [],  # @manual
     }),
 )
 
