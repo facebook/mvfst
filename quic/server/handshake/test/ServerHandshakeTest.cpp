@@ -101,7 +101,7 @@ class ServerHandshakeTest : public Test {
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
             kDefaultActiveConnectionIdLimit,
-            ConnectionId(std::vector<uint8_t>()));
+            ConnectionId::createZeroLength());
     fizzClient.reset(new fizz::client::FizzClient<
                      ServerHandshakeTest,
                      fizz::client::ClientStateMachine>(
@@ -120,8 +120,9 @@ class ServerHandshakeTest : public Test {
         kDefaultAckDelayExponent,
         kDefaultUDPSendPacketLen,
         generateStatelessResetToken(),
-        ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-        ConnectionId(std::vector<uint8_t>()));
+        ConnectionId::createAndMaybeCrash(
+            std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+        ConnectionId::createZeroLength());
     initialize();
     handshake->accept(params);
 

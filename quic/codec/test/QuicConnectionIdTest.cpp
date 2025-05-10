@@ -7,8 +7,6 @@
 
 #include <quic/codec/QuicConnectionId.h>
 
-#include <iterator>
-
 #include <folly/portability/GTest.h>
 
 namespace quic::test {
@@ -17,7 +15,9 @@ TEST(ConnectionIdTest, TestConnidLen) {
   std::string out = folly::unhexlify("ffaabbee00");
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
   Cursor cursor(&buf);
-  ConnectionId connid(cursor, out.size());
+  auto connidExpected = ConnectionId::create(cursor, out.size());
+  EXPECT_TRUE(connidExpected.hasValue());
+  ConnectionId connid = std::move(connidExpected.value());
   EXPECT_EQ(static_cast<size_t>(connid.size()), out.size());
   for (size_t i = 0; i < connid.size(); ++i) {
     EXPECT_EQ(*(connid.data() + i), static_cast<uint8_t>(out[i]));
@@ -30,17 +30,21 @@ TEST(ConnectionIdTest, TestZeroLenConnid) {
   std::string out;
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
   Cursor cursor(&buf);
-  ConnectionId connid(cursor, out.size());
+  auto connidExpected = ConnectionId::create(cursor, out.size());
+  EXPECT_TRUE(connidExpected.hasValue());
+  ConnectionId connid = std::move(connidExpected.value());
   EXPECT_EQ(static_cast<size_t>(connid.size()), out.size());
 }
 
 TEST(ConnectionIdTest, CompareConnId) {
-  ConnectionId connid1(std::vector<uint8_t>{});
-  ConnectionId connid2(std::vector<uint8_t>{});
+  ConnectionId connid1 = ConnectionId::createZeroLength();
+  ConnectionId connid2 = ConnectionId::createZeroLength();
   EXPECT_EQ(connid1, connid2);
 
-  ConnectionId connid3(std::vector<uint8_t>{0x00, 0x01, 0x02, 0x03});
-  ConnectionId connid4(std::vector<uint8_t>{0x00, 0x01, 0x02, 0x03});
+  ConnectionId connid3 = ConnectionId::createAndMaybeCrash(
+      std::vector<uint8_t>{0x00, 0x01, 0x02, 0x03});
+  ConnectionId connid4 = ConnectionId::createAndMaybeCrash(
+      std::vector<uint8_t>{0x00, 0x01, 0x02, 0x03});
   EXPECT_NE(connid3, connid1);
   EXPECT_NE(connid1, connid3);
 
@@ -53,12 +57,12 @@ TEST(ConnectionIdTest, ConnIdSize) {
   for (size_t i = 0; i < kMaxConnectionIdSize + 2; ++i) {
     testconnid.push_back(0);
   }
-  EXPECT_THROW(ConnectionId{testconnid}, std::runtime_error);
+  EXPECT_FALSE(ConnectionId::create(testconnid).hasValue());
   testconnid.clear();
   for (size_t i = 0; i < kMinSelfConnectionIdV1Size - 1; ++i) {
     testconnid.push_back(0);
   }
-  EXPECT_NO_THROW(ConnectionId{testconnid});
+  EXPECT_TRUE(ConnectionId::create(testconnid).hasValue());
 }
 
 } // namespace quic::test

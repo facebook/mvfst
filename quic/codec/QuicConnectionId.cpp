@@ -32,11 +32,7 @@ ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {
   static_assert(
       std::numeric_limits<uint8_t>::max() > kMaxConnectionIdSize,
       "Max connection size is too big");
-  if (connidIn.size() > kMaxConnectionIdSize) {
-    // We can't throw a transport error here because of the dependency. This is
-    // sad because this will cause an internal error downstream.
-    throw std::runtime_error("ConnectionId invalid size");
-  }
+  CHECK(connidIn.size() <= kMaxConnectionIdSize) << "ConnectionId invalid size";
   connidLen = connidIn.size();
   if (connidLen != 0) {
     memcpy(connid.data(), connidIn.data(), connidLen);
@@ -49,17 +45,20 @@ ConnectionId::ConnectionId(Cursor& cursor, size_t len) {
     connidLen = 0;
     return;
   }
-  if (len > kMaxConnectionIdSize) {
-    // We can't throw a transport error here because of the dependency. This is
-    // sad because this will cause an internal error downstream.
-    throw std::runtime_error("ConnectionId invalid size");
-  }
+  CHECK(len <= kMaxConnectionIdSize) << "ConnectionId invalid size";
   connidLen = len;
   cursor.pull(connid.data(), len);
 }
 
-ConnectionId ConnectionId::createWithoutChecks(
+folly::Expected<ConnectionId, QuicError> ConnectionId::create(
     const std::vector<uint8_t>& connidIn) {
+  static_assert(
+      std::numeric_limits<uint8_t>::max() > kMaxConnectionIdSize,
+      "Max connection size is too big");
+  if (connidIn.size() > kMaxConnectionIdSize) {
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR, "ConnectionId invalid size"));
+  }
   ConnectionId connid;
   connid.connidLen = connidIn.size();
   if (connid.connidLen != 0) {
@@ -68,11 +67,50 @@ ConnectionId ConnectionId::createWithoutChecks(
   return connid;
 }
 
-ConnectionId ConnectionId::createRandom(size_t len) {
-  ConnectionId connid;
-  if (len > kMaxConnectionIdSize) {
-    throw std::runtime_error("ConnectionId invalid size");
+folly::Expected<ConnectionId, QuicError> ConnectionId::create(
+    Cursor& cursor,
+    size_t len) {
+  // Zero is special case for connids.
+  if (len == 0) {
+    ConnectionId connid;
+    connid.connidLen = 0;
+    return connid;
   }
+  if (len > kMaxConnectionIdSize) {
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR, "ConnectionId invalid size"));
+  }
+  ConnectionId connid;
+  connid.connidLen = len;
+  cursor.pull(connid.connid.data(), len);
+  return connid;
+}
+
+ConnectionId ConnectionId::createAndMaybeCrash(
+    const std::vector<uint8_t>& connidIn) {
+  ConnectionId connid;
+  LOG_IF(FATAL, connidIn.size() > kMaxConnectionIdSize)
+      << "ConnectionId invalid size";
+  connid.connidLen = connidIn.size();
+  if (connid.connidLen != 0) {
+    memcpy(connid.connid.data(), connidIn.data(), connid.connidLen);
+  }
+  return connid;
+}
+
+ConnectionId ConnectionId::createZeroLength() {
+  ConnectionId connid;
+  connid.connidLen = 0;
+  return connid;
+}
+
+folly::Expected<ConnectionId, QuicError> ConnectionId::createRandom(
+    size_t len) {
+  if (len > kMaxConnectionIdSize) {
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR, "ConnectionId invalid size"));
+  }
+  ConnectionId connid;
   connid.connidLen = len;
   folly::Random::secureRandom(connid.connid.data(), connid.connidLen);
   return connid;

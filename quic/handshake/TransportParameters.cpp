@@ -41,8 +41,14 @@ Optional<ConnectionId> getConnIdParameter(
   auto value = it->value->clone();
   Cursor cursor(value.get());
 
-  // Constructor may throw an exception if the input is invalid.
-  return ConnectionId(cursor, value->length());
+  // Use the factory function instead of constructor
+  auto connIdResult = ConnectionId::create(cursor, value->length());
+  if (connIdResult.hasError()) {
+    throw QuicTransportException(
+        "Invalid connection ID parameter",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+  return connIdResult.value();
 }
 
 Optional<StatelessResetToken> getStatelessResetTokenParameter(

@@ -21,7 +21,7 @@ TEST_F(RetryTokenGeneratorTest, EncryptDecryptRetryToken) {
   folly::Random::secureRandom(secret.data(), secret.size());
 
   // Encrypt the retry token using one generator
-  auto connId = ConnectionId({0x14, 0x35, 0x22, 0x11});
+  auto connId = ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11});
   folly::IPAddress clientIp("109.115.3.49");
   uint16_t clientPort = 42069;
 

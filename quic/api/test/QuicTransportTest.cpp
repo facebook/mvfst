@@ -2877,7 +2877,10 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto& conn = transport_->getConnectionState();
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
@@ -2914,7 +2917,10 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   }
 
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
@@ -2992,7 +2998,10 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
   auto& conn = transport_->getConnectionState();
 
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();

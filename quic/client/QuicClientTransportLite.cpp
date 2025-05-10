@@ -69,15 +69,21 @@ QuicClientTransportLite::QuicClientTransportLite(
   clientConn_ = tempConn.get();
   conn_.reset(tempConn.release());
 
+  if (connectionIdSize > kMaxConnectionIdSize) {
+    LOG(ERROR) << "Source connection ID size is too large, truncating.";
+    connectionIdSize = kMaxConnectionIdSize;
+  }
   auto srcConnId = connectionIdSize > 0
-      ? ConnectionId::createRandom(connectionIdSize)
-      : ConnectionId(std::vector<uint8_t>());
+      ? ConnectionId::createRandom(connectionIdSize).value()
+      : ConnectionId::createZeroLength();
   conn_->clientConnectionId = srcConnId;
   conn_->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   conn_->readCodec->setClientConnectionId(srcConnId);
   conn_->selfConnectionIds.emplace_back(srcConnId, kInitialSequenceNumber);
-  clientConn_->initialDestinationConnectionId =
+  auto randCidExpected =
       ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
+  CHECK(randCidExpected.hasValue());
+  clientConn_->initialDestinationConnectionId = randCidExpected.value();
   clientConn_->originalDestinationConnectionId =
       clientConn_->initialDestinationConnectionId;
   conn_->clientChosenDestConnectionId =

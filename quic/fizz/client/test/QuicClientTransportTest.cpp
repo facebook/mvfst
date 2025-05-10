@@ -550,9 +550,11 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   retryServer->setFizzContext(serverCtx);
 
   std::vector<uint8_t> clientConnIdVec = {};
-  ConnectionId clientConnId(clientConnIdVec);
+  ConnectionId clientConnId =
+      ConnectionId::createAndMaybeCrash(clientConnIdVec);
 
-  ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+  ConnectionId initialDstConnId =
+      ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
 
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
@@ -1363,8 +1365,8 @@ TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
-  auto originalCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 2);
+  auto originalCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 2);
   auto& conn = client->getNonConstConn();
   conn.serverConnectionId = originalCid.connId;
 
@@ -1376,10 +1378,10 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
-  auto originalCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 1);
-  auto secondCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  auto originalCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
 
   auto& conn = client->getNonConstConn();
   conn.serverConnectionId = originalCid.connId;
@@ -1401,12 +1403,12 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
 }
 
 TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
-  auto originalCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 1);
-  auto secondCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
-  auto thirdCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{3, 3, 3, 3}), 3);
+  auto originalCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  auto thirdCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{3, 3, 3, 3}), 3);
 
   auto& conn = client->getNonConstConn();
   conn.serverConnectionId = originalCid.connId;
@@ -1497,7 +1499,8 @@ class QuicClientTransportHappyEyeballsTest
  protected:
   void setupInitialDcidForRetry() {
     if (GetParam() == ServerFirstPacketType::Retry) {
-      ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+      ConnectionId initialDstConnId =
+          ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
       client->getNonConstConn().originalDestinationConnectionId =
           initialDstConnId;
     }
@@ -2691,7 +2694,8 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
   ASSERT_TRUE(builder.canBuildPacket());
 
   auto token = StatelessResetToken{1, 9, 2, 0};
-  NewConnectionIdFrame newConnId(1, 0, ConnectionId({2, 4, 2, 3}), token);
+  NewConnectionIdFrame newConnId(
+      1, 0, ConnectionId::createAndMaybeCrash({2, 4, 2, 3}), token);
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -2757,7 +2761,10 @@ TEST_F(
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -2779,7 +2786,10 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdInvalidRetire) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
-      1, 3, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      3,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -2794,7 +2804,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdUsing0LenCid) {
   auto& conn = client->getNonConstConn();
   conn.transportSettings.selfActiveConnectionIdLimit = 2;
 
-  conn.serverConnectionId = ConnectionId(std::vector<uint8_t>{});
+  conn.serverConnectionId = ConnectionId::createZeroLength();
   conn.peerConnectionIds.pop_back();
   conn.peerConnectionIds.emplace_back(*conn.serverConnectionId, 0);
 
@@ -2804,7 +2814,10 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdUsing0LenCid) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -2827,7 +2840,7 @@ TEST_F(
   auto& conn = client->getNonConstConn();
   conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
-  ConnectionId connId2({5, 5, 5, 5});
+  ConnectionId connId2 = ConnectionId::createAndMaybeCrash({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
@@ -2853,7 +2866,7 @@ TEST_F(
   auto& conn = client->getNonConstConn();
   conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
-  ConnectionId connId2({5, 5, 5, 5});
+  ConnectionId connId2 = ConnectionId::createAndMaybeCrash({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
@@ -2877,7 +2890,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   uint8_t connIdSize = GetParam();
 
   client->getNonConstConn().clientConnectionId =
-      ConnectionId(std::vector<uint8_t>(connIdSize, 1));
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>(connIdSize, 1));
   setConnectionIds();
 
   StreamId streamId = client->createBidirectionalStream().value();
@@ -3004,10 +3017,10 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeNoAvailablePeerIds) {
 
 TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeAvailablePeerId) {
   auto& conn = client->getNonConstConn();
-  auto originalCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 1);
-  auto secondCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  auto originalCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
 
   conn.serverConnectionId = originalCid.connId;
 
@@ -4083,9 +4096,11 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
 
 TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   std::vector<uint8_t> clientConnIdVec = {};
-  ConnectionId clientConnId(clientConnIdVec);
+  ConnectionId clientConnId =
+      ConnectionId::createAndMaybeCrash(clientConnIdVec);
 
-  ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+  ConnectionId initialDstConnId =
+      ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
 
   // Create a stream and attempt to send some data to the server
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -5028,7 +5043,8 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RetryPacketAfterRxInitial) {
-  ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+  ConnectionId initialDstConnId =
+      ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
   client->getNonConstConn().originalDestinationConnectionId = initialDstConnId;
   recvServerRetry(serverAddr);
   loopForWrites();
@@ -6000,7 +6016,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingDataBufferLimit) {
 TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
   uint8_t connIdSize = GetParam();
   client->getNonConstConn().clientConnectionId =
-      ConnectionId(std::vector<uint8_t>(connIdSize, 1));
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>(connIdSize, 1));
   setConnectionIds();
 
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);

@@ -33,14 +33,14 @@ class ConnectionIdAlgo {
   /**
    * Parses ServerConnectionIdParams from the given connection id.
    */
-  virtual folly::Expected<ServerConnectionIdParams, QuicInternalException>
+  virtual folly::Expected<ServerConnectionIdParams, QuicError>
   parseConnectionId(const ConnectionId& id) noexcept = 0;
 
   /**
    * Encodes the given ServerConnectionIdParams into connection id
    */
-  virtual folly::Expected<ConnectionId, QuicInternalException>
-  encodeConnectionId(const ServerConnectionIdParams& params) noexcept = 0;
+  virtual folly::Expected<ConnectionId, QuicError> encodeConnectionId(
+      const ServerConnectionIdParams& params) noexcept = 0;
 };
 
 /**

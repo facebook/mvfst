@@ -129,7 +129,9 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
 TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   folly::EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
-  client_->clientConnectionId = ConnectionId::createRandom(8);
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.hasValue());
+  client_->clientConnectionId = randomCid.value();
   client_->happyEyeballsState.finished = true;
   client_->happyEyeballsState.secondSocket =
       std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);
@@ -144,8 +146,10 @@ TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
       std::make_shared<SocketObserverContainer>(socket.get());
   SocketObserverContainer::ManagedObserver obs;
   observerContainer->addObserver(&obs);
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.hasValue());
+  client_->clientConnectionId = randomCid.value();
 
-  client_->clientConnectionId = ConnectionId::createRandom(8);
   client_->observerContainer = observerContainer;
   EXPECT_EQ(
       1,
@@ -165,7 +169,10 @@ TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
 }
 
 TEST_F(ClientStateMachineTest, PreserveObserverContainerNullptr) {
-  client_->clientConnectionId = ConnectionId::createRandom(8);
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.hasValue());
+  client_->clientConnectionId = randomCid.value();
+
   ASSERT_THAT(client_->observerContainer.lock(), IsNull());
 
   auto newConn = undoAllClientStateForRetry(std::move(client_));

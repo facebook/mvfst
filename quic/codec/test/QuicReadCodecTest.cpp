@@ -819,7 +819,7 @@ TEST_F(QuicReadCodecTest, parseEmptyStreamFrame) {
   auto result = parseFrame(
       bufQueue,
       PacketHeader(ShortHeader(
-          ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
+          ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10).value())),
       CodecParameters());
   EXPECT_FALSE(result.hasValue());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -831,7 +831,7 @@ TEST_F(QuicReadCodecTest, parseEmptyDatagramFrame) {
   auto result = parseFrame(
       bufQueue,
       PacketHeader(ShortHeader(
-          ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10))),
+          ProtectionType::KeyPhaseOne, ConnectionId::createRandom(10).value())),
       CodecParameters());
   EXPECT_FALSE(result.hasValue());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);

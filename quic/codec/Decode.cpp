@@ -741,7 +741,11 @@ folly::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
         "ConnectionId invalid length"));
   }
 
-  ConnectionId connId(cursor, connIdLen);
+  auto connIdResult = ConnectionId::create(cursor, connIdLen);
+  if (connIdResult.hasError()) {
+    return folly::makeUnexpected(connIdResult.error());
+  }
+  ConnectionId connId = connIdResult.value();
 
   StatelessResetToken statelessResetToken;
   size_t bytesRead =
@@ -1291,7 +1295,11 @@ parseLongHeaderInvariant(uint8_t initialByte, Cursor& cursor) {
     VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  ConnectionId destConnId(cursor, destConnIdLen);
+  auto destConnIdResult = ConnectionId::create(cursor, destConnIdLen);
+  if (destConnIdResult.hasError()) {
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  ConnectionId destConnId = destConnIdResult.value();
   if (!cursor.canAdvance(1)) {
     VLOG(5) << "Not enough input bytes to read Source ConnectionId length";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1305,7 +1313,11 @@ parseLongHeaderInvariant(uint8_t initialByte, Cursor& cursor) {
     VLOG(5) << "Not enough input bytes to read Source ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  ConnectionId srcConnId(cursor, srcConnIdLen);
+  auto srcConnIdResult = ConnectionId::create(cursor, srcConnIdLen);
+  if (srcConnIdResult.hasError()) {
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  ConnectionId srcConnId = srcConnIdResult.value();
   size_t currentLength = cursor.totalLength();
   size_t bytesRead = initialLength - currentLength;
   return ParsedLongHeaderInvariant(
@@ -1482,7 +1494,11 @@ parseShortHeaderInvariants(
     VLOG(5) << "Not enough input bytes for ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  ConnectionId connId(cursor, dstConnIdSize);
+  auto connIdResult = ConnectionId::create(cursor, dstConnIdSize);
+  if (connIdResult.hasError()) {
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  ConnectionId connId = connIdResult.value();
   return ShortHeaderInvariant(std::move(connId));
 }
 

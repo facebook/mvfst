@@ -27,8 +27,8 @@ class TestQuicTransport
       : QuicTransportBaseLite(evb, std::move(socket)), QuicTransportBase(evb, nullptr /* Initialized through the QuicTransportBaseLite constructor */), observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
     conn_.reset(new QuicServerConnectionState(
         FizzServerQuicHandshakeContext::Builder().build()));
-    conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});
-    conn_->serverConnectionId = ConnectionId({1, 2, 3, 4});
+    conn_->clientConnectionId = ConnectionId::createAndMaybeCrash({9, 8, 7, 6});
+    conn_->serverConnectionId = ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
     conn_->version = QuicVersion::MVFST;
     conn_->observerContainer = observerContainer_;
     aead = test::createNoOpAead();

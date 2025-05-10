@@ -16,20 +16,26 @@ namespace quic::test {
 TEST(DefaultConnectionIdAlgoTest, canParse) {
   DefaultConnectionIdAlgo al;
   // version 0
-  EXPECT_FALSE(al.canParse(ConnectionId({0x00, 0x01, 0x02, 0x03})));
+  EXPECT_FALSE(
+      al.canParse(ConnectionId::createAndMaybeCrash({0x00, 0x01, 0x02, 0x03})));
   // version 1
-  EXPECT_TRUE(al.canParse(ConnectionId({0x40, 0x01, 0x02, 0x03})));
-  // version 2
-  EXPECT_TRUE(al.canParse(ConnectionId({0x80, 0x01, 0x02, 0x03, 0x04, 0x05})));
-  // version 3
   EXPECT_TRUE(
-      al.canParse(ConnectionId({0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06})));
+      al.canParse(ConnectionId::createAndMaybeCrash({0x40, 0x01, 0x02, 0x03})));
+  // version 2
+  EXPECT_TRUE(al.canParse(
+      ConnectionId::createAndMaybeCrash({0x80, 0x01, 0x02, 0x03, 0x04, 0x05})));
+  // version 3
+  EXPECT_TRUE(al.canParse(ConnectionId::createAndMaybeCrash(
+      {0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06})));
   // version 1, too small size
-  EXPECT_FALSE(al.canParse(ConnectionId({0x40, 0x01, 0x02})));
+  EXPECT_FALSE(
+      al.canParse(ConnectionId::createAndMaybeCrash({0x40, 0x01, 0x02})));
   // version 2, too small size
-  EXPECT_FALSE(al.canParse(ConnectionId({0x80, 0x01, 0x02, 0x03, 0x04})));
+  EXPECT_FALSE(al.canParse(
+      ConnectionId::createAndMaybeCrash({0x80, 0x01, 0x02, 0x03, 0x04})));
   // version 3, too small size
-  EXPECT_FALSE(al.canParse(ConnectionId({0xc0, 0x01, 0x02, 0x03, 0x04, 0x05})));
+  EXPECT_FALSE(al.canParse(
+      ConnectionId::createAndMaybeCrash({0xc0, 0x01, 0x02, 0x03, 0x04, 0x05})));
 }
 
 TEST(DefaultConnectionIdAlgoTest, decodeV1) {
@@ -43,7 +49,7 @@ TEST(DefaultConnectionIdAlgoTest, decodeV1) {
   v[1] = t >> 16;
   v[2] = t >> 8;
   v[3] = t;
-  ConnectionId cid1(v);
+  ConnectionId cid1 = ConnectionId::createAndMaybeCrash(v);
   EXPECT_TRUE(al.canParse(cid1));
   auto params1 = al.parseConnectionId(cid1);
   EXPECT_EQ(params1->version, ConnectionIdVersion::V1);
@@ -54,7 +60,7 @@ TEST(DefaultConnectionIdAlgoTest, decodeV1) {
 
 TEST(DefaultConnectionIdAlgoTest, decodeV2) {
   DefaultConnectionIdAlgo al;
-  ConnectionId cid1(
+  ConnectionId cid1 = ConnectionId::createAndMaybeCrash(
       {/*version*/ 0x80,
        /*host*/ 0xAA,
        0xBB,
@@ -71,7 +77,7 @@ TEST(DefaultConnectionIdAlgoTest, decodeV2) {
 
 TEST(DefaultConnectionIdAlgoTest, decodeV3) {
   DefaultConnectionIdAlgo al;
-  ConnectionId cid1(
+  ConnectionId cid1 = ConnectionId::createAndMaybeCrash(
       {/*version*/ 0xc0,
        /*host*/ 0xAA,
        0xBB,

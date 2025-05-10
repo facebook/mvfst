@@ -65,7 +65,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
                        kDefaultAckDelayExponent,
                        kDefaultUDPSendPacketLen,
                        kDefaultActiveConnectionIdLimit,
-                       ConnectionId(std::vector<uint8_t>())))
+                       ConnectionId::createZeroLength()))
                .hasError());
   }
 
@@ -108,8 +108,9 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
             generateStatelessResetToken(),
-            ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-            ConnectionId(std::vector<uint8_t>()));
+            ConnectionId::createAndMaybeCrash(
+                std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+            ConnectionId::createZeroLength());
     fizzServer.reset(
         new fizz::server::
             FizzServer<ClientHandshakeTest, fizz::server::ServerStateMachine>(
@@ -352,11 +353,11 @@ TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
   uint8_t initialByte = 0xff;
 
   std::vector<uint8_t> dcidVec = {};
-  ConnectionId dcid(dcidVec);
+  ConnectionId dcid = ConnectionId::createAndMaybeCrash(dcidVec);
 
   std::vector<uint8_t> scidVec = {
       0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
-  ConnectionId scid(scidVec);
+  ConnectionId scid = ConnectionId::createAndMaybeCrash(scidVec);
 
   std::string retryToken = R"(token)";
   LongHeader header(
@@ -384,7 +385,7 @@ TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
 
   std::vector<uint8_t> odcidVec = {
       0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
-  ConnectionId odcid(odcidVec);
+  ConnectionId odcid = ConnectionId::createAndMaybeCrash(odcidVec);
 
   EXPECT_TRUE(handshake->verifyRetryIntegrityTag(odcid, retryPacket));
 }
@@ -450,7 +451,7 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
                        kDefaultAckDelayExponent,
                        kDefaultUDPSendPacketLen,
                        kDefaultActiveConnectionIdLimit,
-                       ConnectionId(std::vector<uint8_t>())))
+                       ConnectionId::createZeroLength()))
                .hasError());
   }
 
@@ -562,7 +563,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
                        kDefaultAckDelayExponent,
                        kDefaultUDPSendPacketLen,
                        kDefaultActiveConnectionIdLimit,
-                       ConnectionId(std::vector<uint8_t>())))
+                       ConnectionId::createZeroLength()))
                .hasError());
   }
 

@@ -176,7 +176,7 @@ TEST_F(QuicPacketBuilderTest, TooManyVersions) {
 
 TEST_P(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   ConnectionId clientConnId = getTestConnectionId(),
-               serverConnId = ConnectionId({1, 3, 5, 7});
+               serverConnId = ConnectionId::createAndMaybeCrash({1, 3, 5, 7});
   PacketNum pktNum = 444;
   QuicVersion ver = QuicVersion::MVFST;
   // create a server cleartext write codec.
@@ -599,11 +599,12 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   // QUIC-TLS draft v29.
 
   uint8_t initialByte = 0xff;
-  ConnectionId sourceConnectionId(
+  ConnectionId sourceConnectionId = ConnectionId::createAndMaybeCrash(
       {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
-  ConnectionId destinationConnectionId((std::vector<uint8_t>()));
-  ConnectionId originalDestinationConnectionId(
-      {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
+  ConnectionId destinationConnectionId = ConnectionId::createZeroLength();
+  ConnectionId originalDestinationConnectionId =
+      ConnectionId::createAndMaybeCrash(
+          {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
   auto quicVersion = static_cast<QuicVersion>(0xff00001d);
   BufPtr token = folly::IOBuf::copyBuffer(R"(token)");
 
@@ -630,11 +631,12 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
 
 TEST_F(QuicPacketBuilderTest, PseudoRetryPacketLarge) {
   uint8_t initialByte = 0xff;
-  ConnectionId sourceConnectionId(
+  ConnectionId sourceConnectionId = ConnectionId::createAndMaybeCrash(
       {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
-  ConnectionId destinationConnectionId((std::vector<uint8_t>()));
-  ConnectionId originalDestinationConnectionId(
-      {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
+  ConnectionId destinationConnectionId = ConnectionId::createZeroLength();
+  ConnectionId originalDestinationConnectionId =
+      ConnectionId::createAndMaybeCrash(
+          {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
   auto quicVersion = static_cast<QuicVersion>(0xff00001d);
   BufPtr token = folly::IOBuf::create(500);
   token->append(500);
@@ -697,7 +699,9 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(dcidLen, dstConnId.size());
 
   // dcid
-  ConnectionId dcidObtained(cursor, dcidLen);
+  auto dcidResult = ConnectionId::create(cursor, dcidLen);
+  ASSERT_TRUE(dcidResult.hasValue());
+  ConnectionId dcidObtained = std::move(dcidResult.value());
   EXPECT_EQ(dcidObtained, dstConnId);
 
   // scid length
@@ -705,7 +709,9 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(scidLen, srcConnId.size());
 
   // scid
-  ConnectionId scidObtained(cursor, scidLen);
+  auto scidResult = ConnectionId::create(cursor, scidLen);
+  ASSERT_TRUE(scidResult.hasValue());
+  ConnectionId scidObtained = std::move(scidResult.value());
   EXPECT_EQ(scidObtained, srcConnId);
 
   // retry token
@@ -756,7 +762,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketGiganticToken) {
 }
 
 TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
-  ConnectionId emptyCID(std::vector<uint8_t>(0));
+  ConnectionId emptyCID = ConnectionId::createZeroLength();
   PacketNum packetNum = 0;
   PacketNum largestAcked = 0;
   auto builder = testBuilderProvider(
@@ -788,7 +794,7 @@ TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
 }
 
 TEST_P(QuicPacketBuilderTest, TestCipherOverhead) {
-  ConnectionId emptyCID(std::vector<uint8_t>(0));
+  ConnectionId emptyCID = ConnectionId::createZeroLength();
   PacketNum packetNum = 0;
   PacketNum largestAcked = 0;
   size_t cipherOverhead = 200;

@@ -101,7 +101,7 @@ TEST_F(QuicExtensionsTest, TestServerParamsV1) {
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
-  ConnectionId connId(
+  ConnectionId connId = ConnectionId::createAndMaybeCrash(
       {'\x12', '\x12', '\x54', '\x76', '\x12', '\x56', '\x14', '\x69'});
   EXPECT_EQ(
       *getConnIdParameter(
@@ -129,7 +129,7 @@ TEST_F(QuicExtensionsTest, TestServerParamsD29) {
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
-  ConnectionId connId(
+  ConnectionId connId = ConnectionId::createAndMaybeCrash(
       {'\x12', '\x12', '\x54', '\x76', '\x12', '\x56', '\x14', '\x69'});
   EXPECT_EQ(
       *getConnIdParameter(

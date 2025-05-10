@@ -1397,7 +1397,7 @@ TEST_F(QLoggerTest, PrettyStream) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId(std::vector<uint8_t>{
+  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
       static_cast<uint8_t>(
           folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
       static_cast<uint8_t>(
@@ -1508,7 +1508,7 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId(std::vector<uint8_t>{
+  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
       static_cast<uint8_t>(
           folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
       static_cast<uint8_t>(
@@ -1559,7 +1559,8 @@ TEST_F(QLoggerTest, CompressedStream) {
       true /* streaming */,
       true /* compress */);
 
-  q->setDcid(ConnectionId::createRandom(8));
+  q->setDcid(
+      ConnectionId::createRandom(8).value_or(ConnectionId::createZeroLength()));
   q->addPacket(regularQuicPacket, 10);
   // Streaming. Packet has been immediately logged.
   EXPECT_EQ(q->logs.size(), 0);
@@ -1604,7 +1605,8 @@ TEST_F(QLoggerTest, CompressedNonStream) {
       false /* streaming */,
       true /* compress */);
 
-  q.setDcid(ConnectionId::createRandom(8));
+  q.setDcid(
+      ConnectionId::createRandom(8).value_or(ConnectionId::createZeroLength()));
   q.addPacket(regularQuicPacket, 10);
   // Not streaming. Packet has not been logged yet.
   EXPECT_EQ(q.logs.size(), 1);
@@ -1630,7 +1632,6 @@ TEST_F(QLoggerTest, CompressedNonStream) {
   EXPECT_EQ(expected["traces"], parsed["traces"]);
 }
 #endif
-
 TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
@@ -1650,7 +1651,9 @@ TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
       true /* streaming */,
       true /* compress */);
 
-  EXPECT_NO_THROW(q->setDcid(ConnectionId::createRandom(8)));
+  auto dcid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(dcid.hasValue());
+  q->setDcid(dcid.value());
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(
       q->logs.size(),
@@ -1745,7 +1748,7 @@ TEST_F(QLoggerTest, PrettyDatagram) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId(std::vector<uint8_t>{
+  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
       static_cast<uint8_t>(
           folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
       static_cast<uint8_t>(
@@ -1902,7 +1905,7 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId(std::vector<uint8_t>{
+  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
       static_cast<uint8_t>(
           folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
       static_cast<uint8_t>(

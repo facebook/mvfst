@@ -47,8 +47,9 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       generateStatelessResetToken(),
-      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId(std::vector<uint8_t>()));
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createZeroLength());
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
 
   EXPECT_EQ(extensions.size(), 1);
@@ -70,8 +71,9 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       generateStatelessResetToken(),
-      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId(std::vector<uint8_t>()));
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createZeroLength());
   EXPECT_THROW(ext.getExtensions(TestMessages::clientHello()), FizzException);
 }
 
@@ -89,8 +91,9 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       generateStatelessResetToken(),
-      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId(std::vector<uint8_t>()));
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createZeroLength());
   EXPECT_THROW(
       ext.getExtensions(getClientHello(QuicVersion::MVFST)), FizzException);
   EXPECT_NO_THROW(ext.getExtensions(getClientHello(QuicVersion::QUIC_V1)));
@@ -110,8 +113,10 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       generateStatelessResetToken(),
-      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId(std::vector<uint8_t>()));
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
 
   auto chlo = getClientHello(QuicVersion::QUIC_V1);
   ClientTransportParameters duplicateClientParams;
@@ -137,8 +142,10 @@ TEST(ServerTransportParametersTest, TestQuicV1Fields) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       generateStatelessResetToken(),
-      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId(std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::QUIC_V1));
 
   EXPECT_EQ(extensions.size(), 1);
@@ -177,8 +184,10 @@ TEST(ServerTransportParametersTest, TestMvfstFields) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       generateStatelessResetToken(),
-      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId(std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
 
   EXPECT_EQ(extensions.size(), 1);

@@ -1343,7 +1343,8 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
   auto& conn = server->getNonConstConn();
 
   // Add additional peer id so PathResponse completes.
-  conn.peerConnectionIds.emplace_back(ConnectionId({1, 2, 3, 4}), 1);
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *conn.serverConnectionId, 10);
@@ -1767,8 +1768,8 @@ TEST_F(QuicServerTransportTest, SwitchServerCidsNoOtherIds) {
 TEST_F(QuicServerTransportTest, SwitchServerCidsOneOtherCid) {
   auto& conn = server->getNonConstConn();
   auto originalCid = conn.clientConnectionId;
-  auto secondCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  auto secondCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
   conn.peerConnectionIds.push_back(secondCid);
 
   EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
@@ -1786,10 +1787,10 @@ TEST_F(QuicServerTransportTest, SwitchServerCidsOneOtherCid) {
 TEST_F(QuicServerTransportTest, SwitchServerCidsMultipleCids) {
   auto& conn = server->getNonConstConn();
   auto originalCid = conn.clientConnectionId;
-  auto secondCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
-  auto thirdCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{3, 3, 3, 3}), 3);
+  auto secondCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  auto thirdCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{3, 3, 3, 3}), 3);
 
   conn.peerConnectionIds.push_back(secondCid);
   conn.peerConnectionIds.push_back(thirdCid);
@@ -1812,7 +1813,7 @@ TEST_F(
     TestRetireAndSwitchPeerConnectionIdsEmptyPeerCid) {
   auto& conn = server->getNonConstConn();
 
-  conn.clientConnectionId = ConnectionId(std::vector<uint8_t>{});
+  conn.clientConnectionId = ConnectionId::createZeroLength();
   EXPECT_EQ(conn.peerConnectionIds.size(), 1);
 
   EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
@@ -1953,7 +1954,7 @@ TEST_P(
   EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   // Add additional peer id so PathResponse completes.
   server->getNonConstConn().peerConnectionIds.emplace_back(
-      ConnectionId({1, 2, 3, 4}), 1);
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2520,7 +2521,7 @@ TEST_P(
   // reset queued packets
   conn.outstandings.reset();
   // simulate that the client has a zero-length conn id
-  conn.clientConnectionId = ConnectionId(std::vector<uint8_t>{});
+  conn.clientConnectionId = ConnectionId::createZeroLength();
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -3284,7 +3285,10 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken{9, 8, 7, 6});
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken{9, 8, 7, 6});
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -3308,7 +3312,10 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdTooManyReceivedIds) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      0,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -3329,7 +3336,10 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdInvalidRetire) {
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
-      1, 3, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1,
+      3,
+      ConnectionId::createAndMaybeCrash({2, 4, 2, 3}),
+      StatelessResetToken());
   ASSERT_FALSE(
       writeSimpleFrame(QuicSimpleFrame(newConnId), builder).hasError());
 
@@ -3343,7 +3353,7 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdNoopValidDuplicate) {
   auto& conn = server->getNonConstConn();
   conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
-  ConnectionId connId2({5, 5, 5, 5});
+  ConnectionId connId2 = ConnectionId::createAndMaybeCrash({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
@@ -3365,7 +3375,7 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdNoopValidDuplicate) {
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdExceptionInvalidDuplicate) {
   auto& conn = server->getNonConstConn();
 
-  ConnectionId connId2({5, 5, 5, 5});
+  ConnectionId connId2 = ConnectionId::createAndMaybeCrash({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);

@@ -233,7 +233,8 @@ TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
 
 TEST_F(DecodeTest, DifferentCIDLength) {
   ConnectionId sourceConnectionId = getTestConnectionId();
-  ConnectionId destinationConnectionId({1, 2, 3, 4, 5, 6});
+  ConnectionId destinationConnectionId =
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4, 5, 6});
   std::vector<QuicVersion> versions{
       {static_cast<QuicVersion>(1234),
        static_cast<QuicVersion>(4321),

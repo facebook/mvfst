@@ -17,6 +17,7 @@
 #include <array>
 
 #include <quic/QuicConstants.h>
+#include <quic/QuicException.h>
 
 namespace quic {
 constexpr uint8_t kStatelessResetTokenLength = 16;
@@ -41,27 +42,48 @@ struct ConnectionId {
 
   uint8_t size() const;
 
-  explicit ConnectionId(const std::vector<uint8_t>& connidIn);
-
-  explicit ConnectionId(Cursor& cursor, size_t len);
-
   bool operator==(const ConnectionId& other) const;
   bool operator!=(const ConnectionId& other) const;
 
   std::string hex() const;
 
   /**
-   * Create an connection without any checks for tests.
+   * Create a ConnectionId from a vector of bytes.
+   * Returns Expected<ConnectionId, QuicError> to handle validation errors.
    */
-  static ConnectionId createWithoutChecks(const std::vector<uint8_t>& connidIn);
+  [[nodiscard]] static folly::Expected<ConnectionId, QuicError> create(
+      const std::vector<uint8_t>& connidIn);
+
+  /**
+   * Create a ConnectionId from a cursor and length.
+   * Returns Expected<ConnectionId, QuicError> to handle validation errors.
+   */
+  [[nodiscard]] static folly::Expected<ConnectionId, QuicError> create(
+      Cursor& cursor,
+      size_t len);
+
+  /**
+   * Create an connection id and crash if it's invalid length.
+   */
+  static ConnectionId createAndMaybeCrash(const std::vector<uint8_t>& connidIn);
+
+  /**
+   * Create a zero-length ConnectionId.
+   */
+  static ConnectionId createZeroLength();
 
   /**
    * Create a random ConnectionId with the given length.
+   * Returns Expected<ConnectionId, QuicError> to handle validation errors.
    */
-  static ConnectionId createRandom(size_t len);
+  static folly::Expected<ConnectionId, QuicError> createRandom(size_t len);
 
  private:
   ConnectionId() = default;
+
+  explicit ConnectionId(const std::vector<uint8_t>& connidIn);
+
+  explicit ConnectionId(Cursor& cursor, size_t len);
 
   std::array<uint8_t, kMaxConnectionIdSize> connid;
   uint8_t connidLen;

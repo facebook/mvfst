@@ -696,7 +696,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     // connection id that the client must use in all future initial packets.
     std::vector<uint8_t> serverConnIdVec = {
         0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
-    ConnectionId serverCid(serverConnIdVec);
+    ConnectionId serverCid = ConnectionId::createAndMaybeCrash(serverConnIdVec);
 
     std::string retryToken = "token";
     std::string integrityTag =

@@ -81,8 +81,7 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
 
       transport_->setTransportSettings(transportSettings);
 
-      transport_->setClientConnectionId(
-          quic::ConnectionId(std::vector<uint8_t>{}));
+      transport_->setClientConnectionId(quic::ConnectionId::createZeroLength());
 
       transport_->setOriginalPeerAddress(client);
 

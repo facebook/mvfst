@@ -619,7 +619,8 @@ StatelessResetToken generateStatelessResetToken() {
   folly::SocketAddress address("1.2.3.4", 8080);
   StatelessResetGenerator generator(secret, address.getFullyQualified());
 
-  return generator.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11}));
+  return generator.generateToken(
+      ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11}));
 }
 
 std::array<uint8_t, kStatelessResetTokenSecretLength> getRandSecret() {

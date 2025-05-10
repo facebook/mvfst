@@ -38,7 +38,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       0);
   auto extensions = ext.getClientHelloExtensions();
 
@@ -63,7 +63,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       0);
   auto extensions = ext.getClientHelloExtensions();
 
@@ -87,7 +87,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       0);
   auto extensions = ext.getClientHelloExtensions();
 
@@ -112,7 +112,7 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       0);
   ext.getClientHelloExtensions();
   ext.onEncryptedExtensions(getEncryptedExtensions().extensions);
@@ -132,7 +132,7 @@ TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       0);
   ext.getClientHelloExtensions();
 
@@ -164,7 +164,7 @@ TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       0);
   ext.getClientHelloExtensions();
   EXPECT_THROW(
@@ -193,7 +193,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>()),
+          ConnectionId::createZeroLength(),
           customTransportParameters),
       0);
   auto extensions = ext.getClientHelloExtensions();
@@ -233,7 +233,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsChloPadding) {
           kDefaultAckDelayExponent,
           kDefaultUDPSendPacketLen,
           kDefaultActiveConnectionIdLimit,
-          ConnectionId(std::vector<uint8_t>())),
+          ConnectionId::createZeroLength()),
       chloPaddingBytes);
   auto extensions = ext.getClientHelloExtensions();
 

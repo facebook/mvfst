@@ -190,14 +190,18 @@ TEST_F(TypesTest, KeyPhase) {
 
 TEST_F(TypesTest, ShortHeaderPacketNumberSpace) {
   ShortHeader shortHeaderZero(
-      ProtectionType::KeyPhaseZero, ConnectionId({1, 3, 5, 7, 8}), 100);
+      ProtectionType::KeyPhaseZero,
+      ConnectionId::createAndMaybeCrash({1, 3, 5, 7, 8}),
+      100);
   EXPECT_EQ(PacketNumberSpace::AppData, shortHeaderZero.getPacketNumberSpace());
   EXPECT_EQ(
       PacketNumberSpace::AppData,
       protectionTypeToPacketNumberSpace(shortHeaderZero.getProtectionType()));
 
   ShortHeader shortHeaderOne(
-      ProtectionType::KeyPhaseOne, ConnectionId({1, 3, 5, 7, 9}), 101);
+      ProtectionType::KeyPhaseOne,
+      ConnectionId::createAndMaybeCrash({1, 3, 5, 7, 9}),
+      101);
   EXPECT_EQ(PacketNumberSpace::AppData, shortHeaderOne.getPacketNumberSpace());
   EXPECT_EQ(
       PacketNumberSpace::AppData,

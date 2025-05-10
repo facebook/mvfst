@@ -11,13 +11,6 @@
 #include <quic/codec/Decode.h>
 #include <quic/codec/PacketNumber.h>
 
-namespace {
-quic::ConnectionId zeroConnId() {
-  std::vector<uint8_t> zeroData(quic::kDefaultConnectionIdSize, 0);
-  return quic::ConnectionId(zeroData);
-}
-} // namespace
-
 namespace quic {
 
 QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
@@ -619,7 +612,7 @@ ProtectionType QuicReadCodec::getCurrentOneRttReadPhase() const {
 }
 
 std::string QuicReadCodec::connIdToHex() const {
-  static ConnectionId zeroConn = zeroConnId();
+  static ConnectionId zeroConn = ConnectionId::createZeroLength();
   const auto& serverId = serverConnectionId_.value_or(zeroConn);
   const auto& clientId = clientConnectionId_.value_or(zeroConn);
   return folly::to<std::string>(

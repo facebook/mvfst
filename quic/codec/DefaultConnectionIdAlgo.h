@@ -54,7 +54,7 @@ class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
  public:
   ~DefaultConnectionIdAlgo() override = default;
 
-  static folly::Expected<ServerConnectionIdParams, QuicInternalException>
+  static folly::Expected<ServerConnectionIdParams, QuicError>
   parseConnectionIdDefault(const ConnectionId& id) noexcept;
 
   /**
@@ -65,13 +65,13 @@ class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
   /**
    * Parses ServerConnectionIdParams from the given connection id.
    */
-  folly::Expected<ServerConnectionIdParams, QuicInternalException>
-  parseConnectionId(const ConnectionId& id) noexcept override;
+  folly::Expected<ServerConnectionIdParams, QuicError> parseConnectionId(
+      const ConnectionId& id) noexcept override;
 
   /**
    * Encodes the given ServerConnectionIdParams into connection id
    */
-  folly::Expected<ConnectionId, QuicInternalException> encodeConnectionId(
+  folly::Expected<ConnectionId, QuicError> encodeConnectionId(
       const ServerConnectionIdParams& params) noexcept override;
 };
 

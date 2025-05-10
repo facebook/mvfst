@@ -24,8 +24,10 @@ TEST_F(StatelessResetGeneratorTest, SameSecretSameAddress) {
   StatelessResetGenerator generator1(secret, address.getFullyQualified()),
       generator2(secret, address.getFullyQualified());
   EXPECT_EQ(
-      generator1.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})),
-      generator2.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})));
+      generator1.generateToken(
+          ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11})),
+      generator2.generateToken(
+          ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11})));
 }
 
 TEST_F(StatelessResetGeneratorTest, SameSecretDifferentAddress) {
@@ -37,8 +39,10 @@ TEST_F(StatelessResetGeneratorTest, SameSecretDifferentAddress) {
   // I was told by security expert that by the time they collide, I'm already
   // fired.
   EXPECT_NE(
-      generator1.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})),
-      generator2.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})));
+      generator1.generateToken(
+          ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11})),
+      generator2.generateToken(
+          ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11})));
 }
 
 TEST_F(StatelessResetGeneratorTest, DifferentSecretSameAddress) {
@@ -50,8 +54,10 @@ TEST_F(StatelessResetGeneratorTest, DifferentSecretSameAddress) {
   StatelessResetGenerator generator1(secret1, address.getFullyQualified()),
       generator2(secret2, address.getFullyQualified());
   EXPECT_NE(
-      generator1.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})),
-      generator2.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11})));
+      generator1.generateToken(
+          ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11})),
+      generator2.generateToken(
+          ConnectionId::createAndMaybeCrash({0x14, 0x35, 0x22, 0x11})));
 }
 
 } // namespace quic::test

@@ -479,7 +479,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   EXPECT_CALL(*testTransport2, getEventBase()).WillRepeatedly(Return(qEvb_));
   EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr2));
-  ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
+  ConnectionId connId2 =
+      ConnectionId::createAndMaybeCrash({2, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData2(HeaderForm::Long, true, false, connId2, connId2);
 
@@ -499,7 +500,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
   auto mockSock3 =
       std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
-  ConnectionId connId3({8, 4, 5, 6, 7, 8, 9, 10});
+  ConnectionId connId3 =
+      ConnectionId::createAndMaybeCrash({8, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData3(HeaderForm::Long, true, false, connId3, connId3);
   auto data3 = createData(kMinInitialPacketSize + 10);
@@ -571,7 +573,8 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   EXPECT_CALL(*testTransport2, getEventBase()).WillRepeatedly(Return(qEvb_));
   EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr2));
-  ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
+  ConnectionId connId2 =
+      ConnectionId::createAndMaybeCrash({2, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData2(HeaderForm::Long, true, false, connId2, connId2);
 
@@ -591,7 +594,8 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
   auto mockSock3 =
       std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
-  ConnectionId connId3({3, 4, 5, 6, 7, 8, 9, 10});
+  ConnectionId connId3 =
+      ConnectionId::createAndMaybeCrash({3, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData3(HeaderForm::Long, true, false, connId3, connId3);
   auto data3 = createData(kMinInitialPacketSize + 10);
@@ -622,7 +626,8 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   EXPECT_CALL(*testTransport4, getEventBase()).WillRepeatedly(Return(qEvb_));
   EXPECT_CALL(*testTransport4, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr4));
-  ConnectionId connId4({4, 4, 5, 6, 7, 8, 9, 10});
+  ConnectionId connId4 =
+      ConnectionId::createAndMaybeCrash({4, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData4(HeaderForm::Long, true, false, connId4, connId4);
 
@@ -874,7 +879,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
 
   // routing by address after transport_'s connid available, but before
   // transport2's connid available.
-  ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
+  ConnectionId connId2 =
+      ConnectionId::createAndMaybeCrash({2, 4, 5, 6, 7, 8, 9, 10});
   folly::SocketAddress clientAddr2("2.3.4.5", 2345);
   NiceMock<MockConnectionSetupCallback> connSetupCb;
   NiceMock<MockConnectionCallback> connCb;
@@ -981,7 +987,7 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
   folly::SocketAddress blockedSrcPort("1.2.3.4", 443);
   worker_->setIsBlockListedSrcPort([](uint16_t port) { return port == 443; });
   auto data = createData(kDefaultUDPSendPacketLen);
-  auto connId = ConnectionId(std::vector<uint8_t>());
+  auto connId = ConnectionId::createZeroLength();
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
@@ -1002,7 +1008,7 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
 
 TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   auto data = createData(kDefaultUDPSendPacketLen);
-  auto connId = ConnectionId(std::vector<uint8_t>());
+  auto connId = ConnectionId::createZeroLength();
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
@@ -1064,7 +1070,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
 
 TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   auto data = createData(kDefaultUDPSendPacketLen);
-  auto connId = ConnectionId::createWithoutChecks({1});
+  auto connId = ConnectionId::createAndMaybeCrash({1});
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
@@ -1110,8 +1116,8 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
 
   EXPECT_CALL(*rawConnIdAlgo, canParseNonConst(_)).WillOnce(Return(true));
   EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
-      .WillOnce(Return(folly::makeUnexpected(QuicInternalException(
-          "This CID has COVID-19", LocalErrorCode::INTERNAL_ERROR))));
+      .WillOnce(Return(folly::makeUnexpected(QuicError(
+          TransportErrorCode::INTERNAL_ERROR, "This CID has COVID-19"))));
   EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
   EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
@@ -1123,8 +1129,8 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
 
 TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
   auto data = createData(kDefaultUDPSendPacketLen);
-  auto dstConnId = ConnectionId::createWithoutChecks({3});
-  auto srcConnId = ConnectionId::createWithoutChecks({3});
+  auto dstConnId = ConnectionId::createAndMaybeCrash({3});
+  auto srcConnId = ConnectionId::createAndMaybeCrash({3});
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(
@@ -1151,8 +1157,8 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
 
 TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
   auto data = createData(kDefaultUDPSendPacketLen);
-  auto dstConnId = ConnectionId::createWithoutChecks({21});
-  auto srcConnId = ConnectionId::createWithoutChecks({3});
+  auto dstConnId = ConnectionId::createAndMaybeCrash({21});
+  auto srcConnId = ConnectionId::createAndMaybeCrash({3});
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(

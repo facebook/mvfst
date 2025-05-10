@@ -32,8 +32,7 @@ namespace {
 
 PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
   PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
-  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
-  ConnectionId srcConnId(zeroConnIdData);
+  ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Initial,
       srcConnId,
@@ -59,8 +58,8 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
 PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
   PacketNum nextPacketNum =
       getNextPacketNum(conn, PacketNumberSpace::Handshake);
-  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
-  ConnectionId srcConnId(zeroConnIdData);
+
+  ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Handshake,
       srcConnId,
@@ -522,7 +521,7 @@ TEST_P(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   auto connId = getTestConnectionId();
   LongHeader longHeader(
       LongHeader::Types::Initial,
-      ConnectionId(std::vector<uint8_t>()),
+      ConnectionId::createZeroLength(),
       connId,
       getNextPacketNum(conn, PacketNumberSpace::Initial),
       QuicVersion::MVFST);
@@ -856,8 +855,8 @@ TEST_P(
   }
 
   // Schedule a fourth packet
-  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
-  ConnectionId srcConnId(zeroConnIdData);
+
+  ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Initial,
       srcConnId,
@@ -912,8 +911,7 @@ TEST_P(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
 
-  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
-  ConnectionId srcConnId(zeroConnIdData);
+  ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Initial,
       srcConnId,
@@ -991,8 +989,8 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
   // Get the packet builder going for the clone packet.
   PacketNum nextPacketNum =
       getNextPacketNum(conn, PacketNumberSpace::Handshake);
-  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
-  ConnectionId srcConnId(zeroConnIdData);
+
+  ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Handshake,
       srcConnId,

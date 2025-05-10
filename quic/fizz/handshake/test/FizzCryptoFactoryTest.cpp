@@ -69,7 +69,8 @@ TEST_F(FizzCryptoFactoryTest, TestV1ClearTextCipher) {
   for (size_t i = 0; i < connid.size(); ++i) {
     destinationConnidVector.push_back(connid.data()[i]);
   }
-  ConnectionId destinationConnid(destinationConnidVector);
+  ConnectionId destinationConnid =
+      ConnectionId::createAndMaybeCrash(destinationConnidVector);
   auto fizzFactory = std::make_shared<QuicFizzTestFactory>();
   fizzFactory->setMockAead(createMockAead());
   auto aead =

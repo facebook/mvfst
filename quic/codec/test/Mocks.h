@@ -18,12 +18,12 @@ class MockConnectionIdAlgo : public ConnectionIdAlgo {
  public:
   MOCK_METHOD((bool), canParseNonConst, (const ConnectionId& id), (noexcept));
   MOCK_METHOD(
-      (folly::Expected<ServerConnectionIdParams, QuicInternalException>),
+      (folly::Expected<ServerConnectionIdParams, QuicError>),
       parseConnectionId,
       (const ConnectionId&),
       (noexcept));
   MOCK_METHOD(
-      (folly::Expected<ConnectionId, QuicInternalException>),
+      (folly::Expected<ConnectionId, QuicError>),
       encodeConnectionId,
       (const ServerConnectionIdParams&),
       (noexcept));
