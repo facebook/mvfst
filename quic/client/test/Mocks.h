@@ -73,7 +73,7 @@ class MockClientHandshake : public ClientHandshake {
   MOCK_METHOD(void, destroy, ());
 
   MOCK_METHOD(
-      Optional<CachedServerTransportParameters>,
+      (folly::Expected<Optional<CachedServerTransportParameters>, QuicError>),
       connectImpl,
       (Optional<std::string>));
   MOCK_METHOD(EncryptionLevel, getReadRecordLayerEncryptionLevel, ());

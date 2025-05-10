@@ -66,8 +66,14 @@ bool DefaultAppTokenValidator::validate(
     return validated = false;
   }
 
-  auto ticketIdleTimeout =
+  auto ticketIdleTimeoutResult =
       getIntegerParameter(TransportParameterId::idle_timeout, params);
+  if (ticketIdleTimeoutResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting idle_timeout parameter ",
+        *ticketIdleTimeoutResult.error().code.asTransportErrorCode());
+  }
+  const auto& ticketIdleTimeout = ticketIdleTimeoutResult.value();
   if (!ticketIdleTimeout ||
       conn_->transportSettings.idleTimeout !=
           std::chrono::milliseconds(*ticketIdleTimeout)) {
@@ -75,8 +81,14 @@ bool DefaultAppTokenValidator::validate(
     return validated = false;
   }
 
-  auto ticketPacketSize =
+  auto ticketPacketSizeResult =
       getIntegerParameter(TransportParameterId::max_packet_size, params);
+  if (ticketPacketSizeResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting max_packet_size parameter ",
+        *ticketPacketSizeResult.error().code.asTransportErrorCode());
+  }
+  const auto& ticketPacketSize = ticketPacketSizeResult.value();
   if (!ticketPacketSize ||
       conn_->transportSettings.maxRecvPacketSize < *ticketPacketSize) {
     VLOG(10) << "Decreased max receive packet size";
@@ -85,8 +97,14 @@ bool DefaultAppTokenValidator::validate(
 
   // if the current max data is less than the one advertised previously we
   // reject the early data
-  auto ticketMaxData =
+  auto ticketMaxDataResult =
       getIntegerParameter(TransportParameterId::initial_max_data, params);
+  if (ticketMaxDataResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting initial_max_data parameter ",
+        *ticketMaxDataResult.error().code.asTransportErrorCode());
+  }
+  const auto& ticketMaxData = ticketMaxDataResult.value();
   if (!ticketMaxData ||
       conn_->transportSettings.advertisedInitialConnectionFlowControlWindow <
           *ticketMaxData) {
@@ -94,12 +112,37 @@ bool DefaultAppTokenValidator::validate(
     return validated = false;
   }
 
-  auto ticketMaxStreamDataBidiLocal = getIntegerParameter(
+  auto ticketMaxStreamDataBidiLocalResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local, params);
-  auto ticketMaxStreamDataBidiRemote = getIntegerParameter(
+  if (ticketMaxStreamDataBidiLocalResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting initial_max_stream_data_bidi_local parameter",
+        *ticketMaxStreamDataBidiLocalResult.error()
+             .code.asTransportErrorCode());
+  }
+  const auto& ticketMaxStreamDataBidiLocal =
+      ticketMaxStreamDataBidiLocalResult.value();
+
+  auto ticketMaxStreamDataBidiRemoteResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_remote, params);
-  auto ticketMaxStreamDataUni = getIntegerParameter(
+  if (ticketMaxStreamDataBidiRemoteResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting initial_max_stream_data_bidi_remote parameter",
+        *ticketMaxStreamDataBidiRemoteResult.error()
+             .code.asTransportErrorCode());
+  }
+  const auto& ticketMaxStreamDataBidiRemote =
+      ticketMaxStreamDataBidiRemoteResult.value();
+
+  auto ticketMaxStreamDataUniResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_uni, params);
+  if (ticketMaxStreamDataUniResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting initial_max_stream_data_uni parameter",
+        *ticketMaxStreamDataUniResult.error().code.asTransportErrorCode());
+  }
+  const auto& ticketMaxStreamDataUni = ticketMaxStreamDataUniResult.value();
+
   if (!ticketMaxStreamDataBidiLocal ||
       conn_->transportSettings
               .advertisedInitialBidiLocalStreamFlowControlWindow <
@@ -115,10 +158,24 @@ bool DefaultAppTokenValidator::validate(
     return validated = false;
   }
 
-  auto ticketMaxStreamsBidi = getIntegerParameter(
+  auto ticketMaxStreamsBidiResult = getIntegerParameter(
       TransportParameterId::initial_max_streams_bidi, params);
-  auto ticketMaxStreamsUni = getIntegerParameter(
+  if (ticketMaxStreamsBidiResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting initial_max_streams_bidi parameter",
+        *ticketMaxStreamsBidiResult.error().code.asTransportErrorCode());
+  }
+  const auto& ticketMaxStreamsBidi = ticketMaxStreamsBidiResult.value();
+
+  auto ticketMaxStreamsUniResult = getIntegerParameter(
       TransportParameterId::initial_max_streams_uni, params);
+  if (ticketMaxStreamsUniResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting initial_max_streams_uni parameter",
+        *ticketMaxStreamsUniResult.error().code.asTransportErrorCode());
+  }
+  const auto& ticketMaxStreamsUni = ticketMaxStreamsUniResult.value();
+
   if (!ticketMaxStreamsBidi ||
       conn_->transportSettings.advertisedInitialMaxStreamsBidi <
           *ticketMaxStreamsBidi ||
@@ -129,9 +186,16 @@ bool DefaultAppTokenValidator::validate(
     return validated = false;
   }
 
-  auto ticketExtendedAckFeatures =
-      getIntegerParameter(TransportParameterId::extended_ack_features, params)
-          .value_or(0);
+  auto ticketExtendedAckFeaturesResult =
+      getIntegerParameter(TransportParameterId::extended_ack_features, params);
+  uint64_t ticketExtendedAckFeatures = 0;
+  if (ticketExtendedAckFeaturesResult.hasError()) {
+    throw QuicTransportException(
+        "Error getting extended_ack_features parameter",
+        *ticketExtendedAckFeaturesResult.error().code.asTransportErrorCode());
+  } else if (ticketExtendedAckFeaturesResult.value().has_value()) {
+    ticketExtendedAckFeatures = *ticketExtendedAckFeaturesResult.value();
+  }
   if (conn_->transportSettings.advertisedExtendedAckFeatures !=
       ticketExtendedAckFeatures) {
     VLOG(10) << "Extended ack support changed";

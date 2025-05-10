@@ -494,32 +494,66 @@ class FakeServerHandshake : public FizzServerHandshake {
 
   Optional<ClientTransportParameters> getClientTransportParams() override {
     std::vector<TransportParameter> transportParams;
-    transportParams.push_back(encodeIntegerParameter(
+
+    auto bidiLocalResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
-        kDefaultStreamFlowControlWindow));
-    transportParams.push_back(encodeIntegerParameter(
+        kDefaultStreamFlowControlWindow);
+    CHECK(!bidiLocalResult.hasError())
+        << "Failed to encode initial_max_stream_data_bidi_local";
+    transportParams.push_back(std::move(bidiLocalResult.value()));
+
+    auto bidiRemoteResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_remote,
-        kDefaultStreamFlowControlWindow));
-    transportParams.push_back(encodeIntegerParameter(
+        kDefaultStreamFlowControlWindow);
+    CHECK(!bidiRemoteResult.hasError())
+        << "Failed to encode initial_max_stream_data_bidi_remote";
+    transportParams.push_back(std::move(bidiRemoteResult.value()));
+
+    auto uniResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_uni,
-        kDefaultStreamFlowControlWindow));
-    transportParams.push_back(encodeIntegerParameter(
+        kDefaultStreamFlowControlWindow);
+    CHECK(!uniResult.hasError())
+        << "Failed to encode initial_max_stream_data_uni";
+    transportParams.push_back(std::move(uniResult.value()));
+
+    auto streamsBidiResult = encodeIntegerParameter(
         TransportParameterId::initial_max_streams_bidi,
-        kDefaultMaxStreamsBidirectional));
-    transportParams.push_back(encodeIntegerParameter(
+        kDefaultMaxStreamsBidirectional);
+    CHECK(!streamsBidiResult.hasError())
+        << "Failed to encode initial_max_streams_bidi";
+    transportParams.push_back(std::move(streamsBidiResult.value()));
+
+    auto streamsUniResult = encodeIntegerParameter(
         TransportParameterId::initial_max_streams_uni,
-        kDefaultMaxStreamsUnidirectional));
-    transportParams.push_back(encodeIntegerParameter(
+        kDefaultMaxStreamsUnidirectional);
+    CHECK(!streamsUniResult.hasError())
+        << "Failed to encode initial_max_streams_uni";
+    transportParams.push_back(std::move(streamsUniResult.value()));
+
+    auto maxDataResult = encodeIntegerParameter(
         TransportParameterId::initial_max_data,
-        kDefaultConnectionFlowControlWindow));
-    transportParams.push_back(encodeIntegerParameter(
-        TransportParameterId::idle_timeout, kDefaultIdleTimeout.count()));
-    transportParams.push_back(encodeIntegerParameter(
-        TransportParameterId::max_packet_size, maxRecvPacketSize));
+        kDefaultConnectionFlowControlWindow);
+    CHECK(!maxDataResult.hasError()) << "Failed to encode initial_max_data";
+    transportParams.push_back(std::move(maxDataResult.value()));
+
+    auto idleTimeoutResult = encodeIntegerParameter(
+        TransportParameterId::idle_timeout, kDefaultIdleTimeout.count());
+    CHECK(!idleTimeoutResult.hasError()) << "Failed to encode idle_timeout";
+    transportParams.push_back(std::move(idleTimeoutResult.value()));
+
+    auto maxPacketSizeResult = encodeIntegerParameter(
+        TransportParameterId::max_packet_size, maxRecvPacketSize);
+    CHECK(!maxPacketSizeResult.hasError())
+        << "Failed to encode max_packet_size";
+    transportParams.push_back(std::move(maxPacketSizeResult.value()));
+
     if (clientActiveConnectionIdLimit_) {
-      transportParams.push_back(encodeIntegerParameter(
+      auto limitResult = encodeIntegerParameter(
           TransportParameterId::active_connection_id_limit,
-          *clientActiveConnectionIdLimit_));
+          *clientActiveConnectionIdLimit_);
+      CHECK(!limitResult.hasError())
+          << "Failed to encode active_connection_id_limit";
+      transportParams.push_back(std::move(limitResult.value()));
     }
     transportParams.push_back(encodeConnIdParameter(
         TransportParameterId::initial_source_connection_id,

@@ -12,30 +12,31 @@
 
 namespace quic {
 
-Optional<uint64_t> getIntegerParameter(
+folly::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
-    return std::nullopt;
+    return Optional<uint64_t>(std::nullopt);
   }
   auto parameterCursor = Cursor(it->value.get());
   auto parameter = decodeQuicInteger(parameterCursor);
   if (!parameter) {
-    throw QuicTransportException(
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         folly::to<std::string>(
-            "Failed to decode integer from TransportParameterId: ", u64_tp(id)),
-        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+            "Failed to decode integer from TransportParameterId: ",
+            u64_tp(id))));
   }
-  return parameter->first;
+  return Optional<uint64_t>(parameter->first);
 }
 
-Optional<ConnectionId> getConnIdParameter(
+folly::Expected<Optional<ConnectionId>, QuicError> getConnIdParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
-    return std::nullopt;
+    return Optional<ConnectionId>(std::nullopt);
   }
 
   auto value = it->value->clone();
@@ -44,33 +45,34 @@ Optional<ConnectionId> getConnIdParameter(
   // Use the factory function instead of constructor
   auto connIdResult = ConnectionId::create(cursor, value->length());
   if (connIdResult.hasError()) {
-    throw QuicTransportException(
-        "Invalid connection ID parameter",
-        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        "Invalid connection ID parameter"));
   }
-  return connIdResult.value();
+  return Optional<ConnectionId>(connIdResult.value());
 }
 
-Optional<StatelessResetToken> getStatelessResetTokenParameter(
+folly::Expected<Optional<StatelessResetToken>, QuicError>
+getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters) {
   auto it =
       findParameter(parameters, TransportParameterId::stateless_reset_token);
   if (it == parameters.end()) {
-    return std::nullopt;
+    return Optional<StatelessResetToken>(std::nullopt);
   }
 
   auto value = it->value->clone();
   auto range = value->coalesce();
   if (range.size() != sizeof(StatelessResetToken)) {
-    throw QuicTransportException(
-        "Invalid reset token", TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR, "Invalid reset token"));
   }
   StatelessResetToken token;
   memcpy(token.data(), range.data(), range.size());
-  return token;
+  return Optional<StatelessResetToken>(token);
 }
 
-TransportParameter encodeIntegerParameter(
+folly::Expected<TransportParameter, QuicError> encodeIntegerParameter(
     TransportParameterId id,
     uint64_t value) {
   BufPtr data = BufHelpers::create(8);
@@ -80,11 +82,11 @@ TransportParameter encodeIntegerParameter(
         appender.writeBE(val);
       });
   if (!encoded) {
-    throw QuicTransportException(
-        "Invalid integer parameter",
-        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        "Invalid integer parameter"));
   }
-  return {id, std::move(data)};
+  return TransportParameter{id, std::move(data)};
 }
 
 std::vector<TransportParameter> getSupportedExtTransportParams(
@@ -96,39 +98,61 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   customTps.reserve(7);
 
   if (ts.datagramConfig.enabled) {
-    customTps.push_back(encodeIntegerParameter(
+    auto result = encodeIntegerParameter(
         TransportParameterId::max_datagram_frame_size,
-        conn.datagramState.maxReadFrameSize));
+        conn.datagramState.maxReadFrameSize);
+    if (!result.hasError()) {
+      customTps.push_back(result.value());
+    }
   }
 
   if (ts.advertisedMaxStreamGroups > 0) {
-    customTps.push_back(encodeIntegerParameter(
-        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups));
+    auto result = encodeIntegerParameter(
+        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups);
+    if (!result.hasError()) {
+      customTps.push_back(result.value());
+    }
   }
 
-  customTps.push_back(encodeIntegerParameter(
+  auto ackTimestampsResult = encodeIntegerParameter(
       TpId::ack_receive_timestamps_enabled,
-      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0));
+      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);
+  if (!ackTimestampsResult.hasError()) {
+    customTps.push_back(ackTimestampsResult.value());
+  }
 
   if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
-    customTps.push_back(encodeIntegerParameter(
+    auto maxTimestampsResult = encodeIntegerParameter(
         TpId::max_receive_timestamps_per_ack,
         ts.maybeAckReceiveTimestampsConfigSentToPeer
-            ->maxReceiveTimestampsPerAck));
+            ->maxReceiveTimestampsPerAck);
+    if (!maxTimestampsResult.hasError()) {
+      customTps.push_back(maxTimestampsResult.value());
+    }
 
-    customTps.push_back(encodeIntegerParameter(
+    auto exponentResult = encodeIntegerParameter(
         TpId::receive_timestamps_exponent,
         ts.maybeAckReceiveTimestampsConfigSentToPeer
-            ->receiveTimestampsExponent));
+            ->receiveTimestampsExponent);
+    if (!exponentResult.hasError()) {
+      customTps.push_back(exponentResult.value());
+    }
   }
 
   if (ts.minAckDelay) {
-    customTps.push_back(encodeIntegerParameter(
-        TpId::min_ack_delay, ts.minAckDelay.value().count()));
+    auto minAckDelayResult = encodeIntegerParameter(
+        TpId::min_ack_delay, ts.minAckDelay.value().count());
+    if (!minAckDelayResult.hasError()) {
+      customTps.push_back(minAckDelayResult.value());
+    }
   }
 
   if (ts.advertisedKnobFrameSupport) {
-    customTps.push_back(encodeIntegerParameter(TpId::knob_frames_supported, 1));
+    auto knobFrameResult =
+        encodeIntegerParameter(TpId::knob_frames_supported, 1);
+    if (!knobFrameResult.hasError()) {
+      customTps.push_back(knobFrameResult.value());
+    }
   }
 
   if (ts.advertisedReliableResetStreamSupport) {
@@ -136,8 +160,11 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   }
 
   if (ts.advertisedExtendedAckFeatures) {
-    customTps.push_back(encodeIntegerParameter(
-        TpId::extended_ack_features, ts.advertisedExtendedAckFeatures));
+    auto extendedAckResult = encodeIntegerParameter(
+        TpId::extended_ack_features, ts.advertisedExtendedAckFeatures);
+    if (!extendedAckResult.hasError()) {
+      customTps.push_back(extendedAckResult.value());
+    }
   }
 
   return customTps;

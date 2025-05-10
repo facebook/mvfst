@@ -63,10 +63,10 @@ TEST_F(QuicExtensionsTest, TestClientParamsV1) {
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
+  auto intParamResult = getIntegerParameter(
+      TransportParameterId::initial_max_data, ext->parameters);
+  EXPECT_FALSE(intParamResult.hasError());
+  EXPECT_EQ(*intParamResult.value(), 494878333ULL);
   checkEncode(std::move(*ext), clientParamsV1, QuicVersion::QUIC_V1);
 
   // Confirm D29 parameters are not parsed for V1.
@@ -81,10 +81,10 @@ TEST_F(QuicExtensionsTest, TestClientParamsD29) {
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
+  auto intParamResult = getIntegerParameter(
+      TransportParameterId::initial_max_data, ext->parameters);
+  EXPECT_FALSE(intParamResult.hasError());
+  EXPECT_EQ(*intParamResult.value(), 494878333ULL);
   checkEncode(std::move(*ext), clientParamsD29, kQuicDraft);
 }
 
@@ -97,17 +97,17 @@ TEST_F(QuicExtensionsTest, TestServerParamsV1) {
       TransportParameterId::original_destination_connection_id);
   EXPECT_EQ(
       ext->parameters[1].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
+  auto intParamResult = getIntegerParameter(
+      TransportParameterId::initial_max_data, ext->parameters);
+  EXPECT_FALSE(intParamResult.hasError());
+  EXPECT_EQ(*intParamResult.value(), 494878333ULL);
   ConnectionId connId = ConnectionId::createAndMaybeCrash(
       {'\x12', '\x12', '\x54', '\x76', '\x12', '\x56', '\x14', '\x69'});
-  EXPECT_EQ(
-      *getConnIdParameter(
-          TransportParameterId::original_destination_connection_id,
-          ext->parameters),
-      connId);
+  auto connIdParamResult = getConnIdParameter(
+      TransportParameterId::original_destination_connection_id,
+      ext->parameters);
+  EXPECT_FALSE(connIdParamResult.hasError());
+  EXPECT_EQ(*connIdParamResult.value(), connId);
   checkEncode(std::move(*ext), serverParamsV1, QuicVersion::QUIC_V1);
 
   // Confirm D29 parameters are not parsed for V1.
@@ -125,17 +125,17 @@ TEST_F(QuicExtensionsTest, TestServerParamsD29) {
       TransportParameterId::original_destination_connection_id);
   EXPECT_EQ(
       ext->parameters[1].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
+  auto intParamResult = getIntegerParameter(
+      TransportParameterId::initial_max_data, ext->parameters);
+  EXPECT_FALSE(intParamResult.hasError());
+  EXPECT_EQ(*intParamResult.value(), 494878333ULL);
   ConnectionId connId = ConnectionId::createAndMaybeCrash(
       {'\x12', '\x12', '\x54', '\x76', '\x12', '\x56', '\x14', '\x69'});
-  EXPECT_EQ(
-      *getConnIdParameter(
-          TransportParameterId::original_destination_connection_id,
-          ext->parameters),
-      connId);
+  auto connIdParamResult = getConnIdParameter(
+      TransportParameterId::original_destination_connection_id,
+      ext->parameters);
+  EXPECT_FALSE(connIdParamResult.hasError());
+  EXPECT_EQ(*connIdParamResult.value(), connId);
   checkEncode(std::move(*ext), serverParamsD29, kQuicDraft);
 }
 
@@ -146,10 +146,10 @@ TEST_F(QuicExtensionsTest, TestTicketParamsV1) {
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
+  auto intParamResult = getIntegerParameter(
+      TransportParameterId::initial_max_data, ext->parameters);
+  EXPECT_FALSE(intParamResult.hasError());
+  EXPECT_EQ(*intParamResult.value(), 494878333ULL);
   checkEncode(std::move(*ext), ticketParamsV1, QuicVersion::QUIC_V1);
 
   // Confirm D29 parameters are not parsed for V1.
@@ -165,10 +165,10 @@ TEST_F(QuicExtensionsTest, TestTicketParamsD29) {
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
+  auto intParamResult = getIntegerParameter(
+      TransportParameterId::initial_max_data, ext->parameters);
+  EXPECT_FALSE(intParamResult.hasError());
+  EXPECT_EQ(*intParamResult.value(), 494878333ULL);
   checkEncode(std::move(*ext), ticketParamsD29, kQuicDraft);
 }
 

@@ -22,8 +22,13 @@ folly::Expected<folly::Unit, QuicError> ClientHandshake::connect(
     std::shared_ptr<ClientTransportParametersExtension> transportParams) {
   transportParams_ = std::move(transportParams);
 
+  auto cachedServerTransportParamsResult = connectImpl(std::move(hostname));
+  if (cachedServerTransportParamsResult.hasError()) {
+    return folly::makeUnexpected(cachedServerTransportParamsResult.error());
+  }
+
   Optional<CachedServerTransportParameters> cachedServerTransportParams =
-      connectImpl(std::move(hostname));
+      std::move(cachedServerTransportParamsResult.value());
 
   if (error_.hasError()) {
     return error_;

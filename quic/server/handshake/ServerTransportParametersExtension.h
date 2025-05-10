@@ -74,28 +74,90 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           TransportParameterId::original_destination_connection_id,
           originalDestinationCid_));
     }
-    params.parameters.push_back(encodeIntegerParameter(
+
+    auto bidiLocalResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
-        initialMaxStreamDataBidiLocal_));
-    params.parameters.push_back(encodeIntegerParameter(
+        initialMaxStreamDataBidiLocal_);
+    if (bidiLocalResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode initial_max_stream_data_bidi_local",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(bidiLocalResult.value()));
+
+    auto bidiRemoteResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_remote,
-        initialMaxStreamDataBidiRemote_));
-    params.parameters.push_back(encodeIntegerParameter(
+        initialMaxStreamDataBidiRemote_);
+    if (bidiRemoteResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode initial_max_stream_data_bidi_remote",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(bidiRemoteResult.value()));
+
+    auto uniResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_uni,
-        initialMaxStreamDataUni_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_data, initialMaxData_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_bidi,
-        initialMaxStreamsBidi_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_uni, initialMaxStreamsUni_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::idle_timeout, idleTimeout_.count()));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::ack_delay_exponent, ackDelayExponent_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::max_packet_size, maxRecvPacketSize_));
+        initialMaxStreamDataUni_);
+    if (uniResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode initial_max_stream_data_uni",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(uniResult.value()));
+
+    auto maxDataResult = encodeIntegerParameter(
+        TransportParameterId::initial_max_data, initialMaxData_);
+    if (maxDataResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode initial_max_data",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(maxDataResult.value()));
+
+    auto streamsBidiResult = encodeIntegerParameter(
+        TransportParameterId::initial_max_streams_bidi, initialMaxStreamsBidi_);
+    if (streamsBidiResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode initial_max_streams_bidi",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(streamsBidiResult.value()));
+
+    auto streamsUniResult = encodeIntegerParameter(
+        TransportParameterId::initial_max_streams_uni, initialMaxStreamsUni_);
+    if (streamsUniResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode initial_max_streams_uni",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(streamsUniResult.value()));
+
+    auto idleTimeoutResult = encodeIntegerParameter(
+        TransportParameterId::idle_timeout, idleTimeout_.count());
+    if (idleTimeoutResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode idle_timeout",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(idleTimeoutResult.value()));
+
+    auto ackDelayResult = encodeIntegerParameter(
+        TransportParameterId::ack_delay_exponent, ackDelayExponent_);
+    if (ackDelayResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode ack_delay_exponent",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(ackDelayResult.value()));
+
+    auto maxPacketSizeResult = encodeIntegerParameter(
+        TransportParameterId::max_packet_size, maxRecvPacketSize_);
+    if (maxPacketSizeResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode max_packet_size",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(maxPacketSizeResult.value()));
 
     // stateless reset token
     params.parameters.push_back(TransportParameter(

@@ -825,9 +825,17 @@ QuicClientTransportLite::processUdpPacketData(
         auto maxStreamsBidi = getIntegerParameter(
             TransportParameterId::initial_max_streams_bidi,
             serverParams->parameters);
+        if (maxStreamsBidi.hasError()) {
+          return folly::makeUnexpected(maxStreamsBidi.error());
+        }
+
         auto maxStreamsUni = getIntegerParameter(
             TransportParameterId::initial_max_streams_uni,
             serverParams->parameters);
+        if (maxStreamsUni.hasError()) {
+          return folly::makeUnexpected(maxStreamsUni.error());
+        }
+
         auto processResult = processServerInitialParams(
             *clientConn_, serverParams.value(), packetNum);
         if (processResult.hasError()) {
@@ -842,8 +850,8 @@ QuicClientTransportLite::processUdpPacketData(
             conn_->flowControlState
                 .peerAdvertisedInitialMaxStreamOffsetBidiRemote,
             conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
-            maxStreamsBidi.value_or(0),
-            maxStreamsUni.value_or(0),
+            maxStreamsBidi.value().value_or(0),
+            maxStreamsUni.value().value_or(0),
             conn_->peerAdvertisedKnobFrameSupport,
             conn_->maybePeerAckReceiveTimestampsConfig.has_value(),
             conn_->maybePeerAckReceiveTimestampsConfig
@@ -891,19 +899,24 @@ QuicClientTransportLite::processUdpPacketData(
           !*clientConn_->zeroRttRejected) {
         auto updatedPacketSize = getIntegerParameter(
             TransportParameterId::max_packet_size, serverParams->parameters);
-        updatedPacketSize = std::max<uint64_t>(
-            updatedPacketSize.value_or(kDefaultUDPSendPacketLen),
-            kDefaultUDPSendPacketLen);
-        updatedPacketSize =
-            std::min<uint64_t>(*updatedPacketSize, kDefaultMaxUDPPayload);
-        conn_->udpSendPacketLen = *updatedPacketSize;
+        uint64_t newPacketSize = updatedPacketSize.hasError()
+            ? kDefaultUDPSendPacketLen
+            : updatedPacketSize.value().value_or(kDefaultUDPSendPacketLen);
+        newPacketSize =
+            std::max<uint64_t>(newPacketSize, kDefaultUDPSendPacketLen);
+        newPacketSize =
+            std::min<uint64_t>(newPacketSize, kDefaultMaxUDPPayload);
+        conn_->udpSendPacketLen = newPacketSize;
       }
 
       // TODO this is another bandaid. Explicitly set the stateless reset token
       // or else conns that use 0-RTT won't be able to parse stateless resets.
       if (!clientConn_->statelessResetToken) {
-        clientConn_->statelessResetToken =
+        auto statelessResetTokenResult =
             getStatelessResetTokenParameter(serverParams->parameters);
+        if (!statelessResetTokenResult.hasError()) {
+          clientConn_->statelessResetToken = statelessResetTokenResult.value();
+        }
       }
       if (clientConn_->statelessResetToken) {
         conn_->readCodec->setStatelessResetToken(

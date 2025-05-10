@@ -36,7 +36,7 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   conn.statsCallback = quicStats.get();
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -46,6 +46,8 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -68,7 +70,7 @@ TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
   conn.statsCallback = quicStats.get();
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -78,8 +80,12 @@ TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures);
-  appToken.transportParams.parameters.push_back(
-      encodeIntegerParameter(TransportParameterId::disable_migration, 1));
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
+  auto disableMigrationResult =
+      encodeIntegerParameter(TransportParameterId::disable_migration, 1);
+  ASSERT_FALSE(disableMigrationResult.hasError());
+  appToken.transportParams.parameters.push_back(disableMigrationResult.value());
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -106,7 +112,7 @@ TEST(
   auto initialMaxData =
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow;
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       initialMaxData - 1,
@@ -116,6 +122,8 @@ TEST(
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -183,23 +191,37 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
 
   AppToken appToken;
   auto& params = appToken.transportParams;
-  params.parameters.push_back(encodeIntegerParameter(
+
+  auto bidiLocalResult = encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,
-      conn.transportSettings
-          .advertisedInitialBidiLocalStreamFlowControlWindow));
-  params.parameters.push_back(encodeIntegerParameter(
+      conn.transportSettings.advertisedInitialBidiLocalStreamFlowControlWindow);
+  ASSERT_FALSE(bidiLocalResult.hasError());
+  params.parameters.push_back(bidiLocalResult.value());
+
+  auto bidiRemoteResult = encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_remote,
       conn.transportSettings
-          .advertisedInitialBidiRemoteStreamFlowControlWindow));
-  params.parameters.push_back(encodeIntegerParameter(
+          .advertisedInitialBidiRemoteStreamFlowControlWindow);
+  ASSERT_FALSE(bidiRemoteResult.hasError());
+  params.parameters.push_back(bidiRemoteResult.value());
+
+  auto uniResult = encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_uni,
-      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow));
-  params.parameters.push_back(encodeIntegerParameter(
+      conn.transportSettings.advertisedInitialUniStreamFlowControlWindow);
+  ASSERT_FALSE(uniResult.hasError());
+  params.parameters.push_back(uniResult.value());
+
+  auto ackDelayResult = encodeIntegerParameter(
       TransportParameterId::ack_delay_exponent,
-      conn.transportSettings.ackDelayExponent));
-  params.parameters.push_back(encodeIntegerParameter(
+      conn.transportSettings.ackDelayExponent);
+  ASSERT_FALSE(ackDelayResult.hasError());
+  params.parameters.push_back(ackDelayResult.value());
+
+  auto maxPacketSizeResult = encodeIntegerParameter(
       TransportParameterId::max_packet_size,
-      conn.transportSettings.maxRecvPacketSize));
+      conn.transportSettings.maxRecvPacketSize);
+  ASSERT_FALSE(maxPacketSizeResult.hasError());
+  params.parameters.push_back(maxPacketSizeResult.value());
   appToken.sourceAddresses = {conn.peerAddress.getIPAddress()};
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
@@ -264,7 +286,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   conn.statsCallback = quicStats.get();
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -277,6 +299,8 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {conn.peerAddress.getIPAddress()};
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
@@ -299,7 +323,7 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   conn.statsCallback = quicStats.get();
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count() + 100,
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -309,6 +333,8 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {conn.peerAddress.getIPAddress()};
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
@@ -333,7 +359,7 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   conn.statsCallback = quicStats.get();
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -343,6 +369,8 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi + 1,
       conn.transportSettings.advertisedInitialMaxStreamsUni + 1,
       conn.transportSettings.advertisedExtendedAckFeatures);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {conn.peerAddress.getIPAddress()};
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
@@ -367,7 +395,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidExtendedAckSupportChanged) {
   conn.statsCallback = quicStats.get();
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -377,6 +405,8 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidExtendedAckSupportChanged) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures + 1);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {conn.peerAddress.getIPAddress()};
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
@@ -402,7 +432,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   MockConnectionCallback connCallback;
 
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -412,6 +442,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni,
       conn.transportSettings.advertisedExtendedAckFeatures);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
+  auto idleTimeoutResult =
+      encodeIntegerParameter(TransportParameterId::idle_timeout, 100);
+  ASSERT_FALSE(idleTimeoutResult.hasError());
+  appToken.transportParams.parameters.push_back(idleTimeoutResult.value());
   appToken.sourceAddresses = {conn.peerAddress.getIPAddress()};
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
@@ -431,7 +467,7 @@ class SourceAddressTokenTest : public Test {
     conn_.peerAddress = folly::SocketAddress("1.2.3.4", 443);
     conn_.version = QuicVersion::MVFST;
 
-    appToken_.transportParams = createTicketTransportParameters(
+    auto transportParamsResult = createTicketTransportParameters(
         conn_.transportSettings.idleTimeout.count(),
         conn_.transportSettings.maxRecvPacketSize,
         conn_.transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -443,6 +479,8 @@ class SourceAddressTokenTest : public Test {
         conn_.transportSettings.advertisedInitialMaxStreamsBidi,
         conn_.transportSettings.advertisedInitialMaxStreamsUni,
         conn_.transportSettings.advertisedExtendedAckFeatures);
+    ASSERT_FALSE(transportParamsResult.hasError());
+    appToken_.transportParams = std::move(transportParamsResult.value());
   }
 
   void encodeAndValidate(bool acceptZeroRtt = true) {

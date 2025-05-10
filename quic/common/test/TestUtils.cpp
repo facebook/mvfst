@@ -177,7 +177,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     resState.ticketIssueTime = std::chrono::system_clock::time_point();
     resState.handshakeTime = std::chrono::system_clock::time_point();
     AppToken appToken;
-    appToken.transportParams = createTicketTransportParameters(
+    auto transportParamsResult = createTicketTransportParameters(
         kDefaultIdleTimeout.count(),
         kDefaultUDPReadBufferSize,
         kDefaultConnectionFlowControlWindow,
@@ -187,6 +187,9 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
         kDefaultMaxStreamsBidirectional,
         kDefaultMaxStreamsUnidirectional,
         0 /*extendedAckSupport*/);
+    CHECK(!transportParamsResult.hasError())
+        << "Failed to create ticket transport parameters";
+    appToken.transportParams = std::move(transportParamsResult.value());
     appToken.version = QuicVersion::MVFST;
     resState.appToken = encodeAppToken(appToken);
     return resState;

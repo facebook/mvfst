@@ -25,8 +25,10 @@ static ClientHello getClientHello(QuicVersion version) {
   auto chlo = TestMessages::clientHello();
 
   ClientTransportParameters clientParams;
-  clientParams.parameters.emplace_back(encodeIntegerParameter(
-      static_cast<TransportParameterId>(0xffff), 0xffff));
+  auto paramResult =
+      encodeIntegerParameter(static_cast<TransportParameterId>(0xffff), 0xffff);
+  CHECK(!paramResult.hasError()) << "Failed to encode integer parameter";
+  clientParams.parameters.emplace_back(std::move(paramResult.value()));
 
   chlo.extensions.push_back(encodeExtension(clientParams, version));
 
@@ -120,8 +122,10 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
 
   auto chlo = getClientHello(QuicVersion::QUIC_V1);
   ClientTransportParameters duplicateClientParams;
-  duplicateClientParams.parameters.emplace_back(encodeIntegerParameter(
-      static_cast<TransportParameterId>(0xffff), 0xffff));
+  auto paramResult =
+      encodeIntegerParameter(static_cast<TransportParameterId>(0xffff), 0xffff);
+  CHECK(!paramResult.hasError()) << "Failed to encode integer parameter";
+  duplicateClientParams.parameters.emplace_back(std::move(paramResult.value()));
   chlo.extensions.push_back(
       encodeExtension(duplicateClientParams, QuicVersion::QUIC_V1));
 

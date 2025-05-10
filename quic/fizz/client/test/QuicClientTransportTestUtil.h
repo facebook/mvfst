@@ -169,8 +169,8 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
             std::move(fizzContext),
             std::make_unique<FizzCryptoFactory>()) {}
 
-  Optional<CachedServerTransportParameters> connectImpl(
-      Optional<std::string> hostname) override {
+  folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
+  connectImpl(Optional<std::string> hostname) override {
     // Look up psk
     auto quicCachedPsk = getPsk(hostname);
 
@@ -194,32 +194,56 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   }
 
   void createServerTransportParameters() {
-    TransportParameter maxStreamDataBidiLocal = encodeIntegerParameter(
+    auto maxStreamDataBidiLocalResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
         maxInitialStreamData);
-    TransportParameter maxStreamDataBidiRemote = encodeIntegerParameter(
+    CHECK(!maxStreamDataBidiLocalResult.hasError())
+        << "Failed to encode initial_max_stream_data_bidi_local";
+
+    auto maxStreamDataBidiRemoteResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_remote,
         maxInitialStreamData);
-    TransportParameter maxStreamDataUni = encodeIntegerParameter(
+    CHECK(!maxStreamDataBidiRemoteResult.hasError())
+        << "Failed to encode initial_max_stream_data_bidi_remote";
+
+    auto maxStreamDataUniResult = encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_uni,
         maxInitialStreamData);
-    TransportParameter maxStreamsBidi = encodeIntegerParameter(
+    CHECK(!maxStreamDataUniResult.hasError())
+        << "Failed to encode initial_max_stream_data_uni";
+
+    auto maxStreamsBidiResult = encodeIntegerParameter(
         TransportParameterId::initial_max_streams_bidi, maxInitialStreamsBidi);
-    TransportParameter maxStreamsUni = encodeIntegerParameter(
+    CHECK(!maxStreamsBidiResult.hasError())
+        << "Failed to encode initial_max_streams_bidi";
+
+    auto maxStreamsUniResult = encodeIntegerParameter(
         TransportParameterId::initial_max_streams_uni, maxInitialStreamsUni);
-    TransportParameter maxData = encodeIntegerParameter(
+    CHECK(!maxStreamsUniResult.hasError())
+        << "Failed to encode initial_max_streams_uni";
+
+    auto maxDataResult = encodeIntegerParameter(
         TransportParameterId::initial_max_data, connWindowSize);
+    CHECK(!maxDataResult.hasError()) << "Failed to encode initial_max_data";
+
     std::vector<TransportParameter> parameters;
-    parameters.push_back(std::move(maxStreamDataBidiLocal));
-    parameters.push_back(std::move(maxStreamDataBidiRemote));
-    parameters.push_back(std::move(maxStreamDataUni));
-    parameters.push_back(std::move(maxStreamsBidi));
-    parameters.push_back(std::move(maxStreamsUni));
-    parameters.push_back(std::move(maxData));
-    parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::idle_timeout, kDefaultIdleTimeout.count()));
-    parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::max_packet_size, maxRecvPacketSize));
+    parameters.push_back(std::move(maxStreamDataBidiLocalResult.value()));
+    parameters.push_back(std::move(maxStreamDataBidiRemoteResult.value()));
+    parameters.push_back(std::move(maxStreamDataUniResult.value()));
+    parameters.push_back(std::move(maxStreamsBidiResult.value()));
+    parameters.push_back(std::move(maxStreamsUniResult.value()));
+    parameters.push_back(std::move(maxDataResult.value()));
+
+    auto idleTimeoutResult = encodeIntegerParameter(
+        TransportParameterId::idle_timeout, kDefaultIdleTimeout.count());
+    CHECK(!idleTimeoutResult.hasError()) << "Failed to encode idle_timeout";
+    parameters.push_back(std::move(idleTimeoutResult.value()));
+
+    auto maxPacketSizeResult = encodeIntegerParameter(
+        TransportParameterId::max_packet_size, maxRecvPacketSize);
+    CHECK(!maxPacketSizeResult.hasError())
+        << "Failed to encode max_packet_size";
+    parameters.push_back(std::move(maxPacketSizeResult.value()));
     ServerTransportParameters params;
     StatelessResetToken testStatelessResetToken = generateStatelessResetToken();
     TransportParameter statelessReset;

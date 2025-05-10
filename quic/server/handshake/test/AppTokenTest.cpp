@@ -31,59 +31,94 @@ void expectAppTokenEqual(
       decodedAppToken->transportParams.parameters.size(),
       kMinimumNumOfParamsInTheTicket);
   // TODO Split out into individual flow control parameters.
-  auto maxStreamData = getIntegerParameter(
+  auto maxStreamDataResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,
       decodedAppToken->transportParams.parameters);
-  auto expectedMaxStreamData = getIntegerParameter(
+  EXPECT_FALSE(maxStreamDataResult.hasError());
+  auto maxStreamData = maxStreamDataResult.value();
+
+  auto expectedMaxStreamDataResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,
       appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedMaxStreamDataResult.hasError());
+  auto expectedMaxStreamData = expectedMaxStreamDataResult.value();
   EXPECT_EQ(maxStreamData, expectedMaxStreamData);
 
-  auto maxData = getIntegerParameter(
+  auto maxDataResult = getIntegerParameter(
       TransportParameterId::initial_max_data,
       decodedAppToken->transportParams.parameters);
-  auto expectedMaxData = getIntegerParameter(
+  EXPECT_FALSE(maxDataResult.hasError());
+  auto maxData = maxDataResult.value();
+
+  auto expectedMaxDataResult = getIntegerParameter(
       TransportParameterId::initial_max_data,
       appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedMaxDataResult.hasError());
+  auto expectedMaxData = expectedMaxDataResult.value();
   EXPECT_EQ(maxData, expectedMaxData);
 
-  auto idleTimeout = getIntegerParameter(
+  auto idleTimeoutResult = getIntegerParameter(
       TransportParameterId::idle_timeout,
       decodedAppToken->transportParams.parameters);
-  auto expectedIdleTimeout = getIntegerParameter(
+  EXPECT_FALSE(idleTimeoutResult.hasError());
+  auto idleTimeout = idleTimeoutResult.value();
+
+  auto expectedIdleTimeoutResult = getIntegerParameter(
       TransportParameterId::idle_timeout, appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedIdleTimeoutResult.hasError());
+  auto expectedIdleTimeout = expectedIdleTimeoutResult.value();
   EXPECT_EQ(idleTimeout, expectedIdleTimeout);
 
-  auto maxRecvPacketSize = getIntegerParameter(
+  auto maxRecvPacketSizeResult = getIntegerParameter(
       TransportParameterId::max_packet_size,
       decodedAppToken->transportParams.parameters);
-  auto expectedMaxRecvPacketSize = getIntegerParameter(
+  EXPECT_FALSE(maxRecvPacketSizeResult.hasError());
+  auto maxRecvPacketSize = maxRecvPacketSizeResult.value();
+
+  auto expectedMaxRecvPacketSizeResult = getIntegerParameter(
       TransportParameterId::max_packet_size,
       appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedMaxRecvPacketSizeResult.hasError());
+  auto expectedMaxRecvPacketSize = expectedMaxRecvPacketSizeResult.value();
   EXPECT_EQ(maxRecvPacketSize, expectedMaxRecvPacketSize);
 
-  auto ackDelayExponent = getIntegerParameter(
+  auto ackDelayExponentResult = getIntegerParameter(
       TransportParameterId::ack_delay_exponent,
       decodedAppToken->transportParams.parameters);
-  auto expectedAckDelayExponent = getIntegerParameter(
+  EXPECT_FALSE(ackDelayExponentResult.hasError());
+  auto ackDelayExponent = ackDelayExponentResult.value();
+
+  auto expectedAckDelayExponentResult = getIntegerParameter(
       TransportParameterId::ack_delay_exponent,
       appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedAckDelayExponentResult.hasError());
+  auto expectedAckDelayExponent = expectedAckDelayExponentResult.value();
   EXPECT_EQ(ackDelayExponent, expectedAckDelayExponent);
 
-  auto cwndHintBytes = getIntegerParameter(
+  auto cwndHintBytesResult = getIntegerParameter(
       TransportParameterId::cwnd_hint_bytes,
       decodedAppToken->transportParams.parameters);
-  auto expectedCwndHintBytes = getIntegerParameter(
+  EXPECT_FALSE(cwndHintBytesResult.hasError());
+  auto cwndHintBytes = cwndHintBytesResult.value();
+
+  auto expectedCwndHintBytesResult = getIntegerParameter(
       TransportParameterId::cwnd_hint_bytes,
       appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedCwndHintBytesResult.hasError());
+  auto expectedCwndHintBytes = expectedCwndHintBytesResult.value();
   EXPECT_EQ(cwndHintBytes, expectedCwndHintBytes);
 
-  auto extendedAckSupport = getIntegerParameter(
+  auto extendedAckSupportResult = getIntegerParameter(
       TransportParameterId::extended_ack_features,
       decodedAppToken->transportParams.parameters);
-  auto expectedExtendedAckSupport = getIntegerParameter(
+  EXPECT_FALSE(extendedAckSupportResult.hasError());
+  auto extendedAckSupport = extendedAckSupportResult.value();
+
+  auto expectedExtendedAckSupportResult = getIntegerParameter(
       TransportParameterId::extended_ack_features,
       appToken.transportParams.parameters);
+  EXPECT_FALSE(expectedExtendedAckSupportResult.hasError());
+  auto expectedExtendedAckSupport = expectedExtendedAckSupportResult.value();
   EXPECT_EQ(extendedAckSupport, expectedExtendedAckSupport);
 
   EXPECT_EQ(
@@ -104,7 +139,7 @@ void expectAppTokenEqual(
 
 TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -114,6 +149,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.version = QuicVersion::MVFST;
   BufPtr buf = encodeAppToken(appToken);
 
@@ -122,7 +159,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -132,6 +169,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0")};
   appToken.version = QuicVersion::MVFST;
@@ -142,7 +181,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -152,6 +191,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("2401:db00:2111:7283:face::46:1"),
@@ -164,7 +205,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -174,6 +215,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {folly::IPAddress("1.2.3.4")};
   appToken.version = QuicVersion::MVFST;
   BufPtr buf = encodeAppToken(appToken);
@@ -183,7 +226,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -193,6 +236,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("1.2.3.5"),
@@ -205,7 +250,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -215,6 +260,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),
@@ -227,7 +274,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -237,6 +284,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
   appToken.version = QuicVersion::MVFST;
   BufPtr buf = encodeAppToken(appToken);
@@ -246,7 +295,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -256,6 +305,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max(),
       2 /* extendedAckSupport */);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),
@@ -269,7 +320,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
 
 TEST(AppTokenTest, TestEncodeAndDecodeCwndHint) {
   AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
+  auto transportParamsResult = createTicketTransportParameters(
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionFlowControlWindow,
@@ -279,6 +330,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeCwndHint) {
       std::numeric_limits<uint32_t>::max() - 8,
       std::numeric_limits<uint32_t>::max() - 9,
       std::numeric_limits<uint32_t>::max() - 10);
+  ASSERT_FALSE(transportParamsResult.hasError());
+  appToken.transportParams = std::move(transportParamsResult.value());
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
   appToken.version = QuicVersion::MVFST;

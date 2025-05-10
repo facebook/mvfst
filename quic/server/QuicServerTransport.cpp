@@ -598,7 +598,7 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
       newSessionTicketWrittenCwndHint_ = cwndHint;
     }
     AppToken appToken;
-    appToken.transportParams = createTicketTransportParameters(
+    auto transportParamsResult = createTicketTransportParameters(
         conn_->transportSettings.idleTimeout.count(),
         conn_->transportSettings.maxRecvPacketSize,
         conn_->transportSettings.advertisedInitialConnectionFlowControlWindow,
@@ -611,6 +611,10 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
         conn_->transportSettings.advertisedInitialMaxStreamsUni,
         conn_->transportSettings.advertisedExtendedAckFeatures,
         cwndHint);
+    if (transportParamsResult.hasError()) {
+      return folly::makeUnexpected(transportParamsResult.error());
+    }
+    appToken.transportParams = std::move(transportParamsResult.value());
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
     appToken.version = conn_->version.value();
     // If a client connects to server for the first time and doesn't attempt

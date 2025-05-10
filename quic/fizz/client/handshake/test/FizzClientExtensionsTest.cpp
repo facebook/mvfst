@@ -177,8 +177,10 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
 
   std::string randomBytes = "\x01\x00\x55\x12\xff";
 
-  customTransportParameters.push_back(
-      encodeIntegerParameter(static_cast<TransportParameterId>(0x4000), 12));
+  auto paramResult =
+      encodeIntegerParameter(static_cast<TransportParameterId>(0x4000), 12);
+  ASSERT_FALSE(paramResult.hasError()) << "Failed to encode custom parameter";
+  customTransportParameters.push_back(std::move(paramResult.value()));
 
   FizzClientExtensions ext(
       std::make_shared<ClientTransportParametersExtension>(

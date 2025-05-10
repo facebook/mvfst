@@ -28,7 +28,14 @@ class FizzClientExtensions : public fizz::ClientExtensions {
     std::vector<fizz::Extension> exts;
 
     ClientTransportParameters params;
-    params.parameters = clientParameters_->getChloTransportParameters();
+    auto paramsResult = clientParameters_->getChloTransportParameters();
+    if (paramsResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to get client transport parameters: " +
+              paramsResult.error().message,
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters = std::move(paramsResult.value());
 
     exts.push_back(
         encodeExtension(params, clientParameters_->encodingVersion_));

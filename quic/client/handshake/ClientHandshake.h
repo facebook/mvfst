@@ -185,8 +185,8 @@ class ClientHandshake : public Handshake {
   Optional<bool> canResendZeroRtt_;
 
  private:
-  virtual Optional<CachedServerTransportParameters> connectImpl(
-      Optional<std::string> hostname) = 0;
+  virtual folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
+  connectImpl(Optional<std::string> hostname) = 0;
 
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual bool matchEarlyParameters() = 0;

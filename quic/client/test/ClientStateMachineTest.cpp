@@ -183,9 +183,11 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(encodeIntegerParameter(
+  auto paramResult = encodeIntegerParameter(
       TransportParameterId::max_datagram_frame_size,
-      kMaxDatagramPacketOverhead - 1));
+      kMaxDatagramPacketOverhead - 1);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
 
@@ -199,8 +201,10 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(
-      encodeIntegerParameter(TransportParameterId::max_datagram_frame_size, 0));
+  auto paramResult =
+      encodeIntegerParameter(TransportParameterId::max_datagram_frame_size, 0);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
@@ -212,9 +216,11 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(encodeIntegerParameter(
+  auto paramResult = encodeIntegerParameter(
       TransportParameterId::max_datagram_frame_size,
-      kMaxDatagramPacketOverhead + 1));
+      kMaxDatagramPacketOverhead + 1);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
@@ -228,8 +234,10 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(
-      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 1));
+  auto paramResult =
+      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 1);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
@@ -241,8 +249,10 @@ TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamDisabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(
-      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 0));
+  auto paramResult =
+      encodeIntegerParameter(TransportParameterId::knob_frames_supported, 0);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
@@ -254,8 +264,10 @@ TEST_F(ClientStateMachineTest, TestProcessExtendedAckSupportedParam) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(
-      encodeIntegerParameter(TransportParameterId::extended_ack_features, 3));
+  auto paramResult =
+      encodeIntegerParameter(TransportParameterId::extended_ack_features, 3);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
@@ -306,8 +318,10 @@ TEST_F(ClientStateMachineTest, TestProcessReliableStreamResetNonEmptyParam) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
   std::vector<TransportParameter> transportParams;
-  transportParams.push_back(
-      encodeIntegerParameter(TransportParameterId::reliable_stream_reset, 0));
+  auto paramResult =
+      encodeIntegerParameter(TransportParameterId::reliable_stream_reset, 0);
+  ASSERT_FALSE(paramResult.hasError());
+  transportParams.push_back(std::move(paramResult.value()));
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};
   auto result =
@@ -365,9 +379,11 @@ TEST_P(
   std::vector<TransportParameter> transportParams;
 
   if (GetParam().peerMaxGroupsIn > 0) {
-    transportParams.push_back(encodeIntegerParameter(
+    auto paramResult = encodeIntegerParameter(
         TransportParameterId::stream_groups_enabled,
-        GetParam().peerMaxGroupsIn));
+        GetParam().peerMaxGroupsIn);
+    ASSERT_FALSE(paramResult.hasError());
+    transportParams.push_back(std::move(paramResult.value()));
   }
   ServerTransportParameters serverTransportParams = {
       std::move(transportParams)};

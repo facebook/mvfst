@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/Expected.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/Types.h>
@@ -129,18 +130,19 @@ inline auto findParameter(
   });
 }
 
-Optional<uint64_t> getIntegerParameter(
+folly::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
-Optional<ConnectionId> getConnIdParameter(
+folly::Expected<Optional<ConnectionId>, QuicError> getConnIdParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
-Optional<StatelessResetToken> getStatelessResetTokenParameter(
+folly::Expected<Optional<StatelessResetToken>, QuicError>
+getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters);
 
-TransportParameter encodeIntegerParameter(
+folly::Expected<TransportParameter, QuicError> encodeIntegerParameter(
     TransportParameterId id,
     uint64_t value);
 

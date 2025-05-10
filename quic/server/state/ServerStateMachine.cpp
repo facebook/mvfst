@@ -178,67 +178,176 @@ bool isZeroRttPacketFrameInvalid(const QuicFrame& quicFrame) {
 folly::Expected<folly::Unit, QuicError> processClientInitialParams(
     QuicServerConnectionState& conn,
     const ClientTransportParameters& clientParams) {
-  auto preferredAddress = getIntegerParameter(
+  auto preferredAddressResult = getIntegerParameter(
       TransportParameterId::preferred_address, clientParams.parameters);
-  auto origConnId = getIntegerParameter(
+  if (preferredAddressResult.hasError()) {
+    return folly::makeUnexpected(preferredAddressResult.error());
+  }
+  auto preferredAddress = preferredAddressResult.value();
+
+  auto origConnIdResult = getIntegerParameter(
       TransportParameterId::original_destination_connection_id,
       clientParams.parameters);
-  auto statelessResetToken = getIntegerParameter(
+  if (origConnIdResult.hasError()) {
+    return folly::makeUnexpected(origConnIdResult.error());
+  }
+  auto origConnId = origConnIdResult.value();
+
+  auto statelessResetTokenResult = getIntegerParameter(
       TransportParameterId::stateless_reset_token, clientParams.parameters);
-  auto retrySourceConnId = getIntegerParameter(
+  if (statelessResetTokenResult.hasError()) {
+    return folly::makeUnexpected(statelessResetTokenResult.error());
+  }
+  auto statelessResetToken = statelessResetTokenResult.value();
+
+  auto retrySourceConnIdResult = getIntegerParameter(
       TransportParameterId::retry_source_connection_id,
       clientParams.parameters);
+  if (retrySourceConnIdResult.hasError()) {
+    return folly::makeUnexpected(retrySourceConnIdResult.error());
+  }
+  auto retrySourceConnId = retrySourceConnIdResult.value();
 
-  auto maxData = getIntegerParameter(
+  auto maxDataResult = getIntegerParameter(
       TransportParameterId::initial_max_data, clientParams.parameters);
-  auto maxStreamDataBidiLocal = getIntegerParameter(
+  if (maxDataResult.hasError()) {
+    return folly::makeUnexpected(maxDataResult.error());
+  }
+  auto maxData = maxDataResult.value();
+
+  auto maxStreamDataBidiLocalResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,
       clientParams.parameters);
-  auto maxStreamDataBidiRemote = getIntegerParameter(
+  if (maxStreamDataBidiLocalResult.hasError()) {
+    return folly::makeUnexpected(maxStreamDataBidiLocalResult.error());
+  }
+  auto maxStreamDataBidiLocal = maxStreamDataBidiLocalResult.value();
+
+  auto maxStreamDataBidiRemoteResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_remote,
       clientParams.parameters);
-  auto maxStreamDataUni = getIntegerParameter(
+  if (maxStreamDataBidiRemoteResult.hasError()) {
+    return folly::makeUnexpected(maxStreamDataBidiRemoteResult.error());
+  }
+  auto maxStreamDataBidiRemote = maxStreamDataBidiRemoteResult.value();
+
+  auto maxStreamDataUniResult = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_uni,
       clientParams.parameters);
-  auto maxStreamsBidi = getIntegerParameter(
+  if (maxStreamDataUniResult.hasError()) {
+    return folly::makeUnexpected(maxStreamDataUniResult.error());
+  }
+  auto maxStreamDataUni = maxStreamDataUniResult.value();
+
+  auto maxStreamsBidiResult = getIntegerParameter(
       TransportParameterId::initial_max_streams_bidi, clientParams.parameters);
-  auto maxStreamsUni = getIntegerParameter(
+  if (maxStreamsBidiResult.hasError()) {
+    return folly::makeUnexpected(maxStreamsBidiResult.error());
+  }
+  auto maxStreamsBidi = maxStreamsBidiResult.value();
+
+  auto maxStreamsUniResult = getIntegerParameter(
       TransportParameterId::initial_max_streams_uni, clientParams.parameters);
-  auto idleTimeout = getIntegerParameter(
+  if (maxStreamsUniResult.hasError()) {
+    return folly::makeUnexpected(maxStreamsUniResult.error());
+  }
+  auto maxStreamsUni = maxStreamsUniResult.value();
+
+  auto idleTimeoutResult = getIntegerParameter(
       TransportParameterId::idle_timeout, clientParams.parameters);
-  auto ackDelayExponent = getIntegerParameter(
+  if (idleTimeoutResult.hasError()) {
+    return folly::makeUnexpected(idleTimeoutResult.error());
+  }
+  auto idleTimeout = idleTimeoutResult.value();
+
+  auto ackDelayExponentResult = getIntegerParameter(
       TransportParameterId::ack_delay_exponent, clientParams.parameters);
-  auto packetSize = getIntegerParameter(
+  if (ackDelayExponentResult.hasError()) {
+    return folly::makeUnexpected(ackDelayExponentResult.error());
+  }
+  auto ackDelayExponent = ackDelayExponentResult.value();
+
+  auto packetSizeResult = getIntegerParameter(
       TransportParameterId::max_packet_size, clientParams.parameters);
-  auto activeConnectionIdLimit = getIntegerParameter(
+  if (packetSizeResult.hasError()) {
+    return folly::makeUnexpected(packetSizeResult.error());
+  }
+  auto packetSize = packetSizeResult.value();
+
+  auto activeConnectionIdLimitResult = getIntegerParameter(
       TransportParameterId::active_connection_id_limit,
       clientParams.parameters);
-  auto minAckDelay = getIntegerParameter(
+  if (activeConnectionIdLimitResult.hasError()) {
+    return folly::makeUnexpected(activeConnectionIdLimitResult.error());
+  }
+  auto activeConnectionIdLimit = activeConnectionIdLimitResult.value();
+
+  auto minAckDelayResult = getIntegerParameter(
       TransportParameterId::min_ack_delay, clientParams.parameters);
-  auto maxAckDelay = getIntegerParameter(
+  if (minAckDelayResult.hasError()) {
+    return folly::makeUnexpected(minAckDelayResult.error());
+  }
+  auto minAckDelay = minAckDelayResult.value();
+
+  auto maxAckDelayResult = getIntegerParameter(
       TransportParameterId::max_ack_delay, clientParams.parameters);
-  auto maxDatagramFrameSize = getIntegerParameter(
+  if (maxAckDelayResult.hasError()) {
+    return folly::makeUnexpected(maxAckDelayResult.error());
+  }
+  auto maxAckDelay = maxAckDelayResult.value();
+
+  auto maxDatagramFrameSizeResult = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, clientParams.parameters);
-  auto peerAdvertisedMaxStreamGroups = getIntegerParameter(
+  if (maxDatagramFrameSizeResult.hasError()) {
+    return folly::makeUnexpected(maxDatagramFrameSizeResult.error());
+  }
+  auto maxDatagramFrameSize = maxDatagramFrameSizeResult.value();
+
+  auto peerAdvertisedMaxStreamGroupsResult = getIntegerParameter(
       static_cast<TransportParameterId>(
           TransportParameterId::stream_groups_enabled),
       clientParams.parameters);
+  if (peerAdvertisedMaxStreamGroupsResult.hasError()) {
+    return folly::makeUnexpected(peerAdvertisedMaxStreamGroupsResult.error());
+  }
+  auto peerAdvertisedMaxStreamGroups =
+      peerAdvertisedMaxStreamGroupsResult.value();
 
-  auto isAckReceiveTimestampsEnabled = getIntegerParameter(
+  auto isAckReceiveTimestampsEnabledResult = getIntegerParameter(
       TransportParameterId::ack_receive_timestamps_enabled,
       clientParams.parameters);
-  auto maxReceiveTimestampsPerAck = getIntegerParameter(
+  if (isAckReceiveTimestampsEnabledResult.hasError()) {
+    return folly::makeUnexpected(isAckReceiveTimestampsEnabledResult.error());
+  }
+  auto isAckReceiveTimestampsEnabled =
+      isAckReceiveTimestampsEnabledResult.value();
+
+  auto maxReceiveTimestampsPerAckResult = getIntegerParameter(
       TransportParameterId::max_receive_timestamps_per_ack,
       clientParams.parameters);
-  auto receiveTimestampsExponent = getIntegerParameter(
+  if (maxReceiveTimestampsPerAckResult.hasError()) {
+    return folly::makeUnexpected(maxReceiveTimestampsPerAckResult.error());
+  }
+  auto maxReceiveTimestampsPerAck = maxReceiveTimestampsPerAckResult.value();
+
+  auto receiveTimestampsExponentResult = getIntegerParameter(
       TransportParameterId::receive_timestamps_exponent,
       clientParams.parameters);
+  if (receiveTimestampsExponentResult.hasError()) {
+    return folly::makeUnexpected(receiveTimestampsExponentResult.error());
+  }
+  auto receiveTimestampsExponent = receiveTimestampsExponentResult.value();
+
   if (conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS ||
       conn.version == QuicVersion::QUIC_V1_ALIAS2) {
-    auto initialSourceConnId = getConnIdParameter(
+    auto initialSourceConnIdResult = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
         clientParams.parameters);
+    if (initialSourceConnIdResult.hasError()) {
+      return folly::makeUnexpected(initialSourceConnIdResult.error());
+    }
+    auto initialSourceConnId = initialSourceConnIdResult.value();
     if (!initialSourceConnId ||
         initialSourceConnId.value() !=
             conn.readCodec->getClientConnectionId()) {
@@ -247,15 +356,23 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
           "Initial CID does not match."));
     }
   }
-  auto knobFrameSupported = getIntegerParameter(
+  auto knobFrameSupportedResult = getIntegerParameter(
       static_cast<TransportParameterId>(
           TransportParameterId::knob_frames_supported),
       clientParams.parameters);
+  if (knobFrameSupportedResult.hasError()) {
+    return folly::makeUnexpected(knobFrameSupportedResult.error());
+  }
+  auto knobFrameSupported = knobFrameSupportedResult.value();
 
-  auto extendedAckFeatures = getIntegerParameter(
+  auto extendedAckFeaturesResult = getIntegerParameter(
       static_cast<TransportParameterId>(
           TransportParameterId::extended_ack_features),
       clientParams.parameters);
+  if (extendedAckFeaturesResult.hasError()) {
+    return folly::makeUnexpected(extendedAckFeaturesResult.error());
+  }
+  auto extendedAckFeatures = extendedAckFeaturesResult.value();
 
   auto reliableResetTpIter = findParameter(
       clientParams.parameters,
@@ -636,8 +753,12 @@ void maybeUpdateTransportFromAppToken(
     return;
   }
   auto& params = appToken->transportParams.parameters;
-  auto maybeCwndHintBytes =
+  auto maybeCwndHintBytesResult =
       getIntegerParameter(TransportParameterId::cwnd_hint_bytes, params);
+  if (maybeCwndHintBytesResult.hasError()) {
+    return;
+  }
+  auto maybeCwndHintBytes = maybeCwndHintBytesResult.value();
   if (maybeCwndHintBytes) {
     QUIC_STATS(conn.statsCallback, onCwndHintBytesSample, *maybeCwndHintBytes);
 

@@ -4981,22 +4981,34 @@ class QuicServerTransportHandshakeTest
         .WillOnce(Invoke([=](const AppToken& appToken) {
           auto& params = appToken.transportParams.parameters;
 
-          auto initialMaxData = *getIntegerParameter(
+          auto initialMaxDataResult = getIntegerParameter(
               TransportParameterId::initial_max_data, params);
+          EXPECT_FALSE(initialMaxDataResult.hasError());
+          auto initialMaxData = *initialMaxDataResult.value();
           EXPECT_EQ(
               initialMaxData,
               server->getConn()
                   .transportSettings
                   .advertisedInitialConnectionFlowControlWindow);
 
-          auto initialMaxStreamDataBidiLocal = *getIntegerParameter(
+          auto initialMaxStreamDataBidiLocalResult = getIntegerParameter(
               TransportParameterId::initial_max_stream_data_bidi_local, params);
-          auto initialMaxStreamDataBidiRemote = *getIntegerParameter(
+          EXPECT_FALSE(initialMaxStreamDataBidiLocalResult.hasError());
+          auto initialMaxStreamDataBidiLocal =
+              *initialMaxStreamDataBidiLocalResult.value();
+
+          auto initialMaxStreamDataBidiRemoteResult = getIntegerParameter(
               TransportParameterId::initial_max_stream_data_bidi_remote,
               params);
-          auto initialMaxStreamDataUni = *getIntegerParameter(
+          EXPECT_FALSE(initialMaxStreamDataBidiRemoteResult.hasError());
+          auto initialMaxStreamDataBidiRemote =
+              *initialMaxStreamDataBidiRemoteResult.value();
+
+          auto initialMaxStreamDataUniResult = getIntegerParameter(
               TransportParameterId::initial_max_stream_data_bidi_remote,
               params);
+          EXPECT_FALSE(initialMaxStreamDataUniResult.hasError());
+          auto initialMaxStreamDataUni = *initialMaxStreamDataUniResult.value();
           EXPECT_EQ(
               initialMaxStreamDataBidiLocal,
               server->getConn()
@@ -5013,10 +5025,15 @@ class QuicServerTransportHandshakeTest
                   .transportSettings
                   .advertisedInitialUniStreamFlowControlWindow);
 
-          auto initialMaxStreamsBidi = *getIntegerParameter(
+          auto initialMaxStreamsBidiResult = getIntegerParameter(
               TransportParameterId::initial_max_streams_bidi, params);
-          auto initialMaxStreamsUni = *getIntegerParameter(
+          EXPECT_FALSE(initialMaxStreamsBidiResult.hasError());
+          auto initialMaxStreamsBidi = *initialMaxStreamsBidiResult.value();
+
+          auto initialMaxStreamsUniResult = getIntegerParameter(
               TransportParameterId::initial_max_streams_uni, params);
+          EXPECT_FALSE(initialMaxStreamsUniResult.hasError());
+          auto initialMaxStreamsUni = *initialMaxStreamsUniResult.value();
           EXPECT_EQ(
               initialMaxStreamsBidi,
               server->getConn()
@@ -5026,8 +5043,10 @@ class QuicServerTransportHandshakeTest
               server->getConn()
                   .transportSettings.advertisedInitialMaxStreamsUni);
 
-          auto maxRecvPacketSize = *getIntegerParameter(
+          auto maxRecvPacketSizeResult = getIntegerParameter(
               TransportParameterId::max_packet_size, params);
+          EXPECT_FALSE(maxRecvPacketSizeResult.hasError());
+          auto maxRecvPacketSize = *maxRecvPacketSizeResult.value();
           EXPECT_EQ(
               maxRecvPacketSize,
               server->getConn().transportSettings.maxRecvPacketSize);

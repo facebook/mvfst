@@ -70,8 +70,8 @@ class FizzClientHandshake : public ClientHandshake {
   void echRetryAvailable(fizz::client::ECHRetryAvailable& retry);
 
  private:
-  Optional<CachedServerTransportParameters> connectImpl(
-      Optional<std::string> hostname) override;
+  folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
+  connectImpl(Optional<std::string> hostname) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;

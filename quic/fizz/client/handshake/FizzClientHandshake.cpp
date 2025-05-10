@@ -31,8 +31,8 @@ FizzClientHandshake::FizzClientHandshake(
   CHECK(cryptoFactory_->getFizzFactory());
 }
 
-Optional<CachedServerTransportParameters> FizzClientHandshake::connectImpl(
-    Optional<std::string> hostname) {
+folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
+FizzClientHandshake::connectImpl(Optional<std::string> hostname) {
   // Look up psk
   auto quicCachedPsk = getPsk(hostname);
 
@@ -66,15 +66,35 @@ Optional<CachedServerTransportParameters> FizzClientHandshake::connectImpl(
   if (echConfigs.has_value()) {
     follyECHConfigs = std::move(echConfigs.value());
   }
-  processActions(machine_.processConnect(
-      state_,
-      std::move(context),
-      fizzContext_->getCertificateVerifier(),
-      std::move(follyHostname),
-      std::move(cachedPsk),
-      std::make_shared<FizzClientExtensions>(
-          getClientTransportParameters(), fizzContext_->getChloPaddingBytes()),
-      std::move(follyECHConfigs)));
+
+  try {
+    processActions(machine_.processConnect(
+        state_,
+        std::move(context),
+        fizzContext_->getCertificateVerifier(),
+        std::move(follyHostname),
+        std::move(cachedPsk),
+        std::make_shared<FizzClientExtensions>(
+            getClientTransportParameters(),
+            fizzContext_->getChloPaddingBytes()),
+        std::move(follyECHConfigs)));
+  } catch (const fizz::FizzException& ex) {
+    if (ex.getAlert()) {
+      auto alertNum =
+          static_cast<std::underlying_type<TransportErrorCode>::type>(
+              ex.getAlert().value());
+      alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
+          TransportErrorCode::CRYPTO_ERROR);
+      return folly::makeUnexpected(
+          QuicError(static_cast<TransportErrorCode>(alertNum), ex.what()));
+    } else {
+      return folly::makeUnexpected(
+          QuicError(TransportErrorCode::INTERNAL_ERROR, ex.what()));
+    }
+  } catch (const std::exception& ex) {
+    return folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, ex.what()));
+  }
 
   return transportParams;
 }
