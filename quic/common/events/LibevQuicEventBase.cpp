@@ -98,9 +98,13 @@ bool LibevQuicEventBase::scheduleTimeoutHighRes(
   return true;
 }
 
-void LibevQuicEventBase::scheduleLibevTimeoutImpl(
+void LibevQuicEventBase::scheduleTimeout(
     QuicTimerCallback* timerCallback,
     std::chrono::microseconds timeout) {
+  if (!timerCallback) {
+    // There is no callback. Nothing to schedule.
+    return;
+  }
   double seconds = std::chrono::duration<double>(timeout).count();
   auto wrapper =
       static_cast<TimerCallbackWrapper*>(getImplHandle(timerCallback));
@@ -124,63 +128,6 @@ void LibevQuicEventBase::scheduleLibevTimeoutImpl(
   }
 
   ev_timer_start(ev_loop_, &wrapper->ev_timer_);
-}
-
-void LibevQuicEventBase::scheduleTimerFDTimeoutImpl(
-    QuicTimerCallback* timerCallback,
-    std::chrono::microseconds timeout) {
-#if defined(HAS_TIMERFD)
-  auto wrapper =
-      static_cast<TimerCallbackWrapperTimerFD*>(getImplHandle(timerCallback));
-  if (wrapper == nullptr) {
-    // This is the first time this timer callback is getting scheduled. Create
-    // a wrapper for it.
-    wrapper = new TimerCallbackWrapperTimerFD(
-        timerCallback, ev_loop_, prioritizeTimers_);
-    wrapper->ev_io_watcher_.data = wrapper;
-    setImplHandle(timerCallback, wrapper);
-  }
-  // libev by default bases the timeout on ev_now() which is the time when
-  // poll returned for the current set of events. To have parity with this we
-  // have to subtract the time between now (ev_time()) and then.
-  auto timeElapsed = ev_time() - ev_now(ev_loop_);
-  auto timeElapsedMicros =
-      std::chrono::microseconds(static_cast<int64_t>(timeElapsed * 1e6));
-  auto adjustedTimeout = timeout - timeElapsedMicros;
-  if (adjustedTimeout <= std::chrono::microseconds(0)) {
-    // The timeout is already passed. Feed an event for it.
-    ev_io_start(ev_loop_, &wrapper->ev_io_watcher_);
-    ev_feed_event(ev_loop_, &wrapper->ev_io_watcher_, EV_READ);
-    return;
-  }
-  struct itimerspec new_value;
-  new_value.it_value.tv_sec = adjustedTimeout.count() / 1000000;
-  new_value.it_value.tv_nsec = (adjustedTimeout.count() % 1000000) * 1000;
-  new_value.it_interval.tv_sec = 0; // No repeating
-  new_value.it_interval.tv_nsec = 0;
-  if (timerfd_settime(wrapper->ev_io_watcher_.fd, 0, &new_value, nullptr) ==
-      -1) {
-    LOG(FATAL) << "Failed to set timerfd time";
-  }
-  ev_io_start(ev_loop_, &wrapper->ev_io_watcher_);
-
-#else
-  LOG(FATAL) << "TimerFD not supported on this platform";
-#endif
-}
-
-void LibevQuicEventBase::scheduleTimeout(
-    QuicTimerCallback* timerCallback,
-    std::chrono::microseconds timeout) {
-  if (!timerCallback) {
-    // There is no callback. Nothing to schedule.
-    return;
-  }
-  if (useTimerFd_) {
-    scheduleTimerFDTimeoutImpl(timerCallback, timeout);
-  } else {
-    scheduleLibevTimeoutImpl(timerCallback, timeout);
-  }
 }
 
 void LibevQuicEventBase::checkCallbacks() {

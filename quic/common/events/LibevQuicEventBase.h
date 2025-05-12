@@ -15,19 +15,6 @@
 #include <memory>
 #include <thread>
 
-#if __has_include(<sys/timerfd.h>)
-#include <sys/timerfd.h>
-extern "C" __attribute__((__weak__)) int timerfd_create(int clockid, int flags);
-
-extern "C" __attribute__((__weak__)) int timerfd_settime(
-    int fd,
-    int flags,
-    const struct itimerspec* new_value,
-    struct itimerspec* _Nullable old_value);
-
-#define HAS_TIMERFD 1
-#endif
-
 #include <folly/GLog.h>
 #include <folly/IntrusiveList.h>
 
@@ -129,13 +116,6 @@ class LibevQuicEventBase
     return std::chrono::milliseconds(1);
   }
 
-  // MUST be called before any timers are scheduled.
-  void useTimerFd() {
-#if defined(HAS_TIMERFD)
-    useTimerFd_ = true;
-#endif
-  }
-
   void prioritizeTimers() {
     prioritizeTimers_ = true;
   }
@@ -188,80 +168,6 @@ class LibevQuicEventBase
     ev_timer ev_timer_;
   };
 
-  class TimerCallbackWrapperTimerFD
-      : public QuicTimerCallback::TimerCallbackImpl {
-   public:
-    TimerCallbackWrapperTimerFD(
-        QuicTimerCallback* callback,
-        struct ev_loop* ev_loop,
-        bool prioritizeTimers)
-        : callback_(callback), ev_loop_(ev_loop) {
-#if defined(HAS_TIMERFD)
-      ev_io_watcher_.fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-      if (ev_io_watcher_.fd == -1) {
-        LOG(FATAL) << "Failed to create timerfd";
-      }
-      ev_io_init(
-          &ev_io_watcher_,
-          [](struct ev_loop* loop, ev_io* w, int) {
-            uint64_t expirations;
-            read(w->fd, &expirations, sizeof(expirations));
-            auto wrapper = static_cast<TimerCallbackWrapperTimerFD*>(w->data);
-            ev_io_stop(loop, w);
-            wrapper->timeoutExpired();
-          },
-          ev_io_watcher_.fd,
-          EV_READ);
-      if (prioritizeTimers) {
-        ev_set_priority(&ev_io_watcher_, EV_MAXPRI);
-      }
-#else
-      LOG(FATAL) << "TimerFD not supported on this platform";
-#endif
-    }
-
-    ~TimerCallbackWrapperTimerFD() override {
-#if defined(HAS_TIMERFD)
-      cancelImpl();
-      close(ev_io_watcher_.fd);
-#endif
-    }
-
-    friend class LibevQuicEventBase;
-
-    void timeoutExpired() noexcept {
-      callback_->timeoutExpired();
-    }
-
-    void callbackCanceled() noexcept {
-      callback_->callbackCanceled();
-    }
-
-    void cancelImpl() noexcept override {
-#if defined(HAS_TIMERFD)
-      struct itimerspec new_value = {};
-      if (timerfd_settime(ev_io_watcher_.fd, 0, &new_value, nullptr) == -1) {
-        LOG(FATAL) << "Failed to set timerfd time";
-      }
-      ev_io_stop(ev_loop_, &ev_io_watcher_);
-#endif
-    }
-
-    [[nodiscard]] bool isScheduledImpl() const noexcept override {
-      return ev_is_active(&ev_io_watcher_) || ev_is_pending(&ev_io_watcher_);
-    }
-
-    [[nodiscard]] std::chrono::milliseconds getTimeRemainingImpl()
-        const noexcept override {
-      LOG(FATAL) << __func__ << " not implemented in LibevQuicEventBase";
-    }
-
-   private:
-    QuicTimerCallback* callback_;
-    [[maybe_unused]] struct ev_loop* ev_loop_;
-    [[maybe_unused]] ev_io ev_io_watcher_;
-  };
-
  private:
   class LoopCallbackWrapper
       : public QuicEventBaseLoopCallback::LoopCallbackImpl {
@@ -312,14 +218,6 @@ class LibevQuicEventBase
     folly::IntrusiveListHook listHook_;
   };
 
-  void scheduleLibevTimeoutImpl(
-      QuicTimerCallback* timerCallback,
-      std::chrono::microseconds timeout);
-
-  void scheduleTimerFDTimeoutImpl(
-      QuicTimerCallback* timerCallback,
-      std::chrono::microseconds timeout);
-
   struct ev_loop* ev_loop_{EV_DEFAULT};
   std::unique_ptr<EvLoopWeak> loopWeak_;
 
@@ -340,7 +238,6 @@ class LibevQuicEventBase
   // We're using it to execute delayed work given to us via runInLoop.
   ev_prepare prepareWatcher_;
   std::atomic<std::thread::id> loopThreadId_;
-  bool useTimerFd_{false};
   bool prioritizeTimers_{false};
 };
 } // namespace quic
