@@ -164,4 +164,23 @@ TEST(QuicBufferTest, TestCopyBufferPointerAndSize) {
   EXPECT_EQ(memcmp(quicBuffer->data(), "hello", 5), 0);
 }
 
+TEST(QuicBufferTest, TestWrapBufferPointer) {
+  const auto* data = (const uint8_t*)"hello";
+  auto quicBuffer = QuicBuffer::wrapBuffer((void*)data, 5);
+  EXPECT_EQ(quicBuffer->capacity(), 5);
+  EXPECT_EQ(quicBuffer->headroom(), 0);
+  EXPECT_EQ(quicBuffer->tailroom(), 0);
+  EXPECT_EQ(quicBuffer->data(), data);
+}
+
+TEST(QuicBufferTest, TestWrapBufferSpan) {
+  const auto* data = (const uint8_t*)"hello";
+  std::span range(data, 5);
+  auto quicBuffer = QuicBuffer::wrapBuffer(range);
+  EXPECT_EQ(quicBuffer->capacity(), 5);
+  EXPECT_EQ(quicBuffer->headroom(), 0);
+  EXPECT_EQ(quicBuffer->tailroom(), 0);
+  EXPECT_EQ(quicBuffer->data(), data);
+}
+
 } // namespace quic

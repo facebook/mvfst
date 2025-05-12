@@ -76,6 +76,18 @@ std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
   return quicBuffer;
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(
+    void* buf,
+    std::size_t capacity) {
+  return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
+      capacity, (uint8_t*)buf, (uint8_t*)buf, capacity, nullptr));
+}
+
+std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(
+    std::span<const uint8_t> span) {
+  return wrapBuffer((void*)span.data(), span.size());
+}
+
 void QuicBuffer::appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
   // Take ownership of the specified IOBuf
   QuicBuffer* other = quicBuffer.release();

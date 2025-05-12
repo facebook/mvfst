@@ -56,6 +56,12 @@ class QuicBuffer {
       std::size_t headroom = 0,
       std::size_t minTailroom = 0);
 
+  static std::unique_ptr<QuicBuffer> wrapBuffer(
+      void* buf,
+      std::size_t capacity);
+
+  static std::unique_ptr<QuicBuffer> wrapBuffer(std::span<const uint8_t> span);
+
   void advance(std::size_t amount) noexcept;
 
   /*
