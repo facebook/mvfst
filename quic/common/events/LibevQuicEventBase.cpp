@@ -118,9 +118,6 @@ void LibevQuicEventBase::scheduleTimeout(
         libEvTimeoutCallback,
         seconds /* after */,
         0. /* repeat */);
-    if (prioritizeTimers_) {
-      ev_set_priority(&wrapper->ev_timer_, EV_MAXPRI);
-    }
     setImplHandle(timerCallback, wrapper);
   } else {
     // We already have a wrapper. Just re-arm it.
