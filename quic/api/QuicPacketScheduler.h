@@ -77,13 +77,14 @@ class StreamFrameScheduler {
    * Return: the first boolean indicates if at least one Blocked frame
    * is written into the packet by writeStreams function.
    */
-  void writeStreams(PacketBuilderInterface& builder);
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeStreams(
+      PacketBuilderInterface& builder);
 
   bool hasPendingData() const;
 
  private:
   // Return true if this stream wrote some data
-  bool writeStreamLossBuffers(
+  [[nodiscard]] folly::Expected<bool, QuicError> writeStreamLossBuffers(
       PacketBuilderInterface& builder,
       QuicStreamState& stream);
 
@@ -100,25 +101,25 @@ class StreamFrameScheduler {
    * flow control limited, or not limited by connection flow control.
    */
   enum class StreamWriteResult { PACKET_FULL, NOT_LIMITED, CONN_FC_LIMITED };
-  StreamWriteResult writeSingleStream(
+  [[nodiscard]] folly::Expected<StreamWriteResult, QuicError> writeSingleStream(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
       uint64_t& connWritableBytes);
 
-  StreamId writeStreamsHelper(
+  [[nodiscard]] folly::Expected<StreamId, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
       const std::set<StreamId>& writableStreams,
       StreamId nextScheduledStream,
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 
-  void writeStreamsHelper(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
       deprecated::PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 
-  void writeStreamsHelper(
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
       PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
@@ -130,7 +131,7 @@ class StreamFrameScheduler {
    *
    * Return: A boolean indicates if write is successful.
    */
-  bool writeStreamFrame(
+  [[nodiscard]] folly::Expected<bool, QuicError> writeStreamFrame(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
       uint64_t& connWritableBytes);

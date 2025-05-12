@@ -512,7 +512,9 @@ TEST_P(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
       ChainedByteRangeHead(helloBuf), 0, false);
   conn.cryptoState->handshakeStream.lossBuffer.emplace_back(
       ChainedByteRangeHead(certBuf), 7, false);
-  EXPECT_TRUE(scheduler.writeCryptoData(builderWrapper));
+  auto result = scheduler.writeCryptoData(builderWrapper);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_TRUE(result.value());
 }
 
 TEST_P(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
@@ -1519,7 +1521,9 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
   auto f3 = writeDataToStream(conn, stream3, "some data");
 
   auto builder = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder);
+  auto result4 = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result4.hasError());
+
   verifyStreamFrames(*builder, {f1, f2, f3});
   if (GetParam()) {
     EXPECT_TRUE(conn.streamManager->writeQueue().empty());
@@ -1544,11 +1548,13 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
 
   // write a normal size packet from stream1
   auto builder = createPacketBuilder(conn);
-  scheduler.writeStreams(builder);
+  auto result = scheduler.writeStreams(builder);
+  ASSERT_FALSE(result.hasError());
 
   // Should write frames for stream2, stream3, followed by stream1 again.
   auto builder2 = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder2);
+  auto result2 = scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(result2.hasError());
   verifyStreamFrames(*builder2, {f2, f3, f1});
 }
 
@@ -1571,16 +1577,17 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
   // stream1 again.
   auto builder2 =
       setupMockPacketBuilder({1500, 0, 1400, 0, 1300, 1100, 1000, 0});
-  scheduler.writeStreams(*builder2);
+  auto result2 = scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(result2.hasError());
   builder2->advanceRemaining();
   ASSERT_EQ(nextScheduledStreamID(conn), stream1);
   ASSERT_EQ(builder2->frames_.size(), 1);
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   ASSERT_EQ(builder2->frames_.size(), 2);
   ASSERT_EQ(nextScheduledStreamID(conn), stream2);
   builder2->advanceRemaining();
-  scheduler.writeStreams(*builder2);
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   verifyStreamFrames(*builder2, {stream1, stream1, stream2, stream3, stream1});
 }
 
@@ -1601,16 +1608,16 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
 
   // Write a normal size packet from stream1
   auto builder = createPacketBuilder(conn);
-  scheduler.writeStreams(builder);
+  ASSERT_FALSE(scheduler.writeStreams(builder).hasError());
   EXPECT_EQ(nextScheduledStreamID(conn), stream2);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
   auto builder2 = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   verifyStreamFrames(*builder2, {f2});
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   verifyStreamFrames(*builder2, {f3});
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   verifyStreamFrames(*builder2, {f1});
 }
 
@@ -1656,20 +1663,21 @@ TEST_P(
 
   // Write a normal size packet from stream1
   auto builder1 = createPacketBuilder(conn);
-  scheduler.writeStreams(builder1);
+  auto result = scheduler.writeStreams(builder1);
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(nextScheduledStreamID(conn), stream2);
 
   // Should write frames for stream2, stream3, followed by an empty write.
   auto builder2 = setupMockPacketBuilder();
   ASSERT_TRUE(scheduler.hasPendingData());
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   ASSERT_EQ(builder2->frames_.size(), 1);
   ASSERT_TRUE(scheduler.hasPendingData());
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   ASSERT_EQ(builder2->frames_.size(), 2);
   EXPECT_FALSE(scheduler.hasPendingData());
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
 
   verifyStreamFrames(*builder2, {f2, f3});
 }
@@ -1690,13 +1698,14 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
 
   // Write a normal size packet from stream1
   auto builder1 = createPacketBuilder(conn);
-  scheduler.writeStreams(builder1);
+  auto result = scheduler.writeStreams(builder1);
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(nextScheduledStreamID(conn), stream1);
 
   // Should write frames for stream1, stream2, stream3, in that order.
   auto builder2 = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
 
   verifyStreamFrames(*builder2, {f1, f2, f3});
 }
@@ -1719,13 +1728,14 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerSequentialDefault) {
 
   // Write a normal size packet from stream1
   auto builder1 = createPacketBuilder(conn);
-  scheduler.writeStreams(builder1);
+  auto result = scheduler.writeStreams(builder1);
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(nextScheduledStreamID(conn), stream1);
 
   // Should write frames for stream1, stream2, stream3, in that order.
   auto builder2 = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
 
   verifyStreamFrames(*builder2, {f1, f2, f3});
 }
@@ -1753,7 +1763,8 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
 
   // This writes a normal size packet with 2, 4, 1
   auto builder1 = createPacketBuilder(conn);
-  scheduler.writeStreams(builder1);
+  auto result = scheduler.writeStreams(builder1);
+  ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(nextScheduledStreamID(conn), stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
@@ -1761,7 +1772,7 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   // 2 and 4 did not get removed from writable, so they get repeated here
   // Should write frames for stream2, stream4, followed by stream 3 then 1.
   auto builder2 = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder2);
+  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
 
   verifyStreamFrames(*builder2, {f2, f4, f3, f1});
 
@@ -1782,7 +1793,7 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   writeDataToStream(conn, stream1, "some data");
 
   auto builder1 = createPacketBuilder(conn);
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
 
   if (GetParam()) {
     EXPECT_TRUE(conn.streamManager->writeQueue().empty());
@@ -1803,7 +1814,9 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
   auto f2 = writeDataToStream(conn, stream2, "some data");
 
   auto builder = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder);
+  auto result4 = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result4.hasError());
+
   verifyStreamFrames(*builder, {f1, f2});
 
   // Manually remove a stream and set the next scheduled to that stream.
@@ -1812,7 +1825,8 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
   conn.streamManager->updateWritableStreams(
       *conn.streamManager->findStream(stream2));
 
-  scheduler.writeStreams(*builder);
+  auto result = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result.hasError());
   ASSERT_EQ(builder->frames_.size(), 1);
   verifyStreamFrames(*builder, {f2});
 }
@@ -1918,7 +1932,7 @@ TEST_P(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
       conn, highPriStreamId, buildRandomInputData(conn.udpSendPacketLen * 10));
 
   auto builder1 = createPacketBuilder(conn);
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
 
   auto packet = std::move(builder1).buildPacket().packet;
   EXPECT_EQ(1, packet.frames.size());
@@ -1952,7 +1966,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder1.encodePacketHeader().hasError());
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
@@ -1982,7 +1996,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
       std::move(shortHeader2),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder2.encodePacketHeader().hasError());
-  scheduler.writeStreams(builder2);
+  ASSERT_FALSE(scheduler.writeStreams(builder2).hasError());
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
@@ -2030,7 +2044,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder1.encodePacketHeader().hasError());
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
@@ -2075,7 +2089,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder1.encodePacketHeader().hasError());
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
@@ -2105,7 +2119,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
       std::move(shortHeader2),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder2.encodePacketHeader().hasError());
-  scheduler.writeStreams(builder2);
+  ASSERT_FALSE(scheduler.writeStreams(builder2).hasError());
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
@@ -2156,7 +2170,7 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_TRUE(builder1.encodePacketHeader());
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_TRUE(updateConnection(
       conn, std::nullopt, packet1, Clock::now(), 1200, 0, false /* isDSR */));
@@ -2191,7 +2205,7 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
       std::move(shortHeader2),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_TRUE(builder2.encodePacketHeader());
-  scheduler.writeStreams(builder2);
+  ASSERT_FALSE(scheduler.writeStreams(builder2).hasError());
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_TRUE(updateConnection(
       conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */));
@@ -2238,7 +2252,7 @@ TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder1.encodePacketHeader().hasError());
-  scheduler.writeStreams(builder1);
+  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
@@ -2293,7 +2307,7 @@ TEST_P(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   StreamFrameScheduler scheduler(conn);
-  scheduler.writeStreams(builder);
+  ASSERT_FALSE(scheduler.writeStreams(builder).hasError());
   auto packet = std::move(builder).buildPacket().packet;
   ASSERT_EQ(1, packet.frames.size());
   auto streamFrame = *packet.frames[0].asWriteStreamFrame();
@@ -2331,7 +2345,7 @@ TEST_P(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   StreamFrameScheduler scheduler(conn);
-  scheduler.writeStreams(builder);
+  ASSERT_FALSE(scheduler.writeStreams(builder).hasError());
   auto packet = std::move(builder).buildPacket().packet;
   EXPECT_EQ(1, packet.frames.size());
   auto streamFrame = *packet.frames[0].asWriteStreamFrame();
@@ -2850,7 +2864,8 @@ TEST_P(QuicPacketSchedulerTest, PausedPriorityEnabled) {
 
   // Should write frames for only regular stream.
   auto builder = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder);
+  auto result4 = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result4.hasError());
 
   verifyStreamFrames(*builder, {regularFrame});
 
@@ -2859,7 +2874,8 @@ TEST_P(QuicPacketSchedulerTest, PausedPriorityEnabled) {
 
   // Unpause the stream. Expect the scheduleor to write the data.
   conn.streamManager->setStreamPriority(pausedStreamId, kSequentialPriority);
-  scheduler.writeStreams(*builder);
+  auto result2 = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result2.hasError());
 
   verifyStreamFrames(*builder, {pausedFrame});
 
@@ -2885,7 +2901,8 @@ TEST_P(QuicPacketSchedulerTest, PausedPriorityDisabled) {
   auto regularFrame = writeDataToStream(conn, regularStreamId, "regular_data");
 
   auto builder = setupMockPacketBuilder();
-  scheduler.writeStreams(*builder);
+  auto result = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result.hasError());
   verifyStreamFrames(*builder, {regularFrame, pausedFrame});
 }
 
