@@ -145,6 +145,14 @@ std::unique_ptr<QuicBuffer> QuicBuffer::cloneOneImpl() const {
       capacity_, data_, buf_, length_, sharedBuffer_));
 }
 
+std::size_t QuicBuffer::computeChainDataLength() const noexcept {
+  std::size_t fullLength = length_;
+  for (QuicBuffer* current = next_; current != this; current = current->next_) {
+    fullLength += current->length_;
+  }
+  return fullLength;
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::unlink() {
   next_->prev_ = prev_;
   prev_->next_ = next_;

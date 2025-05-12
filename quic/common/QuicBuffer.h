@@ -119,6 +119,8 @@ class QuicBuffer {
     return capacity_;
   }
 
+  [[nodiscard]] std::size_t computeChainDataLength() const noexcept;
+
   /*
    * Operations to append, split, clone, etc.
    */

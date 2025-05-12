@@ -183,4 +183,20 @@ TEST(QuicBufferTest, TestWrapBufferSpan) {
   EXPECT_EQ(quicBuffer->data(), data);
 }
 
+TEST(QuicBufferTest, TestComputeChainDataLength) {
+  auto quicBuffer1 = QuicBuffer::create(10);
+  quicBuffer1->append(5);
+
+  auto quicBuffer2 = QuicBuffer::create(10);
+  quicBuffer2->append(3);
+
+  auto quicBuffer3 = QuicBuffer::create(10);
+  quicBuffer3->append(6);
+
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+  quicBuffer1->appendToChain(std::move(quicBuffer3));
+
+  EXPECT_EQ(quicBuffer1->computeChainDataLength(), 5 + 3 + 6);
+}
+
 } // namespace quic
