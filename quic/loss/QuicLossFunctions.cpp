@@ -113,21 +113,6 @@ folly::Expected<folly::Unit, QuicError> onPTOAlarm(
   return folly::unit;
 }
 
-template <class T, size_t N>
-using InlineSetVec = SmallVec<T, N>;
-
-template <
-    typename Value,
-    size_t N,
-    class Container = InlineSetVec<Value, N>,
-    typename = std::enable_if_t<std::is_integral<Value>::value>>
-using InlineSet = folly::heap_vector_set<
-    Value,
-    std::less<Value>,
-    typename Container::allocator_type,
-    void,
-    Container>;
-
 folly::Expected<folly::Unit, QuicError> markPacketLoss(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,

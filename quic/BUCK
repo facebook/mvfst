@@ -14,7 +14,9 @@ mvfst_cpp_library(
     }),
     exported_deps = select({
         "DEFAULT": [
+            "//folly:small_vector",  # @manual
             "//folly/container:f14_hash",  # @manual
+            "//folly/container:heap_vector_types",  # @manual
         ],
         "ovr_config//os/constraints:android": [],  # @manual
         "ovr_config//os/constraints:iphoneos": [],  # @manual

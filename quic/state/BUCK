@@ -131,7 +131,6 @@ mvfst_cpp_library(
         "//quic/common:buf_accessor",
         "//quic/common:circular_deque",
         "//quic/common:optional",
-        "//quic/common:small_collections",
         "//quic/congestion_control:congestion_controller",
         "//quic/congestion_control:packet_processor",
         "//quic/congestion_control:throttling_signal_provider",
@@ -164,7 +163,6 @@ mvfst_cpp_library(
         "fbcode//quic:constants",
         "fbcode//quic/codec:types",
         "fbcode//quic/common:optional",
-        "fbcode//quic/common:small_collections",
         "fbcode//quic/congestion_control:congestion_controller",
         "fbcode//quic/state:outstanding_packet",
         "fbcode//quic/state:quic_state_machine",
@@ -298,7 +296,6 @@ mvfst_cpp_library(
         ":outstanding_packet",
         "//quic/codec:types",
         "//quic/common:optional",
-        "//quic/common:small_collections",
         "//quic/congestion_control:congestion_controller",
     ],
 )

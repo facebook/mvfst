@@ -78,7 +78,6 @@ mvfst_cpp_library(
         "//quic/codec:types",
         "//quic/common:network_data",
         "//quic/common:optional",
-        "//quic/common:small_collections",
         "//quic/common/events:eventbase",
         "//quic/common/events:quic_timer",
         "//quic/common/udpsocket:quic_async_udp_socket",

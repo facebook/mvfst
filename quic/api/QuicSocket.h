@@ -13,7 +13,6 @@
 #include <quic/api/QuicSocketLite.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Optional.h>
-#include <quic/common/SmallCollections.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/observer/SocketObserverContainer.h>

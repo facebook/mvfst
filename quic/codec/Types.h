@@ -20,8 +20,8 @@
 #include <quic/common/IntervalSet.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/Optional.h>
-#include <quic/common/SmallCollections.h>
 #include <quic/common/Variant.h>
+#include <quic/mvfst-config.h>
 
 /**
  * This details the types of objects that can be serialized or deserialized

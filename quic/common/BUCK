@@ -121,17 +121,6 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
-    name = "small_collections",
-    headers = [
-        "SmallCollections.h",
-    ],
-    exported_deps = [
-        "//folly:small_vector",
-        "//folly/container:heap_vector_types",
-    ],
-)
-
-mvfst_cpp_library(
     name = "circular_deque",
     headers = [
         "CircularDeque.h",

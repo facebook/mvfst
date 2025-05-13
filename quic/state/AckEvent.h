@@ -9,7 +9,6 @@
 
 #include <quic/codec/Types.h>
 #include <quic/common/Optional.h>
-#include <quic/common/SmallCollections.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/state/OutstandingPacket.h>
 
