@@ -162,6 +162,25 @@ std::size_t QuicBuffer::computeChainDataLength() const noexcept {
   return fullLength;
 }
 
+size_t QuicBuffer::countChainElements() const noexcept {
+  size_t numElements = 1;
+  for (QuicBuffer* current = next_; current != this; current = current->next_) {
+    ++numElements;
+  }
+  return numElements;
+}
+
+void QuicBuffer::trimStart(std::size_t amount) noexcept {
+  DCHECK_LE(amount, length_);
+  data_ += amount;
+  length_ -= amount;
+}
+
+void QuicBuffer::trimEnd(std::size_t amount) noexcept {
+  DCHECK_LE(amount, length_);
+  length_ -= amount;
+}
+
 void QuicBuffer::coalesceAndReallocate(
     size_t newHeadroom,
     size_t newLength,

@@ -125,9 +125,15 @@ class QuicBuffer {
     return next_ != this;
   }
 
+  size_t countChainElements() const noexcept;
+
   /*
-   * Operations to append, split, clone, etc.
+   * Operations to trim, append, split, clone, etc.
    */
+
+  void trimStart(std::size_t amount) noexcept;
+
+  void trimEnd(std::size_t amount) noexcept;
 
   void appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer);
 

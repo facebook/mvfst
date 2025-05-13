@@ -221,4 +221,43 @@ TEST(QuicBufferTest, TestCoalesce) {
   EXPECT_EQ(memcmp(span.data(), "hellomyfriend", 13), 0);
 }
 
+TEST(QuicBufferTest, TestCountChainElements) {
+  const uint8_t* data1 = (const uint8_t*)"hello";
+  const uint8_t* data2 = (const uint8_t*)"my";
+  const uint8_t* data3 = (const uint8_t*)"friend";
+
+  auto quicBuffer1 = QuicBuffer::copyBuffer(data1, 5 /* size */);
+  EXPECT_EQ(quicBuffer1->countChainElements(), 1);
+
+  auto quicBuffer2 = QuicBuffer::copyBuffer(data2, 2 /* size */);
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+  EXPECT_EQ(quicBuffer1->countChainElements(), 2);
+
+  auto quicBuffer3 = QuicBuffer::copyBuffer(data3, 6 /* size */);
+  quicBuffer1->appendToChain(std::move(quicBuffer3));
+  EXPECT_EQ(quicBuffer1->countChainElements(), 3);
+}
+
+TEST(QuicBufferTest, TestTrimStart) {
+  const uint8_t* data = (const uint8_t*)"hello";
+
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 5 /* size */);
+  quicBuffer->trimStart(2);
+  EXPECT_EQ(quicBuffer->length(), 3);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "llo", 3), 0);
+  quicBuffer->trimStart(3);
+  EXPECT_EQ(quicBuffer->length(), 0);
+}
+
+TEST(QuicBufferTest, TestTrimEnd) {
+  const uint8_t* data = (const uint8_t*)"hello";
+
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 5 /* size */);
+  quicBuffer->trimEnd(2);
+  EXPECT_EQ(quicBuffer->length(), 3);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "hel", 3), 0);
+  quicBuffer->trimEnd(3);
+  EXPECT_EQ(quicBuffer->length(), 0);
+}
+
 } // namespace quic
