@@ -51,6 +51,39 @@ Optional<uint64_t> getAckIntervalSetVersion(
   return getAckIntervalSetVersion(*maybeAckedStreamState);
 }
 
+void updateCongestionControllerForAck(
+    QuicConnectionStateBase& conn,
+    AckEvent& ack,
+    Optional<CongestionController::LossEvent>& lossEvent) {
+  if (conn.congestionController &&
+      (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
+    if (lossEvent) {
+      CHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      // TODO it's not clear that we should be using the smallest and largest
+      // lost times here. It may perhaps be better to only consider the latest
+      // contiguous lost block and determine if that block is larger than the
+      // congestion period. Alternatively we could consider every lost block
+      // and check if any of them constitute persistent congestion.
+      lossEvent->persistentCongestion = isPersistentCongestion(
+          conn.lossState.srtt == 0s ? std::nullopt
+                                    : OptionalMicros(calculatePTO(conn)),
+          *lossEvent->smallestLostSentTime,
+          *lossEvent->largestLostSentTime,
+          ack);
+      if (lossEvent->persistentCongestion) {
+        QUIC_STATS(conn.statsCallback, onPersistentCongestion);
+      }
+    }
+    conn.congestionController->onPacketAckOrLoss(
+        &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
+    for (auto& packetProcessor : conn.packetProcessors) {
+      packetProcessor->onPacketAck(&ack);
+    }
+
+    ack.ccState = conn.congestionController->getState();
+  }
+}
+
 } // namespace
 
 void removeOutstandingsForAck(
@@ -391,32 +424,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
     return folly::makeUnexpected(lossEventExpected.error());
   }
   auto& lossEvent = lossEventExpected.value();
-  if (conn.congestionController &&
-      (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
-    if (lossEvent) {
-      CHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
-      // TODO it's not clear that we should be using the smallest and largest
-      // lost times here. It may perhaps be better to only consider the latest
-      // contiguous lost block and determine if that block is larger than the
-      // congestion period. Alternatively we could consider every lost block
-      // and check if any of them constitute persistent congestion.
-      lossEvent->persistentCongestion = isPersistentCongestion(
-          conn.lossState.srtt == 0s ? std::nullopt
-                                    : OptionalMicros(calculatePTO(conn)),
-          *lossEvent->smallestLostSentTime,
-          *lossEvent->largestLostSentTime,
-          ack);
-      if (lossEvent->persistentCongestion) {
-        QUIC_STATS(conn.statsCallback, onPersistentCongestion);
-      }
-    }
-    conn.congestionController->onPacketAckOrLoss(
-        &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
-    for (auto& packetProcessor : conn.packetProcessors) {
-      packetProcessor->onPacketAck(&ack);
-    }
-    ack.ccState = conn.congestionController->getState();
-  }
+  updateCongestionControllerForAck(conn, ack, lossEvent);
+
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
 
   // notify observers
