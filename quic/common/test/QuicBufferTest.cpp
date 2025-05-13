@@ -199,4 +199,26 @@ TEST(QuicBufferTest, TestComputeChainDataLength) {
   EXPECT_EQ(quicBuffer1->computeChainDataLength(), 5 + 3 + 6);
 }
 
+TEST(QuicBufferTest, TestCoalesce) {
+  const uint8_t* data1 = (const uint8_t*)"hello";
+  const uint8_t* data2 = (const uint8_t*)"my";
+  const uint8_t* data3 = (const uint8_t*)"friend";
+
+  auto quicBuffer1 =
+      QuicBuffer::copyBuffer(data1, 5 /* size */, 2 /* headroom */);
+  auto quicBuffer2 = QuicBuffer::copyBuffer(data2, 2 /* size */);
+  auto quicBuffer3 = QuicBuffer::copyBuffer(
+      data3, 6 /* size */, 0 /* headroom */, 4 /* tailroom */);
+
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+  quicBuffer1->appendToChain(std::move(quicBuffer3));
+
+  auto span = quicBuffer1->coalesce();
+  EXPECT_EQ(quicBuffer1->headroom(), 2);
+  EXPECT_EQ(quicBuffer1->tailroom(), 4);
+  EXPECT_EQ(quicBuffer1->length(), 13);
+  EXPECT_FALSE(quicBuffer1->isChained());
+  EXPECT_EQ(memcmp(span.data(), "hellomyfriend", 13), 0);
+}
+
 } // namespace quic

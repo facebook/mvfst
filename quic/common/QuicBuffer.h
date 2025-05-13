@@ -121,6 +121,10 @@ class QuicBuffer {
 
   [[nodiscard]] std::size_t computeChainDataLength() const noexcept;
 
+  bool isChained() const noexcept {
+    return next_ != this;
+  }
+
   /*
    * Operations to append, split, clone, etc.
    */
@@ -140,6 +144,8 @@ class QuicBuffer {
     return cloneOneImpl();
   }
 
+  std::span<const uint8_t> coalesce();
+
  protected:
   QuicBuffer(
       std::size_t capacity,
@@ -149,6 +155,11 @@ class QuicBuffer {
       std::shared_ptr<uint8_t[]> sharedBuffer);
 
  private:
+  void coalesceAndReallocate(
+      size_t newHeadroom,
+      size_t newLength,
+      size_t newTailroom);
+
   std::unique_ptr<QuicBuffer> unlink();
 
   std::unique_ptr<QuicBuffer> cloneOneImpl() const;
@@ -163,7 +174,7 @@ class QuicBuffer {
   QuicBuffer* next_{nullptr};
   QuicBuffer* prev_{nullptr};
   std::size_t length_{0};
-  const std::size_t capacity_{0};
+  std::size_t capacity_{0};
 };
 
 } // namespace quic

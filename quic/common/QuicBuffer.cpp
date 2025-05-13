@@ -140,6 +140,15 @@ std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
   return tmp;
 }
 
+std::span<const uint8_t> QuicBuffer::coalesce() {
+  if (isChained()) {
+    const std::size_t newHeadroom = headroom();
+    const std::size_t newTailroom = prev()->tailroom();
+    coalesceAndReallocate(newHeadroom, computeChainDataLength(), newTailroom);
+  }
+  return {data_, data_ + length_};
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::cloneOneImpl() const {
   return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
       capacity_, data_, buf_, length_, sharedBuffer_));
@@ -151,6 +160,48 @@ std::size_t QuicBuffer::computeChainDataLength() const noexcept {
     fullLength += current->length_;
   }
   return fullLength;
+}
+
+void QuicBuffer::coalesceAndReallocate(
+    size_t newHeadroom,
+    size_t newLength,
+    size_t newTailroom) {
+  QuicBuffer* end = this;
+  std::size_t newCapacity = newLength + newHeadroom + newTailroom;
+
+  // Allocate space for the coalesced buffer.
+  std::shared_ptr<uint8_t[]> newSharedBuffer =
+      std::shared_ptr<uint8_t[]>(new (std::nothrow) uint8_t[newCapacity]);
+
+  // Copy the data into the new buffer
+  uint8_t* newData = newSharedBuffer.get() + newHeadroom;
+  uint8_t* p = newData;
+  QuicBuffer* current = this;
+  size_t remaining = newLength;
+  do {
+    if (current->length_ > 0) {
+      CHECK_LE(current->length_, remaining);
+      CHECK(current->data_ != nullptr);
+      remaining -= current->length_;
+      memcpy(p, current->data_, current->length_);
+      p += current->length_;
+    }
+    current = current->next_;
+  } while (current != end);
+  CHECK_EQ(remaining, 0);
+
+  capacity_ = newCapacity;
+  buf_ = newSharedBuffer.get();
+  data_ = newData;
+  length_ = newLength;
+  sharedBuffer_ = std::move(newSharedBuffer);
+
+  // Separate from the rest of our chain.
+  // Since we don't store the unique_ptr returned by separateChain(),
+  // this will immediately delete the returned subchain.
+  if (isChained()) {
+    (void)separateChain(next_, current->prev_);
+  }
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::unlink() {
