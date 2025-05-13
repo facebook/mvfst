@@ -13,7 +13,6 @@
 #include <folly/container/F14Set.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
-#include <folly/small_vector.h>
 #include <cstdint>
 #include <type_traits>
 
@@ -629,7 +628,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   folly::EvictingCacheMap<
       ConnectionId,
-      folly::small_vector<
+      SmallVec<
           NetworkData,
           kDefaultMaxBufferedPackets,
           folly::small_vector_policy::policy_in_situ_only<true>>,

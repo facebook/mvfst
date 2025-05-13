@@ -94,7 +94,6 @@ mvfst_cpp_library(
         "//fizz/record:record",
         "//fizz/server:fizz_server_context",
         "//folly:random",
-        "//folly:small_vector",
         "//folly:thread_local",
         "//folly/container:evicting_cache_map",
         "//folly/container:f14_hash",

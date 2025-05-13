@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/small_vector.h>
-
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 
@@ -116,7 +114,7 @@ folly::Expected<folly::Unit, QuicError> onPTOAlarm(
 }
 
 template <class T, size_t N>
-using InlineSetVec = folly::small_vector<T, N>;
+using InlineSetVec = SmallVec<T, N>;
 
 template <
     typename Value,
