@@ -179,6 +179,17 @@ size_t QuicBuffer::countChainElements() const noexcept {
   return numElements;
 }
 
+bool QuicBuffer::empty() const noexcept {
+  const QuicBuffer* current = this;
+  do {
+    if (current->length() != 0) {
+      return false;
+    }
+    current = current->next_;
+  } while (current != this);
+  return true;
+}
+
 void QuicBuffer::trimStart(std::size_t amount) noexcept {
   DCHECK_LE(amount, length_);
   data_ += amount;

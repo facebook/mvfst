@@ -306,4 +306,18 @@ TEST(QuicBufferTest, TestPopManyChainElements) {
   EXPECT_EQ(result->countChainElements(), 1);
 }
 
+TEST(QuicBufferTest, TestEmpty) {
+  auto quicBuffer1 = QuicBuffer::create(10);
+  EXPECT_TRUE(quicBuffer1->empty());
+  quicBuffer1->append(5);
+  EXPECT_FALSE(quicBuffer1->empty());
+  quicBuffer1->trimStart(5);
+  EXPECT_TRUE(quicBuffer1->empty());
+  auto quicBuffer2 = QuicBuffer::create(10);
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+  EXPECT_TRUE(quicBuffer1->empty());
+  quicBuffer1->next()->append(5);
+  EXPECT_FALSE(quicBuffer1->empty());
+}
+
 } // namespace quic

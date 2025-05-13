@@ -127,6 +127,8 @@ class QuicBuffer {
 
   size_t countChainElements() const noexcept;
 
+  bool empty() const noexcept;
+
   /*
    * Operations to trim, append, split, clone, etc.
    */
