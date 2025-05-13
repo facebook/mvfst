@@ -31,6 +31,26 @@ struct OutstandingPacketWithHandlerContext {
   bool processAllFrames{false};
 };
 
+Optional<uint64_t> getAckIntervalSetVersion(
+    QuicConnectionStateBase& conn,
+    const QuicWriteFrame& ackedFrame) {
+  if (ackedFrame.type() != QuicWriteFrame::Type::WriteStreamFrame) {
+    return std::nullopt;
+  }
+
+  const WriteStreamFrame& ackedWriteFrame = *ackedFrame.asWriteStreamFrame();
+
+  QuicStreamState* maybeAckedStreamState = nullptr;
+  maybeAckedStreamState =
+      conn.streamManager->findStream(ackedWriteFrame.streamId);
+  if (!maybeAckedStreamState) {
+    return std::nullopt;
+  }
+
+  // stream is alive and frame is WriteStreamFrame
+  return getAckIntervalSetVersion(*maybeAckedStreamState);
+}
+
 } // namespace
 
 void removeOutstandingsForAck(
@@ -293,33 +313,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
       //     ACKed by a retransmit as well.
 
       // Part 1: Record delivery offset prior to running ackVisitor.
-      struct PreAckVisitorState {
-        const uint64_t ackIntervalSetVersion;
-        const Optional<uint64_t> maybeLargestDeliverableOffset;
-      };
-
-      QuicStreamState* maybeAckedStreamState = nullptr;
-      const auto maybePreAckVisitorState =
-          [&conn, &maybeAckedStreamState](
-              const auto& packetFrame) -> Optional<PreAckVisitorState> {
-        // check if it's a WriteStreamFrame being ACKed
-        if (packetFrame.type() != QuicWriteFrame::Type::WriteStreamFrame) {
-          return std::nullopt;
-        }
-
-        // check if the stream is alive (could be ACK for dead stream)
-        const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
-        maybeAckedStreamState =
-            conn.streamManager->findStream(ackedFrame.streamId);
-        if (!maybeAckedStreamState) {
-          return std::nullopt;
-        }
-
-        // stream is alive and frame is WriteStreamFrame
-        return PreAckVisitorState{
-            getAckIntervalSetVersion(*maybeAckedStreamState),
-            getLargestDeliverableOffset(*maybeAckedStreamState)};
-      }(packetFrame);
+      Optional<uint64_t> maybePreAckIntervalSetVersion =
+          getAckIntervalSetVersion(conn, packetFrame);
 
       // run the ACKed frame visitor
       auto result = ackedFrameVisitor(*outstandingPacket, packetFrame);
@@ -327,26 +322,21 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
         return folly::makeUnexpected(result.error());
       }
 
-      // Part 2 and 3: Process current state relative to the PreAckVistorState.
-      if (maybePreAckVisitorState.has_value()) {
-        const auto& preAckVisitorState = maybePreAckVisitorState.value();
-        const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
+      if (maybePreAckIntervalSetVersion.has_value()) {
+        auto ackedWriteFrame = packetFrame.asWriteStreamFrame();
+        Optional<uint64_t> maybePostAckIntervalSetVersion =
+            getAckIntervalSetVersion(conn, packetFrame);
+        CHECK(maybePostAckIntervalSetVersion.has_value())
+            << "Unable to get post-ack interval set version, even though "
+            << "pre-ack interval set version is available";
 
-        // check for change in ACK IntervalSet version
-        CHECK(maybeAckedStreamState);
-        if (preAckVisitorState.ackIntervalSetVersion !=
-            getAckIntervalSetVersion(*maybeAckedStreamState)) {
+        if (*maybePreAckIntervalSetVersion != *maybePostAckIntervalSetVersion) {
           // we were able to fill in a hole in the ACK interval
-          detailsPerStream.recordFrameDelivered(ackedFrame);
+          detailsPerStream.recordFrameDelivered(*ackedWriteFrame);
         } else {
           // we got an ACK of a frame that was already marked as delivered
           // when handling the ACK of some earlier packet; mark as such
-          detailsPerStream.recordFrameAlreadyDelivered(ackedFrame);
-
-          // should be no change in delivery offset
-          DCHECK(
-              preAckVisitorState.maybeLargestDeliverableOffset ==
-              getLargestDeliverableOffset(*maybeAckedStreamState));
+          detailsPerStream.recordFrameAlreadyDelivered(*ackedWriteFrame);
         }
       }
     }
