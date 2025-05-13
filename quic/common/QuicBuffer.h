@@ -152,6 +152,10 @@ class QuicBuffer {
 
   std::span<const uint8_t> coalesce();
 
+  // Removes the rest of the chain from this IOBuf, and returns it. If there is
+  // only one element in the chain, this is a no-op and returns nullptr.
+  std::unique_ptr<QuicBuffer> pop();
+
  protected:
   QuicBuffer(
       std::size_t capacity,

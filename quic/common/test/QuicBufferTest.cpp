@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <quic/common/QuicBuffer.h>
 
@@ -258,6 +259,51 @@ TEST(QuicBufferTest, TestTrimEnd) {
   EXPECT_EQ(memcmp(quicBuffer->data(), "hel", 3), 0);
   quicBuffer->trimEnd(3);
   EXPECT_EQ(quicBuffer->length(), 0);
+}
+
+TEST(QuicBufferTest, TestPopOneChainElement) {
+  const uint8_t* data = (const uint8_t*)"hello";
+
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 5 /* size */);
+  auto result = quicBuffer->pop();
+  EXPECT_EQ(result, nullptr);
+  EXPECT_EQ(quicBuffer->length(), 5);
+  EXPECT_EQ(quicBuffer->countChainElements(), 1);
+}
+
+TEST(QuicBufferTest, TestPopManyChainElements) {
+  const uint8_t* data1 = (const uint8_t*)"hello";
+  const uint8_t* data2 = (const uint8_t*)"my";
+  const uint8_t* data3 = (const uint8_t*)"friend";
+
+  auto quicBuffer1 = QuicBuffer::copyBuffer(data1, 5 /* size */);
+  EXPECT_EQ(quicBuffer1->countChainElements(), 1);
+
+  auto quicBuffer2 = QuicBuffer::copyBuffer(data2, 2 /* size */);
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+  EXPECT_EQ(quicBuffer1->countChainElements(), 2);
+
+  auto quicBuffer3 = QuicBuffer::copyBuffer(data3, 6 /* size */);
+  quicBuffer1->appendToChain(std::move(quicBuffer3));
+  EXPECT_EQ(quicBuffer1->countChainElements(), 3);
+
+  auto result = quicBuffer1->pop();
+  // Now,
+  // quicBuffer1 = "hello"
+  // result = "my", "friend"
+  EXPECT_EQ(result->computeChainDataLength(), 8);
+  EXPECT_EQ(result->countChainElements(), 2);
+  EXPECT_EQ(quicBuffer1->computeChainDataLength(), 5);
+  EXPECT_EQ(quicBuffer1->countChainElements(), 1);
+
+  auto result2 = result->pop();
+  // Now,
+  // result = "my"
+  // result 2 = "friend"
+  EXPECT_EQ(result2->countChainElements(), 1);
+  EXPECT_EQ(result2->computeChainDataLength(), 6);
+  EXPECT_EQ(result->computeChainDataLength(), 2);
+  EXPECT_EQ(result->countChainElements(), 1);
 }
 
 } // namespace quic

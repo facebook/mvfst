@@ -149,6 +149,15 @@ std::span<const uint8_t> QuicBuffer::coalesce() {
   return {data_, data_ + length_};
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::pop() {
+  QuicBuffer* next = next_;
+  next_->prev_ = prev_;
+  prev_->next_ = next_;
+  prev_ = this;
+  next_ = this;
+  return std::unique_ptr<QuicBuffer>((next == this) ? nullptr : next);
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::cloneOneImpl() const {
   return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
       capacity_, data_, buf_, length_, sharedBuffer_));
