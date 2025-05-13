@@ -62,6 +62,10 @@ class QuicBuffer {
 
   static std::unique_ptr<QuicBuffer> wrapBuffer(std::span<const uint8_t> span);
 
+  static QuicBuffer wrapBufferAsValue(
+      const void* buf,
+      std::size_t capacity) noexcept;
+
   void advance(std::size_t amount) noexcept;
 
   /*

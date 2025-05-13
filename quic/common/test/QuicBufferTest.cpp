@@ -320,4 +320,14 @@ TEST(QuicBufferTest, TestEmpty) {
   EXPECT_FALSE(quicBuffer1->empty());
 }
 
+TEST(QuicBufferTest, TestWrapBufferAsValue) {
+  const auto* data = (const uint8_t*)"hello";
+  auto quicBuffer = QuicBuffer::wrapBufferAsValue((void*)data, 5);
+  EXPECT_EQ(quicBuffer.capacity(), 5);
+  EXPECT_EQ(quicBuffer.length(), 5);
+  EXPECT_EQ(quicBuffer.headroom(), 0);
+  EXPECT_EQ(quicBuffer.tailroom(), 0);
+  EXPECT_EQ(quicBuffer.data(), data);
+}
+
 } // namespace quic
