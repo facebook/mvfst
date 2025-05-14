@@ -1198,7 +1198,7 @@ void QuicTransportBaseLite::checkForClosedStream() {
     VLOG(10) << "Closing stream=" << *itr;
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(
-          getClosingStream(folly::to<std::string>(*itr)));
+          getClosingStream(fmt::format("{}", *itr)));
     }
     if (connCallback_) {
       connCallback_->onStreamPreReaped(*itr);
@@ -1531,12 +1531,10 @@ void QuicTransportBaseLite::closeImpl(
           sendCloseImmediately);
     }
   } else if (conn_->qLogger) {
-    auto reason = folly::to<std::string>(
-        "Server: ",
+    auto reason = fmt::format(
+        "Server: {}, Peer: isReset: {}, Peer: isAbandon: {}",
         kNoError,
-        ", Peer: isReset: ",
         isReset,
-        ", Peer: isAbandon: ",
         isAbandon);
     conn_->qLogger->addConnectionClose(
         kNoError, std::move(reason), drainConnection, sendCloseImmediately);
@@ -2299,9 +2297,9 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
   closeImpl(
       quic::QuicError(
           QuicErrorCode(localError),
-          folly::to<std::string>(
+          fmt::format(
+              "{}, num non control streams: {}",
               toString(localError),
-              ", num non control streams: ",
               numOpenStreans - conn_->streamManager->numControlStreams())),
       drain /* drainConnection */,
       !drain /* sendCloseImmediately */);

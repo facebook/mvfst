@@ -193,8 +193,7 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnStreamData(
   if (stream.flowControlState.advertisedMaxOffset < bufferEndOffset) {
     return folly::makeUnexpected(QuicError(
         TransportErrorCode::FLOW_CONTROL_ERROR,
-        folly::to<std::string>(
-            "Stream flow control violation on stream ", stream.id)));
+        fmt::format("Stream flow control violation on stream {}", stream.id)));
   }
   auto curMaxOffsetObserved =
       std::max(previousMaxOffsetObserved, bufferEndOffset);

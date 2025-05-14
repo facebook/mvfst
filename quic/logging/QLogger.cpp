@@ -12,32 +12,33 @@
 namespace quic {
 
 std::string getFlowControlEvent(int offset) {
-  return "flow control event, new offset: " + folly::to<std::string>(offset);
+  return fmt::format("flow control event, new offset: {}", offset);
 }
 
 std::string
 getRxStreamWU(StreamId streamId, PacketNum packetNum, uint64_t maximumData) {
-  return "rx stream, streamId: " + folly::to<std::string>(streamId) +
-      ", packetNum: " + folly::to<std::string>(packetNum) +
-      ", maximumData: " + folly::to<std::string>(maximumData);
+  return fmt::format(
+      "rx stream, streamId: {}, packetNum: {}, maximumData: {}",
+      streamId,
+      packetNum,
+      maximumData);
 }
 
 std::string getRxConnWU(PacketNum packetNum, uint64_t maximumData) {
-  return "rx, packetNum: " + folly::to<std::string>(packetNum) +
-      ", maximumData: " + folly::to<std::string>(maximumData);
+  return fmt::format(
+      "rx, packetNum: {}, maximumData: {}", packetNum, maximumData);
 }
 
 std::string getPeerClose(const std::string& peerCloseReason) {
-  return "error message: " + peerCloseReason;
+  return fmt::format("error message: {}", peerCloseReason);
 }
 
 std::string getFlowControlWindowAvailable(uint64_t windowAvailable) {
-  return "on flow control, window available: " +
-      folly::to<std::string>(windowAvailable);
+  return fmt::format("on flow control, window available: {}", windowAvailable);
 }
 
 std::string getClosingStream(const std::string& streamId) {
-  return "closing stream, stream id: " + streamId;
+  return fmt::format("closing stream, stream id: {}", streamId);
 }
 
 } // namespace quic

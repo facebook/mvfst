@@ -58,8 +58,8 @@ folly::Expected<folly::Unit, QuicError> onResetQuicStream(
     return folly::makeUnexpected(QuicError(
         TransportErrorCode::STREAM_STATE_ERROR,
         "Read offset mismatch, " +
-            folly::to<std::string>(stream.finalReadOffset.value()) +
-            " != " + folly::to<std::string>(frame.finalSize)));
+            fmt::format(
+                "{} != {}", stream.finalReadOffset.value(), frame.finalSize)));
   }
   if (stream.streamReadError &&
       stream.streamReadError.value().asApplicationErrorCode() &&

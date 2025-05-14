@@ -332,13 +332,13 @@ BufPtr QuicAddrValidationToken::getPlaintextToken() const {
 }
 
 BufPtr RetryToken::genAeadAssocData() const {
-  return BufHelpers::copyBuffer(folly::to<std::string>(
-      toString(tokenType), originalDstConnId.hex() + clientIp.str()));
+  return BufHelpers::copyBuffer(fmt::format(
+      "{}{}{}", toString(tokenType), originalDstConnId.hex(), clientIp.str()));
 }
 
 BufPtr NewToken::genAeadAssocData() const {
   return BufHelpers::copyBuffer(
-      folly::to<std::string>(toString(tokenType), clientIp.str()));
+      fmt::format("{}{}", toString(tokenType), clientIp.str()));
 }
 
 std::string_view toString(PacketNumberSpace pnSpace) {

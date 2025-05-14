@@ -22,12 +22,11 @@ std::string Bandwidth::unitName() const noexcept {
 }
 
 std::string Bandwidth::describe() const noexcept {
-  return folly::to<std::string>(
-      units, " ", unitName(), "/", interval.count(), "us");
+  return fmt::format("{} {}/{}us", units, unitName(), interval.count());
 }
 
 std::string Bandwidth::normalizedDescribe() const noexcept {
-  return folly::to<std::string>(normalize(), " ", unitName(), "/s");
+  return fmt::format("{} {}/s", normalize(), unitName());
 }
 
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs) {

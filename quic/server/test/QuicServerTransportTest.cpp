@@ -1421,8 +1421,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
   EXPECT_EQ(
       server->getConn().peerConnectionError->code,
       QuicErrorCode(TransportErrorCode::NO_ERROR));
-  auto closedMsg =
-      folly::to<std::string>("Server closed by peer reason=", errMsg);
+  auto closedMsg = fmt::format("Server closed by peer reason={}", errMsg);
   EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent(
@@ -1516,8 +1515,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
     EXPECT_EQ(
         server->getConn().peerConnectionError->code,
         QuicErrorCode(TransportErrorCode::NO_ERROR));
-    auto closedMsg =
-        folly::to<std::string>("Server closed by peer reason=", errMsg);
+    auto closedMsg = fmt::format("Server closed by peer reason={}", errMsg);
     EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
     EXPECT_TRUE(server->isClosed());
     EXPECT_TRUE(verifyFramePresent(
@@ -1560,8 +1558,7 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
   EXPECT_EQ(
       server->getConn().peerConnectionError->code,
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN));
-  auto closedMsg =
-      folly::to<std::string>("Server closed by peer reason=", errMsg);
+  auto closedMsg = fmt::format("Server closed by peer reason={}", errMsg);
   EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent(
@@ -1597,8 +1594,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
   EXPECT_EQ(
       server->getConn().peerConnectionError->code,
       QuicErrorCode(TransportErrorCode::NO_ERROR));
-  auto closedMsg =
-      folly::to<std::string>("Server closed by peer reason=", errMsg);
+  auto closedMsg = fmt::format("Server closed by peer reason={}", errMsg);
   EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent(

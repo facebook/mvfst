@@ -67,8 +67,8 @@ folly::Expected<folly::Unit, QuicError> sendStopSendingSMHandler(
     case StreamSendState::Invalid: {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
-          folly::to<std::string>(
-              "Invalid transition from state=",
+          fmt::format(
+              "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
@@ -120,8 +120,8 @@ folly::Expected<folly::Unit, QuicError> sendRstSMHandler(
     case StreamSendState::Invalid: {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
-          folly::to<std::string>(
-              "Invalid transition from state=",
+          fmt::format(
+              "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
@@ -196,8 +196,8 @@ folly::Expected<folly::Unit, QuicError> sendAckSMHandler(
     case StreamSendState::Invalid: {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
-          folly::to<std::string>(
-              "Invalid transition from state=",
+          fmt::format(
+              "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
@@ -238,8 +238,8 @@ folly::Expected<folly::Unit, QuicError> sendRstAckSMHandler(
     case StreamSendState::Invalid: {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
-          folly::to<std::string>(
-              "Invalid transition from state=",
+          fmt::format(
+              "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }

@@ -615,8 +615,8 @@ std::string QuicReadCodec::connIdToHex() const {
   static ConnectionId zeroConn = ConnectionId::createZeroLength();
   const auto& serverId = serverConnectionId_.value_or(zeroConn);
   const auto& clientId = clientConnectionId_.value_or(zeroConn);
-  return folly::to<std::string>(
-      "server=", serverId.hex(), " ", "client=", clientId.hex());
+  return fmt::format(
+      "server={} client={}", serverId.hex(), "client=", clientId.hex());
 }
 
 CodecResult::CodecResult(RegularQuicPacket&& regularPacketIn)

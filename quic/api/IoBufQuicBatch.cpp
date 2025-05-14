@@ -138,14 +138,13 @@ folly::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
       (happyEyeballsState_ && !happyEyeballsState_->shouldWriteToFirstSocket &&
        !happyEyeballsState_->shouldWriteToSecondSocket)) {
     auto firstSocketErrorMsg = firstSocketErrno.has_value()
-        ? folly::to<std::string>(
-              folly::errnoStr(firstSocketErrno.value()), ", ")
+        ? fmt::format("{}, ", folly::errnoStr(firstSocketErrno.value()))
         : "";
     auto secondSocketErrorMsg = secondSocketErrno.has_value()
         ? folly::errnoStr(secondSocketErrno.value())
         : "";
     auto errorMsg =
-        folly::to<std::string>(firstSocketErrorMsg, secondSocketErrorMsg);
+        fmt::format("{}{}", firstSocketErrorMsg, secondSocketErrorMsg);
     // Both sockets becomes fatal, close connection
     VLOG(4) << "Error writing to the socket " << errorMsg << " "
             << peerAddress_;
@@ -155,11 +154,11 @@ folly::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
     if (isNetworkUnreachable(errno)) {
       return folly::makeUnexpected(QuicError(
           LocalErrorCode::CONNECTION_ABANDONED,
-          folly::to<std::string>("Error on socket write ", errorMsg)));
+          fmt::format("Error on socket write {}", errorMsg)));
     } else {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::INTERNAL_ERROR,
-          folly::to<std::string>("Error on socket write ", errorMsg)));
+          fmt::format("Error on socket write {}", errorMsg)));
     }
   }
 

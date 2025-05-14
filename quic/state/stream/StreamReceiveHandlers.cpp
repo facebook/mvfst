@@ -71,8 +71,8 @@ folly::Expected<folly::Unit, QuicError> receiveReadStreamFrameSMHandler(
     case StreamRecvState::Invalid: {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
-          folly::to<std::string>(
-              "Invalid transition from state=",
+          fmt::format(
+              "Invalid transition from state={}",
               streamStateToString(stream.recvState))));
     }
   }
@@ -115,8 +115,8 @@ folly::Expected<folly::Unit, QuicError> receiveRstStreamSMHandler(
     case StreamRecvState::Invalid: {
       return folly::makeUnexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
-          folly::to<std::string>(
-              "Invalid transition from state=",
+          fmt::format(
+              "Invalid transition from state={}",
               streamStateToString(stream.recvState))));
     }
   }

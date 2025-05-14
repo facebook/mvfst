@@ -49,7 +49,7 @@ void QuicClientAsyncTransport::onConnectionEnd() noexcept {
 void QuicClientAsyncTransport::onConnectionError(QuicError error) noexcept {
   folly::AsyncSocketException ex(
       folly::AsyncSocketException::UNKNOWN,
-      folly::to<std::string>("Quic connection error", error.message));
+      fmt::format("Quic connection error {}", error.message));
   // TODO: closeNow inside this callback may actually trigger graceful close
   closeNowImpl(std::move(ex));
 }

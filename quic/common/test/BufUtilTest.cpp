@@ -511,7 +511,7 @@ TEST(BufWriterTest, BufQueueChainCopyPartial) {
   outputBuffer->append(bufWriter.getBytesWritten());
   Cursor reader(outputBuffer.get());
   EXPECT_EQ(
-      folly::to<std::string>(testStr1, "That you l"),
+      fmt::format("{}That you l", testStr1),
       reader.readFixedString(testStr1.size() + 10));
 }
 

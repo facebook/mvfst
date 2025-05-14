@@ -291,11 +291,11 @@ Handshake::TLSSummary FizzClientHandshake::getTLSSummary() const {
   }
   if (state_.group().has_value()) {
     summary.namedGroup =
-        folly::to<std::string>(fizz::toString(state_.group().value()));
+        fmt::format("{}", fizz::toString(state_.group().value()));
   }
   if (state_.pskType().has_value()) {
     summary.pskType =
-        folly::to<std::string>(fizz::toString(state_.pskType().value()));
+        fmt::format("{}", fizz::toString(state_.pskType().value()));
   }
   if (state_.echState().has_value()) {
     summary.echStatus =

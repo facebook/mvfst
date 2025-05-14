@@ -307,8 +307,8 @@ folly::Expected<folly::Unit, QuicError> processServerInitialParams(
   if (*packetSize < kMinMaxUDPPayload) {
     return folly::makeUnexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
-        folly::to<std::string>(
-            "Max packet size too small. received max_packetSize = ",
+        fmt::format(
+            "Max packet size too small. received max_packetSize = {}",
             *packetSize)));
   }
 

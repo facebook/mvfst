@@ -1411,7 +1411,7 @@ TEST_F(QLoggerTest, PrettyStream) {
   EXPECT_EQ(q->logs.size(), 0);
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+      fmt::format("{}/{}.qlog", dir, (q->dcid.value()).hex());
   delete q;
 
   std::ifstream file(outputPath, std::ifstream::in);
@@ -1522,7 +1522,7 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   EXPECT_EQ(q->logs.size(), 0);
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+      fmt::format("{}/{}.qlog", dir, (q->dcid.value()).hex());
   delete q;
 
   std::ifstream file(outputPath, std::ifstream::in);
@@ -1566,7 +1566,7 @@ TEST_F(QLoggerTest, CompressedStream) {
   EXPECT_EQ(q->logs.size(), 0);
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog.gz");
+      fmt::format("{}/{}.qlog.gz", dir, (q->dcid.value()).hex());
   LOG(INFO) << outputPath;
   delete q;
 
@@ -1614,7 +1614,7 @@ TEST_F(QLoggerTest, CompressedNonStream) {
   q.outputLogsToFile(dir, false);
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q.dcid.value()).hex(), ".qlog.gz");
+      fmt::format("{}/{}.qlog.gz", dir, (q.dcid.value()).hex());
 
   std::string compressedData;
   auto success = folly::readFile(outputPath.c_str(), compressedData);
@@ -1660,7 +1660,7 @@ TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
       0); // Packet is not written but also not being kept in memory
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog.gz");
+      fmt::format("{}/{}.qlog.gz", dir, (q->dcid.value()).hex());
 
   delete q;
 
@@ -1762,7 +1762,7 @@ TEST_F(QLoggerTest, PrettyDatagram) {
   EXPECT_EQ(q->logs.size(), 0);
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+      fmt::format("{}/{}.qlog", dir, (q->dcid.value()).hex());
   delete q;
 
   std::ifstream file(outputPath, std::ifstream::in);
@@ -1919,7 +1919,7 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
   EXPECT_EQ(q->logs.size(), 0);
 
   std::string outputPath =
-      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+      fmt::format("{}/{}.qlog", dir, (q->dcid.value()).hex());
   delete q;
 
   std::ifstream file(outputPath, std::ifstream::in);

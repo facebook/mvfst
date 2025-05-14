@@ -24,8 +24,8 @@ folly::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
   if (!parameter) {
     return folly::makeUnexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
-        folly::to<std::string>(
-            "Failed to decode integer from TransportParameterId: ",
+        fmt::format(
+            "Failed to decode integer from TransportParameterId: {}",
             u64_tp(id))));
   }
   return Optional<uint64_t>(parameter->first);

@@ -37,7 +37,7 @@ void FileQLogger::setupStream() {
   endLine_ = prettyJson_ ? "\n" : "";
   auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
   std::string outputPath =
-      folly::to<std::string>(path_, "/", (dcid.value()).hex(), extension);
+      fmt::format("{}/{}{}", path_, (dcid.value()).hex(), extension);
   try {
     writer_ = std::make_unique<folly::AsyncFileWriter>(outputPath);
   } catch (const std::system_error& err) {
@@ -138,7 +138,7 @@ void FileQLogger::finishStream() {
   std::string summaryPadding = "";
   // add padding to every line in the summary except the first
   while (getline(summaryBuffer, line)) {
-    writeToStream(folly::to<std::string>(summaryPadding, line, endLine_));
+    writeToStream(fmt::format("{}{}{}", summaryPadding, line, endLine_));
     summaryPadding = basePadding_;
   }
   writeToStream(folly::StringPiece("}"));
@@ -182,7 +182,7 @@ void FileQLogger::handleEvent(std::unique_ptr<QLogEvent> event) {
     // add padding to every line in the event
     while (getline(eventBuffer, line)) {
       writeToStream(endLine_);
-      writeToStream(folly::to<std::string>(basePadding_, eventsPadding_, line));
+      writeToStream(fmt::format("{}{}{}", basePadding_, eventsPadding_, line));
     }
 
   } else {
@@ -549,7 +549,7 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   }
   auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
   std::string outputPath =
-      folly::to<std::string>(path, "/", (dcid.value()).hex(), extension);
+      fmt::format("{}/{}{}", path, (dcid.value()).hex(), extension);
 
   std::ofstream fileObj(outputPath);
   if (fileObj) {

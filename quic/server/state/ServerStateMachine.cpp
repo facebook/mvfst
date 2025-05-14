@@ -424,8 +424,8 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
   if (packetSize && *packetSize < kMinMaxUDPPayload) {
     return folly::makeUnexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
-        folly::to<std::string>(
-            "Max packet size too small. received max_packetSize = ",
+        fmt::format(
+            "Max packet size too small. received max_packetSize = {}",
             *packetSize)));
   }
 
@@ -1512,8 +1512,8 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         case QuicFrame::Type::ConnectionCloseFrame: {
           isNonProbingPacket = true;
           ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
-          auto errMsg = folly::to<std::string>(
-              "Server closed by peer reason=", connFrame.reasonPhrase);
+          auto errMsg = fmt::format(
+              "Server closed by peer reason={}", connFrame.reasonPhrase);
           VLOG(4) << errMsg << " " << conn;
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
@@ -1809,8 +1809,8 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
     switch (quicFrame.type()) {
       case QuicFrame::Type::ConnectionCloseFrame: {
         ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
-        auto errMsg = folly::to<std::string>(
-            "Server closed by peer reason=", connFrame.reasonPhrase);
+        auto errMsg = fmt::format(
+            "Server closed by peer reason={}", connFrame.reasonPhrase);
         VLOG(4) << errMsg << " " << conn;
         if (conn.qLogger) {
           conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));

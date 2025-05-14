@@ -117,8 +117,8 @@ quic::CongestionControlType flagsToCongestionControlType(
     const std::string& congestionControlFlag) {
   auto ccType = quic::congestionControlStrToType(congestionControlFlag);
   if (!ccType) {
-    throw std::invalid_argument(folly::to<std::string>(
-        "Unknown congestion controller ", congestionControlFlag));
+    throw std::invalid_argument(
+        fmt::format("Unknown congestion controller {}", congestionControlFlag));
   }
   return *ccType;
 }

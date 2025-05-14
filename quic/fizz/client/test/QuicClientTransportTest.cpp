@@ -3142,8 +3142,8 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   auto tmp2 = std::move(qLogger->logs[indices[1]]);
   auto event2 = dynamic_cast<QLogConnectionCloseEvent*>(tmp2.get());
   EXPECT_EQ(event2->error, kNoError);
-  auto reason = folly::to<std::string>(
-      "Server: ", kNoError, ", Peer: isReset: ", 0, ", Peer: isAbandon: ", 0);
+  auto reason = fmt::format(
+      "Server: {}, Peer: isReset: false, Peer: isAbandon: false", kNoError);
   EXPECT_EQ(event2->reason, reason);
   EXPECT_TRUE(event2->drainConnection);
   EXPECT_TRUE(event2->sendCloseImmediately);

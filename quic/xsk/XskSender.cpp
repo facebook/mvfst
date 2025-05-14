@@ -216,8 +216,8 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::bind(int queueId) {
         xskFd_, queueId, xskSenderConfig_.sharedState->sharedXskFd);
   }
   if (bind_result < 0) {
-    std::string errorMsg = folly::to<std::string>(
-        "Failed to bind xdp socket: ", folly::errnoStr(errno));
+    std::string errorMsg =
+        fmt::format("Failed to bind xdp socket: {}", folly::errnoStr(errno));
     return folly::makeUnexpected(std::runtime_error(errorMsg));
   }
 

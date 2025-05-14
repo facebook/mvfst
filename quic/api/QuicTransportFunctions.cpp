@@ -45,43 +45,37 @@ std::string optionalToString(const quic::Optional<quic::PacketNum>& packetNum) {
   if (!packetNum) {
     return "-";
   }
-  return folly::to<std::string>(*packetNum);
+  return fmt::format("{}", *packetNum);
 }
 
 std::string largestAckScheduledToString(
     const quic::QuicConnectionStateBase& conn) noexcept {
-  return folly::to<std::string>(
-      "[",
+  return fmt::format(
+      "[{},{},{}]",
       optionalToString(
           conn.ackStates.initialAckState
               ? conn.ackStates.initialAckState->largestAckScheduled
               : std::nullopt),
-      ",",
       optionalToString(
           conn.ackStates.handshakeAckState
               ? conn.ackStates.handshakeAckState->largestAckScheduled
               : std::nullopt),
-      ",",
-      optionalToString(conn.ackStates.appDataAckState.largestAckScheduled),
-      "]");
+      optionalToString(conn.ackStates.appDataAckState.largestAckScheduled));
 }
 
 std::string largestAckToSendToString(
     const quic::QuicConnectionStateBase& conn) noexcept {
-  return folly::to<std::string>(
-      "[",
+  return fmt::format(
+      "[{},{},{}]",
       optionalToString(
           conn.ackStates.initialAckState
               ? largestAckToSend(*conn.ackStates.initialAckState)
               : std::nullopt),
-      ",",
       optionalToString(
           conn.ackStates.handshakeAckState
               ? largestAckToSend(*conn.ackStates.handshakeAckState)
               : std::nullopt),
-      ",",
-      optionalToString(largestAckToSend(conn.ackStates.appDataAckState)),
-      "]");
+      optionalToString(largestAckToSend(conn.ackStates.appDataAckState)));
 }
 
 using namespace quic;

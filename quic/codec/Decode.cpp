@@ -1198,7 +1198,7 @@ folly::Expected<QuicFrame, QuicError> parseFrame(
 
   return folly::makeUnexpected(QuicError(
       TransportErrorCode::FRAME_ENCODING_ERROR,
-      folly::to<std::string>("Unknown frame, type=", frameTypeInt->first)));
+      fmt::format("Unknown frame, type={}", frameTypeInt->first)));
 }
 
 // Parse packet

@@ -52,8 +52,8 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
     if (streamWriteOffset.hasError()) {
       folly::AsyncSocketException ex(
           folly::AsyncSocketException::INTERNAL_ERROR,
-          folly::to<std::string>(
-              "QuicSocket::getStreamWriteOffset error: ",
+          fmt::format(
+              "QuicSocket::getStreamWriteOffset error: {}",
               toString(streamWriteOffset.error())));
       closeNowImpl(std::move(ex));
       return;
@@ -328,7 +328,7 @@ void QuicStreamAsyncTransport::readError(
     QuicError error) noexcept {
   ex_ = folly::AsyncSocketException(
       folly::AsyncSocketException::UNKNOWN,
-      folly::to<std::string>("Quic read error: ", toString(error)));
+      fmt::format("Quic read error: {}", toString(error)));
   sock_->getEventBase()->runInLoop(this, true);
   // TODO: RST here?
 }
@@ -360,7 +360,7 @@ void QuicStreamAsyncTransport::handleRead() {
     if (readData.hasError()) {
       ex_ = folly::AsyncSocketException(
           folly::AsyncSocketException::UNKNOWN,
-          folly::to<std::string>("Quic read error: ", readData.error()));
+          fmt::format("Quic read error: {}", toString(readData.error())));
     } else {
       if (!readData->first) {
         emptyRead = true;
@@ -423,7 +423,7 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   if (res.hasError()) {
     folly::AsyncSocketException ex(
         folly::AsyncSocketException::UNKNOWN,
-        folly::to<std::string>("Quic write error: ", toString(res.error())));
+        fmt::format("Quic write error: {}", toString(res.error())));
     failWrites(ex);
     return;
   }
@@ -435,7 +435,7 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
     if (!res2) {
       folly::AsyncSocketException ex(
           folly::AsyncSocketException::UNKNOWN,
-          folly::to<std::string>("Quic write error: ", toString(res2.error())));
+          fmt::format("Quic write error: {}", toString(res2.error())));
       failWrites(ex);
       return;
     }
@@ -490,7 +490,7 @@ void QuicStreamAsyncTransport::onStreamWriteError(
   if (writeEOF_ != EOFState::DELIVERED) {
     closeNowImpl(folly::AsyncSocketException(
         folly::AsyncSocketException::UNKNOWN,
-        folly::to<std::string>("Quic write error: ", toString(error))));
+        fmt::format("Quic write error: {}", toString(error))));
   }
 }
 

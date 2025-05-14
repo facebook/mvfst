@@ -679,8 +679,8 @@ QuicClientTransportLite::processUdpPacketData(
       }
       case QuicFrame::Type::ConnectionCloseFrame: {
         ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
-        auto errMsg = folly::to<std::string>(
-            "Client closed by peer reason=", connFrame.reasonPhrase);
+        auto errMsg = fmt::format(
+            "Client closed by peer reason={}", connFrame.reasonPhrase);
         VLOG(4) << errMsg << " " << *this;
         // we want to deliver app callbacks with the peer supplied error,
         // but send a NO_ERROR to the peer.
@@ -1347,8 +1347,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMsg(
       if (familyResult.hasError()) {
         return folly::makeUnexpected(QuicError(
             QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-            folly::to<std::string>(
-                "Failed to get address family: ",
+            fmt::format(
+                "Failed to get address family: {}",
                 familyResult.error().message)));
       }
       rawAddr->sa_family = familyResult.value();
@@ -1424,8 +1424,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMsg(
       }
       return folly::makeUnexpected(QuicError(
           QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
-          folly::to<std::string>(
-              "recvmsg() failed, errno=", errno, " ", folly::errnoStr(errno))));
+          fmt::format(
+              "recvmsg() failed, errno={} {}", errno, folly::errnoStr(errno))));
     } else if (ret == 0) {
       break;
     }
@@ -1522,8 +1522,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvFrom(
       if (familyResult.hasError()) {
         return folly::makeUnexpected(QuicError(
             QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-            folly::to<std::string>(
-                "Failed to get address family: ",
+            fmt::format(
+                "Failed to get address family: {}",
                 familyResult.error().message)));
       }
       rawAddr->sa_family = familyResult.value();
@@ -1547,10 +1547,9 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvFrom(
       }
       return folly::makeUnexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-          folly::to<std::string>(
-              "recvfrom() failed, errno=",
+          fmt::format(
+              "recvfrom() failed, errno={} {}",
               errno,
-              " ",
               folly::errnoStr(errno))));
     } else if (ret == 0) {
       break;
@@ -1587,8 +1586,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMmsg(
   if (groResult.hasError()) {
     return folly::makeUnexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        folly::to<std::string>(
-            "Failed to get GRO status: ", groResult.error().message)));
+        fmt::format(
+            "Failed to get GRO status: {}", groResult.error().message)));
   }
   bool useGRO = groResult.value() > 0;
 
@@ -1596,8 +1595,9 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMmsg(
   if (tsResult.hasError()) {
     return folly::makeUnexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        folly::to<std::string>(
-            "Failed to get timestamping status: ", tsResult.error().message)));
+        fmt::format(
+            "Failed to get timestamping status: {}",
+            tsResult.error().message)));
   }
   bool useTs = tsResult.value() > 0;
 
@@ -1605,8 +1605,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMmsg(
   if (tosResult.hasError()) {
     return folly::makeUnexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        folly::to<std::string>(
-            "Failed to get TOS status: ", tosResult.error().message)));
+        fmt::format(
+            "Failed to get TOS status: {}", tosResult.error().message)));
   }
   bool recvTos = tosResult.value();
 
@@ -1641,8 +1641,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMmsg(
     if (addrResult.hasError()) {
       return folly::makeUnexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-          folly::to<std::string>(
-              "Failed to get socket address: ", addrResult.error().message)));
+          fmt::format(
+              "Failed to get socket address: {}", addrResult.error().message)));
     }
     rawAddr->sa_family = addrResult.value().getFamily();
     msg->msg_name = rawAddr;
@@ -1673,8 +1673,8 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransportLite::recvMmsg(
     }
     return folly::makeUnexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        folly::to<std::string>(
-            "recvmmsg() failed, errno=", errno, " ", folly::errnoStr(errno))));
+        fmt::format(
+            "recvmmsg() failed, errno={} {}", errno, folly::errnoStr(errno))));
   }
 
   CHECK_LE(numMsgsRecvd, numPackets);
