@@ -37,7 +37,7 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
     auto packetNum = packet.packet.header.getPacketSequenceNum();
     auto packetNumberSpace = packet.packet.header.getPacketNumberSpace();
     ClonedPacketIdentifier event(packetNumberSpace, packetNum);
-    DCHECK(!conn_.outstandings.clonedPacketIdentifiers.count(event));
+    DCHECK(!conn_.outstandings.clonedPacketIdentifiers.contains(event));
     packet.maybeClonedPacketIdentifier = event;
     conn_.outstandings.clonedPacketIdentifiers.insert(event);
     ++conn_.outstandings
