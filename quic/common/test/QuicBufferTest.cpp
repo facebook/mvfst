@@ -145,7 +145,7 @@ TEST(QuicBufferTest, TestAdvanceNotEnoughRoom) {
 
 TEST(QuicBufferTest, TestCopyBufferSpan) {
   const uint8_t* data = (const uint8_t*)"hello";
-  std::span range(data, 5);
+  ByteRange range(data, 5);
   auto quicBuffer =
       QuicBuffer::copyBuffer(range, 1 /*headroom*/, 3 /*tailroom*/);
   EXPECT_EQ(quicBuffer->length(), 5);
@@ -182,7 +182,7 @@ TEST(QuicBufferTest, TestWrapBufferPointer) {
 
 TEST(QuicBufferTest, TestWrapBufferSpan) {
   const auto* data = (const uint8_t*)"hello";
-  std::span range(data, 5);
+  ByteRange range(data, 5);
   auto quicBuffer = QuicBuffer::wrapBuffer(range);
   EXPECT_EQ(quicBuffer->capacity(), 5);
   EXPECT_EQ(quicBuffer->headroom(), 0);

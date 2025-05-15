@@ -7,9 +7,9 @@
 
 #pragma once
 
+#include <quic/common/QuicRange.h>
 #include <cstring>
 #include <memory>
-#include <span>
 
 namespace quic {
 
@@ -41,7 +41,7 @@ class QuicBuffer {
   }
 
   static std::unique_ptr<QuicBuffer> copyBuffer(
-      std::span<const uint8_t> span,
+      ByteRange span,
       std::size_t headroom = 0,
       std::size_t minTailroom = 0);
 
@@ -60,7 +60,7 @@ class QuicBuffer {
       void* buf,
       std::size_t capacity);
 
-  static std::unique_ptr<QuicBuffer> wrapBuffer(std::span<const uint8_t> span);
+  static std::unique_ptr<QuicBuffer> wrapBuffer(ByteRange range);
 
   static QuicBuffer wrapBufferAsValue(
       const void* buf,
@@ -156,7 +156,7 @@ class QuicBuffer {
     return cloneOneImpl();
   }
 
-  std::span<const uint8_t> coalesce();
+  ByteRange coalesce();
 
   // Removes the rest of the chain from this IOBuf, and returns it. If there is
   // only one element in the chain, this is a no-op and returns nullptr.

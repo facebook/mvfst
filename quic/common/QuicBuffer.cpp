@@ -47,11 +47,11 @@ QuicBuffer::~QuicBuffer() {
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
-    std::span<const uint8_t> span,
+    ByteRange range,
     std::size_t headroom,
     std::size_t minTailroom) {
   return copyBuffer(
-      span.data(), (span.end() - span.begin()), headroom, minTailroom);
+      range.data(), (range.end() - range.begin()), headroom, minTailroom);
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
@@ -83,9 +83,8 @@ std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(
       capacity, (uint8_t*)buf, (uint8_t*)buf, capacity, nullptr));
 }
 
-std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(
-    std::span<const uint8_t> span) {
-  return wrapBuffer((void*)span.data(), span.size());
+std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(ByteRange range) {
+  return wrapBuffer((void*)range.data(), range.size());
 }
 
 QuicBuffer QuicBuffer::wrapBufferAsValue(
@@ -146,13 +145,13 @@ std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
   return tmp;
 }
 
-std::span<const uint8_t> QuicBuffer::coalesce() {
+ByteRange QuicBuffer::coalesce() {
   if (isChained()) {
     const std::size_t newHeadroom = headroom();
     const std::size_t newTailroom = prev()->tailroom();
     coalesceAndReallocate(newHeadroom, computeChainDataLength(), newTailroom);
   }
-  return {data_, data_ + length_};
+  return ByteRange(data_, length_);
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::pop() {
