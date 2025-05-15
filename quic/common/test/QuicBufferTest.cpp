@@ -8,8 +8,14 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <quic/common/QuicBuffer.h>
+#include <quic/common/QuicRange.h>
 
 namespace quic {
+
+std::string toString(const ByteRange& byteRange) {
+  return std::string(
+      reinterpret_cast<const char*>(byteRange.begin()), byteRange.size());
+}
 
 TEST(QuicBufferTest, TestBasic) {
   auto quicBuffer = QuicBuffer::create(100);
@@ -328,6 +334,21 @@ TEST(QuicBufferTest, TestWrapBufferAsValue) {
   EXPECT_EQ(quicBuffer.headroom(), 0);
   EXPECT_EQ(quicBuffer.tailroom(), 0);
   EXPECT_EQ(quicBuffer.data(), data);
+}
+
+TEST(QuicBufferTest, TestRange) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  ByteRange range(data, 5);
+  EXPECT_FALSE(range.empty());
+  EXPECT_EQ(range.begin(), data);
+  EXPECT_EQ(range.end(), data + 5);
+  EXPECT_EQ(range.size(), 5);
+  EXPECT_EQ(toString(range), std::string("hello"));
+  range.advance(2);
+  EXPECT_EQ(toString(range), std::string("llo"));
+  EXPECT_EQ(range[0], 'l');
+  range.advance(3);
+  EXPECT_TRUE(range.empty());
 }
 
 } // namespace quic

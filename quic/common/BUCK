@@ -21,6 +21,7 @@ mvfst_cpp_library(
     ],
     headers = [
         "QuicBuffer.h",
+        "QuicRange.h",
     ],
     deps = [
     ],
