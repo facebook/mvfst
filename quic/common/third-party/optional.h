@@ -33,6 +33,7 @@ Original repository: https://github.com/Sedeniono/tiny-optional
 #include <cassert>
 #include <climits>
 #include <cstdint> // Required for std::uint64_t etc.
+#include <cstdlib> // Required for std::abort.
 #include <cstring> // Required for memcpy
 #include <functional> // Required for std::hash and std::invoke
 #include <limits> // Required for std::numeric_limits
