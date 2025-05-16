@@ -159,9 +159,21 @@ bool ClientHandshake::waitingForData() const {
 }
 
 void ClientHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
-  std::unique_ptr<Aead> aead = buildAead(kind, secret);
+  auto aeadResult = buildAead(kind, secret);
+  if (aeadResult.hasError()) {
+    error_ = folly::makeUnexpected(std::move(aeadResult.error()));
+    return;
+  }
+  auto packetNumberCipherResult = buildHeaderCipher(secret);
+  if (packetNumberCipherResult.hasError()) {
+    error_ = folly::makeUnexpected(std::move(packetNumberCipherResult.error()));
+    return;
+  }
+
+  std::unique_ptr<Aead> aead = std::move(aeadResult.value());
   std::unique_ptr<PacketNumberCipher> packetNumberCipher =
-      buildHeaderCipher(secret);
+      std::move(packetNumberCipherResult.value());
+
   switch (kind) {
     case CipherKind::HandshakeWrite:
       conn_->handshakeWriteCipher = std::move(aead);
@@ -208,11 +220,15 @@ ClientHandshake::getNextOneRttWriteCipher() {
   CHECK(writeTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
       << "Client read and write secrets are out of sync";
-  writeTrafficSecret_ = getNextTrafficSecret(writeTrafficSecret_->coalesce());
+
+  auto nextSecretResult = getNextTrafficSecret(writeTrafficSecret_->coalesce());
+  if (nextSecretResult.hasError()) {
+    return folly::makeUnexpected(std::move(nextSecretResult.error()));
+  }
+  writeTrafficSecret_ = std::move(nextSecretResult.value());
   trafficSecretSync_--;
-  auto cipher =
-      buildAead(CipherKind::OneRttWrite, writeTrafficSecret_->coalesce());
-  return cipher;
+
+  return buildAead(CipherKind::OneRttWrite, writeTrafficSecret_->coalesce());
 }
 
 folly::Expected<std::unique_ptr<Aead>, QuicError>
@@ -224,11 +240,15 @@ ClientHandshake::getNextOneRttReadCipher() {
   CHECK(readTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
       << "Client read and write secrets are out of sync";
-  readTrafficSecret_ = getNextTrafficSecret(readTrafficSecret_->coalesce());
+
+  auto nextSecretResult = getNextTrafficSecret(readTrafficSecret_->coalesce());
+  if (nextSecretResult.hasError()) {
+    return folly::makeUnexpected(std::move(nextSecretResult.error()));
+  }
+  readTrafficSecret_ = std::move(nextSecretResult.value());
   trafficSecretSync_++;
-  auto cipher =
-      buildAead(CipherKind::OneRttRead, readTrafficSecret_->coalesce());
-  return cipher;
+
+  return buildAead(CipherKind::OneRttRead, readTrafficSecret_->coalesce());
 }
 
 void ClientHandshake::waitForData() {

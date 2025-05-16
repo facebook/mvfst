@@ -3491,7 +3491,7 @@ TEST_F(QuicServerTransportTest, InvokeTxCallbacksSingleByteDSR) {
   EXPECT_CALL(dsrByteTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
   EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
   server->getConnectionState().oneRttWriteCipher = test::createNoOpAead();
-  auto temp = test::createNoOpHeaderCipher();
+  auto temp = test::createNoOpHeaderCipher().value();
   temp->setDefaultKey();
   server->getConnectionState().oneRttWriteHeaderCipher = std::move(temp);
   CHECK(server->getConnectionState().oneRttWriteCipher->getKey().has_value());
@@ -3700,8 +3700,10 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadPacketProtectionLevel) {
 TEST_F(QuicUnencryptedServerTransportTest, TestBadCleartextEncryption) {
   FizzCryptoFactory cryptoFactory;
   PacketNum nextPacket = clientNextInitialPacketNum++;
-  auto aead = cryptoFactory.getServerInitialCipher(
-      *clientConnectionId, QuicVersion::MVFST);
+  auto aead =
+      cryptoFactory
+          .getServerInitialCipher(*clientConnectionId, QuicVersion::MVFST)
+          .value();
   auto chloBuf = IOBuf::copyBuffer("CHLO");
   ChainedByteRangeHead chloRch(chloBuf);
   auto packetData = packetToBufCleartext(

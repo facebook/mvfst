@@ -535,7 +535,16 @@ void ServerHandshake::processActions(
 
 void ServerHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(secret);
-  std::unique_ptr<PacketNumberCipher> headerCipher = buildHeaderCipher(secret);
+  auto headerCipherResult = buildHeaderCipher(secret);
+  if (headerCipherResult.hasError()) {
+    LOG(ERROR) << "Failed to build header cipher";
+    onError(std::make_pair(
+        "Failed to build header cipher", TransportErrorCode::INTERNAL_ERROR));
+    return;
+  }
+  std::unique_ptr<PacketNumberCipher> headerCipher =
+      std::move(headerCipherResult.value());
+
   switch (kind) {
     case CipherKind::HandshakeRead:
       handshakeReadCipher_ = std::move(aead);

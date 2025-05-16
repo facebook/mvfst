@@ -1164,15 +1164,35 @@ QuicClientTransportLite::startCryptoHandshake() {
   auto& cryptoFactory = handshakeLayer->getCryptoFactory();
 
   auto version = conn_->originalVersion.value();
-  conn_->initialWriteCipher = cryptoFactory.getClientInitialCipher(
+  auto initialWriteCipherResult = cryptoFactory.getClientInitialCipher(
       *clientConn_->initialDestinationConnectionId, version);
-  conn_->readCodec->setInitialReadCipher(cryptoFactory.getServerInitialCipher(
-      *clientConn_->initialDestinationConnectionId, version));
+  if (initialWriteCipherResult.hasError()) {
+    return folly::makeUnexpected(initialWriteCipherResult.error());
+  }
+  conn_->initialWriteCipher = std::move(initialWriteCipherResult.value());
+
+  auto serverInitialCipherResult = cryptoFactory.getServerInitialCipher(
+      *clientConn_->initialDestinationConnectionId, version);
+  if (serverInitialCipherResult.hasError()) {
+    return folly::makeUnexpected(serverInitialCipherResult.error());
+  }
+  conn_->readCodec->setInitialReadCipher(
+      std::move(serverInitialCipherResult.value()));
+
+  auto serverHeaderCipherResult = cryptoFactory.makeServerInitialHeaderCipher(
+      *clientConn_->initialDestinationConnectionId, version);
+  if (serverHeaderCipherResult.hasError()) {
+    return folly::makeUnexpected(serverHeaderCipherResult.error());
+  }
   conn_->readCodec->setInitialHeaderCipher(
-      cryptoFactory.makeServerInitialHeaderCipher(
-          *clientConn_->initialDestinationConnectionId, version));
-  conn_->initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
+      std::move(serverHeaderCipherResult.value()));
+
+  auto clientHeaderCipherResult = cryptoFactory.makeClientInitialHeaderCipher(
       *clientConn_->initialDestinationConnectionId, version);
+  if (clientHeaderCipherResult.hasError()) {
+    return folly::makeUnexpected(clientHeaderCipherResult.error());
+  }
+  conn_->initialHeaderCipher = std::move(clientHeaderCipherResult.value());
 
   customTransportParameters_ = getSupportedExtTransportParams(*conn_);
 

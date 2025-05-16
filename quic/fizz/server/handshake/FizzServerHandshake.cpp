@@ -97,8 +97,8 @@ std::unique_ptr<Aead> FizzServerHandshake::buildAead(ByteRange secret) {
       kQuicIVLabel));
 }
 
-std::unique_ptr<PacketNumberCipher> FizzServerHandshake::buildHeaderCipher(
-    ByteRange secret) {
+folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+FizzServerHandshake::buildHeaderCipher(ByteRange secret) {
   return cryptoFactory_->makePacketNumberCipher(secret);
 }
 

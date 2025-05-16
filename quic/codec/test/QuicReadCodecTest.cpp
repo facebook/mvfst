@@ -44,15 +44,18 @@ std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
   auto codec = std::make_unique<QuicReadCodec>(nodeType);
   codec->setClientConnectionId(clientConnId);
   codec->setInitialReadCipher(
-      cryptoFactory.getClientInitialCipher(clientConnId, QuicVersion::MVFST));
-  codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
-      clientConnId, QuicVersion::MVFST));
+      cryptoFactory.getClientInitialCipher(clientConnId, QuicVersion::MVFST)
+          .value());
+  codec->setInitialHeaderCipher(
+      cryptoFactory
+          .makeClientInitialHeaderCipher(clientConnId, QuicVersion::MVFST)
+          .value());
   if (zeroRttAead) {
     codec->setZeroRttReadCipher(std::move(zeroRttAead));
   }
-  codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
+  codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher().value());
   codec->setOneRttReadCipher(std::move(oneRttAead));
-  codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
+  codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
   if (sourceToken) {
     codec->setStatelessResetToken(*sourceToken);
   }
@@ -217,7 +220,7 @@ TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
   AckStates ackStates;
   auto codec = makeUnencryptedCodec();
   codec->setInitialReadCipher(createNoOpAead());
-  codec->setInitialHeaderCipher(test::createNoOpHeaderCipher());
+  codec->setInitialHeaderCipher(test::createNoOpHeaderCipher().value());
   auto result = codec->parsePacket(packetQueue, ackStates);
   auto nothing = result.nothing();
   EXPECT_NE(nothing, nullptr);
@@ -667,9 +670,11 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
   FizzCryptoFactory cryptoFactory;
   PacketNum packetNum = 1;
   uint64_t offset = 0;
-  auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  auto aead =
+      cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST).value();
   auto headerCipher =
-      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
+      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST)
+          .value();
   auto initialCryptoPacketBuf = folly::IOBuf::copyBuffer("CHLO");
   ChainedByteRangeHead initialCryptoPacketRch(initialCryptoPacketBuf);
   auto packet = createInitialCryptoPacket(
@@ -682,7 +687,8 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
       offset);
 
   auto codec = makeEncryptedCodec(connId, std::move(aead), nullptr);
-  aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  aead =
+      cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST).value();
   AckStates ackStates;
   auto packetQueue =
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
@@ -703,9 +709,11 @@ TEST_F(QuicReadCodecTest, TestInitialPacketExtractToken) {
   FizzCryptoFactory cryptoFactory;
   PacketNum packetNum = 1;
   uint64_t offset = 0;
-  auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  auto aead =
+      cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST).value();
   auto headerCipher =
-      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
+      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST)
+          .value();
   std::string token = "aswerdfewdewrgetg";
   auto initialCryptoPacketBuf = folly::IOBuf::copyBuffer("CHLO");
   ChainedByteRangeHead initialCryptoPacketRch(initialCryptoPacketBuf);
@@ -721,7 +729,8 @@ TEST_F(QuicReadCodecTest, TestInitialPacketExtractToken) {
       token);
 
   auto codec = makeEncryptedCodec(connId, std::move(aead), nullptr);
-  aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  aead =
+      cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST).value();
   auto packetQueue =
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
 
@@ -740,9 +749,11 @@ TEST_F(QuicReadCodecTest, TestHandshakeDone) {
   FizzCryptoFactory cryptoFactory;
   PacketNum packetNum = 1;
   uint64_t offset = 0;
-  auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  auto aead =
+      cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST).value();
   auto headerCipher =
-      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
+      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST)
+          .value();
   auto initialCryptoPacketBuf = folly::IOBuf::copyBuffer("CHLO");
   ChainedByteRangeHead initialCryptoPacketRch(initialCryptoPacketBuf);
   auto packet = createInitialCryptoPacket(
@@ -755,7 +766,8 @@ TEST_F(QuicReadCodecTest, TestHandshakeDone) {
       offset);
 
   auto codec = makeEncryptedCodec(connId, std::move(aead), nullptr);
-  aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  aead =
+      cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST).value();
   AckStates ackStates;
   auto packetQueue =
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));

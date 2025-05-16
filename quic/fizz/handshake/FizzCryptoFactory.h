@@ -16,21 +16,23 @@ class FizzCryptoFactory : public CryptoFactory {
  public:
   FizzCryptoFactory() : fizzFactory_{std::make_shared<QuicFizzFactory>()} {}
 
-  BufPtr makeInitialTrafficSecret(
+  [[nodiscard]] folly::Expected<BufPtr, QuicError> makeInitialTrafficSecret(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const override;
 
-  std::unique_ptr<Aead> makeInitialAead(
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  makeInitialAead(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const override;
 
-  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      ByteRange baseSecret) const override;
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  makePacketNumberCipher(ByteRange baseSecret) const override;
 
-  virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      fizz::CipherSuite cipher) const;
+  [[nodiscard]] virtual folly::
+      Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+      makePacketNumberCipher(fizz::CipherSuite cipher) const;
 
   [[nodiscard]] std::function<bool(ByteRange, ByteRange)>
   getCryptoEqualFunction() const override;

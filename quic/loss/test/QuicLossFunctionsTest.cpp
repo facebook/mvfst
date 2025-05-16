@@ -82,7 +82,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
  public:
   void SetUp() override {
     aead = createNoOpAead();
-    headerCipher = createNoOpHeaderCipher();
+    headerCipher = createNoOpHeaderCipher().value();
     quicStats_ = std::make_unique<MockQuicStats>();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     socket_ = std::make_unique<MockQuicSocket>();
@@ -1287,7 +1287,7 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
 TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
   auto conn = createConn();
   conn->handshakeWriteCipher = createNoOpAead();
-  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher().value();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Server);
   conn->qLogger = mockQLogger;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
@@ -1338,11 +1338,11 @@ TEST_F(QuicLossFunctionsTest, PTOWithLostInitialData) {
   auto conn = createConn();
 
   conn->initialWriteCipher = createNoOpAead();
-  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->initialHeaderCipher = createNoOpHeaderCipher().value();
   conn->handshakeWriteCipher = createNoOpAead();
-  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher().value();
   conn->oneRttWriteCipher = createNoOpAead();
-  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher().value();
 
   auto buf = buildRandomInputData(20);
   WriteStreamBuffer initialData(ChainedByteRangeHead(buf), 0);
@@ -1368,11 +1368,11 @@ TEST_F(QuicLossFunctionsTest, PTOWithLostHandshakeData) {
   auto conn = createConn();
 
   conn->initialWriteCipher = createNoOpAead();
-  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->initialHeaderCipher = createNoOpHeaderCipher().value();
   conn->handshakeWriteCipher = createNoOpAead();
-  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher().value();
   conn->oneRttWriteCipher = createNoOpAead();
-  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher().value();
 
   auto buf = buildRandomInputData(20);
   WriteStreamBuffer handshakeData(ChainedByteRangeHead(buf), 0);
@@ -1399,11 +1399,11 @@ TEST_F(QuicLossFunctionsTest, PTOWithLostAppData) {
   auto conn = createConn();
 
   conn->initialWriteCipher = createNoOpAead();
-  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->initialHeaderCipher = createNoOpHeaderCipher().value();
   conn->handshakeWriteCipher = createNoOpAead();
-  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher().value();
   conn->oneRttWriteCipher = createNoOpAead();
-  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher().value();
 
   auto buf = buildRandomInputData(20);
   WriteStreamBuffer appData(ChainedByteRangeHead(buf), 0);
@@ -1428,13 +1428,13 @@ TEST_F(QuicLossFunctionsTest, PTOAvoidPointless) {
   auto conn = createConn();
 
   conn->initialWriteCipher = createNoOpAead();
-  conn->initialHeaderCipher = createNoOpHeaderCipher();
+  conn->initialHeaderCipher = createNoOpHeaderCipher().value();
 
   conn->handshakeWriteCipher = createNoOpAead();
-  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher().value();
 
   conn->oneRttWriteCipher = createNoOpAead();
-  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher().value();
 
   conn->outstandings.packetCount[PacketNumberSpace::Initial] = 1;
   conn->outstandings.packetCount[PacketNumberSpace::Handshake] = 1;

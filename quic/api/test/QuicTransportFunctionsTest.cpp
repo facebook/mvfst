@@ -171,7 +171,7 @@ class QuicTransportFunctionsTest : public Test {
  public:
   void SetUp() override {
     aead = test::createNoOpAead();
-    headerCipher = test::createNoOpHeaderCipher();
+    headerCipher = test::createNoOpHeaderCipher().value();
     quicStats_ = std::make_unique<NiceMock<MockQuicStats>>();
   }
 
@@ -191,7 +191,7 @@ class QuicTransportFunctionsTest : public Test {
         kDefaultConnectionFlowControlWindow * 1000;
     conn->statsCallback = quicStats_.get();
     conn->initialWriteCipher = createNoOpAead();
-    conn->initialHeaderCipher = createNoOpHeaderCipher();
+    conn->initialHeaderCipher = createNoOpHeaderCipher().value();
     CHECK(
         !conn->streamManager
              ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
@@ -3665,7 +3665,7 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
   EXPECT_EQ(0, writeRes1->bytesWritten);
 
   conn->handshakeWriteCipher = createNoOpAead();
-  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher().value();
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 2;
   auto writeRes2 = writeCryptoAndAckDataToSocket(
       *rawSocket,
@@ -3682,7 +3682,7 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
   EXPECT_EQ(0, writeRes2->bytesWritten);
 
   conn->oneRttWriteCipher = createNoOpAead();
-  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher().value();
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 2;
   auto writeRes3 = writeQuicDataToSocket(
       *rawSocket,
@@ -4474,13 +4474,13 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
   ASSERT_NE(nullptr, conn->initialWriteCipher);
   conn->handshakeWriteCipher = createNoOpAead();
   conn->readCodec->setInitialReadCipher(createNoOpAead());
-  conn->readCodec->setInitialHeaderCipher(createNoOpHeaderCipher());
+  conn->readCodec->setInitialHeaderCipher(createNoOpHeaderCipher().value());
   conn->readCodec->setHandshakeReadCipher(createNoOpAead());
-  conn->readCodec->setHandshakeHeaderCipher(createNoOpHeaderCipher());
+  conn->readCodec->setHandshakeHeaderCipher(createNoOpHeaderCipher().value());
   conn->oneRttWriteCipher = createNoOpAead();
-  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher().value();
   conn->readCodec->setOneRttReadCipher(createNoOpAead());
-  conn->readCodec->setOneRttHeaderCipher(createNoOpHeaderCipher());
+  conn->readCodec->setOneRttHeaderCipher(createNoOpHeaderCipher().value());
   writeCryptoDataProbesToSocketForTest(
       *socket,
       *conn,

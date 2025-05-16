@@ -189,7 +189,15 @@ std::unique_ptr<T> createNoOpAeadImpl(uint64_t cipherOverhead = 0) {
 
 std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead = 0);
 
-std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipher();
+folly::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
+createNoOpHeaderCipher();
+
+// For backward compatibility with existing code
+inline std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipherNoThrow() {
+  auto result = createNoOpHeaderCipher();
+  CHECK(!result.hasError()) << "Failed to create header cipher";
+  return std::move(result.value());
+}
 
 uint64_t computeExpectedDelay(
     std::chrono::microseconds ackDelay,
@@ -348,17 +356,17 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
   ~FizzCryptoTestFactory() override = default;
 
   using FizzCryptoFactory::makePacketNumberCipher;
-  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      fizz::CipherSuite) const override;
+  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+      makePacketNumberCipher(fizz::CipherSuite) const override;
 
   MOCK_METHOD(
-      std::unique_ptr<PacketNumberCipher>,
+      (folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>),
       _makePacketNumberCipher,
       (ByteRange),
       (const));
 
-  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      ByteRange secret) const override;
+  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  makePacketNumberCipher(ByteRange secret) const override;
 
   void setMockPacketNumberCipher(
       std::unique_ptr<PacketNumberCipher> packetNumberCipher);
@@ -564,9 +572,16 @@ class FakeServerHandshake : public FizzServerHandshake {
 
   void setEarlyKeys() {
     oneRttWriteCipher_ = createNoOpAead();
-    oneRttWriteHeaderCipher_ = createNoOpHeaderCipher();
+    auto oneRttWriteHeaderCipherResult = createNoOpHeaderCipher();
+    CHECK(!oneRttWriteHeaderCipherResult.hasError())
+        << "Failed to create header cipher";
+    oneRttWriteHeaderCipher_ = std::move(oneRttWriteHeaderCipherResult.value());
+
     zeroRttReadCipher_ = createNoOpAead();
-    zeroRttReadHeaderCipher_ = createNoOpHeaderCipher();
+    auto zeroRttReadHeaderCipherResult = createNoOpHeaderCipher();
+    CHECK(!zeroRttReadHeaderCipherResult.hasError())
+        << "Failed to create header cipher";
+    zeroRttReadHeaderCipher_ = std::move(zeroRttReadHeaderCipherResult.value());
   }
 
   void setOneRttKeys() {
@@ -577,12 +592,19 @@ class FakeServerHandshake : public FizzServerHandshake {
       ON_CALL(*mockOneRttWriteCipher, getKey())
           .WillByDefault(testing::Invoke([]() { return getQuicTestKey(); }));
       oneRttWriteCipher_ = std::move(mockOneRttWriteCipher);
-      auto mockOneRttWriteHeaderCipher = createNoOpHeaderCipher();
+      auto mockOneRttWriteHeaderCipherResult = createNoOpHeaderCipher();
+      CHECK(!mockOneRttWriteHeaderCipherResult.hasError())
+          << "Failed to create header cipher";
+      auto& mockOneRttWriteHeaderCipher =
+          mockOneRttWriteHeaderCipherResult.value();
       mockOneRttWriteHeaderCipher->setDefaultKey();
       oneRttWriteHeaderCipher_ = std::move(mockOneRttWriteHeaderCipher);
     }
     oneRttReadCipher_ = createNoOpAead();
-    oneRttReadHeaderCipher_ = createNoOpHeaderCipher();
+    auto oneRttReadHeaderCipherResult = createNoOpHeaderCipher();
+    CHECK(!oneRttReadHeaderCipherResult.hasError())
+        << "Failed to create header cipher";
+    oneRttReadHeaderCipher_ = std::move(oneRttReadHeaderCipherResult.value());
     readTrafficSecret_ = folly::IOBuf::copyBuffer(getRandSecret());
     writeTrafficSecret_ = folly::IOBuf::copyBuffer(getRandSecret());
   }
@@ -597,9 +619,17 @@ class FakeServerHandshake : public FizzServerHandshake {
 
   void setHandshakeKeys() {
     conn_.handshakeWriteCipher = createNoOpAead();
-    conn_.handshakeWriteHeaderCipher = createNoOpHeaderCipher();
+    auto handshakeWriteHeaderCipherResult = createNoOpHeaderCipher();
+    CHECK(!handshakeWriteHeaderCipherResult.hasError())
+        << "Failed to create header cipher";
+    conn_.handshakeWriteHeaderCipher =
+        std::move(handshakeWriteHeaderCipherResult.value());
     handshakeReadCipher_ = createNoOpAead();
-    handshakeReadHeaderCipher_ = createNoOpHeaderCipher();
+    auto handshakeReadHeaderCipherResult = createNoOpHeaderCipher();
+    CHECK(!handshakeReadHeaderCipherResult.hasError())
+        << "Failed to create header cipher";
+    handshakeReadHeaderCipher_ =
+        std::move(handshakeReadHeaderCipherResult.value());
   }
 
   void setHandshakeDone(bool done) {

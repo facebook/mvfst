@@ -45,7 +45,7 @@ class DSRPacketizerSingleWriteTest : public Test {
  protected:
   void SetUp() override {
     aead = test::createNoOpAead();
-    headerCipher = test::createNoOpHeaderCipher();
+    headerCipher = test::createNoOpHeaderCipher().value();
     qEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
   }
 

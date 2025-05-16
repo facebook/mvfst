@@ -33,7 +33,7 @@ class FizzClientHandshake : public ClientHandshake {
 
   const Optional<std::string>& getApplicationProtocol() const override;
 
-  bool verifyRetryIntegrityTag(
+  [[nodiscard]] folly::Expected<bool, QuicError> verifyRetryIntegrityTag(
       const ConnectionId& originalDstConnId,
       const RetryPacket& retryPacket) override;
 
@@ -70,16 +70,20 @@ class FizzClientHandshake : public ClientHandshake {
   void echRetryAvailable(fizz::client::ECHRetryAvailable& retry);
 
  private:
-  folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
-  connectImpl(Optional<std::string> hostname) override;
+  [[nodiscard]] folly::
+      Expected<Optional<CachedServerTransportParameters>, QuicError>
+      connectImpl(Optional<std::string> hostname) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;
   bool matchEarlyParameters() override;
-  std::unique_ptr<Aead> buildAead(CipherKind kind, ByteRange secret) override;
-  std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
+      CipherKind kind,
       ByteRange secret) override;
-  BufPtr getNextTrafficSecret(ByteRange secret) const override;
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  buildHeaderCipher(ByteRange secret) override;
+  [[nodiscard]] folly::Expected<BufPtr, QuicError> getNextTrafficSecret(
+      ByteRange secret) const override;
 
   class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);

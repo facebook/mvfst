@@ -102,7 +102,8 @@ class ClientHandshake : public Handshake {
    * API used to verify that the integrity token present in the retry packet
    * matches what we would expect
    */
-  virtual bool verifyRetryIntegrityTag(
+  [[nodiscard]] virtual folly::Expected<bool, QuicError>
+  verifyRetryIntegrityTag(
       const ConnectionId& originalDstConnId,
       const RetryPacket& retryPacket) = 0;
 
@@ -176,7 +177,8 @@ class ClientHandshake : public Handshake {
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
    * on key updates.
    */
-  virtual BufPtr getNextTrafficSecret(ByteRange secret) const = 0;
+  [[nodiscard]] virtual folly::Expected<BufPtr, QuicError> getNextTrafficSecret(
+      ByteRange secret) const = 0;
 
   BufPtr readTrafficSecret_;
   BufPtr writeTrafficSecret_;
@@ -185,16 +187,17 @@ class ClientHandshake : public Handshake {
   Optional<bool> canResendZeroRtt_;
 
  private:
-  virtual folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
-  connectImpl(Optional<std::string> hostname) = 0;
+  [[nodiscard]] virtual folly::
+      Expected<Optional<CachedServerTransportParameters>, QuicError>
+      connectImpl(Optional<std::string> hostname) = 0;
 
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual bool matchEarlyParameters() = 0;
-  virtual std::unique_ptr<Aead> buildAead(
-      CipherKind kind,
-      ByteRange secret) = 0;
-  virtual std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
-      ByteRange secret) = 0;
+  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  buildAead(CipherKind kind, ByteRange secret) = 0;
+  [[nodiscard]] virtual folly::
+      Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+      buildHeaderCipher(ByteRange secret) = 0;
 
   // Represents the packet type that should be used to write the data currently
   // in the stream.

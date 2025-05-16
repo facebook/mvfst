@@ -1037,8 +1037,13 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         conn.serverHandshakeLayer->getCryptoFactory();
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     conn.readCodec->setConnectionStatsCallback(conn.statsCallback);
-    conn.readCodec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
-        initialDestinationConnectionId, version));
+    auto clientInitialCipherResult = cryptoFactory.getClientInitialCipher(
+        initialDestinationConnectionId, version);
+    if (clientInitialCipherResult.hasError()) {
+      return folly::makeUnexpected(clientInitialCipherResult.error());
+    }
+    conn.readCodec->setInitialReadCipher(
+        std::move(clientInitialCipherResult.value()));
     conn.readCodec->setClientConnectionId(clientConnectionId);
     conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     if (conn.qLogger) {
@@ -1050,14 +1055,30 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         version,
         conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
         conn.transportSettings.advertisedExtendedAckFeatures));
-    conn.initialWriteCipher = cryptoFactory.getServerInitialCipher(
+    auto serverInitialCipherResult = cryptoFactory.getServerInitialCipher(
         initialDestinationConnectionId, version);
+    if (serverInitialCipherResult.hasError()) {
+      return folly::makeUnexpected(serverInitialCipherResult.error());
+    }
+    conn.initialWriteCipher = std::move(serverInitialCipherResult.value());
 
-    conn.readCodec->setInitialHeaderCipher(
+    auto clientInitialHeaderCipherResult =
         cryptoFactory.makeClientInitialHeaderCipher(
-            initialDestinationConnectionId, version));
-    conn.initialHeaderCipher = cryptoFactory.makeServerInitialHeaderCipher(
-        initialDestinationConnectionId, version);
+            initialDestinationConnectionId, version);
+    if (clientInitialHeaderCipherResult.hasError()) {
+      return folly::makeUnexpected(clientInitialHeaderCipherResult.error());
+    }
+    conn.readCodec->setInitialHeaderCipher(
+        std::move(clientInitialHeaderCipherResult.value()));
+
+    auto serverInitialHeaderCipherResult =
+        cryptoFactory.makeServerInitialHeaderCipher(
+            initialDestinationConnectionId, version);
+    if (serverInitialHeaderCipherResult.hasError()) {
+      return folly::makeUnexpected(serverInitialHeaderCipherResult.error());
+    }
+    conn.initialHeaderCipher =
+        std::move(serverInitialHeaderCipherResult.value());
     conn.peerAddress = conn.originalPeerAddress;
   }
   BufQueue& udpData = readData.udpPacket.buf;

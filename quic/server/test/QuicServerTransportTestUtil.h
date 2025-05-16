@@ -304,15 +304,17 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   std::unique_ptr<Aead> getInitialCipher(
       QuicVersion version = QuicVersion::MVFST) {
     FizzCryptoFactory cryptoFactory;
-    return cryptoFactory.getClientInitialCipher(
-        *initialDestinationConnectionId, version);
+    return cryptoFactory
+        .getClientInitialCipher(*initialDestinationConnectionId, version)
+        .value();
   }
 
   std::unique_ptr<PacketNumberCipher> getInitialHeaderCipher(
       QuicVersion version = QuicVersion::MVFST) {
     FizzCryptoFactory cryptoFactory;
-    return cryptoFactory.makeClientInitialHeaderCipher(
-        *initialDestinationConnectionId, version);
+    return cryptoFactory
+        .makeClientInitialHeaderCipher(*initialDestinationConnectionId, version)
+        .value();
   }
 
   BufPtr recvEncryptedStream(
@@ -367,7 +369,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
       QuicVersion version = QuicVersion::MVFST) {
     auto finished = folly::IOBuf::copyBuffer("FINISHED");
     auto nextPacketNum = clientNextHandshakePacketNum++;
-    auto headerCipher = test::createNoOpHeaderCipher();
+    auto headerCipher = test::createNoOpHeaderCipher().value();
     uint64_t offset =
         getCryptoStream(
             *server->getConn().cryptoState, EncryptionLevel::Handshake)
@@ -395,11 +397,16 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     FizzCryptoFactory cryptoFactory;
     clientReadCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
     clientReadCodec->setClientConnectionId(*clientConnectionId);
-    clientReadCodec->setInitialReadCipher(cryptoFactory.getServerInitialCipher(
-        *initialDestinationConnectionId, QuicVersion::MVFST));
+    clientReadCodec->setInitialReadCipher(
+        cryptoFactory
+            .getServerInitialCipher(
+                *initialDestinationConnectionId, QuicVersion::MVFST)
+            .value());
     clientReadCodec->setInitialHeaderCipher(
-        cryptoFactory.makeServerInitialHeaderCipher(
-            *initialDestinationConnectionId, QuicVersion::MVFST));
+        cryptoFactory
+            .makeServerInitialHeaderCipher(
+                *initialDestinationConnectionId, QuicVersion::MVFST)
+            .value());
     clientReadCodec->setCodecParameters(
         CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
   }
@@ -601,18 +608,23 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     FizzCryptoFactory cryptoFactory;
     auto readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
     readCodec->setOneRttReadCipher(test::createNoOpAead());
-    readCodec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
+    readCodec->setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
     readCodec->setHandshakeReadCipher(test::createNoOpAead());
-    readCodec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
+    readCodec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher().value());
     readCodec->setClientConnectionId(*clientConnectionId);
     readCodec->setCodecParameters(
         CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
     if (handshakeCipher) {
-      readCodec->setInitialReadCipher(cryptoFactory.getServerInitialCipher(
-          *initialDestinationConnectionId, QuicVersion::MVFST));
+      readCodec->setInitialReadCipher(
+          cryptoFactory
+              .getServerInitialCipher(
+                  *initialDestinationConnectionId, QuicVersion::MVFST)
+              .value());
       readCodec->setInitialHeaderCipher(
-          cryptoFactory.makeServerInitialHeaderCipher(
-              *initialDestinationConnectionId, QuicVersion::MVFST));
+          cryptoFactory
+              .makeServerInitialHeaderCipher(
+                  *initialDestinationConnectionId, QuicVersion::MVFST)
+              .value());
     }
     return readCodec;
   }

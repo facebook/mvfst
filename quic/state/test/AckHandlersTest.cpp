@@ -4426,7 +4426,7 @@ class AckEventForAppDataTest : public Test {
  public:
   void SetUp() override {
     aead_ = test::createNoOpAead();
-    headerCipher_ = test::createNoOpHeaderCipher();
+    headerCipher_ = test::createNoOpHeaderCipher().value();
     conn_ = createConn();
   }
 
@@ -4445,7 +4445,7 @@ class AckEventForAppDataTest : public Test {
     conn->flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
     conn->initialWriteCipher = createNoOpAead();
-    conn->initialHeaderCipher = createNoOpHeaderCipher();
+    conn->initialHeaderCipher = createNoOpHeaderCipher().value();
     CHECK(
         !conn->streamManager
              ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)

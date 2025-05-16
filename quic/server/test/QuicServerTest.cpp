@@ -346,7 +346,7 @@ void QuicServerWorkerTest::testSendReset(
             .WillRepeatedly(
                 Invoke([&](auto&, auto, auto) { return std::nullopt; }));
         codec.setOneRttReadCipher(std::move(aead));
-        codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
+        codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
         StatelessResetToken token = generateStatelessResetToken();
         codec.setStatelessResetToken(token);
         FizzCryptoFactory cryptoFactory;
@@ -2966,7 +2966,7 @@ void QuicServerTest::testReset(BufPtr packet) {
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto&, auto, auto) { return std::nullopt; }));
   codec.setOneRttReadCipher(std::move(aead));
-  codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
+  codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
   StatelessResetToken token = generateStatelessResetToken();
   codec.setStatelessResetToken(token);
   FizzCryptoFactory cryptoFactory;

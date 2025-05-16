@@ -32,7 +32,7 @@ class TestQuicTransport
     conn_->version = QuicVersion::MVFST;
     conn_->observerContainer = observerContainer_;
     aead = test::createNoOpAead();
-    headerCipher = test::createNoOpHeaderCipher();
+    headerCipher = test::createNoOpHeaderCipher().value();
     setConnectionSetupCallback(connSetupCb);
     setConnectionCallbackFromCtor(connCb);
   }

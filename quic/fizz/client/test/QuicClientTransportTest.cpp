@@ -2912,8 +2912,10 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
 
   FizzCryptoFactory cryptoFactory;
   auto garbage = IOBuf::copyBuffer("garbage");
-  auto initialCipher = cryptoFactory.getServerInitialCipher(
+  auto initialCipherResult = cryptoFactory.getServerInitialCipher(
       *serverChosenConnId, QuicVersion::MVFST);
+  ASSERT_FALSE(initialCipherResult.hasError());
+  auto& initialCipher = initialCipherResult.value();
   auto firstPacketNum = appDataPacketNum++;
   auto packet1 = packetToBufCleartext(
       createStreamPacket(
@@ -2963,8 +2965,11 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   BufQueue packets;
   for (int i = 0; i < kMaxNumCoalescedPackets; i++) {
     auto garbage = IOBuf::copyBuffer("garbage");
-    auto initialCipher = cryptoFactory.getServerInitialCipher(
+    auto initialCipherResult = cryptoFactory.getServerInitialCipher(
         *serverChosenConnId, QuicVersion::MVFST);
+    ASSERT_FALSE(initialCipherResult.hasError());
+    auto& initialCipher = initialCipherResult.value();
+
     auto packetNum = appDataPacketNum++;
     auto packet1 = packetToBufCleartext(
         createStreamPacket(
@@ -2973,7 +2978,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
             packetNum,
             streamId,
             *garbage,
-            initialCipher->getCipherOverhead(),
+            initialCipher.get()->getCipherOverhead(),
             0 /* largestAcked */,
             std::make_pair(LongHeader::Types::Initial, QuicVersion::MVFST)),
         *initialCipher,
@@ -3651,8 +3656,10 @@ TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
   // throws on getting unencrypted stream data.
   PacketNum nextPacketNum = appDataPacketNum++;
 
-  auto initialCipher = cryptoFactory.getServerInitialCipher(
+  auto initialCipherResult = cryptoFactory.getServerInitialCipher(
       *serverChosenConnId, QuicVersion::MVFST);
+  ASSERT_FALSE(initialCipherResult.hasError());
+  auto& initialCipher = initialCipherResult.value();
   auto packet = packetToBufCleartext(
       createStreamPacket(
           *serverChosenConnId /* src */,
@@ -3660,7 +3667,7 @@ TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
           nextPacketNum,
           streamId,
           *expected,
-          initialCipher->getCipherOverhead(),
+          initialCipher.get()->getCipherOverhead(),
           0 /* largestAcked */,
           std::make_pair(LongHeader::Types::Initial, QuicVersion::MVFST)),
       *initialCipher,
@@ -5148,15 +5155,15 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
     mockClientHandshake->setHandshakeWriteCipher(std::move(handshakeWriteAead));
 
     mockClientHandshake->setHandshakeReadHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setHandshakeWriteHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setOneRttWriteHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setOneRttReadHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setZeroRttWriteHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
   }
 
   std::shared_ptr<QuicPskCache> getPskCache() override {

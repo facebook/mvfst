@@ -51,7 +51,7 @@ class QuicClientTransportLiteTest : public Test {
     ON_CALL(*socket, setCmsgs(_)).WillByDefault(Return(folly::unit));
     ON_CALL(*socket, appendCmsgs(_)).WillByDefault(Return(folly::unit));
     auto mockFactory = std::make_shared<MockClientHandshakeFactory>();
-    EXPECT_CALL(*mockFactory, _makeClientHandshake(_))
+    EXPECT_CALL(*mockFactory, makeClientHandshakeImpl(_))
         .WillRepeatedly(Invoke(
             [&](QuicClientConnectionState* conn)
                 -> std::unique_ptr<quic::ClientHandshake> {
@@ -61,7 +61,7 @@ class QuicClientTransportLiteTest : public Test {
         qEvb_, std::move(socket), mockFactory);
     quicClient_->getConn()->oneRttWriteCipher = test::createNoOpAead();
     quicClient_->getConn()->oneRttWriteHeaderCipher =
-        test::createNoOpHeaderCipher();
+        test::createNoOpHeaderCipher().value();
     ASSERT_FALSE(quicClient_->getState()
                      ->streamManager->setMaxLocalBidirectionalStreams(128)
                      .hasError());

@@ -322,8 +322,9 @@ class ServerHandshake : public Handshake {
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual std::unique_ptr<Aead> buildAead(ByteRange secret) = 0;
-  virtual std::unique_ptr<PacketNumberCipher> buildHeaderCipher(
-      ByteRange secret) = 0;
+  [[nodiscard]] virtual folly::
+      Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+      buildHeaderCipher(ByteRange secret) = 0;
 
   virtual void processAccept() = 0;
   /*

@@ -39,18 +39,20 @@ const RegularQuicWritePacket& writeQuicPacket(
     bool eof) {
   auto version = conn.version.value_or(*conn.originalVersion);
   auto aead = createNoOpAead();
-  auto headerCipher = createNoOpHeaderCipher();
+  auto headerCipherResult = createNoOpHeaderCipher();
+  CHECK(!headerCipherResult.hasError()) << "Failed to create header cipher";
+  auto headerCipher = std::move(headerCipherResult.value());
   CHECK(!writeDataToQuicStream(stream, data.clone(), eof).hasError());
-  CHECK(!writeQuicDataToSocket(
-             sock,
-             conn,
-             srcConnId,
-             dstConnId,
-             *aead,
-             *headerCipher,
-             version,
-             conn.transportSettings.writeConnectionDataPacketsLimit)
-             .hasError());
+  auto result = writeQuicDataToSocket(
+      sock,
+      conn,
+      srcConnId,
+      dstConnId,
+      *aead,
+      *headerCipher,
+      version,
+      conn.transportSettings.writeConnectionDataPacketsLimit);
+  CHECK(!result.hasError());
   CHECK(
       conn.outstandings.packets.rend() !=
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData));
@@ -63,19 +65,22 @@ PacketNum rstStreamAndSendPacket(
     QuicStreamState& stream,
     ApplicationErrorCode errorCode) {
   auto aead = createNoOpAead();
-  auto headerCipher = createNoOpHeaderCipher();
+  auto headerCipherResult = createNoOpHeaderCipher();
+  CHECK(!headerCipherResult.hasError()) << "Failed to create header cipher";
+  auto headerCipher = std::move(headerCipherResult.value());
   auto version = conn.version.value_or(*conn.originalVersion);
   CHECK(!sendRstSMHandler(stream, errorCode).hasError());
-  CHECK(!writeQuicDataToSocket(
-             sock,
-             conn,
-             *conn.clientConnectionId,
-             *conn.serverConnectionId,
-             *aead,
-             *headerCipher,
-             version,
-             conn.transportSettings.writeConnectionDataPacketsLimit)
-             .hasError());
+  auto result = writeQuicDataToSocket(
+      sock,
+      conn,
+      *conn.clientConnectionId,
+      *conn.serverConnectionId,
+      *aead,
+      *headerCipher,
+      version,
+      conn.transportSettings.writeConnectionDataPacketsLimit);
+  CHECK(!result.hasError());
+  CHECK(!result.hasError());
 
   for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {
@@ -269,7 +274,8 @@ std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead) {
   return createNoOpAeadImpl<MockAead>(cipherOverhead);
 }
 
-std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipher() {
+folly::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
+createNoOpHeaderCipher() {
   auto headerCipher = std::make_unique<NiceMock<MockPacketNumberCipher>>();
   ON_CALL(*headerCipher, mask(_)).WillByDefault(Return(HeaderProtectionMask{}));
   ON_CALL(*headerCipher, keyLength()).WillByDefault(Return(16));
@@ -776,12 +782,12 @@ bool writableContains(QuicStreamManager& streamManager, StreamId streamId) {
       streamManager.controlWriteQueue().count(streamId) > 0;
 }
 
-std::unique_ptr<PacketNumberCipher>
+folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 FizzCryptoTestFactory::makePacketNumberCipher(fizz::CipherSuite) const {
   return std::move(packetNumberCipher_);
 }
 
-std::unique_ptr<PacketNumberCipher>
+folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 FizzCryptoTestFactory::makePacketNumberCipher(ByteRange secret) const {
   return _makePacketNumberCipher(secret);
 }
@@ -793,9 +799,12 @@ void FizzCryptoTestFactory::setMockPacketNumberCipher(
 
 void FizzCryptoTestFactory::setDefault() {
   ON_CALL(*this, _makePacketNumberCipher(_))
-      .WillByDefault(Invoke([&](ByteRange secret) {
-        return FizzCryptoFactory::makePacketNumberCipher(secret);
-      }));
+      .WillByDefault(Invoke(
+          [&](ByteRange secret) -> folly::Expected<
+                                    std::unique_ptr<PacketNumberCipher>,
+                                    QuicError> {
+            return FizzCryptoFactory::makePacketNumberCipher(secret);
+          }));
 }
 
 void TestPacketBatchWriter::reset() {
@@ -831,15 +840,18 @@ TrafficKey getQuicTestKey() {
 std::unique_ptr<folly::IOBuf> getProtectionKey() {
   FizzCryptoFactory factory;
   auto secret = getRandSecret();
-  auto pnCipher =
+  auto pnCipherResult =
       factory.makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  CHECK(!pnCipherResult.hasError()) << "Failed to make packet number cipher";
+  auto& pnCipher = pnCipherResult.value();
   auto deriver = factory.getFizzFactory()->makeKeyDeriver(
       fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  return deriver->expandLabel(
+  auto pnKey = deriver->expandLabel(
       folly::range(secret),
       kQuicPNLabel,
       folly::IOBuf::create(0),
-      pnCipher->keyLength());
+      (*pnCipher).keyLength());
+  return pnKey;
 }
 
 size_t getTotalIovecLen(const struct iovec* vec, size_t iovec_len) {

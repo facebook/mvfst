@@ -109,7 +109,7 @@ class QuicClientTransportTest : public Test {
         .WillByDefault(testing::Return(folly::unit));
 
     mockFactory_ = std::make_shared<MockClientHandshakeFactory>();
-    EXPECT_CALL(*mockFactory_, _makeClientHandshake(_))
+    EXPECT_CALL(*mockFactory_, makeClientHandshakeImpl(_))
         .WillRepeatedly(Invoke(
             [&](QuicClientConnectionState* conn)
                 -> std::unique_ptr<quic::ClientHandshake> {

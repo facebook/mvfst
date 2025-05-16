@@ -14,7 +14,7 @@
 
 namespace quic {
 
-BufPtr FizzCryptoFactory::makeInitialTrafficSecret(
+folly::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
@@ -31,12 +31,18 @@ BufPtr FizzCryptoFactory::makeInitialTrafficSecret(
   return trafficSecret;
 }
 
-std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
+folly::Expected<std::unique_ptr<Aead>, QuicError>
+FizzCryptoFactory::makeInitialAead(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
-  auto trafficSecret =
+  auto trafficSecretResult =
       makeInitialTrafficSecret(label, clientDestinationConnId, version);
+  if (trafficSecretResult.hasError()) {
+    return folly::makeUnexpected(trafficSecretResult.error());
+  }
+  auto& trafficSecret = trafficSecretResult.value();
+
   auto deriver =
       fizzFactory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto aead = fizzFactory_->makeAead(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
@@ -51,15 +57,22 @@ std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
       BufHelpers::create(0),
       aead->ivLength());
 
-  fizz::TrafficKey trafficKey = {std::move(key), std::move(iv)};
+  fizz::TrafficKey trafficKey;
+  trafficKey.key = std::move(key);
+  trafficKey.iv = std::move(iv);
   aead->setKey(std::move(trafficKey));
   return FizzAead::wrap(std::move(aead));
 }
 
-std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
-    ByteRange baseSecret) const {
-  auto pnCipher =
+folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+FizzCryptoFactory::makePacketNumberCipher(ByteRange baseSecret) const {
+  auto pnCipherResult =
       makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  if (pnCipherResult.hasError()) {
+    return folly::makeUnexpected(pnCipherResult.error());
+  }
+  auto pnCipher = std::move(pnCipherResult.value());
+
   auto deriver =
       fizzFactory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto pnKey = deriver->expandLabel(
@@ -68,15 +81,17 @@ std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
   return pnCipher;
 }
 
-std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
-    fizz::CipherSuite cipher) const {
+folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+FizzCryptoFactory::makePacketNumberCipher(fizz::CipherSuite cipher) const {
   switch (cipher) {
     case fizz::CipherSuite::TLS_AES_128_GCM_SHA256:
       return std::make_unique<Aes128PacketNumberCipher>();
     case fizz::CipherSuite::TLS_AES_256_GCM_SHA384:
       return std::make_unique<Aes256PacketNumberCipher>();
     default:
-      throw std::runtime_error("Packet number cipher not implemented");
+      return folly::makeUnexpected(QuicError(
+          TransportErrorCode::INTERNAL_ERROR,
+          "Packet number cipher not implemented"));
   }
 }
 

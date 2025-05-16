@@ -64,23 +64,25 @@ std::unique_ptr<QuicReadCodec> makeCodec(
   auto codec = std::make_unique<QuicReadCodec>(nodeType);
   if (nodeType != QuicNodeType::Client) {
     codec->setZeroRttReadCipher(std::move(zeroRttCipher));
-    codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
+    codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher().value());
   }
   codec->setOneRttReadCipher(std::move(oneRttCipher));
-  codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
+  codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
   codec->setHandshakeReadCipher(test::createNoOpAead());
-  codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
+  codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher().value());
   codec->setClientConnectionId(clientConnId);
   if (nodeType == QuicNodeType::Client) {
     codec->setInitialReadCipher(
-        cryptoFactory.getServerInitialCipher(clientConnId, version));
+        cryptoFactory.getServerInitialCipher(clientConnId, version).value());
     codec->setInitialHeaderCipher(
-        cryptoFactory.makeServerInitialHeaderCipher(clientConnId, version));
+        cryptoFactory.makeServerInitialHeaderCipher(clientConnId, version)
+            .value());
   } else {
     codec->setInitialReadCipher(
-        cryptoFactory.getClientInitialCipher(clientConnId, version));
+        cryptoFactory.getClientInitialCipher(clientConnId, version).value());
     codec->setInitialHeaderCipher(
-        cryptoFactory.makeClientInitialHeaderCipher(clientConnId, version));
+        cryptoFactory.makeClientInitialHeaderCipher(clientConnId, version)
+            .value());
   }
   return codec;
 }
@@ -181,9 +183,10 @@ TEST_P(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   QuicVersion ver = QuicVersion::MVFST;
   // create a server cleartext write codec.
   FizzCryptoFactory cryptoFactory;
-  auto cleartextAead = cryptoFactory.getClientInitialCipher(serverConnId, ver);
+  auto cleartextAead =
+      cryptoFactory.getClientInitialCipher(serverConnId, ver).value();
   auto headerCipher =
-      cryptoFactory.makeClientInitialHeaderCipher(serverConnId, ver);
+      cryptoFactory.makeClientInitialHeaderCipher(serverConnId, ver).value();
 
   std::unique_ptr<PacketBuilderInterface> builderOwner;
   auto builderProvider = [&](PacketHeader header, PacketNum largestAcked) {

@@ -336,9 +336,10 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     }
     if (getPhase() == Phase::Initial) {
       conn->handshakeWriteCipher = test::createNoOpAead();
-      conn->handshakeWriteHeaderCipher = test::createNoOpHeaderCipher();
+      conn->handshakeWriteHeaderCipher = test::createNoOpHeaderCipherNoThrow();
       conn->readCodec->setHandshakeReadCipher(test::createNoOpAead());
-      conn->readCodec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
+      conn->readCodec->setHandshakeHeaderCipher(
+          test::createNoOpHeaderCipherNoThrow());
       writeDataToQuicStream(
           conn->cryptoState->handshakeStream,
           folly::IOBuf::copyBuffer("ClientFinished"));
@@ -357,7 +358,8 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return params_;
   }
 
-  BufPtr getNextTrafficSecret(ByteRange /*secret*/) const override {
+  folly::Expected<BufPtr, QuicError> getNextTrafficSecret(
+      ByteRange /*secret*/) const override {
     return folly::IOBuf::copyBuffer(getRandSecret());
   }
 
@@ -410,12 +412,15 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     throw std::runtime_error("matchEarlyParameters not implemented");
   }
 
-  std::unique_ptr<Aead> buildAead(CipherKind, ByteRange) override {
+  folly::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
+      CipherKind,
+      ByteRange) override {
     return createNoOpAead();
   }
 
-  std::unique_ptr<PacketNumberCipher> buildHeaderCipher(ByteRange) override {
-    throw std::runtime_error("buildHeaderCipher not implemented");
+  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  buildHeaderCipher(ByteRange) override {
+    return createNoOpHeaderCipher();
   }
 };
 
@@ -650,13 +655,13 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     mockClientHandshake->setOneRttWriteCipher(std::move(writeAead));
 
     mockClientHandshake->setHandshakeReadHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setHandshakeWriteHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setOneRttWriteHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
     mockClientHandshake->setOneRttReadHeaderCipher(
-        test::createNoOpHeaderCipher());
+        test::createNoOpHeaderCipherNoThrow());
   }
 
   virtual void setUpSocketExpectations() {
@@ -1002,12 +1007,20 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     FizzCryptoFactory cryptoFactory;
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     codec->setClientConnectionId(*originalConnId);
-    codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
-        *client->getConn().initialDestinationConnectionId, QuicVersion::MVFST));
-    codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
-        *client->getConn().initialDestinationConnectionId, QuicVersion::MVFST));
+    codec->setInitialReadCipher(
+        cryptoFactory
+            .getClientInitialCipher(
+                *client->getConn().initialDestinationConnectionId,
+                QuicVersion::MVFST)
+            .value());
+    codec->setInitialHeaderCipher(
+        cryptoFactory
+            .makeClientInitialHeaderCipher(
+                *client->getConn().initialDestinationConnectionId,
+                QuicVersion::MVFST)
+            .value());
     codec->setHandshakeReadCipher(test::createNoOpAead());
-    codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
+    codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher().value());
     return codec;
   }
 
@@ -1018,18 +1031,24 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     std::unique_ptr<Aead> handshakeReadCipher;
     codec->setClientConnectionId(*originalConnId);
     codec->setOneRttReadCipher(test::createNoOpAead());
-    codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
+    codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
     codec->setZeroRttReadCipher(test::createNoOpAead());
-    codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
+    codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher().value());
     if (handshakeCipher) {
-      codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
+      auto initialReadCipher = cryptoFactory.getClientInitialCipher(
           *client->getConn().initialDestinationConnectionId,
-          QuicVersion::MVFST));
-      codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
+          QuicVersion::MVFST);
+      CHECK(initialReadCipher.hasValue());
+      codec->setInitialReadCipher(std::move(initialReadCipher.value()));
+
+      auto initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
           *client->getConn().initialDestinationConnectionId,
-          QuicVersion::MVFST));
+          QuicVersion::MVFST);
+      CHECK(initialHeaderCipher.hasValue());
+      codec->setInitialHeaderCipher(std::move(initialHeaderCipher.value()));
+
       codec->setHandshakeReadCipher(test::createNoOpAead());
-      codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
+      codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher().value());
     }
     return codec;
   }

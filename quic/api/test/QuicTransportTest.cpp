@@ -105,7 +105,7 @@ class QuicTransportTest : public Test {
         .WillRepeatedly(
             Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
     transport_->getConnectionState().oneRttWriteCipher = std::move(aead);
-    auto tempHeaderCipher = test::createNoOpHeaderCipher();
+    auto tempHeaderCipher = test::createNoOpHeaderCipher().value();
     tempHeaderCipher->setDefaultKey();
     transport_->getConnectionState().oneRttWriteHeaderCipher =
         std::move(tempHeaderCipher);

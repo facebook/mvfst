@@ -242,7 +242,7 @@ class TestQuicTransport
     transportConn = conn.get();
     conn_.reset(conn.release());
     aead = test::createNoOpAead();
-    headerCipher = test::createNoOpHeaderCipher();
+    headerCipher = test::createNoOpHeaderCipher().value();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     setConnectionSetupCallback(connSetupCb);
     setConnectionCallbackFromCtor(connCb);

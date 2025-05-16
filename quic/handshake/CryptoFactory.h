@@ -7,7 +7,9 @@
 
 #pragma once
 
+#include <folly/Expected.h>
 #include <quic/QuicConstants.h>
+#include <quic/QuicException.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
@@ -19,50 +21,59 @@ namespace quic {
 
 class CryptoFactory {
  public:
-  std::unique_ptr<Aead> getClientInitialCipher(
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getClientInitialCipher(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
-  std::unique_ptr<Aead> getServerInitialCipher(
+  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  getServerInitialCipher(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
-  BufPtr makeServerInitialTrafficSecret(
+  [[nodiscard]] folly::Expected<BufPtr, QuicError>
+  makeServerInitialTrafficSecret(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
-  BufPtr makeClientInitialTrafficSecret(
+  [[nodiscard]] folly::Expected<BufPtr, QuicError>
+  makeClientInitialTrafficSecret(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
   /**
    * Makes the header cipher for writing client initial packets.
    */
-  std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  makeClientInitialHeaderCipher(
       const ConnectionId& initialDestinationConnectionId,
       QuicVersion version) const;
 
   /**
    * Makes the header cipher for writing server initial packets.
    */
-  std::unique_ptr<PacketNumberCipher> makeServerInitialHeaderCipher(
+  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  makeServerInitialHeaderCipher(
       const ConnectionId& initialDestinationConnectionId,
       QuicVersion version) const;
 
   /**
    * Crypto layer specific methods.
    */
-  virtual BufPtr makeInitialTrafficSecret(
+  [[nodiscard]] virtual folly::Expected<BufPtr, QuicError>
+  makeInitialTrafficSecret(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const = 0;
 
-  virtual std::unique_ptr<Aead> makeInitialAead(
+  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  makeInitialAead(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const = 0;
 
-  virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      ByteRange baseSecret) const = 0;
+  [[nodiscard]] virtual folly::
+      Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+      makePacketNumberCipher(ByteRange baseSecret) const = 0;
 
   [[nodiscard]] virtual std::function<bool(ByteRange, ByteRange)>
   getCryptoEqualFunction() const = 0;

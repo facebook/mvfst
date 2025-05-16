@@ -149,26 +149,32 @@ const Optional<std::string>& FizzClientHandshake::getApplicationProtocol()
   }
 }
 
-bool FizzClientHandshake::verifyRetryIntegrityTag(
+folly::Expected<bool, QuicError> FizzClientHandshake::verifyRetryIntegrityTag(
     const ConnectionId& originalDstConnId,
     const RetryPacket& retryPacket) {
-  PseudoRetryPacketBuilder pseudoRetryPacketBuilder(
-      retryPacket.initialByte,
-      retryPacket.header.getSourceConnId(),
-      retryPacket.header.getDestinationConnId(),
-      originalDstConnId,
-      retryPacket.header.getVersion(),
-      BufHelpers::copyBuffer(retryPacket.header.getToken()));
+  try {
+    PseudoRetryPacketBuilder pseudoRetryPacketBuilder(
+        retryPacket.initialByte,
+        retryPacket.header.getSourceConnId(),
+        retryPacket.header.getDestinationConnId(),
+        originalDstConnId,
+        retryPacket.header.getVersion(),
+        BufHelpers::copyBuffer(retryPacket.header.getToken()));
 
-  BufPtr pseudoRetryPacket = std::move(pseudoRetryPacketBuilder).buildPacket();
+    BufPtr pseudoRetryPacket =
+        std::move(pseudoRetryPacketBuilder).buildPacket();
 
-  FizzRetryIntegrityTagGenerator retryIntegrityTagGenerator;
-  auto expectedIntegrityTag = retryIntegrityTagGenerator.getRetryIntegrityTag(
-      retryPacket.header.getVersion(), pseudoRetryPacket.get());
+    FizzRetryIntegrityTagGenerator retryIntegrityTagGenerator;
+    auto expectedIntegrityTag = retryIntegrityTagGenerator.getRetryIntegrityTag(
+        retryPacket.header.getVersion(), pseudoRetryPacket.get());
 
-  folly::IOBuf integrityTagWrapper = BufHelpers::wrapBufferAsValue(
-      retryPacket.integrityTag.data(), retryPacket.integrityTag.size());
-  return BufEq()(*expectedIntegrityTag, integrityTagWrapper);
+    folly::IOBuf integrityTagWrapper = BufHelpers::wrapBufferAsValue(
+        retryPacket.integrityTag.data(), retryPacket.integrityTag.size());
+    return BufEq()(*expectedIntegrityTag, integrityTagWrapper);
+  } catch (const std::exception& ex) {
+    return folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, ex.what()));
+  }
 }
 
 bool FizzClientHandshake::isTLSResumed() const {
@@ -212,40 +218,50 @@ bool FizzClientHandshake::matchEarlyParameters() {
   return fizz::client::earlyParametersMatch(state_);
 }
 
-std::unique_ptr<Aead> FizzClientHandshake::buildAead(
-    CipherKind kind,
-    ByteRange secret) {
-  bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
-  fizz::CipherSuite cipher =
-      isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
-  std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr = isEarlyTraffic
-      ? state_.context()->getFactory()->makeKeyScheduler(cipher)
-      : nullptr;
-  fizz::KeyScheduler& keyScheduler =
-      isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
+folly::Expected<std::unique_ptr<Aead>, QuicError>
+FizzClientHandshake::buildAead(CipherKind kind, ByteRange secret) {
+  try {
+    bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
+    fizz::CipherSuite cipher =
+        isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
+    std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr = isEarlyTraffic
+        ? state_.context()->getFactory()->makeKeyScheduler(cipher)
+        : nullptr;
+    fizz::KeyScheduler& keyScheduler =
+        isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
 
-  auto aead = FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
-      *state_.context()->getFactory(),
-      keyScheduler,
-      cipher,
-      secret,
-      kQuicKeyLabel,
-      kQuicIVLabel));
+    auto aead = FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
+        *state_.context()->getFactory(),
+        keyScheduler,
+        cipher,
+        secret,
+        kQuicKeyLabel,
+        kQuicIVLabel));
 
-  return aead;
+    return aead;
+  } catch (const std::exception& ex) {
+    return folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, ex.what()));
+  }
 }
 
-std::unique_ptr<PacketNumberCipher> FizzClientHandshake::buildHeaderCipher(
-    ByteRange secret) {
+folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+FizzClientHandshake::buildHeaderCipher(ByteRange secret) {
   return cryptoFactory_->makePacketNumberCipher(secret);
 }
 
-BufPtr FizzClientHandshake::getNextTrafficSecret(ByteRange secret) const {
-  auto deriver =
-      state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
-  auto nextSecret = deriver->expandLabel(
-      secret, kQuicKULabel, BufHelpers::create(0), secret.size());
-  return nextSecret;
+folly::Expected<BufPtr, QuicError> FizzClientHandshake::getNextTrafficSecret(
+    ByteRange secret) const {
+  try {
+    auto deriver =
+        state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
+    auto nextSecret = deriver->expandLabel(
+        secret, kQuicKULabel, BufHelpers::create(0), secret.size());
+    return nextSecret;
+  } catch (const std::exception& ex) {
+    return folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, ex.what()));
+  }
 }
 
 void FizzClientHandshake::onNewCachedPsk(

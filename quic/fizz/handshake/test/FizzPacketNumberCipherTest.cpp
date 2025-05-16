@@ -61,7 +61,9 @@ struct CipherBytes {
 
 TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
   FizzCryptoFactory cryptoFactory;
-  auto cipher = cryptoFactory.makePacketNumberCipher(GetParam().cipher);
+  auto cipherResult = cryptoFactory.makePacketNumberCipher(GetParam().cipher);
+  ASSERT_FALSE(cipherResult.hasError());
+  auto cipher = std::move(cipherResult.value());
   auto key = folly::unhexlify(GetParam().key);
   EXPECT_EQ(cipher->keyLength(), key.size());
   cipher->setKey(folly::range(key));
