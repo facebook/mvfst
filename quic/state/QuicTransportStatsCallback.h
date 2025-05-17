@@ -214,6 +214,7 @@ class QuicTransportStatsCallback {
         return "NOMEM";
       case SocketErrorType::OTHER:
         return "Other";
+      case SocketErrorType::MAX:
       default:
         throw std::runtime_error("Undefined SocketErrorType");
     }
