@@ -76,7 +76,10 @@ mvfst_cpp_library(
         ":types",
     ],
     exported_deps = [
+        "//folly:expected",
+        "//folly:unit",
         "//folly/io:iobuf",
+        "//quic:exception",
         "//quic/common:buf_util",
         "//quic/common:optional",
     ],

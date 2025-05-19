@@ -95,13 +95,19 @@ bool PacketGroupWriter::writeSingleQuicPacket(
   packetbuildBuf->prepend(headerLen);
 
   HeaderForm headerForm = packet.packet.header.getHeaderForm();
-  encryptPacketHeader(
+  auto headerEncryptResult = encryptPacketHeader(
       headerForm,
       packetbuildBuf->writableData(),
       headerLen,
       packetbuildBuf->data() + headerLen,
       packetbuildBuf->length() - headerLen,
       headerCipher);
+  if (headerEncryptResult.hasError()) {
+    throw QuicInternalException(
+        "DSR Send failed: Header encryption error: " +
+            headerEncryptResult.error().message,
+        LocalErrorCode::INTERNAL_ERROR);
+  }
   CHECK(!packetbuildBuf->isChained());
   auto encodedSize = packetbuildBuf->length();
   // Include previous packets back.

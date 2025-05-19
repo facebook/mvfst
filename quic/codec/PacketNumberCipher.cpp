@@ -13,14 +13,18 @@
 
 namespace quic {
 
-void PacketNumberCipher::decipherHeader(
+folly::Expected<folly::Unit, QuicError> PacketNumberCipher::decipherHeader(
     ByteRange sample,
     MutableByteRange initialByte,
     MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
     uint8_t /* packetNumLengthMask */) const {
   CHECK_EQ(packetNumberBytes.size(), kMaxPacketNumEncodingSize);
-  HeaderProtectionMask headerMask = mask(sample);
+  auto maskResult = mask(sample);
+  if (maskResult.hasError()) {
+    return folly::makeUnexpected(maskResult.error());
+  }
+  HeaderProtectionMask headerMask = std::move(maskResult.value());
   // Mask size should be > packet number length + 1.
   DCHECK_GE(headerMask.size(), 5);
   initialByte.data()[0] ^= headerMask.data()[0] & initialByteMask;
@@ -28,15 +32,20 @@ void PacketNumberCipher::decipherHeader(
   for (size_t i = 0; i < packetNumLength; ++i) {
     packetNumberBytes.data()[i] ^= headerMask.data()[i + 1];
   }
+  return folly::unit;
 }
 
-void PacketNumberCipher::cipherHeader(
+folly::Expected<folly::Unit, QuicError> PacketNumberCipher::cipherHeader(
     ByteRange sample,
     MutableByteRange initialByte,
     MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
     uint8_t /* packetNumLengthMask */) const {
-  HeaderProtectionMask headerMask = mask(sample);
+  auto maskResult = mask(sample);
+  if (maskResult.hasError()) {
+    return folly::makeUnexpected(maskResult.error());
+  }
+  HeaderProtectionMask headerMask = std::move(maskResult.value());
   // Mask size should be > packet number length + 1.
   DCHECK_GE(headerMask.size(), kMaxPacketNumEncodingSize + 1);
   size_t packetNumLength = parsePacketNumberLength(*initialByte.data());
@@ -44,13 +53,14 @@ void PacketNumberCipher::cipherHeader(
   for (size_t i = 0; i < packetNumLength; ++i) {
     packetNumberBytes.data()[i] ^= headerMask.data()[i + 1];
   }
+  return folly::unit;
 }
 
-void PacketNumberCipher::decryptLongHeader(
+folly::Expected<folly::Unit, QuicError> PacketNumberCipher::decryptLongHeader(
     ByteRange sample,
     MutableByteRange initialByte,
     MutableByteRange packetNumberBytes) const {
-  decipherHeader(
+  return decipherHeader(
       sample,
       initialByte,
       packetNumberBytes,
@@ -58,11 +68,11 @@ void PacketNumberCipher::decryptLongHeader(
       LongHeader::kPacketNumLenMask);
 }
 
-void PacketNumberCipher::decryptShortHeader(
+folly::Expected<folly::Unit, QuicError> PacketNumberCipher::decryptShortHeader(
     ByteRange sample,
     MutableByteRange initialByte,
     MutableByteRange packetNumberBytes) const {
-  decipherHeader(
+  return decipherHeader(
       sample,
       initialByte,
       packetNumberBytes,
@@ -70,11 +80,11 @@ void PacketNumberCipher::decryptShortHeader(
       ShortHeader::kPacketNumLenMask);
 }
 
-void PacketNumberCipher::encryptLongHeader(
+folly::Expected<folly::Unit, QuicError> PacketNumberCipher::encryptLongHeader(
     ByteRange sample,
     MutableByteRange initialByte,
     MutableByteRange packetNumberBytes) const {
-  cipherHeader(
+  return cipherHeader(
       sample,
       initialByte,
       packetNumberBytes,
@@ -82,11 +92,11 @@ void PacketNumberCipher::encryptLongHeader(
       LongHeader::kPacketNumLenMask);
 }
 
-void PacketNumberCipher::encryptShortHeader(
+folly::Expected<folly::Unit, QuicError> PacketNumberCipher::encryptShortHeader(
     ByteRange sample,
     MutableByteRange initialByte,
     MutableByteRange packetNumberBytes) const {
-  cipherHeader(
+  return cipherHeader(
       sample,
       initialByte,
       packetNumberBytes,

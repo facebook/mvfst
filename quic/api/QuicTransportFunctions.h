@@ -268,7 +268,7 @@ void writeShortClose(
  * whether or not there are enough bytes to sample for the header encryption
  * from the encryptedBody via a CHECK.
  */
-void encryptPacketHeader(
+folly::Expected<folly::Unit, QuicError> encryptPacketHeader(
     HeaderForm headerForm,
     uint8_t* header,
     size_t headerLen,

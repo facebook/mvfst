@@ -9,22 +9,26 @@
 
 namespace quic {
 
-static void setKeyImpl(
+static folly::Expected<folly::Unit, QuicError> setKeyImpl(
     folly::ssl::EvpCipherCtxUniquePtr& context,
     const EVP_CIPHER* cipher,
     ByteRange key) {
   DCHECK_EQ(key.size(), EVP_CIPHER_key_length(cipher));
   context.reset(EVP_CIPHER_CTX_new());
   if (context == nullptr) {
-    throw std::runtime_error("Unable to allocate an EVP_CIPHER_CTX object");
+    return folly::makeUnexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "Unable to allocate an EVP_CIPHER_CTX object"));
   }
   if (EVP_EncryptInit_ex(context.get(), cipher, nullptr, key.data(), nullptr) !=
       1) {
-    throw std::runtime_error("Init error");
+    return folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, "Init error"));
   }
+  return folly::unit;
 }
 
-static HeaderProtectionMask maskImpl(
+static folly::Expected<HeaderProtectionMask, QuicError> maskImpl(
     const folly::ssl::EvpCipherCtxUniquePtr& context,
     ByteRange sample) {
   HeaderProtectionMask outMask;
@@ -35,19 +39,22 @@ static HeaderProtectionMask maskImpl(
           outMask.data(),
           &outLen,
           sample.data(),
-          sample.size()) != 1 ||
+          static_cast<int>(sample.size())) != 1 ||
       static_cast<HeaderProtectionMask::size_type>(outLen) != outMask.size()) {
-    throw std::runtime_error("Encryption error");
+    return folly::makeUnexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, "Encryption error"));
   }
   return outMask;
 }
 
-void Aes128PacketNumberCipher::setKey(ByteRange key) {
+folly::Expected<folly::Unit, QuicError> Aes128PacketNumberCipher::setKey(
+    ByteRange key) {
   pnKey_ = BufHelpers::copyBuffer(key);
   return setKeyImpl(encryptCtx_, EVP_aes_128_ecb(), key);
 }
 
-void Aes256PacketNumberCipher::setKey(ByteRange key) {
+folly::Expected<folly::Unit, QuicError> Aes256PacketNumberCipher::setKey(
+    ByteRange key) {
   pnKey_ = BufHelpers::copyBuffer(key);
   return setKeyImpl(encryptCtx_, EVP_aes_256_ecb(), key);
 }
@@ -60,11 +67,13 @@ const BufPtr& Aes256PacketNumberCipher::getKey() const {
   return pnKey_;
 }
 
-HeaderProtectionMask Aes128PacketNumberCipher::mask(ByteRange sample) const {
+folly::Expected<HeaderProtectionMask, QuicError> Aes128PacketNumberCipher::mask(
+    ByteRange sample) const {
   return maskImpl(encryptCtx_, sample);
 }
 
-HeaderProtectionMask Aes256PacketNumberCipher::mask(ByteRange sample) const {
+folly::Expected<HeaderProtectionMask, QuicError> Aes256PacketNumberCipher::mask(
+    ByteRange sample) const {
   return maskImpl(encryptCtx_, sample);
 }
 

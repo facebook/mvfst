@@ -68,7 +68,9 @@ class CipherBuilder {
       throw std::runtime_error("Failed to create header cipher");
     }
     auto headerCipher = std::move(headerCipherResult.value());
-    headerCipher->setKey(packetProtectionKey->coalesce());
+    if (headerCipher->setKey(packetProtectionKey->coalesce()).hasError()) {
+      throw std::runtime_error("Failed to set header cipher key");
+    }
 
     return {std::move(aead), std::move(headerCipher)};
   }

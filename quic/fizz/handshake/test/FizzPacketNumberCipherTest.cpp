@@ -66,23 +66,26 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
   auto cipher = std::move(cipherResult.value());
   auto key = folly::unhexlify(GetParam().key);
   EXPECT_EQ(cipher->keyLength(), key.size());
-  cipher->setKey(folly::range(key));
+  auto setKeyResult = cipher->setKey(folly::range(key));
+  ASSERT_FALSE(setKeyResult.hasError());
   EXPECT_TRUE(!memcmp(cipher->getKey()->data(), key.c_str(), key.size()));
   CipherBytes cipherBytes(
       GetParam().sample,
       GetParam().decryptedInitialByte,
       GetParam().decryptedPacketNumberBytes);
-  cipher->encryptLongHeader(
+  auto encryptResult = cipher->encryptLongHeader(
       cipherBytes.sample,
       folly::range(cipherBytes.initial),
       folly::range(cipherBytes.packetNumber));
+  ASSERT_FALSE(encryptResult.hasError());
   EXPECT_EQ(folly::hexlify(cipherBytes.initial), GetParam().initialByte);
   EXPECT_EQ(
       folly::hexlify(cipherBytes.packetNumber), GetParam().packetNumberBytes);
-  cipher->decryptLongHeader(
+  auto decryptResult = cipher->decryptLongHeader(
       cipherBytes.sample,
       folly::range(cipherBytes.initial),
       folly::range(cipherBytes.packetNumber));
+  ASSERT_FALSE(decryptResult.hasError());
   EXPECT_EQ(
       folly::hexlify(cipherBytes.initial), GetParam().decryptedInitialByte);
   EXPECT_EQ(

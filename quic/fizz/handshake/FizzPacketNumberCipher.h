@@ -17,13 +17,15 @@ class Aes128PacketNumberCipher : public PacketNumberCipher {
  public:
   ~Aes128PacketNumberCipher() override = default;
 
-  void setKey(ByteRange key) override;
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> setKey(
+      ByteRange key) override;
 
-  const BufPtr& getKey() const override;
+  [[nodiscard]] const BufPtr& getKey() const override;
 
-  HeaderProtectionMask mask(ByteRange sample) const override;
+  [[nodiscard]] folly::Expected<HeaderProtectionMask, QuicError> mask(
+      ByteRange sample) const override;
 
-  size_t keyLength() const override;
+  [[nodiscard]] size_t keyLength() const override;
 
  private:
   folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
@@ -35,13 +37,15 @@ class Aes256PacketNumberCipher : public PacketNumberCipher {
  public:
   ~Aes256PacketNumberCipher() override = default;
 
-  void setKey(ByteRange key) override;
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> setKey(
+      ByteRange key) override;
 
-  const BufPtr& getKey() const override;
+  [[nodiscard]] const BufPtr& getKey() const override;
 
-  HeaderProtectionMask mask(ByteRange sample) const override;
+  [[nodiscard]] folly::Expected<HeaderProtectionMask, QuicError> mask(
+      ByteRange sample) const override;
 
-  size_t keyLength() const override;
+  [[nodiscard]] size_t keyLength() const override;
 
  private:
   folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;

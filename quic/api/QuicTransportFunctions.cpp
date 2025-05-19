@@ -309,13 +309,19 @@ continuousMemoryBuildScheduleEncrypt(
   packetBuf->prepend(headerLen);
 
   HeaderForm headerForm = packet->packet.header.getHeaderForm();
-  encryptPacketHeader(
+  auto headerEncryptResult = encryptPacketHeader(
       headerForm,
       packetBuf->writableData(),
       headerLen,
       packetBuf->data() + headerLen,
       packetBuf->length() - headerLen,
       headerCipher);
+  if (headerEncryptResult.hasError()) {
+    return folly::makeUnexpected(headerEncryptResult.error());
+  }
+  if (headerEncryptResult.hasError()) {
+    return folly::makeUnexpected(headerEncryptResult.error());
+  }
   CHECK(!packetBuf->isChained());
   auto encodedSize = packetBuf->length();
   auto encodedBodySize = encodedSize - headerLen;
@@ -413,13 +419,16 @@ iobufChainBasedBuildScheduleEncrypt(
   packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
 
   HeaderForm headerForm = packet->packet.header.getHeaderForm();
-  encryptPacketHeader(
+  auto headerEncryptResult = encryptPacketHeader(
       headerForm,
       packetBuf->writableData(),
       headerLen,
       packetBuf->data() + headerLen,
       packetBuf->length() - headerLen,
       headerCipher);
+  if (headerEncryptResult.hasError()) {
+    return folly::makeUnexpected(headerEncryptResult.error());
+  }
   auto encodedSize = packetBuf->computeChainDataLength();
   auto encodedBodySize = encodedSize - headerLen;
   if (encodedSize > connection.udpSendPacketLen) {
@@ -1525,7 +1534,7 @@ void writeShortClose(
       headerCipher);
 }
 
-void encryptPacketHeader(
+folly::Expected<folly::Unit, QuicError> encryptPacketHeader(
     HeaderForm headerForm,
     uint8_t* header,
     size_t headerLen,
@@ -1546,12 +1555,19 @@ void encryptPacketHeader(
   MutableByteRange packetNumByteRange(
       header + headerLen - packetNumberLength, packetNumberLength);
   if (headerForm == HeaderForm::Short) {
-    headerCipher.encryptShortHeader(
+    auto result = headerCipher.encryptShortHeader(
         sample, initialByteRange, packetNumByteRange);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
   } else {
-    headerCipher.encryptLongHeader(
+    auto result = headerCipher.encryptLongHeader(
         sample, initialByteRange, packetNumByteRange);
+    if (result.hasError()) {
+      return folly::makeUnexpected(result.error());
+    }
   }
+  return folly::unit;
 }
 
 /**

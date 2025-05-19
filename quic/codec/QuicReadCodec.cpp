@@ -91,7 +91,7 @@ static PacketDropReason getDecryptErrorReason(ProtectionType protectionType) {
   }
 }
 
-CodecResult QuicReadCodec::parseLongHeaderPacket(
+folly::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
     BufQueue& queue,
     const AckStates& ackStates) {
   Cursor cursor(queue.front());
@@ -213,8 +213,12 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   MutableByteRange packetNumberByteRange(
       currentPacketData->writableData() + packetNumberOffset,
       kMaxPacketNumEncodingSize);
-  headerCipher->decryptLongHeader(
+  auto decryptResult = headerCipher->decryptLongHeader(
       folly::range(sample), initialByteRange, packetNumberByteRange);
+  if (decryptResult.hasError()) {
+    VLOG(4) << "Failed to decrypt long header " << connIdToHex();
+    return folly::makeUnexpected(decryptResult.error());
+  }
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
       initialByteRange.data()[0], packetNumberByteRange, expectedNextPacketNum);
 
@@ -260,7 +264,8 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   return CodecResult(std::move(*packetRes));
 }
 
-CodecResult QuicReadCodec::tryParseShortHeaderPacket(
+folly::Expected<CodecResult, QuicError>
+QuicReadCodec::tryParseShortHeaderPacket(
     BufPtr data,
     const AckStates& ackStates,
     size_t dstConnIdSize,
@@ -284,8 +289,12 @@ CodecResult QuicReadCodec::tryParseShortHeaderPacket(
       data->writableData() + packetNumberOffset, kMaxPacketNumEncodingSize);
   ByteRange sampleByteRange(data->writableData() + sampleOffset, sample.size());
 
-  oneRttHeaderCipher_->decryptShortHeader(
+  auto decryptResult = oneRttHeaderCipher_->decryptShortHeader(
       sampleByteRange, initialByteRange, packetNumberByteRange);
+  if (decryptResult.hasError()) {
+    VLOG(4) << "Failed to decrypt short header " << connIdToHex();
+    return folly::makeUnexpected(decryptResult.error());
+  }
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
       initialByteRange.data()[0], packetNumberByteRange, expectedNextPacketNum);
   auto shortHeader =
@@ -411,7 +420,11 @@ CodecResult QuicReadCodec::parsePacket(
   uint8_t initialByte = cursor.readBE<uint8_t>();
   auto headerForm = getHeaderForm(initialByte);
   if (headerForm == HeaderForm::Long) {
-    return parseLongHeaderPacket(queue, ackStates);
+    auto result = parseLongHeaderPacket(queue, ackStates);
+    if (result.hasError()) {
+      return CodecResult(CodecError(std::move(result.error())));
+    }
+    return std::move(result.value());
   }
   // Missing 1-rtt header cipher is the only case we wouldn't consider reset
   if (!currentOneRttReadCipher_ || !oneRttHeaderCipher_) {
@@ -447,8 +460,12 @@ CodecResult QuicReadCodec::parsePacket(
       }
     }
   }
-  return tryParseShortHeaderPacket(
+  auto result = tryParseShortHeaderPacket(
       std::move(data), ackStates, dstConnIdSize, cursor);
+  if (result.hasError()) {
+    return CodecResult(CodecError(std::move(result.error())));
+  }
+  return std::move(result.value());
 }
 
 bool QuicReadCodec::canInitiateKeyUpdate() const {

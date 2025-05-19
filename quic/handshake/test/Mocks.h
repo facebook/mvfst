@@ -7,7 +7,10 @@
 
 #pragma once
 
+#include <folly/Expected.h>
+#include <folly/Unit.h>
 #include <folly/portability/GMock.h>
+#include <quic/QuicException.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/Aead.h>
@@ -23,8 +26,15 @@ class MockPacketNumberCipher : public PacketNumberCipher {
  public:
   virtual ~MockPacketNumberCipher() = default;
 
-  MOCK_METHOD(void, setKey, (ByteRange key));
-  MOCK_METHOD(HeaderProtectionMask, mask, (ByteRange), (const));
+  MOCK_METHOD(
+      (folly::Expected<folly::Unit, QuicError>),
+      setKey,
+      (ByteRange key));
+  MOCK_METHOD(
+      (folly::Expected<HeaderProtectionMask, QuicError>),
+      mask,
+      (ByteRange),
+      (const));
   MOCK_METHOD(size_t, keyLength, (), (const));
   MOCK_METHOD(const BufPtr&, getKey, (), (const));
 

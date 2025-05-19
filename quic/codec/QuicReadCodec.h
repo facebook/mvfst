@@ -198,12 +198,12 @@ class QuicReadCodec {
   Optional<TimePoint> getHandshakeDoneTime();
 
  private:
-  CodecResult tryParseShortHeaderPacket(
+  folly::Expected<CodecResult, QuicError> tryParseShortHeaderPacket(
       BufPtr data,
       const AckStates& ackStates,
       size_t dstConnIdSize,
       Cursor& cursor);
-  CodecResult parseLongHeaderPacket(
+  folly::Expected<CodecResult, QuicError> parseLongHeaderPacket(
       BufQueue& queue,
       const AckStates& ackStates);
 

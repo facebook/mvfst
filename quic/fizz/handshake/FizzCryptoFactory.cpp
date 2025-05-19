@@ -77,7 +77,10 @@ FizzCryptoFactory::makePacketNumberCipher(ByteRange baseSecret) const {
       fizzFactory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto pnKey = deriver->expandLabel(
       baseSecret, kQuicPNLabel, BufHelpers::create(0), pnCipher->keyLength());
-  pnCipher->setKey(pnKey->coalesce());
+  auto setKeyResult = pnCipher->setKey(pnKey->coalesce());
+  if (setKeyResult.hasError()) {
+    return folly::makeUnexpected(setKeyResult.error());
+  }
   return pnCipher;
 }
 

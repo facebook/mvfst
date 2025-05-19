@@ -51,6 +51,7 @@ class FizzCryptoFactoryTest : public Test {
     EXPECT_CALL(*mockPacketNumberCipher, setKey(_))
         .WillOnce(Invoke([&](ByteRange key) {
           packetCipherKey_ = folly::IOBuf::copyBuffer(key);
+          return folly::Expected<folly::Unit, QuicError>(folly::unit);
         }));
     EXPECT_CALL(*mockPacketNumberCipher, keyLength())
         .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));
