@@ -184,7 +184,7 @@ class MockClientHandshake : public MockClientHandshakeBase {
 class MockQuicConnectorCallback : public quic::QuicConnector::Callback {
  public:
   MOCK_METHOD(void, onConnectError, (QuicError));
-  MOCK_METHOD(void, onConnectSuccess, ());
+  MOCK_METHOD(void, onConnectSuccess, (const quic::QuicSocket&));
 };
 
 class MockQuicClientTransport : public quic::QuicClientTransport {

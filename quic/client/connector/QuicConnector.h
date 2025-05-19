@@ -33,7 +33,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
    public:
     virtual ~Callback() = default;
     virtual void onConnectError(QuicError errorCode) = 0;
-    virtual void onConnectSuccess() = 0;
+    virtual void onConnectSuccess(const quic::QuicSocket& quicSocket) = 0;
   };
 
   QuicConnector(Callback* cb);

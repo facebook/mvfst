@@ -55,7 +55,7 @@ class QuicConnectorTest : public Test {
 };
 
 TEST_F(QuicConnectorTest, TestConnectSuccess) {
-  EXPECT_CALL(cb_, onConnectSuccess()).Times(1).WillOnce(Invoke([this]() {
+  EXPECT_CALL(cb_, onConnectSuccess(_)).Times(1).WillOnce(Invoke([this]() {
     eventBase_.terminateLoopSoon();
   }));
   executeMockConnect(

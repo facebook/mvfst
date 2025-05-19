@@ -32,7 +32,8 @@ void QuicConnector::onConnectionSetupError(QuicError code) noexcept {
 
 void QuicConnector::onReplaySafe() noexcept {
   if (cb_) {
-    cb_->onConnectSuccess();
+    CHECK(quicClient_);
+    cb_->onConnectSuccess(*quicClient_);
   }
   cancelTimerCallback();
   cleanUpAndCloseSocket();
