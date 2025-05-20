@@ -223,7 +223,7 @@ class ServerHandshake : public Handshake {
 
   ~ServerHandshake() override = default;
 
-  void onError(std::pair<std::string, TransportErrorCode> error);
+  void onError(const std::pair<std::string, TransportErrorCode>& error);
 
   void onWriteData(fizz::WriteToSocket& write);
 

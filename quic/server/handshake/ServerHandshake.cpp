@@ -238,7 +238,7 @@ const Optional<std::string>& ServerHandshake::getApplicationProtocol() const {
 }
 
 void ServerHandshake::onError(
-    std::pair<std::string, TransportErrorCode> error) {
+    const std::pair<std::string, TransportErrorCode>& error) {
   VLOG(10) << "ServerHandshake error " << error.first;
   error_ = error;
   handshakeEventAvailable_ = true;
