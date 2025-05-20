@@ -156,6 +156,7 @@ mvfst_cpp_test(
         "QuicBufferTest.cpp",
     ],
     deps = [
+        "fbsource//third-party/glog:glog",
         "//folly/portability:gtest",
         "//quic/common:quic_buffer",
     ],
