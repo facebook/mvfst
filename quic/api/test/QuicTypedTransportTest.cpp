@@ -1450,6 +1450,13 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
  * Initiate the first key update - Successful attempt
  */
 TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateFirstKeyUpdateSuccess) {
+  // Use QUIC_V1 for the server since MVFST has special handling to accommodate
+  // older client versions without key update support. That behavior is covered
+  // in another test
+  if (this->getConn().nodeType == QuicNodeType::Server) {
+    this->getNonConstConn().version = QuicVersion::QUIC_V1;
+  }
+
   ASSERT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
   auto numberOfWrittenPacketsInPhase =
       this->getConn().oneRttWritePacketsSentInCurrentPhase;
@@ -1516,6 +1523,110 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateFirstKeyUpdateSuccess) {
         streamId, IOBuf::copyBuffer("hello4"), ProtectionType::KeyPhaseOne));
 
     EXPECT_TRUE(this->getConn().readCodec->canInitiateKeyUpdate());
+  }
+
+  this->getNonConstConn().outstandings.reset();
+
+  this->destroyTransport();
+}
+
+/**
+ * As a server, do not initiate key updates for QuicVersion::MVFST unless the
+ * client has performed a key update.
+ * (Old versions of MVFST did not support key updates)
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    ServerInitiateKeyUpdateForMvfstClient) {
+  if (this->getConn().nodeType != QuicNodeType::Server) {
+    // This test is for the server behavior only
+    return;
+  }
+
+  ASSERT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  this->getNonConstConn().version = QuicVersion::MVFST;
+
+  auto numberOfWrittenPacketsInPhase =
+      this->getConn().oneRttWritePacketsSentInCurrentPhase;
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+
+  {
+    // Send and receive a packet in the current phase
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    this->loopForWrites();
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("hello2"), ProtectionType::KeyPhaseZero));
+
+    // Both read and writer ciphers should be in phase zero.
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseZero);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  }
+
+  {
+    // First key update is due but it shouldn't trigger one because connection
+    // is for QuicVersion::MVFST and the peer hasn't initiated a key update yet
+
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    conn.transportSettings.initiateKeyUpdate = true;
+    // Trigger this update as a first update
+    conn.transportSettings.firstKeyUpdatePacketCount =
+        numberOfWrittenPacketsInPhase;
+    // Periodic interval is high enough not to be triggered
+    conn.transportSettings.keyUpdatePacketCountInterval =
+        kDefaultKeyUpdatePacketCountInterval;
+
+    // A key update should be triggered after this write is completed.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello3"), false);
+    this->loopForWrites();
+
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        ++numberOfWrittenPacketsInPhase);
+
+    // Both read and writer ciphers should still be at Phase Zero
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseZero);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseZero);
+  }
+
+  // Clear firstKeyUpdatePacketCount to indicate that a key update was performed
+  // by the peer.
+  this->getNonConstConn().transportSettings.firstKeyUpdatePacketCount.reset();
+
+  {
+    // Now that the peer had initiated a key update, the server can trigger one
+    // too.
+    QuicConnectionStateBase& conn = this->getNonConstConn();
+    conn.transportSettings.initiateKeyUpdate = true;
+    // Indicate that a regular update is due
+    conn.transportSettings.keyUpdatePacketCountInterval =
+        numberOfWrittenPacketsInPhase;
+
+    // A key update should be triggered after this write is completed.
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello3"), false);
+    this->loopForWrites();
+
+    numberOfWrittenPacketsInPhase = 0;
+    EXPECT_EQ(
+        this->getConn().oneRttWritePacketsSentInCurrentPhase,
+        numberOfWrittenPacketsInPhase);
+
+    // Read and writer ciphers should advance to Key Phase One
+    EXPECT_EQ(
+        this->getConn().readCodec->getCurrentOneRttReadPhase(),
+        ProtectionType::KeyPhaseOne);
+    EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
   }
 
   this->getNonConstConn().outstandings.reset();

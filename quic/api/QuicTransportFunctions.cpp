@@ -2228,6 +2228,10 @@ folly::Expected<folly::Unit, QuicError> maybeHandleIncomingKeyUpdate(
     }
     conn.readCodec->setNextOneRttReadCipher(
         std::move(nextOneRttReadCipherResult.value()));
+
+    // The peer has initiated a key update. We should use the regular key
+    // update interval if we are initiating key updates.
+    conn.transportSettings.firstKeyUpdatePacketCount.reset();
   }
   return folly::unit;
 }
@@ -2235,6 +2239,14 @@ folly::Expected<folly::Unit, QuicError> maybeHandleIncomingKeyUpdate(
 folly::Expected<folly::Unit, QuicError> maybeInitiateKeyUpdate(
     QuicConnectionStateBase& conn) {
   if (conn.transportSettings.initiateKeyUpdate) {
+    if (conn.nodeType == QuicNodeType::Server && conn.version.has_value() &&
+        conn.version.value() == QuicVersion::MVFST &&
+        conn.transportSettings.firstKeyUpdatePacketCount.has_value()) {
+      // Some old versions of MVFST did not support key updates.
+      // So as the server, do not attempt to initiate key updates if the client
+      // hasn't initiated one yet.
+      return folly::unit;
+    }
     auto packetsBeforeNextUpdate =
         conn.transportSettings.firstKeyUpdatePacketCount
         ? conn.transportSettings.firstKeyUpdatePacketCount.value()
@@ -2244,6 +2256,9 @@ folly::Expected<folly::Unit, QuicError> maybeInitiateKeyUpdate(
         conn.readCodec->canInitiateKeyUpdate()) {
       QUIC_STATS(conn.statsCallback, onKeyUpdateAttemptInitiated);
       conn.readCodec->advanceOneRttReadPhase();
+
+      //  We have initiated a key update. We should use the regular key
+      // update from now on.
       conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
       auto nextOneRttWriteCipherResult =
