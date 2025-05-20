@@ -1046,7 +1046,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
   ASSERT_FALSE(markPacketLoss(*conn, packet, false).hasError());
 
   EXPECT_EQ(1, conn->pendingEvents.resets.size());
-  EXPECT_EQ(1, conn->pendingEvents.resets.count(stream->id));
+  EXPECT_TRUE(conn->pendingEvents.resets.contains(stream->id));
   auto& retxRstFrame = conn->pendingEvents.resets.at(stream->id);
   EXPECT_EQ(stream->id, retxRstFrame.streamId);
   EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, retxRstFrame.errorCode);
