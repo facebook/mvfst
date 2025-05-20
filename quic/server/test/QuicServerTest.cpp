@@ -293,7 +293,7 @@ void QuicServerWorkerTest::createQuicConnectionDuringShedding(
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
-  EXPECT_EQ(0, addrMap.count(std::make_pair(addr, connId)));
+  EXPECT_FALSE(addrMap.contains(std::make_pair(addr, connId)));
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -320,7 +320,7 @@ void QuicServerWorkerTest::createQuicConnection(
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
-  EXPECT_EQ(addrMap.count(std::make_pair(addr, connId)), 1);
+  EXPECT_TRUE(addrMap.contains(std::make_pair(addr, connId)));
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -462,7 +462,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
-  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
+  EXPECT_TRUE(addrMap.contains(std::make_pair(kClientAddr, connId1)));
   eventbase_.loopIgnoreKeepAlive();
 
   auto caddr2 = folly::SocketAddress("2.3.4.5", 1234);
@@ -494,7 +494,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       NetworkData(data2->clone(), Clock::now(), 0),
       version);
 
-  EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
+  EXPECT_TRUE(addrMap.contains(std::make_pair(caddr2, connId2)));
   eventbase_.loopIgnoreKeepAlive();
 
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
@@ -512,7 +512,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       NetworkData(data2->clone(), Clock::now(), 0),
       version);
 
-  EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
+  EXPECT_FALSE(addrMap.contains(std::make_pair(caddr3, connId3)));
   EXPECT_EQ(addrMap.size(), 2);
   eventbase_.loopIgnoreKeepAlive();
 }
@@ -556,7 +556,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
-  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
+  EXPECT_TRUE(addrMap.contains(std::make_pair(kClientAddr, connId1)));
   eventbase_.loopIgnoreKeepAlive();
 
   auto caddr2 = folly::SocketAddress("2.3.4.5", 1234);
@@ -588,7 +588,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       NetworkData(data2->clone(), Clock::now(), 0),
       version);
 
-  EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
+  EXPECT_TRUE(addrMap.contains(std::make_pair(caddr2, connId2)));
   eventbase_.loopIgnoreKeepAlive();
 
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
@@ -606,7 +606,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       NetworkData(data3->clone(), Clock::now(), 0),
       version);
 
-  EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
+  EXPECT_FALSE(addrMap.contains(std::make_pair(caddr3, connId3)));
   EXPECT_EQ(addrMap.size(), 2);
   eventbase_.loopIgnoreKeepAlive();
 
@@ -641,7 +641,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       NetworkData(data4->clone(), Clock::now(), 0),
       version);
 
-  EXPECT_EQ(addrMap.count(std::make_pair(caddr4, connId4)), 1);
+  EXPECT_TRUE(addrMap.contains(std::make_pair(caddr4, connId4)));
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -701,7 +701,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
   worker_.get()->onConnectionIdAvailable(transport_, connId);
   const auto& connIdMap = worker_->getConnectionIdMap();
-  EXPECT_EQ(connIdMap.count(connId), 1);
+  EXPECT_TRUE(connIdMap.contains(connId));
 
   EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
@@ -710,7 +710,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   worker_->cancelTimeout();
 
   const auto& addrMap = worker_->getSrcToTransportMap();
-  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+  EXPECT_FALSE(addrMap.contains(std::make_pair(kClientAddr, connId)));
 
   // routing by connid after connid available.
   EXPECT_CALL(
@@ -749,8 +749,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       std::make_pair(kClientAddr, connId),
       std::vector<ConnectionIdData>{
           ConnectionIdData{connId, 0}, ConnectionIdData{connId2, 1}});
-  EXPECT_EQ(connIdMap.count(connId), 0);
-  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+  EXPECT_FALSE(connIdMap.contains(connId));
+  EXPECT_FALSE(addrMap.contains(std::make_pair(kClientAddr, connId)));
 
   // transport_ dtor is run at the end of the test, which causes
   // onConnectionUnbound to be called if the routingCallback_ is
@@ -768,7 +768,7 @@ TEST_F(QuicServerWorkerTest, RetireConnIds) {
 
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
   worker_->onConnectionIdAvailable(transport_, connId);
-  EXPECT_EQ(connIdMap.count(connId), 1);
+  EXPECT_TRUE(connIdMap.contains(connId));
 
   EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
@@ -776,7 +776,7 @@ TEST_F(QuicServerWorkerTest, RetireConnIds) {
   EXPECT_TRUE(worker_->isScheduled());
   worker_->cancelTimeout();
 
-  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+  EXPECT_FALSE(addrMap.contains(std::make_pair(kClientAddr, connId)));
 
   // create two additional conn ids
   auto connId2 = connId;
@@ -808,8 +808,8 @@ TEST_F(QuicServerWorkerTest, RetireConnIds) {
       transport_.get(),
       std::make_pair(kClientAddr, connId),
       std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
-  EXPECT_EQ(connIdMap.count(connId), 0);
-  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+  EXPECT_FALSE(connIdMap.contains(connId));
+  EXPECT_FALSE(addrMap.contains(std::make_pair(kClientAddr, connId)));
   // transport_ dtor is run at the end of the test, which causes
   // onConnectionUnbound to be called if the routingCallback_ is
   // still set.
@@ -848,7 +848,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
   worker_.get()->onConnectionIdAvailable(transport_, newConnId);
   const auto& connIdMap = worker_->getConnectionIdMap();
-  EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
+  EXPECT_TRUE(connIdMap.contains(getTestConnectionId(hostId_)));
 
   EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
@@ -857,9 +857,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->cancelTimeout();
 
   const auto& addrMap = worker_->getSrcToTransportMap();
-  EXPECT_EQ(
-      addrMap.count(std::make_pair(kClientAddr, getTestConnectionId(hostId_))),
-      0);
+  EXPECT_FALSE(addrMap.contains(
+      std::make_pair(kClientAddr, getTestConnectionId(hostId_))));
 
   // routing by connid after connid available.
   EXPECT_CALL(
@@ -924,10 +923,9 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       transport_.get(),
       std::make_pair(clientAddr2, connId2),
       std::vector<ConnectionIdData>{ConnectionIdData{connId2, 0}});
-  EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 0);
-  EXPECT_EQ(
-      addrMap.count(std::make_pair(kClientAddr, getTestConnectionId(hostId_))),
-      0);
+  EXPECT_FALSE(connIdMap.contains(getTestConnectionId(hostId_)));
+  EXPECT_FALSE(addrMap.contains(
+      std::make_pair(kClientAddr, getTestConnectionId(hostId_))));
 
   // transport_ dtor is run at the end of the test, which causes
   // onConnectionUnbound to be called if the routingCallback_ is
@@ -1189,7 +1187,7 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
 
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
   const auto& connIdMap = worker_->getConnectionIdMap();
-  EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
+  EXPECT_TRUE(connIdMap.contains(getTestConnectionId(hostId_)));
 
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
@@ -1227,7 +1225,7 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
 
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
   const auto& connIdMap = worker_->getConnectionIdMap();
-  EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
+  EXPECT_TRUE(connIdMap.contains(getTestConnectionId(hostId_)));
 
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
