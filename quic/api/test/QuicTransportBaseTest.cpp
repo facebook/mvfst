@@ -3983,7 +3983,7 @@ TEST_P(QuicTransportImplTestBase, UpdatePeekableListNoDataTest) {
   // After the call the streamId should be removed
   // from the list since there is no peekable data in the stream.
   conn->streamManager->updatePeekableStreams(*stream);
-  EXPECT_EQ(0, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_FALSE(conn->streamManager->peekableStreams().contains(streamId));
 }
 
 TEST_P(QuicTransportImplTestBase, UpdatePeekableListWithDataTest) {
@@ -3997,12 +3997,12 @@ TEST_P(QuicTransportImplTestBase, UpdatePeekableListWithDataTest) {
       StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
 
   // streamId is in the list after the above call.
-  EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_TRUE(conn->streamManager->peekableStreams().contains(streamId));
 
   // After the call the streamId shall remain
   // in the list since there is data in the stream.
   conn->streamManager->updatePeekableStreams(*stream);
-  EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_TRUE(conn->streamManager->peekableStreams().contains(streamId));
 }
 
 TEST_P(QuicTransportImplTestBase, UpdatePeekableListEmptyListTest) {
@@ -4017,13 +4017,13 @@ TEST_P(QuicTransportImplTestBase, UpdatePeekableListEmptyListTest) {
 
   // Erase streamId from the list.
   conn->streamManager->peekableStreams().erase(streamId);
-  EXPECT_EQ(0, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_FALSE(conn->streamManager->peekableStreams().contains(streamId));
 
   // After the call the streamId should be added to the list
   // because there is data in the stream and the streamId is
   // not in the list.
   conn->streamManager->updatePeekableStreams(*stream);
-  EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_TRUE(conn->streamManager->peekableStreams().contains(streamId));
 }
 
 TEST_P(QuicTransportImplTestBase, UpdatePeekableListWithStreamErrorTest) {
@@ -4035,13 +4035,13 @@ TEST_P(QuicTransportImplTestBase, UpdatePeekableListWithStreamErrorTest) {
       StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
 
   // streamId is in the list.
-  EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_TRUE(conn->streamManager->peekableStreams().contains(streamId));
 
   transport->addStreamReadError(streamId, LocalErrorCode::NO_ERROR);
 
   // peekableStreams is updated to allow stream with streamReadError.
   // So the streamId shall be in the list
-  EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
+  EXPECT_TRUE(conn->streamManager->peekableStreams().contains(streamId));
 }
 
 TEST_P(QuicTransportImplTestBase, SuccessfulPing) {
