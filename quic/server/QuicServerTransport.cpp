@@ -1313,22 +1313,19 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(serverTransport);
         bool useNewPriorityQueue = static_cast<bool>(std::get<uint64_t>(value));
         auto serverConn = serverTransport->serverConn_;
-        std::swap(
-            useNewPriorityQueue,
-            serverConn->transportSettings.useNewPriorityQueue);
         VLOG(3) << "USE_NEW_PRIORITY_QUEUE KnobParam received: "
                 << useNewPriorityQueue;
-        auto refreshResult =
-            serverConn->streamManager->refreshTransportSettings(
-                serverConn->transportSettings);
+        auto refreshResult = serverConn->streamManager->updatePriorityQueueImpl(
+            useNewPriorityQueue);
         if (refreshResult.hasError()) {
           LOG(ERROR) << "Refresh transport settings failed";
-          std::swap(
-              useNewPriorityQueue,
-              serverConn->transportSettings.useNewPriorityQueue);
           return folly::makeUnexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "Refresh transport settings failed"));
+        } else {
+          std::swap(
+              useNewPriorityQueue,
+              serverConn->transportSettings.useNewPriorityQueue);
         }
         return folly::unit;
       });

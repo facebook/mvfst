@@ -290,7 +290,12 @@ QuicStreamManager::refreshTransportSettings(const TransportSettings& settings) {
   if (!writeQueue_) {
     writeQueue_ = std::make_unique<HTTPPriorityQueue>();
   }
-  if (!transportSettings_->useNewPriorityQueue && !oldWriteQueue_) {
+  return updatePriorityQueueImpl(transportSettings_->useNewPriorityQueue);
+}
+
+folly::Expected<folly::Unit, QuicError>
+QuicStreamManager::updatePriorityQueueImpl(bool useNewPriorityQueue) {
+  if (!useNewPriorityQueue && !oldWriteQueue_) {
     if (writeQueue_->empty() && connFlowControlBlocked_.empty()) {
       oldWriteQueue_ = std::make_unique<deprecated::PriorityQueue>();
     } else {
@@ -298,7 +303,7 @@ QuicStreamManager::refreshTransportSettings(const TransportSettings& settings) {
           QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
           "Cannot change priority queue when the queue is not empty"));
     }
-  } else if (transportSettings_->useNewPriorityQueue && oldWriteQueue_) {
+  } else if (useNewPriorityQueue && oldWriteQueue_) {
     if (oldWriteQueue_->empty()) {
       oldWriteQueue_.reset();
     } else {

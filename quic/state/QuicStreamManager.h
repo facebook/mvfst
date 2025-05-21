@@ -556,8 +556,13 @@ class QuicStreamManager {
   bool consumeMaxLocalBidirectionalStreamIdIncreased();
   bool consumeMaxLocalUnidirectionalStreamIdIncreased();
 
+  // This function messes with the connection state and you should think very
+  // hard before calling it
   [[nodiscard]] folly::Expected<folly::Unit, QuicError>
   refreshTransportSettings(const TransportSettings& settings);
+
+  [[nodiscard]] folly::Expected<folly::Unit, QuicError> updatePriorityQueueImpl(
+      bool useNewPriorityQueue);
 
   void setStreamLimitWindowingFraction(uint64_t fraction) {
     if (fraction > 0) {
