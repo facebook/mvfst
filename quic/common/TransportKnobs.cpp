@@ -38,11 +38,11 @@ Optional<TransportKnobParams> parseTransportKnobs(
     opts.parse_numbers_as_strings = true;
     folly::dynamic params = folly::parseJson(serializedParams, opts);
     for (const auto& id : params.keys()) {
-      auto paramId = folly::to<uint64_t>(id.asInt());
+      auto paramId = static_cast<uint64_t>(id.asInt());
       auto val = params[id];
       switch (val.type()) {
         case folly::dynamic::Type::BOOL:
-          knobParams.push_back({paramId, folly::to<uint64_t>(val.asInt())});
+          knobParams.push_back({paramId, static_cast<uint64_t>(val.asInt())});
           continue;
         case folly::dynamic::Type::STRING: {
           /*
@@ -79,7 +79,7 @@ Optional<TransportKnobParams> parseTransportKnobs(
                 congestionControlStrToType(val.asString());
             if (cctype) {
               knobParams.push_back(
-                  {paramId, folly::to<uint64_t>(cctype.value())});
+                  {paramId, static_cast<uint64_t>(cctype.value())});
             } else {
               LOG(ERROR) << "unknown cc type " << val;
               return std::nullopt;
@@ -122,7 +122,7 @@ Optional<TransportKnobParams> parseTransportKnobs(
             // transport knobs must be a single int, so we pack numerator and
             // denominator into a single int here and unpack in the handler
             factor = numerator * kKnobFractionMax + denominator;
-            knobParams.push_back({paramId, folly::to<uint64_t>(factor)});
+            knobParams.push_back({paramId, factor});
           } else if (paramId == TransportKnobParamId::NO_OP) {
             // No further processing needed. Ignore this knob parameter.
             VLOG(4) << "Skipping over noop transport knob";

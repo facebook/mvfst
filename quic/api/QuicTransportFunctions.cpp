@@ -487,7 +487,7 @@ void handleNewStreamDataWritten(
   // or loss buffer, but that's an expensive search.
   stream.currentWriteOffset += frameLen;
   ChainedByteRangeHead bufWritten(
-      stream.pendingWrites.splitAtMost(folly::to<size_t>(frameLen)));
+      stream.pendingWrites.splitAtMost(static_cast<size_t>(frameLen)));
   DCHECK_EQ(bufWritten.chainLength(), frameLen);
   // TODO: If we want to be able to write FIN out of order for DSR-ed streams,
   // this needs to be fixed:
@@ -1737,8 +1737,8 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
           writeLoopTimeLimit(writeLoopBeginTime, connection))) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
     auto header = builder(srcConnId, dstConnId, packetNum, version, token);
-    uint32_t writableBytes = folly::to<uint32_t>(std::min<uint64_t>(
-        connection.udpSendPacketLen, writableBytesFunc(connection)));
+    uint32_t writableBytes = std::min<uint64_t>(
+        connection.udpSendPacketLen, writableBytesFunc(connection));
     uint64_t cipherOverhead = aead.getCipherOverhead();
     if (writableBytes < cipherOverhead) {
       writableBytes = 0;
@@ -1803,8 +1803,8 @@ folly::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
         std::move(result->clonedPacketIdentifier),
         std::move(result->packet->packet),
         sentTime,
-        folly::to<uint32_t>(ret->encodedSize),
-        folly::to<uint32_t>(ret->encodedBodySize),
+        static_cast<uint32_t>(ret->encodedSize),
+        static_cast<uint32_t>(ret->encodedBodySize),
         false /* isDSRPacket */);
     if (updateConnResult.hasError()) {
       return folly::makeUnexpected(updateConnResult.error());

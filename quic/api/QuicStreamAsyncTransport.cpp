@@ -410,7 +410,7 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   // overkill until there are delivery cbs
   folly::DelayedDestruction::DestructorGuard dg(this);
   uint64_t toSend =
-      std::min(maxToSend, folly::to<uint64_t>(writeBuf_.chainLength()));
+      std::min(maxToSend, static_cast<uint64_t>(writeBuf_.chainLength()));
 
   uint64_t sentOffset = streamWriteOffset_ + toSend;
   bool writeEOF =

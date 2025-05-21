@@ -21,7 +21,7 @@ namespace {
  * Return: true if there is enough space, false otherwise
  */
 bool packetSpaceCheck(uint64_t limit, size_t require) {
-  return (folly::to<uint64_t>(require) <= limit);
+  return (static_cast<uint64_t>(require) <= limit);
 }
 } // namespace
 

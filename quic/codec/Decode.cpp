@@ -170,7 +170,7 @@ folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad largest acked"));
   }
-  auto largestAcked = folly::to<PacketNum>(largestAckedInt->first);
+  PacketNum largestAcked = largestAckedInt->first;
   auto ackDelay = decodeQuicInteger(cursor);
   if (!ackDelay) {
     return folly::makeUnexpected(QuicError(
@@ -456,7 +456,7 @@ folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
     }
   }
   return RstStreamFrame(
-      folly::to<StreamId>(streamId->first),
+      streamId->first,
       errorCode,
       finalSize->first,
       reliableSize ? Optional<uint64_t>(reliableSize->first) : std::nullopt);
@@ -478,7 +478,7 @@ folly::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Cannot decode error code"));
   }
-  return StopSendingFrame(folly::to<StreamId>(streamId->first), errorCode);
+  return StopSendingFrame(streamId->first, errorCode);
 }
 
 folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(Cursor& cursor) {
@@ -609,11 +609,7 @@ folly::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     }
   }
   return ReadStreamFrame(
-      folly::to<StreamId>(streamId->first),
-      offset,
-      std::move(data),
-      fin,
-      groupId);
+      streamId->first, offset, std::move(data), fin, groupId);
 }
 
 folly::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(Cursor& cursor) {
@@ -637,8 +633,7 @@ folly::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
   }
-  return MaxStreamDataFrame(
-      folly::to<StreamId>(streamId->first), offset->first);
+  return MaxStreamDataFrame(streamId->first, offset->first);
 }
 
 folly::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
@@ -685,8 +680,7 @@ folly::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
     return folly::makeUnexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
-  return StreamDataBlockedFrame(
-      folly::to<StreamId>(streamId->first), dataLimit->first);
+  return StreamDataBlockedFrame(streamId->first, dataLimit->first);
 }
 
 folly::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
@@ -697,8 +691,7 @@ folly::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad Bi-Directional streamId"));
   }
-  return StreamsBlockedFrame(
-      folly::to<StreamId>(streamId->first), true /* isBidirectional */);
+  return StreamsBlockedFrame(streamId->first, true /* isBidirectional */);
 }
 
 folly::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
@@ -709,8 +702,7 @@ folly::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad Uni-direcitonal streamId"));
   }
-  return StreamsBlockedFrame(
-      folly::to<StreamId>(streamId->first), false /* isBidirectional */);
+  return StreamsBlockedFrame(streamId->first, false /* isBidirectional */);
 }
 
 folly::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(

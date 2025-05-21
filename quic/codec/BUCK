@@ -22,7 +22,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":packet_number",
-        "//folly:conv",
         "//folly:expected",
         "//folly:network_address",
         "//folly:string",
@@ -53,7 +52,6 @@ mvfst_cpp_library(
         "PacketNumber.h",
     ],
     deps = [
-        "//folly:conv",
         "//folly/lang:bits",
         "//quic:constants",
         "//quic:exception",

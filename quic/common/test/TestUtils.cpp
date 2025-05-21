@@ -330,7 +330,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
   writeStreamFrameData(
       *builder,
       std::move(dataBuf),
-      std::min(folly::to<size_t>(dataLen), data.computeChainDataLength()));
+      std::min(static_cast<size_t>(dataLen), data.computeChainDataLength()));
   return std::move(*builder).buildPacket();
 }
 

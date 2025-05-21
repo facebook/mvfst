@@ -7,8 +7,6 @@
 
 #include <quic/codec/QuicInteger.h>
 
-#include <folly/Conv.h>
-
 namespace quic {
 
 folly::Expected<size_t, QuicError> getQuicIntegerSize(uint64_t value) {

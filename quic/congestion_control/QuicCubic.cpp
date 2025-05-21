@@ -289,12 +289,13 @@ uint64_t Cubic::calculateCubicCwnd(int64_t delta) noexcept {
   // packet size. Linux also has a limit the cwnd increase to 1 MSS per 2 ACKs.
   if (delta > 0 &&
       (std::numeric_limits<uint64_t>::max() - *steadyState_.lastMaxCwndBytes <
-       folly::to<uint64_t>(delta))) {
+       static_cast<uint64_t>(delta))) {
     LOG(WARNING) << "Quic Cubic: overflow cwnd cut at uint64_t max";
     return conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen;
   } else if (
       delta < 0 &&
-      (folly::to<uint64_t>(std::abs(delta)) > *steadyState_.lastMaxCwndBytes)) {
+      (static_cast<uint64_t>(std::abs(delta)) >
+       *steadyState_.lastMaxCwndBytes)) {
     LOG(WARNING) << "Quic Cubic: underflow cwnd cut at minCwndBytes_ " << conn_;
     return conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   } else {

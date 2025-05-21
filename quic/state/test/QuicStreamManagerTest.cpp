@@ -802,7 +802,7 @@ TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
   // A frame of length 4 has been written to the wire
   quicStreamState->currentWriteOffset += 4;
   ChainedByteRangeHead bufWritten1(
-      quicStreamState->pendingWrites.splitAtMost(folly::to<size_t>(4)));
+      quicStreamState->pendingWrites.splitAtMost(4));
   quicStreamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(5),
@@ -814,7 +814,7 @@ TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
   // A frame of length 2 has been written to the wire
   quicStreamState->currentWriteOffset += 2;
   ChainedByteRangeHead bufWritten2(
-      quicStreamState->pendingWrites.splitAtMost(folly::to<size_t>(2)));
+      quicStreamState->pendingWrites.splitAtMost(2));
   quicStreamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(9),

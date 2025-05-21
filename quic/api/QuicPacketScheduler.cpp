@@ -805,9 +805,9 @@ folly::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     if (datagramLenSize.hasError()) {
       return folly::makeUnexpected(datagramLenSize.error());
     }
-    auto datagramFrameLength =
+    uint64_t datagramFrameLength =
         frameTypeSize.value() + len + datagramLenSize.value();
-    if (folly::to<uint64_t>(datagramFrameLength) <= spaceLeft) {
+    if (datagramFrameLength <= spaceLeft) {
       auto datagramFrame = DatagramFrame(len, payload.move());
       auto res = writeFrame(datagramFrame, builder);
       if (res.hasError()) {
@@ -914,8 +914,7 @@ CryptoStreamScheduler::CryptoStreamScheduler(
 folly::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
     PacketBuilderInterface& builder) {
   bool cryptoDataWritten = false;
-  uint64_t writableData =
-      folly::to<uint64_t>(cryptoStream_.pendingWrites.chainLength());
+  uint64_t writableData = cryptoStream_.pendingWrites.chainLength();
   // We use the crypto scheduler to reschedule the retransmissions of the
   // crypto streams so that we know that retransmissions of the crypto data
   // will always take precedence over the crypto data.

@@ -61,7 +61,6 @@ mvfst_cpp_library(
         "fbsource//third-party/fmt:fmt",
         ":accept_observer",
         "//common/network:mvfst_hooks",  # @manual
-        "//folly:conv",
         "//folly/chrono:conv",
         "//folly/io:iobuf",
         "//folly/io/async:event_base_manager",

@@ -68,7 +68,7 @@ encodeLongHeaderHelper(
     spaceCounter -= longHeaderSize;
   }
   bufop.template writeBE<uint32_t>(
-      folly::to<uint32_t>(longHeader.getVersion()));
+      static_cast<uint32_t>(longHeader.getVersion()));
   bufop.template writeBE<uint8_t>(longHeader.getDestinationConnId().size());
   bufop.push(
       longHeader.getDestinationConnId().data(),
@@ -147,7 +147,7 @@ uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
   bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
   CHECK(packetNumberEncoding_)
       << "packetNumberEncoding_ should be valid after ctor";
-  return folly::to<uint32_t>(header_.computeChainDataLength()) +
+  return static_cast<uint32_t>(header_.computeChainDataLength()) +
       (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
 }
 
@@ -808,7 +808,7 @@ bool InplaceQuicPacketBuilder::canBuildPacket() const noexcept {
 uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
   CHECK(packetNumberEncoding_)
       << "packetNumberEncoding_ should be valid after ctor";
-  return folly::to<uint32_t>(bodyStart_ - headerStart_);
+  return static_cast<uint32_t>(bodyStart_ - headerStart_);
 }
 
 bool RegularQuicPacketBuilder::hasFramesPending() const {

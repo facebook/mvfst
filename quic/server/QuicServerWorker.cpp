@@ -22,7 +22,6 @@
 #define SOF_TIMESTAMPING_SOFTWARE 0
 #endif
 
-#include <folly/Conv.h>
 #include <quic/common/SocketUtil.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/Copa.h>
@@ -332,8 +331,11 @@ void QuicServerWorker::onDataAvailable(
   auto originalPacketReceiveTime = packetReceiveTime;
   if (params.ts) {
     // This is the software system time from the datagram.
+    const auto& tsTimespec = params.ts.value()[0];
     auto packetRxEpochUs =
-        folly::to<std::chrono::microseconds>(params.ts.value()[0]);
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::seconds(tsTimespec.tv_sec) +
+            std::chrono::nanoseconds(tsTimespec.tv_nsec));
     if (packetRxEpochUs != 0us) {
       auto now = std::chrono::system_clock::now();
       auto nowEpochUs = std::chrono::duration_cast<std::chrono::microseconds>(

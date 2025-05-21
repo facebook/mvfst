@@ -5,7 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/Conv.h>
 #include <folly/lang/Bits.h>
 #include <glog/logging.h>
 #include <quic/QuicConstants.h>

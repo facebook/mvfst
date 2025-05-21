@@ -103,6 +103,8 @@ mvfst_cpp_library(
         "handshake/ClientTransportParametersExtension.h",
     ],
     exported_deps = [
+        "//folly:expected",
+        "//quic:exception",
         "//quic/handshake:transport_parameters",
     ],
 )
@@ -126,7 +128,6 @@ mvfst_cpp_library(
         "QuicClientAsyncTransport.h",
     ],
     deps = [
-        "//folly:conv",
         "//folly/experimental/symbolizer:symbolizer",
     ],
     exported_deps = [

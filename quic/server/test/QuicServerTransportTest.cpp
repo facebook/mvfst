@@ -3894,7 +3894,7 @@ TEST_F(
   writeStreamFrameData(
       builder,
       data->clone(),
-      std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
+      std::min(static_cast<size_t>(dataLen), data->computeChainDataLength()));
 
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(0);
@@ -3938,7 +3938,7 @@ TEST_F(
   writeStreamFrameData(
       builder,
       data->clone(),
-      std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
+      std::min(static_cast<size_t>(dataLen), data->computeChainDataLength()));
 
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(0);
@@ -3983,7 +3983,7 @@ TEST_F(
   writeStreamFrameData(
       builder,
       data->clone(),
-      std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
+      std::min(static_cast<size_t>(dataLen), data->computeChainDataLength()));
 
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(0);

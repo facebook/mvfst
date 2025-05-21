@@ -50,23 +50,24 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   }
 
   virtual void connect() {
-    CHECK(!handshake
-               ->connect(
-                   hostname,
-                   std::make_shared<ClientTransportParametersExtension>(
-                       QuicVersion::MVFST,
-                       folly::to<uint32_t>(kDefaultConnectionFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultMaxStreamsBidirectional),
-                       folly::to<uint32_t>(kDefaultMaxStreamsUnidirectional),
-                       kDefaultIdleTimeout,
-                       kDefaultAckDelayExponent,
-                       kDefaultUDPSendPacketLen,
-                       kDefaultActiveConnectionIdLimit,
-                       ConnectionId::createZeroLength()))
-               .hasError());
+    CHECK(
+        !handshake
+             ->connect(
+                 hostname,
+                 std::make_shared<ClientTransportParametersExtension>(
+                     QuicVersion::MVFST,
+                     static_cast<uint32_t>(kDefaultConnectionFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultMaxStreamsBidirectional),
+                     static_cast<uint32_t>(kDefaultMaxStreamsUnidirectional),
+                     kDefaultIdleTimeout,
+                     kDefaultAckDelayExponent,
+                     kDefaultUDPSendPacketLen,
+                     kDefaultActiveConnectionIdLimit,
+                     ConnectionId::createZeroLength()))
+             .hasError());
   }
 
   void SetUp() override {
@@ -97,10 +98,10 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(
             getVersion(),
-            folly::to<uint32_t>(kDefaultConnectionFlowControlWindow),
-            folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-            folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-            folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
+            static_cast<uint32_t>(kDefaultConnectionFlowControlWindow),
+            static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+            static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+            static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
             std::numeric_limits<uint32_t>::max(),
             std::numeric_limits<uint32_t>::max(),
             /*disableMigration=*/true,
@@ -436,23 +437,24 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
   }
 
   void connect() override {
-    CHECK(!handshake
-               ->connect(
-                   hostname,
-                   std::make_shared<ClientTransportParametersExtension>(
-                       QuicVersion::MVFST,
-                       folly::to<uint32_t>(kDefaultConnectionFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultMaxStreamsBidirectional),
-                       folly::to<uint32_t>(kDefaultMaxStreamsUnidirectional),
-                       kDefaultIdleTimeout,
-                       kDefaultAckDelayExponent,
-                       kDefaultUDPSendPacketLen,
-                       kDefaultActiveConnectionIdLimit,
-                       ConnectionId::createZeroLength()))
-               .hasError());
+    CHECK(
+        !handshake
+             ->connect(
+                 hostname,
+                 std::make_shared<ClientTransportParametersExtension>(
+                     QuicVersion::MVFST,
+                     static_cast<uint32_t>(kDefaultConnectionFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultMaxStreamsBidirectional),
+                     static_cast<uint32_t>(kDefaultMaxStreamsUnidirectional),
+                     kDefaultIdleTimeout,
+                     kDefaultAckDelayExponent,
+                     kDefaultUDPSendPacketLen,
+                     kDefaultActiveConnectionIdLimit,
+                     ConnectionId::createZeroLength()))
+             .hasError());
   }
 
  protected:
@@ -548,23 +550,24 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   }
 
   void connect() override {
-    CHECK(!handshake
-               ->connect(
-                   hostname,
-                   std::make_shared<ClientTransportParametersExtension>(
-                       QuicVersion::MVFST,
-                       folly::to<uint32_t>(kDefaultConnectionFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultStreamFlowControlWindow),
-                       folly::to<uint32_t>(kDefaultMaxStreamsBidirectional),
-                       folly::to<uint32_t>(kDefaultMaxStreamsUnidirectional),
-                       kDefaultIdleTimeout,
-                       kDefaultAckDelayExponent,
-                       kDefaultUDPSendPacketLen,
-                       kDefaultActiveConnectionIdLimit,
-                       ConnectionId::createZeroLength()))
-               .hasError());
+    CHECK(
+        !handshake
+             ->connect(
+                 hostname,
+                 std::make_shared<ClientTransportParametersExtension>(
+                     QuicVersion::MVFST,
+                     static_cast<uint32_t>(kDefaultConnectionFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultStreamFlowControlWindow),
+                     static_cast<uint32_t>(kDefaultMaxStreamsBidirectional),
+                     static_cast<uint32_t>(kDefaultMaxStreamsUnidirectional),
+                     kDefaultIdleTimeout,
+                     kDefaultAckDelayExponent,
+                     kDefaultUDPSendPacketLen,
+                     kDefaultActiveConnectionIdLimit,
+                     ConnectionId::createZeroLength()))
+             .hasError());
   }
 
   virtual void setupZeroRttServer() {

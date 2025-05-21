@@ -11,7 +11,8 @@ mvfst_cpp_library(
         "Bandwidth.h",
     ],
     deps = [
-        "//folly:conv",
+        "fbsource//third-party/fmt:fmt",
+        "//folly/lang:assume",
     ],
 )
 
