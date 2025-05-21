@@ -1507,6 +1507,16 @@ CipherInfo QuicServerTransport::getOneRttCipherInfo() const {
       conn_->oneRttWriteHeaderCipher->getKey()->clone()};
 }
 
+Optional<std::string> QuicServerTransport::getSni() {
+  auto logging =
+      serverConn_->serverHandshakeLayer->getState().handshakeLogging();
+  if (!logging || !logging->clientSni.has_value()) {
+    return std::nullopt;
+  }
+
+  return logging->clientSni.value();
+}
+
 void QuicServerTransport::logTimeBasedStats() const {
   if (!conn_ || !conn_->statsCallback) {
     return;

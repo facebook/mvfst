@@ -187,6 +187,8 @@ class QuicServerTransport
         label, context, keyLength);
   }
 
+  Optional<std::string> getSni();
+
   /* Log a collection of statistics that are meant to be sampled consistently
    * over time, rather than driven by transport events.
    */
