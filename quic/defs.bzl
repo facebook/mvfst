@@ -2,6 +2,7 @@ load("@fbcode_macros//build_defs:autodeps_rule.bzl", "autodeps_rule")
 load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
 load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+load("@fbsource//tools/build_defs:buckconfig.bzl", "read_bool")
 load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load(
     "@fbsource//tools/build_defs:default_platform_defs.bzl",
@@ -32,7 +33,9 @@ FBANDROID_CXXFLAGS = [
     "-ffunction-sections",
     "-Wno-nullability-completeness",
     "-fstack-protector-strong",
-]
+] + ([
+    "-flazy-init-all",
+] if read_bool("ndk", "flazy_init_all", False) else [])
 
 FBOBJC_CXXFLAGS = [
     "-Wno-global-constructors",
