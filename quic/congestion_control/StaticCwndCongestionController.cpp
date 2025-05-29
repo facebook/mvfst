@@ -26,7 +26,10 @@ void StaticCwndCongestionController::onRemoveBytesFromInflight(
 void StaticCwndCongestionController::onPacketSent(
     const OutstandingPacketWrapper& packet) {
   isAppLimited_ = false;
-  addAndCheckOverflow(inflightBytes_, packet.metadata.encodedSize);
+  addAndCheckOverflow(
+      inflightBytes_,
+      packet.metadata.encodedSize,
+      conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
 }
 
 void StaticCwndCongestionController::onPacketAckOrLoss(

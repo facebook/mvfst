@@ -90,7 +90,9 @@ void Bbr2CongestionController::onPacketSent(
   }
 
   addAndCheckOverflow(
-      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
+      conn_.lossState.inflightBytes,
+      packet.metadata.encodedSize,
+      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
 
   // Maintain cwndLimited flag. We consider the transport being cwnd limited if
   // we are using > 90% of the cwnd.
@@ -771,7 +773,10 @@ void Bbr2CongestionController::probeInflightLongTermUpward() {
   if (probeUpAcks_ >= probeUpCount_) {
     auto delta = probeUpAcks_ / probeUpCount_;
     probeUpAcks_ -= delta * probeUpCount_;
-    addAndCheckOverflow(*inflightLongTerm_, delta);
+    addAndCheckOverflow(
+        *inflightLongTerm_,
+        delta,
+        2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   }
   if (roundStart_) {
     raiseInflightLongTermSlope();

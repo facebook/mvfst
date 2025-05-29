@@ -128,7 +128,9 @@ void BbrCongestionController::onPacketSent(
     exitingQuiescene_ = true;
   }
   addAndCheckOverflow(
-      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
+      conn_.lossState.inflightBytes,
+      packet.metadata.encodedSize,
+      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   if (!ackAggregationStartTime_) {
     ackAggregationStartTime_ = packet.metadata.time;
   }

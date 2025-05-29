@@ -46,7 +46,9 @@ void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
 
 void Copa::onPacketSent(const OutstandingPacketWrapper& packet) {
   addAndCheckOverflow(
-      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
+      conn_.lossState.inflightBytes,
+      packet.metadata.encodedSize,
+      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
 
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
@@ -239,7 +241,10 @@ void Copa::onPacketAcked(const AckEvent& ack) {
           ack.ackTime - lastCwndDoubleTime_.value() > conn_.lossState.srtt) {
         VLOG(10) << __func__ << " doubling cwnd per RTT from=" << cwndBytes_
                  << " due to slow start" << " " << conn_;
-        addAndCheckOverflow(cwndBytes_, cwndBytes_);
+        addAndCheckOverflow(
+            cwndBytes_,
+            cwndBytes_,
+            conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
         lastCwndDoubleTime_ = ack.ackTime;
       }
     } else {
@@ -256,7 +261,10 @@ void Copa::onPacketAcked(const AckEvent& ack) {
           (deltaParam_ * cwndBytes_);
       VLOG(10) << __func__ << " increasing cwnd from=" << cwndBytes_ << " by "
                << addition << " " << conn_;
-      addAndCheckOverflow(cwndBytes_, addition);
+      addAndCheckOverflow(
+          cwndBytes_,
+          addition,
+          conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
     }
   } else {
     if (velocityState_.direction != VelocityState::Direction::Down &&
@@ -278,7 +286,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
         std::min<uint64_t>(
             reduction,
             cwndBytes_ -
-                conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen));
+                conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen),
+        conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen);
   }
   if (conn_.pacer) {
     conn_.pacer->refreshPacingRate(cwndBytes_ * 2, conn_.lossState.srtt);

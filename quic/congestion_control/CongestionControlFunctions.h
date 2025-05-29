@@ -10,7 +10,6 @@
 #include <quic/state/StateData.h>
 
 #include <chrono>
-#include <utility>
 
 namespace quic {
 
@@ -26,24 +25,41 @@ PacingRate calculatePacingRate(
     uint64_t minCwndInMss,
     std::chrono::microseconds rtt);
 
-template <class T1, class T2>
-void addAndCheckOverflow(T1& value, const T2& toAdd) {
-  if (std::numeric_limits<T1>::max() - toAdd < value) {
-    // TODO: the error code is CWND_OVERFLOW but this function can totally be
-    // used for inflight bytes.
-    throw quic::QuicInternalException(
-        "Overflow bytes in flight", quic::LocalErrorCode::CWND_OVERFLOW);
+template <class T1, class T2, class T3 = T1>
+void addAndCheckOverflow(
+    T1& value,
+    const T2& toAdd,
+    const T3& maxValue = std::numeric_limits<T1>::max()) {
+  if (std::numeric_limits<T1>::max() - static_cast<T1>(toAdd) < value) {
+    LOG(ERROR) << "Overflow prevented, capping at max value";
+    value = static_cast<T1>(maxValue);
+  } else {
+    T1 newValue = value + static_cast<T1>(toAdd);
+    if (newValue > static_cast<T1>(maxValue)) {
+      LOG(ERROR) << "Value would exceed max limit, capping at max value";
+      value = static_cast<T1>(maxValue);
+    } else {
+      value = newValue;
+    }
   }
-  value += folly::to<T1>(toAdd);
 }
 
-template <class T1, class T2>
-void subtractAndCheckUnderflow(T1& value, const T2& toSub) {
-  if (value < toSub) {
-    // TODO: wrong error code
-    throw quic::QuicInternalException(
-        "Underflow bytes in flight", quic::LocalErrorCode::CWND_OVERFLOW);
+template <class T1, class T2, class T3 = T1>
+void subtractAndCheckUnderflow(
+    T1& value,
+    const T2& toSub,
+    const T3& minValue = 0) {
+  if (value < static_cast<T1>(toSub)) {
+    LOG(ERROR) << "Underflow prevented, capping at min value";
+    value = static_cast<T1>(minValue);
+  } else {
+    T1 newValue = value - static_cast<T1>(toSub);
+    if (newValue < static_cast<T1>(minValue)) {
+      LOG(ERROR) << "Value would be below min limit, capping at min value";
+      value = static_cast<T1>(minValue);
+    } else {
+      value = newValue;
+    }
   }
-  value -= folly::to<T1>(toSub);
 }
 } // namespace quic

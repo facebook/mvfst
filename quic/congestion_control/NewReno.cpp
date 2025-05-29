@@ -38,7 +38,9 @@ void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
 
 void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
   addAndCheckOverflow(
-      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
+      conn_.lossState.inflightBytes,
+      packet.metadata.encodedSize,
+      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes
@@ -82,7 +84,9 @@ void NewReno::onPacketAcked(
   }
   if (cwndBytes_ < ssthresh_) {
     addAndCheckOverflow(
-        cwndBytes_, packet.outstandingPacketMetadata.encodedSize);
+        cwndBytes_,
+        packet.outstandingPacketMetadata.encodedSize,
+        conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   } else {
     // TODO: I think this may be a bug in the specs. We should use
     // conn_.udpSendPacketLen for the cwnd calculation. But I need to
@@ -90,7 +94,10 @@ void NewReno::onPacketAcked(
     uint64_t additionFactor = (kDefaultUDPSendPacketLen *
                                packet.outstandingPacketMetadata.encodedSize) /
         cwndBytes_;
-    addAndCheckOverflow(cwndBytes_, additionFactor);
+    addAndCheckOverflow(
+        cwndBytes_,
+        additionFactor,
+        conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   }
 }
 
