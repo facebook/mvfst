@@ -384,8 +384,9 @@ inline folly::StringPiece streamStateToString(StreamSendState state) {
       return "Closed";
     case StreamSendState::Invalid:
       return "Invalid";
+    default:
+      return "Unknown";
   }
-  return "Unknown";
 }
 
 inline folly::StringPiece streamStateToString(StreamRecvState state) {
@@ -396,8 +397,9 @@ inline folly::StringPiece streamStateToString(StreamRecvState state) {
       return "Closed";
     case StreamRecvState::Invalid:
       return "Invalid";
+    default:
+      return "Unknown";
   }
-  return "Unknown";
 }
 
 struct QuicStreamState : public QuicStreamLike {

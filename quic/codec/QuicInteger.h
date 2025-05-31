@@ -91,8 +91,9 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
     case 8:
       CHECK(value <= kEightByteLimit);
       return encodeEightBytes(std::move(bufop), value);
+    default:
+      return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
   }
-  return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
 }
 
 /**

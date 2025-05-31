@@ -962,6 +962,8 @@ struct LongHeader {
         return PacketNumberSpace::Handshake;
       case LongHeader::Types::ZeroRtt:
         return PacketNumberSpace::AppData;
+      default:
+        break;
     }
     folly::assume_unreachable();
   }

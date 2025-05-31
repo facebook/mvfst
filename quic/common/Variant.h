@@ -74,87 +74,111 @@ namespace quic {
   case Type::X:                        \
     return X##_ == *other.as##X();
 
-#define DECLARE_VARIANT_TYPE(NAME, X)                         \
-  struct NAME {                                               \
-    enum class Type { X(ENUM_TYPES) };                        \
-                                                              \
-    X(UNION_CTORS, NAME)                                      \
-                                                              \
-    X(UNION_COPY_CTORS, NAME)                                 \
-                                                              \
-    NAME(NAME&& other) {                                      \
-      switch (other.type_) { X(UNION_MOVE_CASES, other) }     \
-      type_ = other.type_;                                    \
-    }                                                         \
-                                                              \
-    NAME& operator=(NAME&& other) {                           \
-      destroyVariant();                                       \
-      switch (other.type_) { X(UNION_MOVE_CASES, other) }     \
-      type_ = other.type_;                                    \
-      return *this;                                           \
-    }                                                         \
-                                                              \
-    NAME(const NAME& other) {                                 \
-      switch (other.type_) { X(UNION_COPY_CASES, other) }     \
-      type_ = other.type_;                                    \
-    }                                                         \
-                                                              \
-    NAME& operator=(const NAME& other) {                      \
-      destroyVariant();                                       \
-      switch (other.type_) { X(UNION_COPY_CASES, other) }     \
-      type_ = other.type_;                                    \
-      return *this;                                           \
-    }                                                         \
-                                                              \
-    bool operator==(const NAME& other) const {                \
-      if (other.type() != type_) {                            \
-        return false;                                         \
-      }                                                       \
-      switch (other.type_) { X(UNION_EQUALITY_CASES, other) } \
-      return false;                                           \
-    }                                                         \
-                                                              \
-    ~NAME() {                                                 \
-      destroyVariant();                                       \
-    }                                                         \
-                                                              \
-    Type type() const {                                       \
-      return type_;                                           \
-    }                                                         \
-                                                              \
-    X(UNION_ACCESSOR)                                         \
-                                                              \
-    X(CONST_UNION_ACCESSOR)                                   \
-                                                              \
-    template <typename T>                                     \
-    T* get() {                                                \
-      return get(Identity<T>());                              \
-    }                                                         \
-                                                              \
-    template <typename T>                                     \
-    const T* get() const {                                    \
-      return get(Identity<T>());                              \
-    }                                                         \
-                                                              \
-   private:                                                   \
-    template <typename T>                                     \
-    struct Identity {                                         \
-      typedef T type;                                         \
-    };                                                        \
-                                                              \
-    union {                                                   \
-      X(UNION_TYPE)                                           \
-    };                                                        \
-                                                              \
-    X(UNION_ACCESSOR_TYPE_TPL)                                \
-                                                              \
-    X(CONST_UNION_ACCESSOR_TYPE_TPL)                          \
-                                                              \
-    void destroyVariant() {                                   \
-      switch (type_) { X(DESTRUCTOR_CASES) }                  \
-    }                                                         \
-                                                              \
-    Type type_;                                               \
+#define DECLARE_VARIANT_TYPE(NAME, X)          \
+  struct NAME {                                \
+    enum class Type { X(ENUM_TYPES) };         \
+                                               \
+    X(UNION_CTORS, NAME)                       \
+                                               \
+    X(UNION_COPY_CTORS, NAME)                  \
+                                               \
+    NAME(NAME&& other) {                       \
+      switch (other.type_) {                   \
+        X(UNION_MOVE_CASES, other)             \
+        default:                               \
+          break;                               \
+      }                                        \
+      type_ = other.type_;                     \
+    }                                          \
+                                               \
+    NAME& operator=(NAME&& other) {            \
+      destroyVariant();                        \
+      switch (other.type_) {                   \
+        X(UNION_MOVE_CASES, other)             \
+        default:                               \
+          break;                               \
+      }                                        \
+      type_ = other.type_;                     \
+      return *this;                            \
+    }                                          \
+                                               \
+    NAME(const NAME& other) {                  \
+      switch (other.type_) {                   \
+        X(UNION_COPY_CASES, other)             \
+        default:                               \
+          break;                               \
+      }                                        \
+      type_ = other.type_;                     \
+    }                                          \
+                                               \
+    NAME& operator=(const NAME& other) {       \
+      destroyVariant();                        \
+      switch (other.type_) {                   \
+        X(UNION_COPY_CASES, other)             \
+        default:                               \
+          break;                               \
+      }                                        \
+      type_ = other.type_;                     \
+      return *this;                            \
+    }                                          \
+                                               \
+    bool operator==(const NAME& other) const { \
+      if (other.type() != type_) {             \
+        return false;                          \
+      }                                        \
+      switch (other.type_) {                   \
+        X(UNION_EQUALITY_CASES, other)         \
+        default:                               \
+          break;                               \
+      }                                        \
+      return false;                            \
+    }                                          \
+                                               \
+    ~NAME() {                                  \
+      destroyVariant();                        \
+    }                                          \
+                                               \
+    Type type() const {                        \
+      return type_;                            \
+    }                                          \
+                                               \
+    X(UNION_ACCESSOR)                          \
+                                               \
+    X(CONST_UNION_ACCESSOR)                    \
+                                               \
+    template <typename T>                      \
+    T* get() {                                 \
+      return get(Identity<T>());               \
+    }                                          \
+                                               \
+    template <typename T>                      \
+    const T* get() const {                     \
+      return get(Identity<T>());               \
+    }                                          \
+                                               \
+   private:                                    \
+    template <typename T>                      \
+    struct Identity {                          \
+      typedef T type;                          \
+    };                                         \
+                                               \
+    union {                                    \
+      X(UNION_TYPE)                            \
+    };                                         \
+                                               \
+    X(UNION_ACCESSOR_TYPE_TPL)                 \
+                                               \
+    X(CONST_UNION_ACCESSOR_TYPE_TPL)           \
+                                               \
+    void destroyVariant() {                    \
+      switch (type_) {                         \
+        X(DESTRUCTOR_CASES)                    \
+        default:                               \
+          break;                               \
+      }                                        \
+    }                                          \
+                                               \
+    Type type_;                                \
   };
 
 } // namespace quic
