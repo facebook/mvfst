@@ -403,6 +403,11 @@ void handleStreamWindowUpdate(
     QuicStreamState& stream,
     uint64_t maximumData,
     PacketNum packetNum) {
+  if (stream.sendState == StreamSendState::Closed ||
+      stream.sendState == StreamSendState::ResetSent) {
+    // Flow control updates are not meaningful.
+    return;
+  }
   if (stream.flowControlState.peerAdvertisedMaxOffset <= maximumData) {
     stream.flowControlState.peerAdvertisedMaxOffset = maximumData;
     stream.flowControlState.pendingBlockedFrame = false;

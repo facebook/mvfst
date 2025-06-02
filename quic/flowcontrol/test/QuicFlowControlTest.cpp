@@ -562,6 +562,22 @@ TEST_F(QuicFlowControlTest, LostConnectionWindowUpdateSmallerWindow) {
   EXPECT_EQ(generateMaxDataFrame(conn_).maximumData, 400);
 }
 
+TEST_F(QuicFlowControlTest, HandleStreamWindowUpdateClosedStream) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn_);
+  stream.currentWriteOffset = 100;
+  stream.flowControlState.peerAdvertisedMaxOffset = 200;
+
+  stream.sendState = StreamSendState::Closed;
+  uint64_t newMaximumData = 300;
+  handleStreamWindowUpdate(stream, newMaximumData, 123 /* PacketNum */);
+  EXPECT_EQ(stream.flowControlState.peerAdvertisedMaxOffset, 200);
+
+  stream.sendState = StreamSendState::ResetSent;
+  handleStreamWindowUpdate(stream, newMaximumData, 124 /* PacketNum */);
+  EXPECT_EQ(stream.flowControlState.peerAdvertisedMaxOffset, 200);
+}
+
 TEST_F(QuicFlowControlTest, LostStreamWindowUpdate) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
