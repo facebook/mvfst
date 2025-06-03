@@ -172,6 +172,95 @@ class QuicBuffer {
 
   FillIovResult fillIov(struct iovec* iov, size_t len) const;
 
+  class Iterator {
+   public:
+    explicit Iterator(const QuicBuffer* pos, const QuicBuffer* end)
+        : pos_(pos), end_(end) {
+      if (pos_) {
+        setVal();
+      }
+    }
+
+    Iterator() = default;
+
+    Iterator(Iterator const& rhs) : Iterator(rhs.pos_, rhs.end_) {}
+
+    Iterator& operator=(Iterator const& rhs) {
+      pos_ = rhs.pos_;
+      end_ = rhs.end_;
+      if (pos_) {
+        setVal();
+      }
+      return *this;
+    }
+
+    bool operator==(const Iterator& other) const {
+      return equal(other);
+    }
+
+    bool operator!=(const Iterator& other) const {
+      return !equal(other);
+    }
+
+    [[nodiscard]] const ByteRange* dereference() const {
+      return &val_;
+    }
+
+    [[nodiscard]] bool equal(const Iterator& other) const {
+      return pos_ == other.pos_ && end_ == other.end_;
+    }
+
+    void increment() {
+      pos_ = pos_->next();
+      adjustForEnd();
+    }
+
+    const ByteRange* operator->() const {
+      return dereference();
+    }
+
+    ByteRange operator*() const {
+      return val_;
+    }
+
+    Iterator& operator++() {
+      increment();
+      return *this;
+    }
+
+    Iterator operator++(int) {
+      Iterator other = *this;
+      increment();
+      return other;
+    }
+
+   private:
+    void setVal() {
+      val_ = ByteRange(pos_->data(), pos_->tail());
+    }
+
+    void adjustForEnd() {
+      if (pos_ == end_) {
+        pos_ = end_ = nullptr;
+        val_ = ByteRange();
+      } else {
+        setVal();
+      }
+    }
+
+    const QuicBuffer* pos_{nullptr};
+    const QuicBuffer* end_{nullptr};
+    ByteRange val_;
+  };
+
+  [[nodiscard]] Iterator begin() const {
+    return Iterator(this, this);
+  }
+
+  [[nodiscard]] Iterator end() const {
+    return Iterator(nullptr, nullptr);
+  }
+
  protected:
   QuicBuffer(
       std::size_t capacity,

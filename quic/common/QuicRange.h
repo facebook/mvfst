@@ -15,6 +15,8 @@ struct Range {
 
   Range(Iter begin, size_t size) : begin_(begin), end_(begin + size) {}
 
+  Range(Iter begin, Iter end) : begin_(begin), end_(end) {}
+
   Range() : begin_(nullptr), end_(nullptr) {}
 
   size_t size() const {

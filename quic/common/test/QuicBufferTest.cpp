@@ -368,6 +368,31 @@ TEST(QuicBufferTest, TestWrapBufferAsValue) {
   EXPECT_EQ(quicBuffer.data(), data);
 }
 
+TEST(QuicBufferTest, TestIterator) {
+  const auto* data1 = (const uint8_t*)"hello";
+  const auto* data2 = (const uint8_t*)"my";
+  const auto* data3 = (const uint8_t*)"friend";
+
+  auto quicBuffer1 = QuicBuffer::copyBuffer(data1, 5 /* size */);
+  EXPECT_EQ(quicBuffer1->countChainElements(), 1);
+
+  auto quicBuffer2 = QuicBuffer::copyBuffer(data2, 2 /* size */);
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+
+  auto quicBuffer3 = QuicBuffer::copyBuffer(data3, 6 /* size */);
+  quicBuffer1->appendToChain(std::move(quicBuffer3));
+
+  auto it = quicBuffer1->begin();
+  EXPECT_EQ(it->size(), 5);
+  EXPECT_EQ(memcmp(it->data(), "hello", 5), 0);
+  ++it;
+  EXPECT_EQ(it->size(), 2);
+  EXPECT_EQ(memcmp(it->data(), "my", 2), 0);
+  ++it;
+  EXPECT_EQ(it->size(), 6);
+  EXPECT_EQ(memcmp(it->data(), "friend", 6), 0);
+}
+
 TEST(QuicBufferTest, TestRange) {
   const uint8_t* data = (const uint8_t*)"hello";
   ByteRange range(data, 5);
