@@ -180,6 +180,8 @@ class QuicBuffer {
 
   FillIovResult fillIov(struct iovec* iov, size_t len) const;
 
+  void clear() noexcept;
+
   class Iterator {
    public:
     explicit Iterator(const QuicBuffer* pos, const QuicBuffer* end)

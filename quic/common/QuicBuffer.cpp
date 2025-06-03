@@ -213,6 +213,11 @@ QuicBuffer::FillIovResult QuicBuffer::fillIov(struct iovec* iov, size_t len)
   return {0, 0};
 }
 
+void QuicBuffer::clear() noexcept {
+  data_ = buf_;
+  length_ = 0;
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::cloneOneImpl() const {
   return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
       capacity_, data_, buf_, length_, sharedBuffer_));

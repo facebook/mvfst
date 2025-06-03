@@ -428,6 +428,16 @@ TEST(QuicBufferTest, FillIov) {
   }
 }
 
+TEST(QuicBufferTest, TestClear) {
+  const auto* data = (const uint8_t*)"hello";
+  auto quicBuffer = QuicBuffer::wrapBufferAsValue((void*)data, 5);
+  EXPECT_EQ(quicBuffer.capacity(), 5);
+  EXPECT_EQ(quicBuffer.length(), 5);
+  quicBuffer.clear();
+  EXPECT_EQ(quicBuffer.capacity(), 5);
+  EXPECT_EQ(quicBuffer.length(), 0);
+}
+
 TEST(QuicBufferTest, TestWrapBufferAsValue) {
   const auto* data = (const uint8_t*)"hello";
   auto quicBuffer = QuicBuffer::wrapBufferAsValue((void*)data, 5);
