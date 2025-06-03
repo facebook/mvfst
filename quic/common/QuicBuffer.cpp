@@ -111,6 +111,11 @@ void QuicBuffer::appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
   prev_ = otherTail;
 }
 
+void QuicBuffer::appendChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
+  // Just use appendToChain() on the next element in our chain
+  next_->appendToChain(std::move(quicBuffer));
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::separateChain(
     QuicBuffer* head,
     QuicBuffer* tail) {

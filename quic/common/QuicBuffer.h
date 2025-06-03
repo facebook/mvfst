@@ -150,6 +150,8 @@ class QuicBuffer {
 
   void appendToChain(std::unique_ptr<QuicBuffer>&& quicBuffer);
 
+  void appendChain(std::unique_ptr<QuicBuffer>&& quicBuffer);
+
   /*
    * If you have a chain (A, B, C, D, E, F), and you call A->separateChain(B,
    * D), then you will be returned the chain (B, C, D) and the current

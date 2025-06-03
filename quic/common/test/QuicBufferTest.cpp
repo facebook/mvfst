@@ -55,6 +55,26 @@ TEST(QuicBufferTest, TestAppendToChain) {
   EXPECT_EQ(quicBufferRawPtr3->prev(), quicBufferRawPtr2);
 }
 
+TEST(QuicBufferTest, TestAppendChain) {
+  const uint8_t* data1 = (const uint8_t*)"hello";
+  const uint8_t* data2 = (const uint8_t*)"my";
+  const uint8_t* data3 = (const uint8_t*)"friend";
+
+  auto quicBuffer1 = QuicBuffer::wrapBuffer((void*)data1, 5);
+  auto quicBuffer2 = QuicBuffer::wrapBuffer((void*)data2, 2);
+  auto quicBuffer3 = QuicBuffer::wrapBuffer((void*)data3, 6);
+
+  quicBuffer1->appendChain(std::move(quicBuffer2));
+  // hello -> my
+
+  quicBuffer1->appendChain(std::move(quicBuffer3));
+  // hello -> friend -> my
+
+  EXPECT_EQ(memcmp(quicBuffer1->data(), "hello", 5), 0);
+  EXPECT_EQ(memcmp(quicBuffer1->next()->data(), "friend", 6), 0);
+  EXPECT_EQ(memcmp(quicBuffer1->next()->next()->data(), "my", 2), 0);
+}
+
 TEST(QuicBufferTest, TestSeparateChain) {
   auto quicBuffer1 = QuicBuffer::create(100);
   QuicBuffer* quicBufferRawPtr1 = quicBuffer1.get();
