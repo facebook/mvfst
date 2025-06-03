@@ -166,6 +166,20 @@ TEST(QuicBufferTest, TestRetreatNotEnoughRoom) {
   EXPECT_DEATH(quicBuffer1->retreat(5), "");
 }
 
+TEST(QuicBufferTest, TestIsSharedOne) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer1 = QuicBuffer::wrapBuffer((void*)data, 5);
+  EXPECT_TRUE(quicBuffer1->isSharedOne());
+
+  auto quicBuffer2 = QuicBuffer::copyBuffer(data, 5);
+  EXPECT_FALSE(quicBuffer2->isSharedOne());
+  auto quicBuffer3 = quicBuffer2->clone();
+  EXPECT_TRUE(quicBuffer2->isSharedOne());
+  EXPECT_TRUE(quicBuffer3->isSharedOne());
+  quicBuffer3 = nullptr;
+  EXPECT_FALSE(quicBuffer2->isSharedOne());
+}
+
 TEST(QuicBufferTest, TestCopyBufferSpan) {
   const uint8_t* data = (const uint8_t*)"hello";
   ByteRange range(data, 5);

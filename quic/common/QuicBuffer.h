@@ -71,6 +71,8 @@ class QuicBuffer {
 
   void retreat(std::size_t amount) noexcept;
 
+  bool isSharedOne() const noexcept;
+
   /*
    * Basic getters
    */
