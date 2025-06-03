@@ -73,6 +73,8 @@ class QuicBuffer {
 
   bool isSharedOne() const noexcept;
 
+  [[nodiscard]] bool isShared() const noexcept;
+
   /*
    * Basic getters
    */

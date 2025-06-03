@@ -180,6 +180,19 @@ TEST(QuicBufferTest, TestIsSharedOne) {
   EXPECT_FALSE(quicBuffer2->isSharedOne());
 }
 
+TEST(QuicBufferTest, TestIsShared) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer1 = QuicBuffer::copyBuffer(data, 5);
+  auto quicBuffer2 = QuicBuffer::copyBuffer(data, 5);
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+
+  EXPECT_FALSE(quicBuffer1->isShared());
+  auto quicBuffer3 = quicBuffer1->next()->clone();
+  EXPECT_TRUE(quicBuffer1->isShared());
+  quicBuffer3 = nullptr;
+  EXPECT_FALSE(quicBuffer1->isShared());
+}
+
 TEST(QuicBufferTest, TestCopyBufferSpan) {
   const uint8_t* data = (const uint8_t*)"hello";
   ByteRange range(data, 5);

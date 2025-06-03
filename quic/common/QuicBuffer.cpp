@@ -148,6 +148,17 @@ bool QuicBuffer::isSharedOne() const noexcept {
   return !sharedBuffer_ || (sharedBuffer_.use_count() > 1);
 }
 
+bool QuicBuffer::isShared() const noexcept {
+  const QuicBuffer* current = this;
+  do {
+    if (current->isSharedOne()) {
+      return true;
+    }
+    current = current->next_;
+  } while (current != this);
+  return false;
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
   auto tmp = cloneOneImpl();
 
