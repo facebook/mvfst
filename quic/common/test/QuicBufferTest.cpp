@@ -143,6 +143,29 @@ TEST(QuicBufferTest, TestAdvanceNotEnoughRoom) {
   EXPECT_DEATH(quicBuffer1->advance(1), "");
 }
 
+TEST(QuicBufferTest, TestRetreat) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer1 = QuicBuffer::copyBuffer(data, 5, 3);
+  const uint8_t* originalBufData = quicBuffer1->data();
+  EXPECT_EQ(quicBuffer1->length(), 5);
+
+  quicBuffer1->retreat(1);
+  EXPECT_EQ(originalBufData, quicBuffer1->data() + 1);
+  EXPECT_EQ(memcmp(data, quicBuffer1->data(), 5), 0);
+  EXPECT_EQ(quicBuffer1->length(), 5);
+
+  quicBuffer1->retreat(2);
+  EXPECT_EQ(originalBufData, quicBuffer1->data() + 3);
+  EXPECT_EQ(memcmp(data, quicBuffer1->data(), 5), 0);
+  EXPECT_EQ(quicBuffer1->length(), 5);
+}
+
+TEST(QuicBufferTest, TestRetreatNotEnoughRoom) {
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer1 = QuicBuffer::copyBuffer(data, 5, 3);
+  EXPECT_DEATH(quicBuffer1->retreat(5), "");
+}
+
 TEST(QuicBufferTest, TestCopyBufferSpan) {
   const uint8_t* data = (const uint8_t*)"hello";
   ByteRange range(data, 5);

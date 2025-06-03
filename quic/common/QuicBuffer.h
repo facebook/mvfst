@@ -69,6 +69,8 @@ class QuicBuffer {
 
   void advance(std::size_t amount) noexcept;
 
+  void retreat(std::size_t amount) noexcept;
+
   /*
    * Basic getters
    */

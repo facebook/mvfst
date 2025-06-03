@@ -135,6 +135,15 @@ void QuicBuffer::advance(std::size_t amount) noexcept {
   data_ += amount;
 }
 
+void QuicBuffer::retreat(std::size_t amount) noexcept {
+  CHECK_LE(amount, headroom())
+      << "Not enough room to retreat data in QuicBuffer";
+  if (length_ > 0) {
+    memmove(data_ - amount, data_, length_);
+  }
+  data_ -= amount;
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
   auto tmp = cloneOneImpl();
 
