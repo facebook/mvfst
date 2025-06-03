@@ -163,6 +163,27 @@ std::unique_ptr<QuicBuffer> QuicBuffer::pop() {
   return std::unique_ptr<QuicBuffer>((next == this) ? nullptr : next);
 }
 
+QuicBuffer::FillIovResult QuicBuffer::fillIov(struct iovec* iov, size_t len)
+    const {
+  QuicBuffer const* p = this;
+  size_t i = 0;
+  size_t totalBytes = 0;
+  while (i < len) {
+    // some code can get confused by empty iovs, so skip them
+    if (p->length() > 0) {
+      iov[i].iov_base = const_cast<uint8_t*>(p->data());
+      iov[i].iov_len = p->length();
+      totalBytes += p->length();
+      i++;
+    }
+    p = p->next();
+    if (p == this) {
+      return {i, totalBytes};
+    }
+  }
+  return {0, 0};
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::cloneOneImpl() const {
   return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
       capacity_, data_, buf_, length_, sharedBuffer_));

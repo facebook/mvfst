@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/portability/SysUio.h>
 #include <quic/common/QuicRange.h>
 #include <cstring>
 #include <memory>
@@ -161,6 +162,15 @@ class QuicBuffer {
   // Removes the rest of the chain from this IOBuf, and returns it. If there is
   // only one element in the chain, this is a no-op and returns nullptr.
   std::unique_ptr<QuicBuffer> pop();
+
+  struct FillIovResult {
+    // How many iovecs were filled (or 0 on error).
+    size_t numIovecs;
+    // The total length of filled iovecs (or 0 on error).
+    size_t totalLength;
+  };
+
+  FillIovResult fillIov(struct iovec* iov, size_t len) const;
 
  protected:
   QuicBuffer(

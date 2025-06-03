@@ -26,6 +26,7 @@ mvfst_cpp_library(
     deps = [
     ],
     exported_deps = [
+        "//folly/portability:sys_uio",
     ],
     external_deps = [
         "glog",

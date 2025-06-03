@@ -326,6 +326,38 @@ TEST(QuicBufferTest, TestEmpty) {
   EXPECT_FALSE(quicBuffer1->empty());
 }
 
+TEST(QuicBufferTest, FillIov) {
+  auto quicBuffer1 = QuicBuffer::create(10);
+  quicBuffer1->append(10);
+
+  auto quicBuffer2 = QuicBuffer::create(5);
+  quicBuffer2->append(5);
+
+  auto quicBuffer3 = QuicBuffer::create(7);
+  quicBuffer3->append(7);
+
+  quicBuffer1->appendToChain(std::move(quicBuffer2));
+  quicBuffer1->appendToChain(std::move(quicBuffer3));
+
+  iovec iov1[5];
+  quicBuffer1->fillIov(iov1, 3);
+  QuicBuffer* iter = quicBuffer1.get();
+  for (int i = 0; i < 3; i++) {
+    EXPECT_EQ(iov1[i].iov_base, iter->data());
+    EXPECT_EQ(iov1[i].iov_len, iter->length());
+    iter = iter->next();
+  }
+
+  iovec iov2[2];
+  quicBuffer1->fillIov(iov2, 2);
+  iter = quicBuffer1.get();
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(iov1[i].iov_base, iter->data());
+    EXPECT_EQ(iov1[i].iov_len, iter->length());
+    iter = iter->next();
+  }
+}
+
 TEST(QuicBufferTest, TestWrapBufferAsValue) {
   const auto* data = (const uint8_t*)"hello";
   auto quicBuffer = QuicBuffer::wrapBufferAsValue((void*)data, 5);
