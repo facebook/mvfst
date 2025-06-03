@@ -88,8 +88,14 @@ bool PacketGroupWriter::writeSingleQuicPacket(
   // buildBuf's data starts from the body part of buildBuf.
   buildBuf->trimStart(prevSize_ + headerLen);
   // buildBuf and packetbuildBuf is actually the same.
-  auto packetbuildBuf =
+  auto encryptResult =
       aead.inplaceEncrypt(std::move(buildBuf), &packet.header, packetNum);
+  if (encryptResult.hasError()) {
+    throw QuicInternalException(
+        "DSR Send failed: Encryption error: " + encryptResult.error().message,
+        LocalErrorCode::INTERNAL_ERROR);
+  }
+  auto packetbuildBuf = std::move(encryptResult.value());
   CHECK_EQ(packetbuildBuf->headroom(), headerLen + prevSize_);
   // Include header back.
   packetbuildBuf->prepend(headerLen);

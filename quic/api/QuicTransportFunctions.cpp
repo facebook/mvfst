@@ -302,8 +302,12 @@ continuousMemoryBuildScheduleEncrypt(
   connection.bufAccessor->trimStart(prevSize + headerLen);
   // buf and packetBuf is actually the same.
   auto buf = connection.bufAccessor->obtain();
-  auto packetBuf =
+  auto encryptResult =
       aead.inplaceEncrypt(std::move(buf), &packet->header, packetNum);
+  if (encryptResult.hasError()) {
+    return folly::makeUnexpected(encryptResult.error());
+  }
+  auto packetBuf = std::move(encryptResult.value());
   CHECK(packetBuf->headroom() == headerLen + prevSize);
   // Include header back.
   packetBuf->prepend(headerLen);
@@ -410,8 +414,12 @@ iobufChainBasedBuildScheduleEncrypt(
   bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
   unencrypted->advance(headerLen);
   unencrypted->append(bodyLen);
-  auto packetBuf =
+  auto encryptResult =
       aead.inplaceEncrypt(std::move(unencrypted), &packet->header, packetNum);
+  if (encryptResult.hasError()) {
+    return folly::makeUnexpected(encryptResult.error());
+  }
+  auto packetBuf = std::move(encryptResult.value());
   DCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
   auto headerCursor = Cursor(&packet->header);
@@ -1447,8 +1455,13 @@ void writeCloseCommon(
   auto packet = std::move(packetBuilder).buildPacket();
   CHECK_GE(packet.body.tailroom(), aead.getCipherOverhead());
   auto bufUniquePtr = packet.body.clone();
-  bufUniquePtr =
+  auto encryptResult =
       aead.inplaceEncrypt(std::move(bufUniquePtr), &packet.header, packetNum);
+  if (encryptResult.hasError()) {
+    LOG(ERROR) << "Error encrypting packet: " << encryptResult.error().message;
+    return;
+  }
+  bufUniquePtr = std::move(encryptResult.value());
   bufUniquePtr->coalesce();
   encryptPacketHeader(
       headerForm,

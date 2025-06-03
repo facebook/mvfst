@@ -448,8 +448,13 @@ BufPtr packetToBufCleartext(
     body->appendToChain(folly::IOBuf::create(tagLen));
   }
   body->coalesce();
-  auto encryptedBody = cleartextCipher.inplaceEncrypt(
+  auto encryptResult = cleartextCipher.inplaceEncrypt(
       std::move(body), &packet.header, packetNum);
+  if (encryptResult.hasError()) {
+    throw std::runtime_error(
+        "Failed to encrypt packet: " + encryptResult.error().message);
+  }
+  auto encryptedBody = std::move(encryptResult.value());
   encryptedBody->coalesce();
   encryptPacketHeader(
       headerForm,

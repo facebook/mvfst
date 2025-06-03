@@ -54,14 +54,14 @@ class MockAead : public Aead {
 
   MOCK_METHOD(Optional<TrafficKey>, getKey, (), (const));
   MOCK_METHOD(
-      std::unique_ptr<folly::IOBuf>,
+      (folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError>),
       _inplaceEncrypt,
       (std::unique_ptr<folly::IOBuf> & plaintext,
        const folly::IOBuf* associatedData,
        uint64_t seqNum),
       (const));
 
-  std::unique_ptr<folly::IOBuf> inplaceEncrypt(
+  folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {
@@ -102,7 +102,9 @@ class MockAead : public Aead {
     using namespace testing;
     ON_CALL(*this, _inplaceEncrypt(_, _, _))
         .WillByDefault(InvokeWithoutArgs(
-            []() { return folly::IOBuf::copyBuffer("ciphertext"); }));
+            []() -> folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError> {
+              return folly::IOBuf::copyBuffer("ciphertext");
+            }));
     ON_CALL(*this, _decrypt(_, _, _)).WillByDefault(InvokeWithoutArgs([]() {
       return folly::IOBuf::copyBuffer("plaintext");
     }));

@@ -39,7 +39,9 @@ BufPtr packetToBuf(
   }
   if (aead && !packet.header.empty()) {
     auto bodySize = body->computeChainDataLength();
-    body = aead->inplaceEncrypt(std::move(body), &packet.header, num);
+    auto result = aead->inplaceEncrypt(std::move(body), &packet.header, num);
+    CHECK(!result.hasError());
+    body = std::move(result.value());
     EXPECT_GT(body->computeChainDataLength(), bodySize);
   }
   if (body) {
