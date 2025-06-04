@@ -545,7 +545,6 @@ void Bbr2CongestionController::checkStartupDone() {
   checkStartupHighLoss();
 
   if (state_ == State::Startup && fullBwReached_) {
-    QUIC_STATS(conn_.statsCallback, onBBR2ExitStartup);
     enterDrain();
   }
 }

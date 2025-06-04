@@ -279,14 +279,6 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
-  void onBBR1ExitStartup() override {
-    VLOG(2) << prefix_ << __func__;
-  }
-
-  void onBBR2ExitStartup() override {
-    VLOG(2) << prefix_ << __func__;
-  }
-
  private:
   std::string prefix_;
 };
