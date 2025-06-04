@@ -12,7 +12,7 @@
 
 namespace quic::test {
 
-quic::PacketizationRequest sendInstructionToPacketizationRequest(
+inline quic::PacketizationRequest sendInstructionToPacketizationRequest(
     const quic::SendInstruction& instruction) {
   quic::PacketizationRequest request(
       instruction.packetNum,
