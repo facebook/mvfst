@@ -167,6 +167,8 @@ void HTTPPriorityQueue::clear() {
   for (auto& rr : roundRobins_) {
     rr.clear();
   }
+  roundRobinElements_ = 0;
+  lowestRoundRobin_ = roundRobins_.size();
 }
 
 const HTTPPriorityQueue::Element* FOLLY_NULLABLE

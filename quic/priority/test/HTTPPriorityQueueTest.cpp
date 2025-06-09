@@ -21,6 +21,16 @@ class HTTPPriorityQueueTest : public testing::Test {
 };
 
 TEST_F(HTTPPriorityQueueTest, EmptyQueue) {
+  queue_.clear();
+  EXPECT_TRUE(queue_.empty());
+}
+
+TEST_F(HTTPPriorityQueueTest, IncrementalEmptyQueue) {
+  auto id = Identifier::fromStreamID(1);
+  auto priority = HTTPPriorityQueue::Priority(0, true);
+  queue_.insertOrUpdate(id, priority);
+  EXPECT_FALSE(queue_.empty());
+  queue_.clear();
   EXPECT_TRUE(queue_.empty());
 }
 
