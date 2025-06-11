@@ -683,7 +683,7 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
             ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey));
     parsedECHConfig.key_config.cipher_suites = {suite};
     parsedECHConfig.maximum_name_length = 50;
-    parsedECHConfig.public_name = folly::IOBuf::copyBuffer("public.dummy.com");
+    parsedECHConfig.public_name = "public.dummy.com";
     return parsedECHConfig;
   }
 
