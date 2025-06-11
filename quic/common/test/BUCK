@@ -213,3 +213,16 @@ mvfst_cpp_test(
         "//quic/common/udpsocket:folly_async_udp_socket",
     ],
 )
+
+mvfst_cpp_test(
+    name = "ContiguousCursorTest",
+    srcs = [
+        "ContiguousCursorTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic/common:contiguous_cursor",
+    ],
+)
