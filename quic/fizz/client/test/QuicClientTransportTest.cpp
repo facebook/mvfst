@@ -8,7 +8,6 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
-#include <fizz/crypto/aead/test/Mocks.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <folly/futures/Future.h>
 #include <folly/io/Cursor.h>
