@@ -86,14 +86,14 @@ void FizzClientQuicHandshakeContext::removePsk(
   }
 }
 
-Optional<std::vector<fizz::ech::ECHConfig>>
+Optional<std::vector<fizz::ech::ParsedECHConfig>>
 FizzClientQuicHandshakeContext::getECHConfigs(const std::string& sni) const {
   if (!echPolicy_) {
     return std::nullopt;
   }
   auto result = echPolicy_->getConfig(sni);
   if (result.has_value()) {
-    return Optional<std::vector<fizz::ech::ECHConfig>>(
+    return Optional<std::vector<fizz::ech::ParsedECHConfig>>(
         std::move(result.value()));
   } else {
     return std::nullopt;

@@ -52,7 +52,7 @@ FizzClientHandshake::connectImpl(Optional<std::string> hostname) {
   // Since Draft-17, EOED should not be sent
   context->setOmitEarlyRecordLayer(true);
 
-  Optional<std::vector<fizz::ech::ECHConfig>> echConfigs;
+  Optional<std::vector<fizz::ech::ParsedECHConfig>> echConfigs;
   if (hostname.has_value()) {
     std::string hostnameStr = hostname.value();
     echConfigs = fizzContext_->getECHConfigs(hostnameStr);
@@ -62,7 +62,7 @@ FizzClientHandshake::connectImpl(Optional<std::string> hostname) {
   if (hostname.has_value()) {
     follyHostname = hostname.value();
   }
-  folly::Optional<std::vector<fizz::ech::ECHConfig>> follyECHConfigs;
+  folly::Optional<std::vector<fizz::ech::ParsedECHConfig>> follyECHConfigs;
   if (echConfigs.has_value()) {
     follyECHConfigs = std::move(echConfigs.value());
   }

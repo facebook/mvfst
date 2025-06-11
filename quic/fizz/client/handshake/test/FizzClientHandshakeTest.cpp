@@ -672,26 +672,19 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
     return echCallback;
   }
 
-  fizz::ech::ECHConfigContentDraft getECHConfigContent() {
+  fizz::ech::ParsedECHConfig getParsedECHConfig() {
     fizz::ech::HpkeSymmetricCipherSuite suite{
         fizz::hpke::KDFId::Sha256, fizz::hpke::AeadId::TLS_AES_128_GCM_SHA256};
-    fizz::ech::ECHConfigContentDraft echConfigContent;
-    echConfigContent.key_config.config_id = 0xFB;
-    echConfigContent.key_config.kem_id = fizz::hpke::KEMId::secp256r1;
-    echConfigContent.key_config.public_key =
+    fizz::ech::ParsedECHConfig parsedECHConfig;
+    parsedECHConfig.key_config.config_id = 0xFB;
+    parsedECHConfig.key_config.kem_id = fizz::hpke::KEMId::secp256r1;
+    parsedECHConfig.key_config.public_key =
         fizz::openssl::detail::encodeECPublicKey(
             ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey));
-    echConfigContent.key_config.cipher_suites = {suite};
-    echConfigContent.maximum_name_length = 100;
-    echConfigContent.public_name = folly::IOBuf::copyBuffer("public.dummy.com");
-    return echConfigContent;
-  }
-
-  fizz::ech::ECHConfig getECHConfig() {
-    fizz::ech::ECHConfig config;
-    config.version = fizz::ech::ECHVersion::Draft15;
-    config.ech_config_content = fizz::encode(getECHConfigContent());
-    return config;
+    parsedECHConfig.key_config.cipher_suites = {suite};
+    parsedECHConfig.maximum_name_length = 50;
+    parsedECHConfig.public_name = folly::IOBuf::copyBuffer("public.dummy.com");
+    return parsedECHConfig;
   }
 
   std::shared_ptr<fizz::client::test::MockECHPolicy> echPolicy;
@@ -703,15 +696,16 @@ TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   echPolicy = std::make_shared<fizz::client::test::MockECHPolicy>();
   echCallback = std::make_shared<fizz::client::test::MockECHRetryCallback>();
   EXPECT_CALL(*echPolicy, getConfig(_))
-      .WillOnce(Return(std::vector<fizz::ech::ECHConfig>{getECHConfig()}));
+      .WillOnce(Return(
+          std::vector<fizz::ech::ParsedECHConfig>{getParsedECHConfig()}));
 
   auto kex = fizz::openssl::makeOpenSSLECKeyExchange<fizz::P256>();
 
   kex->setPrivateKey(fizz::test::getPrivateKey(fizz::test::kP256Key));
   echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>(
       std::make_shared<fizz::DefaultFactory>());
-  echDecrypter->addDecryptionConfig(
-      fizz::ech::DecrypterParams{getECHConfig(), kex->clone()});
+  echDecrypter->addDecryptionConfig(fizz::ech::DecrypterParams{
+      .echConfig = getParsedECHConfig(), .kex = kex->clone()});
 
   // Try handshake flow with ECHPolicy set on FizzClientContext.
   quic::test::ClientHandshakeECHPolicyTest::SetUp();

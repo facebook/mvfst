@@ -45,7 +45,7 @@ class FizzClientQuicHandshakeContext
       QuicCachedPsk quicCachedPsk);
   void removePsk(const Optional<std::string>& hostname);
 
-  Optional<std::vector<fizz::ech::ECHConfig>> getECHConfigs(
+  Optional<std::vector<fizz::ech::ParsedECHConfig>> getECHConfigs(
       const std::string& sni) const;
 
   void setECHRetryCallback(
