@@ -118,4 +118,7 @@ mvfst_cpp_library(
         "//quic/state:quic_connection_stats",
         "//quic/state:stats_callback",
     ],
+    external_deps = [
+        "glog",
+    ],
 )
