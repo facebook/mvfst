@@ -91,7 +91,7 @@ struct ConnectionId {
 
 struct ConnectionIdHash {
   size_t operator()(const ConnectionId& connId) const {
-    return folly::hash::fnv32_buf(connId.data(), connId.size());
+    return folly::hash::fnv32_buf_BROKEN(connId.data(), connId.size());
   }
 };
 
