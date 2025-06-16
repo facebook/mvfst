@@ -188,9 +188,9 @@ void QuicServer::initializeImpl(
     bool useDefaultTransport) {
   checkRunningInThread(mainThreadId_);
   CHECK(!evbs.empty());
-  CHECK_LE(evbs.size(), std::numeric_limits<uint8_t>::max())
+  CHECK_LE(evbs.size(), std::numeric_limits<uint16_t>::max())
       << "Quic Server does not support more than "
-      << std::numeric_limits<uint8_t>::max() << " workers";
+      << std::numeric_limits<uint16_t>::max() << " workers";
   CHECK(shutdown_);
   shutdown_ = false;
 
