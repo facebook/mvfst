@@ -52,7 +52,7 @@ const RegularQuicWritePacket& writeQuicPacket(
     ConnectionId dstConnId,
     quic::test::MockAsyncUDPSocket& sock,
     QuicStreamState& stream,
-    const folly::IOBuf& data,
+    const Buf& data,
     bool eof = false);
 
 RegularQuicPacketBuilder::Packet createAckPacket(
@@ -82,7 +82,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     ConnectionId dstConnId,
     PacketNum packetNum,
     StreamId streamId,
-    folly::IOBuf& data,
+    Buf& data,
     uint8_t cipherOverhead,
     PacketNum largestAcked,
     Optional<std::pair<LongHeader::Types, QuicVersion>> longHeaderOverride =
@@ -169,7 +169,7 @@ std::unique_ptr<T> createNoOpAeadImpl(uint64_t cipherOverhead = 0) {
         if (buf) {
           return std::move(buf);
         } else {
-          return folly::IOBuf::create(0);
+          return BufHelpers::create(0);
         }
       }));
   // Fake that the handshake has already occurred and fix the keys.
@@ -248,7 +248,7 @@ OutstandingPacketWrapper* findOutstandingPacket(
 }
 
 // Helper function to generate a buffer containing random data of given length
-std::unique_ptr<folly::IOBuf> buildRandomInputData(size_t length);
+BufPtr buildRandomInputData(size_t length);
 
 void addAckStatesWithCurrentTimestamps(
     AckState& ackState,
@@ -336,9 +336,7 @@ void overridePacketWithToken(
     PacketBuilderInterface::Packet& packet,
     const StatelessResetToken& token);
 
-void overridePacketWithToken(
-    folly::IOBuf& bodyBuf,
-    const StatelessResetToken& token);
+void overridePacketWithToken(Buf& bodyBuf, const StatelessResetToken& token);
 
 /*
  * Returns if the current writable streams contains the given id.
@@ -388,7 +386,7 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
   void reset() override;
 
   bool append(
-      std::unique_ptr<folly::IOBuf>&& /*unused*/,
+      BufPtr&& /*unused*/,
       size_t size,
       const folly::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
@@ -407,7 +405,7 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
   size_t bufSize_{0};
 };
 
-std::unique_ptr<folly::IOBuf> getProtectionKey();
+BufPtr getProtectionKey();
 
 class FakeServerHandshake : public FizzServerHandshake {
  public:
@@ -439,12 +437,12 @@ class FakeServerHandshake : public FizzServerHandshake {
     // Fall through and let the ServerStateMachine to process the event
     writeDataToQuicStream(
         *getCryptoStream(*conn_.cryptoState, EncryptionLevel::Initial),
-        folly::IOBuf::copyBuffer("SHLO"));
+        BufHelpers::copyBuffer("SHLO"));
     if (chloWithCert) {
       /* write 4000 bytes of data to the handshake crypto stream */
       writeDataToQuicStream(
           *getCryptoStream(*conn_.cryptoState, EncryptionLevel::Handshake),
-          folly::IOBuf::copyBuffer(std::string(4000, '.')));
+          BufHelpers::copyBuffer(std::string(4000, '.')));
     }
 
     if (allowZeroRttKeys_) {
@@ -464,12 +462,12 @@ class FakeServerHandshake : public FizzServerHandshake {
   }
 
   folly::Expected<folly::Unit, QuicError> doHandshake(
-      std::unique_ptr<folly::IOBuf> data,
+      BufPtr data,
       EncryptionLevel) override {
     folly::IOBufEqualTo eq;
-    auto chlo = folly::IOBuf::copyBuffer("CHLO");
-    auto chloWithCert = folly::IOBuf::copyBuffer("CHLO_CERT");
-    auto clientFinished = folly::IOBuf::copyBuffer("FINISHED");
+    auto chlo = BufHelpers::copyBuffer("CHLO");
+    auto chloWithCert = BufHelpers::copyBuffer("CHLO_CERT");
+    auto clientFinished = BufHelpers::copyBuffer("FINISHED");
     bool sendHandshakeBytes = false;
 
     if (eq(data, chlo) || (sendHandshakeBytes = eq(data, chloWithCert))) {
@@ -605,8 +603,8 @@ class FakeServerHandshake : public FizzServerHandshake {
     CHECK(!oneRttReadHeaderCipherResult.hasError())
         << "Failed to create header cipher";
     oneRttReadHeaderCipher_ = std::move(oneRttReadHeaderCipherResult.value());
-    readTrafficSecret_ = folly::IOBuf::copyBuffer(getRandSecret());
-    writeTrafficSecret_ = folly::IOBuf::copyBuffer(getRandSecret());
+    readTrafficSecret_ = BufHelpers::copyBuffer(getRandSecret());
+    writeTrafficSecret_ = BufHelpers::copyBuffer(getRandSecret());
   }
 
   std::unique_ptr<Aead> buildAead(ByteRange /*secret*/) override {
@@ -614,7 +612,7 @@ class FakeServerHandshake : public FizzServerHandshake {
   }
 
   BufPtr getNextTrafficSecret(ByteRange /*secret*/) const override {
-    return folly::IOBuf::copyBuffer(getRandSecret());
+    return BufHelpers::copyBuffer(getRandSecret());
   }
 
   void setHandshakeKeys() {

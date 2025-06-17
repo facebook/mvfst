@@ -354,7 +354,7 @@ QuicReadCodec::tryParseShortHeaderPacket(
   // don't clone the buffer, the buffer will not show up as shared and we can
   // decrypt in-place.
   size_t aadLen = packetNumberOffset + packetNum.second;
-  folly::IOBuf headerData = BufHelpers::wrapBufferAsValue(data->data(), aadLen);
+  Buf headerData = BufHelpers::wrapBufferAsValue(data->data(), aadLen);
   data->trimStart(aadLen);
 
   BufPtr decrypted;

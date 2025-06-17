@@ -606,7 +606,7 @@ void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int bytesRead) {
 
 bool QuicServerWorker::tryHandlingAsHealthCheck(
     const folly::SocketAddress& client,
-    const folly::IOBuf& data) {
+    const Buf& data) {
   // If we cannot parse the long header then it is not a QUIC invariant
   // packet, so just drop it after checking whether it could be a health
   // check.

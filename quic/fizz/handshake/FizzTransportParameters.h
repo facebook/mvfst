@@ -29,7 +29,7 @@ inline quic::BufPtr encodeVarintParams(
   }
 
   // callers expect empty buf if no parameters supplied
-  return folly::IOBuf::create(0);
+  return quic::BufHelpers::create(0);
 }
 
 inline fizz::ExtensionType getQuicTransportParametersExtention(

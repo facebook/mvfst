@@ -168,7 +168,7 @@ folly::Expected<bool, QuicError> FizzClientHandshake::verifyRetryIntegrityTag(
     auto expectedIntegrityTag = retryIntegrityTagGenerator.getRetryIntegrityTag(
         retryPacket.header.getVersion(), pseudoRetryPacket.get());
 
-    folly::IOBuf integrityTagWrapper = BufHelpers::wrapBufferAsValue(
+    Buf integrityTagWrapper = BufHelpers::wrapBufferAsValue(
         retryPacket.integrityTag.data(), retryPacket.integrityTag.size());
     return BufEq()(*expectedIntegrityTag, integrityTagWrapper);
   } catch (const std::exception& ex) {

@@ -462,7 +462,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   bool tryHandlingAsHealthCheck(
       const folly::SocketAddress& client,
-      const folly::IOBuf& data);
+      const Buf& data);
 
   /**
    * Return Infocallback ptr for various transport stats (such as packet

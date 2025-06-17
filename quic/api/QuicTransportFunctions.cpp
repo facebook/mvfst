@@ -333,8 +333,7 @@ continuousMemoryBuildScheduleEncrypt(
   packetBuf->prepend(prevSize);
   if (connection.transportSettings.isPriming && packetBuf) {
     packetBuf->coalesce();
-    connection.bufAccessor->release(
-        folly::IOBuf::create(packetBuf->capacity()));
+    connection.bufAccessor->release(BufHelpers::create(packetBuf->capacity()));
     connection.primingData_.emplace_back(std::move(packetBuf));
     return DataPathResult::makeWriteResult(
         true, std::move(result.value()), encodedSize, encodedBodySize);
@@ -1470,7 +1469,7 @@ void writeCloseCommon(
       bufUniquePtr->data(),
       bufUniquePtr->length(),
       headerCipher);
-  folly::IOBuf packetBuf(std::move(packet.header));
+  Buf packetBuf(std::move(packet.header));
   packetBuf.appendToChain(std::move(bufUniquePtr));
   auto packetSize = packetBuf.computeChainDataLength();
   if (connection.qLogger) {

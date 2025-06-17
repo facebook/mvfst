@@ -140,7 +140,7 @@ class FileQLogger : public BaseQLogger {
 
   std::unique_ptr<folly::AsyncFileWriter> writer_;
   std::unique_ptr<folly::compression::StreamCodec> compressionCodec_;
-  std::unique_ptr<folly::IOBuf> compressionBuffer_;
+  BufPtr compressionBuffer_;
 
   std::string path_;
   std::string basePadding_ = "  ";

@@ -96,7 +96,7 @@ void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data) {
 // a logic IOBuf chain, buf. The function will pack data into the available
 // tail agressively, and allocate in terms of appendLen until the push is
 // complete.
-static void pushToTail(folly::IOBuf* dst, BufPtr src, size_t allocSize) {
+static void pushToTail(Buf* dst, BufPtr src, size_t allocSize) {
   size_t appended = 0;
   auto len = src->length();
   auto data = src->data();
@@ -340,7 +340,7 @@ std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
 
     uint64_t toRead =
         std::min<uint64_t>(currSize, amount == 0 ? currSize : remaining);
-    std::unique_ptr<folly::IOBuf> splice;
+    BufPtr splice;
     if (sinkData) {
       curr->data.trimStart(toRead);
     } else {
