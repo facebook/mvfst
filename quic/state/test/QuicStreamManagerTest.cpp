@@ -12,7 +12,6 @@
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamManager.h>
-#include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/stream/StreamStateFunctions.h>
 #include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
