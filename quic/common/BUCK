@@ -219,3 +219,13 @@ mvfst_cpp_library(
         "//folly/lang:bits",
     ],
 )
+
+mvfst_cpp_library(
+    name = "expected",
+    headers = [
+        "Expected.h",
+    ],
+    exported_deps = [
+        "//quic/common/third-party:expected",
+    ],
+)

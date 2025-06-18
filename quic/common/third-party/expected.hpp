@@ -1757,12 +1757,13 @@ struct error_traits
 template<>
 struct error_traits< std::exception_ptr >
 {
-    static void rethrow( std::exception_ptr const & /*e*/ )
+    [[noreturn]] static void rethrow( std::exception_ptr const & /*e*/ )
     {
 #if nsel_CONFIG_NO_EXCEPTIONS_SEH
         RaiseException( EXCEPTION_ACCESS_VIOLATION, EXCEPTION_NONCONTINUABLE, 0, NULL );
 #else
         assert( false && detail::text("throw bad_expected_access<std::exception_ptr>{ e };") );
+        std::terminate();
 #endif
     }
 };
@@ -1770,12 +1771,13 @@ struct error_traits< std::exception_ptr >
 template<>
 struct error_traits< std::error_code >
 {
-    static void rethrow( std::error_code const & /*e*/ )
+    [[noreturn]] static void rethrow( std::error_code const & /*e*/ )
     {
 #if nsel_CONFIG_NO_EXCEPTIONS_SEH
         RaiseException( EXCEPTION_ACCESS_VIOLATION, EXCEPTION_NONCONTINUABLE, 0, NULL );
 #else
         assert( false && detail::text("throw std::system_error( e );") );
+        std::terminate();
 #endif
     }
 };
@@ -3594,10 +3596,10 @@ namespace std {
 // expected: hash support
 
 template< typename T, typename E >
-struct hash< nonstd::expected<T,E> >
+struct hash< ::quic::detail_expected_lite::nonstd::expected_lite::expected<T,E> >
 {
     using result_type = std::size_t;
-    using argument_type = nonstd::expected<T,E>;
+    using argument_type = ::quic::detail_expected_lite::nonstd::expected_lite::expected<T,E>;
 
     constexpr result_type operator()(argument_type const & arg) const
     {
@@ -3607,10 +3609,10 @@ struct hash< nonstd::expected<T,E> >
 
 // TBD - ?? remove? see spec.
 template< typename T, typename E >
-struct hash< nonstd::expected<T&,E> >
+struct hash< ::quic::detail_expected_lite::nonstd::expected_lite::expected<T&,E> >
 {
     using result_type = std::size_t;
-    using argument_type = nonstd::expected<T&,E>;
+    using argument_type = ::quic::detail_expected_lite::nonstd::expected_lite::expected<T&,E>;
 
     constexpr result_type operator()(argument_type const & arg) const
     {
@@ -3624,7 +3626,7 @@ struct hash< nonstd::expected<T&,E> >
 // a combination of hashing false and hash<E>()(e.error()).
 
 template< typename E >
-struct hash< nonstd::expected<void,E> >
+struct hash< ::quic::detail_expected_lite::nonstd::expected_lite::expected<void,E> >
 {
 };
 
@@ -3640,6 +3642,11 @@ using unexpected = unexpected_type<E>;
 #endif
 
 } // namespace nonstd
+
+namespace quic {
+  template<class T, class E>
+  using Expected = ::nonstd::expected_lite::expected<T, E>;
+} // namespace quic
 
 #undef nsel_REQUIRES
 #undef nsel_REQUIRES_0
