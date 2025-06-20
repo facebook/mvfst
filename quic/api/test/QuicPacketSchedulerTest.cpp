@@ -3380,6 +3380,103 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
   EXPECT_EQ(ackFrame->ecnCECount, 3);
 }
 
+// Tests for Expected result handling bug fix
+// These tests verify that the schedulers correctly handle writeFrame returning
+// Expected<size_t, QuicError> where size_t can be 0 (no bytes written) but
+// still be successful (no error).
+
+TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerNoSpaceHandling) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  // Set up a stream with pending reset
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  conn.pendingEvents.resets.emplace(
+      stream->id, RstStreamFrame(stream->id, 0, 100, 100));
+
+  RstStreamScheduler scheduler(conn);
+  auto connId = getTestConnectionId();
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  // Use PacketBuilderWrapper with very limited space to simulate scenario
+  // where writeFrame returns success but 0 bytes written
+  PacketBuilderWrapper builderWrapper(builder, 1); // Very limited space
+
+  // Call writeRsts - should handle 0 bytes gracefully when no space available
+  auto result = scheduler.writeRsts(builderWrapper);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_FALSE(result.value()); // Should return false (no RST written)
+
+  // Reset should still be pending since it wasn't written
+  EXPECT_TRUE(conn.pendingEvents.resets.contains(stream->id));
+}
+
+TEST_P(QuicPacketSchedulerTest, WindowUpdateSchedulerNoSpaceHandling) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.pendingEvents.connWindowUpdate = true;
+
+  WindowUpdateScheduler scheduler(conn);
+  auto connId = getTestConnectionId();
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  // Use PacketBuilderWrapper with very limited space
+  PacketBuilderWrapper builderWrapper(builder, 1);
+
+  // Call writeWindowUpdates - should handle 0 bytes gracefully
+  auto result = scheduler.writeWindowUpdates(builderWrapper);
+  ASSERT_FALSE(result.hasError());
+
+  // Should still be pending since no bytes were written
+  EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
+}
+
+TEST_P(QuicPacketSchedulerTest, BlockedSchedulerNoSpaceHandling) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.pendingEvents.sendDataBlocked = true;
+
+  BlockedScheduler scheduler(conn);
+  auto connId = getTestConnectionId();
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  // Use PacketBuilderWrapper with very limited space
+  PacketBuilderWrapper builderWrapper(builder, 1);
+
+  // Call writeBlockedFrames - should handle 0 bytes gracefully and return early
+  auto result = scheduler.writeBlockedFrames(builderWrapper);
+  ASSERT_FALSE(result.hasError());
+
+  // Should still be pending since no bytes were written
+  EXPECT_TRUE(conn.pendingEvents.sendDataBlocked);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicPacketSchedulerTest,
     QuicPacketSchedulerTest,
