@@ -30,26 +30,37 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
  public:
   class Priority : public quic::PriorityQueue::Priority {
    public:
-    using OrderId = uint64_t;
+    using OrderId = uint32_t;
 
     struct HTTPPriority {
       uint8_t urgency : 3;
       bool paused : 1;
       bool incremental : 1;
-      OrderId order : 59;
+      OrderId order : 32;
+      bool uninitialized : 1;
     };
 
     // TODO: change default priority to (3, false, false, 0) to match spec
-    static constexpr HTTPPriority kDefaultPriority{3, false, true, 0};
-
+#if __cplusplus >= 202002L
+    static constexpr HTTPPriority kDefaultPriority{
+        .urgency = 3,
+        .paused = false,
+        .incremental = true,
+        .order = 0,
+        .uninitialized = false};
+#else
+    static constexpr HTTPPriority kDefaultPriority = {3, false, true, 0, false};
+#endif
     /*implicit*/ Priority(const PriorityQueue::Priority& basePriority);
 
     Priority(uint8_t u, bool i, OrderId o = 0);
+    Priority& operator=(const PriorityQueue::Priority& basePriority);
 
     enum Paused { PAUSED };
 
-    /* implicit */ Priority(Paused) : Priority(0, false, 0) {
-      getFields().paused = true;
+    /* implicit */ Priority(Paused) : Priority(7, true) {
+      auto& fields = getFields();
+      fields.paused = true;
     }
 
     Priority(const Priority&) = default;
@@ -63,20 +74,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
 
     bool operator==(const Priority& other) const {
-      auto asUint64 = toUint64();
-      auto otherAsUint64 = other.toUint64();
-      if (asUint64 == otherAsUint64) {
-        return true;
-      }
-      // The only other way to be equal is if one is initialized and the other
-      // is default
-      const static uint64_t kDefaultUint64 = Priority(
-                                                 kDefaultPriority.urgency,
-                                                 kDefaultPriority.incremental,
-                                                 kDefaultPriority.order)
-                                                 .toUint64();
-      return (kDefaultUint64 == otherAsUint64 && !isInitialized()) ||
-          (asUint64 == kDefaultUint64 && !other.isInitialized());
+      return toUint64() == other.toUint64();
     }
 
     bool operator<(const Priority& other) const {
@@ -84,10 +82,9 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
 
     [[nodiscard]] uint64_t toUint64() const {
+      const static uint64_t kDefaultUint64 = toUint64Static(kDefaultPriority);
       const auto& fields = getFields();
-      return (
-          (uint64_t(fields.urgency) << 61) | (uint64_t(fields.paused) << 60) |
-          (uint64_t(fields.incremental) << 59) | fields.order);
+      return fields.uninitialized ? kDefaultUint64 : toUint64Static(fields);
     }
 
     [[nodiscard]] const HTTPPriority& getFields() const {
@@ -95,6 +92,17 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
 
    private:
+    [[nodiscard]] bool isInitializedFast() const {
+      return !getFields().uninitialized;
+    }
+
+    static uint64_t toUint64Static(const HTTPPriority& fields) {
+      return (
+          (uint64_t(fields.urgency) << 61) | (uint64_t(fields.paused) << 60) |
+          (uint64_t(fields.incremental) << 59) |
+          (uint64_t(fields.order) << 27));
+    }
+
     HTTPPriority& getFields() {
       return getPriority<HTTPPriority>();
     }

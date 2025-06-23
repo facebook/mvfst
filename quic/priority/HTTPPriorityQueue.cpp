@@ -17,9 +17,18 @@ namespace quic {
 /*implicit*/ HTTPPriorityQueue::Priority::Priority(
     const PriorityQueue::Priority& basePriority)
     : PriorityQueue::Priority(basePriority) {
-  if (!isInitialized()) {
+  if (!isInitializedFast()) {
     getFields() = kDefaultPriority;
   }
+}
+
+HTTPPriorityQueue::Priority& HTTPPriorityQueue::Priority::operator=(
+    const PriorityQueue::Priority& basePriority) {
+  PriorityQueue::Priority::operator=(basePriority);
+  if (!isInitializedFast()) {
+    getFields() = kDefaultPriority;
+  }
+  return *this;
 }
 
 HTTPPriorityQueue::Priority::Priority(uint8_t u, bool i, OrderId o) {
@@ -28,6 +37,7 @@ HTTPPriorityQueue::Priority::Priority(uint8_t u, bool i, OrderId o) {
   fields.incremental = i;
   fields.order = (i ? 0 : o);
   fields.paused = false;
+  fields.uninitialized = false;
 }
 
 PriorityQueue::PriorityLogFields HTTPPriorityQueue::toLogFields(

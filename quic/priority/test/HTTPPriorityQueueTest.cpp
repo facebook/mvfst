@@ -36,10 +36,10 @@ TEST_F(HTTPPriorityQueueTest, IncrementalEmptyQueue) {
 
 TEST_F(HTTPPriorityQueueTest, Compare) {
   std::vector<HTTPPriorityQueue::Priority> pris = {
-      PriorityQueue::Priority(),
       {0, false},
       {0, false, 1},
       {0, true},
+      PriorityQueue::Priority(),
       {7, false},
       {7, false, std::numeric_limits<uint32_t>::max()},
       {7, true},
@@ -51,10 +51,19 @@ TEST_F(HTTPPriorityQueueTest, Compare) {
       EXPECT_TRUE(
           (i == j && queue_.equalPriority(pris[i], pris[j])) ||
           (i != j && !queue_.equalPriority(pris[i], pris[j])));
+      EXPECT_TRUE(i >= j || (i < j && pris[i] < pris[j])) << i << " " << j;
     }
   }
   // TODO: will change when default changes
-  EXPECT_EQ(pris[0], HTTPPriorityQueue::Priority(3, true));
+  EXPECT_EQ(pris[3], HTTPPriorityQueue::Priority(3, true));
+  PriorityQueue::Priority baseDefaultPri;
+  auto* defaultPri = static_cast<HTTPPriorityQueue::Priority*>(&baseDefaultPri);
+  EXPECT_TRUE(
+      HTTPPriorityQueue::Priority(
+          3, false, std::numeric_limits<uint32_t>::max()) < *defaultPri);
+  EXPECT_TRUE(
+      *defaultPri < HTTPPriorityQueue::Priority(
+                        4, false, std::numeric_limits<uint32_t>::max()));
 }
 
 TEST_F(HTTPPriorityQueueTest, InsertSingleElement) {
@@ -352,4 +361,35 @@ TEST_F(HTTPPriorityQueueTest, ToLogFields) {
   EXPECT_EQ(lookup(fieldsRegular2, "incremental"), "false");
   EXPECT_EQ(lookup(fieldsRegular2, "order"), "5");
 }
+
+TEST_F(HTTPPriorityQueueTest, ImplicitPriorityConstructor) {
+  // Test with uninitialized basePriority
+  PriorityQueue::Priority uninitializedPriority;
+  HTTPPriorityQueue::Priority priorityWithDefault(uninitializedPriority);
+
+  EXPECT_EQ(
+      priorityWithDefault->urgency,
+      HTTPPriorityQueue::Priority::kDefaultPriority.urgency);
+  EXPECT_EQ(
+      priorityWithDefault->incremental,
+      HTTPPriorityQueue::Priority::kDefaultPriority.incremental);
+  EXPECT_EQ(
+      priorityWithDefault->order,
+      HTTPPriorityQueue::Priority::kDefaultPriority.order);
+}
+
+TEST_F(HTTPPriorityQueueTest, PriorityAssignmentOperator) {
+  PriorityQueue::Priority uninitializedPriority;
+  HTTPPriorityQueue::Priority priority(0, false);
+  priority = uninitializedPriority;
+
+  EXPECT_EQ(
+      priority->urgency, HTTPPriorityQueue::Priority::kDefaultPriority.urgency);
+  EXPECT_EQ(
+      priority->incremental,
+      HTTPPriorityQueue::Priority::kDefaultPriority.incremental);
+  EXPECT_EQ(
+      priority->order, HTTPPriorityQueue::Priority::kDefaultPriority.order);
+}
+
 } // namespace
