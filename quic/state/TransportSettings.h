@@ -273,8 +273,6 @@ struct TransportSettings {
   bool shouldUseWrapperRecvmmsgForBatchRecv{false};
   // Whether or not use recvmmsg.
   bool shouldUseRecvmmsgForBatchRecv{false};
-  // Whether or not use recvfrom.
-  bool shouldUseRecvfromForBatchRecv{false};
   // Config struct for congestion controllers
   CongestionControlConfig ccaConfig;
   // A packet is considered loss when a packet that's sent later by at least

@@ -111,11 +111,6 @@ class QuicClientTransport : public QuicTransportBase,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvfrom(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      uint16_t numPackets);
-
   [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,

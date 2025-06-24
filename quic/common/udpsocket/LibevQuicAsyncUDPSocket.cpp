@@ -518,20 +518,6 @@ folly::Expected<int, QuicError> LibevQuicAsyncUDPSocket::getGRO() {
   return -1;
 }
 
-ssize_t LibevQuicAsyncUDPSocket::recvfrom(
-    uint8_t* buf,
-    size_t bufSize,
-    sockaddr_storage* sockaddrStorage) {
-  socklen_t addrlen = sizeof(*sockaddrStorage);
-  return ::recvfrom(
-      fd_,
-      buf,
-      bufSize,
-      MSG_DONTWAIT,
-      (struct sockaddr*)sockaddrStorage,
-      &addrlen);
-}
-
 ssize_t LibevQuicAsyncUDPSocket::recvmsg(struct msghdr* msg, int flags) {
   return ::recvmsg(fd_, msg, flags);
 }

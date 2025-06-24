@@ -50,8 +50,6 @@ void QuicClientTransport::onNotifyDataAvailable(
       return readWithRecvmmsgWrapper(sock, readAllocSize, numPackets);
     } else if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
       return readWithRecvmmsg(sock, readAllocSize, numPackets);
-    } else if (conn_->transportSettings.shouldUseRecvfromForBatchRecv) {
-      return readWithRecvfrom(sock, readAllocSize, numPackets);
     } else {
       return readWithRecvmsg(sock, readAllocSize, numPackets);
     }
@@ -139,22 +137,6 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmmsg(
     return recvResult;
   }
 
-  return processPackets(std::move(networkData), server);
-}
-
-folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvfrom(
-    QuicAsyncUDPSocket& sock,
-    uint64_t readBufferSize,
-    uint16_t numPackets) {
-  NetworkData networkData;
-  networkData.reserve(numPackets);
-  size_t totalData = 0;
-  Optional<folly::SocketAddress> server;
-  auto recvResult = recvFrom(
-      sock, readBufferSize, numPackets, networkData, server, totalData);
-  if (recvResult.hasError()) {
-    return recvResult;
-  }
   return processPackets(std::move(networkData), server);
 }
 

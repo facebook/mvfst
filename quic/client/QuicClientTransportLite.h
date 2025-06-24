@@ -284,13 +284,6 @@ class QuicClientTransportLite
       OnDataAvailableParams params) noexcept override;
   bool shouldOnlyNotify() override;
   void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvFrom(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      int numPackets,
-      NetworkData& networkData,
-      Optional<folly::SocketAddress>& server,
-      size_t& totalData);
 
   [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvMsg(
       QuicAsyncUDPSocket& sock,
