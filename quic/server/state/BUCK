@@ -23,7 +23,6 @@ mvfst_cpp_library(
     deps = [
         "//quic/api:transport_helpers",
         "//quic/common:buf_util",
-        "//quic/congestion_control:pacer",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/handshake:transport_parameters",

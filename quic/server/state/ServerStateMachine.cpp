@@ -12,7 +12,6 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/BufUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
-#include <quic/congestion_control/TokenlessPacer.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
