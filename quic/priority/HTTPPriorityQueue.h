@@ -124,6 +124,10 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     return heap_.empty() && roundRobinElements_ == 0;
   }
 
+  uint32_t getRoundRobinElements() const {
+    return roundRobinElements_;
+  }
+
   [[nodiscard]] bool equalPriority(
       const PriorityQueue::Priority& p1,
       const PriorityQueue::Priority& p2) const override {
