@@ -13,7 +13,6 @@
 
 #include <folly/SocketAddress.h>
 #include <folly/io/SocketOptionMap.h>
-#include <folly/net/NetOps.h>
 #include <folly/portability/Sockets.h>
 
 #include <chrono>
