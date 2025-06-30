@@ -9,7 +9,9 @@
 
 #include <folly/String.h>
 #include <folly/io/Cursor.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
+#include <array>
 
 using namespace std;
 using namespace folly;
@@ -395,6 +397,18 @@ TEST(BufWriterTest, PushLimit) {
   auto biggerBuffer = folly::IOBuf::create(200);
   EXPECT_DEATH(writer.push(biggerBuffer->data(), 200), "");
 }
+
+TEST(BufWriterTest, DeathOnOverflow) {
+  constexpr size_t kSmallCapacity = 64;
+  BufAccessor accessor(kSmallCapacity);
+  auto* rawBuf = accessor.writableTail();
+  BufWriter writer(rawBuf, kSmallCapacity);
+  std::array<uint8_t, kSmallCapacity + 1> bigData;
+  bigData.fill(0xAA);
+  EXPECT_DEATH(
+      writer.push(bigData.data(), bigData.size()), "BufWriter overflow");
+}
+
 #endif
 
 TEST(BufWriterTest, Push) {

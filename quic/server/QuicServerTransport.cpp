@@ -1303,8 +1303,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             val <= kMaxWriteConnectionDataPacketLimit
             ? val
             : kMaxWriteConnectionDataPacketLimit;
-        serverConn->transportSettings.maxBatchSize =
-            val <= kQuicMaxBatchSizeLimit ? val : kQuicMaxBatchSizeLimit;
         VLOG(3) << "MAX_BATCH_PACKETS KnobParam received: " << val;
         return folly::unit;
       });
