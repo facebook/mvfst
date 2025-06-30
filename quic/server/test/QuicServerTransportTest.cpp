@@ -7,6 +7,7 @@
 
 #include <quic/server/test/QuicServerTransportTestUtil.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/TransportKnobs.h>
 #include <quic/dsr/Types.h>
@@ -196,6 +197,28 @@ TEST_F(QuicServerTransportTest, IdleTimerResetOnRecvNewData) {
   ASSERT_TRUE(server->idleTimeout().isTimerCallbackScheduled());
   ASSERT_TRUE(server->keepaliveTimeout().isTimerCallbackScheduled());
   EXPECT_CALL(*quicStats_, onQuicStreamClosed());
+}
+
+TEST_F(QuicServerTransportTest, MaxBatchPacketsKnobOnlyUpdatesPacketLimit) {
+  // Capture initial maxBatchSize.
+  auto& conn = server->getNonConstConn();
+  uint32_t initialBatchSize = conn.transportSettings.maxBatchSize;
+
+  // Build knob param to set packet limit to 25.
+  TransportKnobParams params;
+  params.push_back(
+      {static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+       uint64_t{25}});
+
+  server->handleKnobParams(params);
+
+  // writeConnectionDataPacketsLimit should reflect the new value (bounded).
+  EXPECT_EQ(
+      conn.transportSettings.writeConnectionDataPacketsLimit,
+      std::min<uint64_t>(25, kMaxWriteConnectionDataPacketLimit));
+
+  // maxBatchSize should remain unchanged.
+  EXPECT_EQ(conn.transportSettings.maxBatchSize, initialBatchSize);
 }
 
 TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
@@ -5781,11 +5804,13 @@ TEST_F(QuicServerTransportTest, TestBurstSizeKnobHandlers) {
       {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
         uint64_t(25)}});
   EXPECT_EQ(transportSettings.writeConnectionDataPacketsLimit, 25);
-  EXPECT_EQ(transportSettings.maxBatchSize, 25);
+  // maxBatchSize should remain unchanged
+  EXPECT_EQ(transportSettings.maxBatchSize, kDefaultQuicMaxBatchSize);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
         uint64_t(kQuicMaxBatchSizeLimit) + 1}});
-  EXPECT_EQ(transportSettings.maxBatchSize, kQuicMaxBatchSizeLimit);
+  // maxBatchSize should still remain unchanged
+  EXPECT_EQ(transportSettings.maxBatchSize, kDefaultQuicMaxBatchSize);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
         uint64_t(kMaxWriteConnectionDataPacketLimit) + 1}});

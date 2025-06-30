@@ -144,8 +144,9 @@ class BufWriter {
   // should let BufWriter check the size and return error code if it fails to
   // write.
   void sizeCheck(size_t dataSize) {
-    DCHECK(written_ + dataSize <= most_)
-        << " written=" << written_ << " limit=" << most_;
+    CHECK(written_ + dataSize <= most_)
+        << "BufWriter overflow: written=" << written_
+        << " attempting=" << dataSize << " limit=" << most_;
   }
 
   void copy(const Buf* data, size_t limit);
