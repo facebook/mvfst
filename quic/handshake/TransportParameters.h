@@ -44,6 +44,8 @@ enum class TransportParameterId : uint64_t {
   stream_groups_enabled = 0x0000ff99,
   knob_frames_supported = 0x00005178,
   cwnd_hint_bytes = 0x00007492,
+  client_direct_encap = 0x000042fc,
+  server_direct_encap = 0x000042fd,
   reliable_stream_reset = 0x17f7586d2cb571
 };
 

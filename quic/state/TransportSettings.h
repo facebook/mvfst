@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/IPAddress.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/Optional.h>
 #include <quic/priority/PriorityQueue.h>
@@ -474,6 +475,14 @@ struct TransportSettings {
   // When set to true it creates a transport for the sole purpose of
   // retrieving 0-RTT data to a given destination
   bool isPriming{false};
+
+  // On the client-side, this indicates support for direct encapsulation.
+  bool supportDirectEncap{false};
+
+  // On the server-side, if this is not null, it indicates that the
+  // server supports direct encapsulation and the value is the address
+  // to use.
+  Optional<folly::IPAddress> directEncapAddress;
 };
 
 } // namespace quic

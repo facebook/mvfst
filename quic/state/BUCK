@@ -32,6 +32,7 @@ mvfst_cpp_library(
         "TransportSettings.h",
     ],
     exported_deps = [
+        "//folly:network_address",
         "//quic:constants",
         "//quic/common:optional",
         "//quic/priority:priority_queue",
