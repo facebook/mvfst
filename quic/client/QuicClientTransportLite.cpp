@@ -1213,14 +1213,6 @@ QuicClientTransportLite::startCryptoHandshake() {
       conn_->clientConnectionId.value(),
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
-  if (!conn_->transportSettings.flowPriming.empty() &&
-      conn_->peerAddress.isInitialized()) {
-    auto flowPrimingBuf =
-        BufHelpers::copyBuffer(conn_->transportSettings.flowPriming);
-    iovec vec[kNumIovecBufferChains];
-    size_t iovec_len = fillIovec(flowPrimingBuf, vec);
-    socket_->write(conn_->peerAddress, vec, iovec_len);
-  }
   auto connectResult =
       handshakeLayer->connect(hostname_, std::move(paramsExtension));
   if (connectResult.hasError()) {

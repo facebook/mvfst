@@ -324,7 +324,6 @@ struct TransportSettings {
   // before an idle timeout. To work effectively this means the idle timer
   // has to be set to something >> the RTT of the connection.
   bool enableKeepalive{false};
-  std::string flowPriming = "";
   // Whether or not to enable WritableBytes limit (server only)
   bool enableWritableBytesLimit{false};
   // Whether or not to remove data from the loss buffer on spurious loss.
