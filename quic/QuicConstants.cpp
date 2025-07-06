@@ -95,7 +95,8 @@ std::vector<QuicVersion> filterSupportedVersions(
             version == QuicVersion::MVFST_EXPERIMENTAL ||
             version == QuicVersion::MVFST_EXPERIMENTAL4 ||
             version == QuicVersion::MVFST_EXPERIMENTAL5 ||
-            version == QuicVersion::MVFST_ALIAS;
+            version == QuicVersion::MVFST_ALIAS ||
+            version == QuicVersion::MVFST_PRIMING;
       });
   return filteredVersions;
 }

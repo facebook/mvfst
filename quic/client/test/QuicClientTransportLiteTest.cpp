@@ -82,7 +82,10 @@ class QuicClientTransportLiteTest : public Test {
 TEST_F(QuicClientTransportLiteTest, TestPriming) {
   auto transportSettings = quicClient_->getTransportSettings();
   transportSettings.isPriming = true;
+  CHECK_EQ(*quicClient_->getConn()->originalVersion, QuicVersion::MVFST);
   quicClient_->setTransportSettings(std::move(transportSettings));
+  CHECK_EQ(
+      *quicClient_->getConn()->originalVersion, QuicVersion::MVFST_PRIMING);
   quicClient_->setConnectionSetupCallback(&mockConnectionSetupCallback_);
   quicClient_->getConn()->zeroRttWriteCipher = test::createNoOpAead();
 

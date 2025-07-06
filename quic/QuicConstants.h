@@ -401,6 +401,7 @@ enum class QuicVersion : uint32_t {
   // MVFST_EXPERIMENTAL4 uses a new salt
   MVFST_EXPERIMENTAL4 = 0xfaceb014,
   MVFST_EXPERIMENTAL5 = 0xfaceb015,
+  MVFST_PRIMING = 0xfacefeed, // Reserved for priming
 };
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;

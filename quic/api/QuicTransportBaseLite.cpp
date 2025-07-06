@@ -2970,6 +2970,10 @@ void QuicTransportBaseLite::setTransportSettings(
     auto result = conn_->streamManager->refreshTransportSettings(
         conn_->transportSettings);
     LOG_IF(FATAL, result.hasError()) << result.error().message;
+    if (conn_->nodeType == QuicNodeType::Client &&
+        conn_->transportSettings.isPriming) {
+      setSupportedVersions({QuicVersion::MVFST_PRIMING});
+    }
   }
 
   // A few values cannot be overridden to be lower than default:
