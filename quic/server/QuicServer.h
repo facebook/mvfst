@@ -404,6 +404,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       QuicVersion::QUIC_V1,
       QuicVersion::QUIC_V1_ALIAS,
       QuicVersion::QUIC_V1_ALIAS2,
+      QuicVersion::MVFST_PRIMING,
   }};
 
   std::atomic<bool> shutdown_{true};
