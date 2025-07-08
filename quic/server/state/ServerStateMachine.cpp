@@ -1030,6 +1030,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
             *newServerConnIdData->token,
             conn.serverConnectionId.value(),
             initialDestinationConnectionId,
+            conn,
             customTransportParams));
     conn.transportParametersEncoded = true;
     const CryptoFactory& cryptoFactory =

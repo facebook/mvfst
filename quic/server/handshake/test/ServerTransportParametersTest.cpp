@@ -12,6 +12,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/handshake/ServerTransportParametersExtension.h>
 
 #include <fizz/protocol/test/TestUtil.h>
@@ -36,6 +37,8 @@ static ClientHello getClientHello(QuicVersion version) {
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensions) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
       kDefaultConnectionFlowControlWindow,
@@ -51,7 +54,8 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
       generateStatelessResetToken(),
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId::createZeroLength());
+      ConnectionId::createZeroLength(),
+      conn);
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
 
   EXPECT_EQ(extensions.size(), 1);
@@ -60,6 +64,8 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
       kDefaultConnectionFlowControlWindow,
@@ -75,11 +81,14 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
       generateStatelessResetToken(),
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId::createZeroLength());
+      ConnectionId::createZeroLength(),
+      conn);
   EXPECT_THROW(ext.getExtensions(TestMessages::clientHello()), FizzException);
 }
 
 TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
       kDefaultConnectionFlowControlWindow,
@@ -95,13 +104,16 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
       generateStatelessResetToken(),
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-      ConnectionId::createZeroLength());
+      ConnectionId::createZeroLength(),
+      conn);
   EXPECT_THROW(
       ext.getExtensions(getClientHello(QuicVersion::MVFST)), FizzException);
   EXPECT_NO_THROW(ext.getExtensions(getClientHello(QuicVersion::QUIC_V1)));
 }
 
 TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
       kDefaultConnectionFlowControlWindow,
@@ -118,7 +130,8 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId::createAndMaybeCrash(
-          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}),
+      conn);
 
   auto chlo = getClientHello(QuicVersion::QUIC_V1);
   ClientTransportParameters duplicateClientParams;
@@ -133,6 +146,8 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
 }
 
 TEST(ServerTransportParametersTest, TestQuicV1Fields) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
   ServerTransportParametersExtension ext(
       QuicVersion::QUIC_V1,
       kDefaultConnectionFlowControlWindow,
@@ -149,7 +164,8 @@ TEST(ServerTransportParametersTest, TestQuicV1Fields) {
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId::createAndMaybeCrash(
-          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}),
+      conn);
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::QUIC_V1));
 
   EXPECT_EQ(extensions.size(), 1);
@@ -175,6 +191,8 @@ TEST(ServerTransportParametersTest, TestQuicV1Fields) {
 }
 
 TEST(ServerTransportParametersTest, TestMvfstFields) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
       kDefaultConnectionFlowControlWindow,
@@ -191,7 +209,8 @@ TEST(ServerTransportParametersTest, TestMvfstFields) {
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId::createAndMaybeCrash(
-          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}));
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}),
+      conn);
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
 
   EXPECT_EQ(extensions.size(), 1);

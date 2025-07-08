@@ -148,6 +148,10 @@ folly::Expected<TransportParameter, QuicError> encodeIntegerParameter(
     TransportParameterId id,
     uint64_t value);
 
+TransportParameter encodeIPAddressParameter(
+    TransportParameterId id,
+    const folly::IPAddress& addr);
+
 inline TransportParameter encodeEmptyParameter(TransportParameterId id) {
   TransportParameter param;
   param.parameter = id;

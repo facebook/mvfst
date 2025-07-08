@@ -111,7 +111,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             generateStatelessResetToken(),
             ConnectionId::createAndMaybeCrash(
                 std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-            ConnectionId::createZeroLength());
+            ConnectionId::createZeroLength(),
+            *conn);
     fizzServer.reset(
         new fizz::server::
             FizzServer<ClientHandshakeTest, fizz::server::ServerStateMachine>(

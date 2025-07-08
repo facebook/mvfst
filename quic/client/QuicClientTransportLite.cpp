@@ -1195,6 +1195,10 @@ QuicClientTransportLite::startCryptoHandshake() {
   conn_->initialHeaderCipher = std::move(clientHeaderCipherResult.value());
 
   customTransportParameters_ = getSupportedExtTransportParams(*conn_);
+  if (conn_->transportSettings.supportDirectEncap) {
+    customTransportParameters_.push_back(
+        encodeEmptyParameter(TransportParameterId::client_direct_encap));
+  }
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),

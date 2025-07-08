@@ -10,6 +10,33 @@
 #include <fizz/server/ServerExtensions.h>
 #include <quic/fizz/handshake/FizzTransportParameters.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/StateData.h>
+
+namespace {
+
+std::vector<quic::TransportParameter> getClientDependentExtTransportParams(
+    const quic::QuicConnectionStateBase& conn,
+    const std::vector<quic::TransportParameter>& clientParams) {
+  using TpId = quic::TransportParameterId;
+  std::vector<quic::TransportParameter> params;
+
+  // Server-side direct encap logic
+  if (conn.transportSettings.directEncapAddress.has_value()) {
+    // Check if client sent client_direct_encap parameter
+    auto clientDirectEncapIt =
+        findParameter(clientParams, TpId::client_direct_encap);
+    if (clientDirectEncapIt != clientParams.end()) {
+      // Client supports direct encap and server has address configured
+      params.push_back(encodeIPAddressParameter(
+          TpId::server_direct_encap,
+          conn.transportSettings.directEncapAddress.value()));
+    }
+  }
+
+  return params;
+}
+
+} // namespace
 
 namespace quic {
 
@@ -30,6 +57,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       const StatelessResetToken& token,
       ConnectionId initialSourceCid,
       ConnectionId originalDestinationCid,
+      const QuicConnectionStateBase& conn,
       std::vector<TransportParameter> customTransportParameters =
           std::vector<TransportParameter>())
       : encodingVersion_(encodingVersion),
@@ -46,7 +74,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         token_(token),
         initialSourceCid_(initialSourceCid),
         originalDestinationCid_(originalDestinationCid),
-        customTransportParameters_(std::move(customTransportParameters)) {}
+        customTransportParameters_(std::move(customTransportParameters)),
+        conn_(conn) {}
 
   ~ServerTransportParametersExtension() override = default;
 
@@ -181,6 +210,15 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       params.parameters.push_back(customParameter);
     }
 
+    // Add direct encap parameters if connection state is available
+    if (clientTransportParameters_.has_value()) {
+      auto additionalParams = getClientDependentExtTransportParams(
+          conn_, clientTransportParameters_->parameters);
+      for (const auto& param : additionalParams) {
+        params.parameters.push_back(param);
+      }
+    }
+
     exts.push_back(encodeExtension(params, encodingVersion_));
     return exts;
   }
@@ -206,5 +244,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   ConnectionId initialSourceCid_;
   ConnectionId originalDestinationCid_;
   std::vector<TransportParameter> customTransportParameters_;
+  const QuicConnectionStateBase& conn_;
 };
 } // namespace quic

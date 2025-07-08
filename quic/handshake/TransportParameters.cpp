@@ -89,6 +89,12 @@ folly::Expected<TransportParameter, QuicError> encodeIntegerParameter(
   return TransportParameter{id, std::move(data)};
 }
 
+TransportParameter encodeIPAddressParameter(
+    TransportParameterId id,
+    const folly::IPAddress& addr) {
+  return {id, BufHelpers::copyBuffer(addr.bytes(), addr.byteCount())};
+}
+
 std::vector<TransportParameter> getSupportedExtTransportParams(
     const QuicConnectionStateBase& conn) {
   using TpId = TransportParameterId;

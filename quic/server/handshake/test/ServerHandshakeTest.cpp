@@ -122,7 +122,8 @@ class ServerHandshakeTest : public Test {
         generateStatelessResetToken(),
         ConnectionId::createAndMaybeCrash(
             std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
-        ConnectionId::createZeroLength());
+        ConnectionId::createZeroLength(),
+        *conn);
     initialize();
     handshake->accept(params);
 

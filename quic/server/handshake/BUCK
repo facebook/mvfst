@@ -39,6 +39,7 @@ mvfst_cpp_library(
         ":stateless_reset_generator",
         "//fizz/server:server_extensions",
         "//quic/fizz/handshake:fizz_handshake",
+        "//quic/state:quic_state_machine",
     ],
 )
 
@@ -51,7 +52,9 @@ mvfst_cpp_library(
         "AppToken.h",
     ],
     exported_deps = [
+        "//folly:expected",
         "//quic:constants",
+        "//quic:exception",
         "//quic/handshake:transport_parameters",
     ],
 )

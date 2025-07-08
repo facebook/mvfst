@@ -1,4 +1,4 @@
-load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
 
 oncall("traffic_protocols")
 
@@ -16,5 +16,23 @@ mvfst_cpp_library(
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/handshake:aead",
         "//quic/handshake:handshake",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "TransportParametersTest",
+    srcs = [
+        "TransportParametersTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "//folly:network_address",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/client:state_and_handshake",
+        "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/handshake:transport_parameters",
+        "//quic/server/state:server",
     ],
 )
