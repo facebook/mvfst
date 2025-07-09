@@ -271,7 +271,8 @@ folly::Expected<folly::Unit, QuicError> processServerInitialParams(
   }
   if (conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS ||
-      conn.version == QuicVersion::QUIC_V1_ALIAS2) {
+      conn.version == QuicVersion::QUIC_V1_ALIAS2 ||
+      conn.version == QuicVersion::MVFST_PRIMING) {
     auto initialSourceConnIdResult = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
         serverParams.parameters);

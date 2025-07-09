@@ -129,7 +129,8 @@ struct ClientTransportParametersExtension {
 
     if (encodingVersion_ == QuicVersion::QUIC_V1 ||
         encodingVersion_ == QuicVersion::QUIC_V1_ALIAS ||
-        encodingVersion_ == QuicVersion::QUIC_V1_ALIAS2) {
+        encodingVersion_ == QuicVersion::QUIC_V1_ALIAS2 ||
+        encodingVersion_ == QuicVersion::MVFST_PRIMING) {
       res.push_back(encodeConnIdParameter(
           TpId::initial_source_connection_id, initialSourceCid_));
     }

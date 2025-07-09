@@ -35,6 +35,8 @@ folly::StringPiece getQuicVersionSalt(QuicVersion version) {
     case QuicVersion::QUIC_V1_ALIAS:
       [[fallthrough]];
     case QuicVersion::QUIC_V1_ALIAS2:
+      [[fallthrough]];
+    case QuicVersion::MVFST_PRIMING:
       return kQuicV1Salt;
     case QuicVersion::MVFST:
       [[fallthrough]];

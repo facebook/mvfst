@@ -36,7 +36,8 @@ inline fizz::ExtensionType getQuicTransportParametersExtention(
     quic::QuicVersion version) {
   if (version == quic::QuicVersion::QUIC_V1 ||
       version == quic::QuicVersion::QUIC_V1_ALIAS ||
-      version == quic::QuicVersion::QUIC_V1_ALIAS2) {
+      version == quic::QuicVersion::QUIC_V1_ALIAS2 ||
+      version == quic::QuicVersion::MVFST_PRIMING) {
     return fizz::ExtensionType::quic_transport_parameters;
   } else {
     return fizz::ExtensionType::quic_transport_parameters_draft;
@@ -184,7 +185,8 @@ inline void validateTransportExtensions(
       } else if (
           (encodingVersion == quic::QuicVersion::QUIC_V1 ||
            encodingVersion == quic::QuicVersion::QUIC_V1_ALIAS ||
-           encodingVersion == quic::QuicVersion::QUIC_V1_ALIAS2) &&
+           encodingVersion == quic::QuicVersion::QUIC_V1_ALIAS2 ||
+           encodingVersion == quic::QuicVersion::MVFST_PRIMING) &&
           extension.extension_type !=
               fizz::ExtensionType::quic_transport_parameters) {
         // This is QUIC v1 using an incorrect transport parameters extension
