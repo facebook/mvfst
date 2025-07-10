@@ -709,9 +709,15 @@ TEST_F(BbrTest, BytesCounting) {
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = packetNum;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
-  auto ackPacketVisitor = [](auto&) { return folly::unit; };
-  auto ackFrameVisitor = [](auto&, auto&) { return folly::unit; };
-  auto lossVisitor = [](auto&, auto&, bool) { return folly::unit; };
+  auto ackPacketVisitor = [](auto&) -> quic::Expected<void, quic::QuicError> {
+    return {};
+  };
+  auto ackFrameVisitor =
+      [](auto&, auto&) -> quic::Expected<void, quic::QuicError> { return {}; };
+  auto lossVisitor =
+      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+    return {};
+  };
   ASSERT_FALSE(processAckFrame(
                    conn,
                    PacketNumberSpace::AppData,

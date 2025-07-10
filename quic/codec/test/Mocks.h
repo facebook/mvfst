@@ -18,12 +18,12 @@ class MockConnectionIdAlgo : public ConnectionIdAlgo {
  public:
   MOCK_METHOD((bool), canParseNonConst, (const ConnectionId& id), (noexcept));
   MOCK_METHOD(
-      (folly::Expected<ServerConnectionIdParams, QuicError>),
+      (quic::Expected<ServerConnectionIdParams, QuicError>),
       parseConnectionId,
       (const ConnectionId&),
       (noexcept));
   MOCK_METHOD(
-      (folly::Expected<ConnectionId, QuicError>),
+      (quic::Expected<ConnectionId, QuicError>),
       encodeConnectionId,
       (const ServerConnectionIdParams&),
       (noexcept));
@@ -96,10 +96,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD(uint32_t, getHeaderBytes, (), (const));
   MOCK_METHOD(bool, hasFramesPending, (), (const));
   MOCK_METHOD(void, releaseOutputBufferMock, ());
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
-      encodePacketHeader,
-      ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), encodePacketHeader, ());
 
   void releaseOutputBuffer() && override {
     releaseOutputBufferMock();

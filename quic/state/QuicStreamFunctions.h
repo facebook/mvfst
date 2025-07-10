@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/Expected.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -17,7 +18,7 @@ namespace quic {
  *
  * @throws QuicTransportException on error.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+[[nodiscard]] quic::Expected<void, QuicError>
 writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof);
 
 /**
@@ -26,7 +27,7 @@ writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof);
  *
  * TODO: move to dsr directory.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> writeBufMetaToQuicStream(
+[[nodiscard]] quic::Expected<void, QuicError> writeBufMetaToQuicStream(
     QuicStreamState& stream,
     const BufferMeta& data,
     bool eof);
@@ -43,7 +44,7 @@ void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data);
  *
  * @throws QuicTransportException on error.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
+[[nodiscard]] quic::Expected<void, QuicError> appendDataToReadBuffer(
     QuicStreamState& stream,
     StreamBuffer buffer);
 
@@ -53,7 +54,7 @@ void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data);
  *
  * @throws QuicTransportException on error.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> appendDataToReadBuffer(
+[[nodiscard]] quic::Expected<void, QuicError> appendDataToReadBuffer(
     QuicCryptoStream& stream,
     StreamBuffer buffer);
 
@@ -62,7 +63,7 @@ void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data);
  * Returns a pair of data and whether or not EOF was reached on the stream.
  * amount == 0 reads all the pending data in the stream.
  */
-folly::Expected<std::pair<BufPtr, bool>, QuicError> readDataFromQuicStream(
+quic::Expected<std::pair<BufPtr, bool>, QuicError> readDataFromQuicStream(
     QuicStreamState& state,
     uint64_t amount = 0);
 
@@ -88,7 +89,7 @@ void peekDataFromQuicStream(
  * Same as readDataFromQuicStream,
  * releases data instead of returning it.
  */
-folly::Expected<folly::Unit, QuicError> consumeDataFromQuicStream(
+quic::Expected<void, QuicError> consumeDataFromQuicStream(
     QuicStreamState& stream,
     uint64_t amount);
 
@@ -140,8 +141,7 @@ uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream);
  * object. Callers should provide a connFlowControlVisitor which will be invoked
  * when flow control operations need to be performed.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-appendDataToReadBufferCommon(
+[[nodiscard]] quic::Expected<void, QuicError> appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,

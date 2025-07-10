@@ -141,8 +141,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
     std::unique_ptr<QuicClientConnectionState> conn);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-processServerInitialParams(
+[[nodiscard]] quic::Expected<void, QuicError> processServerInitialParams(
     QuicClientConnectionState& conn,
     const ServerTransportParameters& serverParams,
     PacketNum packetNum);
@@ -165,7 +164,7 @@ void cacheServerInitialParams(
 CachedServerTransportParameters getServerCachedTransportParameters(
     const QuicClientConnectionState& conn);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
+[[nodiscard]] quic::Expected<void, QuicError>
 updateTransportParamsFromCachedEarlyParams(
     QuicClientConnectionState& conn,
     const CachedServerTransportParameters& transportParams);

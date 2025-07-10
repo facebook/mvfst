@@ -196,16 +196,15 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 // Transition to error state on invalid state transition.
 void ServerInvalidStateHandler(QuicServerConnectionState& state);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> onServerReadData(
+[[nodiscard]] quic::Expected<void, QuicError> onServerReadData(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
+[[nodiscard]] quic::Expected<void, QuicError> onServerReadDataFromOpen(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-onServerReadDataFromClosed(
+[[nodiscard]] quic::Expected<void, QuicError> onServerReadDataFromClosed(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData);
 
@@ -213,12 +212,11 @@ void onServerClose(QuicServerConnectionState& conn);
 
 void onServerCloseOpenState(QuicServerConnectionState& conn);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-processClientInitialParams(
+[[nodiscard]] quic::Expected<void, QuicError> processClientInitialParams(
     QuicServerConnectionState& conn,
     const ClientTransportParameters& clientParams);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> updateHandshakeState(
+[[nodiscard]] quic::Expected<void, QuicError> updateHandshakeState(
     QuicServerConnectionState& conn);
 
 bool validateAndUpdateSourceToken(
@@ -231,7 +229,7 @@ void maybeUpdateTransportFromAppToken(
     QuicServerConnectionState& conn,
     const Optional<BufPtr>& appToken);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> onConnectionMigration(
+[[nodiscard]] quic::Expected<void, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,
     const folly::SocketAddress& newPeerAddress,
     bool isIntentional = false);

@@ -12,6 +12,27 @@
 
 #include <utility>
 
+// Protect against Windows macros that interfere with standard library and QUIC
+// code
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+// If the macros are already defined, undefine them temporarily
+#ifdef max
+#define QUIC_EXPECTED_HAD_MAX_MACRO
+#undef max
+#endif
+#ifdef min
+#define QUIC_EXPECTED_HAD_MIN_MACRO
+#undef min
+#endif
+#ifdef NO_ERROR
+#define QUIC_EXPECTED_HAD_NO_ERROR_MACRO
+#undef NO_ERROR
+#endif
+#endif // _WIN32
+
 // Forward-declare nonstd::expected_lite first, then create the compatibility
 // alias *before* including the vendor header, so its hash specializations can
 // resolve.
@@ -63,3 +84,19 @@ constexpr auto make_unexpected(E&& err) {
   return ::nonstd::expected_lite::make_unexpected(std::forward<E>(err));
 }
 } // namespace quic
+
+// Restore Windows macros if they were previously defined
+#ifdef _WIN32
+#ifdef QUIC_EXPECTED_HAD_MAX_MACRO
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+#undef QUIC_EXPECTED_HAD_MAX_MACRO
+#endif
+#ifdef QUIC_EXPECTED_HAD_MIN_MACRO
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#undef QUIC_EXPECTED_HAD_MIN_MACRO
+#endif
+#ifdef QUIC_EXPECTED_HAD_NO_ERROR_MACRO
+#define NO_ERROR 0L
+#undef QUIC_EXPECTED_HAD_NO_ERROR_MACRO
+#endif
+#endif // _WIN32

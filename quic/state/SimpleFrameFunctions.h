@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -44,8 +45,7 @@ void updateSimpleFrameOnPacketLoss(
  * Update the connection state on receipt of the given simple frame.
  * Returns true if the frame is NOT a probing frame
  */
-[[nodiscard]] folly::Expected<bool, QuicError>
-updateSimpleFrameOnPacketReceived(
+[[nodiscard]] quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frameIn,
     const ConnectionId& dstConnId,

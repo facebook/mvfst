@@ -168,7 +168,6 @@ mvfst_cpp_library(
     exported_deps = [
         ":ack_scheduler",
         ":quic_batch_writer",
-        "//folly:expected",
         "//folly/lang:assume",
         "//quic:constants",
         "//quic:exception",
@@ -177,6 +176,7 @@ mvfst_cpp_library(
         "//quic/codec:pktbuilder",
         "//quic/codec:pktrebuilder",
         "//quic/codec:types",
+        "//quic/common:expected",
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/flowcontrol:flow_control",
         "//quic/handshake:transport_parameters",

@@ -32,9 +32,9 @@ class FizzAead final : public Aead {
 
   /**
    * Forward calls to fizz::Aead, catching any exceptions and converting them to
-   * folly::Expected.
+   * quic::Expected.
    */
-  folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError> inplaceEncrypt(
+  quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {
@@ -42,7 +42,7 @@ class FizzAead final : public Aead {
       return fizzAead->inplaceEncrypt(
           std::move(plaintext), associatedData, seqNum);
     } catch (const std::exception& ex) {
-      return folly::makeUnexpected(
+      return quic::make_unexpected(
           QuicError(TransportErrorCode::INTERNAL_ERROR, ex.what()));
     }
   }

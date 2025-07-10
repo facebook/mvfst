@@ -14,7 +14,7 @@
 
 namespace quic {
 
-folly::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
+quic::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
@@ -31,15 +31,15 @@ folly::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
   return trafficSecret;
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 FizzCryptoFactory::makeInitialAead(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   auto trafficSecretResult =
       makeInitialTrafficSecret(label, clientDestinationConnId, version);
-  if (trafficSecretResult.hasError()) {
-    return folly::makeUnexpected(trafficSecretResult.error());
+  if (!trafficSecretResult.has_value()) {
+    return quic::make_unexpected(trafficSecretResult.error());
   }
   auto& trafficSecret = trafficSecretResult.value();
 
@@ -64,12 +64,12 @@ FizzCryptoFactory::makeInitialAead(
   return FizzAead::wrap(std::move(aead));
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 FizzCryptoFactory::makePacketNumberCipher(ByteRange baseSecret) const {
   auto pnCipherResult =
       makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  if (pnCipherResult.hasError()) {
-    return folly::makeUnexpected(pnCipherResult.error());
+  if (!pnCipherResult.has_value()) {
+    return quic::make_unexpected(pnCipherResult.error());
   }
   auto pnCipher = std::move(pnCipherResult.value());
 
@@ -78,13 +78,13 @@ FizzCryptoFactory::makePacketNumberCipher(ByteRange baseSecret) const {
   auto pnKey = deriver->expandLabel(
       baseSecret, kQuicPNLabel, BufHelpers::create(0), pnCipher->keyLength());
   auto setKeyResult = pnCipher->setKey(pnKey->coalesce());
-  if (setKeyResult.hasError()) {
-    return folly::makeUnexpected(setKeyResult.error());
+  if (!setKeyResult.has_value()) {
+    return quic::make_unexpected(setKeyResult.error());
   }
   return pnCipher;
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 FizzCryptoFactory::makePacketNumberCipher(fizz::CipherSuite cipher) const {
   switch (cipher) {
     case fizz::CipherSuite::TLS_AES_128_GCM_SHA256:
@@ -92,7 +92,7 @@ FizzCryptoFactory::makePacketNumberCipher(fizz::CipherSuite cipher) const {
     case fizz::CipherSuite::TLS_AES_256_GCM_SHA384:
       return std::make_unique<Aes256PacketNumberCipher>();
     default:
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::INTERNAL_ERROR,
           "Packet number cipher not implemented"));
   }

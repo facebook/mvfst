@@ -12,7 +12,7 @@
 
 namespace quic {
 
-folly::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
+quic::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
@@ -22,7 +22,7 @@ folly::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
   auto parameterCursor = Cursor(it->value.get());
   auto parameter = decodeQuicInteger(parameterCursor);
   if (!parameter) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         fmt::format(
             "Failed to decode integer from TransportParameterId: {}",
@@ -31,7 +31,7 @@ folly::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
   return Optional<uint64_t>(parameter->first);
 }
 
-folly::Expected<Optional<ConnectionId>, QuicError> getConnIdParameter(
+quic::Expected<Optional<ConnectionId>, QuicError> getConnIdParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
   auto it = findParameter(parameters, id);
@@ -44,15 +44,15 @@ folly::Expected<Optional<ConnectionId>, QuicError> getConnIdParameter(
 
   // Use the factory function instead of constructor
   auto connIdResult = ConnectionId::create(cursor, value->length());
-  if (connIdResult.hasError()) {
-    return folly::makeUnexpected(QuicError(
+  if (!connIdResult.has_value()) {
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Invalid connection ID parameter"));
   }
   return Optional<ConnectionId>(connIdResult.value());
 }
 
-folly::Expected<Optional<StatelessResetToken>, QuicError>
+quic::Expected<Optional<StatelessResetToken>, QuicError>
 getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters) {
   auto it =
@@ -64,7 +64,7 @@ getStatelessResetTokenParameter(
   auto value = it->value->clone();
   auto range = value->coalesce();
   if (range.size() != sizeof(StatelessResetToken)) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR, "Invalid reset token"));
   }
   StatelessResetToken token;
@@ -72,7 +72,7 @@ getStatelessResetTokenParameter(
   return Optional<StatelessResetToken>(token);
 }
 
-folly::Expected<TransportParameter, QuicError> encodeIntegerParameter(
+quic::Expected<TransportParameter, QuicError> encodeIntegerParameter(
     TransportParameterId id,
     uint64_t value) {
   BufPtr data = BufHelpers::create(8);
@@ -82,7 +82,7 @@ folly::Expected<TransportParameter, QuicError> encodeIntegerParameter(
         appender.writeBE(val);
       });
   if (!encoded) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Invalid integer parameter"));
   }
@@ -107,7 +107,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     auto result = encodeIntegerParameter(
         TransportParameterId::max_datagram_frame_size,
         conn.datagramState.maxReadFrameSize);
-    if (!result.hasError()) {
+    if (result.has_value()) {
       customTps.push_back(result.value());
     }
   }
@@ -115,7 +115,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   if (ts.advertisedMaxStreamGroups > 0) {
     auto result = encodeIntegerParameter(
         TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups);
-    if (!result.hasError()) {
+    if (result.has_value()) {
       customTps.push_back(result.value());
     }
   }
@@ -123,7 +123,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   auto ackTimestampsResult = encodeIntegerParameter(
       TpId::ack_receive_timestamps_enabled,
       ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);
-  if (!ackTimestampsResult.hasError()) {
+  if (ackTimestampsResult.has_value()) {
     customTps.push_back(ackTimestampsResult.value());
   }
 
@@ -132,7 +132,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
         TpId::max_receive_timestamps_per_ack,
         ts.maybeAckReceiveTimestampsConfigSentToPeer
             ->maxReceiveTimestampsPerAck);
-    if (!maxTimestampsResult.hasError()) {
+    if (maxTimestampsResult.has_value()) {
       customTps.push_back(maxTimestampsResult.value());
     }
 
@@ -140,7 +140,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
         TpId::receive_timestamps_exponent,
         ts.maybeAckReceiveTimestampsConfigSentToPeer
             ->receiveTimestampsExponent);
-    if (!exponentResult.hasError()) {
+    if (exponentResult.has_value()) {
       customTps.push_back(exponentResult.value());
     }
   }
@@ -148,7 +148,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   if (ts.minAckDelay) {
     auto minAckDelayResult = encodeIntegerParameter(
         TpId::min_ack_delay, ts.minAckDelay.value().count());
-    if (!minAckDelayResult.hasError()) {
+    if (minAckDelayResult.has_value()) {
       customTps.push_back(minAckDelayResult.value());
     }
   }
@@ -156,7 +156,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   if (ts.advertisedKnobFrameSupport) {
     auto knobFrameResult =
         encodeIntegerParameter(TpId::knob_frames_supported, 1);
-    if (!knobFrameResult.hasError()) {
+    if (knobFrameResult.has_value()) {
       customTps.push_back(knobFrameResult.value());
     }
   }
@@ -168,7 +168,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   if (ts.advertisedExtendedAckFeatures) {
     auto extendedAckResult = encodeIntegerParameter(
         TpId::extended_ack_features, ts.advertisedExtendedAckFeatures);
-    if (!extendedAckResult.hasError()) {
+    if (extendedAckResult.has_value()) {
       customTps.push_back(extendedAckResult.value());
     }
   }

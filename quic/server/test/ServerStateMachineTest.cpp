@@ -141,7 +141,7 @@ TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
   auto firstCid = getTestConnectionId(0);
   EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
       .WillOnce(Return(firstCid))
-      .WillOnce(Return(folly::makeUnexpected(
+      .WillOnce(Return(quic::make_unexpected(
           QuicError(quic::TransportErrorCode::INTERNAL_ERROR, "Tumbledown"))));
   EXPECT_CALL(mockRejector, rejectConnectionIdNonConst(_))
       .WillOnce(Invoke([&](const ConnectionId& inputCid) {

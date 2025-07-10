@@ -31,7 +31,7 @@ class BaseXskContainer {
 
   virtual ~BaseXskContainer() = default;
 
-  virtual folly::Expected<folly::Unit, std::runtime_error> init(
+  virtual quic::Expected<void, std::runtime_error> init(
       const XskContainerConfig& xskContainerConfig) = 0;
 
   virtual XskSender* pickXsk(
@@ -39,7 +39,7 @@ class BaseXskContainer {
       const folly::SocketAddress& dst) = 0;
 
  protected:
-  folly::Expected<std::unique_ptr<XskSender>, std::runtime_error>
+  quic::Expected<std::unique_ptr<XskSender>, std::runtime_error>
   createXskSender(int queueId, const XskSenderConfig& xskSenderConfig);
 
   void initializeQueueParams(const std::string& interfaceName);

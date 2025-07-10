@@ -17,12 +17,11 @@ class Aes128PacketNumberCipher : public PacketNumberCipher {
  public:
   ~Aes128PacketNumberCipher() override = default;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> setKey(
-      ByteRange key) override;
+  [[nodiscard]] quic::Expected<void, QuicError> setKey(ByteRange key) override;
 
   [[nodiscard]] const BufPtr& getKey() const override;
 
-  [[nodiscard]] folly::Expected<HeaderProtectionMask, QuicError> mask(
+  [[nodiscard]] quic::Expected<HeaderProtectionMask, QuicError> mask(
       ByteRange sample) const override;
 
   [[nodiscard]] size_t keyLength() const override;
@@ -37,12 +36,11 @@ class Aes256PacketNumberCipher : public PacketNumberCipher {
  public:
   ~Aes256PacketNumberCipher() override = default;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> setKey(
-      ByteRange key) override;
+  [[nodiscard]] quic::Expected<void, QuicError> setKey(ByteRange key) override;
 
   [[nodiscard]] const BufPtr& getKey() const override;
 
-  [[nodiscard]] folly::Expected<HeaderProtectionMask, QuicError> mask(
+  [[nodiscard]] quic::Expected<HeaderProtectionMask, QuicError> mask(
       ByteRange sample) const override;
 
   [[nodiscard]] size_t keyLength() const override;

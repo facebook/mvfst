@@ -22,6 +22,6 @@ struct ParsedHeaderResult {
       Optional<PacketHeader> parsedHeaderIn);
 };
 
-folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
+quic::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
     const folly::IOBuf& data);
 } // namespace quic

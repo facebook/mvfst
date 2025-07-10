@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <folly/Unit.h>
 #include <folly/io/Cursor.h>
 #include <quic/QuicException.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
 namespace quic {
@@ -23,10 +23,10 @@ class PacketNumberCipher {
  public:
   virtual ~PacketNumberCipher() = default;
 
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setKey(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setKey(
       ByteRange key) = 0;
 
-  [[nodiscard]] virtual folly::Expected<HeaderProtectionMask, QuicError> mask(
+  [[nodiscard]] virtual quic::Expected<HeaderProtectionMask, QuicError> mask(
       ByteRange sample) const = 0;
 
   /**
@@ -35,8 +35,7 @@ class PacketNumberCipher {
    * initialByte is the initial byte.
    * packetNumberBytes should be supplied with at least 4 bytes.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  decryptLongHeader(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> decryptLongHeader(
       ByteRange sample,
       MutableByteRange initialByte,
       MutableByteRange packetNumberBytes) const;
@@ -47,8 +46,7 @@ class PacketNumberCipher {
    * initialByte is the initial byte.
    * packetNumberBytes should be supplied with at least 4 bytes.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  decryptShortHeader(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> decryptShortHeader(
       ByteRange sample,
       MutableByteRange initialByte,
       MutableByteRange packetNumberBytes) const;
@@ -58,8 +56,7 @@ class PacketNumberCipher {
    * sample should be 16 bytes long.
    * initialByte is the initial byte.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  encryptLongHeader(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> encryptLongHeader(
       ByteRange sample,
       MutableByteRange initialByte,
       MutableByteRange packetNumberBytes) const;
@@ -69,8 +66,7 @@ class PacketNumberCipher {
    * sample should be 16 bytes long.
    * initialByte is the initial byte.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  encryptShortHeader(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> encryptShortHeader(
       ByteRange sample,
       MutableByteRange initialByte,
       MutableByteRange packetNumberBytes) const;
@@ -86,14 +82,14 @@ class PacketNumberCipher {
   [[nodiscard]] virtual const BufPtr& getKey() const = 0;
 
  protected:
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> cipherHeader(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> cipherHeader(
       ByteRange sample,
       MutableByteRange initialByte,
       MutableByteRange packetNumberBytes,
       uint8_t initialByteMask,
       uint8_t packetNumLengthMask) const;
 
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> decipherHeader(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> decipherHeader(
       ByteRange sample,
       MutableByteRange initialByte,
       MutableByteRange packetNumberBytes,

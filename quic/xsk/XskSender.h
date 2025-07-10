@@ -9,7 +9,6 @@
 
 #if defined(__linux__) && !defined(ANDROID)
 
-#include <folly/Expected.h>
 #include <folly/IPAddress.h>
 #include <folly/MacAddress.h>
 #include <folly/SocketAddress.h>
@@ -18,6 +17,7 @@
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+#include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 #include <quic/xsk/xsk_lib.h>
 #include <queue>
@@ -135,9 +135,9 @@ class XskSender {
       std::unique_ptr<folly::IOBuf>& data,
       uint16_t len);
 
-  folly::Expected<folly::Unit, std::runtime_error> init();
+  quic::Expected<void, std::runtime_error> init();
 
-  folly::Expected<folly::Unit, std::runtime_error> bind(int queueId);
+  quic::Expected<void, std::runtime_error> bind(int queueId);
 
   FlushResult flush();
 
@@ -159,7 +159,7 @@ class XskSender {
       const void* data,
       uint16_t len);
 
-  folly::Expected<folly::Unit, std::runtime_error> initXdpSocket();
+  quic::Expected<void, std::runtime_error> initXdpSocket();
 
   xdp_desc* getTxDescriptor();
 

@@ -14,6 +14,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/CircularDeque.h>
+#include <quic/common/Expected.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
 #include <quic/congestion_control/ThrottlingSignalProvider.h>
@@ -768,7 +769,7 @@ struct AckStateVersion {
   bool operator!=(const AckStateVersion& other) const;
 };
 
-using LossVisitor = std::function<folly::Expected<folly::Unit, QuicError>(
+using LossVisitor = std::function<quic::Expected<void, QuicError>(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,
     bool processed)>;

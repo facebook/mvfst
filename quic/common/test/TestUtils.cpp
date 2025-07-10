@@ -274,7 +274,7 @@ std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead) {
   return createNoOpAeadImpl<MockAead>(cipherOverhead);
 }
 
-folly::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
 createNoOpHeaderCipher() {
   auto headerCipher = std::make_unique<NiceMock<MockPacketNumberCipher>>();
   ON_CALL(*headerCipher, mask(_)).WillByDefault(Return(HeaderProtectionMask{}));
@@ -365,7 +365,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
   CHECK(!builder->encodePacketHeader().hasError());
   builder->accountForCipherOverhead(aead.getCipherOverhead());
   auto res = writeCryptoFrame(offset, data, *builder);
-  CHECK(res.hasValue()) << "failed to write crypto frame";
+  CHECK(res.has_value()) << "failed to write crypto frame";
   return std::move(*builder).buildPacket();
 }
 
@@ -408,7 +408,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
   CHECK(!builder.encodePacketHeader().hasError());
   builder.accountForCipherOverhead(aead.getCipherOverhead());
   auto res = writeCryptoFrame(offset, data, builder);
-  CHECK(res.hasValue()) << "failed to write crypto frame";
+  CHECK(res.has_value()) << "failed to write crypto frame";
   return std::move(builder).buildPacket();
 }
 
@@ -456,13 +456,23 @@ BufPtr packetToBufCleartext(
   }
   auto encryptedBody = std::move(encryptResult.value());
   encryptedBody->coalesce();
-  encryptPacketHeader(
+  auto headerEncryptResult = encryptPacketHeader(
       headerForm,
       packet.header.writableData(),
       packet.header.length(),
       encryptedBody->data(),
       encryptedBody->length(),
       headerCipher);
+  if (headerEncryptResult.hasError()) {
+    auto& quicError = headerEncryptResult.error();
+    auto transportErrorCode = quicError.code.asTransportErrorCode();
+    if (transportErrorCode) {
+      throw QuicTransportException(
+          "Failed to encrypt packet header", *transportErrorCode);
+    }
+    throw QuicTransportException(
+        "Failed to encrypt packet header", TransportErrorCode::INTERNAL_ERROR);
+  }
   packetBuf->appendToChain(std::move(encryptedBody));
   return packetBuf;
 }
@@ -787,12 +797,12 @@ bool writableContains(QuicStreamManager& streamManager, StreamId streamId) {
       streamManager.controlWriteQueue().count(streamId) > 0;
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 FizzCryptoTestFactory::makePacketNumberCipher(fizz::CipherSuite) const {
   return std::move(packetNumberCipher_);
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 FizzCryptoTestFactory::makePacketNumberCipher(ByteRange secret) const {
   return _makePacketNumberCipher(secret);
 }
@@ -805,7 +815,7 @@ void FizzCryptoTestFactory::setMockPacketNumberCipher(
 void FizzCryptoTestFactory::setDefault() {
   ON_CALL(*this, _makePacketNumberCipher(_))
       .WillByDefault(Invoke(
-          [&](ByteRange secret) -> folly::Expected<
+          [&](ByteRange secret) -> quic::Expected<
                                     std::unique_ptr<PacketNumberCipher>,
                                     QuicError> {
             return FizzCryptoFactory::makePacketNumberCipher(secret);

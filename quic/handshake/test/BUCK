@@ -8,11 +8,11 @@ mvfst_cpp_library(
         "Mocks.h",
     ],
     exported_deps = [
-        "//folly:expected",
         "//folly:unit",
         "//folly/portability:gmock",
         "//quic:exception",
         "//quic/codec:packet_number_cipher",
+        "//quic/common:expected",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/handshake:aead",
         "//quic/handshake:handshake",

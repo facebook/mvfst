@@ -115,7 +115,7 @@ mvfst_cpp_library(
         "SocketUtil.h",
     ],
     exported_deps = [
-        "//folly:expected",
+        ":expected",
         "//folly/io:socket_option_map",
         "//folly/net:net_ops",
         "//quic:exception",

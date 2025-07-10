@@ -12,7 +12,6 @@ mvfst_cpp_library(
         "QuicAsyncUDPSocket.h",
     ],
     exported_deps = [
-        "//folly:expected",
         "//folly:network_address",
         "//folly:range",
         "//folly/io:iobuf",
@@ -21,6 +20,7 @@ mvfst_cpp_library(
         "//folly/lang:exception",
         "//folly/portability:sockets",
         "//quic:exception",
+        "//quic/common:expected",
         "//quic/common:network_data",
         "//quic/common:optional",
         "//quic/common/events:eventbase",
@@ -63,9 +63,9 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",
-        "//folly:expected",
         "//folly/io/async:async_udp_socket",
         "//folly/net:network_socket",
+        "//quic/common:expected",
         "//quic/common:network_data",
         "//quic/common/events:folly_eventbase",
     ],
@@ -87,8 +87,8 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",
-        "//folly:expected",
         "//quic:exception",
+        "//quic/common:expected",
         "//quic/common:network_data",
         "//quic/common/events:libev_eventbase",
     ],

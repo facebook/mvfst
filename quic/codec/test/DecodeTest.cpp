@@ -300,7 +300,7 @@ TEST_F(DecodeTest, ValidAckFrame) {
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto ackFrame = *res;
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
@@ -331,7 +331,7 @@ TEST_F(DecodeTest, AckEcnFrame) {
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto ackFrame = *res->asReadAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
@@ -373,7 +373,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithECN) {
           std::nullopt,
           static_cast<ExtendedAckFeatureMaskType>(
               ExtendedAckFeatureMask::ECN_COUNTS)));
-  ASSERT_TRUE(ackFrameRes.hasValue());
+  ASSERT_TRUE(ackFrameRes.has_value());
   auto ackFrame = *ackFrameRes;
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
@@ -412,7 +412,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithNoFeatures) {
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(ackFrameRes.hasValue());
+  ASSERT_TRUE(ackFrameRes.has_value());
   auto ackFrame = *ackFrameRes;
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
@@ -480,7 +480,7 @@ TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto ackFrame = *res;
   // it will interpret this as a 8 byte range with the max value.
   EXPECT_EQ(ackFrame.largestAcked, 4611686018427387903);
@@ -754,7 +754,7 @@ TEST_F(DecodeTest, AckFrameBlockLengthZero) {
       cursor,
       makeHeader(),
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto readAckFrame = *res;
   EXPECT_EQ(readAckFrame.ackBlocks[0].endPacket, 1000);
   EXPECT_EQ(readAckFrame.ackBlocks[0].startPacket, 990);
@@ -777,7 +777,7 @@ TEST_F(DecodeTest, StreamDecodeSuccess) {
   BufQueue queue;
   queue.append(streamFrame->clone());
   auto decodedFrameRes = decodeStreamFrame(queue, streamType);
-  ASSERT_TRUE(decodedFrameRes.hasValue());
+  ASSERT_TRUE(decodedFrameRes.has_value());
   auto decodedFrame = decodedFrameRes.value();
   EXPECT_EQ(decodedFrame.offset, 10);
   EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
@@ -870,12 +870,12 @@ void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
 
   Cursor cursorBiDi(buf.get());
   auto maxStreamsBiDiFrameRes = decodeBiDiMaxStreamsFrame(cursorBiDi);
-  ASSERT_TRUE(maxStreamsBiDiFrameRes.hasValue());
+  ASSERT_TRUE(maxStreamsBiDiFrameRes.has_value());
   EXPECT_EQ(maxStreamsBiDiFrameRes->maxStreams, maxStreamsId);
 
   Cursor cursorUni(buf.get());
   auto maxStreamsUniFrameRes = decodeUniMaxStreamsFrame(cursorUni);
-  ASSERT_TRUE(maxStreamsUniFrameRes.hasValue());
+  ASSERT_TRUE(maxStreamsUniFrameRes.has_value());
   EXPECT_EQ(maxStreamsUniFrameRes->maxStreams, maxStreamsId);
 }
 
@@ -1043,7 +1043,7 @@ TEST_F(DecodeTest, ParsePlaintextNewToken) {
 
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 
-  EXPECT_TRUE(parseResult.hasValue());
+  EXPECT_TRUE(parseResult.has_value());
 
   EXPECT_EQ(parseResult.value(), timestampInMs);
 }
@@ -1067,7 +1067,7 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
    */
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 
-  EXPECT_TRUE(parseResult.hasValue());
+  EXPECT_TRUE(parseResult.has_value());
 
   EXPECT_EQ(parseResult.value(), timestampInMs);
 }
@@ -1095,7 +1095,7 @@ TEST_F(DecodeTest, StreamGroupDecodeSuccess) {
   queue.append(streamFrame->clone());
   auto decodedFrameRes =
       decodeStreamFrame(queue, streamType, true /* isGroupFrame */);
-  ASSERT_TRUE(decodedFrameRes.hasValue());
+  ASSERT_TRUE(decodedFrameRes.has_value());
   auto decodedFrame = decodedFrameRes.value();
   EXPECT_EQ(decodedFrame.offset, 10);
   EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
@@ -1115,7 +1115,7 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeValid) {
 
   Cursor cursor(ackFrequencyFrame.get());
   auto res = decodeAckFrequencyFrame(cursor);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto decodedFrame = *res->asAckFrequencyFrame();
   EXPECT_EQ(decodedFrame.sequenceNumber, 1);
   EXPECT_EQ(decodedFrame.packetTolerance, 100);

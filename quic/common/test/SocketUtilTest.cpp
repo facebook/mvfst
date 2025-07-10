@@ -18,7 +18,7 @@ class MockQuicAsyncUDPSocket : public quic::FollyQuicAsyncUDPSocket {
 
   MOCK_METHOD2(
       applyOptions,
-      folly::Expected<folly::Unit, quic::QuicError>(
+      quic::Expected<void, quic::QuicError>(
           const folly::SocketOptionMap&,
           folly::SocketOptionKey::ApplyPos));
 };
@@ -81,30 +81,30 @@ TEST(SocketUtilTest, applySocketOptions) {
       sock,
       applyOptions(
           expected_v4_prebind_opts, folly::SocketOptionKey::ApplyPos::PRE_BIND))
-      .WillOnce(testing::Return(folly::unit));
-  applySocketOptions(
+      .WillOnce(testing::Return(quic::Expected<void, quic::QuicError>{}));
+  auto result1 = applySocketOptions(
       sock, opts, AF_INET, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   EXPECT_CALL(
       sock,
       applyOptions(
           expected_v4_postbind_opts,
           folly::SocketOptionKey::ApplyPos::POST_BIND))
-      .WillOnce(testing::Return(folly::unit));
-  applySocketOptions(
+      .WillOnce(testing::Return(quic::Expected<void, quic::QuicError>{}));
+  auto result2 = applySocketOptions(
       sock, opts, AF_INET, folly::SocketOptionKey::ApplyPos::POST_BIND);
   EXPECT_CALL(
       sock,
       applyOptions(
           expected_v6_prebind_opts, folly::SocketOptionKey::ApplyPos::PRE_BIND))
-      .WillOnce(testing::Return(folly::unit));
-  applySocketOptions(
+      .WillOnce(testing::Return(quic::Expected<void, quic::QuicError>{}));
+  auto result3 = applySocketOptions(
       sock, opts, AF_INET6, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   EXPECT_CALL(
       sock,
       applyOptions(
           expected_v6_postbind_opts,
           folly::SocketOptionKey::ApplyPos::POST_BIND))
-      .WillOnce(testing::Return(folly::unit));
-  applySocketOptions(
+      .WillOnce(testing::Return(quic::Expected<void, quic::QuicError>{}));
+  auto result4 = applySocketOptions(
       sock, opts, AF_INET6, folly::SocketOptionKey::ApplyPos::POST_BIND);
 }

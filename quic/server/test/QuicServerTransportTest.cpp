@@ -97,7 +97,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       true,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
@@ -111,7 +111,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       buf1->computeChainDataLength(),
       true,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
@@ -251,7 +251,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   server->idleTimeout().cancelTimerCallback();
   server->keepaliveTimeout().cancelTimerCallback();
   ASSERT_FALSE(server->idleTimeout().isTimerCallbackScheduled());
-  server->writeChain(
+  auto serverWriteChain1 = server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the darkness is to keep us apart"),
       false);
@@ -264,7 +264,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   server->idleTimeout().cancelTimerCallback();
   server->keepaliveTimeout().cancelTimerCallback();
   EXPECT_FALSE(server->idleTimeout().isTimerCallbackScheduled());
-  server->writeChain(
+  auto serverWriteChain2 = server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the daylight feels like it's a long way off"),
       false);
@@ -423,7 +423,8 @@ TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
   auto streamId = server->createBidirectionalStream().value();
 
-  server->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto serverWriteChain3 =
+      server->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
 
   AckBlocks acks;
@@ -631,10 +632,10 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
 
   // Remove any packets that might have been queued.
   server->getNonConstConn().outstandings.reset();
-  server->writeChain(streamId, data->clone(), false);
+  auto serverWriteChain4 = server->writeChain(streamId, data->clone(), false);
   loopForWrites();
-  server->writeChain(streamId, data->clone(), false);
-  server->writeChain(streamId, data->clone(), false);
+  auto serverWriteChain5 = server->writeChain(streamId, data->clone(), false);
+  auto serverWriteChain6 = server->writeChain(streamId, data->clone(), false);
   loopForWrites();
 
   auto streamResult =
@@ -720,7 +721,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   auto empty = IOBuf::create(0);
-  server->writeChain(streamId, std::move(empty), true);
+  auto serverWriteChain7 = server->writeChain(streamId, std::move(empty), true);
   loopForWrites();
   ASSERT_FALSE(server->getConn().outstandings.packets.empty());
 
@@ -814,7 +815,7 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
   deliverData(std::move(packet2));
 
   auto readData = server->read(streamId, 0);
-  ASSERT_TRUE(readData.hasValue());
+  ASSERT_TRUE(readData.has_value());
   ASSERT_NE(readData.value().first, nullptr);
   EXPECT_TRUE(folly::IOBufEqualTo()(*readData.value().first, *data));
 }
@@ -1024,7 +1025,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
   ASSERT_FALSE(
       writeFrame(QuicSimpleFrame(stopSendingFrame), builder).hasError());
   auto packet = std::move(builder).buildPacket();
-  server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto serverResetStream1 =
+      server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   EXPECT_CALL(connCallback, onStopSending(_, _)).Times(0);
   deliverData(packetToBuf(packet));
 }
@@ -1124,7 +1126,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       10,
       true,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen.has_value());
   ASSERT_EQ(*dataLen, 0);
@@ -1311,7 +1313,8 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
     t.reset();
   }
 
-  server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto serverStopSending1 =
+      server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   // Find the outstanding StopSending.
   auto packetItr = std::find_if(
@@ -1344,7 +1347,8 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
   auto streamResult =
       server->getNonConstConn().streamManager->getStream(streamId);
   ASSERT_FALSE(streamResult.hasError());
-  server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto serverStopSending2 =
+      server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   auto match = findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame>();
 
@@ -1690,13 +1694,14 @@ TEST_F(QuicServerTransportTest, DestroyWithoutClosing) {
   StreamId streamId = server->createBidirectionalStream().value();
 
   MockReadCallback readCb;
-  server->setReadCallback(streamId, &readCb);
+  auto serverSetReadCallback1 = server->setReadCallback(streamId, &readCb);
 
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   MockDeliveryCallback deliveryCallback;
   auto write = IOBuf::copyBuffer("no");
-  server->writeChain(streamId, write->clone(), true, &deliveryCallback);
+  auto serverWriteChain8 =
+      server->writeChain(streamId, write->clone(), true, &deliveryCallback);
 
   EXPECT_CALL(deliveryCallback, onCanceled(_, _));
   EXPECT_CALL(readCb, readError(_, _));
@@ -1708,19 +1713,19 @@ TEST_F(QuicServerTransportTest, DestroyWithoutClosingCancelByteEvents) {
   StreamId streamId = server->createBidirectionalStream().value();
 
   MockReadCallback readCb;
-  server->setReadCallback(streamId, &readCb);
+  auto serverSetReadCallback2 = server->setReadCallback(streamId, &readCb);
 
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   auto write = IOBuf::copyBuffer("no");
-  server->writeChain(streamId, write->clone(), true);
+  auto serverWriteChain9 = server->writeChain(streamId, write->clone(), true);
 
   MockByteEventCallback txCallback;
   MockByteEventCallback deliveryCallback;
 
-  server->registerByteEventCallback(
+  auto serverRegisterByteEvent1 = server->registerByteEventCallback(
       ByteEvent::Type::TX, streamId, 0, &txCallback);
-  server->registerByteEventCallback(
+  auto serverRegisterByteEvent2 = server->registerByteEventCallback(
       ByteEvent::Type::ACK, streamId, 0, &deliveryCallback);
 
   EXPECT_CALL(txCallback, onByteEventCanceled(_));
@@ -1949,7 +1954,7 @@ class QuicServerTransportAllowMigrationTest
         false,
         GetParam().clientSentActiveConnIdTransportParam);
     ON_CALL(*fakeHandshake, writeNewSessionTicket)
-        .WillByDefault(Return(folly::unit));
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
   }
 };
 
@@ -3012,7 +3017,7 @@ TEST_F(QuicServerTransportTest, ClientPortChangeNATRebinding) {
 
   StreamId streamId = server->createBidirectionalStream().value();
   auto data1 = IOBuf::copyBuffer("Aloha");
-  server->writeChain(streamId, data1->clone(), false);
+  auto serverWriteChain10 = server->writeChain(streamId, data1->clone(), false);
   loopForWrites();
   PacketNum packetNum1 =
       getFirstOutstandingPacket(
@@ -3059,7 +3064,7 @@ TEST_F(QuicServerTransportTest, ClientAddressChangeNATRebinding) {
   server->getNonConstConn().transportSettings.disableMigration = false;
   StreamId streamId = server->createBidirectionalStream().value();
   auto data1 = IOBuf::copyBuffer("Aloha");
-  server->writeChain(streamId, data1->clone(), false);
+  auto serverWriteChain11 = server->writeChain(streamId, data1->clone(), false);
   loopForWrites();
   PacketNum packetNum1 =
       getFirstOutstandingPacket(
@@ -3429,17 +3434,19 @@ TEST_F(QuicServerTransportTest, ResetDSRStream) {
   auto buf = buildRandomInputData(200);
   auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   EXPECT_CALL(*dsrSender, release()).Times(1);
-  server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
-  EXPECT_TRUE(server->writeChain(streamId, std::move(buf), false).hasValue());
+  auto serverSetDSRSender1 =
+      server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
+  EXPECT_TRUE(server->writeChain(streamId, std::move(buf), false).has_value());
   auto streamResult = conn.streamManager->getStream(streamId);
   ASSERT_FALSE(streamResult.hasError());
   auto stream = streamResult.value();
-  EXPECT_TRUE(server->writeBufMeta(streamId, meta, false).hasValue());
+  EXPECT_TRUE(server->writeBufMeta(streamId, meta, false).has_value());
   loopForWrites();
   ASSERT_NE(stream, nullptr);
   stream->writeBufMeta.split(conn.udpSendPacketLen - 200);
 
-  server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto serverResetStream2 =
+      server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   auto packet = getLastOutstandingPacket(
                     server->getConnectionState(), PacketNumberSpace::AppData)
@@ -3466,10 +3473,11 @@ TEST_F(QuicServerTransportTest, SetDSRSenderAndWriteBufMetaIntoStream) {
   BufferMeta meta(bufferLength);
   auto buf = buildRandomInputData(20);
   auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
+  auto serverSetDSRSender2 =
+      server->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
   // Some amount of real data needs to be written first:
-  server->writeChain(streamId, std::move(buf), false);
-  server->writeBufMeta(streamId, meta, true);
+  auto serverWriteChain12 = server->writeChain(streamId, std::move(buf), false);
+  auto serverWriteBufMeta1 = server->writeBufMeta(streamId, meta, true);
   auto& stream =
       *server->getConnectionState().streamManager->findStream(streamId);
   EXPECT_GE(stream.writeBufMeta.offset, 20);
@@ -3487,11 +3495,13 @@ TEST_F(QuicServerTransportTest, InvokeTxCallbacksSingleByteDSR) {
   StrictMock<MockByteEventCallback> pastlastByteTxCb;
   auto stream = server->createBidirectionalStream().value();
   auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  server->setDSRPacketizationRequestSender(stream, std::move(dsrSender));
+  auto serverSetDSRSender3 =
+      server->setDSRPacketizationRequestSender(stream, std::move(dsrSender));
 
   auto buf = buildRandomInputData(1);
-  server->writeChain(stream, buf->clone(), false /* eof */);
-  server->writeBufMeta(stream, BufferMeta(1), false);
+  auto serverWriteChain13 =
+      server->writeChain(stream, buf->clone(), false /* eof */);
+  auto serverWriteBufMeta2 = server->writeBufMeta(stream, BufferMeta(1), false);
   EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
       .Times(1);
   EXPECT_CALL(dsrByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
@@ -3500,10 +3510,14 @@ TEST_F(QuicServerTransportTest, InvokeTxCallbacksSingleByteDSR) {
       .Times(1);
   EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 2)))
       .Times(1);
-  server->registerTxCallback(stream, 0, &firstByteTxCb);
-  server->registerTxCallback(stream, 1, &dsrByteTxCb);
-  server->registerTxCallback(stream, 1, &lastByteTxCb);
-  server->registerTxCallback(stream, 2, &pastlastByteTxCb);
+  auto serverRegisterTxCallback1 =
+      server->registerTxCallback(stream, 0, &firstByteTxCb);
+  auto serverRegisterTxCallback2 =
+      server->registerTxCallback(stream, 1, &dsrByteTxCb);
+  auto serverRegisterTxCallback3 =
+      server->registerTxCallback(stream, 1, &lastByteTxCb);
+  auto serverRegisterTxCallback4 =
+      server->registerTxCallback(stream, 2, &pastlastByteTxCb);
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&dsrByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
@@ -3532,9 +3546,12 @@ TEST_F(QuicServerTransportTest, InvokeTxCallbacksSingleByteDSR) {
       .Times(1);
   EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
       .Times(1);
-  server->registerTxCallback(stream, 0, &firstByteTxCb);
-  server->registerTxCallback(stream, 1, &dsrByteTxCb);
-  server->registerTxCallback(stream, 1, &lastByteTxCb);
+  auto serverRegisterTxCallback5 =
+      server->registerTxCallback(stream, 0, &firstByteTxCb);
+  auto serverRegisterTxCallback6 =
+      server->registerTxCallback(stream, 1, &dsrByteTxCb);
+  auto serverRegisterTxCallback7 =
+      server->registerTxCallback(stream, 1, &lastByteTxCb);
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&dsrByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
@@ -3576,15 +3593,20 @@ TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
   StrictMock<MockDeliveryCallback> unsentByteDeliveryCb;
   auto stream = server->createBidirectionalStream().value();
   auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  server->setDSRPacketizationRequestSender(stream, std::move(dsrSender));
+  auto serverSetDSRSender4 =
+      server->setDSRPacketizationRequestSender(stream, std::move(dsrSender));
 
   auto buf = buildRandomInputData(1);
-  server->writeChain(
+  auto serverWriteChain14 = server->writeChain(
       stream, buf->clone(), false /* eof */, &writeChainDeliveryCb);
-  server->writeBufMeta(stream, BufferMeta(1), false, &writeBufMetaDeliveryCb);
-  server->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
-  server->registerDeliveryCallback(stream, 1, &lastByteDeliveryCb);
-  server->registerDeliveryCallback(stream, 2, &unsentByteDeliveryCb);
+  auto serverWriteBufMeta3 = server->writeBufMeta(
+      stream, BufferMeta(1), false, &writeBufMetaDeliveryCb);
+  auto serverRegisterDelivery1 =
+      server->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  auto serverRegisterDelivery2 =
+      server->registerDeliveryCallback(stream, 1, &lastByteDeliveryCb);
+  auto serverRegisterDelivery3 =
+      server->registerDeliveryCallback(stream, 2, &unsentByteDeliveryCb);
 
   // writeChain, first, last byte callbacks triggered after delivery
   auto& conn = server->getConnectionState();
@@ -3609,8 +3631,10 @@ TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
   // callbacks should be triggered immediately
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, _)).Times(1);
   EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 1, _)).Times(1);
-  server->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
-  server->registerDeliveryCallback(stream, 1, &lastByteDeliveryCb);
+  auto serverRegisterDelivery4 =
+      server->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  auto serverRegisterDelivery5 =
+      server->registerDeliveryCallback(stream, 1, &lastByteDeliveryCb);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
   Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
@@ -4432,7 +4456,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestWriteHandshakeAndZeroRtt) {
   recvClientHello();
 
   auto streamId = server->createBidirectionalStream().value();
-  server->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto serverWriteChain15 =
+      server->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   auto clientCodec = makeClientEncryptedCodec(true);
 
@@ -4818,7 +4843,7 @@ class QuicServerTransportPendingDataTest
         GetParam().chloSync,
         GetParam().cfinSync);
     ON_CALL(*fakeHandshake, writeNewSessionTicket)
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     if (GetParam().acceptZeroRtt) {
       fakeHandshake->allowZeroRttKeys();
     }
@@ -4999,86 +5024,89 @@ class QuicServerTransportHandshakeTest
         [](const Optional<std::string>&, const BufPtr&) { return false; },
         [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams); });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
-        .WillOnce(Invoke([=](const AppToken& appToken) {
-          auto& params = appToken.transportParams.parameters;
+        .WillOnce(Invoke(
+            [=](const AppToken& appToken) -> quic::Expected<void, QuicError> {
+              auto& params = appToken.transportParams.parameters;
 
-          auto initialMaxDataResult = getIntegerParameter(
-              TransportParameterId::initial_max_data, params);
-          EXPECT_FALSE(initialMaxDataResult.hasError());
-          auto initialMaxData = *initialMaxDataResult.value();
-          EXPECT_EQ(
-              initialMaxData,
-              server->getConn()
-                  .transportSettings
-                  .advertisedInitialConnectionFlowControlWindow);
+              auto initialMaxDataResult = getIntegerParameter(
+                  TransportParameterId::initial_max_data, params);
+              EXPECT_FALSE(initialMaxDataResult.hasError());
+              auto initialMaxData = *initialMaxDataResult.value();
+              EXPECT_EQ(
+                  initialMaxData,
+                  server->getConn()
+                      .transportSettings
+                      .advertisedInitialConnectionFlowControlWindow);
 
-          auto initialMaxStreamDataBidiLocalResult = getIntegerParameter(
-              TransportParameterId::initial_max_stream_data_bidi_local, params);
-          EXPECT_FALSE(initialMaxStreamDataBidiLocalResult.hasError());
-          auto initialMaxStreamDataBidiLocal =
-              *initialMaxStreamDataBidiLocalResult.value();
+              auto initialMaxStreamDataBidiLocalResult = getIntegerParameter(
+                  TransportParameterId::initial_max_stream_data_bidi_local,
+                  params);
+              EXPECT_FALSE(initialMaxStreamDataBidiLocalResult.hasError());
+              auto initialMaxStreamDataBidiLocal =
+                  *initialMaxStreamDataBidiLocalResult.value();
 
-          auto initialMaxStreamDataBidiRemoteResult = getIntegerParameter(
-              TransportParameterId::initial_max_stream_data_bidi_remote,
-              params);
-          EXPECT_FALSE(initialMaxStreamDataBidiRemoteResult.hasError());
-          auto initialMaxStreamDataBidiRemote =
-              *initialMaxStreamDataBidiRemoteResult.value();
+              auto initialMaxStreamDataBidiRemoteResult = getIntegerParameter(
+                  TransportParameterId::initial_max_stream_data_bidi_remote,
+                  params);
+              EXPECT_FALSE(initialMaxStreamDataBidiRemoteResult.hasError());
+              auto initialMaxStreamDataBidiRemote =
+                  *initialMaxStreamDataBidiRemoteResult.value();
 
-          auto initialMaxStreamDataUniResult = getIntegerParameter(
-              TransportParameterId::initial_max_stream_data_bidi_remote,
-              params);
-          EXPECT_FALSE(initialMaxStreamDataUniResult.hasError());
-          auto initialMaxStreamDataUni = *initialMaxStreamDataUniResult.value();
-          EXPECT_EQ(
-              initialMaxStreamDataBidiLocal,
-              server->getConn()
-                  .transportSettings
-                  .advertisedInitialBidiLocalStreamFlowControlWindow);
-          EXPECT_EQ(
-              initialMaxStreamDataBidiRemote,
-              server->getConn()
-                  .transportSettings
-                  .advertisedInitialBidiRemoteStreamFlowControlWindow);
-          EXPECT_EQ(
-              initialMaxStreamDataUni,
-              server->getConn()
-                  .transportSettings
-                  .advertisedInitialUniStreamFlowControlWindow);
+              auto initialMaxStreamDataUniResult = getIntegerParameter(
+                  TransportParameterId::initial_max_stream_data_bidi_remote,
+                  params);
+              EXPECT_FALSE(initialMaxStreamDataUniResult.hasError());
+              auto initialMaxStreamDataUni =
+                  *initialMaxStreamDataUniResult.value();
+              EXPECT_EQ(
+                  initialMaxStreamDataBidiLocal,
+                  server->getConn()
+                      .transportSettings
+                      .advertisedInitialBidiLocalStreamFlowControlWindow);
+              EXPECT_EQ(
+                  initialMaxStreamDataBidiRemote,
+                  server->getConn()
+                      .transportSettings
+                      .advertisedInitialBidiRemoteStreamFlowControlWindow);
+              EXPECT_EQ(
+                  initialMaxStreamDataUni,
+                  server->getConn()
+                      .transportSettings
+                      .advertisedInitialUniStreamFlowControlWindow);
 
-          auto initialMaxStreamsBidiResult = getIntegerParameter(
-              TransportParameterId::initial_max_streams_bidi, params);
-          EXPECT_FALSE(initialMaxStreamsBidiResult.hasError());
-          auto initialMaxStreamsBidi = *initialMaxStreamsBidiResult.value();
+              auto initialMaxStreamsBidiResult = getIntegerParameter(
+                  TransportParameterId::initial_max_streams_bidi, params);
+              EXPECT_FALSE(initialMaxStreamsBidiResult.hasError());
+              auto initialMaxStreamsBidi = *initialMaxStreamsBidiResult.value();
 
-          auto initialMaxStreamsUniResult = getIntegerParameter(
-              TransportParameterId::initial_max_streams_uni, params);
-          EXPECT_FALSE(initialMaxStreamsUniResult.hasError());
-          auto initialMaxStreamsUni = *initialMaxStreamsUniResult.value();
-          EXPECT_EQ(
-              initialMaxStreamsBidi,
-              server->getConn()
-                  .transportSettings.advertisedInitialMaxStreamsBidi);
-          EXPECT_EQ(
-              initialMaxStreamsUni,
-              server->getConn()
-                  .transportSettings.advertisedInitialMaxStreamsUni);
+              auto initialMaxStreamsUniResult = getIntegerParameter(
+                  TransportParameterId::initial_max_streams_uni, params);
+              EXPECT_FALSE(initialMaxStreamsUniResult.hasError());
+              auto initialMaxStreamsUni = *initialMaxStreamsUniResult.value();
+              EXPECT_EQ(
+                  initialMaxStreamsBidi,
+                  server->getConn()
+                      .transportSettings.advertisedInitialMaxStreamsBidi);
+              EXPECT_EQ(
+                  initialMaxStreamsUni,
+                  server->getConn()
+                      .transportSettings.advertisedInitialMaxStreamsUni);
 
-          auto maxRecvPacketSizeResult = getIntegerParameter(
-              TransportParameterId::max_packet_size, params);
-          EXPECT_FALSE(maxRecvPacketSizeResult.hasError());
-          auto maxRecvPacketSize = *maxRecvPacketSizeResult.value();
-          EXPECT_EQ(
-              maxRecvPacketSize,
-              server->getConn().transportSettings.maxRecvPacketSize);
+              auto maxRecvPacketSizeResult = getIntegerParameter(
+                  TransportParameterId::max_packet_size, params);
+              EXPECT_FALSE(maxRecvPacketSizeResult.hasError());
+              auto maxRecvPacketSize = *maxRecvPacketSizeResult.value();
+              EXPECT_EQ(
+                  maxRecvPacketSize,
+                  server->getConn().transportSettings.maxRecvPacketSize);
 
-          EXPECT_THAT(
-              appToken.sourceAddresses, ContainerEq(expectedSourceToken_));
+              EXPECT_THAT(
+                  appToken.sourceAddresses, ContainerEq(expectedSourceToken_));
 
-          EXPECT_TRUE(folly::IOBufEqualTo()(
-              appToken.appParams, folly::IOBuf::copyBuffer(appParams)));
-          return folly::unit;
-        }));
+              EXPECT_TRUE(folly::IOBufEqualTo()(
+                  appToken.appParams, folly::IOBuf::copyBuffer(appParams)));
+              return {};
+            }));
   }
 
   void testSetupConnection() {
@@ -5166,17 +5194,19 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   int flag = 0;
   server->registerKnobParamHandler(
       199,
-      [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {
+      [&](QuicServerTransport* /* server_conn */,
+          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         EXPECT_EQ(std::get<uint64_t>(val), 10);
         flag = 1;
-        return folly::unit;
+        return {};
       });
   server->registerKnobParamHandler(
       200,
       [&](QuicServerTransport* /* server_conn */,
-          const TransportKnobParam::Val& /* val */) {
+          const TransportKnobParam::Val& /* val */)
+          -> quic::Expected<void, QuicError> {
         flag = 2;
-        return folly::unit;
+        return {};
       });
   server->handleKnobParams({
       {199, uint64_t{10}},
@@ -5188,10 +5218,11 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   // overwrite will fail, the new handler won't be called
   server->registerKnobParamHandler(
       199,
-      [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {
+      [&](QuicServerTransport* /* server_conn */,
+          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         EXPECT_EQ(std::get<uint64_t>(val), 30);
         flag = 3;
-        return folly::unit;
+        return {};
       });
 
   server->handleKnobParams({
@@ -5846,7 +5877,7 @@ TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
 
   auto buf = folly::IOBuf::create(1100);
   buf->append(1100);
-  server->writeChain(streamId, std::move(buf), false);
+  auto serverWriteChain16 = server->writeChain(streamId, std::move(buf), false);
 
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
@@ -5881,7 +5912,7 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   // Make sure we are post-handshake
   ASSERT_NE(nullptr, server->getConn().oneRttWriteCipher);
   // Rinse anything pending
-  server->writeData();
+  auto serverWriteData1 = server->writeData();
   loopForWrites();
   server->getNonConstConn().outstandings.reset();
   getFakeHandshakeLayer()->setCipherSuite(
@@ -5890,17 +5921,18 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   // Large-ish non-DSR data but not a full packet's worth.
   auto buf = folly::IOBuf::create(1100);
   buf->append(1100);
-  server->writeChain(streamId, std::move(buf), false);
+  auto serverWriteChain17 = server->writeChain(streamId, std::move(buf), false);
   auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
   auto rawDSRSender = mockDSRSender.get();
-  server->setDSRPacketizationRequestSender(streamId, std::move(mockDSRSender));
+  auto serverSetDSRSender5 = server->setDSRPacketizationRequestSender(
+      streamId, std::move(mockDSRSender));
   // Explicitly control how many packets we expect.
   server->getNonConstConn().transportSettings.writeConnectionDataPacketsLimit =
       6;
   // Ensure we have plenty of data.
   BufferMeta bufMeta(server->getConn().udpSendPacketLen * 50);
-  server->writeBufMeta(streamId, bufMeta, true);
-  server->writeData();
+  auto serverWriteBufMeta4 = server->writeBufMeta(streamId, bufMeta, true);
+  auto serverWriteData2 = server->writeData();
   int numDsr = 0;
   int numNonDsr = 0;
   for (auto& p : server->getConn().outstandings.packets) {
@@ -5916,7 +5948,8 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   EXPECT_EQ(numDsr, 6);
   EXPECT_EQ(numNonDsr, 1);
   EXPECT_CALL(*rawDSRSender, release()).Times(1);
-  server->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR);
+  auto serverResetStream3 =
+      server->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR);
   EXPECT_EQ(server->getConn().dsrPacketCount, 6);
 }
 

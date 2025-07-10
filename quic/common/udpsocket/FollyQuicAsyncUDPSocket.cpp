@@ -6,43 +6,43 @@
  */
 
 #include <errno.h> // For errno
-#include <folly/Expected.h>
 #include <folly/String.h>
 #include <folly/Unit.h>
 #include <folly/io/async/AsyncSocketException.h>
 #include <folly/lang/Exception.h> // For folly::errnoStr
 #include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
+#include <quic/common/Expected.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <memory>
 
 namespace quic {
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::init(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::init(
     sa_family_t family) {
   try {
     follySocket_.init(family);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly init failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::bind(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::bind(
     const folly::SocketAddress& address) {
   try {
     follySocket_.bind(address);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly bind failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
@@ -52,34 +52,34 @@ folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::bind(
   return follySocket_.isBound();
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::connect(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::connect(
     const folly::SocketAddress& address) {
   try {
     follySocket_.connect(address);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly connect failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::close() {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::close() {
   try {
     follySocket_.close();
     readCallbackWrapper_.reset(); // Ensure wrapper is cleared on close
     errCallbackWrapper_.reset();
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly close failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
@@ -94,7 +94,7 @@ void FollyQuicAsyncUDPSocket::resumeRead(ReadCallback* callback) {
     follySocket_.resumeRead(readCallbackWrapper_.get());
     // TODO: This should return Expected<Unit, QuicError>
   } catch (const folly::AsyncSocketException& ex) {
-    // TODO: Convert to QuicError and return folly::makeUnexpected
+    // TODO: Convert to QuicError and return quic::make_unexpected
     LOG(ERROR) << "FollyQuicAsyncUDPSocket::resumeRead failed: " << ex.what();
     throw; // Re-throw for now until signature is updated
   }
@@ -105,8 +105,8 @@ void FollyQuicAsyncUDPSocket::pauseRead() {
   readCallbackWrapper_.reset();
 }
 
-folly::Expected<folly::Unit, QuicError>
-FollyQuicAsyncUDPSocket::setErrMessageCallback(ErrMessageCallback* callback) {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setErrMessageCallback(
+    ErrMessageCallback* callback) {
   try {
     if (errCallbackWrapper_) {
       errCallbackWrapper_.reset();
@@ -117,14 +117,14 @@ FollyQuicAsyncUDPSocket::setErrMessageCallback(ErrMessageCallback* callback) {
     } else {
       follySocket_.setErrMessageCallback(nullptr);
     }
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly setErrMessageCallback failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
@@ -251,7 +251,7 @@ int FollyQuicAsyncUDPSocket::recvmmsg(
   }
 }
 
-folly::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGSO() {
+quic::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGSO() {
   try {
     return follySocket_.getGSO();
   } catch (const folly::AsyncSocketException& ex) {
@@ -260,13 +260,13 @@ folly::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGSO() {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
     LOG(ERROR) << "getGSO failed: " << errorMsg;
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGRO() {
+quic::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGRO() {
   try {
     return follySocket_.getGRO();
   } catch (const folly::AsyncSocketException& ex) {
@@ -274,17 +274,16 @@ folly::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGRO() {
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setGRO(
-    bool bVal) {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setGRO(bool bVal) {
   try {
     if (follySocket_.setGRO(bVal)) {
-      return folly::unit;
+      return {};
     } else {
       // Folly's setGRO returns bool, not throwing. Assume failure means error.
       int errnoCopy = errno; // Capture errno immediately after failure
@@ -292,7 +291,7 @@ folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setGRO(
       if (errnoCopy != 0) {
         errorMsg += ": " + folly::errnoStr(errnoCopy);
       }
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
     }
@@ -302,29 +301,29 @@ folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setGRO(
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setRecvTos(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setRecvTos(
     bool recvTos) {
   try {
     follySocket_.setRecvTos(recvTos);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly setRecvTos failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<bool, QuicError> FollyQuicAsyncUDPSocket::getRecvTos() {
+quic::Expected<bool, QuicError> FollyQuicAsyncUDPSocket::getRecvTos() {
   try {
     return follySocket_.getRecvTos();
   } catch (const folly::AsyncSocketException& ex) {
@@ -332,30 +331,30 @@ folly::Expected<bool, QuicError> FollyQuicAsyncUDPSocket::getRecvTos() {
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError>
-FollyQuicAsyncUDPSocket::setTosOrTrafficClass(uint8_t tos) {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setTosOrTrafficClass(
+    uint8_t tos) {
   try {
     follySocket_.setTosOrTrafficClass(tos);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly setTosOrTrafficClass failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-[[nodiscard]] folly::Expected<folly::SocketAddress, QuicError>
+[[nodiscard]] quic::Expected<folly::SocketAddress, QuicError>
 FollyQuicAsyncUDPSocket::address() const {
   try {
     return follySocket_.address();
@@ -364,7 +363,7 @@ FollyQuicAsyncUDPSocket::address() const {
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
@@ -407,41 +406,40 @@ FollyQuicAsyncUDPSocket::getEventBase() const {
   return evb_;
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setCmsgs(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setCmsgs(
     const folly::SocketCmsgMap& cmsgs) {
   try {
     follySocket_.setCmsgs(cmsgs);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly setCmsgs failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::appendCmsgs(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::appendCmsgs(
     const folly::SocketCmsgMap& cmsgs) {
   try {
     follySocket_.appendCmsgs(cmsgs);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly appendCmsgs failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError>
-FollyQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
     std::function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc) {
   try {
     auto adapter = [originalFunc = std::move(additionalCmsgsFunc)]()
@@ -459,20 +457,20 @@ FollyQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
     };
 
     follySocket_.setAdditionalCmsgsFunc(std::move(adapter));
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly setAdditionalCmsgsFunc failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getTimestamping() {
+quic::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getTimestamping() {
   try {
     return follySocket_.getTimestamping();
   } catch (const folly::AsyncSocketException& ex) {
@@ -481,114 +479,111 @@ folly::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getTimestamping() {
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setReuseAddr(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setReuseAddr(
     bool reuseAddr) {
   try {
     follySocket_.setReuseAddr(reuseAddr);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly setReuseAddr failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError>
-FollyQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
   try {
     follySocket_.setDFAndTurnOffPMTU();
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly setDFAndTurnOffPMTU failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::applyOptions(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::applyOptions(
     const folly::SocketOptionMap& options,
     folly::SocketOptionKey::ApplyPos pos) {
   try {
     follySocket_.applyOptions(options, pos);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly applyOptions failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setReusePort(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setReusePort(
     bool reusePort) {
   try {
     follySocket_.setReusePort(reusePort);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg =
         "Folly setReusePort failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setRcvBuf(
-    int rcvBuf) {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setRcvBuf(int rcvBuf) {
   try {
     follySocket_.setRcvBuf(rcvBuf);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly setRcvBuf failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setSndBuf(
-    int sndBuf) {
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setSndBuf(int sndBuf) {
   try {
     follySocket_.setSndBuf(sndBuf);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly setSndBuf failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }
 }
 
-folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setFD(
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setFD(
     int fd,
     FDOwnership ownership) {
   folly::AsyncUDPSocket::FDOwnership follyOwnership;
@@ -602,13 +597,13 @@ folly::Expected<folly::Unit, QuicError> FollyQuicAsyncUDPSocket::setFD(
   }
   try {
     follySocket_.setFD(folly::NetworkSocket::fromFd(fd), follyOwnership);
-    return folly::unit;
+    return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly setFD failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
       errorMsg += ": " + folly::errnoStr(ex.getErrno());
     }
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
   }

@@ -41,7 +41,7 @@ namespace quic {
  *               ACKed.
  *
  */
-folly::Expected<folly::Unit, QuicError> sendStopSendingSMHandler(
+quic::Expected<void, QuicError> sendStopSendingSMHandler(
     QuicStreamState& stream,
     const StopSendingFrame& frame) {
   switch (stream.sendState) {
@@ -65,17 +65,17 @@ folly::Expected<folly::Unit, QuicError> sendStopSendingSMHandler(
       break;
     }
     case StreamSendState::Invalid: {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
           fmt::format(
               "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> sendRstSMHandler(
+quic::Expected<void, QuicError> sendRstSMHandler(
     QuicStreamState& stream,
     ApplicationErrorCode errorCode,
     const Optional<uint64_t>& reliableSize) {
@@ -102,7 +102,7 @@ folly::Expected<folly::Unit, QuicError> sendRstSMHandler(
       }
       stream.appErrorCodeToPeer = errorCode;
       auto resetResult = resetQuicStream(stream, errorCode, reliableSize);
-      if (resetResult.hasError()) {
+      if (!resetResult.has_value()) {
         return resetResult;
       }
       appendPendingStreamReset(stream.conn, stream, errorCode, reliableSize);
@@ -118,17 +118,17 @@ folly::Expected<folly::Unit, QuicError> sendRstSMHandler(
       break;
     }
     case StreamSendState::Invalid: {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
           fmt::format(
               "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> sendAckSMHandler(
+quic::Expected<void, QuicError> sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame) {
   switch (stream.sendState) {
@@ -194,17 +194,17 @@ folly::Expected<folly::Unit, QuicError> sendAckSMHandler(
       break;
     }
     case StreamSendState::Invalid: {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
           fmt::format(
               "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> sendRstAckSMHandler(
+quic::Expected<void, QuicError> sendRstAckSMHandler(
     QuicStreamState& stream,
     Optional<uint64_t> reliableSize) {
   switch (stream.sendState) {
@@ -236,14 +236,14 @@ folly::Expected<folly::Unit, QuicError> sendRstAckSMHandler(
     }
     case StreamSendState::Open:
     case StreamSendState::Invalid: {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
           fmt::format(
               "Invalid transition from state={}",
               streamStateToString(stream.sendState))));
     }
   }
-  return folly::unit;
+  return {};
 }
 
 } // namespace quic

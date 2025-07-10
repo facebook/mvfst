@@ -8,9 +8,9 @@ mvfst_cpp_library(
         "Aead.h",
     ],
     exported_deps = [
-        "//folly:expected",
         "//folly/io:iobuf",
         "//quic:exception",
+        "//quic/common:expected",
         "//quic/common:optional",
     ],
 )
@@ -27,11 +27,11 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":aead",
-        "//folly:expected",
         "//quic:constants",
         "//quic:exception",
         "//quic/codec:packet_number_cipher",
         "//quic/codec:types",
+        "//quic/common:expected",
     ],
 )
 
@@ -48,10 +48,10 @@ mvfst_cpp_library(
         "//quic/state:quic_state_machine",
     ],
     exported_deps = [
-        "//folly:expected",
         "//quic:constants",
         "//quic:exception",
         "//quic/codec:types",
+        "//quic/common:expected",
     ],
 )
 

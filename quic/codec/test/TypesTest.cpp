@@ -39,7 +39,7 @@ TEST_F(TypesTest, ReadHeaderForm) {
   EXPECT_EQ(HeaderForm::Long, getHeaderForm(0xFF));
 }
 
-folly::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
+quic::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
     LongHeader::Types packetType) {
   LongHeader headerRegular(
       packetType,
@@ -86,8 +86,8 @@ TEST_F(TypesTest, LongHeaderTypes) {
       LongHeader::Types::ZeroRtt,
       makeLongHeader(LongHeader::Types::ZeroRtt)
           ->parsedLongHeader->header.getHeaderType());
-  EXPECT_FALSE(
-      makeLongHeader(static_cast<LongHeader::Types>(badLongHeader)).hasValue());
+  EXPECT_FALSE(makeLongHeader(static_cast<LongHeader::Types>(badLongHeader))
+                   .has_value());
 }
 
 TEST_F(TypesTest, LongHeaderEmptyInput) {
@@ -96,7 +96,7 @@ TEST_F(TypesTest, LongHeaderEmptyInput) {
   auto buf = folly::IOBuf::create(0);
   buf->append(0);
   Cursor cursor(buf.get());
-  EXPECT_FALSE(parseLongHeader(versionNegotiation, cursor).hasValue());
+  EXPECT_FALSE(parseLongHeader(versionNegotiation, cursor).has_value());
 }
 
 TEST_F(TypesTest, LongHeaderSmallInput) {
@@ -115,7 +115,7 @@ TEST_F(TypesTest, LongHeaderSmallInput) {
   wcursor.writeBE<uint8_t>(3);
 
   Cursor cursor(buf.get());
-  EXPECT_FALSE(parseLongHeader(clientCleartext, cursor).hasValue());
+  EXPECT_FALSE(parseLongHeader(clientCleartext, cursor).has_value());
 }
 
 TEST_F(TypesTest, LongHeaderInvalid) {
@@ -132,7 +132,7 @@ TEST_F(TypesTest, LongHeaderInvalid) {
   wcursor.writeBE<QuicVersionType>(static_cast<QuicVersionType>(version));
 
   Cursor cursor(buf.get());
-  EXPECT_FALSE(parseLongHeader(badInitialValue, cursor).hasValue());
+  EXPECT_FALSE(parseLongHeader(badInitialValue, cursor).has_value());
 }
 
 TEST_F(TypesTest, ShortHeader) {
@@ -149,7 +149,7 @@ TEST_F(TypesTest, ShortHeader) {
   auto buf4 = folly::IOBuf::create(0);
   buf4->append(0);
   Cursor cursor4(buf4.get());
-  EXPECT_FALSE(parseShortHeader(0x01, cursor4).hasValue());
+  EXPECT_FALSE(parseShortHeader(0x01, cursor4).has_value());
 }
 
 TEST_F(TypesTest, TestHasDataLength) {

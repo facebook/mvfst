@@ -118,7 +118,7 @@ void startHappyEyeballs(
   }
 }
 
-folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
+quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket& socket,
     Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
@@ -130,19 +130,19 @@ folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
   auto sockFamily = localAddress.value_or(peerAddress).getFamily();
   auto result = socket.setReuseAddr(false);
   if (!result) {
-    return folly::makeUnexpected(result.error());
+    return quic::make_unexpected(result.error());
   }
   if (transportSettings.readEcnOnIngress) {
     result = socket.setRecvTos(true);
     if (!result) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
 
-  auto initSockAndApplyOpts = [&]() -> folly::Expected<folly::Unit, QuicError> {
+  auto initSockAndApplyOpts = [&]() -> quic::Expected<void, QuicError> {
     auto initResult = socket.init(sockFamily);
     if (!initResult) {
-      return folly::makeUnexpected(initResult.error());
+      return quic::make_unexpected(initResult.error());
     }
     auto applyResult = applySocketOptions(
         socket,
@@ -150,29 +150,29 @@ folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
         sockFamily,
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
     if (!applyResult) {
-      return folly::makeUnexpected(applyResult.error());
+      return quic::make_unexpected(applyResult.error());
     }
-    return folly::unit;
+    return {};
   };
 
   if (localAddress.has_value()) {
     auto initResult = initSockAndApplyOpts();
     if (!initResult) {
-      return folly::makeUnexpected(initResult.error());
+      return quic::make_unexpected(initResult.error());
     }
     result = socket.bind(*localAddress);
     if (!result) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
   if (transportSettings.connectUDP) {
     auto initResult = initSockAndApplyOpts();
     if (!initResult) {
-      return folly::makeUnexpected(initResult.error());
+      return quic::make_unexpected(initResult.error());
     }
     result = socket.connect(peerAddress);
     if (!result) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
   if (!socket.isBound()) {
@@ -180,11 +180,11 @@ folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
         peerAddress.getFamily() == AF_INET ? "0.0.0.0" : "::", 0);
     auto initResult = initSockAndApplyOpts();
     if (!initResult) {
-      return folly::makeUnexpected(initResult.error());
+      return quic::make_unexpected(initResult.error());
     }
     result = socket.bind(addr);
     if (!result) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
   // This is called before applySocketOptions to allow the configured socket
@@ -193,13 +193,13 @@ folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
   // socket options directly.
   result = socket.setTosOrTrafficClass(socketTos);
   if (!result) {
-    return folly::makeUnexpected(result.error());
+    return quic::make_unexpected(result.error());
   }
 
   auto applyResult = applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
   if (!applyResult) {
-    return folly::makeUnexpected(applyResult.error());
+    return quic::make_unexpected(applyResult.error());
   }
 
 #ifdef SO_NOSIGPIPE
@@ -208,7 +208,7 @@ folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
     result = socket.applyOptions(
         {{nopipeKey, 1}}, folly::SocketOptionKey::ApplyPos::POST_BIND);
     if (!result) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
 #endif
@@ -220,18 +220,18 @@ folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
   // never fragment, always turn off PMTU
   result = socket.setDFAndTurnOffPMTU();
   if (!result) {
-    return folly::makeUnexpected(result.error());
+    return quic::make_unexpected(result.error());
   }
 
   if (transportSettings.enableSocketErrMsgCallback) {
     result = socket.setErrMessageCallback(errMsgCallback);
     if (!result) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
 
   socket.resumeRead(readCallback);
-  return folly::unit;
+  return {};
 }
 
 void happyEyeballsStartSecondSocket(

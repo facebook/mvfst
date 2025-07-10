@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
 #include <quic/state/TransportSettings.h>
 
 namespace quic {
@@ -69,7 +70,7 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
  * Throws with a QuicException if the data in the cursor is not a complete QUIC
  * packet or the packet could not be decoded correctly.
  */
-[[nodiscard]] folly::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
+[[nodiscard]] quic::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
     BufPtr packetData);
@@ -78,7 +79,7 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
  * Parses a single frame from the queue. Throws a QuicException if the frame
  * could not be parsed.
  */
-[[nodiscard]] folly::Expected<QuicFrame, QuicError> parseFrame(
+[[nodiscard]] quic::Expected<QuicFrame, QuicError> parseFrame(
     BufQueue& queue,
     const PacketHeader& header,
     const CodecParameters& params);
@@ -87,111 +88,111 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
  * The following functions decode frames. They return an Expected with error
  * when decoding fails.
  */
-[[nodiscard]] folly::Expected<PaddingFrame, QuicError> decodePaddingFrame(
+[[nodiscard]] quic::Expected<PaddingFrame, QuicError> decodePaddingFrame(
     Cursor& cursor);
 
-[[nodiscard]] folly::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
+[[nodiscard]] quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
     Cursor& cursor,
     bool reliable);
 
-[[nodiscard]] folly::Expected<ConnectionCloseFrame, QuicError>
+[[nodiscard]] quic::Expected<ConnectionCloseFrame, QuicError>
 decodeConnectionCloseFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<ConnectionCloseFrame, QuicError>
+[[nodiscard]] quic::Expected<ConnectionCloseFrame, QuicError>
 decodeApplicationClose(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
+[[nodiscard]] quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
     Cursor& cursor);
 
-[[nodiscard]] folly::Expected<MaxStreamDataFrame, QuicError>
+[[nodiscard]] quic::Expected<MaxStreamDataFrame, QuicError>
 decodeMaxStreamDataFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<MaxStreamsFrame, QuicError>
+[[nodiscard]] quic::Expected<MaxStreamsFrame, QuicError>
 decodeBiDiMaxStreamsFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<MaxStreamsFrame, QuicError>
+[[nodiscard]] quic::Expected<MaxStreamsFrame, QuicError>
 decodeUniMaxStreamsFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<PingFrame, QuicError> decodePingFrame(
+[[nodiscard]] quic::Expected<PingFrame, QuicError> decodePingFrame(
     Cursor& cursor);
 
-[[nodiscard]] folly::Expected<QuicFrame, QuicError> decodeKnobFrame(
+[[nodiscard]] quic::Expected<QuicFrame, QuicError> decodeKnobFrame(
     Cursor& cursor);
 
-[[nodiscard]] folly::Expected<QuicSimpleFrame, QuicError>
+[[nodiscard]] quic::Expected<QuicSimpleFrame, QuicError>
 decodeAckFrequencyFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<ImmediateAckFrame, QuicError>
+[[nodiscard]] quic::Expected<ImmediateAckFrame, QuicError>
 decodeImmediateAckFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<DataBlockedFrame, QuicError>
+[[nodiscard]] quic::Expected<DataBlockedFrame, QuicError>
 decodeDataBlockedFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<StreamDataBlockedFrame, QuicError>
+[[nodiscard]] quic::Expected<StreamDataBlockedFrame, QuicError>
 decodeStreamDataBlockedFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<StreamsBlockedFrame, QuicError>
+[[nodiscard]] quic::Expected<StreamsBlockedFrame, QuicError>
 decodeBiDiStreamsBlockedFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<StreamsBlockedFrame, QuicError>
+[[nodiscard]] quic::Expected<StreamsBlockedFrame, QuicError>
 decodeUniStreamsBlockedFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<NewConnectionIdFrame, QuicError>
+[[nodiscard]] quic::Expected<NewConnectionIdFrame, QuicError>
 decodeNewConnectionIdFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<RetireConnectionIdFrame, QuicError>
+[[nodiscard]] quic::Expected<RetireConnectionIdFrame, QuicError>
 decodeRetireConnectionIdFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<StopSendingFrame, QuicError>
+[[nodiscard]] quic::Expected<StopSendingFrame, QuicError>
 decodeStopSendingFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<PathChallengeFrame, QuicError>
+[[nodiscard]] quic::Expected<PathChallengeFrame, QuicError>
 decodePathChallengeFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<PathResponseFrame, QuicError>
+[[nodiscard]] quic::Expected<PathResponseFrame, QuicError>
 decodePathResponseFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<ReadAckFrame, QuicError> decodeAckFrame(
+[[nodiscard]] quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
     Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType = FrameType::ACK);
 
-[[nodiscard]] folly::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
+[[nodiscard]] quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
     Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params);
 
-[[nodiscard]] folly::Expected<QuicFrame, QuicError>
+[[nodiscard]] quic::Expected<QuicFrame, QuicError>
 decodeAckFrameWithReceivedTimestamps(
     Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType);
 
-[[nodiscard]] folly::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
+[[nodiscard]] quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
     Cursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params);
 
-[[nodiscard]] folly::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
+[[nodiscard]] quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     BufQueue& queue,
     StreamTypeField frameTypeField,
     bool isGroupFrame = false);
 
-[[nodiscard]] folly::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
+[[nodiscard]] quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
     Cursor& cursor);
 
-[[nodiscard]] folly::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
+[[nodiscard]] quic::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
     Cursor& cursor);
 
-[[nodiscard]] folly::Expected<HandshakeDoneFrame, QuicError>
+[[nodiscard]] quic::Expected<HandshakeDoneFrame, QuicError>
 decodeHandshakeDoneFrame(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<uint64_t, TransportErrorCode>
+[[nodiscard]] quic::Expected<uint64_t, TransportErrorCode>
 parsePlaintextRetryOrNewToken(Cursor& cursor);
 
-[[nodiscard]] folly::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
+[[nodiscard]] quic::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
     BufQueue& queue,
     bool hasLen);
 
@@ -201,7 +202,7 @@ parsePlaintextRetryOrNewToken(Cursor& cursor);
  * cursor: points to the byte just past initialByte. After parsing, cursor
  * will be moved to the byte right after Source Connection ID.
  */
-[[nodiscard]] folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
+[[nodiscard]] quic::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
 parseLongHeaderInvariant(uint8_t initalByte, Cursor& cursor);
 
 struct PacketLength {
@@ -247,29 +248,29 @@ std::pair<PacketNum, size_t> parsePacketNumber(
     PacketNum expectedNextPacketNum);
 
 // cursor: has to be point to the byte just past initialByte
-[[nodiscard]] folly::Expected<ParsedLongHeaderResult, TransportErrorCode>
+[[nodiscard]] quic::Expected<ParsedLongHeaderResult, TransportErrorCode>
 parseLongHeader(uint8_t initialByte, Cursor& cursor);
 
 // nodeType: Determine if we allow 0-len dst connection ids.
-[[nodiscard]] folly::Expected<ParsedLongHeader, TransportErrorCode>
+[[nodiscard]] quic::Expected<ParsedLongHeader, TransportErrorCode>
 parseLongHeaderVariants(
     LongHeader::Types type,
     ParsedLongHeaderInvariant longHeaderInvariant,
     Cursor& cursor,
     QuicNodeType nodeType = QuicNodeType::Server);
 
-[[nodiscard]] folly::Expected<ShortHeaderInvariant, TransportErrorCode>
+[[nodiscard]] quic::Expected<ShortHeaderInvariant, TransportErrorCode>
 parseShortHeaderInvariants(
     uint8_t initialByte,
     Cursor& cursor,
     size_t dstConnIdSize = kDefaultConnectionIdSize);
 
-[[nodiscard]] folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
+[[nodiscard]] quic::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     uint8_t initialByte,
     Cursor& cursor,
     size_t dstConnIdSize = kDefaultConnectionIdSize);
 
-[[nodiscard]] folly::Expected<uint64_t, QuicError>
+[[nodiscard]] quic::Expected<uint64_t, QuicError>
 convertEncodedDurationToMicroseconds(
     uint8_t exponentToUse,
     uint64_t delay) noexcept;

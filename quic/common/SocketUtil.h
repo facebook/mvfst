@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/net/NetOps.h>
 #include <quic/QuicException.h>
+#include <quic/common/Expected.h>
 
 namespace quic {
 
@@ -23,7 +23,7 @@ inline bool isNetworkUnreachable(int err) {
 //      const folly::SocketOptionMap& /* options */,
 //      folly::SocketOptionKey::ApplyPos /* pos */)
 template <class T>
-folly::Expected<folly::Unit, quic::QuicError> applySocketOptions(
+quic::Expected<void, quic::QuicError> applySocketOptions(
     T& sock,
     const folly::SocketOptionMap& options,
     sa_family_t family,

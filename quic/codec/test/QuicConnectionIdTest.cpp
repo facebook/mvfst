@@ -16,7 +16,7 @@ TEST(ConnectionIdTest, TestConnidLen) {
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
   Cursor cursor(&buf);
   auto connidExpected = ConnectionId::create(cursor, out.size());
-  EXPECT_TRUE(connidExpected.hasValue());
+  EXPECT_TRUE(connidExpected.has_value());
   ConnectionId connid = std::move(connidExpected.value());
   EXPECT_EQ(static_cast<size_t>(connid.size()), out.size());
   for (size_t i = 0; i < connid.size(); ++i) {
@@ -31,7 +31,7 @@ TEST(ConnectionIdTest, TestZeroLenConnid) {
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
   Cursor cursor(&buf);
   auto connidExpected = ConnectionId::create(cursor, out.size());
-  EXPECT_TRUE(connidExpected.hasValue());
+  EXPECT_TRUE(connidExpected.has_value());
   ConnectionId connid = std::move(connidExpected.value());
   EXPECT_EQ(static_cast<size_t>(connid.size()), out.size());
 }
@@ -57,12 +57,12 @@ TEST(ConnectionIdTest, ConnIdSize) {
   for (size_t i = 0; i < kMaxConnectionIdSize + 2; ++i) {
     testconnid.push_back(0);
   }
-  EXPECT_FALSE(ConnectionId::create(testconnid).hasValue());
+  EXPECT_FALSE(ConnectionId::create(testconnid).has_value());
   testconnid.clear();
   for (size_t i = 0; i < kMinSelfConnectionIdV1Size - 1; ++i) {
     testconnid.push_back(0);
   }
-  EXPECT_TRUE(ConnectionId::create(testconnid).hasValue());
+  EXPECT_TRUE(ConnectionId::create(testconnid).has_value());
 }
 
 } // namespace quic::test

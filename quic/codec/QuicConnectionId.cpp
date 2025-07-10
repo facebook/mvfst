@@ -50,13 +50,13 @@ ConnectionId::ConnectionId(Cursor& cursor, size_t len) {
   cursor.pull(connid.data(), len);
 }
 
-folly::Expected<ConnectionId, QuicError> ConnectionId::create(
+quic::Expected<ConnectionId, QuicError> ConnectionId::create(
     const std::vector<uint8_t>& connidIn) {
   static_assert(
       std::numeric_limits<uint8_t>::max() > kMaxConnectionIdSize,
       "Max connection size is too big");
   if (connidIn.size() > kMaxConnectionIdSize) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::INTERNAL_ERROR, "ConnectionId invalid size"));
   }
   ConnectionId connid;
@@ -67,7 +67,7 @@ folly::Expected<ConnectionId, QuicError> ConnectionId::create(
   return connid;
 }
 
-folly::Expected<ConnectionId, QuicError> ConnectionId::create(
+quic::Expected<ConnectionId, QuicError> ConnectionId::create(
     Cursor& cursor,
     size_t len) {
   // Zero is special case for connids.
@@ -77,7 +77,7 @@ folly::Expected<ConnectionId, QuicError> ConnectionId::create(
     return connid;
   }
   if (len > kMaxConnectionIdSize) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::INTERNAL_ERROR, "ConnectionId invalid size"));
   }
   ConnectionId connid;
@@ -104,10 +104,9 @@ ConnectionId ConnectionId::createZeroLength() {
   return connid;
 }
 
-folly::Expected<ConnectionId, QuicError> ConnectionId::createRandom(
-    size_t len) {
+quic::Expected<ConnectionId, QuicError> ConnectionId::createRandom(size_t len) {
   if (len > kMaxConnectionIdSize) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::INTERNAL_ERROR, "ConnectionId invalid size"));
   }
   ConnectionId connid;

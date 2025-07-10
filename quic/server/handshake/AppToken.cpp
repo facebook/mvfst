@@ -9,7 +9,7 @@
 
 namespace quic {
 
-folly::Expected<TicketTransportParameters, QuicError>
+quic::Expected<TicketTransportParameters, QuicError>
 createTicketTransportParameters(
     uint64_t idleTimeout,
     uint64_t maxRecvPacketSize,
@@ -25,21 +25,21 @@ createTicketTransportParameters(
   auto idleTimeoutResult =
       encodeIntegerParameter(TransportParameterId::idle_timeout, idleTimeout);
   if (idleTimeoutResult.hasError()) {
-    return folly::makeUnexpected(idleTimeoutResult.error());
+    return quic::make_unexpected(idleTimeoutResult.error());
   }
   params.parameters.push_back(idleTimeoutResult.value());
 
   auto maxRecvPacketSizeResult = encodeIntegerParameter(
       TransportParameterId::max_packet_size, maxRecvPacketSize);
   if (maxRecvPacketSizeResult.hasError()) {
-    return folly::makeUnexpected(maxRecvPacketSizeResult.error());
+    return quic::make_unexpected(maxRecvPacketSizeResult.error());
   }
   params.parameters.push_back(maxRecvPacketSizeResult.value());
 
   auto initialMaxDataResult = encodeIntegerParameter(
       TransportParameterId::initial_max_data, initialMaxData);
   if (initialMaxDataResult.hasError()) {
-    return folly::makeUnexpected(initialMaxDataResult.error());
+    return quic::make_unexpected(initialMaxDataResult.error());
   }
   params.parameters.push_back(initialMaxDataResult.value());
 
@@ -47,7 +47,7 @@ createTicketTransportParameters(
       TransportParameterId::initial_max_stream_data_bidi_local,
       initialMaxStreamDataBidiLocal);
   if (initialMaxStreamDataBidiLocalResult.hasError()) {
-    return folly::makeUnexpected(initialMaxStreamDataBidiLocalResult.error());
+    return quic::make_unexpected(initialMaxStreamDataBidiLocalResult.error());
   }
   params.parameters.push_back(initialMaxStreamDataBidiLocalResult.value());
 
@@ -55,7 +55,7 @@ createTicketTransportParameters(
       TransportParameterId::initial_max_stream_data_bidi_remote,
       initialMaxStreamDataBidiRemote);
   if (initialMaxStreamDataBidiRemoteResult.hasError()) {
-    return folly::makeUnexpected(initialMaxStreamDataBidiRemoteResult.error());
+    return quic::make_unexpected(initialMaxStreamDataBidiRemoteResult.error());
   }
   params.parameters.push_back(initialMaxStreamDataBidiRemoteResult.value());
 
@@ -63,28 +63,28 @@ createTicketTransportParameters(
       TransportParameterId::initial_max_stream_data_uni,
       initialMaxStreamDataUni);
   if (initialMaxStreamDataUniResult.hasError()) {
-    return folly::makeUnexpected(initialMaxStreamDataUniResult.error());
+    return quic::make_unexpected(initialMaxStreamDataUniResult.error());
   }
   params.parameters.push_back(initialMaxStreamDataUniResult.value());
 
   auto initialMaxStreamsBidiResult = encodeIntegerParameter(
       TransportParameterId::initial_max_streams_bidi, initialMaxStreamsBidi);
   if (initialMaxStreamsBidiResult.hasError()) {
-    return folly::makeUnexpected(initialMaxStreamsBidiResult.error());
+    return quic::make_unexpected(initialMaxStreamsBidiResult.error());
   }
   params.parameters.push_back(initialMaxStreamsBidiResult.value());
 
   auto initialMaxStreamsUniResult = encodeIntegerParameter(
       TransportParameterId::initial_max_streams_uni, initialMaxStreamsUni);
   if (initialMaxStreamsUniResult.hasError()) {
-    return folly::makeUnexpected(initialMaxStreamsUniResult.error());
+    return quic::make_unexpected(initialMaxStreamsUniResult.error());
   }
   params.parameters.push_back(initialMaxStreamsUniResult.value());
 
   auto extendedAckFeaturesResult = encodeIntegerParameter(
       TransportParameterId::extended_ack_features, extendedAckFeatures);
   if (extendedAckFeaturesResult.hasError()) {
-    return folly::makeUnexpected(extendedAckFeaturesResult.error());
+    return quic::make_unexpected(extendedAckFeaturesResult.error());
   }
   params.parameters.push_back(extendedAckFeaturesResult.value());
 
@@ -92,7 +92,7 @@ createTicketTransportParameters(
     auto cwndHintBytesResult = encodeIntegerParameter(
         TransportParameterId::cwnd_hint_bytes, *cwndHintBytes);
     if (cwndHintBytesResult.hasError()) {
-      return folly::makeUnexpected(cwndHintBytesResult.error());
+      return quic::make_unexpected(cwndHintBytesResult.error());
     }
     params.parameters.push_back(cwndHintBytesResult.value());
   }

@@ -34,7 +34,7 @@ namespace quic {
  * Receive::Closed <---------+
  *
  */
-folly::Expected<folly::Unit, QuicError> receiveReadStreamFrameSMHandler(
+quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
     QuicStreamState& stream,
     ReadStreamFrame&& frame) {
   switch (stream.recvState) {
@@ -43,7 +43,7 @@ folly::Expected<folly::Unit, QuicError> receiveReadStreamFrameSMHandler(
                              << " stream=" << stream.id << " " << stream.conn;
       auto appendResult = appendDataToReadBuffer(
           stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
-      if (appendResult.hasError()) {
+      if (!appendResult.has_value()) {
         return appendResult;
       }
       bool allDataTillReliableSizeReceived = stream.reliableSizeFromPeer &&
@@ -69,17 +69,17 @@ folly::Expected<folly::Unit, QuicError> receiveReadStreamFrameSMHandler(
       break;
     }
     case StreamRecvState::Invalid: {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
           fmt::format(
               "Invalid transition from state={}",
               streamStateToString(stream.recvState))));
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> receiveRstStreamSMHandler(
+quic::Expected<void, QuicError> receiveRstStreamSMHandler(
     QuicStreamState& stream,
     const RstStreamFrame& rst) {
   switch (stream.recvState) {
@@ -87,7 +87,7 @@ folly::Expected<folly::Unit, QuicError> receiveRstStreamSMHandler(
       // This will check whether the reset is still consistent with the
       // stream.
       auto resetResult = onResetQuicStream(stream, rst);
-      if (resetResult.hasError()) {
+      if (!resetResult.has_value()) {
         return resetResult;
       }
       break;
@@ -107,20 +107,20 @@ folly::Expected<folly::Unit, QuicError> receiveRstStreamSMHandler(
         }
       }
       auto resetResult = onResetQuicStream(stream, rst);
-      if (resetResult.hasError()) {
+      if (!resetResult.has_value()) {
         return resetResult;
       }
       break;
     }
     case StreamRecvState::Invalid: {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR,
           fmt::format(
               "Invalid transition from state={}",
               streamStateToString(stream.recvState))));
     }
   }
-  return folly::unit;
+  return {};
 }
 
 } // namespace quic

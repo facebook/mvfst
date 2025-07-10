@@ -43,7 +43,7 @@ void QuicClientTransport::onNotifyDataAvailable(
       ? conn_->transportSettings.readCoalescingSize
       : readBufferSize;
 
-  auto result = [&]() -> folly::Expected<folly::Unit, QuicError> {
+  auto result = [&]() -> quic::Expected<void, QuicError> {
     if (conn_->transportSettings.networkDataPerSocketRead) {
       return readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
     } else if (conn_->transportSettings.shouldUseWrapperRecvmmsgForBatchRecv) {
@@ -54,13 +54,12 @@ void QuicClientTransport::onNotifyDataAvailable(
       return readWithRecvmsg(sock, readAllocSize, numPackets);
     }
   }();
-  if (result.hasError()) {
+  if (!result.has_value()) {
     asyncClose(result.error());
   }
 }
 
-folly::Expected<folly::Unit, QuicError>
-QuicClientTransport::readWithRecvmmsgWrapper(
+quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsgWrapper(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -72,8 +71,8 @@ QuicClientTransport::readWithRecvmmsgWrapper(
   const auto result = sock.recvmmsgNetworkData(
       readBufferSize, numPackets, networkData, server, totalData);
 
-  if (result.hasError()) {
-    return folly::makeUnexpected(result.error());
+  if (!result.has_value()) {
+    return quic::make_unexpected(result.error());
   }
 
   // track the received packets
@@ -120,7 +119,7 @@ QuicClientTransport::readWithRecvmmsgWrapper(
   return processPackets(std::move(networkData), server);
 }
 
-folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmmsg(
+quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -133,14 +132,14 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmmsg(
   recvmmsgStorage_.resize(numPackets);
   auto recvResult = recvMmsg(
       sock, readBufferSize, numPackets, networkData, server, totalData);
-  if (recvResult.hasError()) {
+  if (!recvResult.has_value()) {
     return recvResult;
   }
 
   return processPackets(std::move(networkData), server);
 }
 
-folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmsg(
+quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize,
     uint16_t numPackets) {
@@ -152,7 +151,7 @@ folly::Expected<folly::Unit, QuicError> QuicClientTransport::readWithRecvmsg(
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   auto recvResult =
       recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
-  if (recvResult.hasError()) {
+  if (!recvResult.has_value()) {
     return recvResult;
   }
 

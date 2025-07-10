@@ -137,7 +137,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   ASSERT_FALSE(
       writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1).hasError());
   ASSERT_FALSE(writeFrame(pingFrame, regularBuilder1).hasError());
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder1,
       streamId,
       0,
@@ -272,7 +272,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf = folly::IOBuf::copyBuffer("A million miles away.");
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder1,
       streamId,
       0,
@@ -314,7 +314,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   auto streamId = stream->id;
 
   // Write them with a regular builder
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder1, streamId, 0, 0, 0, true, std::nullopt /* skipLenHint */);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   stream->retransmissionBuffer.emplace(
@@ -367,7 +367,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   auto cryptoBuf = folly::IOBuf::copyBuffer("NewSessionTicket");
 
   // Write them with a regular builder
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder1,
       streamId,
       0,
@@ -487,7 +487,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   ASSERT_FALSE(writeFrame(maxStreamIdFrame, regularBuilder1).hasError());
   ASSERT_FALSE(writeFrame(pingFrame, regularBuilder1).hasError());
   ASSERT_FALSE(writeAckFrame(ackMeta, regularBuilder1).hasError());
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder1,
       streamId,
       0,
@@ -587,7 +587,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader), 0);
   ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder,
       streamId,
       0,
@@ -597,7 +597,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
       std::nullopt);
   writeStreamFrameData(
       regularBuilder, buf1->clone(), buf1->computeChainDataLength());
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder,
       streamId,
       buf1->computeChainDataLength(),
@@ -666,7 +666,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader), 0);
   ASSERT_FALSE(regularBuilder.encodePacketHeader().hasError());
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder,
       streamId,
       0,
@@ -676,7 +676,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
       std::nullopt);
   writeStreamFrameData(
       regularBuilder, buf1->clone(), buf1->computeChainDataLength());
-  writeStreamFrameHeader(
+  (void)writeStreamFrameHeader(
       regularBuilder,
       streamId,
       buf1->computeChainDataLength(),

@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicException.h>
+#include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
 namespace quic {
@@ -29,15 +29,14 @@ class Aead {
   virtual Optional<TrafficKey> getKey() const = 0;
 
   /**
-   * Encrypts plaintext inplace. Returns folly::Expected with the encrypted
+   * Encrypts plaintext inplace. Returns quic::Expected with the encrypted
    * buffer or an error.
    */
-  [[nodiscard]] virtual folly::
-      Expected<std::unique_ptr<folly::IOBuf>, QuicError>
-      inplaceEncrypt(
-          std::unique_ptr<folly::IOBuf>&& plaintext,
-          const folly::IOBuf* associatedData,
-          uint64_t seqNum) const = 0;
+  [[nodiscard]] virtual quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError>
+  inplaceEncrypt(
+      std::unique_ptr<folly::IOBuf>&& plaintext,
+      const folly::IOBuf* associatedData,
+      uint64_t seqNum) const = 0;
 
   /**
    * Decrypt ciphertext. Will throw if the ciphertext does not decrypt

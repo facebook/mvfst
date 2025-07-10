@@ -705,7 +705,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
 
   // dcid
   auto dcidResult = ConnectionId::create(cursor, dcidLen);
-  ASSERT_TRUE(dcidResult.hasValue());
+  ASSERT_TRUE(dcidResult.has_value());
   ConnectionId dcidObtained = std::move(dcidResult.value());
   EXPECT_EQ(dcidObtained, dstConnId);
 
@@ -715,7 +715,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
 
   // scid
   auto scidResult = ConnectionId::create(cursor, scidLen);
-  ASSERT_TRUE(scidResult.hasValue());
+  ASSERT_TRUE(scidResult.has_value());
   ConnectionId scidObtained = std::move(scidResult.value());
   EXPECT_EQ(scidObtained, srcConnId);
 

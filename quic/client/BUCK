@@ -13,6 +13,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":client_lite",
         "//quic/api:transport",
+        "//quic/common:expected",
     ],
 )
 
@@ -51,6 +52,7 @@ mvfst_cpp_library(
         "//quic/api:transport_lite",
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
+        "//quic/common:expected",
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/state:quic_connection_stats",
     ],
@@ -85,6 +87,7 @@ mvfst_cpp_library(
         "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic:exception",
+        "//quic/common:expected",
         "//quic/common:network_data",
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/congestion_control:cubic",
@@ -103,8 +106,8 @@ mvfst_cpp_library(
         "handshake/ClientTransportParametersExtension.h",
     ],
     exported_deps = [
-        "//folly:expected",
         "//quic:exception",
+        "//quic/common:expected",
         "//quic/handshake:transport_parameters",
     ],
 )

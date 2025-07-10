@@ -57,27 +57,29 @@ Optional<uint64_t> calculateNewWindowUpdate(
 }
 
 template <typename T>
-[[nodiscard]] inline folly::Expected<folly::Unit, QuicError>
-incrementWithOverFlowCheck(T& num, T diff) {
+[[nodiscard]] inline quic::Expected<void, QuicError> incrementWithOverFlowCheck(
+    T& num,
+    T diff) {
   if (num > std::numeric_limits<T>::max() - diff) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
         "flow control state overflow"));
   }
   num += diff;
-  return folly::unit;
+  return {};
 }
 
 template <typename T>
-[[nodiscard]] inline folly::Expected<folly::Unit, QuicError>
-decrementWithOverFlowCheck(T& num, T diff) {
+[[nodiscard]] inline quic::Expected<void, QuicError> decrementWithOverFlowCheck(
+    T& num,
+    T diff) {
   if (num < std::numeric_limits<T>::min() + diff) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
         "flow control state overflow"));
   }
   num -= diff;
-  return folly::unit;
+  return {};
 }
 
 inline uint64_t calculateMaximumData(const QuicStreamState& stream) {
@@ -186,12 +188,12 @@ bool maybeSendStreamWindowUpdate(
   return false;
 }
 
-folly::Expected<folly::Unit, QuicError> updateFlowControlOnStreamData(
+quic::Expected<void, QuicError> updateFlowControlOnStreamData(
     QuicStreamState& stream,
     uint64_t previousMaxOffsetObserved,
     uint64_t bufferEndOffset) {
   if (stream.flowControlState.advertisedMaxOffset < bufferEndOffset) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::FLOW_CONTROL_ERROR,
         fmt::format("Stream flow control violation on stream {}", stream.id)));
   }
@@ -201,11 +203,11 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnStreamData(
   uint64_t connMaxObservedOffset = connFlowControlState.sumMaxObservedOffset;
   auto incrementResult = incrementWithOverFlowCheck(
       connMaxObservedOffset, curMaxOffsetObserved - previousMaxOffsetObserved);
-  if (incrementResult.hasError()) {
+  if (!incrementResult.has_value()) {
     return incrementResult;
   }
   if (connMaxObservedOffset > connFlowControlState.advertisedMaxOffset) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::FLOW_CONTROL_ERROR,
         "Connection flow control violation"));
   }
@@ -214,7 +216,7 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnStreamData(
       curMaxOffsetObserved - previousMaxOffsetObserved);
 }
 
-folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
+quic::Expected<void, QuicError> updateFlowControlOnRead(
     QuicStreamState& stream,
     uint64_t lastReadOffset,
     TimePoint readTime) {
@@ -233,7 +235,7 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
   }
   auto incrementResult = incrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurReadOffset, diff);
-  if (incrementResult.hasError()) {
+  if (!incrementResult.has_value()) {
     return incrementResult;
   }
   if (maybeSendConnWindowUpdate(stream.conn, readTime)) {
@@ -248,10 +250,10 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
             << " maxOffset=" << stream.flowControlState.advertisedMaxOffset
             << " window=" << stream.flowControlState.windowSize;
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> updateFlowControlOnReceiveReset(
+quic::Expected<void, QuicError> updateFlowControlOnReceiveReset(
     QuicStreamState& stream,
     TimePoint resetTime) {
   CHECK(stream.reliableSizeFromPeer.has_value())
@@ -268,7 +270,7 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnReceiveReset(
     stream.currentReadOffset = *stream.finalReadOffset;
     auto incrementResult = incrementWithOverFlowCheck(
         stream.conn.flowControlState.sumCurReadOffset, diff);
-    if (incrementResult.hasError()) {
+    if (!incrementResult.has_value()) {
       return incrementResult;
     }
     if (maybeSendConnWindowUpdate(stream.conn, resetTime)) {
@@ -279,15 +281,15 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnReceiveReset(
               << " window=" << stream.conn.flowControlState.windowSize;
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> updateFlowControlOnWriteToSocket(
+quic::Expected<void, QuicError> updateFlowControlOnWriteToSocket(
     QuicStreamState& stream,
     uint64_t length) {
   auto incrementResult = incrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurWriteOffset, length);
-  if (incrementResult.hasError()) {
+  if (!incrementResult.has_value()) {
     return incrementResult;
   }
   DCHECK_GE(stream.conn.flowControlState.sumCurStreamBufferLen, length);
@@ -300,17 +302,17 @@ folly::Expected<folly::Unit, QuicError> updateFlowControlOnWriteToSocket(
     }
     QUIC_STATS(stream.conn.statsCallback, onConnFlowControlBlocked);
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> updateFlowControlOnWriteToStream(
+quic::Expected<void, QuicError> updateFlowControlOnWriteToStream(
     QuicStreamState& stream,
     uint64_t length) {
   return incrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurStreamBufferLen, length);
 }
 
-folly::Expected<folly::Unit, QuicError> updateFlowControlOnResetStream(
+quic::Expected<void, QuicError> updateFlowControlOnResetStream(
     QuicStreamState& stream,
     Optional<uint64_t> reliableSize) {
   uint64_t decrementAmount = 0;

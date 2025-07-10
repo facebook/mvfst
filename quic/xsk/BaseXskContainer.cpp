@@ -16,7 +16,7 @@
 
 namespace facebook::xdpsocket {
 
-folly::Expected<std::unique_ptr<XskSender>, std::runtime_error>
+quic::Expected<std::unique_ptr<XskSender>, std::runtime_error>
 BaseXskContainer::createXskSender(
     int queueId,
     const XskSenderConfig& xskSenderConfig) {
@@ -24,12 +24,12 @@ BaseXskContainer::createXskSender(
 
   auto initResult = xskSender->init();
   if (initResult.hasError()) {
-    return folly::makeUnexpected(initResult.error());
+    return quic::make_unexpected(initResult.error());
   }
 
   auto bindResult = xskSender->bind(queueId);
   if (bindResult.hasError()) {
-    return folly::makeUnexpected(bindResult.error());
+    return quic::make_unexpected(bindResult.error());
   }
 
   return xskSender;

@@ -14,7 +14,7 @@
 
 namespace quic {
 template <typename BufOp = BufAppender>
-[[nodiscard]] folly::Expected<PacketNumEncodingResult, QuicError>
+[[nodiscard]] quic::Expected<PacketNumEncodingResult, QuicError>
 encodeLongHeaderHelper(
     const LongHeader& longHeader,
     BufOp& bufop,
@@ -44,8 +44,8 @@ encodeLongHeaderHelper(
     // For initial packets, we write both the token length and the token itself.
     uint64_t tokenLength = token.size();
     auto tokenLengthInt = QuicInteger(tokenLength).getSize();
-    if (tokenLengthInt.hasError()) {
-      return folly::makeUnexpected(tokenLengthInt.error());
+    if (!tokenLengthInt.has_value()) {
+      return quic::make_unexpected(tokenLengthInt.error());
     }
     tokenHeaderLength = tokenLengthInt.value() + tokenLength;
   } else if (isRetry) {
@@ -281,17 +281,16 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   return Packet(std::move(packet_), std::move(header_), std::move(body_));
 }
 
-folly::Expected<folly::Unit, QuicError>
-RegularQuicPacketBuilder::encodeLongHeader(
+quic::Expected<void, QuicError> RegularQuicPacketBuilder::encodeLongHeader(
     const LongHeader& longHeader,
     PacketNum largestAckedPacketNum) {
   auto encodingResult = encodeLongHeaderHelper(
       longHeader, headerAppender_, remainingBytes_, largestAckedPacketNum);
-  if (encodingResult.hasError()) {
-    return folly::makeUnexpected(encodingResult.error());
+  if (!encodingResult.has_value()) {
+    return quic::make_unexpected(encodingResult.error());
   }
   packetNumberEncoding_ = std::move(encodingResult.value());
-  return folly::unit;
+  return {};
 }
 
 void RegularQuicPacketBuilder::encodeShortHeader(
@@ -582,10 +581,11 @@ RetryPacketBuilder::RetryPacketBuilder(
       retryToken_(std::move(retryToken)),
       integrityTag_(integrityTag),
       remainingBytes_(kDefaultUDPSendPacketLen) {
-  writeRetryPacket();
+  auto result = writeRetryPacket();
+  CHECK(result.has_value()) << "Failed to write retry packet";
 }
 
-folly::Expected<folly::Unit, QuicError> RetryPacketBuilder::writeRetryPacket() {
+quic::Expected<void, QuicError> RetryPacketBuilder::writeRetryPacket() {
   packetBuf_ = BufHelpers::create(kAppenderGrowthSize);
 
   // Encode the portion of the retry packet that comes before the
@@ -600,8 +600,8 @@ folly::Expected<folly::Unit, QuicError> RetryPacketBuilder::writeRetryPacket() {
       retryToken_);
   auto encodeResult =
       encodeLongHeaderHelper(header, appender, remainingBytes_, 0);
-  if (encodeResult.hasError()) {
-    return folly::makeUnexpected(encodeResult.error());
+  if (!encodeResult.has_value()) {
+    return quic::make_unexpected(encodeResult.error());
   }
   packetBuf_->coalesce();
 
@@ -614,7 +614,7 @@ folly::Expected<folly::Unit, QuicError> RetryPacketBuilder::writeRetryPacket() {
     BufAppender appender2(packetBuf_.get(), kRetryIntegrityTagLen);
     appender2.push(integrityTag_.data(), integrityTag_.size());
   }
-  return folly::unit;
+  return {};
 }
 
 bool RetryPacketBuilder::canBuildPacket() const noexcept {
@@ -838,31 +838,29 @@ InplaceQuicPacketBuilder::~InplaceQuicPacketBuilder() {
   releaseOutputBufferInternal();
 }
 
-folly::Expected<folly::Unit, QuicError>
-RegularQuicPacketBuilder::encodePacketHeader() {
+quic::Expected<void, QuicError> RegularQuicPacketBuilder::encodePacketHeader() {
   CHECK(!packetNumberEncoding_.has_value());
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     auto result = encodeLongHeader(longHeader, largestAckedPacketNum_);
-    if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
   } else {
     ShortHeader& shortHeader = *packet_.header.asShort();
     encodeShortHeader(shortHeader, largestAckedPacketNum_);
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError>
-InplaceQuicPacketBuilder::encodePacketHeader() {
+quic::Expected<void, QuicError> InplaceQuicPacketBuilder::encodePacketHeader() {
   CHECK(!packetNumberEncoding_.has_value());
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     auto encodingResult = encodeLongHeaderHelper(
         longHeader, bufWriter_, remainingBytes_, largestAckedPacketNum_);
-    if (encodingResult.hasError()) {
-      return folly::makeUnexpected(encodingResult.error());
+    if (!encodingResult.has_value()) {
+      return quic::make_unexpected(encodingResult.error());
     }
     packetNumberEncoding_ = std::move(encodingResult.value());
     if (longHeader.getHeaderType() != LongHeader::Types::Retry) {
@@ -887,7 +885,7 @@ InplaceQuicPacketBuilder::encodePacketHeader() {
     }
   }
   bodyStart_ = bufWriter_.tail();
-  return folly::unit;
+  return {};
 }
 
 } // namespace quic

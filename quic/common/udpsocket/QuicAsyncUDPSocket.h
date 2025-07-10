@@ -9,7 +9,6 @@
 
 #include <type_traits>
 
-#include <folly/Expected.h>
 #include <folly/Range.h>
 #include <folly/SocketAddress.h>
 #include <folly/io/IOBuf.h>
@@ -17,6 +16,7 @@
 #include <folly/io/async/AsyncSocketException.h>
 #include <folly/lang/Exception.h> // For folly::errnoStr
 #include <folly/portability/Sockets.h>
+#include <quic/common/Expected.h>
 
 #include <quic/QuicException.h> // Include for existing QuicError and QuicErrorCode
 #include <quic/common/NetworkData.h>
@@ -97,7 +97,7 @@ class QuicAsyncUDPSocket {
   // internally if fd is not yet set at the time of the call. But if there is a
   // need to apply socket options pre-bind, one can call this function
   // explicitly before bind()/connect() and socket opts application.
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> init(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> init(
       sa_family_t /* family */) = 0;
 
   /**
@@ -106,7 +106,7 @@ class QuicAsyncUDPSocket {
    * use `address()` method above to get it after this method successfully
    * returns.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> bind(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> bind(
       const folly::SocketAddress& address) = 0;
 
   [[nodiscard]] virtual bool isBound() const = 0;
@@ -130,13 +130,13 @@ class QuicAsyncUDPSocket {
    *
    * Returns the result of calling the connect syscall.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> connect(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> connect(
       const folly::SocketAddress& /* address */) = 0;
 
   /**
    * Stop listening on the socket.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> close() = 0;
+  [[nodiscard]] virtual quic::Expected<void, QuicError> close() = 0;
 
   /**
    * Start reading datagrams
@@ -156,9 +156,9 @@ class QuicAsyncUDPSocket {
   /**
    * Start listening to writable events on the socket.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> resumeWrite(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> resumeWrite(
       WriteCallback* /* cb */) {
-    return folly::unit;
+    return {};
   }
 
   /**
@@ -270,7 +270,7 @@ class QuicAsyncUDPSocket {
     Optional<NoReadReason> maybeNoReadReason;
   };
 
-  [[nodiscard]] virtual folly::Expected<RecvResult, QuicError>
+  [[nodiscard]] virtual quic::Expected<RecvResult, QuicError>
   recvmmsgNetworkData(
       uint64_t readBufferSize,
       uint16_t numPackets,
@@ -280,28 +280,28 @@ class QuicAsyncUDPSocket {
 
   // generic segmentation offload get/set
   // negative return value means GSO is not available
-  [[nodiscard]] virtual folly::Expected<int, QuicError> getGSO() = 0;
+  [[nodiscard]] virtual quic::Expected<int, QuicError> getGSO() = 0;
 
   // generic receive offload get/set
   // negative return value means GRO is not available
-  [[nodiscard]] virtual folly::Expected<int, QuicError> getGRO() = 0;
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setGRO(
+  [[nodiscard]] virtual quic::Expected<int, QuicError> getGRO() = 0;
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setGRO(
       bool /* bVal */) = 0;
 
   // receive tos cmsgs
   // if true, the IPv6 Traffic Class/IPv4 Type of Service field should be
   // populated in OnDataAvailableParams.
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setRecvTos(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setRecvTos(
       bool recvTos) = 0;
-  [[nodiscard]] virtual folly::Expected<bool, QuicError> getRecvTos() = 0;
+  [[nodiscard]] virtual quic::Expected<bool, QuicError> getRecvTos() = 0;
 
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  setTosOrTrafficClass(uint8_t tos) = 0;
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setTosOrTrafficClass(
+      uint8_t tos) = 0;
 
   /**
    * Returns the socket address this socket is bound to and error otherwise.
    */
-  [[nodiscard]] virtual folly::Expected<folly::SocketAddress, QuicError>
+  [[nodiscard]] virtual quic::Expected<folly::SocketAddress, QuicError>
   address() const = 0;
 
   /**
@@ -318,23 +318,23 @@ class QuicAsyncUDPSocket {
   /**
    * Set extra control messages to send
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setCmsgs(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setCmsgs(
       const folly::SocketCmsgMap& /* cmsgs */) = 0;
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> appendCmsgs(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> appendCmsgs(
       const folly::SocketCmsgMap& /* cmsgs */) = 0;
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  setAdditionalCmsgsFunc(std::function<Optional<folly::SocketCmsgMap>()>&&
-                         /* additionalCmsgsFunc */) = 0;
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setAdditionalCmsgsFunc(
+      std::function<Optional<folly::SocketCmsgMap>()>&&
+      /* additionalCmsgsFunc */) = 0;
 
   /*
    * Packet timestamping is currentl not supported.
    */
-  [[nodiscard]] virtual folly::Expected<int, QuicError> getTimestamping() = 0;
+  [[nodiscard]] virtual quic::Expected<int, QuicError> getTimestamping() = 0;
 
   /**
    * Set SO_REUSEADDR flag on the socket. Default is OFF.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setReuseAddr(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setReuseAddr(
       bool reuseAddr) = 0;
 
   /**
@@ -345,35 +345,35 @@ class QuicAsyncUDPSocket {
    * This may be desirable for apps that has its own PMTU Discovery mechanism.
    * See http://man7.org/linux/man-pages/man7/ip.7.html for more info.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] virtual quic::Expected<void, QuicError>
   setDFAndTurnOffPMTU() = 0;
 
   /**
    * Callback for receiving errors on the UDP sockets
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
-  setErrMessageCallback(ErrMessageCallback* /* errMessageCallback */) = 0;
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setErrMessageCallback(
+      ErrMessageCallback* /* errMessageCallback */) = 0;
 
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> applyOptions(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> applyOptions(
       const folly::SocketOptionMap& /* options */,
       folly::SocketOptionKey::ApplyPos /* pos */) = 0;
 
   /**
    * Set reuse port mode to call bind() on the same address multiple times
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setReusePort(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setReusePort(
       bool reusePort) = 0;
 
   /**
    * Set SO_RCVBUF option on the socket, if not zero. Default is zero.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setRcvBuf(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setRcvBuf(
       int rcvBuf) = 0;
 
   /**
    * Set SO_SNDBUF option on the socket, if not zero. Default is zero.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setSndBuf(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setSndBuf(
       int sndBuf) = 0;
 
   enum class FDOwnership { OWNS, SHARED };
@@ -384,17 +384,17 @@ class QuicAsyncUDPSocket {
    * FDOwnership::SHARED. In case FD is shared, it will not be `close`d in
    * destructor.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> setFD(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> setFD(
       int /* fd */,
       FDOwnership /* ownership */) = 0;
 
   virtual int getFD() = 0;
 
-  [[nodiscard]] virtual folly::Expected<sa_family_t, QuicError>
+  [[nodiscard]] virtual quic::Expected<sa_family_t, QuicError>
   getLocalAddressFamily() const {
     auto addrResult = address();
     if (addrResult.hasError()) {
-      return folly::makeUnexpected(addrResult.error());
+      return quic::make_unexpected(addrResult.error());
     }
     return addrResult->getFamily();
   }

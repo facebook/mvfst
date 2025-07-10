@@ -29,7 +29,7 @@ class Handshake {
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] virtual quic::Expected<std::unique_ptr<Aead>, QuicError>
   getNextOneRttReadCipher() = 0;
 
   /**
@@ -37,7 +37,7 @@ class Handshake {
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] virtual quic::Expected<std::unique_ptr<Aead>, QuicError>
   getNextOneRttWriteCipher() = 0;
 
   /*

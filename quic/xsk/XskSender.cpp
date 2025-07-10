@@ -192,18 +192,18 @@ SendResult XskSender::writeUdpPacket(
   return writeUdpPacket(peer, src, data->data(), len);
 }
 
-folly::Expected<folly::Unit, std::runtime_error> XskSender::init() {
+quic::Expected<void, std::runtime_error> XskSender::init() {
   auto xdpSocketInitResult = initXdpSocket();
   if (xdpSocketInitResult.hasError()) {
-    return folly::makeUnexpected(xdpSocketInitResult.error());
+    return quic::make_unexpected(xdpSocketInitResult.error());
   }
 
   initAddresses(xskSenderConfig_.localMac, xskSenderConfig_.gatewayMac);
 
-  return folly::Unit();
+  return {};
 }
 
-folly::Expected<folly::Unit, std::runtime_error> XskSender::bind(int queueId) {
+quic::Expected<void, std::runtime_error> XskSender::bind(int queueId) {
   int bind_result = 0;
   if (isPrimaryOwner()) {
     bind_result = bind_xsk(
@@ -218,10 +218,10 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::bind(int queueId) {
   if (bind_result < 0) {
     std::string errorMsg =
         fmt::format("Failed to bind xdp socket: {}", folly::errnoStr(errno));
-    return folly::makeUnexpected(std::runtime_error(errorMsg));
+    return quic::make_unexpected(std::runtime_error(errorMsg));
   }
 
-  return folly::Unit();
+  return {};
 }
 
 FlushResult XskSender::flush() {
@@ -282,11 +282,11 @@ void XskSender::writeUdpPacketToBuffer(
       len + sizeof(udphdr));
 }
 
-folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
+quic::Expected<void, std::runtime_error> XskSender::initXdpSocket() {
   // Create xdp socket
   xskFd_ = create_xsk();
   if (xskFd_ < 0) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         std::runtime_error("Failed to create xdp socket"));
   }
 
@@ -304,7 +304,7 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   if (!umemArea_) {
-    return folly::makeUnexpected(std::runtime_error("Failed to create umem"));
+    return quic::make_unexpected(std::runtime_error("Failed to create umem"));
   }
 
   // The guard takes care of cleanup in case something goes wrong during
@@ -326,14 +326,14 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
     int completion_ring_set_result =
         set_completion_ring(xskFd_, xskSenderConfig_.numFrames);
     if (completion_ring_set_result < 0) {
-      return folly::makeUnexpected(
+      return quic::make_unexpected(
           std::runtime_error("Failed to set completion ring"));
     }
 
     // Set fill ring
     int fill_ring_set_result = set_fill_ring(xskFd_);
     if (fill_ring_set_result < 0) {
-      return folly::makeUnexpected(
+      return quic::make_unexpected(
           std::runtime_error("Failed to set fill ring"));
     }
   }
@@ -341,13 +341,13 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   // Set tx ring
   int tx_ring_set_result = set_tx_ring(xskFd_, xskSenderConfig_.numFrames);
   if (tx_ring_set_result < 0) {
-    return folly::makeUnexpected(std::runtime_error("Failed to set tx ring"));
+    return quic::make_unexpected(std::runtime_error("Failed to set tx ring"));
   }
 
   // Get mmap offsets
   int xsk_map_offsets_get_result = xsk_get_mmap_offsets(xskFd_, &xskOffsets_);
   if (xsk_map_offsets_get_result < 0) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         std::runtime_error("Failed to get mmap offsets"));
   }
 
@@ -361,18 +361,18 @@ folly::Expected<folly::Unit, std::runtime_error> XskSender::initXdpSocket() {
   }
 
   if (!cxMap_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         std::runtime_error("Failed to map completion ring"));
   }
 
   // Map tx ring
   txMap_ = map_tx_ring(xskFd_, &xskOffsets_, xskSenderConfig_.numFrames);
   if (!txMap_) {
-    return folly::makeUnexpected(std::runtime_error("Failed to map tx ring"));
+    return quic::make_unexpected(std::runtime_error("Failed to map tx ring"));
   }
 
   g.dismiss();
-  return folly::Unit();
+  return {};
 }
 
 void XskSender::initAddresses(

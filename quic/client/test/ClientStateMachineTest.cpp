@@ -114,13 +114,13 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
 
   for (unsigned long i = 0; i < initialMaxStreamsBidi; i++) {
     EXPECT_TRUE(
-        client_->streamManager->createNextBidirectionalStream().hasValue());
+        client_->streamManager->createNextBidirectionalStream().has_value());
   }
   EXPECT_TRUE(
       client_->streamManager->createNextBidirectionalStream().hasError());
   for (unsigned long i = 0; i < initialMaxStreamsUni; i++) {
     EXPECT_TRUE(
-        client_->streamManager->createNextUnidirectionalStream().hasValue());
+        client_->streamManager->createNextUnidirectionalStream().has_value());
   }
   EXPECT_TRUE(
       client_->streamManager->createNextUnidirectionalStream().hasError());
@@ -130,7 +130,7 @@ TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   folly::EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   auto randomCid = ConnectionId::createRandom(8);
-  ASSERT_TRUE(randomCid.hasValue());
+  ASSERT_TRUE(randomCid.has_value());
   client_->clientConnectionId = randomCid.value();
   client_->happyEyeballsState.finished = true;
   client_->happyEyeballsState.secondSocket =
@@ -147,7 +147,7 @@ TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
   SocketObserverContainer::ManagedObserver obs;
   observerContainer->addObserver(&obs);
   auto randomCid = ConnectionId::createRandom(8);
-  ASSERT_TRUE(randomCid.hasValue());
+  ASSERT_TRUE(randomCid.has_value());
   client_->clientConnectionId = randomCid.value();
 
   client_->observerContainer = observerContainer;
@@ -170,7 +170,7 @@ TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
 
 TEST_F(ClientStateMachineTest, PreserveObserverContainerNullptr) {
   auto randomCid = ConnectionId::createRandom(8);
-  ASSERT_TRUE(randomCid.hasValue());
+  ASSERT_TRUE(randomCid.has_value());
   client_->clientConnectionId = randomCid.value();
 
   ASSERT_THAT(client_->observerContainer.lock(), IsNull());

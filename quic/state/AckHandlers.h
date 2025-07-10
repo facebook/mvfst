@@ -9,6 +9,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
 #include <quic/state/StateData.h>
 #include <functional>
 
@@ -19,11 +20,10 @@ using AckVisitor = std::function<void(
     const QuicWriteFrame&,
     const ReadAckFrame&)>;
 
-using AckedPacketVisitor =
-    std::function<folly::Expected<folly::Unit, QuicError>(
-        const OutstandingPacketWrapper&)>; // outstanding packet acked
+using AckedPacketVisitor = std::function<quic::Expected<void, QuicError>(
+    const OutstandingPacketWrapper&)>; // outstanding packet acked
 
-using AckedFrameVisitor = std::function<folly::Expected<folly::Unit, QuicError>(
+using AckedFrameVisitor = std::function<quic::Expected<void, QuicError>(
     const OutstandingPacketWrapper&, // outstanding packet acked
     const QuicWriteFrame&)>; // outstanding frame acked
 
@@ -41,7 +41,7 @@ void removeOutstandingsForAck(
  *
  * Returns AckEvent with information about what was observed during processing
  */
-[[nodiscard]] folly::Expected<AckEvent, QuicError> processAckFrame(
+[[nodiscard]] quic::Expected<AckEvent, QuicError> processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& ackFrame,

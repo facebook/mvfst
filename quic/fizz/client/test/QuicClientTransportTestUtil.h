@@ -169,7 +169,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
             std::move(fizzContext),
             std::make_unique<FizzCryptoFactory>()) {}
 
-  folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
+  quic::Expected<Optional<CachedServerTransportParameters>, QuicError>
   connectImpl(Optional<std::string> hostname) override {
     // Look up psk
     auto quicCachedPsk = getPsk(hostname);
@@ -325,7 +325,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     }
   }
 
-  folly::Expected<folly::Unit, QuicError> doHandshake(
+  quic::Expected<void, QuicError> doHandshake(
       std::unique_ptr<folly::IOBuf> buf,
       EncryptionLevel level) override {
     EXPECT_EQ(writeBuf.get(), nullptr);
@@ -346,7 +346,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
       handshakeInitiated();
     }
     readBuffers[level].append(std::move(buf));
-    return folly::unit;
+    return {};
   }
 
   bool connectInvoked() {
@@ -358,7 +358,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return params_;
   }
 
-  folly::Expected<BufPtr, QuicError> getNextTrafficSecret(
+  quic::Expected<BufPtr, QuicError> getNextTrafficSecret(
       ByteRange /*secret*/) const override {
     return folly::IOBuf::copyBuffer(getRandSecret());
   }
@@ -412,13 +412,13 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     throw std::runtime_error("matchEarlyParameters not implemented");
   }
 
-  folly::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
+  quic::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
       CipherKind,
       ByteRange) override {
     return createNoOpAead();
   }
 
-  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   buildHeaderCipher(ByteRange) override {
     return createNoOpHeaderCipher();
   }
@@ -475,8 +475,9 @@ class QuicClientTransportTestBase : public virtual testing::Test {
             qEvb_);
     sock = socket.get();
     EXPECT_CALL(*sock, setAdditionalCmsgsFunc(testing::_))
-        .WillRepeatedly(testing::Return(folly::unit));
-    EXPECT_CALL(*sock, close()).WillRepeatedly(testing::Return(folly::unit));
+        .WillRepeatedly(testing::Return(quic::Expected<void, QuicError>{}));
+    EXPECT_CALL(*sock, close())
+        .WillRepeatedly(testing::Return(quic::Expected<void, QuicError>{}));
 
     client = TestingQuicClientTransport::newClient<TestingQuicClientTransport>(
         qEvb_, std::move(socket), getFizzClientContext());
@@ -529,40 +530,41 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     ON_CALL(*sock, getGRO()).WillByDefault(testing::Return(0));
     ON_CALL(*sock, getTimestamping()).WillByDefault(testing::Return(0));
     ON_CALL(*sock, setTosOrTrafficClass(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, init(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, bind(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, connect(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
-    ON_CALL(*sock, close()).WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*sock, close())
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setReuseAddr(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setDFAndTurnOffPMTU())
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setErrMessageCallback(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, applyOptions(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setReusePort(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setRcvBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setSndBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, resumeWrite(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setGRO(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setRecvTos(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, appendCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setFD(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     EXPECT_EQ(client->getConn().selfConnectionIds.size(), 1);
     EXPECT_EQ(
         client->getConn().selfConnectionIds[0].connId,
@@ -1038,13 +1040,13 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       auto initialReadCipher = cryptoFactory.getClientInitialCipher(
           *client->getConn().initialDestinationConnectionId,
           QuicVersion::MVFST);
-      CHECK(initialReadCipher.hasValue());
+      CHECK(initialReadCipher.has_value());
       codec->setInitialReadCipher(std::move(initialReadCipher.value()));
 
       auto initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
           *client->getConn().initialDestinationConnectionId,
           QuicVersion::MVFST);
-      CHECK(initialHeaderCipher.hasValue());
+      CHECK(initialHeaderCipher.has_value());
       codec->setInitialHeaderCipher(std::move(initialHeaderCipher.value()));
 
       codec->setHandshakeReadCipher(test::createNoOpAead());

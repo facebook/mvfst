@@ -146,7 +146,7 @@ class ServerHandshakeTest : public Test {
     auto handshakeStateResult = setHandshakeState();
     if (handshakeStateResult.hasError()) {
       VLOG(1) << "server exception " << handshakeStateResult.error().message;
-      ex = folly::makeUnexpected(handshakeStateResult.error());
+      ex = quic::make_unexpected(handshakeStateResult.error());
       if (!inRoundScope_ && !handshakeCv.ready()) {
         VLOG(1) << "Posting handshake cv";
         handshakeCv.post();
@@ -185,7 +185,7 @@ class ServerHandshakeTest : public Test {
         auto result =
             handshake->doHandshake(std::move(content.data), encryptionLevel);
         if (result.hasError()) {
-          ex = folly::makeUnexpected(result.error());
+          ex = quic::make_unexpected(result.error());
         }
       }
     }
@@ -213,23 +213,23 @@ class ServerHandshakeTest : public Test {
     evb.loop();
   }
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> setHandshakeState() {
+  [[nodiscard]] quic::Expected<void, QuicError> setHandshakeState() {
     auto oneRttWriteCipherTmp = handshake->getFirstOneRttWriteCipher();
     if (oneRttWriteCipherTmp.hasError()) {
-      return folly::makeUnexpected(oneRttWriteCipherTmp.error());
+      return quic::make_unexpected(oneRttWriteCipherTmp.error());
     }
     auto oneRttReadCipherTmp = handshake->getFirstOneRttReadCipher();
     if (oneRttReadCipherTmp.hasError()) {
-      return folly::makeUnexpected(oneRttReadCipherTmp.error());
+      return quic::make_unexpected(oneRttReadCipherTmp.error());
     }
     auto zeroRttReadCipherTmp = handshake->getZeroRttReadCipher();
     if (zeroRttReadCipherTmp.hasError()) {
-      return folly::makeUnexpected(zeroRttReadCipherTmp.error());
+      return quic::make_unexpected(zeroRttReadCipherTmp.error());
     }
     auto handshakeWriteCipherTmp = std::move(conn->handshakeWriteCipher);
     auto handshakeReadCipherTmp = handshake->getHandshakeReadCipher();
     if (handshakeReadCipherTmp.hasError()) {
-      return folly::makeUnexpected(handshakeReadCipherTmp.error());
+      return quic::make_unexpected(handshakeReadCipherTmp.error());
     }
     if (oneRttWriteCipherTmp.value()) {
       oneRttWriteCipher = std::move(oneRttWriteCipherTmp.value());
@@ -246,7 +246,7 @@ class ServerHandshakeTest : public Test {
     if (handshakeWriteCipherTmp) {
       handshakeWriteCipher = std::move(handshakeWriteCipherTmp);
     }
-    return folly::unit;
+    return {};
   }
 
   void expectOneRttReadCipher(bool expected) {
@@ -380,7 +380,7 @@ class ServerHandshakeTest : public Test {
   std::unique_ptr<Aead> handshakeWriteCipher;
   std::unique_ptr<Aead> handshakeReadCipher;
 
-  folly::Expected<folly::Unit, QuicError> ex{folly::unit};
+  quic::Expected<void, QuicError> ex{};
   std::string hostname;
   std::shared_ptr<fizz::test::MockCertificateVerifier> verifier;
   std::shared_ptr<fizz::client::FizzClientContext> clientCtx;

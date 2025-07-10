@@ -110,8 +110,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TransportInfoRttSignals) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    this->getTransport()->writeChain(
-        streamId, IOBuf::copyBuffer("hello"), false);
+    [[maybe_unused]] auto typedTestWriteChain1 =
+        this->getTransport()->writeChain(
+            streamId, IOBuf::copyBuffer("hello"), false);
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 
@@ -311,8 +312,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayEqual) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    this->getTransport()->writeChain(
-        streamId, IOBuf::copyBuffer("hello"), false);
+    [[maybe_unused]] auto typedTestWriteChain2 =
+        this->getTransport()->writeChain(
+            streamId, IOBuf::copyBuffer("hello"), false);
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 
@@ -372,8 +374,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    this->getTransport()->writeChain(
-        streamId, IOBuf::copyBuffer("hello"), false);
+    [[maybe_unused]] auto typedTestWriteChain3 =
+        this->getTransport()->writeChain(
+            streamId, IOBuf::copyBuffer("hello"), false);
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 
@@ -435,7 +438,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleZeroTime) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain4 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
@@ -498,7 +501,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain5 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -529,7 +533,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain6 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // should have sent one packet
@@ -537,7 +542,8 @@ TYPED_TEST(
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain7 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // should have sent another packet
@@ -582,7 +588,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain8 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // should have sent one packet
@@ -590,7 +597,8 @@ TYPED_TEST(
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain9 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // should have sent another packet
@@ -637,7 +645,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain10 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -694,11 +703,13 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain11 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain12 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // should have sent two packets
@@ -781,7 +792,8 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
 
     const auto bufLength = 1700;
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain13 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     const auto maybeWrittenPackets1 = this->loopForWrites();
 
     // should have sent two packets
@@ -833,7 +845,8 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
 
     const auto bufLength = 10000;
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false /* eof */);
+    auto typedTestWriteChain14 = this->getTransport()->writeChain(
+        streamId, std::move(buf), false /* eof */);
 
     const auto maybeWrittenPackets = this->loopForWrites();
 
@@ -901,7 +914,8 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TotalAppLimitedTime) {
 
     const auto bufLength = 1700;
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain15 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     const auto maybeWrittenPackets1 = this->loopForWrites();
 
     // should have sent two packets
@@ -962,7 +976,8 @@ TYPED_TEST(
   auto streamId = this->getTransport()->createBidirectionalStream().value();
   const auto bufLength = 1000;
   auto buf = buildRandomInputData(bufLength);
-  this->getTransport()->writeChain(streamId, std::move(buf), false);
+  auto typedTestWriteChain16 =
+      this->getTransport()->writeChain(streamId, std::move(buf), false);
   this->loopForWrites();
   ASSERT_FALSE(this->getConn().outstandings.packets.empty());
 
@@ -998,7 +1013,8 @@ TYPED_TEST(
     auto streamId = this->getTransport()->createBidirectionalStream().value();
     const auto bufLength = 1700; // Two packets
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain17 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     this->loopForWrites();
     packetsSent += 2;
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
@@ -1018,7 +1034,8 @@ TYPED_TEST(
     auto streamId = this->getTransport()->createBidirectionalStream().value();
     const auto bufLength = 1700; // Two packets
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain18 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     this->loopForWrites();
     packetsSent += 2;
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
@@ -1040,7 +1057,8 @@ TYPED_TEST(
     auto streamId = this->getTransport()->createBidirectionalStream().value();
     const auto bufLength = 1700; // Two packets
     auto buf = buildRandomInputData(bufLength);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain19 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     this->loopForWrites();
     packetsSent += 2;
     ASSERT_EQ(this->getConn().outstandings.packets.size(), packetsSent);
@@ -1064,12 +1082,14 @@ TYPED_TEST(
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
   auto data1 = IOBuf::copyBuffer("hello");
-  this->getTransport()->writeChain(streamId, data1->clone(), false);
+  auto typedTestWriteChain20 =
+      this->getTransport()->writeChain(streamId, data1->clone(), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // write some more bytes into the same stream
   auto data2 = IOBuf::copyBuffer("world");
-  this->getTransport()->writeChain(streamId, data2->clone(), false);
+  auto typedTestWriteChain21 =
+      this->getTransport()->writeChain(streamId, data2->clone(), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   data1->appendToChain(std::move(data2));
@@ -1085,11 +1105,13 @@ TYPED_TEST(
   MockDeliveryCallback cb;
   for (uint64_t offset = 0; offset < combined->computeChainDataLength();
        offset++) {
-    this->getTransport()->registerDeliveryCallback(streamId, offset, &cb);
+    auto typedTestRegisterDelivery1 =
+        this->getTransport()->registerDeliveryCallback(streamId, offset, &cb);
     EXPECT_CALL(cb, onDeliveryAck(streamId, offset, _)).Times(1);
   }
-  this->getTransport()->registerDeliveryCallback(
-      streamId, combined->computeChainDataLength(), &cb);
+  auto typedTestRegisterDelivery2 =
+      this->getTransport()->registerDeliveryCallback(
+          streamId, combined->computeChainDataLength(), &cb);
   EXPECT_CALL(
       cb, onDeliveryAck(streamId, combined->computeChainDataLength(), _))
       .Times(0);
@@ -1119,13 +1141,15 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, nullptr, true);
+  auto typedTestWriteChain22 =
+      this->getTransport()->writeChain(streamId, nullptr, true);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
   MockDeliveryCallback cb;
-  this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
+  auto typedTestRegisterDelivery3 =
+      this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
   EXPECT_CALL(cb, onDeliveryAck(streamId, 0, _));
 
   // deliver an ACK for all of the outstanding packets
@@ -1150,14 +1174,15 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain23 = this->getTransport()->writeChain(
       streamId, folly::IOBuf::copyBuffer("a"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // should have sent one packet
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
   MockDeliveryCallback cb;
-  this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
+  auto typedTestRegisterDelivery4 =
+      this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
   EXPECT_CALL(cb, onDeliveryAck(streamId, 0, _));
 
   // deliver an ACK for all of the outstanding packets
@@ -1188,7 +1213,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, HandleIncomingKeyUpdate) {
 
   {
     // Send a packet in the current phase
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain24 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     this->loopForWrites();
     EXPECT_EQ(
@@ -1227,7 +1252,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, HandleIncomingKeyUpdate) {
   {
     // Send a packet. The connection should stay in phase one and increment the
     // number of packets written in this phase.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain25 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello4"), false);
     this->loopForWrites();
     EXPECT_EQ(this->getConn().oneRttWritePhase, ProtectionType::KeyPhaseOne);
@@ -1287,7 +1312,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateSuccess) {
 
   {
     // Send and receive a packet in the current phase
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain26 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     this->loopForWrites();
     EXPECT_EQ(
@@ -1314,7 +1339,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateSuccess) {
     conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
     // A key update should be triggered after this write is completed.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain27 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello3"), false);
     this->loopForWrites();
 
@@ -1362,7 +1387,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
 
   {
     // Send and receive a packet in the current phase
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain28 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     this->loopForWrites();
     EXPECT_EQ(
@@ -1389,7 +1414,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
     conn.transportSettings.firstKeyUpdatePacketCount.reset();
 
     // A key update should be triggered after this write is completed.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain29 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello3"), false);
     const auto maybeWriteInterval = this->loopForWrites();
     ASSERT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
@@ -1410,7 +1435,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateKeyUpdateFailure) {
 
   {
     // Send a packet in the new phase.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain30 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello3"), false);
     const auto maybeWriteInterval = this->loopForWrites();
     ASSERT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
@@ -1465,7 +1490,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateFirstKeyUpdateSuccess) {
 
   {
     // Send and receive a packet in the current phase
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain31 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     this->loopForWrites();
     EXPECT_EQ(
@@ -1494,7 +1519,7 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, InitiateFirstKeyUpdateSuccess) {
         kDefaultKeyUpdatePacketCountInterval;
 
     // A key update should be triggered after this write is completed.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain32 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello3"), false);
     this->loopForWrites();
 
@@ -1553,7 +1578,7 @@ TYPED_TEST(
 
   {
     // Send and receive a packet in the current phase
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain33 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     this->loopForWrites();
     EXPECT_EQ(
@@ -1584,7 +1609,7 @@ TYPED_TEST(
         kDefaultKeyUpdatePacketCountInterval;
 
     // A key update should be triggered after this write is completed.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain34 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello3"), false);
     this->loopForWrites();
 
@@ -1613,7 +1638,7 @@ TYPED_TEST(
         numberOfWrittenPacketsInPhase;
 
     // A key update should be triggered after this write is completed.
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain35 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello3"), false);
     this->loopForWrites();
 
@@ -2205,7 +2230,7 @@ TYPED_TEST(
   EXPECT_EQ(expectedStreamId, streamId);
 
   // send some stream data, see a packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain36 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello1"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2219,7 +2244,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello2")));
 
   // local sends goodbye with EOF, gets the ACK
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain37 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("goodbye1"), true /* eof */);
   const auto maybeWrittenPackets2 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
@@ -2276,7 +2301,7 @@ TYPED_TEST(
   EXPECT_EQ(expectedStreamId, streamId);
 
   // send some stream data with EOF, see a packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain38 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello1"), true /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2339,7 +2364,7 @@ TYPED_TEST(
   EXPECT_EQ(expectedStreamId, streamId);
 
   // send some stream data with EOF, see a packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain39 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello1"), true /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2399,7 +2424,7 @@ TYPED_TEST(
   EXPECT_EQ(expectedStreamId, streamId);
 
   // send some stream data, see a packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain40 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello1"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2472,7 +2497,7 @@ TYPED_TEST(
   EXPECT_EQ(expectedStreamId, streamId);
 
   // send some stream data, see a packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain41 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello1"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2541,7 +2566,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // local sends some stream data, see a packet be written, gets the ACK
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain42 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2553,7 +2578,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("goodbye1")));
 
   // local sends goodbye with EOF too, get the ACK, stream should close
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain43 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("goodbye2"), true /* eof */);
   const auto maybeWrittenPackets2 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
@@ -2606,7 +2631,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // send some stream data, see a packet be written, get the ACK
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain44 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2614,7 +2639,7 @@ TYPED_TEST(
       this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1));
 
   // local sends goodbye with EOF too, get the ACK, stream should close
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain45 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("goodbye"), true /* eof */);
   const auto maybeWrittenPackets2 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
@@ -2667,7 +2692,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // send some stream data with EOF, see a packet be written, get the ACK
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain46 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), true /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2722,7 +2747,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // local sends some stream data, see a packet be written, gets the ACK
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain47 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2801,7 +2826,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // local sends some stream data, see a packet be written, ACK not received
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain48 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2878,7 +2903,7 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // local sends some stream data, see a packet be written, ACK not received
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain49 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
@@ -2952,13 +2977,13 @@ TYPED_TEST(
       streamId, IOBuf::copyBuffer("hello1")));
 
   // local sends some stream data, see a packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain50 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets1 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets1));
 
   // local sends some more stream data, see another packet be written
-  this->getTransport()->writeChain(
+  auto typedTestWriteChain51 = this->getTransport()->writeChain(
       streamId, IOBuf::copyBuffer("hello2"), false /* eof */);
   const auto maybeWrittenPackets2 = this->loopForWrites();
   EXPECT_EQ(1, this->getNumPacketsWritten(maybeWrittenPackets2));
@@ -3243,7 +3268,8 @@ TYPED_TEST(
 
   // open a stream and write string
   {
-    this->getTransport()->writeChain(streamId, IOBuf::copyBuffer(str1), false);
+    auto typedTestWriteChain52 = this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer(str1), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
     // should have sent one packet
@@ -3297,7 +3323,7 @@ TYPED_TEST(
         });
 
     // open a stream and write string
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain53 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("hello"), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
@@ -3336,7 +3362,7 @@ TYPED_TEST(
         });
 
     // open a stream and write string
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain54 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("goodbye"), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
@@ -3401,7 +3427,8 @@ TYPED_TEST(
 
     // open a stream and write string
     auto buf = buildRandomInputData(2000 /* bufLength */);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain55 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
     // should have sent two packets
@@ -3448,7 +3475,7 @@ TYPED_TEST(
         });
 
     // open a stream and write string
-    this->getTransport()->writeChain(
+    auto typedTestWriteChain56 = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer("goodbye"), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
@@ -3488,7 +3515,8 @@ TYPED_TEST(
 
     // open a stream and write string
     auto buf = buildRandomInputData(3000 /* bufLength */);
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain57 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
     // should have sent three packets
@@ -3656,7 +3684,8 @@ TYPED_TEST(
 
   // open a stream and write string
   {
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain58 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
     // should have sent one packet
@@ -3800,7 +3829,8 @@ TYPED_TEST(
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
 
-    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    auto typedTestWriteChain59 =
+        this->getTransport()->writeChain(streamId, std::move(buf), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
     // make sure we wrote
@@ -4017,7 +4047,8 @@ TYPED_TEST(
 
   // open a stream and write str1
   {
-    this->getTransport()->writeChain(streamId, IOBuf::copyBuffer(str1), false);
+    auto typedTestWriteChain60 = this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer(str1), false);
     const auto maybeWrittenPackets = this->loopForWrites();
 
     // should have sent one packet
@@ -4058,7 +4089,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain61 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -4131,7 +4163,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain62 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -4204,7 +4237,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain63 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -4301,7 +4335,8 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain64 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -4396,15 +4431,18 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain65 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain66 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // third and final write, this time with EOF
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
+  auto typedTestWriteChain67 =
+      this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
   const auto maybeWrittenPackets3 = this->loopForWrites();
 
   // should have sent three packets
@@ -4482,7 +4520,8 @@ TYPED_TEST(
 
   // open a stream, write some bytes, send packet, deliver ACK
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain68 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   {
     const auto maybeWrittenPackets = this->loopForWrites();
     ASSERT_TRUE(maybeWrittenPackets.has_value());
@@ -4523,7 +4562,8 @@ TYPED_TEST(
   }
 
   // write some more bytes into the same stream, send packet, deliver ACK
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain69 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   {
     const auto maybeWrittenPackets = this->loopForWrites();
     ASSERT_TRUE(maybeWrittenPackets.has_value());
@@ -4563,7 +4603,8 @@ TYPED_TEST(
   }
 
   // third and final write, this time with EOF, send packet, deliver ACK
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
+  auto typedTestWriteChain70 =
+      this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
   {
     const auto maybeWrittenPackets = this->loopForWrites();
     ASSERT_TRUE(maybeWrittenPackets.has_value());
@@ -4634,15 +4675,18 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain71 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain72 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // third and final write, this time with EOF
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
+  auto typedTestWriteChain73 =
+      this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
   const auto maybeWrittenPackets3 = this->loopForWrites();
 
   // should have sent three packets
@@ -4801,15 +4845,18 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain74 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain75 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // third and final write, this time with EOF
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
+  auto typedTestWriteChain76 =
+      this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
   const auto maybeWrittenPackets3 = this->loopForWrites();
 
   // should have sent three packets
@@ -4966,15 +5013,18 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  auto typedTestWriteChain77 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
   const auto maybeWrittenPackets1 = this->loopForWrites();
 
   // write some more bytes into the same stream
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  auto typedTestWriteChain78 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
   const auto maybeWrittenPackets2 = this->loopForWrites();
 
   // third and final write, this time with EOF
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
+  auto typedTestWriteChain79 =
+      this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("!"), true);
   const auto maybeWrittenPackets3 = this->loopForWrites();
 
   // should have sent three packets

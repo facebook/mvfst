@@ -98,7 +98,7 @@ struct CodecResult {
  * Reads given data and returns parsed long header.
  * Returns an error if parsing is unsuccessful.
  */
-folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
+quic::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
     Cursor& cursor,
     QuicNodeType nodeType);
 
@@ -198,12 +198,12 @@ class QuicReadCodec {
   Optional<TimePoint> getHandshakeDoneTime();
 
  private:
-  folly::Expected<CodecResult, QuicError> tryParseShortHeaderPacket(
+  quic::Expected<CodecResult, QuicError> tryParseShortHeaderPacket(
       BufPtr data,
       const AckStates& ackStates,
       size_t dstConnIdSize,
       Cursor& cursor);
-  folly::Expected<CodecResult, QuicError> parseLongHeaderPacket(
+  quic::Expected<CodecResult, QuicError> parseLongHeaderPacket(
       BufQueue& queue,
       const AckStates& ackStates);
 

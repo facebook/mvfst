@@ -20,7 +20,7 @@ class QuicHeaderCodecTest : public Test {};
 
 TEST_F(QuicHeaderCodecTest, EmptyBuffer) {
   auto emptyBuffer = folly::IOBuf::create(0);
-  EXPECT_FALSE(parseHeader(*emptyBuffer).hasValue());
+  EXPECT_FALSE(parseHeader(*emptyBuffer).has_value());
 }
 
 TEST_F(QuicHeaderCodecTest, TooSmallBuffer) {
@@ -28,7 +28,7 @@ TEST_F(QuicHeaderCodecTest, TooSmallBuffer) {
   smallBuffer->append(1);
   folly::io::RWPrivateCursor wcursor(smallBuffer.get());
   wcursor.writeBE<uint8_t>(0x01);
-  EXPECT_FALSE(parseHeader(*smallBuffer).hasValue());
+  EXPECT_FALSE(parseHeader(*smallBuffer).has_value());
 }
 
 TEST_F(QuicHeaderCodecTest, VersionNegotiationPacketTest) {

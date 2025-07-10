@@ -53,7 +53,7 @@ class QuicPacketScheduler {
    * packet is a clone and the associated ClonedPacketIdentifier for both origin
    * and clone.
    */
-  [[nodiscard]] virtual folly::Expected<SchedulingResult, QuicError>
+  [[nodiscard]] virtual quic::Expected<SchedulingResult, QuicError>
   scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) = 0;
@@ -77,14 +77,14 @@ class StreamFrameScheduler {
    * Return: the first boolean indicates if at least one Blocked frame
    * is written into the packet by writeStreams function.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeStreams(
+  [[nodiscard]] quic::Expected<void, QuicError> writeStreams(
       PacketBuilderInterface& builder);
 
   bool hasPendingData() const;
 
  private:
   // Return true if this stream wrote some data
-  [[nodiscard]] folly::Expected<bool, QuicError> writeStreamLossBuffers(
+  [[nodiscard]] quic::Expected<bool, QuicError> writeStreamLossBuffers(
       PacketBuilderInterface& builder,
       QuicStreamState& stream);
 
@@ -101,25 +101,25 @@ class StreamFrameScheduler {
    * flow control limited, or not limited by connection flow control.
    */
   enum class StreamWriteResult { PACKET_FULL, NOT_LIMITED, CONN_FC_LIMITED };
-  [[nodiscard]] folly::Expected<StreamWriteResult, QuicError> writeSingleStream(
+  [[nodiscard]] quic::Expected<StreamWriteResult, QuicError> writeSingleStream(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
       uint64_t& connWritableBytes);
 
-  [[nodiscard]] folly::Expected<StreamId, QuicError> writeStreamsHelper(
+  [[nodiscard]] quic::Expected<StreamId, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
       const std::set<StreamId>& writableStreams,
       StreamId nextScheduledStream,
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeStreamsHelper(
+  [[nodiscard]] quic::Expected<void, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
       deprecated::PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeStreamsHelper(
+  [[nodiscard]] quic::Expected<void, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
       PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
@@ -131,7 +131,7 @@ class StreamFrameScheduler {
    *
    * Return: A boolean indicates if write is successful.
    */
-  [[nodiscard]] folly::Expected<bool, QuicError> writeStreamFrame(
+  [[nodiscard]] quic::Expected<bool, QuicError> writeStreamFrame(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
       uint64_t& connWritableBytes);
@@ -146,7 +146,7 @@ class RstStreamScheduler {
 
   bool hasPendingRsts() const;
 
-  [[nodiscard]] folly::Expected<bool, QuicError> writeRsts(
+  [[nodiscard]] quic::Expected<bool, QuicError> writeRsts(
       PacketBuilderInterface& builder);
 
  private:
@@ -187,7 +187,7 @@ class DatagramFrameScheduler {
 
   [[nodiscard]] bool hasPendingDatagramFrames() const;
 
-  [[nodiscard]] folly::Expected<bool, QuicError> writeDatagramFrames(
+  [[nodiscard]] quic::Expected<bool, QuicError> writeDatagramFrames(
       PacketBuilderInterface& builder);
 
  private:
@@ -200,7 +200,7 @@ class WindowUpdateScheduler {
 
   bool hasPendingWindowUpdates() const;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeWindowUpdates(
+  [[nodiscard]] quic::Expected<void, QuicError> writeWindowUpdates(
       PacketBuilderInterface& builder);
 
  private:
@@ -213,7 +213,7 @@ class BlockedScheduler {
 
   bool hasPendingBlockedFrames() const;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeBlockedFrames(
+  [[nodiscard]] quic::Expected<void, QuicError> writeBlockedFrames(
       PacketBuilderInterface& builder);
 
  private:
@@ -229,7 +229,7 @@ class CryptoStreamScheduler {
   /**
    * Returns whether or we could write data to the stream.
    */
-  [[nodiscard]] folly::Expected<bool, QuicError> writeCryptoData(
+  [[nodiscard]] quic::Expected<bool, QuicError> writeCryptoData(
       PacketBuilderInterface& builder);
 
   bool hasData() const;
@@ -300,7 +300,7 @@ class FrameScheduler : public QuicPacketScheduler {
 
   FrameScheduler(folly::StringPiece name, QuicConnectionStateBase& conn);
 
-  [[nodiscard]] folly::Expected<SchedulingResult, QuicError>
+  [[nodiscard]] quic::Expected<SchedulingResult, QuicError>
   scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
@@ -356,7 +356,7 @@ class CloningScheduler : public QuicPacketScheduler {
    * packet is a clone and the associated ClonedPacketIdentifier for both origin
    * and clone.
    */
-  [[nodiscard]] folly::Expected<SchedulingResult, QuicError>
+  [[nodiscard]] quic::Expected<SchedulingResult, QuicError>
   scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;

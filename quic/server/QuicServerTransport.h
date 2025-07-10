@@ -137,10 +137,10 @@ class QuicServerTransport
   void verifiedClientAddress();
 
   // From QuicTransportBase
-  folly::Expected<folly::Unit, QuicError> onReadData(
+  quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) override;
-  folly::Expected<folly::Unit, QuicError> writeData() override;
+  quic::Expected<void, QuicError> writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
   bool hasWriteCipher() const override;
@@ -215,7 +215,7 @@ class QuicServerTransport
   // Made it protected for testing purpose
   void registerTransportKnobParamHandler(
       uint64_t paramId,
-      std::function<folly::Expected<folly::Unit, QuicError>(
+      std::function<quic::Expected<void, QuicError>(
           QuicServerTransport*,
           TransportKnobParam::Val)>&& handler);
 
@@ -237,8 +237,7 @@ class QuicServerTransport
   void maybeNotifyTransportReady();
   void maybeNotifyConnectionIdRetired();
   void maybeNotifyConnectionIdBound();
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
-  maybeWriteNewSessionTicket();
+  [[nodiscard]] quic::Expected<void, QuicError> maybeWriteNewSessionTicket();
   void maybeIssueConnectionIds();
   void maybeNotifyHandshakeFinished();
   bool hasReadCipher() const;
@@ -269,7 +268,7 @@ class QuicServerTransport
   QuicServerConnectionState* serverConn_;
   folly::F14FastMap<
       uint64_t,
-      std::function<folly::Expected<folly::Unit, QuicError>(
+      std::function<quic::Expected<void, QuicError>(
           QuicServerTransport*,
           TransportKnobParam::Val)>>
       transportKnobParamHandlers_;

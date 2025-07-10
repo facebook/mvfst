@@ -11,9 +11,9 @@
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocketImpl.h>
 
-#include <folly/Expected.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/net/NetworkSocket.h>
+#include <quic/common/Expected.h>
 #include <cstddef>
 #include <memory>
 
@@ -55,19 +55,19 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
     }
   }
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> init(
+  [[nodiscard]] quic::Expected<void, QuicError> init(
       sa_family_t family) override;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> bind(
+  [[nodiscard]] quic::Expected<void, QuicError> bind(
       const folly::SocketAddress& address) override;
   // TODO: bind should return Expected
 
   [[nodiscard]] bool isBound() const override;
 
-  folly::Expected<folly::Unit, QuicError> connect(
+  quic::Expected<void, QuicError> connect(
       const folly::SocketAddress& address) override;
 
-  folly::Expected<folly::Unit, QuicError> close() override;
+  quic::Expected<void, QuicError> close() override;
 
   void resumeRead(ReadCallback* callback) override;
   // TODO: resumeRead should return Expected
@@ -123,26 +123,25 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   // generic segmentation offload get/set
   // negative return value means GSO is not available
-  folly::Expected<int, QuicError> getGSO() override;
+  quic::Expected<int, QuicError> getGSO() override;
 
   // generic receive offload get/set
   // negative return value means GRO is not available
-  folly::Expected<int, QuicError> getGRO() override;
-  folly::Expected<folly::Unit, QuicError> setGRO(bool bVal) override;
+  quic::Expected<int, QuicError> getGRO() override;
+  quic::Expected<void, QuicError> setGRO(bool bVal) override;
 
   // receive tos cmsgs
   // if true, the IPv6 Traffic Class/IPv4 Type of Service field should be
   // populated in OnDataAvailableParams.
-  folly::Expected<folly::Unit, QuicError> setRecvTos(bool recvTos) override;
-  folly::Expected<bool, QuicError> getRecvTos() override;
+  quic::Expected<void, QuicError> setRecvTos(bool recvTos) override;
+  quic::Expected<bool, QuicError> getRecvTos() override;
 
-  folly::Expected<folly::Unit, QuicError> setTosOrTrafficClass(
-      uint8_t tos) override;
+  quic::Expected<void, QuicError> setTosOrTrafficClass(uint8_t tos) override;
 
   /**
    * Returns the socket address this socket is bound to and error otherwise.
    */
-  [[nodiscard]] folly::Expected<folly::SocketAddress, QuicError> address()
+  [[nodiscard]] quic::Expected<folly::SocketAddress, QuicError> address()
       const override;
 
   /**
@@ -160,23 +159,23 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   /**
    * Set extra control messages to send
    */
-  folly::Expected<folly::Unit, QuicError> setCmsgs(
+  quic::Expected<void, QuicError> setCmsgs(
       const folly::SocketCmsgMap& cmsgs) override;
-  folly::Expected<folly::Unit, QuicError> appendCmsgs(
+  quic::Expected<void, QuicError> appendCmsgs(
       const folly::SocketCmsgMap& cmsgs) override;
-  folly::Expected<folly::Unit, QuicError> setAdditionalCmsgsFunc(
+  quic::Expected<void, QuicError> setAdditionalCmsgsFunc(
       std::function<Optional<folly::SocketCmsgMap>()>&& additionalCmsgsFunc)
       override;
 
   /*
    * Packet timestamping is currentl not supported.
    */
-  folly::Expected<int, QuicError> getTimestamping() override;
+  quic::Expected<int, QuicError> getTimestamping() override;
 
   /**
    * Set SO_REUSEADDR flag on the socket. Default is OFF.
    */
-  folly::Expected<folly::Unit, QuicError> setReuseAddr(bool reuseAddr) override;
+  quic::Expected<void, QuicError> setReuseAddr(bool reuseAddr) override;
 
   /**
    * Set Dont-Fragment (DF) but ignore Path MTU.
@@ -186,32 +185,32 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    * This may be desirable for apps that has its own PMTU Discovery mechanism.
    * See http://man7.org/linux/man-pages/man7/ip.7.html for more info.
    */
-  folly::Expected<folly::Unit, QuicError> setDFAndTurnOffPMTU() override;
+  quic::Expected<void, QuicError> setDFAndTurnOffPMTU() override;
 
   /**
    * Callback for receiving errors on the UDP sockets
    */
-  folly::Expected<folly::Unit, QuicError> setErrMessageCallback(
+  quic::Expected<void, QuicError> setErrMessageCallback(
       ErrMessageCallback* /* errMessageCallback */) override;
 
-  folly::Expected<folly::Unit, QuicError> applyOptions(
+  quic::Expected<void, QuicError> applyOptions(
       const folly::SocketOptionMap& options,
       folly::SocketOptionKey::ApplyPos pos) override;
 
   /**
    * Set reuse port mode to call bind() on the same address multiple times
    */
-  folly::Expected<folly::Unit, QuicError> setReusePort(bool reusePort) override;
+  quic::Expected<void, QuicError> setReusePort(bool reusePort) override;
 
   /**
    * Set SO_RCVBUF option on the socket, if not zero. Default is zero.
    */
-  folly::Expected<folly::Unit, QuicError> setRcvBuf(int rcvBuf) override;
+  quic::Expected<void, QuicError> setRcvBuf(int rcvBuf) override;
 
   /**
    * Set SO_SNDBUF option on the socket, if not zero. Default is zero.
    */
-  folly::Expected<folly::Unit, QuicError> setSndBuf(int sndBuf) override;
+  quic::Expected<void, QuicError> setSndBuf(int sndBuf) override;
 
   /**
    * Use an already bound file descriptor. You can either transfer ownership
@@ -219,8 +218,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    * FDOwnership::SHARED. In case FD is shared, it will not be `close`d in
    * destructor.
    */
-  folly::Expected<folly::Unit, QuicError> setFD(int fd, FDOwnership ownership)
-      override;
+  quic::Expected<void, QuicError> setFD(int fd, FDOwnership ownership) override;
 
   int getFD() override;
 

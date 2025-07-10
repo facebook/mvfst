@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <folly/Unit.h>
 #include <folly/portability/GMock.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumberCipher.h>
+#include <quic/common/Expected.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
@@ -26,12 +26,9 @@ class MockPacketNumberCipher : public PacketNumberCipher {
  public:
   virtual ~MockPacketNumberCipher() = default;
 
+  MOCK_METHOD((quic::Expected<void, QuicError>), setKey, (ByteRange key));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
-      setKey,
-      (ByteRange key));
-  MOCK_METHOD(
-      (folly::Expected<HeaderProtectionMask, QuicError>),
+      (quic::Expected<HeaderProtectionMask, QuicError>),
       mask,
       (ByteRange),
       (const));
@@ -54,14 +51,14 @@ class MockAead : public Aead {
 
   MOCK_METHOD(Optional<TrafficKey>, getKey, (), (const));
   MOCK_METHOD(
-      (folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError>),
+      (quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError>),
       _inplaceEncrypt,
       (std::unique_ptr<folly::IOBuf> & plaintext,
        const folly::IOBuf* associatedData,
        uint64_t seqNum),
       (const));
 
-  folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError> inplaceEncrypt(
+  quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {
@@ -102,7 +99,7 @@ class MockAead : public Aead {
     using namespace testing;
     ON_CALL(*this, _inplaceEncrypt(_, _, _))
         .WillByDefault(InvokeWithoutArgs(
-            []() -> folly::Expected<std::unique_ptr<folly::IOBuf>, QuicError> {
+            []() -> quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError> {
               return folly::IOBuf::copyBuffer("ciphertext");
             }));
     ON_CALL(*this, _decrypt(_, _, _)).WillByDefault(InvokeWithoutArgs([]() {

@@ -43,7 +43,7 @@ void startHappyEyeballs(
     QuicAsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> happyEyeballsSetUpSocket(
+[[nodiscard]] quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket& socket,
     Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,

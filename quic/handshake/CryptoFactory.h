@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
 #include <quic/handshake/Aead.h>
 
 #include <memory>
@@ -21,21 +21,21 @@ namespace quic {
 
 class CryptoFactory {
  public:
-  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<Aead>, QuicError>
   getClientInitialCipher(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
-  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<Aead>, QuicError>
   getServerInitialCipher(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
 
-  [[nodiscard]] folly::Expected<BufPtr, QuicError>
+  [[nodiscard]] quic::Expected<BufPtr, QuicError>
   makeServerInitialTrafficSecret(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
-  [[nodiscard]] folly::Expected<BufPtr, QuicError>
+  [[nodiscard]] quic::Expected<BufPtr, QuicError>
   makeClientInitialTrafficSecret(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;
@@ -43,7 +43,7 @@ class CryptoFactory {
   /**
    * Makes the header cipher for writing client initial packets.
    */
-  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   makeClientInitialHeaderCipher(
       const ConnectionId& initialDestinationConnectionId,
       QuicVersion version) const;
@@ -51,7 +51,7 @@ class CryptoFactory {
   /**
    * Makes the header cipher for writing server initial packets.
    */
-  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   makeServerInitialHeaderCipher(
       const ConnectionId& initialDestinationConnectionId,
       QuicVersion version) const;
@@ -59,19 +59,19 @@ class CryptoFactory {
   /**
    * Crypto layer specific methods.
    */
-  [[nodiscard]] virtual folly::Expected<BufPtr, QuicError>
+  [[nodiscard]] virtual quic::Expected<BufPtr, QuicError>
   makeInitialTrafficSecret(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const = 0;
 
-  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] virtual quic::Expected<std::unique_ptr<Aead>, QuicError>
   makeInitialAead(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const = 0;
 
-  [[nodiscard]] virtual folly::
+  [[nodiscard]] virtual quic::
       Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
       makePacketNumberCipher(ByteRange baseSecret) const = 0;
 

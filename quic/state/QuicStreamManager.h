@@ -11,6 +11,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
 #include <quic/priority/PriorityQueue.h>
 #include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/StreamData.h>
@@ -255,47 +256,47 @@ class QuicStreamManager {
   /*
    * Create the state for a stream if it does not exist and return it.
    */
-  [[nodiscard]] folly::Expected<QuicStreamState*, QuicError> createStream(
+  [[nodiscard]] quic::Expected<QuicStreamState*, QuicError> createStream(
       StreamId streamId,
       OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Create a new bidirectional stream group.
    */
-  [[nodiscard]] folly::Expected<StreamGroupId, LocalErrorCode>
+  [[nodiscard]] quic::Expected<StreamGroupId, LocalErrorCode>
   createNextBidirectionalStreamGroup();
 
   /*
    * Create and return the state for the next available bidirectional stream.
    */
-  [[nodiscard]] folly::Expected<QuicStreamState*, LocalErrorCode>
+  [[nodiscard]] quic::Expected<QuicStreamState*, LocalErrorCode>
   createNextBidirectionalStream(
       OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Create a new unidirectional stream group.
    */
-  [[nodiscard]] folly::Expected<StreamGroupId, LocalErrorCode>
+  [[nodiscard]] quic::Expected<StreamGroupId, LocalErrorCode>
   createNextUnidirectionalStreamGroup();
 
   /*
    * Create and return the state for the next available unidirectional stream.
    */
-  [[nodiscard]] folly::Expected<QuicStreamState*, LocalErrorCode>
+  [[nodiscard]] quic::Expected<QuicStreamState*, LocalErrorCode>
   createNextUnidirectionalStream(
       OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Return the stream state or create it if the state has not yet been created.
    */
-  [[nodiscard]] folly::Expected<QuicStreamState*, QuicError> getStream(
+  [[nodiscard]] quic::Expected<QuicStreamState*, QuicError> getStream(
       StreamId streamId,
       OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
   /*
    * Remove all the state for a stream that is being closed.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> removeClosedStream(
+  [[nodiscard]] quic::Expected<void, QuicError> removeClosedStream(
       StreamId streamId);
 
   /*
@@ -445,7 +446,7 @@ class QuicStreamManager {
     lossStreams_.insert(id);
   }
 
-  folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
+  quic::Expected<void, LocalErrorCode> setPriorityQueue(
       std::unique_ptr<PriorityQueue> queue);
 
   /**
@@ -532,25 +533,26 @@ class QuicStreamManager {
   /*
    * Set the max number of local bidirectional streams.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
-  setMaxLocalBidirectionalStreams(uint64_t maxStreams, bool force = false);
+  [[nodiscard]] quic::Expected<void, QuicError> setMaxLocalBidirectionalStreams(
+      uint64_t maxStreams,
+      bool force = false);
 
   /*
    * Set the max number of local unidirectional streams.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] quic::Expected<void, QuicError>
   setMaxLocalUnidirectionalStreams(uint64_t maxStreams, bool force = false);
 
   /*
    * Set the max number of remote bidirectional streams.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] quic::Expected<void, QuicError>
   setMaxRemoteBidirectionalStreams(uint64_t maxStreams);
 
   /*
    * Set the max number of remote unidirectional streams.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] quic::Expected<void, QuicError>
   setMaxRemoteUnidirectionalStreams(uint64_t maxStreams);
 
   bool consumeMaxLocalBidirectionalStreamIdIncreased();
@@ -558,10 +560,10 @@ class QuicStreamManager {
 
   // This function messes with the connection state and you should think very
   // hard before calling it
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
-  refreshTransportSettings(const TransportSettings& settings);
+  [[nodiscard]] quic::Expected<void, QuicError> refreshTransportSettings(
+      const TransportSettings& settings);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> updatePriorityQueueImpl(
+  [[nodiscard]] quic::Expected<void, QuicError> updatePriorityQueueImpl(
       bool useNewPriorityQueue);
 
   void setStreamLimitWindowingFraction(uint64_t fraction) {
@@ -841,24 +843,24 @@ class QuicStreamManager {
  private:
   void updateAppIdleState();
 
-  [[nodiscard]] folly::Expected<QuicStreamState*, QuicError>
+  [[nodiscard]] quic::Expected<QuicStreamState*, QuicError>
   getOrCreateOpenedLocalStream(StreamId streamId);
 
-  [[nodiscard]] folly::Expected<QuicStreamState*, QuicError>
+  [[nodiscard]] quic::Expected<QuicStreamState*, QuicError>
   getOrCreatePeerStream(
       StreamId streamId,
       OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] quic::Expected<void, QuicError>
   setMaxRemoteBidirectionalStreamsInternal(uint64_t maxStreams, bool force);
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] quic::Expected<void, QuicError>
   setMaxRemoteUnidirectionalStreamsInternal(uint64_t maxStreams, bool force);
 
   QuicStreamState* FOLLY_NULLABLE instantiatePeerStream(
       StreamId streamId,
       OptionalIntegral<StreamGroupId> groupId);
 
-  [[nodiscard]] folly::Expected<StreamGroupId, LocalErrorCode>
+  [[nodiscard]] quic::Expected<StreamGroupId, LocalErrorCode>
   createNextStreamGroup(StreamGroupId& groupId, StreamIdSet& streamGroups);
 
   void addToReadableStreams(const QuicStreamState& stream);

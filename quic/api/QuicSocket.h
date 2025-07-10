@@ -115,48 +115,49 @@ class QuicSocket : virtual public QuicSocketLite {
    * Returns the current offset already read or written by the application on
    * the given stream.
    */
-  virtual folly::Expected<size_t, LocalErrorCode> getStreamReadOffset(
+  virtual quic::Expected<size_t, LocalErrorCode> getStreamReadOffset(
       StreamId id) const = 0;
-  virtual folly::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
+  virtual quic::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
       StreamId id) const = 0;
   /**
    * Returns the amount of data buffered by the transport waiting to be written
    */
-  virtual folly::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
+  virtual quic::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
       StreamId id) const = 0;
 
   /**
    * Returns the current flow control windows for the connection.
    * Use getStreamFlowControl for stream flow control window.
    */
-  virtual folly::Expected<FlowControlState, LocalErrorCode>
+  virtual quic::Expected<FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const = 0;
 
   /**
    * Returns the minimum of current send flow control window and available
    * buffer space.
    */
-  virtual folly::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
+  virtual quic::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
       StreamId id) const = 0;
 
   /**
    * Sets the flow control window for the connection.
    * Use setStreamFlowControlWindow for per Stream flow control.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  setConnectionFlowControlWindow(uint64_t windowSize) = 0;
+  virtual quic::Expected<void, LocalErrorCode> setConnectionFlowControlWindow(
+      uint64_t windowSize) = 0;
 
   /**
    * Sets the flow control window for the stream.
    * Use setConnectionFlowControlWindow for connection flow control.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  setStreamFlowControlWindow(StreamId id, uint64_t windowSize) = 0;
+  virtual quic::Expected<void, LocalErrorCode> setStreamFlowControlWindow(
+      StreamId id,
+      uint64_t windowSize) = 0;
 
   /**
    * Get stream priority.
    */
-  virtual folly::Expected<PriorityQueue::Priority, LocalErrorCode>
+  virtual quic::Expected<PriorityQueue::Priority, LocalErrorCode>
   getStreamPriority(StreamId id) = 0;
 
   /**
@@ -179,10 +180,8 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Pause/Resume read callback being triggered when data is available.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> pauseRead(
-      StreamId id) = 0;
-  virtual folly::Expected<folly::Unit, LocalErrorCode> resumeRead(
-      StreamId id) = 0;
+  virtual quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) = 0;
+  virtual quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) = 0;
 
   /**
    * ===== Peek/Consume API =====
@@ -207,17 +206,15 @@ class QuicSocket : virtual public QuicSocketLite {
    * };
    */
 
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setPeekCallback(
+  virtual quic::Expected<void, LocalErrorCode> setPeekCallback(
       StreamId id,
       PeekCallback* cb) = 0;
 
   /**
    * Pause/Resume peek callback being triggered when data is available.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> pausePeek(
-      StreamId id) = 0;
-  virtual folly::Expected<folly::Unit, LocalErrorCode> resumePeek(
-      StreamId id) = 0;
+  virtual quic::Expected<void, LocalErrorCode> pausePeek(StreamId id) = 0;
+  virtual quic::Expected<void, LocalErrorCode> resumePeek(StreamId id) = 0;
 
   /**
    * Peek at the given stream.
@@ -233,7 +230,7 @@ class QuicSocket : virtual public QuicSocketLite {
    * Calling peek() when there is no data/eof to deliver will return an
    * EAGAIN-like error code.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> peek(
+  virtual quic::Expected<void, LocalErrorCode> peek(
       StreamId id,
       const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
           peekCallback) = 0;
@@ -252,39 +249,38 @@ class QuicSocket : virtual public QuicSocketLite {
    * will return an EAGAIN-like error code.
    *
    */
-  virtual folly::
-      Expected<folly::Unit, std::pair<LocalErrorCode, Optional<uint64_t>>>
-      consume(StreamId id, uint64_t offset, size_t amount) = 0;
+  virtual quic::Expected<void, std::pair<LocalErrorCode, Optional<uint64_t>>>
+  consume(StreamId id, uint64_t offset, size_t amount) = 0;
 
   /**
    * Equivalent of calling consume(id, stream->currentReadOffset, amount);
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> consume(
+  virtual quic::Expected<void, LocalErrorCode> consume(
       StreamId id,
       size_t amount) = 0;
 
   /**
    *  Create a bidirectional stream group.
    */
-  virtual folly::Expected<StreamGroupId, LocalErrorCode>
+  virtual quic::Expected<StreamGroupId, LocalErrorCode>
   createBidirectionalStreamGroup() = 0;
 
   /**
    *  Create a unidirectional stream group.
    */
-  virtual folly::Expected<StreamGroupId, LocalErrorCode>
+  virtual quic::Expected<StreamGroupId, LocalErrorCode>
   createUnidirectionalStreamGroup() = 0;
 
   /**
    *  Same as createBidirectionalStream(), but creates a stream in a group.
    */
-  virtual folly::Expected<StreamId, LocalErrorCode>
+  virtual quic::Expected<StreamId, LocalErrorCode>
   createBidirectionalStreamInGroup(StreamGroupId groupId) = 0;
 
   /**
    *  Same as createBidirectionalStream(), but creates a stream in a group.
    */
-  virtual folly::Expected<StreamId, LocalErrorCode>
+  virtual quic::Expected<StreamId, LocalErrorCode>
   createUnidirectionalStreamInGroup(StreamGroupId groupId) = 0;
 
   /**
@@ -315,7 +311,7 @@ class QuicSocket : virtual public QuicSocketLite {
    * be invoked for anything. If the registration succeeds, the callback is
    * guaranteed to receive an onByteEventRegistered() notification.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> registerTxCallback(
+  virtual quic::Expected<void, LocalErrorCode> registerTxCallback(
       const StreamId id,
       const uint64_t offset,
       ByteEventCallback* cb) = 0;
@@ -336,13 +332,14 @@ class QuicSocket : virtual public QuicSocketLite {
    * Returns true if the error was an ApplicationErrorCode, and the stream was
    * reset.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  maybeResetStreamFromReadError(StreamId id, QuicErrorCode error) = 0;
+  virtual quic::Expected<void, LocalErrorCode> maybeResetStreamFromReadError(
+      StreamId id,
+      QuicErrorCode error) = 0;
 
   /**
    * Set the ping callback
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setPingCallback(
+  virtual quic::Expected<void, LocalErrorCode> setPingCallback(
       PingCallback* cb) = 0;
 
   /**
@@ -387,7 +384,7 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Set the read callback for Datagrams
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setDatagramCallback(
+  virtual quic::Expected<void, LocalErrorCode> setDatagramCallback(
       DatagramCallback* cb) = 0;
 
   /**
@@ -407,20 +404,20 @@ class QuicSocket : virtual public QuicSocketLite {
    * Returns the currently available received Datagrams.
    * Returns all datagrams if atMost is 0.
    */
-  virtual folly::Expected<std::vector<ReadDatagram>, LocalErrorCode>
+  virtual quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>
   readDatagrams(size_t atMost = 0) = 0;
 
   /**
    * Returns the currently available received Datagram IOBufs.
    * Returns all datagrams if atMost is 0.
    */
-  virtual folly::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
+  virtual quic::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) = 0;
 
   /**
    *  Sets a retransmission policy on a stream group.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  virtual quic::Expected<void, LocalErrorCode>
   setStreamGroupRetransmissionPolicy(
       StreamGroupId groupId,
       std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept = 0;

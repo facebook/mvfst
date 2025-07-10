@@ -30,11 +30,11 @@ class IOBufQuicBatch {
   ~IOBufQuicBatch() = default;
 
   // returns true if it succeeds and false if the loop should end
-  [[nodiscard]] folly::Expected<bool, QuicError> write(
+  [[nodiscard]] quic::Expected<bool, QuicError> write(
       BufPtr&& buf,
       size_t encodedSize);
 
-  [[nodiscard]] folly::Expected<bool, QuicError> flush();
+  [[nodiscard]] quic::Expected<bool, QuicError> flush();
 
   FOLLY_ALWAYS_INLINE uint64_t getPktSent() const {
     return result_.packetsSent;
@@ -52,7 +52,7 @@ class IOBufQuicBatch {
   void reset();
 
   // flushes the internal buffers
-  [[nodiscard]] folly::Expected<bool, QuicError> flushInternal();
+  [[nodiscard]] quic::Expected<bool, QuicError> flushInternal();
 
   /**
    * Returns whether or not the errno can be retried later.

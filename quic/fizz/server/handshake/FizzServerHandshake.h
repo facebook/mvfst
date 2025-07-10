@@ -40,7 +40,7 @@ class FizzServerHandshake : public ServerHandshake {
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;
   std::unique_ptr<Aead> buildAead(ByteRange secret) override;
-  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   buildHeaderCipher(ByteRange secret) override;
   BufPtr getNextTrafficSecret(ByteRange secret) const override;
 

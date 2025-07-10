@@ -7,6 +7,14 @@
 
 #pragma once
 
+// Protect against Windows NO_ERROR macro that conflicts with our enums
+#ifdef _WIN32
+#ifdef NO_ERROR
+#define QUIC_CONSTANTS_HAD_NO_ERROR_MACRO
+#undef NO_ERROR
+#endif
+#endif // _WIN32
+
 #include <folly/chrono/Clock.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/IOBuf.h>
@@ -800,3 +808,11 @@ constexpr uint8_t kEcnCE = 0b11;
 constexpr uint16_t kSkipOneInNPacketSequenceNumber = 1000;
 constexpr uint16_t kDistanceToClearSkippedPacketNumber = 1000;
 } // namespace quic
+
+// Restore Windows NO_ERROR macro if it was previously defined
+#ifdef _WIN32
+#ifdef QUIC_CONSTANTS_HAD_NO_ERROR_MACRO
+#define NO_ERROR 0L
+#undef QUIC_CONSTANTS_HAD_NO_ERROR_MACRO
+#endif
+#endif // _WIN32

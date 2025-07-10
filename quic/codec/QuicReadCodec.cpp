@@ -39,11 +39,11 @@ Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
   return decodeVersionNegotiation(*longHeaderInvariant, cursor);
 }
 
-folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
+quic::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
     Cursor& cursor,
     QuicNodeType nodeType) {
   if (cursor.isAtEnd() || !cursor.canAdvance(sizeof(uint8_t))) {
-    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+    return quic::make_unexpected(TransportErrorCode::PROTOCOL_VIOLATION);
   }
   auto initialByte = cursor.readBE<uint8_t>();
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
@@ -52,7 +52,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
-    return folly::makeUnexpected(longHeaderInvariant.error());
+    return quic::make_unexpected(longHeaderInvariant.error());
   }
   if (longHeaderInvariant->invariant.version ==
       QuicVersion::VERSION_NEGOTIATION) {
@@ -61,7 +61,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
     // function.
     // Since VN is not allowed to be coalesced with another packet
     // type, we clear out the buffer to avoid anyone else parsing it.
-    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+    return quic::make_unexpected(TransportErrorCode::PROTOCOL_VIOLATION);
   }
   auto type = parseLongHeaderType(initialByte);
 
@@ -72,7 +72,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
-    return folly::makeUnexpected(parsedLongHeader.error());
+    return quic::make_unexpected(parsedLongHeader.error());
   }
 
   return std::move(parsedLongHeader.value());
@@ -91,7 +91,7 @@ static PacketDropReason getDecryptErrorReason(ProtectionType protectionType) {
   }
 }
 
-folly::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
+quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
     BufQueue& queue,
     const AckStates& ackStates) {
   Cursor cursor(queue.front());
@@ -217,7 +217,7 @@ folly::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
       folly::range(sample), initialByteRange, packetNumberByteRange);
   if (decryptResult.hasError()) {
     VLOG(4) << "Failed to decrypt long header " << connIdToHex();
-    return folly::makeUnexpected(decryptResult.error());
+    return quic::make_unexpected(decryptResult.error());
   }
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
       initialByteRange.data()[0], packetNumberByteRange, expectedNextPacketNum);
@@ -257,15 +257,14 @@ folly::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   auto packetRes =
       decodeRegularPacket(std::move(longHeader), params_, std::move(decrypted));
 
-  if (!packetRes.hasValue()) {
+  if (!packetRes.has_value()) {
     return CodecResult(CodecError(std::move(packetRes.error())));
   }
 
   return CodecResult(std::move(*packetRes));
 }
 
-folly::Expected<CodecResult, QuicError>
-QuicReadCodec::tryParseShortHeaderPacket(
+quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
     BufPtr data,
     const AckStates& ackStates,
     size_t dstConnIdSize,
@@ -293,7 +292,7 @@ QuicReadCodec::tryParseShortHeaderPacket(
       sampleByteRange, initialByteRange, packetNumberByteRange);
   if (decryptResult.hasError()) {
     VLOG(4) << "Failed to decrypt short header " << connIdToHex();
-    return folly::makeUnexpected(decryptResult.error());
+    return quic::make_unexpected(decryptResult.error());
   }
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
       initialByteRange.data()[0], packetNumberByteRange, expectedNextPacketNum);
@@ -399,7 +398,7 @@ QuicReadCodec::tryParseShortHeaderPacket(
   auto packetRes = decodeRegularPacket(
       std::move(*shortHeader), params_, std::move(decrypted));
 
-  if (!packetRes.hasValue()) {
+  if (!packetRes.has_value()) {
     return CodecResult(CodecError(std::move(packetRes.error())));
   }
   return CodecResult(std::move(*packetRes));

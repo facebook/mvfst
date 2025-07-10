@@ -58,7 +58,7 @@ class PacketBuilderInterface {
 
   [[nodiscard]] virtual uint32_t remainingSpaceInPkt() const = 0;
 
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError>
+  [[nodiscard]] virtual quic::Expected<void, QuicError>
   encodePacketHeader() = 0;
 
   // Functions to write bytes to the packet
@@ -130,8 +130,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   // PacketBuilderInterface
   [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodePacketHeader()
-      override;
+  [[nodiscard]] quic::Expected<void, QuicError> encodePacketHeader() override;
 
   void writeBE(uint8_t data) override;
   void writeBE(uint16_t data) override;
@@ -209,8 +208,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
 
   [[nodiscard]] uint32_t getHeaderBytes() const override;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodePacketHeader()
-      override;
+  [[nodiscard]] quic::Expected<void, QuicError> encodePacketHeader() override;
 
   // PacketBuilderInterface
   [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
@@ -253,7 +251,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void releaseOutputBuffer() && override;
 
  private:
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodeLongHeader(
+  [[nodiscard]] quic::Expected<void, QuicError> encodeLongHeader(
       const LongHeader& longHeader,
       PacketNum largestAckedPacketNum);
   void encodeShortHeader(
@@ -432,7 +430,7 @@ class RetryPacketBuilder {
   [[nodiscard]] bool canBuildPacket() const noexcept;
 
  private:
-  folly::Expected<folly::Unit, QuicError> writeRetryPacket();
+  quic::Expected<void, QuicError> writeRetryPacket();
 
   BufPtr packetBuf_;
 
@@ -481,8 +479,7 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
         : 0;
   }
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> encodePacketHeader()
-      override {
+  [[nodiscard]] quic::Expected<void, QuicError> encodePacketHeader() override {
     CHECK(false)
         << "We only support wrapping builder that has already encoded header";
   }

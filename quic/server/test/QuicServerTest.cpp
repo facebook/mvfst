@@ -1114,7 +1114,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
 
   EXPECT_CALL(*rawConnIdAlgo, canParseNonConst(_)).WillOnce(Return(true));
   EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
-      .WillOnce(Return(folly::makeUnexpected(QuicError(
+      .WillOnce(Return(quic::make_unexpected(QuicError(
           TransportErrorCode::INTERNAL_ERROR, "This CID has COVID-19"))));
   EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
@@ -1480,7 +1480,7 @@ auto createInitialStream(
       streamData->computeChainDataLength(),
       true,
       std::nullopt /* skipLenHint */);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_TRUE(dataLen);
   writeStreamFrameData(builder, std::move(streamData), *dataLen);

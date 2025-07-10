@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/Expected.h>
+#include <quic/common/Expected.h>
 
 #include <quic/QuicException.h>
 #include <quic/api/IoBufQuicBatch.h>
@@ -89,7 +89,7 @@ struct WriteQuicDataResult {
  * Attempts to write data from all frames in the QUIC connection into the UDP
  * socket supplied with the aead and the headerCipher.
  */
-[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+[[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
 writeQuicDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
@@ -106,7 +106,7 @@ writeQuicDataToSocket(
  *
  * return the number of packets written to socket.
  */
-[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+[[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
 writeCryptoAndAckDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
@@ -124,7 +124,7 @@ writeCryptoAndAckDataToSocket(
  * This is useful when the crypto stream still needs to be sent in separate
  * packets and cannot use the encryption of the data key.
  */
-[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+[[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
 writeQuicDataExceptCryptoStreamToSocket(
     QuicAsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
@@ -139,7 +139,7 @@ writeQuicDataExceptCryptoStreamToSocket(
  * Writes frame data including zero rtt data to the socket with the supplied
  * zero rtt cipher.
  */
-[[nodiscard]] folly::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
+[[nodiscard]] quic::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
     QuicAsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -181,7 +181,7 @@ void handleRetransmissionWritten(
  * with new data, as well as retranmissions. Returns true if the data sent is
  * new data.
  */
-[[nodiscard]] folly::Expected<bool, QuicError> handleStreamWritten(
+[[nodiscard]] quic::Expected<bool, QuicError> handleStreamWritten(
     QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
     uint64_t frameOffset,
@@ -202,7 +202,7 @@ bool handleStreamBufMetaWritten(
 /**
  * Update the connection state after sending a new packet.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> updateConnection(
+[[nodiscard]] quic::Expected<void, QuicError> updateConnection(
     QuicConnectionStateBase& conn,
     Optional<ClonedPacketIdentifier> clonedPacketIdentifier,
     RegularQuicWritePacket packet,
@@ -268,7 +268,7 @@ void writeShortClose(
  * whether or not there are enough bytes to sample for the header encryption
  * from the encryptedBody via a CHECK.
  */
-folly::Expected<folly::Unit, QuicError> encryptPacketHeader(
+quic::Expected<void, QuicError> encryptPacketHeader(
     HeaderForm headerForm,
     uint8_t* header,
     size_t headerLen,
@@ -282,7 +282,7 @@ folly::Expected<folly::Unit, QuicError> encryptPacketHeader(
  * data allowed by the writableBytesFunc and will only write a maximum
  * number of packetLimit packets at each invocation.
  */
-[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+[[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
 writeConnectionDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
@@ -299,7 +299,7 @@ writeConnectionDataToSocket(
     TimePoint writeLoopBeginTime,
     const std::string& token = std::string());
 
-[[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+[[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
 writeProbingDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
@@ -338,12 +338,11 @@ void updateOneRttWriteCipher(
     QuicConnectionStateBase& conn,
     std::unique_ptr<Aead> aead,
     ProtectionType oneRttPhase);
-folly::Expected<folly::Unit, QuicError> maybeHandleIncomingKeyUpdate(
+quic::Expected<void, QuicError> maybeHandleIncomingKeyUpdate(
     QuicConnectionStateBase& conn);
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> maybeInitiateKeyUpdate(
+[[nodiscard]] quic::Expected<void, QuicError> maybeInitiateKeyUpdate(
     QuicConnectionStateBase& conn);
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-maybeVerifyPendingKeyUpdate(
+[[nodiscard]] quic::Expected<void, QuicError> maybeVerifyPendingKeyUpdate(
     QuicConnectionStateBase& conn,
     const OutstandingPacketWrapper& outstandingPacket,
     const RegularQuicPacket& ackPacket);

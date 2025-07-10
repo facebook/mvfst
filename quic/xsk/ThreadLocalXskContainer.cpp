@@ -11,7 +11,7 @@
 
 namespace facebook::xdpsocket {
 
-folly::Expected<folly::Unit, std::runtime_error> ThreadLocalXskContainer::init(
+quic::Expected<void, std::runtime_error> ThreadLocalXskContainer::init(
     const XskContainerConfig& xskContainerConfig) {
   initializeQueueParams(xskContainerConfig.interfaceName);
 
@@ -53,7 +53,7 @@ folly::Expected<folly::Unit, std::runtime_error> ThreadLocalXskContainer::init(
     socketId += groupSize;
     qid++;
   }
-  return folly::Unit();
+  return {};
 }
 
 XskSender* ThreadLocalXskContainer::pickXsk(

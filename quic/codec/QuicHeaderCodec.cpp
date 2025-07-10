@@ -18,30 +18,35 @@ ParsedHeaderResult::ParsedHeaderResult(
   CHECK(isVersionNegotiation || parsedHeader);
 }
 
-folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
+quic::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
     const folly::IOBuf& data) {
   Cursor cursor(&data);
   if (!cursor.canAdvance(sizeof(uint8_t))) {
-    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   uint8_t initialByte = cursor.readBE<uint8_t>();
   if (getHeaderForm(initialByte) == HeaderForm::Long) {
-    return parseLongHeader(initialByte, cursor)
-        .then([](ParsedLongHeaderResult&& parsedLongHeaderResult) {
-          if (parsedLongHeaderResult.isVersionNegotiation) {
-            return ParsedHeaderResult(true, std::nullopt);
-          }
-          // We compensate for the type byte length by adding it back.
-          DCHECK(parsedLongHeaderResult.parsedLongHeader);
-          return ParsedHeaderResult(
-              false,
-              PacketHeader(
-                  std::move(parsedLongHeaderResult.parsedLongHeader->header)));
-        });
+    auto longHeaderResult = parseLongHeader(initialByte, cursor);
+    if (!longHeaderResult.has_value()) {
+      return quic::make_unexpected(longHeaderResult.error());
+    }
+    auto parsedLongHeaderResult = std::move(longHeaderResult.value());
+    if (parsedLongHeaderResult.isVersionNegotiation) {
+      return ParsedHeaderResult(true, std::nullopt);
+    }
+    // We compensate for the type byte length by adding it back.
+    DCHECK(parsedLongHeaderResult.parsedLongHeader);
+    return ParsedHeaderResult(
+        false,
+        PacketHeader(
+            std::move(parsedLongHeaderResult.parsedLongHeader->header)));
   } else {
-    return parseShortHeader(initialByte, cursor).then([](ShortHeader&& header) {
-      return ParsedHeaderResult(false, PacketHeader(std::move(header)));
-    });
+    auto shortHeaderResult = parseShortHeader(initialByte, cursor);
+    if (!shortHeaderResult.has_value()) {
+      return quic::make_unexpected(shortHeaderResult.error());
+    }
+    return ParsedHeaderResult(
+        false, PacketHeader(std::move(shortHeaderResult.value())));
   }
 }
 

@@ -20,19 +20,19 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
 
   ~MockAsyncUDPSocket() override {}
 
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), init, (sa_family_t));
+  MOCK_METHOD((quic::Expected<void, QuicError>), init, (sa_family_t));
   MOCK_METHOD(
-      (folly::Expected<folly::SocketAddress, QuicError>),
+      (quic::Expected<folly::SocketAddress, QuicError>),
       address,
       (),
       (const));
   MOCK_METHOD((const folly::SocketAddress&), addressRef, (), (const));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       bind,
       (const folly::SocketAddress&));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       setFD,
       (int, QuicAsyncUDPSocket::FDOwnership));
   MOCK_METHOD(
@@ -70,80 +70,74 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
        size_t count,
        const WriteOptions* options));
   MOCK_METHOD(
-      (folly::Expected<RecvResult, QuicError>),
+      (quic::Expected<RecvResult, QuicError>),
       recvmmsgNetworkData,
       (uint64_t readBufferSize,
        uint16_t numPackets,
        NetworkData& networkData,
        Optional<folly::SocketAddress>& peerAddress,
        size_t& totalData));
-  MOCK_METHOD((folly::Expected<int, QuicError>), getGRO, ());
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setGRO, (bool));
+  MOCK_METHOD((quic::Expected<int, QuicError>), getGRO, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), setGRO, (bool));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       setAdditionalCmsgsFunc,
       (std::function<Optional<folly::SocketCmsgMap>()>&&));
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setRcvBuf, (int));
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setSndBuf, (int));
-  MOCK_METHOD((folly::Expected<int, QuicError>), getTimestamping, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), setRcvBuf, (int));
+  MOCK_METHOD((quic::Expected<void, QuicError>), setSndBuf, (int));
+  MOCK_METHOD((quic::Expected<int, QuicError>), getTimestamping, ());
   MOCK_METHOD(void, resumeRead, (QuicAsyncUDPSocket::ReadCallback*));
   MOCK_METHOD(void, pauseRead, ());
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), close, ());
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
-      setDFAndTurnOffPMTU,
-      ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), close, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), setDFAndTurnOffPMTU, ());
   MOCK_METHOD(int, getFD, ());
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setReusePort, (bool));
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setReuseAddr, (bool));
+  MOCK_METHOD((quic::Expected<void, QuicError>), setReusePort, (bool));
+  MOCK_METHOD((quic::Expected<void, QuicError>), setReuseAddr, (bool));
   MOCK_METHOD(void, dontFragment, (bool));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       setErrMessageCallback,
       (QuicAsyncUDPSocket::ErrMessageCallback*));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       connect,
       (const folly::SocketAddress&));
   MOCK_METHOD(bool, isBound, (), (const));
-  MOCK_METHOD((folly::Expected<int, QuicError>), getGSO, ());
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setGSO, (int));
+  MOCK_METHOD((quic::Expected<int, QuicError>), getGSO, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), setGSO, (int));
   MOCK_METHOD(ssize_t, recvmsg, (struct msghdr*, int));
   MOCK_METHOD(
       int,
       recvmmsg,
       (struct mmsghdr*, unsigned int, unsigned int, struct timespec*));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       setCmsgs,
       (const folly::SocketCmsgMap&));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       setNontrivialCmsgs,
       (const folly::SocketNontrivialCmsgMap&));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       appendCmsgs,
       (const folly::SocketCmsgMap&));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       appendNontrivialCmsgs,
       (const folly::SocketNontrivialCmsgMap&));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       applyOptions,
       (const folly::SocketOptionMap&, folly::SocketOptionKey::ApplyPos));
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), setRecvTos, (bool));
-  MOCK_METHOD((folly::Expected<bool, QuicError>), getRecvTos, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), setRecvTos, (bool));
+  MOCK_METHOD((quic::Expected<bool, QuicError>), getRecvTos, ());
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       setTosOrTrafficClass,
       (uint8_t));
   MOCK_METHOD((bool), isWritableCallbackSet, (), (const));
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
-      resumeWrite,
-      (WriteCallback*));
+  MOCK_METHOD((quic::Expected<void, QuicError>), resumeWrite, (WriteCallback*));
   MOCK_METHOD((void), pauseWrite, ());
 };
 

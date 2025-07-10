@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
 #include <folly/String.h>
@@ -51,14 +52,14 @@ struct ConnectionId {
    * Create a ConnectionId from a vector of bytes.
    * Returns Expected<ConnectionId, QuicError> to handle validation errors.
    */
-  [[nodiscard]] static folly::Expected<ConnectionId, QuicError> create(
+  [[nodiscard]] static quic::Expected<ConnectionId, QuicError> create(
       const std::vector<uint8_t>& connidIn);
 
   /**
    * Create a ConnectionId from a cursor and length.
    * Returns Expected<ConnectionId, QuicError> to handle validation errors.
    */
-  [[nodiscard]] static folly::Expected<ConnectionId, QuicError> create(
+  [[nodiscard]] static quic::Expected<ConnectionId, QuicError> create(
       Cursor& cursor,
       size_t len);
 
@@ -76,7 +77,7 @@ struct ConnectionId {
    * Create a random ConnectionId with the given length.
    * Returns Expected<ConnectionId, QuicError> to handle validation errors.
    */
-  static folly::Expected<ConnectionId, QuicError> createRandom(size_t len);
+  static quic::Expected<ConnectionId, QuicError> createRandom(size_t len);
 
  private:
   ConnectionId() = default;

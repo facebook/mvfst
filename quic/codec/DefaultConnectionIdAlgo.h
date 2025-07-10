@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <quic/QuicException.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/common/Expected.h>
 
 namespace quic {
 
@@ -54,7 +54,7 @@ class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
  public:
   ~DefaultConnectionIdAlgo() override = default;
 
-  static folly::Expected<ServerConnectionIdParams, QuicError>
+  static quic::Expected<ServerConnectionIdParams, QuicError>
   parseConnectionIdDefault(const ConnectionId& id) noexcept;
 
   /**
@@ -65,13 +65,13 @@ class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
   /**
    * Parses ServerConnectionIdParams from the given connection id.
    */
-  folly::Expected<ServerConnectionIdParams, QuicError> parseConnectionId(
+  quic::Expected<ServerConnectionIdParams, QuicError> parseConnectionId(
       const ConnectionId& id) noexcept override;
 
   /**
    * Encodes the given ServerConnectionIdParams into connection id
    */
-  folly::Expected<ConnectionId, QuicError> encodeConnectionId(
+  quic::Expected<ConnectionId, QuicError> encodeConnectionId(
       const ServerConnectionIdParams& params) noexcept override;
 };
 

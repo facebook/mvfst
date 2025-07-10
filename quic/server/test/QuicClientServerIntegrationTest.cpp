@@ -174,7 +174,7 @@ TEST_F(ServerTransportParameters, DatagramTestDisabled) {
   auto param = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size,
       serverTransportParams->parameters);
-  ASSERT_TRUE(param.hasValue());
+  ASSERT_TRUE(param.has_value());
   EXPECT_FALSE(param.value().has_value());
 }
 
@@ -197,7 +197,7 @@ TEST_F(ServerTransportParameters, DatagramTestEnabled) {
   auto param = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size,
       serverTransportParams->parameters);
-  ASSERT_TRUE(param.hasValue());
+  ASSERT_TRUE(param.has_value());
   CHECK(param.value().has_value());
   // also validate value because why not
   EXPECT_EQ(param.value(), kMaxDatagramFrameSize);

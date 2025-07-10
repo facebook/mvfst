@@ -27,7 +27,7 @@ class PacketRebuilder {
       PacketBuilderInterface& regularBuilder,
       QuicConnectionStateBase& conn);
 
-  [[nodiscard]] folly::Expected<Optional<ClonedPacketIdentifier>, QuicError>
+  [[nodiscard]] quic::Expected<Optional<ClonedPacketIdentifier>, QuicError>
   rebuildFromPacket(OutstandingPacketWrapper& packet);
 
   // TODO: Same as passing cipherOverhead into the CloningScheduler, this really

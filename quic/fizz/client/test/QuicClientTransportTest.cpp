@@ -293,8 +293,17 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
     std::unique_ptr<folly::IOBuf> data,
     StreamId streamId,
     MockReadCallback* readCallback) {
-  client->setReadCallback(streamId, readCallback);
-  client->writeChain(streamId, data->clone(), true);
+  auto readCallbackResult = client->setReadCallback(streamId, readCallback);
+  if (!readCallbackResult.has_value()) {
+    return folly::makeFuture<StreamPair>(
+        folly::make_exception_wrapper<std::runtime_error>(
+            "setReadCallback failed"));
+  }
+  auto writeResult = client->writeChain(streamId, data->clone(), true);
+  if (!writeResult.has_value()) {
+    return folly::makeFuture<StreamPair>(
+        folly::make_exception_wrapper<std::runtime_error>("writeChain failed"));
+  }
   auto streamData = new StreamData(streamId);
   auto dataCopy = std::shared_ptr<folly::IOBuf>(std::move(data));
   EXPECT_CALL(*readCallback, readAvailable(streamId))
@@ -309,13 +318,21 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
                       << " sent=" << dataCopy->computeChainDataLength();
             streamData->append(std::move(readData->first), readData->second);
             if (readData->second) {
-              c->setReadCallback(id, nullptr);
+              auto clearCallbackResult = c->setReadCallback(id, nullptr);
+              if (!clearCallbackResult.has_value()) {
+                LOG(WARNING) << "Failed to clear read callback: "
+                             << toString(clearCallbackResult.error());
+              }
             }
           }));
   ON_CALL(*readCallback, readError(streamId, _))
       .WillByDefault(Invoke([streamData, this](auto sid, auto err) mutable {
         streamData->setException(err);
-        client->setReadCallback(sid, nullptr);
+        auto clearErrorCallbackResult = client->setReadCallback(sid, nullptr);
+        if (!clearErrorCallbackResult.has_value()) {
+          LOG(WARNING) << "Failed to clear read callback on error: "
+                       << toString(clearErrorCallbackResult.error());
+        }
       }));
   return streamData->promise.getFuture().within(30s);
 }
@@ -367,7 +384,8 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
-  client->setStreamFlowControlWindow(streamId, 256);
+  auto setStreamFlowControlWindowResult =
+      client->setStreamFlowControlWindow(streamId, 256);
   auto data = IOBuf::create(4096);
   data->append(4096);
   memset(data->writableData(), 'a', data->length());
@@ -1104,44 +1122,45 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto newSocket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
   ON_CALL(*newSocket, setReuseAddr(_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setAdditionalCmsgsFunc(_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setDFAndTurnOffPMTU())
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setErrMessageCallback(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setTosOrTrafficClass(_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, init(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, applyOptions(testing::_, testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, bind(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, connect(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
-  ON_CALL(*newSocket, close()).WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*newSocket, close())
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, resumeWrite(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setGRO(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setRecvTos(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, getRecvTos()).WillByDefault(testing::Return(false));
   ON_CALL(*newSocket, setCmsgs(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, appendCmsgs(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, getTimestamping()).WillByDefault(testing::Return(0));
   ON_CALL(*newSocket, setReusePort(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setRcvBuf(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setSndBuf(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setFD(testing::_, testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
 
   auto newSocketPtr = newSocket.get();
   EXPECT_CALL(*sock, pauseRead());
@@ -1160,44 +1179,45 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
   auto newSocket =
       std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
   ON_CALL(*newSocket, setReuseAddr(_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setAdditionalCmsgsFunc(_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setDFAndTurnOffPMTU())
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setErrMessageCallback(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setTosOrTrafficClass(_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, init(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, applyOptions(testing::_, testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, bind(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, connect(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
-  ON_CALL(*newSocket, close()).WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*newSocket, close())
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, resumeWrite(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setGRO(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setRecvTos(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, getRecvTos()).WillByDefault(testing::Return(false));
   ON_CALL(*newSocket, setCmsgs(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, appendCmsgs(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, getTimestamping()).WillByDefault(testing::Return(0));
   ON_CALL(*newSocket, setReusePort(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setRcvBuf(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setSndBuf(testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*newSocket, setFD(testing::_, testing::_))
-      .WillByDefault(testing::Return(folly::unit));
+      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   auto newSocketPtr = newSocket.get();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
@@ -1453,46 +1473,47 @@ class QuicClientTransportHappyEyeballsTest
 
     ON_CALL(*secondSock, address()).WillByDefault(testing::Return(serverAddr));
     ON_CALL(*secondSock, setAdditionalCmsgsFunc(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, getGSO).WillByDefault(testing::Return(0));
     ON_CALL(*secondSock, getGRO).WillByDefault(testing::Return(0));
     ON_CALL(*secondSock, init(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, bind(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, connect(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
-    ON_CALL(*secondSock, close()).WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*secondSock, close())
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, resumeWrite(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setGRO(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setRecvTos(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, getRecvTos()).WillByDefault(testing::Return(false));
     ON_CALL(*secondSock, setTosOrTrafficClass(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, appendCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, getTimestamping()).WillByDefault(testing::Return(0));
     ON_CALL(*secondSock, setReuseAddr(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setDFAndTurnOffPMTU())
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setErrMessageCallback(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, applyOptions(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setReusePort(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setRcvBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setSndBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setFD(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
   }
 
  protected:
@@ -1732,7 +1753,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*sock, write(firstAddress, _, _));
     EXPECT_CALL(*secondSock, bind(_))
         .WillOnce(Invoke([](const folly::SocketAddress&) {
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, "oopsies"));
         }));
     client->start(&clientConnSetupCallback, &clientConnCallback);
@@ -2447,7 +2468,7 @@ class QuicClientVersionParamInvalidTest
 TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback3 = client->setReadCallback(streamId, &readCb);
   bool dataDelivered = false;
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
@@ -2551,7 +2572,7 @@ TEST_F(QuicClientTransportAfterStartTest, PartialReadLoopCounting) {
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback4 = client->setReadCallback(streamId, &readCb);
   bool dataDelivered = false;
   auto data = IOBuf::copyBuffer("hello");
 
@@ -2600,22 +2621,22 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithRetriableError) {
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback5 = client->setReadCallback(streamId, &readCb);
   EXPECT_CALL(readCb, readAvailable(_)).Times(0);
   EXPECT_CALL(readCb, readError(_, _)).Times(0);
   deliverNetworkError(EAGAIN);
-  client->setReadCallback(streamId, nullptr);
+  auto fizzClientSetReadCallback6 = client->setReadCallback(streamId, nullptr);
   client->close(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithNonRetriableError) {
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback7 = client->setReadCallback(streamId, &readCb);
   EXPECT_CALL(readCb, readAvailable(_)).Times(0);
   // TODO: we currently do not close the socket, but maybe we can in the future.
   EXPECT_CALL(readCb, readError(_, _)).Times(0);
   deliverNetworkError(EBADF);
-  client->setReadCallback(streamId, nullptr);
+  auto fizzClientSetReadCallback8 = client->setReadCallback(streamId, nullptr);
   client->close(std::nullopt);
 }
 
@@ -2624,7 +2645,7 @@ TEST_F(
     ReadStreamMultiplePacketsWithRetriableError) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback9 = client->setReadCallback(streamId, &readCb);
   bool dataDelivered = false;
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
@@ -2659,7 +2680,7 @@ TEST_F(
     ReadStreamMultiplePacketsWithNonRetriableError) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback10 = client->setReadCallback(streamId, &readCb);
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
 
@@ -2679,7 +2700,7 @@ TEST_F(
     socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
     deliverNetworkError(EBADF);
   }
-  client->setReadCallback(streamId, nullptr);
+  auto fizzClientSetReadCallback11 = client->setReadCallback(streamId, nullptr);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
@@ -2896,7 +2917,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback12 = client->setReadCallback(streamId, &readCb);
   bool dataDelivered = false;
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
@@ -2957,7 +2978,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback13 = client->setReadCallback(streamId, &readCb);
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
   FizzCryptoFactory cryptoFactory;
@@ -3084,8 +3105,9 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
-  client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true);
+  auto fizzClientSetReadCallback14 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientWriteChain2 =
+      client->writeChain(streamId, expected->clone(), true);
   loopForWrites();
   // ack all the packets
   ASSERT_FALSE(client->getConn().outstandings.packets.empty());
@@ -3157,8 +3179,9 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
   StreamId streamId = client->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");
-  client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true);
+  auto fizzClientSetReadCallback15 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientWriteChain3 =
+      client->writeChain(streamId, expected->clone(), true);
 
   loopForWrites();
 
@@ -3219,8 +3242,9 @@ TEST_P(
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
-  client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true);
+  auto fizzClientSetReadCallback16 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientWriteChain4 =
+      client->writeChain(streamId, expected->clone(), true);
 
   loopForWrites();
   socketWrites.clear();
@@ -3348,8 +3372,9 @@ TEST_F(QuicClientTransportAfterStartTest, RecvOneRttAck) {
   StreamId streamId = client->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");
-  client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true);
+  auto fizzClientSetReadCallback17 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientWriteChain5 =
+      client->writeChain(streamId, expected->clone(), true);
   loopForWrites();
 
   AckBlocks sentPackets;
@@ -3377,8 +3402,9 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
   StreamId streamId = client->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");
-  client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true);
+  auto fizzClientSetReadCallback18 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientWriteChain6 =
+      client->writeChain(streamId, expected->clone(), true);
   loopForWrites();
   auto packet = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -3562,7 +3588,8 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
   auto expected = IOBuf::copyBuffer("hello");
   client->idleTimeout().cancelTimerCallback();
   ASSERT_FALSE(client->idleTimeout().isTimerCallbackScheduled());
-  client->writeChain(streamId, expected->clone(), false);
+  auto fizzClientWriteChain7 =
+      client->writeChain(streamId, expected->clone(), false);
   loopForWrites();
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
@@ -3577,7 +3604,8 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   client->idleTimeout().cancelTimerCallback();
   auto streamId = client->createBidirectionalStream().value();
   auto expected = folly::IOBuf::copyBuffer("hello");
-  client->writeChain(streamId, expected->clone(), false);
+  auto fizzClientWriteChain8 =
+      client->writeChain(streamId, expected->clone(), false);
   loopForWrites();
   ASSERT_TRUE(client->idleTimeout().isTimerCallbackScheduled());
 }
@@ -3696,7 +3724,7 @@ TEST_F(
 TEST_F(QuicClientTransportAfterStartTest, ReceiveReliableRst) {
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback19 = client->setReadCallback(streamId, &readCb);
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 5, 5);
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
@@ -3746,21 +3774,22 @@ TEST_F(
   ASSERT_FALSE(writeFrame(rstFrame, builder2).hasError());
 
   auto data = folly::IOBuf::copyBuffer("hello");
-  writeStreamFrameHeader(
-      builder2,
-      streamId,
-      0,
-      data->computeChainDataLength(),
-      data->computeChainDataLength(),
-      false,
-      std::nullopt /* skipLenHint */);
+  ASSERT_TRUE(writeStreamFrameHeader(
+                  builder2,
+                  streamId,
+                  0,
+                  data->computeChainDataLength(),
+                  data->computeChainDataLength(),
+                  false,
+                  std::nullopt /* skipLenHint */)
+                  .has_value());
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));
   deliverData(packet2->coalesce());
 
   auto readData = client->read(streamId, 0);
-  ASSERT_TRUE(readData.hasValue());
+  ASSERT_TRUE(readData.has_value());
   ASSERT_NE(readData.value().first, nullptr);
   EXPECT_TRUE(folly::IOBufEqualTo()(*readData.value().first, *data));
 }
@@ -3769,7 +3798,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   // A RstStreamFrame will be written to sock when we receive a RstStreamFrame
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback20 = client->setReadCallback(streamId, &readCb);
 
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto id) {
     auto readData = client->read(id, 0);
@@ -3812,7 +3841,7 @@ TEST_F(
   // A RstStreamFrame will be written to sock when we receive a RstStreamFrame
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback21 = client->setReadCallback(streamId, &readCb);
 
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto id) {
     auto readData = client->read(id, 0);
@@ -3831,11 +3860,12 @@ TEST_F(
       0 /* largestAcked */));
   deliverData(packet->coalesce());
 
-  client->setReadCallback(streamId, nullptr);
+  auto fizzClientSetReadCallback22 = client->setReadCallback(streamId, nullptr);
 
   AckBlocks sentPackets;
   auto writeData = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, writeData->clone(), true);
+  auto fizzClientWriteChain9 =
+      client->writeChain(streamId, writeData->clone(), true);
   loopForWrites();
   verifyShortPackets(sentPackets);
 
@@ -3861,7 +3891,8 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
 
   AckBlocks sentPackets;
   auto writeData = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, writeData->clone(), true);
+  auto fizzClientWriteChain10 =
+      client->writeChain(streamId, writeData->clone(), true);
   loopForWrites();
   verifyShortPackets(sentPackets);
 
@@ -3897,10 +3928,12 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
   AckBlocks sentPackets;
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
-  client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
+  auto fizzClientRegisterDelivery1 =
+      client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
 
   auto data = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, data->clone(), true);
+  auto fizzClientWriteChain11 =
+      client->writeChain(streamId, data->clone(), true);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -3922,7 +3955,8 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
 
-  client->writeChain(streamId, nullptr, true, &deliveryCallback);
+  auto fizzClientWriteChain12 =
+      client->writeChain(streamId, nullptr, true, &deliveryCallback);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -3946,13 +3980,18 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackRange) {
       client->createBidirectionalStream(false /* replaySafe */).value();
 
   auto data = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, data->clone(), false, nullptr);
+  auto fizzClientWriteChain13 =
+      client->writeChain(streamId, data->clone(), false, nullptr);
   for (uint64_t offset = 0; offset < data->computeChainDataLength(); offset++) {
-    client->registerDeliveryCallback(streamId, offset, &deliveryCallback);
+    auto fizzClientRegisterDelivery2 =
+        client->registerDeliveryCallback(streamId, offset, &deliveryCallback);
     EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, offset, _)).Times(1);
   }
-  client->registerDeliveryCallback(
-      streamId, data->computeChainDataLength(), &deliveryCallback);
+  ASSERT_TRUE(
+      client
+          ->registerDeliveryCallback(
+              streamId, data->computeChainDataLength(), &deliveryCallback)
+          .has_value());
   EXPECT_CALL(
       deliveryCallback,
       onDeliveryAck(streamId, data->computeChainDataLength(), _))
@@ -3982,7 +4021,8 @@ TEST_F(
       client->createBidirectionalStream(false /* replaySafe */).value();
 
   auto data = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, data->clone(), true);
+  auto fizzClientWriteChain14 =
+      client->writeChain(streamId, data->clone(), true);
 
   loopForWrites();
   verifyShortPackets(sentPackets);
@@ -3998,7 +4038,8 @@ TEST_F(
   // Register a DeliveryCallback for an offset that's already delivered, will
   // callback immediately
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, 0, _)).Times(1);
-  client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
+  auto fizzClientRegisterDelivery3 =
+      client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
   eventbase_->loopOnce();
   client->close(std::nullopt);
 }
@@ -4011,7 +4052,8 @@ TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
   // Write 10 bytes of data, and write EOF on an empty stream. So EOF offset is
   // 10
   auto data = test::buildRandomInputData(10);
-  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain15 =
+      client->writeChain(streamId, data->clone(), true, &deliveryCallback);
 
   loopForWrites();
   verifyShortPackets(sentPackets);
@@ -4032,7 +4074,8 @@ TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
 TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
   NiceMock<MockWriteCallback> writeCallback;
   EXPECT_CALL(writeCallback, onConnectionWriteReady(_));
-  client->notifyPendingWriteOnConnection(&writeCallback);
+  auto fizzClientNotifyPendingWrite1 =
+      client->notifyPendingWriteOnConnection(&writeCallback);
   loopForWrites();
   client->close(std::nullopt);
 }
@@ -4042,7 +4085,8 @@ TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
   EventBase evb2;
   auto qEvb2 = std::make_shared<FollyQuicEventBase>(&evb2);
   EXPECT_CALL(writeCallback, onConnectionWriteReady(_)).Times(0);
-  client->notifyPendingWriteOnConnection(&writeCallback);
+  auto fizzClientNotifyPendingWrite2 =
+      client->notifyPendingWriteOnConnection(&writeCallback);
   client->detachEventBase();
   client->attachEventBase(qEvb2);
   loopForWrites();
@@ -4121,7 +4165,8 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   StreamId streamId = *client->createBidirectionalStream();
   auto write = IOBuf::copyBuffer("ice cream");
-  client->writeChain(streamId, write->clone(), true, nullptr);
+  auto fizzClientWriteChain16 =
+      client->writeChain(streamId, write->clone(), true, nullptr);
   loopForWrites();
 
   std::unique_ptr<IOBuf> bytesWrittenToNetwork = nullptr;
@@ -4171,10 +4216,11 @@ TEST_F(
     VersionNegotiationPacketNotSupported) {
   StreamId streamId = *client->createBidirectionalStream();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback23 = client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain17 =
+      client->writeChain(streamId, write->clone(), true, &deliveryCallback);
   loopForWrites();
   auto packet = VersionNegotiationPacketBuilder(
                     *client->getConn().initialDestinationConnectionId,
@@ -4198,10 +4244,11 @@ TEST_F(
     VersionNegotiationPacketCurrentVersion) {
   StreamId streamId = *client->createBidirectionalStream();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback24 = client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain18 =
+      client->writeChain(streamId, write->clone(), true, &deliveryCallback);
   loopForWrites();
 
   auto packet = VersionNegotiationPacketBuilder(
@@ -4331,11 +4378,13 @@ TEST_F(QuicClientTransportVersionAndRetryTest, FrameNotAllowed) {
 TEST_F(QuicClientTransportAfterStartTest, SendReset) {
   AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
-  client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
+  auto fizzClientSetReadCallback25 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientRegisterDelivery4 =
+      client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
   EXPECT_CALL(deliveryCallback, onCanceled(streamId, 100));
   EXPECT_CALL(readCb, readError(streamId, _));
-  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto fizzClientResetStream1 =
+      client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   verifyShortPackets(sentPackets);
 
@@ -4381,11 +4430,12 @@ RegularQuicWritePacket* findPacketWithStream(
 
 TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback26 = client->setReadCallback(streamId, &readCb);
   SCOPE_EXIT {
     client->close(std::nullopt);
   };
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain19 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
@@ -4396,21 +4446,24 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
   ASSERT_FALSE(result.hasError());
   ASSERT_TRUE(client->getConn().streamManager->hasLoss());
 
-  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto fizzClientResetStream2 =
+      client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_FALSE(client->getConn().streamManager->hasLoss());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback27 = client->setReadCallback(streamId, &readCb);
   SCOPE_EXIT {
     client->close(std::nullopt);
   };
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain20 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
-  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto fizzClientResetStream3 =
+      client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
@@ -4428,12 +4481,15 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
 TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
-  client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
+  auto fizzClientSetReadCallback28 = client->setReadCallback(streamId, &readCb);
+  auto fizzClientRegisterDelivery5 =
+      client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
   EXPECT_CALL(deliveryCallback, onCanceled(streamId, 100));
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain21 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
 
-  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  auto fizzClientResetStream4 =
+      client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   verifyShortPackets(sentPackets);
   const auto& readCbs = client->getReadCallbacks();
@@ -4461,9 +4517,10 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
 
   AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback29 = client->setReadCallback(streamId, &readCb);
   auto data = test::buildRandomInputData(10);
-  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain22 =
+      client->writeChain(streamId, data->clone(), true, &deliveryCallback);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -4515,13 +4572,17 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
 
   NiceMock<MockDeliveryCallback> deliveryCallback2;
   auto data = IOBuf::copyBuffer("hello");
-  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
-  client->writeChain(streamId2, data->clone(), true, &deliveryCallback2);
+  auto fizzClientWriteChain23 =
+      client->writeChain(streamId, data->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain24 =
+      client->writeChain(streamId2, data->clone(), true, &deliveryCallback2);
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, _, _))
       .WillOnce(Invoke([&](auto, auto, auto) {
-        client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
-        client->resetStream(streamId2, GenericApplicationErrorCode::UNKNOWN);
+        auto fizzClientResetStream5 =
+            client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+        auto fizzClientResetStream6 = client->resetStream(
+            streamId2, GenericApplicationErrorCode::UNKNOWN);
       }));
   auto packet1 = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -4566,7 +4627,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
       .transportSettings.removeStreamAfterEomCallbackUnset = true;
 
   StreamId streamId = client->createBidirectionalStream().value();
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback30 = client->setReadCallback(streamId, &readCb);
   auto data = test::buildRandomInputData(10);
   auto packet = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -4595,7 +4656,8 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   EXPECT_EQ(conn.streamManager->readableStreams().count(streamId), 0);
 
   AckBlocks sentPackets;
-  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain25 =
+      client->writeChain(streamId, data->clone(), true, &deliveryCallback);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -4712,13 +4774,14 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationCloseNoError) {
 TEST_F(QuicClientTransportAfterStartTest, DestroyWithoutClosing) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback31 = client->setReadCallback(streamId, &readCb);
 
   EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(clientConnCallback, onConnectionEnd());
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain26 =
+      client->writeChain(streamId, write->clone(), true, &deliveryCallback);
   loopForWrites();
 
   EXPECT_CALL(deliveryCallback, onCanceled(_, _));
@@ -4728,10 +4791,11 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyWithoutClosing) {
 TEST_F(QuicClientTransportAfterStartTest, DestroyWhileDraining) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback32 = client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
+  auto fizzClientWriteChain27 =
+      client->writeChain(streamId, write->clone(), true, &deliveryCallback);
 
   loopForWrites();
   EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
@@ -4782,10 +4846,11 @@ TEST_F(QuicClientTransportAfterStartTest, WriteThrowsExceptionWhileDraining) {
 TEST_F(QuicClientTransportAfterStartTest, DestroyEvbWhileLossTimeoutActive) {
   StreamId streamId = client->createBidirectionalStream().value();
 
-  client->setReadCallback(streamId, &readCb);
+  auto fizzClientSetReadCallback33 = client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true);
+  auto fizzClientWriteChain28 =
+      client->writeChain(streamId, write->clone(), true);
   loopForWrites();
   EXPECT_TRUE(client->lossTimeout().isTimerCallbackScheduled());
   eventbase_.reset();
@@ -5238,7 +5303,8 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain29 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
@@ -5316,7 +5382,8 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain30 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
@@ -5396,7 +5463,8 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain31 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
@@ -5449,7 +5517,8 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
   mockClientHandshake->maxInitialStreamData = 10;
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain32 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   mockClientHandshake->setZeroRttRejected(
@@ -5491,7 +5560,8 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionCannotResendZeroRttData) {
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain33 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
@@ -5512,48 +5582,49 @@ class QuicZeroRttHappyEyeballsClientTransportTest
     secondSock = secondSocket.get();
     ON_CALL(*secondSock, address()).WillByDefault(testing::Return(serverAddr));
     ON_CALL(*secondSock, setAdditionalCmsgsFunc(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, getGSO).WillByDefault(testing::Return(0));
     ON_CALL(*secondSock, getGRO).WillByDefault(testing::Return(0));
     ON_CALL(*secondSock, init(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, bind(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, connect(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
-    ON_CALL(*secondSock, close()).WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*secondSock, close())
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, resumeWrite(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setGRO(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setRecvTos(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, getRecvTos()).WillByDefault(testing::Return(false));
     ON_CALL(*secondSock, setTosOrTrafficClass(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, appendCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, getTimestamping()).WillByDefault(testing::Return(0));
     ON_CALL(*secondSock, setReuseAddr(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setDFAndTurnOffPMTU())
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setAdditionalCmsgsFunc(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setErrMessageCallback(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, applyOptions(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setReusePort(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setRcvBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setSndBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*secondSock, setFD(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     client->setHappyEyeballsEnabled(true);
     client->addNewPeerAddress(firstAddress);
     client->addNewPeerAddress(secondAddress);
@@ -5625,7 +5696,8 @@ TEST_F(
   client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
 
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain34 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
@@ -5720,7 +5792,8 @@ TEST_F(
         return -1;
       }));
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  auto fizzClientWriteChain35 =
+      client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_FALSE(zeroRttPacketsOutstanding());
   ASSERT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
@@ -6106,8 +6179,8 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
                    .hasError());
 
   socket.pauseRead();
-  socket.close();
+  ASSERT_TRUE(socket.close().has_value());
   socket.pauseRead();
-  socket.close();
+  ASSERT_TRUE(socket.close().has_value());
 }
 } // namespace quic::test

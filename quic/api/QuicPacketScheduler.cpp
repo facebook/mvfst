@@ -218,7 +218,7 @@ FrameScheduler::FrameScheduler(
     QuicConnectionStateBase& conn)
     : name_(name), conn_(conn) {}
 
-folly::Expected<SchedulingResult, QuicError>
+quic::Expected<SchedulingResult, QuicError>
 FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
@@ -228,16 +228,16 @@ FrameScheduler::scheduleFramesForPacket(
   bool initialPacket =
       longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
   auto encodeRes = builder.encodePacketHeader();
-  if (encodeRes.hasError()) {
-    return folly::makeUnexpected(encodeRes.error());
+  if (!encodeRes.has_value()) {
+    return quic::make_unexpected(encodeRes.error());
   }
   // Add fixed padding at start of short header packets if configured
   if (shortHeader && conn_.transportSettings.fixedShortHeaderPadding > 0) {
     for (size_t i = 0; i < conn_.transportSettings.fixedShortHeaderPadding;
          i++) {
       auto writeRes = writeFrame(PaddingFrame(), builder);
-      if (writeRes.hasError()) {
-        return folly::makeUnexpected(writeRes.error());
+      if (!writeRes.has_value()) {
+        return quic::make_unexpected(writeRes.error());
       }
     }
     shortHeaderPadding = conn_.transportSettings.fixedShortHeaderPadding;
@@ -253,15 +253,15 @@ FrameScheduler::scheduleFramesForPacket(
   bool rstWritten = false;
   if (cryptoStreamScheduler_ && cryptoStreamScheduler_->hasData()) {
     auto cryptoDataRes = cryptoStreamScheduler_->writeCryptoData(wrapper);
-    if (cryptoDataRes.hasError()) {
-      return folly::makeUnexpected(cryptoDataRes.error());
+    if (!cryptoDataRes.has_value()) {
+      return quic::make_unexpected(cryptoDataRes.error());
     }
     cryptoDataWritten = cryptoDataRes.value();
   }
   if (rstScheduler_ && rstScheduler_->hasPendingRsts()) {
     auto rstWrittenRes = rstScheduler_->writeRsts(wrapper);
-    if (rstWrittenRes.hasError()) {
-      return folly::makeUnexpected(rstWrittenRes.error());
+    if (!rstWrittenRes.has_value()) {
+      return quic::make_unexpected(rstWrittenRes.error());
     }
     rstWritten = rstWrittenRes.value();
   }
@@ -271,8 +271,8 @@ FrameScheduler::scheduleFramesForPacket(
       // If packet has non ack data, it is subject to congestion control. We
       // need to use the wrapper/
       auto writeAcksRes = ackScheduler_->writeNextAcks(wrapper);
-      if (writeAcksRes.hasError()) {
-        return folly::makeUnexpected(writeAcksRes.error());
+      if (!writeAcksRes.has_value()) {
+        return quic::make_unexpected(writeAcksRes.error());
       }
     } else {
       // If we start with writing acks, we will let the ack scheduler write
@@ -281,8 +281,8 @@ FrameScheduler::scheduleFramesForPacket(
       // controller. Otherwise, we will give other schedulers an opportunity to
       // write up to writable bytes.
       auto writeAcksRes = ackScheduler_->writeNextAcks(builder);
-      if (writeAcksRes.hasError()) {
-        return folly::makeUnexpected(writeAcksRes.error());
+      if (!writeAcksRes.has_value()) {
+        return quic::make_unexpected(writeAcksRes.error());
       }
     }
   }
@@ -296,14 +296,14 @@ FrameScheduler::scheduleFramesForPacket(
   if (windowUpdateScheduler_ &&
       windowUpdateScheduler_->hasPendingWindowUpdates()) {
     auto result = windowUpdateScheduler_->writeWindowUpdates(wrapper);
-    if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
   }
   if (blockedScheduler_ && blockedScheduler_->hasPendingBlockedFrames()) {
     auto result = blockedScheduler_->writeBlockedFrames(wrapper);
-    if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
   }
   // Simple frames should be scheduled before stream frames and retx frames
@@ -320,15 +320,15 @@ FrameScheduler::scheduleFramesForPacket(
   }
   if (streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()) {
     auto result = streamFrameScheduler_->writeStreams(wrapper);
-    if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
   }
   if (datagramFrameScheduler_ &&
       datagramFrameScheduler_->hasPendingDatagramFrames()) {
     auto datagramRes = datagramFrameScheduler_->writeDatagramFrames(wrapper);
-    if (datagramRes.hasError()) {
-      return folly::makeUnexpected(datagramRes.error());
+    if (!datagramRes.has_value()) {
+      return quic::make_unexpected(datagramRes.error());
     }
   }
 
@@ -337,8 +337,8 @@ FrameScheduler::scheduleFramesForPacket(
       // This is the initial packet, we need to fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
         auto writeRes = writeFrame(PaddingFrame(), builder);
-        if (writeRes.hasError()) {
-          return folly::makeUnexpected(writeRes.error());
+        if (!writeRes.has_value()) {
+          return quic::make_unexpected(writeRes.error());
         }
       }
     }
@@ -348,8 +348,8 @@ FrameScheduler::scheduleFramesForPacket(
         size_t paddingIncrement = wrapper.remainingSpaceInPkt() % paddingModulo;
         for (size_t i = 0; i < paddingIncrement; i++) {
           auto writeRes = writeFrame(PaddingFrame(), builder);
-          if (writeRes.hasError()) {
-            return folly::makeUnexpected(writeRes.error());
+          if (!writeRes.has_value()) {
+            return quic::make_unexpected(writeRes.error());
           }
         }
         shortHeaderPadding += paddingIncrement;
@@ -389,7 +389,7 @@ folly::StringPiece FrameScheduler::name() const {
   return name_;
 }
 
-folly::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
+quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
     PacketBuilderInterface& builder,
     QuicStreamState& stream) {
   bool wroteStreamFrame = false;
@@ -406,8 +406,8 @@ folly::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
         buffer->eof,
         std::nullopt /* skipLenHint */,
         stream.groupId);
-    if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
+    if (!res.has_value()) {
+      return quic::make_unexpected(res.error());
     }
     auto dataLen = *res;
     if (dataLen) {
@@ -428,7 +428,7 @@ folly::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
 StreamFrameScheduler::StreamFrameScheduler(QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
-folly::Expected<StreamFrameScheduler::StreamWriteResult, QuicError>
+quic::Expected<StreamFrameScheduler::StreamWriteResult, QuicError>
 StreamFrameScheduler::writeSingleStream(
     PacketBuilderInterface& builder,
     QuicStreamState& stream,
@@ -436,8 +436,8 @@ StreamFrameScheduler::writeSingleStream(
   StreamWriteResult result = StreamWriteResult::NOT_LIMITED;
   if (!stream.lossBuffer.empty()) {
     auto writeResult = writeStreamLossBuffers(builder, stream);
-    if (writeResult.hasError()) {
-      return folly::makeUnexpected(writeResult.error());
+    if (!writeResult.has_value()) {
+      return quic::make_unexpected(writeResult.error());
     }
     if (!writeResult.value()) {
       return StreamWriteResult::PACKET_FULL;
@@ -446,8 +446,8 @@ StreamFrameScheduler::writeSingleStream(
   if (stream.hasWritableData(true)) {
     if (connWritableBytes > 0 || stream.hasWritableData(false)) {
       auto writeResult = writeStreamFrame(builder, stream, connWritableBytes);
-      if (writeResult.hasError()) {
-        return folly::makeUnexpected(writeResult.error());
+      if (!writeResult.has_value()) {
+        return quic::make_unexpected(writeResult.error());
       }
       if (!writeResult.value()) {
         return StreamWriteResult::PACKET_FULL;
@@ -461,7 +461,7 @@ StreamFrameScheduler::writeSingleStream(
   return result;
 }
 
-folly::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
+quic::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
     const std::set<StreamId>& writableStreams,
     StreamId nextScheduledStream,
@@ -477,8 +477,8 @@ folly::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
     auto stream = conn_.streamManager->findStream(*writableStreamItr);
     CHECK(stream);
     auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
-    if (writeResult.hasError()) {
-      return folly::makeUnexpected(writeResult.error());
+    if (!writeResult.has_value()) {
+      return quic::make_unexpected(writeResult.error());
     }
     if (writeResult.value() == StreamWriteResult::PACKET_FULL) {
       break;
@@ -491,8 +491,7 @@ folly::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
   return *writableStreamItr;
 }
 
-folly::Expected<folly::Unit, QuicError>
-StreamFrameScheduler::writeStreamsHelper(
+quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
     deprecated::PriorityQueue& writableStreams,
     uint64_t& connWritableBytes,
@@ -513,13 +512,13 @@ StreamFrameScheduler::writeStreamsHelper(
       auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
       if (!stream->hasSchedulableData() && stream->hasSchedulableDsr()) {
         // We hit a DSR stream
-        return folly::unit;
+        return {};
       }
       CHECK(stream) << "streamId=" << streamId
                     << "inc=" << uint64_t(level.incremental);
       auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
-      if (writeResult.hasError()) {
-        return folly::makeUnexpected(writeResult.error());
+      if (!writeResult.has_value()) {
+        return quic::make_unexpected(writeResult.error());
       }
       if (writeResult.value() == StreamWriteResult::PACKET_FULL) {
         break;
@@ -531,15 +530,14 @@ StreamFrameScheduler::writeStreamsHelper(
       bool forceNext = remainingSpaceAfter > 0;
       level.iterator->next(forceNext);
       if (streamPerPacket) {
-        return folly::unit;
+        return {};
       }
     } while (!level.iterator->end());
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError>
-StreamFrameScheduler::writeStreamsHelper(
+quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
     PriorityQueue& writableStreams,
     uint64_t& connWritableBytes,
@@ -558,14 +556,14 @@ StreamFrameScheduler::writeStreamsHelper(
     auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
     if (!stream->hasSchedulableData() && stream->hasSchedulableDsr()) {
       // We hit a DSR stream
-      return folly::unit;
+      return {};
     }
     CHECK(stream) << "streamId=" << streamId;
     // TODO: this is counting STREAM frame overhead against the stream itself
     auto lastWriteBytes = builder.remainingSpaceInPkt();
     auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
-    if (writeResult.hasError()) {
-      return folly::makeUnexpected(writeResult.error());
+    if (!writeResult.has_value()) {
+      return quic::make_unexpected(writeResult.error());
     }
     if (writeResult.value() == StreamWriteResult::PACKET_FULL) {
       break;
@@ -585,13 +583,13 @@ StreamFrameScheduler::writeStreamsHelper(
       writableStreams.consume(lastWriteBytes);
     }
     if (streamPerPacket) {
-      return folly::unit;
+      return {};
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> StreamFrameScheduler::writeStreams(
+quic::Expected<void, QuicError> StreamFrameScheduler::writeStreams(
     PacketBuilderInterface& builder) {
   DCHECK(conn_.streamManager->hasWritable());
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
@@ -604,8 +602,8 @@ folly::Expected<folly::Unit, QuicError> StreamFrameScheduler::writeStreams(
         conn_.schedulingState.nextScheduledControlStream,
         connWritableBytes,
         conn_.transportSettings.streamFramePerPacket);
-    if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
     conn_.schedulingState.nextScheduledControlStream = result.value();
   }
@@ -618,8 +616,8 @@ folly::Expected<folly::Unit, QuicError> StreamFrameScheduler::writeStreams(
           *oldWriteQueue,
           connWritableBytes,
           conn_.transportSettings.streamFramePerPacket);
-      if (result.hasError()) {
-        return folly::makeUnexpected(result.error());
+      if (!result.has_value()) {
+        return quic::make_unexpected(result.error());
       }
       auto streamId = oldWriteQueue->getNextScheduledStream();
       nextStream = conn_.streamManager->findStream(streamId);
@@ -632,8 +630,8 @@ folly::Expected<folly::Unit, QuicError> StreamFrameScheduler::writeStreams(
           writeQueue,
           connWritableBytes,
           conn_.transportSettings.streamFramePerPacket);
-      if (result.hasError()) {
-        return folly::makeUnexpected(result.error());
+      if (!result.has_value()) {
+        return quic::make_unexpected(result.error());
       }
       if (!writeQueue.empty()) {
         auto id = writeQueue.peekNextScheduledID();
@@ -650,7 +648,7 @@ folly::Expected<folly::Unit, QuicError> StreamFrameScheduler::writeStreams(
   if (nextStream && !nextStream->hasSchedulableData()) {
     nextStreamDsr_ = true;
   }
-  return folly::unit;
+  return {};
 }
 
 bool StreamFrameScheduler::hasPendingData() const {
@@ -660,7 +658,7 @@ bool StreamFrameScheduler::hasPendingData() const {
         getSendConnFlowControlBytesWire(conn_) > 0));
 }
 
-folly::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
+quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
     PacketBuilderInterface& builder,
     QuicStreamState& stream,
     uint64_t& connWritableBytes) {
@@ -688,8 +686,8 @@ folly::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
       canWriteFin,
       std::nullopt /* skipLenHint */,
       stream.groupId);
-  if (res.hasError()) {
-    return folly::makeUnexpected(res.error());
+  if (!res.has_value()) {
+    return quic::make_unexpected(res.error());
   }
   auto dataLen = *res;
   if (!dataLen) {
@@ -712,7 +710,7 @@ bool RstStreamScheduler::hasPendingRsts() const {
   return !conn_.pendingEvents.resets.empty();
 }
 
-folly::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
+quic::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
     PacketBuilderInterface& builder) {
   bool rstWritten = false;
   for (const auto& resetStream : conn_.pendingEvents.resets) {
@@ -729,8 +727,8 @@ folly::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
       //    it in this implementation because it dramatically simplifies flow
       //    control accounting.
       auto bytesWrittenResult = writeFrame(resetStream.second, builder);
-      if (bytesWrittenResult.hasError()) {
-        return folly::makeUnexpected(bytesWrittenResult.error());
+      if (!bytesWrittenResult.has_value()) {
+        return quic::make_unexpected(bytesWrittenResult.error());
       }
       if (!bytesWrittenResult.value()) {
         break;
@@ -777,7 +775,7 @@ bool PingFrameScheduler::hasPingFrame() const {
 bool PingFrameScheduler::writePing(PacketBuilderInterface& builder) {
   auto writeFrameResult = writeFrame(PingFrame(), builder);
   // We shouldn't ever error on a PING.
-  CHECK(!writeFrameResult.hasError());
+  CHECK(writeFrameResult.has_value());
   return writeFrameResult.value() != 0;
 }
 
@@ -788,7 +786,7 @@ bool DatagramFrameScheduler::hasPendingDatagramFrames() const {
   return !conn_.datagramState.writeBuffer.empty();
 }
 
-folly::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
+quic::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     PacketBuilderInterface& builder) {
   bool sent = false;
   for (size_t i = 0; i <= conn_.datagramState.writeBuffer.size(); ++i) {
@@ -797,21 +795,21 @@ folly::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     uint64_t spaceLeft = builder.remainingSpaceInPkt();
     QuicInteger frameTypeQuicInt(static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
     auto frameTypeSize = frameTypeQuicInt.getSize();
-    if (frameTypeSize.hasError()) {
-      return folly::makeUnexpected(frameTypeSize.error());
+    if (!frameTypeSize.has_value()) {
+      return quic::make_unexpected(frameTypeSize.error());
     }
     QuicInteger datagramLenInt(len);
     auto datagramLenSize = datagramLenInt.getSize();
-    if (datagramLenSize.hasError()) {
-      return folly::makeUnexpected(datagramLenSize.error());
+    if (!datagramLenSize.has_value()) {
+      return quic::make_unexpected(datagramLenSize.error());
     }
     uint64_t datagramFrameLength =
         frameTypeSize.value() + len + datagramLenSize.value();
     if (datagramFrameLength <= spaceLeft) {
       auto datagramFrame = DatagramFrame(len, payload.move());
       auto res = writeFrame(datagramFrame, builder);
-      if (res.hasError()) {
-        return folly::makeUnexpected(res.error());
+      if (!res.has_value()) {
+        return quic::make_unexpected(res.error());
       }
       // Must always succeed since we have already checked that there is enough
       // space to write the frame
@@ -836,14 +834,14 @@ bool WindowUpdateScheduler::hasPendingWindowUpdates() const {
       conn_.pendingEvents.connWindowUpdate;
 }
 
-folly::Expected<folly::Unit, QuicError>
-WindowUpdateScheduler::writeWindowUpdates(PacketBuilderInterface& builder) {
+quic::Expected<void, QuicError> WindowUpdateScheduler::writeWindowUpdates(
+    PacketBuilderInterface& builder) {
   if (conn_.pendingEvents.connWindowUpdate) {
     auto maxDataFrame = generateMaxDataFrame(conn_);
     auto maximumData = maxDataFrame.maximumData;
     auto bytesResult = writeFrame(std::move(maxDataFrame), builder);
-    if (bytesResult.hasError()) {
-      return folly::makeUnexpected(bytesResult.error());
+    if (!bytesResult.has_value()) {
+      return quic::make_unexpected(bytesResult.error());
     }
     if (bytesResult.value()) {
       VLOG(4) << "Wrote max_data=" << maximumData << " " << conn_;
@@ -857,8 +855,8 @@ WindowUpdateScheduler::writeWindowUpdates(PacketBuilderInterface& builder) {
     auto maxStreamDataFrame = generateMaxStreamDataFrame(*stream);
     auto maximumData = maxStreamDataFrame.maximumData;
     auto bytesResult = writeFrame(std::move(maxStreamDataFrame), builder);
-    if (bytesResult.hasError()) {
-      return folly::makeUnexpected(bytesResult.error());
+    if (!bytesResult.has_value()) {
+      return quic::make_unexpected(bytesResult.error());
     }
     if (!bytesResult.value()) {
       break;
@@ -866,7 +864,7 @@ WindowUpdateScheduler::writeWindowUpdates(PacketBuilderInterface& builder) {
     VLOG(4) << "Wrote max_stream_data stream=" << stream->id
             << " maximumData=" << maximumData << " " << conn_;
   }
-  return folly::unit;
+  return {};
 }
 
 BlockedScheduler::BlockedScheduler(const QuicConnectionStateBase& conn)
@@ -877,33 +875,33 @@ bool BlockedScheduler::hasPendingBlockedFrames() const {
       conn_.pendingEvents.sendDataBlocked;
 }
 
-folly::Expected<folly::Unit, QuicError> BlockedScheduler::writeBlockedFrames(
+quic::Expected<void, QuicError> BlockedScheduler::writeBlockedFrames(
     PacketBuilderInterface& builder) {
   if (conn_.pendingEvents.sendDataBlocked) {
     // Connection is write blocked due to connection level flow control.
     DataBlockedFrame blockedFrame(
         conn_.flowControlState.peerAdvertisedMaxOffset);
     auto result = writeFrame(blockedFrame, builder);
-    if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
     if (!result.value()) {
       // If there is not enough room to write data blocked frame in the
       // current packet, we won't be able to write stream blocked frames either
       // so just return.
-      return folly::unit;
+      return {};
     }
   }
   for (const auto& blockedStream : conn_.streamManager->blockedStreams()) {
     auto bytesWrittenResult = writeFrame(blockedStream.second, builder);
-    if (bytesWrittenResult.hasError()) {
-      return folly::makeUnexpected(bytesWrittenResult.error());
+    if (!bytesWrittenResult.has_value()) {
+      return quic::make_unexpected(bytesWrittenResult.error());
     }
     if (!bytesWrittenResult.value()) {
       break;
     }
   }
-  return folly::unit;
+  return {};
 }
 
 CryptoStreamScheduler::CryptoStreamScheduler(
@@ -911,7 +909,7 @@ CryptoStreamScheduler::CryptoStreamScheduler(
     const QuicCryptoStream& cryptoStream)
     : conn_(conn), cryptoStream_(cryptoStream) {}
 
-folly::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
+quic::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
     PacketBuilderInterface& builder) {
   bool cryptoDataWritten = false;
   uint64_t writableData = cryptoStream_.pendingWrites.chainLength();
@@ -920,8 +918,8 @@ folly::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
   // will always take precedence over the crypto data.
   for (const auto& buffer : cryptoStream_.lossBuffer) {
     auto res = writeCryptoFrame(buffer.offset, buffer.data, builder);
-    if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
+    if (!res.has_value()) {
+      return quic::make_unexpected(res.error());
     }
     if (!res.value()) {
       return cryptoDataWritten;
@@ -934,8 +932,8 @@ folly::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
   if (writableData != 0) {
     auto res = writeCryptoFrame(
         cryptoStream_.currentWriteOffset, cryptoStream_.pendingWrites, builder);
-    if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
+    if (!res.has_value()) {
+      return quic::make_unexpected(res.error());
     }
     if (res.value()) {
       VLOG(4) << "Wrote crypto frame"
@@ -964,7 +962,7 @@ bool ImmediateAckFrameScheduler::writeImmediateAckFrame(
     PacketBuilderInterface& builder) {
   auto result = writeFrame(ImmediateAckFrame(), builder);
   // We shouldn't ever error on an IMMEDIATE_ACK.
-  CHECK(!result.hasError());
+  CHECK(result.has_value());
   return result.value() != 0;
 }
 
@@ -983,7 +981,7 @@ bool CloningScheduler::hasData() const {
       conn_.outstandings.numOutstanding() > conn_.outstandings.dsrCount;
 }
 
-folly::Expected<SchedulingResult, QuicError>
+quic::Expected<SchedulingResult, QuicError>
 CloningScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
@@ -1078,8 +1076,8 @@ CloningScheduler::scheduleFramesForPacket(
 
     internalBuilder->accountForCipherOverhead(cipherOverhead_);
     auto encodeRes = internalBuilder->encodePacketHeader();
-    if (encodeRes.hasError()) {
-      return folly::makeUnexpected(encodeRes.error());
+    if (!encodeRes.has_value()) {
+      return quic::make_unexpected(encodeRes.error());
     }
     PacketRebuilder rebuilder(*internalBuilder, conn_);
 
@@ -1094,8 +1092,8 @@ CloningScheduler::scheduleFramesForPacket(
 
     // Rebuilder will write the rest of frames
     auto rebuildResultExpected = rebuilder.rebuildFromPacket(outstandingPacket);
-    if (rebuildResultExpected.hasError()) {
-      return folly::makeUnexpected(rebuildResultExpected.error());
+    if (!rebuildResultExpected.has_value()) {
+      return quic::make_unexpected(rebuildResultExpected.error());
     }
     if (rebuildResultExpected.value()) {
       return SchedulingResult(

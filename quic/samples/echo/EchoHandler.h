@@ -30,13 +30,13 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     sock = socket;
     if (useDatagrams_) {
       auto res = sock->setDatagramCallback(this);
-      CHECK(res.hasValue()) << res.error();
+      CHECK(res.has_value()) << res.error();
     }
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
     LOG(INFO) << "Got bidirectional stream id=" << id;
-    sock->setReadCallback(id, this);
+    CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onNewBidirectionalStreamGroup(
@@ -47,7 +47,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     if (disableRtx_) {
       QuicStreamGroupRetransmissionPolicy policy;
       policy.disableRetransmission = true;
-      sock->setStreamGroupRetransmissionPolicy(groupId, policy);
+      CHECK(sock->setStreamGroupRetransmissionPolicy(groupId, policy)
+                .has_value());
     }
   }
 
@@ -56,12 +57,12 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       quic::StreamGroupId groupId) noexcept override {
     LOG(INFO) << "Got bidirectional stream id=" << id
               << " in group=" << groupId;
-    sock->setReadCallback(id, this);
+    CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
     LOG(INFO) << "Got unidirectional stream id=" << id;
-    sock->setReadCallback(id, this);
+    CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onNewUnidirectionalStreamGroup(
@@ -76,7 +77,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       quic::StreamGroupId groupId) noexcept override {
     LOG(INFO) << "Got unidirectional stream id=" << id
               << " in group=" << groupId;
-    sock->setReadCallback(id, this);
+    CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onStopSending(
@@ -104,7 +105,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     auto res = sock->read(id, 0);
     if (res.hasError()) {
       LOG(ERROR) << "Got error=" << toString(res.error());
-      sock->setReadCallback(id, nullptr);
+      CHECK(sock->setReadCallback(id, nullptr).has_value());
       return;
     }
     if (input_.find(id) == input_.end()) {
@@ -122,7 +123,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     if (eof) {
       echo(id, input_[id]);
       LOG(INFO) << "uninstalling read callback";
-      sock->setReadCallback(id, nullptr);
+      CHECK(sock->setReadCallback(id, nullptr).has_value());
     }
   }
 

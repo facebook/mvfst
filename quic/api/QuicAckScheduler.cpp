@@ -33,7 +33,7 @@ AckScheduler::AckScheduler(
     const AckState& ackState)
     : conn_(conn), ackState_(ackState) {}
 
-folly::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
+quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
     PacketBuilderInterface& builder) {
   // Use default ack delay for long headers. Usually long headers are sent
   // before crypto negotiation, so the peer might not know about the ack delay
@@ -62,7 +62,7 @@ folly::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
   };
 
   auto ackWriteResult =
-      [&]() -> folly::Expected<Optional<WriteAckFrameResult>, QuicError> {
+      [&]() -> quic::Expected<Optional<WriteAckFrameResult>, QuicError> {
     uint64_t peerRequestedTimestampsCount =
         conn_.maybePeerAckReceiveTimestampsConfig.has_value()
         ? conn_.maybePeerAckReceiveTimestampsConfig.value()
@@ -103,8 +103,8 @@ folly::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
     }
   }();
 
-  if (ackWriteResult.hasError()) {
-    return folly::makeUnexpected(ackWriteResult.error());
+  if (!ackWriteResult.has_value()) {
+    return quic::make_unexpected(ackWriteResult.error());
   }
 
   if (!ackWriteResult.value()) {

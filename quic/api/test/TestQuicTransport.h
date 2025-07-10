@@ -54,13 +54,13 @@ class TestQuicTransport
       const BufferMeta& /* data */,
       bool /* eof */,
       ByteEventCallback* /* cb */) override {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
 
   WriteResult setDSRPacketizationRequestSender(
       StreamId /* id */,
       std::unique_ptr<DSRPacketizationRequestSender> /* sender */) override {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
 
   Optional<std::vector<TransportParameter>> getPeerTransportParams()
@@ -85,15 +85,15 @@ class TestQuicTransport
     return writeLooper_->isPacingScheduled();
   }
 
-  folly::Expected<folly::Unit, QuicError> onReadData(
+  quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& /* peer */,
       ReceivedUdpPacket&& /* udpPacket */) noexcept override {
-    return folly::unit;
+    return {};
   }
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeData() override {
+  [[nodiscard]] quic::Expected<void, QuicError> writeData() override {
     if (closed) {
-      return folly::unit;
+      return {};
     }
     auto result = writeQuicDataToSocket(
         *socket_,
@@ -107,9 +107,9 @@ class TestQuicTransport
              ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
              : conn_->transportSettings.writeConnectionDataPacketsLimit));
     if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
-    writePacketizationRequest(
+    [[maybe_unused]] auto writePacketization = writePacketizationRequest(
         *dynamic_cast<QuicServerConnectionState*>(conn_.get()),
         *conn_->clientConnectionId,
         (isConnectionPaced(*conn_)
@@ -117,7 +117,7 @@ class TestQuicTransport
              : conn_->transportSettings.writeConnectionDataPacketsLimit),
         *aead,
         Clock::now());
-    return folly::unit;
+    return {};
   }
 
   void closeTransport() override {

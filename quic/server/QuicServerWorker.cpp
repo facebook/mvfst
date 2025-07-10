@@ -108,7 +108,7 @@ void QuicServerWorker::bind(
   // TODO this totally doesn't work, we can't apply socket options before
   // bind, since bind creates the fd.
   if (socketOptions_) {
-    applySocketOptions(
+    (void)applySocketOptions(
         tmpSock,
         *socketOptions_,
         address.getFamily(),
@@ -119,7 +119,7 @@ void QuicServerWorker::bind(
   }
   socket_->bind(address, bindOptions);
   if (socketOptions_) {
-    applySocketOptions(
+    (void)applySocketOptions(
         tmpSock,
         *socketOptions_,
         address.getFamily(),
@@ -151,12 +151,12 @@ void QuicServerWorker::applyAllSocketOptions() {
   FollyQuicAsyncUDPSocket tmpSock(
       std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
   if (socketOptions_) {
-    applySocketOptions(
+    (void)applySocketOptions(
         tmpSock,
         *socketOptions_,
         getAddress().getFamily(),
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
-    applySocketOptions(
+    (void)applySocketOptions(
         tmpSock,
         *socketOptions_,
         getAddress().getFamily(),
@@ -1503,7 +1503,7 @@ std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
 
   if (connIdAlgo_->canParse(connId)) {
     auto maybeParsedConnIdParam = connIdAlgo_->parseConnectionId(connId);
-    if (maybeParsedConnIdParam.hasValue()) {
+    if (maybeParsedConnIdParam.has_value()) {
       const auto& connIdParam = maybeParsedConnIdParam.value();
       return base +
           fmt::format(

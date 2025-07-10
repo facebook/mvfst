@@ -46,7 +46,7 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
   return *packet.maybeClonedPacketIdentifier;
 }
 
-folly::Expected<Optional<ClonedPacketIdentifier>, QuicError>
+quic::Expected<Optional<ClonedPacketIdentifier>, QuicError>
 PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
   // TODO: if PMTU changes between the transmission of the original packet and
   // now, then we cannot clone everything in the packet.
@@ -94,7 +94,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
                   << " for cloning WriteStreamFrame: "
                   << streamResult.error().message;
           // Propagate error
-          return folly::makeUnexpected(streamResult.error());
+          return quic::make_unexpected(streamResult.error());
         }
         auto* stream = streamResult.value();
         if (stream && retransmittable(*stream)) {
@@ -115,7 +115,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
           if (res.hasError()) {
             VLOG(4) << "Failed to write stream frame header for cloning: "
                     << res.error().message;
-            return folly::makeUnexpected(res.error());
+            return quic::make_unexpected(res.error());
           }
 
           auto dataLen = *res;
@@ -154,7 +154,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         auto cryptoWriteResult =
             writeCryptoFrame(cryptoFrame.offset, *buf, builder_);
         if (cryptoWriteResult.hasError()) {
-          return folly::makeUnexpected(cryptoWriteResult.error());
+          return quic::make_unexpected(cryptoWriteResult.error());
         }
 
         bool ret = cryptoWriteResult.value()->offset == cryptoFrame.offset &&
@@ -167,7 +167,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         shouldWriteWindowUpdate = true;
         auto writeResult = writeFrame(generateMaxDataFrame(conn_), builder_);
         if (writeResult.hasError()) {
-          return folly::makeUnexpected(writeResult.error());
+          return quic::make_unexpected(writeResult.error());
         }
         bool ret = writeResult.value() != 0;
         windowUpdateWritten |= ret;
@@ -184,7 +184,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
           VLOG(4) << "Failed to get stream " << maxStreamDataFrame.streamId
                   << " for cloning MaxStreamDataFrame: "
                   << streamResult.error().message;
-          return folly::makeUnexpected(streamResult.error());
+          return quic::make_unexpected(streamResult.error());
         }
         auto* stream = streamResult.value();
 
@@ -196,7 +196,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         auto writeResult =
             writeFrame(generateMaxStreamDataFrame(*stream), builder_);
         if (writeResult.hasError()) {
-          return folly::makeUnexpected(writeResult.error());
+          return quic::make_unexpected(writeResult.error());
         }
         bool ret = writeResult.value() != 0;
         windowUpdateWritten |= ret;
@@ -208,7 +208,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         const PaddingFrame& paddingFrame = *frame.asPaddingFrame();
         auto writeResult = writeFrame(paddingFrame, builder_);
         if (writeResult.hasError()) {
-          return folly::makeUnexpected(writeResult.error());
+          return quic::make_unexpected(writeResult.error());
         }
         writeSuccess = writeResult.value() != 0;
         break;
@@ -217,7 +217,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         const PingFrame& pingFrame = *frame.asPingFrame();
         auto writeResult = writeFrame(pingFrame, builder_);
         if (writeResult.hasError()) {
-          return folly::makeUnexpected(writeResult.error());
+          return quic::make_unexpected(writeResult.error());
         }
         writeSuccess = writeResult.value() != 0;
         notPureAck |= writeSuccess;
@@ -234,7 +234,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         auto writeResult =
             writeSimpleFrame(std::move(*updatedSimpleFrame), builder_);
         if (writeResult.hasError()) {
-          return folly::makeUnexpected(writeResult.error());
+          return quic::make_unexpected(writeResult.error());
         }
         bool ret = writeResult.value() != 0;
         notPureAck |= ret;
@@ -248,7 +248,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
       default: {
         auto writeResult = writeFrame(QuicWriteFrame(frame), builder_);
         if (writeResult.hasError()) {
-          return folly::makeUnexpected(writeResult.error());
+          return quic::make_unexpected(writeResult.error());
         }
         bool ret = writeResult.value() != 0;
         notPureAck |= ret;
@@ -273,7 +273,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
     AckScheduler ackScheduler(conn_, ackState);
     auto writeResult = ackScheduler.writeNextAcks(builder_);
     if (writeResult.hasError()) {
-      return folly::makeUnexpected(writeResult.error());
+      return quic::make_unexpected(writeResult.error());
     }
   }
 
@@ -290,7 +290,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
     while (builder_.remainingSpaceInPkt() > 0) {
       auto writeResult = writeFrame(PaddingFrame(), builder_);
       if (writeResult.hasError()) {
-        return folly::makeUnexpected(writeResult.error());
+        return quic::make_unexpected(writeResult.error());
       }
     }
   }

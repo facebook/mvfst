@@ -5,10 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/Expected.h>
 #include <folly/String.h>
 #include <folly/io/IOBuf.h>
 #include <folly/portability/GTest.h>
+#include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
 #include <quic/QuicException.h>
@@ -125,7 +125,7 @@ TEST_F(QuicIntegerEncodeTest, ForceWrongBytes) {
   auto queue = folly::IOBuf::create(0);
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
-  EXPECT_DEATH(encodeQuicInteger(15293, appendOp, 1), "");
+  EXPECT_DEATH((void)encodeQuicInteger(15293, appendOp, 1), "");
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -1761,6 +1761,7 @@ struct error_traits< std::exception_ptr >
     {
 #if nsel_CONFIG_NO_EXCEPTIONS_SEH
         RaiseException( EXCEPTION_ACCESS_VIOLATION, EXCEPTION_NONCONTINUABLE, 0, NULL );
+        __assume(0); // Tell compiler this point is never reached
 #else
         assert( false && detail::text("throw bad_expected_access<std::exception_ptr>{ e };") );
         std::terminate();
@@ -1775,6 +1776,7 @@ struct error_traits< std::error_code >
     {
 #if nsel_CONFIG_NO_EXCEPTIONS_SEH
         RaiseException( EXCEPTION_ACCESS_VIOLATION, EXCEPTION_NONCONTINUABLE, 0, NULL );
+        __assume(0); // Tell compiler this point is never reached
 #else
         assert( false && detail::text("throw std::system_error( e );") );
         std::terminate();

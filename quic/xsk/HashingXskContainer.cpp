@@ -11,7 +11,7 @@
 
 namespace facebook::xdpsocket {
 
-folly::Expected<folly::Unit, std::runtime_error> HashingXskContainer::init(
+quic::Expected<void, std::runtime_error> HashingXskContainer::init(
     const XskContainerConfig& xskContainerConfig) {
   initializeQueueParams(xskContainerConfig.interfaceName);
   for (uint32_t queueId = startQueue_; queueId < startQueue_ + numQueues_;
@@ -32,12 +32,12 @@ folly::Expected<folly::Unit, std::runtime_error> HashingXskContainer::init(
     if (createResult.hasError()) {
       // TODO: Clean up the already-created XDP sockets if we fail at this
       // point.
-      return folly::makeUnexpected(createResult.error());
+      return quic::make_unexpected(createResult.error());
     } else {
       queueIdToXsk_.emplace(queueId, std::move(createResult.value()));
     }
   }
-  return folly::Unit();
+  return {};
 }
 
 XskSender* HashingXskContainer::pickXsk(

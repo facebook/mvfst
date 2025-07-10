@@ -1061,7 +1061,7 @@ TEST_F(QuicStateFunctionsTest, InvokeResetDoesNotSendFlowControl) {
   conn.flowControlState.advertisedMaxOffset = 100;
   conn.flowControlState.windowSize = 100;
   auto result = receiveRstStreamSMHandler(stream, std::move(rst));
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   bool matches = (stream.recvState == StreamRecvState::Closed);
   EXPECT_TRUE(matches);
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());

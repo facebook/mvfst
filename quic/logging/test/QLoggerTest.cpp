@@ -1652,7 +1652,7 @@ TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
       true /* compress */);
 
   auto dcid = ConnectionId::createRandom(8);
-  ASSERT_TRUE(dcid.hasValue());
+  ASSERT_TRUE(dcid.has_value());
   q->setDcid(dcid.value());
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(

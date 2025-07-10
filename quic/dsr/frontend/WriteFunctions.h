@@ -15,7 +15,7 @@
 #include <quic/server/state/ServerStateMachine.h>
 
 namespace quic {
-folly::Expected<uint64_t, QuicError> writePacketizationRequest(
+quic::Expected<uint64_t, QuicError> writePacketizationRequest(
     QuicServerConnectionState& connection,
     const ConnectionId& dstCid,
     size_t packetLimit,

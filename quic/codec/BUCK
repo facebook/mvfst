@@ -22,7 +22,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":packet_number",
-        "//folly:expected",
         "//folly:network_address",
         "//folly:string",
         "//folly/hash:hash",
@@ -33,6 +32,7 @@ mvfst_cpp_library(
         "//quic:exception",
         "//quic/common:buf_util",
         "//quic/common:circular_deque",
+        "//quic/common:expected",
         "//quic/common:interval_set",
         "//quic/common:network_data",
         "//quic/common:optional",
@@ -74,11 +74,11 @@ mvfst_cpp_library(
         ":types",
     ],
     exported_deps = [
-        "//folly:expected",
         "//folly:unit",
         "//folly/io:iobuf",
         "//quic:exception",
         "//quic/common:buf_util",
+        "//quic/common:expected",
         "//quic/common:optional",
     ],
 )
@@ -102,6 +102,7 @@ mvfst_cpp_library(
         ":types",
         "//folly/io:iobuf",
         "//quic:constants",
+        "//quic/common:expected",
         "//quic/state:transport_settings",
     ],
 )

@@ -56,69 +56,68 @@ class QuicTransportBase : public QuicSocket,
 
   void closeGracefully() override;
 
-  folly::Expected<size_t, LocalErrorCode> getStreamReadOffset(
+  quic::Expected<size_t, LocalErrorCode> getStreamReadOffset(
       StreamId id) const override;
-  folly::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
+  quic::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
       StreamId id) const override;
-  folly::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
+  quic::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
       StreamId id) const override;
 
-  folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
+  quic::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const override;
 
-  folly::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
+  quic::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
       StreamId id) const override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setConnectionFlowControlWindow(
+  quic::Expected<void, LocalErrorCode> setConnectionFlowControlWindow(
       uint64_t windowSize) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setStreamFlowControlWindow(
+  quic::Expected<void, LocalErrorCode> setStreamFlowControlWindow(
       StreamId id,
       uint64_t windowSize) override;
 
   void unsetAllReadCallbacks() override;
   void unsetAllPeekCallbacks() override;
   void unsetAllDeliveryCallbacks() override;
-  folly::Expected<folly::Unit, LocalErrorCode> pauseRead(StreamId id) override;
-  folly::Expected<folly::Unit, LocalErrorCode> resumeRead(StreamId id) override;
+  quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) override;
+  quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setPeekCallback(
+  quic::Expected<void, LocalErrorCode> setPeekCallback(
       StreamId id,
       PeekCallback* cb) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> pausePeek(StreamId id) override;
-  folly::Expected<folly::Unit, LocalErrorCode> resumePeek(StreamId id) override;
+  quic::Expected<void, LocalErrorCode> pausePeek(StreamId id) override;
+  quic::Expected<void, LocalErrorCode> resumePeek(StreamId id) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> peek(
+  quic::Expected<void, LocalErrorCode> peek(
       StreamId id,
       const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
           peekCallback) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> consume(
-      StreamId id,
-      size_t amount) override;
+  quic::Expected<void, LocalErrorCode> consume(StreamId id, size_t amount)
+      override;
 
-  folly::Expected<folly::Unit, std::pair<LocalErrorCode, Optional<uint64_t>>>
+  quic::Expected<void, std::pair<LocalErrorCode, Optional<uint64_t>>>
   consume(StreamId id, uint64_t offset, size_t amount) override;
 
-  folly::Expected<StreamGroupId, LocalErrorCode>
-  createBidirectionalStreamGroup() override;
-  folly::Expected<StreamGroupId, LocalErrorCode>
+  quic::Expected<StreamGroupId, LocalErrorCode> createBidirectionalStreamGroup()
+      override;
+  quic::Expected<StreamGroupId, LocalErrorCode>
   createUnidirectionalStreamGroup() override;
-  folly::Expected<StreamId, LocalErrorCode> createBidirectionalStreamInGroup(
+  quic::Expected<StreamId, LocalErrorCode> createBidirectionalStreamInGroup(
       StreamGroupId groupId) override;
-  folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStreamInGroup(
+  quic::Expected<StreamId, LocalErrorCode> createUnidirectionalStreamInGroup(
       StreamGroupId groupId) override;
   bool isClientStream(StreamId stream) noexcept override;
   bool isServerStream(StreamId stream) noexcept override;
   StreamDirectionality getStreamDirectionality(
       StreamId stream) noexcept override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> maybeResetStreamFromReadError(
+  quic::Expected<void, LocalErrorCode> maybeResetStreamFromReadError(
       StreamId id,
       QuicErrorCode error) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setPingCallback(
+  quic::Expected<void, LocalErrorCode> setPingCallback(
       PingCallback* cb) override;
 
   void sendPing(std::chrono::milliseconds pingTimeout) override;
@@ -142,7 +141,7 @@ class QuicTransportBase : public QuicSocket,
 
   // Subclass API.
 
-  folly::Expected<PriorityQueue::Priority, LocalErrorCode> getStreamPriority(
+  quic::Expected<PriorityQueue::Priority, LocalErrorCode> getStreamPriority(
       StreamId id) override;
 
   /**
@@ -153,7 +152,7 @@ class QuicTransportBase : public QuicSocket,
    * congestion control and pacing. In the future, this callback may be
    * triggered by socket/NIC software or hardware timestamps.
    */
-  folly::Expected<folly::Unit, LocalErrorCode> registerTxCallback(
+  quic::Expected<void, LocalErrorCode> registerTxCallback(
       const StreamId id,
       const uint64_t offset,
       ByteEventCallback* cb) override;
@@ -174,7 +173,7 @@ class QuicTransportBase : public QuicSocket,
   /**
    * Set the read callback for Datagrams
    */
-  folly::Expected<folly::Unit, LocalErrorCode> setDatagramCallback(
+  quic::Expected<void, LocalErrorCode> setDatagramCallback(
       DatagramCallback* cb) override;
 
   /**
@@ -188,21 +187,20 @@ class QuicTransportBase : public QuicSocket,
    * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
    * dropped, and a LocalErrorCode will be returned to caller.
    */
-  folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(
-      BufPtr buf) override;
+  quic::Expected<void, LocalErrorCode> writeDatagram(BufPtr buf) override;
 
   /**
    * Returns the currently available received Datagrams.
    * Returns all datagrams if atMost is 0.
    */
-  folly::Expected<std::vector<ReadDatagram>, LocalErrorCode> readDatagrams(
+  quic::Expected<std::vector<ReadDatagram>, LocalErrorCode> readDatagrams(
       size_t atMost = 0) override;
 
   /**
    * Returns the currently available received Datagram IOBufs.
    * Returns all datagrams if atMost is 0.
    */
-  folly::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
+  quic::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) override;
 
   /**
@@ -219,8 +217,7 @@ class QuicTransportBase : public QuicSocket,
    * If policy == std::nullopt, the policy is removed for corresponding stream
    * group id (reset to the default rtx policy).
    */
-  folly::Expected<folly::Unit, LocalErrorCode>
-  setStreamGroupRetransmissionPolicy(
+  quic::Expected<void, LocalErrorCode> setStreamGroupRetransmissionPolicy(
       StreamGroupId groupId,
       std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept
       override;
@@ -237,13 +234,13 @@ class QuicTransportBase : public QuicSocket,
   }
 
  protected:
-  folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
+  quic::Expected<void, LocalErrorCode> pauseOrResumeRead(
       StreamId id,
       bool resume);
-  folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumePeek(
+  quic::Expected<void, LocalErrorCode> pauseOrResumePeek(
       StreamId id,
       bool resume);
-  folly::Expected<folly::Unit, LocalErrorCode> setPeekCallbackInternal(
+  quic::Expected<void, LocalErrorCode> setPeekCallbackInternal(
       StreamId id,
       PeekCallback* cb) noexcept;
 

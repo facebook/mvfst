@@ -220,7 +220,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeContiguousData) {
   peekDataFromQuicStream(*stream, peekCallback);
   EXPECT_TRUE(peekCbCalled);
 
-  EXPECT_NO_THROW(consumeDataFromQuicStream(*stream, 81));
+  EXPECT_NO_THROW(((void)consumeDataFromQuicStream(*stream, 81)));
 
   peekCbCalled = false;
   auto peekCallback2 = [&](StreamId /* unused */,
@@ -271,7 +271,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
   EXPECT_TRUE(cbCalled);
 
   // Consume left side.
-  EXPECT_NO_THROW(consumeDataFromQuicStream(*stream, 81));
+  EXPECT_NO_THROW(((void)consumeDataFromQuicStream(*stream, 81)));
 
   cbCalled = false;
   auto peekCallback2 = [&](StreamId /* unused */,
@@ -287,7 +287,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
 
   // Try consuming again.
   // Nothing has changed since we're missing data in the middle.
-  EXPECT_NO_THROW(consumeDataFromQuicStream(*stream, 81));
+  EXPECT_NO_THROW(((void)consumeDataFromQuicStream(*stream, 81)));
   cbCalled = false;
   peekDataFromQuicStream(*stream, peekCallback2);
   EXPECT_TRUE(cbCalled);
@@ -315,7 +315,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeNonContiguousData) {
   EXPECT_TRUE(cbCalled);
 
   // Consume the rest of the buffer.
-  EXPECT_NO_THROW(consumeDataFromQuicStream(*stream, 81));
+  EXPECT_NO_THROW(((void)consumeDataFromQuicStream(*stream, 81)));
 
   cbCalled = false;
   peekDataFromQuicStream(
@@ -340,7 +340,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeEmptyData) {
   peekDataFromQuicStream(*stream, peekCallback);
   EXPECT_TRUE(cbCalled);
 
-  EXPECT_NO_THROW(consumeDataFromQuicStream(*stream, 81));
+  EXPECT_NO_THROW(((void)consumeDataFromQuicStream(*stream, 81)));
 
   cbCalled = false;
   peekDataFromQuicStream(*stream, peekCallback);
@@ -363,7 +363,7 @@ TEST_P(QuicStreamFunctionsTestBase, TestPeekAndConsumeEmptyDataEof) {
   peekDataFromQuicStream(*stream, peekCallback);
   EXPECT_TRUE(cbCalled);
 
-  EXPECT_NO_THROW(consumeDataFromQuicStream(*stream, 42));
+  EXPECT_NO_THROW(((void)consumeDataFromQuicStream(*stream, 42)));
 
   cbCalled = false;
   peekDataFromQuicStream(*stream, peekCallback);
@@ -1599,16 +1599,16 @@ TEST_P(QuicStreamFunctionsTestBase, HasReadableData) {
                    .hasError());
   EXPECT_TRUE(stream->hasReadableData());
 
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->hasReadableData());
 
   auto buf3 = IOBuf::copyBuffer("just ");
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 2))
                    .hasError());
   EXPECT_TRUE(stream->hasReadableData());
-  readDataFromQuicStream(*stream, 5);
+  (void)readDataFromQuicStream(*stream, 5);
   EXPECT_TRUE(stream->hasReadableData());
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->hasReadableData());
 }
 
@@ -1674,16 +1674,16 @@ TEST_P(QuicStreamFunctionsTestBase, HasPeekableData) {
                    .hasError());
   EXPECT_TRUE(stream->hasPeekableData());
 
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_TRUE(stream->hasPeekableData());
 
   auto buf3 = IOBuf::copyBuffer("just ");
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf3->clone(), 2))
                    .hasError());
   EXPECT_TRUE(stream->hasPeekableData());
-  readDataFromQuicStream(*stream, 5);
+  (void)readDataFromQuicStream(*stream, 5);
   EXPECT_TRUE(stream->hasPeekableData());
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->hasPeekableData());
 }
 
@@ -1696,7 +1696,7 @@ TEST_P(QuicStreamFunctionsTestBase, UpdatesLastHolbTime) {
                    .hasError());
   // Should not be HOL blocked before data has arrived
   EXPECT_FALSE(stream->lastHolbTime);
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   // Should be HOL blocked
   EXPECT_TRUE(stream->lastHolbTime);
 }
@@ -1773,7 +1773,7 @@ TEST_P(
   // !HOLB && totalTime == totalTimeMark
   //   => HOLB && holbCount == 2
   //       && totalHolbTime == totalTimeMark
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(2, stream->holbCount);
   EXPECT_EQ(totalHolbTimeMark, stream->totalHolbTime);
@@ -1798,7 +1798,7 @@ TEST_P(
   // uRL 4.1 - read the entire stream - expected state transition:
   // !HOLB && holbCount == 2
   // => !HOLB && holbCount == 2
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(2, stream->holbCount);
 
@@ -1825,7 +1825,7 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingFirstBufferHOLBlocked) {
   EXPECT_EQ(0us, stream->totalHolbTime);
   auto lastHolbTimeMark = stream->lastHolbTime;
 
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   // Read data should fail since there is no data available at
   // the reading cursor
   EXPECT_EQ(lastHolbTimeMark, stream->lastHolbTime);
@@ -1860,7 +1860,7 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingReadingEntireStream) {
   EXPECT_EQ(1, stream->holbCount);
 
   // Consume the entire stream. This should not change the holb status
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 }
@@ -1877,7 +1877,7 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingLockstepScenario) {
   // Should not be HOL blocked before data has arrived
   EXPECT_FALSE(stream->lastHolbTime);
 
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   // Should be HOL blocked now
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
@@ -1906,7 +1906,7 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingLockstepScenario) {
   auto snapshotHolbTime = stream->totalHolbTime;
 
   // Consume all available data from the stream
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
 
   // Should be HOL blocked at missing buf3.
   EXPECT_TRUE(stream->lastHolbTime);
@@ -1930,14 +1930,14 @@ TEST_P(QuicStreamFunctionsTestBase, HolbTimingReadDataCallsUpdateRL) {
 
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf1->clone(), 2))
                    .hasError());
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   // Should be HOL blocked
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
   ASSERT_FALSE(appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0))
                    .hasError());
-  readDataFromQuicStream(*stream);
+  (void)readDataFromQuicStream(*stream);
   EXPECT_FALSE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 }

@@ -24,7 +24,7 @@ IOBufQuicBatch::IOBufQuicBatch(
       statsCallback_(statsCallback),
       happyEyeballsState_(happyEyeballsState) {}
 
-folly::Expected<bool, QuicError> IOBufQuicBatch::write(
+quic::Expected<bool, QuicError> IOBufQuicBatch::write(
     BufPtr&& buf,
     size_t encodedSize) {
   result_.packetsSent++;
@@ -34,7 +34,7 @@ folly::Expected<bool, QuicError> IOBufQuicBatch::write(
   if (batchWriter_->needsFlush(encodedSize)) {
     // continue even if we get an error here
     auto result = flush();
-    if (result.hasError()) {
+    if (!result.has_value()) {
       return result;
     }
   }
@@ -48,7 +48,7 @@ folly::Expected<bool, QuicError> IOBufQuicBatch::write(
   return true;
 }
 
-folly::Expected<bool, QuicError> IOBufQuicBatch::flush() {
+quic::Expected<bool, QuicError> IOBufQuicBatch::flush() {
   auto ret = flushInternal();
   reset();
 
@@ -63,7 +63,7 @@ bool IOBufQuicBatch::isRetriableError(int err) {
   return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS;
 }
 
-folly::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
+quic::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
   if (batchWriter_->empty()) {
     return true;
   }
@@ -152,11 +152,11 @@ folly::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
     // We can get write error for any reason, close the conn only if network
     // is unreachable, for all others, we throw a transport exception
     if (isNetworkUnreachable(errno)) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           LocalErrorCode::CONNECTION_ABANDONED,
           fmt::format("Error on socket write {}", errorMsg)));
     } else {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::INTERNAL_ERROR,
           fmt::format("Error on socket write {}", errorMsg)));
     }

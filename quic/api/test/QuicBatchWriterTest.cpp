@@ -64,7 +64,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBase) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
-  sock.setReuseAddr(false);
+  auto ret = sock.setReuseAddr(false);
+  ASSERT_FALSE(ret.hasError());
   ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   auto gsoResult = sock.getGSO();
   ASSERT_FALSE(gsoResult.hasError());
@@ -96,7 +97,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastSmallPacket) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
-  sock.setReuseAddr(false);
+  auto ret = sock.setReuseAddr(false);
+  ASSERT_FALSE(ret.hasError());
   ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   auto gsoResult = sock.getGSO();
   ASSERT_FALSE(gsoResult.hasError());
@@ -140,7 +142,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOLastBigPacket) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
-  sock.setReuseAddr(false);
+  auto ret = sock.setReuseAddr(false);
+  ASSERT_FALSE(ret.hasError());
   ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   auto gsoResult = sock.getGSO();
   ASSERT_FALSE(gsoResult.hasError());
@@ -179,7 +182,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingGSOBatchNum) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
-  sock.setReuseAddr(false);
+  auto ret = sock.setReuseAddr(false);
+  ASSERT_FALSE(ret.hasError());
   ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   auto gsoResult = sock.getGSO();
   ASSERT_FALSE(gsoResult.hasError());
@@ -482,7 +486,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatchNum) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
-  sock.setReuseAddr(false);
+  auto ret = sock.setReuseAddr(false);
+  ASSERT_FALSE(ret.hasError());
   ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   auto gsoResult = sock.getGSO();
   ASSERT_FALSE(gsoResult.hasError());
@@ -530,7 +535,8 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
   std::shared_ptr<FollyQuicEventBase> qEvb =
       std::make_shared<FollyQuicEventBase>(&evb);
   FollyQuicAsyncUDPSocket sock(qEvb);
-  sock.setReuseAddr(false);
+  auto ret = sock.setReuseAddr(false);
+  ASSERT_FALSE(ret.hasError());
   ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   auto gsoResult = sock.getGSO();
   ASSERT_FALSE(gsoResult.hasError());

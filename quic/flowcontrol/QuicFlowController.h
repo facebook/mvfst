@@ -7,6 +7,7 @@
 
 #pragma once
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -38,28 +39,29 @@ bool maybeSendStreamWindowUpdate(QuicStreamState& stream, TimePoint updateTime);
  * before receiving the data. bufferEndOffset is the end offset of the current
  * buffer.
  */
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-updateFlowControlOnStreamData(
+[[nodiscard]] quic::Expected<void, QuicError> updateFlowControlOnStreamData(
     QuicStreamState& stream,
     uint64_t previousMaxOffsetObserved,
     uint64_t bufferEndOffset);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError> updateFlowControlOnRead(
+[[nodiscard]] quic::Expected<void, QuicError> updateFlowControlOnRead(
     QuicStreamState& stream,
     uint64_t lastReadOffset,
     TimePoint readTime);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-updateFlowControlOnReceiveReset(QuicStreamState& stream, TimePoint resetTime);
+[[nodiscard]] quic::Expected<void, QuicError> updateFlowControlOnReceiveReset(
+    QuicStreamState& stream,
+    TimePoint resetTime);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-updateFlowControlOnWriteToSocket(QuicStreamState& stream, uint64_t length);
+[[nodiscard]] quic::Expected<void, QuicError> updateFlowControlOnWriteToSocket(
+    QuicStreamState& stream,
+    uint64_t length);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
+[[nodiscard]] quic::Expected<void, QuicError> updateFlowControlOnWriteToStream(
+    QuicStreamState& stream,
+    uint64_t length);
 
-[[nodiscard]] folly::Expected<folly::Unit, QuicError>
-updateFlowControlOnResetStream(
+[[nodiscard]] quic::Expected<void, QuicError> updateFlowControlOnResetStream(
     QuicStreamState& stream,
     Optional<uint64_t> reliableSize = std::nullopt);
 

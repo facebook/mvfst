@@ -15,6 +15,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//quic/codec:types",
+        "//quic/common:expected",
         "//quic/state:quic_state_machine",
     ],
 )

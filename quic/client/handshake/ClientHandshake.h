@@ -14,6 +14,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/common/Expected.h>
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
 
@@ -34,7 +35,7 @@ class ClientHandshake : public Handshake {
   /**
    * Initiate the handshake with the supplied parameters.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> connect(
+  [[nodiscard]] quic::Expected<void, QuicError> connect(
       Optional<std::string> hostname,
       std::shared_ptr<ClientTransportParametersExtension> transportParams);
 
@@ -43,7 +44,7 @@ class ClientHandshake : public Handshake {
    * This can change the state of the transport which may result in ciphers
    * being initialized, bytes written out, or the write phase changing.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> doHandshake(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> doHandshake(
       BufPtr data,
       EncryptionLevel encryptionLevel);
 
@@ -62,7 +63,7 @@ class ClientHandshake : public Handshake {
    * one rtt write cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<Aead>, QuicError>
   getNextOneRttWriteCipher() override;
 
   /**
@@ -70,7 +71,7 @@ class ClientHandshake : public Handshake {
    * one rtt read cipher using the current traffic secret and advance the
    * traffic secret.
    */
-  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<Aead>, QuicError>
   getNextOneRttReadCipher() override;
 
   /**
@@ -102,8 +103,7 @@ class ClientHandshake : public Handshake {
    * API used to verify that the integrity token present in the retry packet
    * matches what we would expect
    */
-  [[nodiscard]] virtual folly::Expected<bool, QuicError>
-  verifyRetryIntegrityTag(
+  [[nodiscard]] virtual quic::Expected<bool, QuicError> verifyRetryIntegrityTag(
       const ConnectionId& originalDstConnId,
       const RetryPacket& retryPacket) = 0;
 
@@ -177,7 +177,7 @@ class ClientHandshake : public Handshake {
    * Given secret_n, returns secret_n+1 to be used for generating the next Aead
    * on key updates.
    */
-  [[nodiscard]] virtual folly::Expected<BufPtr, QuicError> getNextTrafficSecret(
+  [[nodiscard]] virtual quic::Expected<BufPtr, QuicError> getNextTrafficSecret(
       ByteRange secret) const = 0;
 
   BufPtr readTrafficSecret_;
@@ -187,15 +187,15 @@ class ClientHandshake : public Handshake {
   Optional<bool> canResendZeroRtt_;
 
  private:
-  [[nodiscard]] virtual folly::
+  [[nodiscard]] virtual quic::
       Expected<Optional<CachedServerTransportParameters>, QuicError>
       connectImpl(Optional<std::string> hostname) = 0;
 
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual bool matchEarlyParameters() = 0;
-  [[nodiscard]] virtual folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] virtual quic::Expected<std::unique_ptr<Aead>, QuicError>
   buildAead(CipherKind kind, ByteRange secret) = 0;
-  [[nodiscard]] virtual folly::
+  [[nodiscard]] virtual quic::
       Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
       buildHeaderCipher(ByteRange secret) = 0;
 
@@ -219,7 +219,7 @@ class ClientHandshake : public Handshake {
   // transport's read and write ciphers are likely out of sync.
   int8_t trafficSecretSync_{0};
 
-  folly::Expected<folly::Unit, QuicError> error_{folly::unit};
+  quic::Expected<void, QuicError> error_{};
 };
 
 } // namespace quic

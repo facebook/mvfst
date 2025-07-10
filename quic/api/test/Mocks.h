@@ -30,7 +30,7 @@ class MockFrameScheduler : public FrameScheduler {
       : FrameScheduler("mock", *conn) {}
 
   // override methods accepting rvalue ref since gmock doesn't support it
-  folly::Expected<SchedulingResult, QuicError> scheduleFramesForPacket(
+  quic::Expected<SchedulingResult, QuicError> scheduleFramesForPacket(
       PacketBuilderInterface&& builderIn,
       uint32_t writableBytes) override {
     return _scheduleFramesForPacket(&builderIn, writableBytes);
@@ -39,7 +39,7 @@ class MockFrameScheduler : public FrameScheduler {
   MOCK_METHOD((bool), hasData, (), (const));
   MOCK_METHOD((bool), hasImmediateData, (), (const));
   MOCK_METHOD(
-      (folly::Expected<SchedulingResult, QuicError>),
+      (quic::Expected<SchedulingResult, QuicError>),
       _scheduleFramesForPacket,
       (PacketBuilderInterface*, uint32_t));
 };

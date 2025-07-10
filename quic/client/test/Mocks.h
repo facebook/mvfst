@@ -43,16 +43,16 @@ class MockClientHandshakeBase : public ClientHandshake {
   }
 
   // Legacy workaround for move-only types
-  folly::Expected<folly::Unit, QuicError> doHandshake(
+  quic::Expected<void, QuicError> doHandshake(
       BufPtr data,
       EncryptionLevel encryptionLevel) override {
     doHandshakeImpl(data.get(), encryptionLevel);
-    return folly::unit;
+    return {};
   }
 
   MOCK_METHOD(void, doHandshakeImpl, (folly::IOBuf*, EncryptionLevel));
   MOCK_METHOD(
-      (folly::Expected<bool, QuicError>),
+      (quic::Expected<bool, QuicError>),
       verifyRetryIntegrityTag,
       (const ConnectionId&, const RetryPacket&),
       (override));
@@ -75,12 +75,12 @@ class MockClientHandshakeBase : public ClientHandshake {
       (override));
   MOCK_METHOD(void, destroy, ());
   MOCK_METHOD(
-      (folly::Expected<std::unique_ptr<Aead>, QuicError>),
+      (quic::Expected<std::unique_ptr<Aead>, QuicError>),
       getNextOneRttWriteCipher,
       (),
       (override));
   MOCK_METHOD(
-      (folly::Expected<std::unique_ptr<Aead>, QuicError>),
+      (quic::Expected<std::unique_ptr<Aead>, QuicError>),
       getNextOneRttReadCipher,
       (),
       (override));
@@ -98,14 +98,14 @@ class MockClientHandshakeBase : public ClientHandshake {
   MOCK_METHOD(Handshake::TLSSummary, getTLSSummaryImpl, (), (const));
 
   // Mock the public connect method
-  folly::Expected<folly::Unit, QuicError> connect(
+  quic::Expected<void, QuicError> connect(
       Optional<std::string> hostname,
       std::shared_ptr<ClientTransportParametersExtension> transportParams) {
     return mockConnect(std::move(hostname), std::move(transportParams));
   }
 
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       mockConnect,
       (Optional<std::string>,
        std::shared_ptr<ClientTransportParametersExtension>));
@@ -117,15 +117,15 @@ class MockClientHandshakeBase : public ClientHandshake {
   MOCK_METHOD(void, processSocketData, (folly::IOBufQueue & queue));
   MOCK_METHOD(bool, matchEarlyParameters, ());
   MOCK_METHOD(
-      (folly::Expected<std::unique_ptr<Aead>, QuicError>),
+      (quic::Expected<std::unique_ptr<Aead>, QuicError>),
       buildAead,
       (ClientHandshake::CipherKind kind, ByteRange secret));
   MOCK_METHOD(
-      (folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>),
+      (quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>),
       buildHeaderCipher,
       (ByteRange secret));
   MOCK_METHOD(
-      (folly::Expected<BufPtr, QuicError>),
+      (quic::Expected<BufPtr, QuicError>),
       getNextTrafficSecret,
       (ByteRange secret),
       (const));
@@ -150,7 +150,7 @@ class MockClientHandshake : public MockClientHandshakeBase {
 
  private:
   // Implement the private pure virtual methods from ClientHandshake
-  folly::Expected<Optional<CachedServerTransportParameters>, QuicError>
+  quic::Expected<Optional<CachedServerTransportParameters>, QuicError>
   connectImpl(Optional<std::string> /* hostname */) override {
     return Optional<CachedServerTransportParameters>(std::nullopt);
   }
@@ -161,22 +161,22 @@ class MockClientHandshake : public MockClientHandshakeBase {
     return false;
   }
 
-  folly::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
+  quic::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
       CipherKind /* kind */,
       ByteRange /* secret */) override {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(TransportErrorCode::INTERNAL_ERROR, "Not implemented"));
   }
 
-  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   buildHeaderCipher(ByteRange /* secret */) override {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(TransportErrorCode::INTERNAL_ERROR, "Not implemented"));
   }
 
-  folly::Expected<BufPtr, QuicError> getNextTrafficSecret(
+  quic::Expected<BufPtr, QuicError> getNextTrafficSecret(
       ByteRange /* secret */) const override {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(TransportErrorCode::INTERNAL_ERROR, "Not implemented"));
   }
 };

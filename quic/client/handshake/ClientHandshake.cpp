@@ -17,20 +17,20 @@ namespace quic {
 ClientHandshake::ClientHandshake(QuicClientConnectionState* conn)
     : conn_(conn) {}
 
-folly::Expected<folly::Unit, QuicError> ClientHandshake::connect(
+quic::Expected<void, QuicError> ClientHandshake::connect(
     Optional<std::string> hostname,
     std::shared_ptr<ClientTransportParametersExtension> transportParams) {
   transportParams_ = std::move(transportParams);
 
   auto cachedServerTransportParamsResult = connectImpl(std::move(hostname));
-  if (cachedServerTransportParamsResult.hasError()) {
-    return folly::makeUnexpected(cachedServerTransportParamsResult.error());
+  if (!cachedServerTransportParamsResult.has_value()) {
+    return quic::make_unexpected(cachedServerTransportParamsResult.error());
   }
 
   Optional<CachedServerTransportParameters> cachedServerTransportParams =
       std::move(cachedServerTransportParamsResult.value());
 
-  if (error_.hasError()) {
+  if (!error_.has_value()) {
     return error_;
   }
 
@@ -57,19 +57,19 @@ folly::Expected<folly::Unit, QuicError> ClientHandshake::connect(
         cachedServerTransportParams->extendedAckFeatures);
     auto result = updateTransportParamsFromCachedEarlyParams(
         *conn_, *cachedServerTransportParams);
-    if (result.hasError()) {
+    if (!result.has_value()) {
       // Why are we not returning here?
-      error_ = folly::makeUnexpected(std::move(result.error()));
+      error_ = quic::make_unexpected(std::move(result.error()));
     }
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> ClientHandshake::doHandshake(
+quic::Expected<void, QuicError> ClientHandshake::doHandshake(
     quic::BufPtr data,
     EncryptionLevel encryptionLevel) {
   if (!data) {
-    return folly::unit;
+    return {};
   }
   // TODO: deal with clear text alert messages. It's possible that a MITM who
   // mucks with the finished messages could cause the decryption to be invalid
@@ -114,11 +114,11 @@ folly::Expected<folly::Unit, QuicError> ClientHandshake::doHandshake(
       default:
         LOG(FATAL) << "Unhandled EncryptionLevel";
     }
-    if (error_.hasError()) {
+    if (!error_.has_value()) {
       return std::move(error_);
     }
   }
-  return folly::unit;
+  return {};
 }
 
 void ClientHandshake::handshakeConfirmed() {
@@ -160,13 +160,13 @@ bool ClientHandshake::waitingForData() const {
 
 void ClientHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   auto aeadResult = buildAead(kind, secret);
-  if (aeadResult.hasError()) {
-    error_ = folly::makeUnexpected(std::move(aeadResult.error()));
+  if (!aeadResult.has_value()) {
+    error_ = quic::make_unexpected(std::move(aeadResult.error()));
     return;
   }
   auto packetNumberCipherResult = buildHeaderCipher(secret);
-  if (packetNumberCipherResult.hasError()) {
-    error_ = folly::makeUnexpected(std::move(packetNumberCipherResult.error()));
+  if (!packetNumberCipherResult.has_value()) {
+    error_ = quic::make_unexpected(std::move(packetNumberCipherResult.error()));
     return;
   }
 
@@ -193,8 +193,8 @@ void ClientHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
       conn_->readCodec->setOneRttReadCipher(std::move(aead));
       conn_->readCodec->setOneRttHeaderCipher(std::move(packetNumberCipher));
       auto nextOneRttReadCipher = getNextOneRttReadCipher();
-      if (nextOneRttReadCipher.hasError()) {
-        error_ = folly::makeUnexpected(std::move(nextOneRttReadCipher.error()));
+      if (!nextOneRttReadCipher.has_value()) {
+        error_ = quic::make_unexpected(std::move(nextOneRttReadCipher.error()));
         return;
       }
       conn_->readCodec->setNextOneRttReadCipher(
@@ -211,10 +211,10 @@ void ClientHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   }
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ClientHandshake::getNextOneRttWriteCipher() {
-  if (error_.hasError()) {
-    return folly::makeUnexpected(std::move(error_.error()));
+  if (!error_.has_value()) {
+    return quic::make_unexpected(std::move(error_.error()));
   }
 
   CHECK(writeTrafficSecret_);
@@ -222,8 +222,8 @@ ClientHandshake::getNextOneRttWriteCipher() {
       << "Client read and write secrets are out of sync";
 
   auto nextSecretResult = getNextTrafficSecret(writeTrafficSecret_->coalesce());
-  if (nextSecretResult.hasError()) {
-    return folly::makeUnexpected(std::move(nextSecretResult.error()));
+  if (!nextSecretResult.has_value()) {
+    return quic::make_unexpected(std::move(nextSecretResult.error()));
   }
   writeTrafficSecret_ = std::move(nextSecretResult.value());
   trafficSecretSync_--;
@@ -231,10 +231,10 @@ ClientHandshake::getNextOneRttWriteCipher() {
   return buildAead(CipherKind::OneRttWrite, writeTrafficSecret_->coalesce());
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ClientHandshake::getNextOneRttReadCipher() {
-  if (error_.hasError()) {
-    return folly::makeUnexpected(std::move(error_.error()));
+  if (!error_.has_value()) {
+    return quic::make_unexpected(std::move(error_.error()));
   }
 
   CHECK(readTrafficSecret_);
@@ -242,8 +242,8 @@ ClientHandshake::getNextOneRttReadCipher() {
       << "Client read and write secrets are out of sync";
 
   auto nextSecretResult = getNextTrafficSecret(readTrafficSecret_->coalesce());
-  if (nextSecretResult.hasError()) {
-    return folly::makeUnexpected(std::move(nextSecretResult.error()));
+  if (!nextSecretResult.has_value()) {
+    return quic::make_unexpected(std::move(nextSecretResult.error()));
   }
   readTrafficSecret_ = std::move(nextSecretResult.value());
   trafficSecretSync_++;
@@ -298,7 +298,7 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
 }
 
 void ClientHandshake::setError(QuicError error) {
-  error_ = folly::makeUnexpected(std::move(error));
+  error_ = quic::make_unexpected(std::move(error));
 }
 
 QuicClientConnectionState* ClientHandshake::getClientConn() {

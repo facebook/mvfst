@@ -55,23 +55,23 @@ class MockQuicSocket : public QuicSocket {
       (const));
   MOCK_METHOD(std::shared_ptr<QuicEventBase>, getEventBase, (), (const));
   MOCK_METHOD(
-      (folly::Expected<size_t, LocalErrorCode>),
+      (quic::Expected<size_t, LocalErrorCode>),
       getStreamReadOffset,
       (StreamId),
       (const));
   MOCK_METHOD(
-      (folly::Expected<size_t, LocalErrorCode>),
+      (quic::Expected<size_t, LocalErrorCode>),
       getStreamWriteOffset,
       (StreamId),
       (const));
   MOCK_METHOD(
-      (folly::Expected<size_t, LocalErrorCode>),
+      (quic::Expected<size_t, LocalErrorCode>),
       getStreamWriteBufferedBytes,
       (StreamId),
       (const));
   MOCK_METHOD(QuicSocket::TransportInfo, getTransportInfo, (), (const));
   MOCK_METHOD(
-      (folly::Expected<QuicSocket::StreamTransportInfo, LocalErrorCode>),
+      (quic::Expected<QuicSocket::StreamTransportInfo, LocalErrorCode>),
       getStreamTransportInfo,
       (StreamId),
       (const));
@@ -80,17 +80,17 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(void, setSendBuffer, (StreamId, size_t, size_t));
   MOCK_METHOD(uint64_t, getConnectionBufferAvailable, (), (const));
   MOCK_METHOD(
-      (folly::Expected<FlowControlState, LocalErrorCode>),
+      (quic::Expected<FlowControlState, LocalErrorCode>),
       getConnectionFlowControl,
       (),
       (const));
   MOCK_METHOD(
-      (folly::Expected<FlowControlState, LocalErrorCode>),
+      (quic::Expected<FlowControlState, LocalErrorCode>),
       getStreamFlowControl,
       (StreamId),
       (const));
   MOCK_METHOD(
-      (folly::Expected<uint64_t, LocalErrorCode>),
+      (quic::Expected<uint64_t, LocalErrorCode>),
       getMaxWritableOnStream,
       (StreamId),
       (const));
@@ -103,44 +103,44 @@ class MockQuicSocket : public QuicSocket {
       cancelDeliveryCallbacksForStream,
       (StreamId, uint64_t offset));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setConnectionFlowControlWindow,
       (uint64_t));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setStreamFlowControlWindow,
       (StreamId, uint64_t));
   MOCK_METHOD(void, setTransportSettings, (TransportSettings));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setMaxPacingRate,
       (uint64_t));
 
-  folly::Expected<folly::Unit, LocalErrorCode>
+  quic::Expected<void, LocalErrorCode>
   setKnob(uint64_t knobSpace, uint64_t knobId, BufPtr knobBlob) override {
     SharedBuf sharedBlob(knobBlob.release());
     return setKnob(knobSpace, knobId, sharedBlob);
   }
 
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setKnob,
       (uint64_t, uint64_t, SharedBuf));
   MOCK_METHOD(bool, isKnobSupported, (), (const));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setStreamPriority,
       (StreamId, PriorityQueue::Priority));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setPriorityQueue,
       (std::unique_ptr<PriorityQueue> queue));
   MOCK_METHOD(
-      (folly::Expected<PriorityQueue::Priority, LocalErrorCode>),
+      (quic::Expected<PriorityQueue::Priority, LocalErrorCode>),
       getStreamPriority,
       (StreamId));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setReadCallback,
       (StreamId, ReadCallback*, Optional<ApplicationErrorCode> err));
   MOCK_METHOD(
@@ -160,25 +160,19 @@ class MockQuicSocket : public QuicSocket {
     earlyDataAppParamsGetter_ = std::move(getter);
   }
 
+  MOCK_METHOD((quic::Expected<void, LocalErrorCode>), pauseRead, (StreamId));
+  MOCK_METHOD((quic::Expected<void, LocalErrorCode>), resumeRead, (StreamId));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
-      pauseRead,
-      (StreamId));
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
-      resumeRead,
-      (StreamId));
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       stopSending,
       (StreamId, ApplicationErrorCode));
 
-  folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
+  quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxRead) override {
     auto res = readNaked(id, maxRead);
     if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
+      return quic::make_unexpected(res.error());
     } else {
       return std::pair<BufPtr, bool>(
           BufPtr(res.value().first), res.value().second);
@@ -186,14 +180,14 @@ class MockQuicSocket : public QuicSocket {
   }
 
   using ReadResult =
-      folly::Expected<std::pair<folly::IOBuf*, bool>, LocalErrorCode>;
+      quic::Expected<std::pair<folly::IOBuf*, bool>, LocalErrorCode>;
   MOCK_METHOD(ReadResult, readNaked, (StreamId, size_t));
   MOCK_METHOD(
-      (folly::Expected<StreamId, LocalErrorCode>),
+      (quic::Expected<StreamId, LocalErrorCode>),
       createBidirectionalStream,
       (bool));
   MOCK_METHOD(
-      (folly::Expected<StreamId, LocalErrorCode>),
+      (quic::Expected<StreamId, LocalErrorCode>),
       createUnidirectionalStream,
       (bool));
   MOCK_METHOD(uint64_t, getNumOpenableBidirectionalStreams, (), (const));
@@ -209,23 +203,23 @@ class MockQuicSocket : public QuicSocket {
       (StreamId),
       (noexcept));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       notifyPendingWriteOnConnection,
       (ConnectionWriteCallback*));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       notifyPendingWriteOnStream,
       (StreamId, StreamWriteCallback*));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       unregisterStreamWriteCallback,
       (StreamId));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       registerTxCallback,
       (const StreamId, const uint64_t, ByteEventCallback*));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       registerByteEventCallback,
       (const ByteEvent::Type,
        const StreamId,
@@ -254,7 +248,7 @@ class MockQuicSocket : public QuicSocket {
       (const ByteEvent::Type, const StreamId),
       (const));
 
-  folly::Expected<folly::Unit, LocalErrorCode> writeChain(
+  quic::Expected<void, LocalErrorCode> writeChain(
       StreamId id,
       BufPtr data,
       bool eof,
@@ -276,28 +270,28 @@ class MockQuicSocket : public QuicSocket {
       setDSRPacketizationRequestSender,
       (StreamId, std::unique_ptr<DSRPacketizationRequestSender>));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       registerDeliveryCallback,
       (StreamId, uint64_t, ByteEventCallback*));
   MOCK_METHOD(Optional<LocalErrorCode>, shutdownWrite, (StreamId));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       resetStream,
       (StreamId, ApplicationErrorCode));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       updateReliableDeliveryCheckpoint,
       (StreamId));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       resetStreamReliably,
       (StreamId, ApplicationErrorCode));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       maybeResetStreamFromReadError,
       (StreamId, QuicErrorCode));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setPingCallback,
       (PingCallback*));
   MOCK_METHOD(void, sendPing, (std::chrono::milliseconds));
@@ -308,34 +302,26 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(Optional<LocalErrorCode>, setControlStream, (StreamId));
 
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setPeekCallback,
       (StreamId, PeekCallback*));
 
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
-      pausePeek,
-      (StreamId));
-  MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
-      resumePeek,
-      (StreamId));
+  MOCK_METHOD((quic::Expected<void, LocalErrorCode>), pausePeek, (StreamId));
+  MOCK_METHOD((quic::Expected<void, LocalErrorCode>), resumePeek, (StreamId));
 
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       peek,
       (StreamId,
        const std::function<
            void(StreamId, const folly::Range<PeekIterator>&)>&));
 
   MOCK_METHOD(
-      (folly::Expected<
-          folly::Unit,
-          std::pair<LocalErrorCode, Optional<uint64_t>>>),
+      (quic::Expected<void, std::pair<LocalErrorCode, Optional<uint64_t>>>),
       consume,
       (StreamId, uint64_t, size_t));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       consume,
       (StreamId, size_t));
 
@@ -361,24 +347,23 @@ class MockQuicSocket : public QuicSocket {
       (ApplicationErrorCode, folly::StringPiece));
   MOCK_METHOD(QuicConnectionStats, getConnectionsStats, (), (const));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setDatagramCallback,
       (DatagramCallback*));
   MOCK_METHOD(uint16_t, getDatagramSizeLimit, (), (const));
 
-  folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(
-      BufPtr data) override {
+  quic::Expected<void, LocalErrorCode> writeDatagram(BufPtr data) override {
     SharedBuf sharedData(data.release());
     return writeDatagram(sharedData);
   }
 
   MOCK_METHOD(WriteResult, writeDatagram, (SharedBuf));
   MOCK_METHOD(
-      (folly::Expected<std::vector<ReadDatagram>, LocalErrorCode>),
+      (quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>),
       readDatagrams,
       (size_t));
   MOCK_METHOD(
-      (folly::Expected<std::vector<BufPtr>, LocalErrorCode>),
+      (quic::Expected<std::vector<BufPtr>, LocalErrorCode>),
       readDatagramBufs,
       (size_t));
   MOCK_METHOD(
@@ -387,23 +372,23 @@ class MockQuicSocket : public QuicSocket {
       (),
       (const));
   MOCK_METHOD(
-      (folly::Expected<StreamGroupId, LocalErrorCode>),
+      (quic::Expected<StreamGroupId, LocalErrorCode>),
       createBidirectionalStreamGroup,
       ());
   MOCK_METHOD(
-      (folly::Expected<StreamGroupId, LocalErrorCode>),
+      (quic::Expected<StreamGroupId, LocalErrorCode>),
       createUnidirectionalStreamGroup,
       ());
   MOCK_METHOD(
-      (folly::Expected<StreamId, LocalErrorCode>),
+      (quic::Expected<StreamId, LocalErrorCode>),
       createBidirectionalStreamInGroup,
       (StreamGroupId));
   MOCK_METHOD(
-      (folly::Expected<StreamId, LocalErrorCode>),
+      (quic::Expected<StreamId, LocalErrorCode>),
       createUnidirectionalStreamInGroup,
       (StreamGroupId));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setStreamGroupRetransmissionPolicy,
       (StreamGroupId, std::optional<QuicStreamGroupRetransmissionPolicy>),
       (noexcept));

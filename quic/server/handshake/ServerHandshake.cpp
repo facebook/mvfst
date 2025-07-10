@@ -33,7 +33,7 @@ void ServerHandshake::initialize(
   initializeImpl(callback, std::move(validator));
 }
 
-folly::Expected<folly::Unit, QuicError> ServerHandshake::doHandshake(
+quic::Expected<void, QuicError> ServerHandshake::doHandshake(
     BufPtr data,
     EncryptionLevel encryptionLevel) {
   SCOPE_EXIT {
@@ -57,13 +57,13 @@ folly::Expected<folly::Unit, QuicError> ServerHandshake::doHandshake(
   }
   processPendingEvents();
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> ServerHandshake::writeNewSessionTicket(
+quic::Expected<void, QuicError> ServerHandshake::writeNewSessionTicket(
     const AppToken& appToken) {
   SCOPE_EXIT {
     inHandshakeStack_ = false;
@@ -72,34 +72,34 @@ folly::Expected<folly::Unit, QuicError> ServerHandshake::writeNewSessionTicket(
   writeNewSessionTicketToCrypto(appToken);
   processPendingEvents();
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ServerHandshake::getHandshakeReadCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(handshakeReadCipher_);
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ServerHandshake::getFirstOneRttWriteCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(oneRttWriteCipher_);
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ServerHandshake::getNextOneRttWriteCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   CHECK(writeTrafficSecret_);
@@ -111,19 +111,19 @@ ServerHandshake::getNextOneRttWriteCipher() {
   return cipher;
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ServerHandshake::getFirstOneRttReadCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(oneRttReadCipher_);
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ServerHandshake::getNextOneRttReadCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   CHECK(readTrafficSecret_);
@@ -135,46 +135,46 @@ ServerHandshake::getNextOneRttReadCipher() {
   return cipher;
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 ServerHandshake::getZeroRttReadCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(zeroRttReadCipher_);
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 ServerHandshake::getOneRttReadHeaderCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(oneRttReadHeaderCipher_);
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 ServerHandshake::getOneRttWriteHeaderCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(oneRttWriteHeaderCipher_);
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 ServerHandshake::getHandshakeReadHeaderCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(handshakeReadHeaderCipher_);
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 ServerHandshake::getZeroRttReadHeaderCipher() {
   if (error_) {
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
   return std::move(zeroRttReadHeaderCipher_);

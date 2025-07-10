@@ -47,12 +47,12 @@ class QuicClientTransportMock : public QuicClientTransport {
                .hasError());
   }
 
-  folly::Expected<folly::Unit, QuicError> processPackets(
+  quic::Expected<void, QuicError> processPackets(
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server) override {
     networkDataVec_.push_back(std::move(networkData));
     server_ = server;
-    return folly::unit;
+    return {};
   }
 
   QuicClientConnectionState* getClientConn() {
@@ -69,44 +69,46 @@ class QuicClientTransportTest : public Test {
     evb_ = std::make_shared<QuicEventBaseMock>();
     auto sock = std::make_unique<QuicAsyncUDPSocketMock>();
     sockPtr_ = sock.get();
-    ON_CALL(*sock, setReuseAddr(_)).WillByDefault(testing::Return(folly::unit));
+    ON_CALL(*sock, setReuseAddr(_))
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setAdditionalCmsgsFunc(_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setDFAndTurnOffPMTU())
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setErrMessageCallback(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setTosOrTrafficClass(_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, init(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, applyOptions(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, bind(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, connect(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
-    ON_CALL(*sock, close()).WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*sock, close())
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setGRO(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, getGRO()).WillByDefault(testing::Return(0));
     ON_CALL(*sock, getGSO()).WillByDefault(testing::Return(0));
     ON_CALL(*sock, setRecvTos(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, getRecvTos()).WillByDefault(testing::Return(false));
     ON_CALL(*sock, setCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, appendCmsgs(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, getTimestamping()).WillByDefault(testing::Return(0));
     ON_CALL(*sock, setReusePort(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setRcvBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setSndBuf(testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*sock, setFD(testing::_, testing::_))
-        .WillByDefault(testing::Return(folly::unit));
+        .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
 
     mockFactory_ = std::make_shared<MockClientHandshakeFactory>();
     EXPECT_CALL(*mockFactory_, makeClientHandshakeImpl(_))
@@ -163,7 +165,8 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
                    ->streamManager->setMaxLocalBidirectionalStreams(128)
                    .hasError());
   StreamId streamId = quicClient_->createBidirectionalStream().value();
-  quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false);
+  [[maybe_unused]] auto writeChainResult = quicClient_->writeChain(
+      streamId, folly::IOBuf::copyBuffer("test"), false);
 
   EXPECT_CALL(*sockPtr_, recvmsg(_, _))
       .WillRepeatedly(Invoke([&](struct msghdr* /* msg */, int /* flags */) {

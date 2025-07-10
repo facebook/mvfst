@@ -25,7 +25,7 @@ class QuicClientTransportMock : public QuicClientTransport {
             std::move(handshakeFactory)) {}
 
   MOCK_METHOD(
-      (folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode>),
+      (quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode>),
       read,
       (StreamId, size_t));
   MOCK_METHOD(
@@ -43,20 +43,20 @@ class QuicClientTransportMock : public QuicClientTransport {
   MOCK_METHOD((void), onNotifyDataAvailable, (QuicAsyncUDPSocket&), (noexcept));
   MOCK_METHOD((void), errMessage, (const cmsghdr&), (noexcept));
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, LocalErrorCode>),
+      (quic::Expected<void, LocalErrorCode>),
       setReadCallback,
       (StreamId,
        quic::QuicSocket::ReadCallback*,
        Optional<ApplicationErrorCode>));
   MOCK_METHOD(
-      (folly::Expected<StreamTransportInfo, LocalErrorCode>),
+      (quic::Expected<StreamTransportInfo, LocalErrorCode>),
       getStreamTransportInfo,
       (StreamId),
       (const));
   MOCK_METHOD((bool), isTLSResumed, (), (const));
   MOCK_METHOD((ZeroRttAttemptState), getZeroRttState, ());
   MOCK_METHOD((void), close, (Optional<QuicError>));
-  MOCK_METHOD((folly::Expected<folly::Unit, QuicError>), writeData, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), writeData, ());
   MOCK_METHOD((void), closeSecondSocket, ());
   MOCK_METHOD((void), setHappyEyeballsEnabled, (bool));
   MOCK_METHOD(

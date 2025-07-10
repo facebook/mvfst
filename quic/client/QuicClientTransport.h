@@ -9,6 +9,7 @@
 
 #include <quic/api/QuicTransportBase.h>
 #include <quic/client/QuicClientTransportLite.h>
+#include <quic/common/Expected.h>
 
 namespace quic {
 
@@ -101,17 +102,17 @@ class QuicClientTransport : public QuicTransportBase,
     return wrappedObserverContainer_.getPtr();
   }
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmmsgWrapper(
+  [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmmsgWrapper(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmmsg(
+  [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> readWithRecvmsg(
+  [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets);

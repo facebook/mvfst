@@ -219,7 +219,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     connectionBaton_.post();
   }
 
-  folly::Expected<folly::Unit, QuicError> start(std::string token) {
+  quic::Expected<void, QuicError> start(std::string token) {
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
     auto qEvb = std::make_shared<FollyQuicEventBase>(evb);
@@ -242,7 +242,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       }
       if (useDatagrams_) {
         auto res = quicClient_->setDatagramCallback(this);
-        CHECK(res.hasValue()) << res.error();
+        CHECK(res.has_value()) << res.error();
       }
 
       TransportSettings settings;
@@ -266,13 +266,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     connectionBaton_.reset();
 
     if (connectionError_.has_value()) {
-      return folly::makeUnexpected(connectionError_.value());
+      return quic::make_unexpected(connectionError_.value());
     }
 
     if (connectOnly_) {
       evb->runInEventBaseThreadAndWait(
           [this] { quicClient_->closeNow(std::nullopt); });
-      return folly::unit;
+      return quic::Expected<void, QuicError>{};
     }
 
     std::string message;
@@ -283,7 +283,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       // Generate two groups.
       for (size_t i = 0; i < kNumTestStreamGroups; ++i) {
         auto groupId = quicClient_->createBidirectionalStreamGroup();
-        CHECK(groupId.hasValue())
+        CHECK(groupId.has_value())
             << "Failed to generate a stream group: " << groupId.error();
         streamGroups_[i] = *groupId;
       }
@@ -307,7 +307,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       // create new stream for each message
       auto streamId =
           client->createBidirectionalStreamInGroup(getNextGroupId());
-      CHECK(streamId.hasValue())
+      CHECK(streamId.has_value())
           << "Failed to generate stream id in group: " << streamId.error();
       client->setReadCallback(*streamId, this);
       pendingOutput_[*streamId].append(BufHelpers::copyBuffer(message));
@@ -336,8 +336,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     LOG(INFO) << "EchoClient stopping client";
 
     return connectionError_.has_value()
-        ? folly::makeUnexpected(connectionError_.value())
-        : folly::Expected<folly::Unit, QuicError>(folly::unit);
+        ? quic::make_unexpected(connectionError_.value())
+        : quic::Expected<void, QuicError>{};
   }
 
   ~EchoClient() override = default;

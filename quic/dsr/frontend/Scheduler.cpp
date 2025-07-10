@@ -78,7 +78,7 @@ DSRStreamFrameScheduler::enrichAndAddSendInstruction(
  * same backend. Thus one SendInstruction can only have one stream. So this API
  * only write a single stream.
  */
-folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+quic::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
 DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
   auto oldWriteQueue = conn_.streamManager->oldWriteQueue();
   if (oldWriteQueue) {
@@ -88,7 +88,7 @@ DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
   }
 }
 
-folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+quic::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
 DSRStreamFrameScheduler::writeStreamImpl(
     DSRPacketBuilderBase& builder,
     PriorityQueue& writeQueue) {
@@ -124,7 +124,7 @@ DSRStreamFrameScheduler::writeStreamImpl(
         stream->lossBufMetas.front().eof,
         stream->currentWriteOffset + stream->pendingWrites.chainLength());
     if (encodedSizeExpected.hasError()) {
-      return folly::makeUnexpected(encodedSizeExpected.error());
+      return quic::make_unexpected(encodedSizeExpected.error());
     }
 
     auto encodedSize = encodedSizeExpected.value();
@@ -174,7 +174,7 @@ DSRStreamFrameScheduler::writeStreamImpl(
       canWriteFin,
       stream->currentWriteOffset + stream->pendingWrites.chainLength());
   if (encodedSizeExpected.hasError()) {
-    return folly::makeUnexpected(encodedSizeExpected.error());
+    return quic::make_unexpected(encodedSizeExpected.error());
   }
 
   auto encodedSize = encodedSizeExpected.value();
@@ -195,7 +195,7 @@ DSRStreamFrameScheduler::writeStreamImpl(
   return result;
 }
 
-folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+quic::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
 DSRStreamFrameScheduler::writeStreamImpl(
     DSRPacketBuilderBase& builder,
     const deprecated::PriorityQueue& writeQueue) {
@@ -232,7 +232,7 @@ DSRStreamFrameScheduler::writeStreamImpl(
         stream->currentWriteOffset + stream->pendingWrites.chainLength());
 
     if (encodedSizeExpected.hasError()) {
-      return folly::makeUnexpected(encodedSizeExpected.error());
+      return quic::make_unexpected(encodedSizeExpected.error());
     }
 
     auto encodedSize = encodedSizeExpected.value();
@@ -282,7 +282,7 @@ DSRStreamFrameScheduler::writeStreamImpl(
       stream->currentWriteOffset + stream->pendingWrites.chainLength());
 
   if (encodedSizeExpected.hasError()) {
-    return folly::makeUnexpected(encodedSizeExpected.error());
+    return quic::make_unexpected(encodedSizeExpected.error());
   }
 
   auto encodedSize = encodedSizeExpected.value();

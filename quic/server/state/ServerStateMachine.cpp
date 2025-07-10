@@ -174,13 +174,13 @@ bool isZeroRttPacketFrameInvalid(const QuicFrame& quicFrame) {
 }
 } // namespace
 
-folly::Expected<folly::Unit, QuicError> processClientInitialParams(
+quic::Expected<void, QuicError> processClientInitialParams(
     QuicServerConnectionState& conn,
     const ClientTransportParameters& clientParams) {
   auto preferredAddressResult = getIntegerParameter(
       TransportParameterId::preferred_address, clientParams.parameters);
   if (preferredAddressResult.hasError()) {
-    return folly::makeUnexpected(preferredAddressResult.error());
+    return quic::make_unexpected(preferredAddressResult.error());
   }
   auto preferredAddress = preferredAddressResult.value();
 
@@ -188,14 +188,14 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::original_destination_connection_id,
       clientParams.parameters);
   if (origConnIdResult.hasError()) {
-    return folly::makeUnexpected(origConnIdResult.error());
+    return quic::make_unexpected(origConnIdResult.error());
   }
   auto origConnId = origConnIdResult.value();
 
   auto statelessResetTokenResult = getIntegerParameter(
       TransportParameterId::stateless_reset_token, clientParams.parameters);
   if (statelessResetTokenResult.hasError()) {
-    return folly::makeUnexpected(statelessResetTokenResult.error());
+    return quic::make_unexpected(statelessResetTokenResult.error());
   }
   auto statelessResetToken = statelessResetTokenResult.value();
 
@@ -203,14 +203,14 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::retry_source_connection_id,
       clientParams.parameters);
   if (retrySourceConnIdResult.hasError()) {
-    return folly::makeUnexpected(retrySourceConnIdResult.error());
+    return quic::make_unexpected(retrySourceConnIdResult.error());
   }
   auto retrySourceConnId = retrySourceConnIdResult.value();
 
   auto maxDataResult = getIntegerParameter(
       TransportParameterId::initial_max_data, clientParams.parameters);
   if (maxDataResult.hasError()) {
-    return folly::makeUnexpected(maxDataResult.error());
+    return quic::make_unexpected(maxDataResult.error());
   }
   auto maxData = maxDataResult.value();
 
@@ -218,7 +218,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::initial_max_stream_data_bidi_local,
       clientParams.parameters);
   if (maxStreamDataBidiLocalResult.hasError()) {
-    return folly::makeUnexpected(maxStreamDataBidiLocalResult.error());
+    return quic::make_unexpected(maxStreamDataBidiLocalResult.error());
   }
   auto maxStreamDataBidiLocal = maxStreamDataBidiLocalResult.value();
 
@@ -226,7 +226,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::initial_max_stream_data_bidi_remote,
       clientParams.parameters);
   if (maxStreamDataBidiRemoteResult.hasError()) {
-    return folly::makeUnexpected(maxStreamDataBidiRemoteResult.error());
+    return quic::make_unexpected(maxStreamDataBidiRemoteResult.error());
   }
   auto maxStreamDataBidiRemote = maxStreamDataBidiRemoteResult.value();
 
@@ -234,42 +234,42 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::initial_max_stream_data_uni,
       clientParams.parameters);
   if (maxStreamDataUniResult.hasError()) {
-    return folly::makeUnexpected(maxStreamDataUniResult.error());
+    return quic::make_unexpected(maxStreamDataUniResult.error());
   }
   auto maxStreamDataUni = maxStreamDataUniResult.value();
 
   auto maxStreamsBidiResult = getIntegerParameter(
       TransportParameterId::initial_max_streams_bidi, clientParams.parameters);
   if (maxStreamsBidiResult.hasError()) {
-    return folly::makeUnexpected(maxStreamsBidiResult.error());
+    return quic::make_unexpected(maxStreamsBidiResult.error());
   }
   auto maxStreamsBidi = maxStreamsBidiResult.value();
 
   auto maxStreamsUniResult = getIntegerParameter(
       TransportParameterId::initial_max_streams_uni, clientParams.parameters);
   if (maxStreamsUniResult.hasError()) {
-    return folly::makeUnexpected(maxStreamsUniResult.error());
+    return quic::make_unexpected(maxStreamsUniResult.error());
   }
   auto maxStreamsUni = maxStreamsUniResult.value();
 
   auto idleTimeoutResult = getIntegerParameter(
       TransportParameterId::idle_timeout, clientParams.parameters);
   if (idleTimeoutResult.hasError()) {
-    return folly::makeUnexpected(idleTimeoutResult.error());
+    return quic::make_unexpected(idleTimeoutResult.error());
   }
   auto idleTimeout = idleTimeoutResult.value();
 
   auto ackDelayExponentResult = getIntegerParameter(
       TransportParameterId::ack_delay_exponent, clientParams.parameters);
   if (ackDelayExponentResult.hasError()) {
-    return folly::makeUnexpected(ackDelayExponentResult.error());
+    return quic::make_unexpected(ackDelayExponentResult.error());
   }
   auto ackDelayExponent = ackDelayExponentResult.value();
 
   auto packetSizeResult = getIntegerParameter(
       TransportParameterId::max_packet_size, clientParams.parameters);
   if (packetSizeResult.hasError()) {
-    return folly::makeUnexpected(packetSizeResult.error());
+    return quic::make_unexpected(packetSizeResult.error());
   }
   auto packetSize = packetSizeResult.value();
 
@@ -277,28 +277,28 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::active_connection_id_limit,
       clientParams.parameters);
   if (activeConnectionIdLimitResult.hasError()) {
-    return folly::makeUnexpected(activeConnectionIdLimitResult.error());
+    return quic::make_unexpected(activeConnectionIdLimitResult.error());
   }
   auto activeConnectionIdLimit = activeConnectionIdLimitResult.value();
 
   auto minAckDelayResult = getIntegerParameter(
       TransportParameterId::min_ack_delay, clientParams.parameters);
   if (minAckDelayResult.hasError()) {
-    return folly::makeUnexpected(minAckDelayResult.error());
+    return quic::make_unexpected(minAckDelayResult.error());
   }
   auto minAckDelay = minAckDelayResult.value();
 
   auto maxAckDelayResult = getIntegerParameter(
       TransportParameterId::max_ack_delay, clientParams.parameters);
   if (maxAckDelayResult.hasError()) {
-    return folly::makeUnexpected(maxAckDelayResult.error());
+    return quic::make_unexpected(maxAckDelayResult.error());
   }
   auto maxAckDelay = maxAckDelayResult.value();
 
   auto maxDatagramFrameSizeResult = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, clientParams.parameters);
   if (maxDatagramFrameSizeResult.hasError()) {
-    return folly::makeUnexpected(maxDatagramFrameSizeResult.error());
+    return quic::make_unexpected(maxDatagramFrameSizeResult.error());
   }
   auto maxDatagramFrameSize = maxDatagramFrameSizeResult.value();
 
@@ -307,7 +307,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
           TransportParameterId::stream_groups_enabled),
       clientParams.parameters);
   if (peerAdvertisedMaxStreamGroupsResult.hasError()) {
-    return folly::makeUnexpected(peerAdvertisedMaxStreamGroupsResult.error());
+    return quic::make_unexpected(peerAdvertisedMaxStreamGroupsResult.error());
   }
   auto peerAdvertisedMaxStreamGroups =
       peerAdvertisedMaxStreamGroupsResult.value();
@@ -316,7 +316,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::ack_receive_timestamps_enabled,
       clientParams.parameters);
   if (isAckReceiveTimestampsEnabledResult.hasError()) {
-    return folly::makeUnexpected(isAckReceiveTimestampsEnabledResult.error());
+    return quic::make_unexpected(isAckReceiveTimestampsEnabledResult.error());
   }
   auto isAckReceiveTimestampsEnabled =
       isAckReceiveTimestampsEnabledResult.value();
@@ -325,7 +325,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::max_receive_timestamps_per_ack,
       clientParams.parameters);
   if (maxReceiveTimestampsPerAckResult.hasError()) {
-    return folly::makeUnexpected(maxReceiveTimestampsPerAckResult.error());
+    return quic::make_unexpected(maxReceiveTimestampsPerAckResult.error());
   }
   auto maxReceiveTimestampsPerAck = maxReceiveTimestampsPerAckResult.value();
 
@@ -333,7 +333,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       TransportParameterId::receive_timestamps_exponent,
       clientParams.parameters);
   if (receiveTimestampsExponentResult.hasError()) {
-    return folly::makeUnexpected(receiveTimestampsExponentResult.error());
+    return quic::make_unexpected(receiveTimestampsExponentResult.error());
   }
   auto receiveTimestampsExponent = receiveTimestampsExponentResult.value();
 
@@ -345,13 +345,13 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
         TransportParameterId::initial_source_connection_id,
         clientParams.parameters);
     if (initialSourceConnIdResult.hasError()) {
-      return folly::makeUnexpected(initialSourceConnIdResult.error());
+      return quic::make_unexpected(initialSourceConnIdResult.error());
     }
     auto initialSourceConnId = initialSourceConnIdResult.value();
     if (!initialSourceConnId ||
         initialSourceConnId.value() !=
             conn.readCodec->getClientConnectionId()) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
           "Initial CID does not match."));
     }
@@ -361,7 +361,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
           TransportParameterId::knob_frames_supported),
       clientParams.parameters);
   if (knobFrameSupportedResult.hasError()) {
-    return folly::makeUnexpected(knobFrameSupportedResult.error());
+    return quic::make_unexpected(knobFrameSupportedResult.error());
   }
   auto knobFrameSupported = knobFrameSupportedResult.value();
 
@@ -370,7 +370,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
           TransportParameterId::extended_ack_features),
       clientParams.parameters);
   if (extendedAckFeaturesResult.hasError()) {
-    return folly::makeUnexpected(extendedAckFeaturesResult.error());
+    return quic::make_unexpected(extendedAckFeaturesResult.error());
   }
   auto extendedAckFeatures = extendedAckFeaturesResult.value();
 
@@ -380,7 +380,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
           TransportParameterId::reliable_stream_reset));
   if (reliableResetTpIter != clientParams.parameters.end()) {
     if (!reliableResetTpIter->value->empty()) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
           "Reliable reset transport parameter must be empty"));
     }
@@ -392,37 +392,37 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
   // validate that we didn't receive original connection ID, stateless
   // reset token, or preferred address.
   if (preferredAddress && *preferredAddress != 0) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Preferred Address is received by server"));
   }
 
   if (origConnId && *origConnId != 0) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "OriginalDestinationConnectionId is received by server"));
   }
 
   if (statelessResetToken && statelessResetToken.value() != 0) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Stateless Reset Token is received by server"));
   }
 
   if (retrySourceConnId && retrySourceConnId.value() != 0) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Retry Source Connection ID is received by server"));
   }
   if (maxAckDelay && *maxAckDelay >= kMaxAckDelay) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Max Ack Delay is greater than 2^14 "));
   }
 
   // TODO Validate active_connection_id_limit
   if (packetSize && *packetSize < kMinMaxUDPPayload) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         fmt::format(
             "Max packet size too small. received max_packetSize = {}",
@@ -449,7 +449,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       conn.streamManager->setMaxLocalBidirectionalStreams(
           maxStreamsBidi.value_or(0));
   if (!maxBidiStreamsResult) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Failed to set max local bidirectional streams"));
   }
@@ -458,7 +458,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
       conn.streamManager->setMaxLocalUnidirectionalStreams(
           maxStreamsUni.value_or(0));
   if (!maxUniStreamsResult) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "Failed to set max local unidirectional streams"));
   }
@@ -466,7 +466,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   conn.peerIdleTimeout = timeMin(conn.peerIdleTimeout, kMaxIdleTimeout);
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "ack_delay_exponent too large"));
   }
@@ -478,7 +478,7 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
   if (maxDatagramFrameSize.has_value()) {
     if (maxDatagramFrameSize.value() > 0 &&
         maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
           "max_datagram_frame_size too small"));
     }
@@ -521,23 +521,23 @@ folly::Expected<folly::Unit, QuicError> processClientInitialParams(
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
   conn.peerAdvertisedExtendedAckFeatures = extendedAckFeatures.value_or(0);
 
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> updateHandshakeState(
+quic::Expected<void, QuicError> updateHandshakeState(
     QuicServerConnectionState& conn) {
   // Zero RTT read cipher is available after chlo is processed with the
   // condition that early data attempt is accepted.
   auto handshakeLayer = conn.serverHandshakeLayer;
   auto zeroRttReadCipherResult = handshakeLayer->getZeroRttReadCipher();
   if (zeroRttReadCipherResult.hasError()) {
-    return folly::makeUnexpected(zeroRttReadCipherResult.error());
+    return quic::make_unexpected(zeroRttReadCipherResult.error());
   }
   auto zeroRttReadCipher = std::move(zeroRttReadCipherResult.value());
 
   auto zeroRttHeaderCipherResult = handshakeLayer->getZeroRttReadHeaderCipher();
   if (zeroRttHeaderCipherResult.hasError()) {
-    return folly::makeUnexpected(zeroRttHeaderCipherResult.error());
+    return quic::make_unexpected(zeroRttHeaderCipherResult.error());
   }
   auto zeroRttHeaderCipher = std::move(zeroRttHeaderCipherResult.value());
 
@@ -547,21 +547,21 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
   // processed.
   auto oneRttWriteCipherResult = handshakeLayer->getFirstOneRttWriteCipher();
   if (oneRttWriteCipherResult.hasError()) {
-    return folly::makeUnexpected(oneRttWriteCipherResult.error());
+    return quic::make_unexpected(oneRttWriteCipherResult.error());
   }
   auto oneRttWriteCipher = std::move(oneRttWriteCipherResult.value());
 
   // One RTT read cipher is available after cfin is processed.
   auto oneRttReadCipherResult = handshakeLayer->getFirstOneRttReadCipher();
   if (oneRttReadCipherResult.hasError()) {
-    return folly::makeUnexpected(oneRttReadCipherResult.error());
+    return quic::make_unexpected(oneRttReadCipherResult.error());
   }
   auto oneRttReadCipher = std::move(oneRttReadCipherResult.value());
 
   auto oneRttWriteHeaderCipherResult =
       handshakeLayer->getOneRttWriteHeaderCipher();
   if (oneRttWriteHeaderCipherResult.hasError()) {
-    return folly::makeUnexpected(oneRttWriteHeaderCipherResult.error());
+    return quic::make_unexpected(oneRttWriteHeaderCipherResult.error());
   }
   auto oneRttWriteHeaderCipher =
       std::move(oneRttWriteHeaderCipherResult.value());
@@ -569,7 +569,7 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
   auto oneRttReadHeaderCipherResult =
       handshakeLayer->getOneRttReadHeaderCipher();
   if (oneRttReadHeaderCipherResult.hasError()) {
-    return folly::makeUnexpected(oneRttReadHeaderCipherResult.error());
+    return quic::make_unexpected(oneRttReadHeaderCipherResult.error());
   }
   auto oneRttReadHeaderCipher = std::move(oneRttReadHeaderCipherResult.value());
 
@@ -595,7 +595,7 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
       conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher);
     }
     if (conn.oneRttWriteCipher) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::CRYPTO_ERROR, "Duplicate 1-rtt write cipher"));
     }
     conn.oneRttWriteCipher = std::move(oneRttWriteCipher);
@@ -607,7 +607,7 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
     // keys available.
     auto clientParams = handshakeLayer->getClientTransportParams();
     if (!clientParams) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
           "No client transport params"));
     }
@@ -627,21 +627,21 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
     conn.readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
     auto nextOneRttReadCipherResult = handshakeLayer->getNextOneRttReadCipher();
     if (nextOneRttReadCipherResult.hasError()) {
-      return folly::makeUnexpected(nextOneRttReadCipherResult.error());
+      return quic::make_unexpected(nextOneRttReadCipherResult.error());
     }
     conn.readCodec->setNextOneRttReadCipher(
         std::move(nextOneRttReadCipherResult.value()));
   }
   auto handshakeReadCipherResult = handshakeLayer->getHandshakeReadCipher();
   if (handshakeReadCipherResult.hasError()) {
-    return folly::makeUnexpected(handshakeReadCipherResult.error());
+    return quic::make_unexpected(handshakeReadCipherResult.error());
   }
   auto handshakeReadCipher = std::move(handshakeReadCipherResult.value());
 
   auto handshakeReadHeaderCipherResult =
       handshakeLayer->getHandshakeReadHeaderCipher();
   if (handshakeReadHeaderCipherResult.hasError()) {
-    return folly::makeUnexpected(handshakeReadHeaderCipherResult.error());
+    return quic::make_unexpected(handshakeReadHeaderCipherResult.error());
   }
   auto handshakeReadHeaderCipher =
       std::move(handshakeReadHeaderCipherResult.value());
@@ -677,7 +677,7 @@ folly::Expected<folly::Unit, QuicError> updateHandshakeState(
       conn.sentNewTokenFrame = true;
     }
   }
-  return folly::unit;
+  return {};
 }
 
 bool validateAndUpdateSourceToken(
@@ -775,7 +775,7 @@ void maybeUpdateTransportFromAppToken(
   }
 }
 
-folly::Expected<folly::Unit, QuicError> onConnectionMigration(
+quic::Expected<void, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,
     const folly::SocketAddress& newPeerAddress,
     bool isIntentional) {
@@ -790,7 +790,7 @@ folly::Expected<folly::Unit, QuicError> onConnectionMigration(
         conn.statsCallback,
         onPacketDropped,
         PacketDropReason::PEER_ADDRESS_CHANGE);
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::INVALID_MIGRATION, "Too many migrations"));
   }
 
@@ -848,10 +848,10 @@ folly::Expected<folly::Unit, QuicError> onConnectionMigration(
     conn.qLogger->addConnectionMigrationUpdate(isIntentional);
   }
   conn.peerAddress = newPeerAddress;
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> onServerReadData(
+quic::Expected<void, QuicError> onServerReadData(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
   switch (conn.state) {
@@ -938,13 +938,13 @@ static void handleCipherUnavailable(
   }
 }
 
-folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
+quic::Expected<void, QuicError> onServerReadDataFromOpen(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Open);
 
   if (readData.udpPacket.buf.empty()) {
-    return folly::unit;
+    return {};
   }
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
@@ -964,7 +964,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           conn.statsCallback,
           onPacketDropped,
           PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL);
-      return folly::unit;
+      return {};
     }
     QuicVersion version = parsedLongHeader->invariant.version;
     if (version == QuicVersion::VERSION_NEGOTIATION) {
@@ -978,7 +978,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           conn.statsCallback,
           onPacketDropped,
           PacketDropReason::INVALID_PACKET_VN);
-      return folly::unit;
+      return {};
     }
 
     const auto& clientConnectionId = parsedLongHeader->invariant.srcConnId;
@@ -997,7 +997,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           conn.statsCallback,
           onPacketDropped,
           PacketDropReason::INITIAL_CONNID_SMALL);
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::PROTOCOL_VIOLATION,
           "Initial destination connectionid too small"));
     }
@@ -1041,7 +1041,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
     auto clientInitialCipherResult = cryptoFactory.getClientInitialCipher(
         initialDestinationConnectionId, version);
     if (clientInitialCipherResult.hasError()) {
-      return folly::makeUnexpected(clientInitialCipherResult.error());
+      return quic::make_unexpected(clientInitialCipherResult.error());
     }
     conn.readCodec->setInitialReadCipher(
         std::move(clientInitialCipherResult.value()));
@@ -1059,7 +1059,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
     auto serverInitialCipherResult = cryptoFactory.getServerInitialCipher(
         initialDestinationConnectionId, version);
     if (serverInitialCipherResult.hasError()) {
-      return folly::makeUnexpected(serverInitialCipherResult.error());
+      return quic::make_unexpected(serverInitialCipherResult.error());
     }
     conn.initialWriteCipher = std::move(serverInitialCipherResult.value());
 
@@ -1067,7 +1067,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         cryptoFactory.makeClientInitialHeaderCipher(
             initialDestinationConnectionId, version);
     if (clientInitialHeaderCipherResult.hasError()) {
-      return folly::makeUnexpected(clientInitialHeaderCipherResult.error());
+      return quic::make_unexpected(clientInitialHeaderCipherResult.error());
     }
     conn.readCodec->setInitialHeaderCipher(
         std::move(clientInitialHeaderCipherResult.value()));
@@ -1076,7 +1076,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         cryptoFactory.makeServerInitialHeaderCipher(
             initialDestinationConnectionId, version);
     if (serverInitialHeaderCipherResult.hasError()) {
-      return folly::makeUnexpected(serverInitialHeaderCipherResult.error());
+      return quic::make_unexpected(serverInitialHeaderCipherResult.error());
     }
     conn.initialHeaderCipher =
         std::move(serverInitialHeaderCipherResult.value());
@@ -1118,7 +1118,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
             conn.statsCallback,
             onPacketDropped,
             PacketDropReason::UNEXPECTED_RESET);
-        return folly::unit;
+        return {};
       }
       case CodecResult::Type::NOTHING: {
         VLOG(10) << "drop no data, reason: "
@@ -1132,14 +1132,14 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
             onPacketDropped,
             parsedPacket.nothing()->reason);
         if (firstPacketFromPeer) {
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               LocalErrorCode::CONNECTION_ABANDONED,
               "Failed to decrypt first packet from peer"));
         }
         break;
       }
       case CodecResult::Type::CODEC_ERROR: {
-        return folly::makeUnexpected(parsedPacket.codecError()->error);
+        return quic::make_unexpected(parsedPacket.codecError()->error);
       }
       case CodecResult::Type::REGULAR_PACKET:
         break;
@@ -1168,7 +1168,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           conn.statsCallback,
           onPacketDropped,
           PacketDropReason::PROTOCOL_VIOLATION);
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::PROTOCOL_VIOLATION, "Packet has no frames"));
     }
 
@@ -1212,7 +1212,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
                 PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)
                     ._to_string());
           }
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               TransportErrorCode::PROTOCOL_VIOLATION,
               "Invalid frame received"));
         }
@@ -1227,7 +1227,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
     if (!conn.version) {
       LongHeader* longHeader = regularPacket.header.asLong();
       if (!longHeader) {
-        return folly::makeUnexpected(QuicError(
+        return quic::make_unexpected(QuicError(
             TransportErrorCode::PROTOCOL_VIOLATION,
             "Invalid packet type (expected LongHeader)"));
       }
@@ -1256,7 +1256,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         const char* errMsg = encryptionLevel != EncryptionLevel::AppData
             ? "Migration not allowed during handshake"
             : "Migration disabled";
-        return folly::makeUnexpected(
+        return quic::make_unexpected(
             QuicError(TransportErrorCode::INVALID_MIGRATION, errMsg));
       }
     }
@@ -1281,7 +1281,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         };
     AckedFrameVisitor ackedFrameVisitor = [&](const OutstandingPacketWrapper&,
                                               const QuicWriteFrame& packetFrame)
-        -> folly::Expected<folly::Unit, QuicError> {
+        -> quic::Expected<void, QuicError> {
       switch (packetFrame.type()) {
         case QuicWriteFrame::Type::WriteStreamFrame: {
           const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
@@ -1293,7 +1293,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           if (ackedStream) {
             auto result = sendAckSMHandler(*ackedStream, frame);
             if (result.hasError()) {
-              return folly::makeUnexpected(result.error());
+              return quic::make_unexpected(result.error());
             }
           }
           break;
@@ -1314,7 +1314,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           if (stream) {
             auto result = sendRstAckSMHandler(*stream, frame.reliableSize);
             if (result.hasError()) {
-              return folly::makeUnexpected(result.error());
+              return quic::make_unexpected(result.error());
             }
           }
           break;
@@ -1344,7 +1344,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           break;
         }
       }
-      return folly::unit;
+      return {};
     };
 
     for (auto& quicFrame : regularPacket.frames) {
@@ -1357,14 +1357,14 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
 
           if (ackFrame.frameType == FrameType::ACK_EXTENDED &&
               !conn.transportSettings.advertisedExtendedAckFeatures) {
-            return folly::makeUnexpected(QuicError(
+            return quic::make_unexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Received unexpected ACK_EXTENDED frame"));
           } else if (
               ackFrame.frameType == FrameType::ACK_RECEIVE_TIMESTAMPS &&
               !conn.transportSettings
                    .maybeAckReceiveTimestampsConfigSentToPeer) {
-            return folly::makeUnexpected(QuicError(
+            return quic::make_unexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Received unexpected ACK_RECEIVE_TIMESTAMPS frame"));
           }
@@ -1378,7 +1378,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
               readData.udpPacket.timings.receiveTimePoint);
 
           if (result.hasError()) {
-            return folly::makeUnexpected(result.error());
+            return quic::make_unexpected(result.error());
           }
           conn.lastProcessedAckEvents.emplace_back(std::move(result.value()));
           break;
@@ -1386,7 +1386,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         case QuicFrame::Type::RstStreamFrame: {
           RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
           if (frame.reliableSize.has_value()) {
-            return folly::makeUnexpected(QuicError(
+            return quic::make_unexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Reliable resets not supported"));
           }
@@ -1396,7 +1396,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           isNonProbingPacket = true;
           auto streamResult = conn.streamManager->getStream(frame.streamId);
           if (streamResult.hasError()) {
-            return folly::makeUnexpected(streamResult.error());
+            return quic::make_unexpected(streamResult.error());
           }
           auto& stream = streamResult.value();
 
@@ -1405,7 +1405,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           }
           auto result = receiveRstStreamSMHandler(*stream, frame);
           if (result.hasError()) {
-            return folly::makeUnexpected(result.error());
+            return quic::make_unexpected(result.error());
           }
           break;
         }
@@ -1427,7 +1427,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
               StreamBuffer(
                   std::move(cryptoFrame.data), cryptoFrame.offset, false));
           if (result.hasError()) {
-            return folly::makeUnexpected(result.error());
+            return quic::make_unexpected(result.error());
           }
           if (isQuicInitialPacket &&
               readBufferSize != cryptoStream->readBuffer.size()) {
@@ -1448,7 +1448,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           auto streamResult = conn.streamManager->getStream(
               frame.streamId, frame.streamGroupId);
           if (streamResult.hasError()) {
-            return folly::makeUnexpected(streamResult.error());
+            return quic::make_unexpected(streamResult.error());
           }
           auto& stream = streamResult.value();
 
@@ -1456,7 +1456,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
             auto result =
                 receiveReadStreamFrameSMHandler(*stream, std::move(frame));
             if (result.hasError()) {
-              return folly::makeUnexpected(result.error());
+              return quic::make_unexpected(result.error());
             }
           }
           break;
@@ -1478,7 +1478,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
                    << " offset=" << streamWindowUpdate.maximumData << " "
                    << conn;
           if (isReceivingStream(conn.nodeType, streamWindowUpdate.streamId)) {
-            return folly::makeUnexpected(QuicError(
+            return quic::make_unexpected(QuicError(
                 TransportErrorCode::STREAM_STATE_ERROR,
                 "Received MaxStreamDataFrame for receiving stream."));
           }
@@ -1487,7 +1487,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           auto streamResult =
               conn.streamManager->getStream(streamWindowUpdate.streamId);
           if (streamResult.hasError()) {
-            return folly::makeUnexpected(streamResult.error());
+            return quic::make_unexpected(streamResult.error());
           }
           auto& stream = streamResult.value();
           if (stream) {
@@ -1512,7 +1512,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           isNonProbingPacket = true;
           auto streamResult = conn.streamManager->getStream(blocked.streamId);
           if (streamResult.hasError()) {
-            return folly::makeUnexpected(streamResult.error());
+            return quic::make_unexpected(streamResult.error());
           }
           auto& stream = streamResult.value();
           if (stream) {
@@ -1548,7 +1548,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
               conn.flowControlState.sumCurStreamBufferLen) {
             VLOG(2) << "Client gives up a flow control blocked connection";
           }
-          return folly::unit;
+          return {};
         }
         case QuicFrame::Type::PingFrame:
           isNonProbingPacket = true;
@@ -1569,7 +1569,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           auto simpleResult = updateSimpleFrameOnPacketReceived(
               conn, simpleFrame, dstConnId, readData.peer != conn.peerAddress);
           if (simpleResult.hasError()) {
-            return folly::makeUnexpected(simpleResult.error());
+            return quic::make_unexpected(simpleResult.error());
           }
           isNonProbingPacket |= simpleResult.value();
           break;
@@ -1587,7 +1587,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
         }
         case QuicFrame::Type::ImmediateAckFrame: {
           if (!conn.transportSettings.minAckDelay.has_value()) {
-            return folly::makeUnexpected(QuicError(
+            return quic::make_unexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Received IMMEDIATE_ACK frame without announcing min_ack_delay"));
           }
@@ -1612,7 +1612,10 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
     }
 
     maybeScheduleAckForCongestionFeedback(readData.udpPacket, ackState);
-    maybeHandleIncomingKeyUpdate(conn);
+    auto keyUpdateResult = maybeHandleIncomingKeyUpdate(conn);
+    if (keyUpdateResult.hasError()) {
+      return quic::make_unexpected(keyUpdateResult.error());
+    }
 
     // Update writable limit before processing the handshake data. This is so
     // that if we haven't decided whether or not to validate the peer, we
@@ -1632,7 +1635,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
           auto migrationResult =
               onConnectionMigration(conn, readData.peer, intentionalMigration);
           if (migrationResult.hasError()) {
-            return folly::makeUnexpected(migrationResult.error());
+            return quic::make_unexpected(migrationResult.error());
           }
         }
       } else {
@@ -1648,7 +1651,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
             conn.statsCallback,
             onPacketDropped,
             PacketDropReason::PEER_ADDRESS_CHANGE);
-        return folly::makeUnexpected(QuicError(
+        return quic::make_unexpected(QuicError(
             TransportErrorCode::INVALID_MIGRATION,
             "Probing not supported yet"));
       }
@@ -1660,7 +1663,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
       auto handshakeResult = conn.serverHandshakeLayer->doHandshake(
           std::move(data), encryptionLevel);
       if (handshakeResult.hasError()) {
-        return folly::makeUnexpected(handshakeResult.error());
+        return quic::make_unexpected(handshakeResult.error());
       }
       auto handshakeStateResult = updateHandshakeState(conn);
       if (handshakeStateResult.hasError()) {
@@ -1674,7 +1677,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
             conn.statsCallback,
             onPacketDropped,
             PacketDropReason::TRANSPORT_PARAMETER_ERROR);
-        return folly::makeUnexpected(handshakeStateResult.error());
+        return quic::make_unexpected(handshakeStateResult.error());
       }
     }
     updateAckSendStateOnRecvPacket(
@@ -1702,10 +1705,10 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromOpen(
       << " bytes unprocessed after attempting to process "
       << kMaxNumCoalescedPackets << " packets.";
 
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
+quic::Expected<void, QuicError> onServerReadDataFromClosed(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Closed);
@@ -1723,7 +1726,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
         conn.statsCallback,
         onPacketDropped,
         PacketDropReason::SERVER_STATE_CLOSED);
-    return folly::unit;
+    return {};
   }
 
   if (conn.peerConnectionError) {
@@ -1737,7 +1740,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
         conn.statsCallback,
         onPacketDropped,
         PacketDropReason::SERVER_STATE_CLOSED);
-    return folly::unit;
+    return {};
   }
   auto parsedPacket = conn.readCodec->parsePacket(udpData, conn.ackStates);
   switch (parsedPacket.type()) {
@@ -1787,7 +1790,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
       break;
     }
     case CodecResult::Type::CODEC_ERROR: {
-      return folly::makeUnexpected(parsedPacket.codecError()->error);
+      return quic::make_unexpected(parsedPacket.codecError()->error);
     }
     case CodecResult::Type::REGULAR_PACKET:
       break;
@@ -1797,7 +1800,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
     // We were unable to parse the packet, drop for now.
     // Packet drop has already been added to qlog and stats
     VLOG(10) << "Not able to parse QUIC packet " << conn;
-    return folly::unit;
+    return {};
   }
   if (regularOptional->frames.empty()) {
     // This packet had a pareseable header (most probably short header)
@@ -1813,7 +1816,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
         conn.statsCallback,
         onPacketDropped,
         PacketDropReason::PROTOCOL_VIOLATION);
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Packet has no frames"));
   }
 
@@ -1854,7 +1857,7 @@ folly::Expected<folly::Unit, QuicError> onServerReadDataFromClosed(
       getAckState(conn, pnSpace).largestRecvdPacketNum;
   largestRecvdPacketNum =
       std::max<PacketNum>(largestRecvdPacketNum.value_or(packetNum), packetNum);
-  return folly::unit;
+  return {};
 }
 
 void onServerClose(QuicServerConnectionState& conn) {

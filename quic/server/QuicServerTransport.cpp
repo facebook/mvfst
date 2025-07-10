@@ -69,7 +69,7 @@ QuicServerTransport::QuicServerTransport(
           .setCryptoFactory(std::move(cryptoFactory))
           .build());
   auto addrResult = socket_->address();
-  CHECK(addrResult.hasValue());
+  CHECK(addrResult.has_value());
   tempConn->serverAddr = addrResult.value();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());
@@ -158,7 +158,7 @@ void QuicServerTransport::setServerConnectionIdRejector(
   }
 }
 
-folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
+quic::Expected<void, QuicError> QuicServerTransport::onReadData(
     const folly::SocketAddress& peer,
     ReceivedUdpPacket&& udpPacket) {
   ServerEvents::ReadData readData;
@@ -170,12 +170,12 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
       : std::numeric_limits<uint64_t>::max();
   auto readDataResult = onServerReadData(*serverConn_, readData);
   if (readDataResult.hasError()) {
-    return folly::makeUnexpected(readDataResult.error());
+    return quic::make_unexpected(readDataResult.error());
   }
   processPendingData(true);
 
   if (closeState_ == CloseState::CLOSED) {
-    return folly::unit;
+    return {};
   }
   if (!notifiedRouting_ && routingCb_ && conn_->serverConnectionId) {
     notifiedRouting_ = true;
@@ -213,7 +213,7 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::onReadData(
   maybeIssueConnectionIds();
   maybeNotifyTransportReady();
 
-  return folly::unit;
+  return {};
 }
 
 void QuicServerTransport::accept() {
@@ -226,9 +226,9 @@ void QuicServerTransport::accept() {
       std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
-folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
+quic::Expected<void, QuicError> QuicServerTransport::writeData() {
   if (!conn_->clientConnectionId || !conn_->serverConnectionId) {
-    return folly::unit;
+    return {};
   }
   auto version = conn_->version.value_or(*(conn_->originalVersion));
   const ConnectionId& srcConnId = *conn_->serverConnectionId;
@@ -237,12 +237,12 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
     if (conn_->peerConnectionError &&
         hasReceivedUdpPacketsAtLastCloseSent(*conn_)) {
       // The peer sent us an error, we are in draining state now.
-      return folly::unit;
+      return {};
     }
     if (hasReceivedUdpPacketsAtLastCloseSent(*conn_) &&
         hasNotReceivedNewPacketsSinceLastCloseSent(*conn_)) {
       // We did not receive any new packets, do not sent a new close frame.
-      return folly::unit;
+      return {};
     }
     updateLargestReceivedUdpPacketsAtLastCloseSent(*conn_);
     if (conn_->oneRttWriteCipher) {
@@ -281,7 +281,7 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
           *conn_->initialHeaderCipher,
           version);
     }
-    return folly::unit;
+    return {};
   }
   uint64_t packetLimit =
       (isConnectionPaced(*conn_)
@@ -295,31 +295,31 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
   if (conn_->initialWriteCipher) {
     auto res = handleInitialWriteDataCommon(srcConnId, destConnId, packetLimit);
     if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
+      return quic::make_unexpected(res.error());
     }
     packetLimit -= res->packetsWritten;
     serverConn_->numHandshakeBytesSent += res->bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-      return folly::unit;
+      return {};
     }
   }
   if (conn_->handshakeWriteCipher) {
     auto res =
         handleHandshakeWriteDataCommon(srcConnId, destConnId, packetLimit);
     if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
+      return quic::make_unexpected(res.error());
     }
     packetLimit -= res->packetsWritten;
     serverConn_->numHandshakeBytesSent += res->bytesWritten;
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
-      return folly::unit;
+      return {};
     }
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
     auto writeLoopBeginTime = Clock::now();
     auto nonDsrPath =
-        [&](auto limit) -> folly::Expected<WriteQuicDataResult, QuicError> {
+        [&](auto limit) -> quic::Expected<WriteQuicDataResult, QuicError> {
       auto result = writeQuicDataToSocket(
           *socket_,
           *conn_,
@@ -331,12 +331,12 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
           limit,
           writeLoopBeginTime);
       if (result.hasError()) {
-        return folly::makeUnexpected(result.error());
+        return quic::make_unexpected(result.error());
       }
       return result.value();
     };
     auto dsrPath =
-        [&](auto limit) -> folly::Expected<WriteQuicDataResult, QuicError> {
+        [&](auto limit) -> quic::Expected<WriteQuicDataResult, QuicError> {
       auto bytesBefore = conn_->lossState.totalBytesSent;
       // The DSR path can't write probes.
       // This is packetsWritte, probesWritten, bytesWritten.
@@ -347,7 +347,7 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
           *conn_->oneRttWriteCipher,
           writeLoopBeginTime);
       if (dsrResult.hasError()) {
-        return folly::makeUnexpected(dsrResult.error());
+        return quic::make_unexpected(dsrResult.error());
       }
       auto result = WriteQuicDataResult{
           dsrResult.value(), 0, conn_->lossState.totalBytesSent - bytesBefore};
@@ -361,7 +361,7 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
       // control.
       auto written = nonDsrPath(packetLimit);
       if (written.hasError()) {
-        return folly::makeUnexpected(written.error());
+        return quic::make_unexpected(written.error());
       }
       // For both paths we only consider full packets against the packet
       // limit. While this is slightly more aggressive than the intended
@@ -371,7 +371,7 @@ folly::Expected<folly::Unit, QuicError> QuicServerTransport::writeData() {
       if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
         auto dsrWritten = dsrPath(packetLimit);
         if (dsrWritten.hasError()) {
-          return folly::makeUnexpected(dsrWritten.error());
+          return quic::make_unexpected(dsrWritten.error());
         }
         packetLimit -= dsrWritten->bytesWritten / conn_->udpSendPacketLen;
       }
@@ -499,7 +499,7 @@ void QuicServerTransport::handleTransportKnobParams(
     }
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
       auto result = (maybeParamHandler->second)(this, param.val);
-      if (result.hasValue()) {
+      if (result.has_value()) {
         QUIC_STATS(conn_->statsCallback, onTransportKnobApplied, knobParamId);
       } else {
         QUIC_STATS(conn_->statsCallback, onTransportKnobError, knobParamId);
@@ -583,7 +583,7 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
   return false;
 }
 
-folly::Expected<folly::Unit, QuicError>
+quic::Expected<void, QuicError>
 QuicServerTransport::maybeWriteNewSessionTicket() {
   if (shouldWriteNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
@@ -614,7 +614,7 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
         conn_->transportSettings.advertisedExtendedAckFeatures,
         cwndHint);
     if (transportParamsResult.hasError()) {
-      return folly::makeUnexpected(transportParamsResult.error());
+      return quic::make_unexpected(transportParamsResult.error());
     }
     appToken.transportParams = std::move(transportParamsResult.value());
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
@@ -634,10 +634,10 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
     auto result =
         serverConn_->serverHandshakeLayer->writeNewSessionTicket(appToken);
     if (result.hasError()) {
-      return folly::makeUnexpected(result.error());
+      return quic::make_unexpected(result.error());
     }
   }
-  return folly::unit;
+  return {};
 }
 
 void QuicServerTransport::maybeNotifyConnectionIdRetired() {
@@ -721,7 +721,7 @@ void QuicServerTransport::maybeNotifyTransportReady() {
 
 void QuicServerTransport::registerTransportKnobParamHandler(
     uint64_t paramId,
-    std::function<folly::Expected<folly::Unit, QuicError>(
+    std::function<quic::Expected<void, QuicError>(
         QuicServerTransport*,
         TransportKnobParam::Val)>&& handler) {
   transportKnobParamHandlers_.emplace(paramId, std::move(handler));
@@ -778,8 +778,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         if (static_cast<bool>(std::get<uint64_t>(val))) {
@@ -787,13 +787,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           VLOG(3)
               << "Knob param received, udpSendPacketLen is forcibly set to max UDP payload size advertised by peer";
         }
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         auto cctype =
@@ -801,15 +801,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "Knob param received, set congestion control type to "
                 << congestionControlTypeToString(cctype);
         if (cctype == server_conn->congestionController->type()) {
-          return folly::unit;
+          return {};
         }
         serverTransport->setCongestionControl(cctype);
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         auto val = std::get<uint64_t>(value);
@@ -819,13 +819,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << unsigned(numerator) << "," << unsigned(denominator) << ")";
         server_conn->transportSettings.startupRttFactor =
             std::make_pair(numerator, denominator);
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         auto val = std::get<uint64_t>(value);
@@ -835,13 +835,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << unsigned(numerator) << "," << unsigned(denominator) << ")";
         server_conn->transportSettings.defaultRttFactor =
             std::make_pair(numerator, denominator);
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
 
         // Safely check if value is a uint64_t
@@ -850,7 +850,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           auto errMsg =
               "Received invalid type for MAX_PACING_RATE_KNOB KnobParam: expected uint64_t";
           VLOG(3) << errMsg;
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
         }
 
@@ -859,7 +859,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto& maxPacingRateKnobState =
             serverTransport->serverConn_->maxPacingRateKnobState;
         if (maxPacingRateKnobState.frameOutOfOrderDetected) {
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "MAX_PACING_RATE_KNOB frame out of order detected"));
         }
@@ -872,23 +872,23 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               serverTransport->serverConn_->statsCallback,
               onTransportKnobOutOfOrder,
               TransportKnobParamId::MAX_PACING_RATE_KNOB);
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "MAX_PACING_RATE_KNOB frame out of order detected"));
         }
 
         VLOG(3) << "Knob param received, set max pacing rate to ("
                 << unsigned(val) << " bytes per second)";
-        serverTransport->setMaxPacingRate(val);
+        (void)serverTransport->setMaxPacingRate(val);
         maxPacingRateKnobState.lastMaxRateBytesPerSec = val;
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
 
         // Safely check if value is a string
@@ -897,7 +897,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           auto errMsg =
               "Received invalid type for MAX_PACING_RATE_KNOB_SEQUENCED KnobParam: expected string";
           VLOG(3) << errMsg;
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
         }
 
@@ -908,7 +908,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               "MAX_PACING_RATE_KNOB_SEQUENCED frame value {} is not in expected format: "
               "{{rate}},{{sequenceNumber}}",
               val);
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
 
@@ -917,7 +917,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           std::string errMsg = fmt::format(
               "MAX_PACING_RATE_KNOB_SEQUENCED frame received with invalid rate {}",
               rateBytesPerSecStr);
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
 
@@ -926,7 +926,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           std::string errMsg = fmt::format(
               "MAX_PACING_RATE_KNOB_SEQUENCED frame received with invalid sequence number {}",
               seqNumStr);
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
 
@@ -936,7 +936,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               serverTransport->serverConn_->statsCallback,
               onTransportKnobOutOfOrder,
               TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "MAX_PACING_RATE_KNOB_SEQUENCED frame received out of order"));
         }
@@ -946,15 +946,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             "and sequence number {}",
             maybeRateBytesPerSec.value(),
             expectedSeqNum.value());
-        serverTransport->setMaxPacingRate(maybeRateBytesPerSec.value());
+        (void)serverTransport->setMaxPacingRate(maybeRateBytesPerSec.value());
         serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum =
             expectedSeqNum.value();
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         if (server_conn->congestionController) {
@@ -968,26 +968,26 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               congestionControlTypeToString(
                   server_conn->congestionController->type()));
         }
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         serverTransport->serverConn_->transportSettings.paddingModulo = val;
         VLOG(3) << fmt::format(
             "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
             val);
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         serverTransport->serverConn_->transportSettings
@@ -995,13 +995,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << fmt::format(
             "FIXED_SHORT_HEADER_PADDING_KNOB KnobParam received, setting fixedShortHeaderPadding={}",
             val);
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::ADAPTIVE_LOSS_DETECTION),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         auto useAdaptiveLossReorderingThresholds =
@@ -1011,13 +1011,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << fmt::format(
             "ADAPTIVE_LOSS_DETECTION KnobParam received, UseAdaptiveLossReorderingThresholds is now set to {}",
             useAdaptiveLossReorderingThresholds);
-        return folly::unit;
+        return {};
       });
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         if (server_conn->pacer) {
@@ -1028,35 +1028,35 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               "setting experimental={} for pacer",
               enableExperimental);
         }
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto server_conn = serverTransport->serverConn_;
         server_conn->transportSettings.enableKeepalive = static_cast<bool>(val);
         VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: "
                 << static_cast<bool>(val);
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::REMOVE_FROM_LOSS_BUFFER),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         // Temporarily disabled while we investigate some related bugs.
         VLOG(3) << "REMOVE_FROM_LOSS_BUFFER KnobParam received: "
                 << static_cast<bool>(val);
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
 
         const std::string* valPtr = std::get_if<std::string>(&value);
@@ -1064,7 +1064,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           auto errMsg =
               "Received invalid type for ACK_FREQUENCY_POLICY KnobParam: expected string";
           VLOG(3) << errMsg;
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
         }
 
@@ -1106,38 +1106,38 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           auto errMsg = fmt::format(
               "Received invalid KnobParam for ACK_FREQUENCY_POLICY: {}", val);
           VLOG(3) << errMsg;
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::FIRE_LOOP_EARLY),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         serverTransport->writeLooper_->setFireLoopEarly(static_cast<bool>(val));
         VLOG(3) << "FIRE_LOOP_EARLY KnobParam received: "
                 << static_cast<bool>(val);
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACING_TIMER_TICK),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
         serverConn->transportSettings.pacingTickInterval =
             std::chrono::microseconds(val);
         VLOG(3) << "PACING_TIMER_TICK KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<std::string>(value);
         auto serverConn = serverTransport->serverConn_;
@@ -1154,29 +1154,29 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               "Received invalid KnobParam for DEFAULT_STREAM_PRIORITY: {}",
               val);
           VLOG(3) << errMsg;
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
         serverConn->transportSettings.defaultPriority =
             HTTPPriorityQueue::Priority(level, incremental);
         VLOG(3) << "DEFAULT_STREAM_PRIORITY KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
         serverConn->transportSettings.writeLimitRttFraction = val;
         VLOG(3) << "WRITE_LOOP_TIME_FRACTION KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::WRITES_PER_STREAM),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
@@ -1184,30 +1184,30 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverConn->streamManager->setWriteQueueMaxNextsPerStream(
             serverConn->transportSettings.priorityQueueWritesPerStream);
         VLOG(3) << "WRITES_PER_STREAM KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<std::string>(value);
         try {
           serverTransport->conn_->transportSettings.ccaConfig =
               parseCongestionControlConfig(val);
           VLOG(3) << "CC_CONFIG KnobParam received: " << val;
-          return folly::unit;
+          return {};
         } catch (const std::exception& ex) {
           std::string errorMsg = fmt::format(
               "Failed to parse congestion control config: {}", ex.what());
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR, std::move(errorMsg)));
         }
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto server_conn = serverTransport->serverConn_;
@@ -1215,32 +1215,32 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             !static_cast<bool>(val);
         VLOG(3) << "CONNECTION_MIGRATION KnobParam received: "
                 << static_cast<bool>(val);
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEY_UPDATE_INTERVAL),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         if (val < 1000 || val > 8ul * 1000 * 1000) {
           std::string errMsg = fmt::format(
               "KEY_UPDATE_INTERVAL KnobParam received with invalid value: {}",
               val);
-          return folly::makeUnexpected(
+          return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
         auto server_conn = serverTransport->serverConn_;
         server_conn->transportSettings.initiateKeyUpdate = val > 0;
         server_conn->transportSettings.keyUpdatePacketCountInterval = val;
         VLOG(3) << "KEY_UPDATE_INTERVAL KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         bool useNewStreamBlockedCondition =
             static_cast<bool>(std::get<uint64_t>(value));
@@ -1249,13 +1249,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             useNewStreamBlockedCondition;
         VLOG(3) << "USE_NEW_STREAM_BLOCKED_CONDITION KnobParam received: "
                 << useNewStreamBlockedCondition;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         bool autotuneReceiveStreamFlowControl =
             static_cast<bool>(std::get<uint64_t>(value));
@@ -1264,13 +1264,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             autotuneReceiveStreamFlowControl;
         VLOG(3) << "AUTOTUNE_RECV_STREAM_FLOW_CONTROL KnobParam received: "
                 << autotuneReceiveStreamFlowControl;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         bool inflightReorderingThreshold =
             static_cast<bool>(std::get<uint64_t>(value));
@@ -1279,23 +1279,23 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             inflightReorderingThreshold;
         VLOG(3) << "INFLIGHT_REORDERING_THRESHOLD KnobParam received: "
                 << inflightReorderingThreshold;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_MIN_BURST_PACKETS),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
         serverConn->transportSettings.minBurstPackets = val;
         VLOG(3) << "PACER_MIN_BURST_PACKETS KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
@@ -1304,12 +1304,12 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             ? val
             : kMaxWriteConnectionDataPacketLimit;
         VLOG(3) << "MAX_BATCH_PACKETS KnobParam received: " << val;
-        return folly::unit;
+        return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value)
-          -> folly::Expected<folly::Unit, QuicError> {
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         bool useNewPriorityQueue = static_cast<bool>(std::get<uint64_t>(value));
         auto serverConn = serverTransport->serverConn_;
@@ -1319,7 +1319,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             useNewPriorityQueue);
         if (refreshResult.hasError()) {
           LOG_EVERY_N(ERROR, 1000) << "Refresh transport settings failed";
-          return folly::makeUnexpected(QuicError(
+          return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "Refresh transport settings failed"));
         } else {
@@ -1327,7 +1327,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               useNewPriorityQueue,
               serverConn->transportSettings.useNewPriorityQueue);
         }
-        return folly::unit;
+        return {};
       });
 }
 
@@ -1345,37 +1345,46 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
     bool eof,
     ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   [[maybe_unused]] auto self = sharedGuard();
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
     if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream =
         CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     if (!stream->writable()) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+      return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
     }
     if (!stream->dsrSender) {
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     if (stream->currentWriteOffset == 0 && stream->pendingWrites.empty()) {
       // If nothing has been written ever, meta writing isn't allowed.
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     // Register DeliveryCallback for the data + eof offset.
     if (cb) {
       auto dataLength = data.length + (eof ? 1 : 0);
       if (dataLength) {
         auto currentLargestWriteOffset = getLargestWriteOffsetSeen(*stream);
-        registerDeliveryCallback(
+        auto deliveryResult = registerDeliveryCallback(
             id, currentLargestWriteOffset + dataLength - 1, cb);
+        if (!deliveryResult.has_value()) {
+          VLOG(4) << "Failed to register delivery callback: "
+                  << toString(deliveryResult.error());
+          exceptionCloseWhat_ = "Failed to register delivery callback";
+          closeImpl(QuicError(
+              deliveryResult.error(),
+              std::string("registerDeliveryCallback() error")));
+          return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
+        }
       }
     }
     bool wasAppLimitedOrIdle = false;
@@ -1384,14 +1393,14 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
       wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
     }
     auto writeResult = writeBufMetaToQuicStream(*stream, data, eof);
-    if (writeResult.hasError()) {
+    if (!writeResult.has_value()) {
       VLOG(4) << __func__ << " streamId=" << id << " "
               << writeResult.error().message << " " << *this;
       exceptionCloseWhat_ = writeResult.error().message;
       closeImpl(QuicError(
           QuicErrorCode(*writeResult.error().code.asTransportErrorCode()),
           std::string("writeChain() error")));
-      return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
     }
     // If we were previously app limited restart pacing with the current rate.
     if (wasAppLimitedOrIdle && conn_->pacer) {
@@ -1404,14 +1413,14 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return folly::makeUnexpected(ex.errorCode());
+    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
@@ -1419,32 +1428,32 @@ QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeChain() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
-  return folly::unit;
+  return {};
 }
 
 QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
     StreamId id,
     std::unique_ptr<DSRPacketizationRequestSender> sender) {
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   [[maybe_unused]] auto self = sharedGuard();
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
     if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream =
         CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     // Only allow resetting it back to nullptr once set.
     if (stream->dsrSender && sender != nullptr) {
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     if (stream->dsrSender != nullptr) {
       // If any of these aren't true then we are abandoning stream data.
@@ -1453,10 +1462,10 @@ QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
       CHECK_EQ(stream->retransmissionBufMetas.size(), 0) << stream;
       stream->dsrSender->release();
       stream->dsrSender = nullptr;
-      return folly::unit;
+      return {};
     }
     if (!stream->writable()) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+      return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
     }
     stream->dsrSender = std::move(sender);
     // Default to disabling opportunistic ACKing for DSR since it causes extra
@@ -1477,14 +1486,14 @@ QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return folly::makeUnexpected(ex.errorCode());
+    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
@@ -1492,9 +1501,9 @@ QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeChain() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
-  return folly::unit;
+  return {};
 }
 
 CipherInfo QuicServerTransport::getOneRttCipherInfo() const {

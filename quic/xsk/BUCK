@@ -56,10 +56,10 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":xsk_lib",
-        "//folly:expected",
         "//folly:network_address",
         "//folly/container:f14_hash",
         "//folly/io:iobuf",
+        "//quic/common:expected",
         "//quic/common:optional",
     ],
 )

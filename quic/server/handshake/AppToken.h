@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/common/Expected.h>
 #include <quic/handshake/TransportParameters.h>
 
 #include <cstdint>
@@ -29,7 +29,7 @@ struct AppToken {
   std::unique_ptr<folly::IOBuf> appParams;
 };
 
-folly::Expected<TicketTransportParameters, QuicError>
+quic::Expected<TicketTransportParameters, QuicError>
 createTicketTransportParameters(
     uint64_t idleTimeout,
     uint64_t maxRecvPacketSize,

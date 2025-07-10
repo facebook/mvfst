@@ -46,11 +46,11 @@ class QuicStreamManagerTest
     ASSERT_TRUE(
         conn.streamManager
             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
-            .hasValue());
+            .has_value());
     ASSERT_TRUE(
         conn.streamManager
             ->setMaxLocalUnidirectionalStreams(kDefaultMaxStreamsUnidirectional)
-            .hasValue());
+            .has_value());
 
     auto congestionController =
         std::make_unique<NiceMock<MockCongestionController>>();
@@ -61,7 +61,7 @@ class QuicStreamManagerTest
         GetParam().notifyOnNewStreamsExplicitly;
     ASSERT_TRUE(
         conn.streamManager->refreshTransportSettings(conn.transportSettings)
-            .hasValue());
+            .has_value());
   }
 
   QuicServerConnectionState conn;
@@ -71,7 +71,7 @@ class QuicStreamManagerTest
 TEST_P(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
   auto& manager = *conn.streamManager;
   auto streamResult = manager.createNextBidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   auto streamId = stream->id;
   HTTPPriorityQueue::Priority currentPriority(stream->priority);
@@ -95,7 +95,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
   auto streamResult = manager.createNextBidirectionalStream();
   ASSERT_FALSE(streamResult.hasError());
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   StreamId id = stream->id;
   EXPECT_FALSE(manager.isAppIdle());
@@ -109,7 +109,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
 
   auto getResult = manager.getStream(id);
   ASSERT_FALSE(getResult.hasError());
-  ASSERT_TRUE(getResult.hasValue());
+  ASSERT_TRUE(getResult.has_value());
   EXPECT_EQ(getResult.value(), nullptr); // Check stream is gone (nullptr)
 }
 
@@ -119,7 +119,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCreateUnidiStream) {
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
   auto streamResult = manager.createNextUnidirectionalStream();
   ASSERT_FALSE(streamResult.hasError());
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   EXPECT_FALSE(manager.isAppIdle());
 
@@ -137,7 +137,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleExistingLocalStream) {
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
 
   auto streamResult = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   EXPECT_FALSE(manager.isAppIdle());
 
@@ -146,7 +146,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleExistingLocalStream) {
   EXPECT_TRUE(manager.isAppIdle());
 
   auto getResult = manager.getStream(stream->id);
-  ASSERT_TRUE(getResult.hasValue());
+  ASSERT_TRUE(getResult.has_value());
   EXPECT_NE(getResult.value(), nullptr); // Stream should still exist
   EXPECT_TRUE(manager.isAppIdle());
 }
@@ -156,7 +156,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleStreamAsControl) {
   EXPECT_FALSE(manager.isAppIdle());
 
   auto streamResult = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   EXPECT_FALSE(manager.isAppIdle());
 
@@ -166,7 +166,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleStreamAsControl) {
 
   EXPECT_CALL(*mockController, setAppIdle(false, _));
   auto streamResult2 = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult2.hasValue());
+  ASSERT_TRUE(streamResult2.has_value());
   EXPECT_FALSE(manager.isAppIdle());
 }
 
@@ -175,7 +175,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCreatePeerStream) {
   EXPECT_FALSE(manager.isAppIdle());
   StreamId id = 0;
   auto streamResult = manager.getStream(id);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   ASSERT_NE(stream, nullptr);
   EXPECT_FALSE(manager.isAppIdle());
@@ -187,7 +187,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCreatePeerStream) {
   EXPECT_CALL(*mockController, setAppIdle(false, _));
   StreamId id2 = 4;
   auto streamResult2 = manager.getStream(id2);
-  ASSERT_TRUE(streamResult2.hasValue());
+  ASSERT_TRUE(streamResult2.has_value());
   ASSERT_NE(streamResult2.value(), nullptr);
   EXPECT_FALSE(manager.isAppIdle());
 }
@@ -199,7 +199,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleExistingPeerStream) {
 
   StreamId id = 0;
   auto streamResult = manager.getStream(id);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   ASSERT_NE(stream, nullptr);
   EXPECT_FALSE(manager.isAppIdle());
@@ -209,7 +209,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleExistingPeerStream) {
   EXPECT_TRUE(manager.isAppIdle());
 
   auto getResult = manager.getStream(id);
-  ASSERT_TRUE(getResult.hasValue());
+  ASSERT_TRUE(getResult.has_value());
   EXPECT_NE(getResult.value(), nullptr);
   EXPECT_TRUE(manager.isAppIdle());
 }
@@ -220,7 +220,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleClosePeerStream) {
   StreamId id = 0;
   auto streamResult = manager.getStream(id);
   ASSERT_FALSE(streamResult.hasError());
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   ASSERT_NE(stream, nullptr);
   EXPECT_FALSE(manager.isAppIdle());
@@ -234,7 +234,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleClosePeerStream) {
 
   auto getResult = manager.getStream(id);
   ASSERT_FALSE(getResult.hasError());
-  ASSERT_TRUE(getResult.hasValue());
+  ASSERT_TRUE(getResult.has_value());
   EXPECT_EQ(getResult.value(), nullptr); // Check stream is gone
 }
 
@@ -246,7 +246,7 @@ TEST_P(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   StreamId id = 0;
   auto streamResult = manager.getStream(id);
   ASSERT_FALSE(streamResult.hasError());
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   ASSERT_NE(stream, nullptr);
   EXPECT_FALSE(manager.isAppIdle());
@@ -293,7 +293,7 @@ TEST_P(QuicStreamManagerTest, PeerMaxStreamsLimitSaturated) {
   for (idx = 0; idx < 10; idx++) {
     auto streamResult1 = manager.getStream(idx * detail::kStreamIncrement);
     ASSERT_FALSE(streamResult1.hasError());
-    ASSERT_TRUE(streamResult1.hasValue());
+    ASSERT_TRUE(streamResult1.has_value());
     auto* stream1 = streamResult1.value();
     ASSERT_NE(stream1, nullptr);
     stream1->sendState = StreamSendState::Closed;
@@ -302,7 +302,7 @@ TEST_P(QuicStreamManagerTest, PeerMaxStreamsLimitSaturated) {
 
     auto streamResult2 = manager.getStream(2 + idx * detail::kStreamIncrement);
     ASSERT_FALSE(streamResult2.hasError());
-    ASSERT_TRUE(streamResult2.hasValue());
+    ASSERT_TRUE(streamResult2.has_value());
     auto* stream2 = streamResult2.value();
     ASSERT_NE(stream2, nullptr);
     stream2->sendState = StreamSendState::Closed;
@@ -338,7 +338,7 @@ TEST_P(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
   for (int i = 0; i < 25; i++) {
     auto streamResult1 = manager.getStream(i * detail::kStreamIncrement);
     ASSERT_FALSE(streamResult1.hasError());
-    ASSERT_TRUE(streamResult1.hasValue());
+    ASSERT_TRUE(streamResult1.has_value());
     auto* stream1 = streamResult1.value();
     ASSERT_NE(stream1, nullptr);
     stream1->sendState = StreamSendState::Closed;
@@ -347,7 +347,7 @@ TEST_P(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
 
     auto streamResult2 = manager.getStream(2 + i * detail::kStreamIncrement);
     ASSERT_FALSE(streamResult2.hasError());
-    ASSERT_TRUE(streamResult2.hasValue());
+    ASSERT_TRUE(streamResult2.has_value());
     auto* stream2 = streamResult2.value();
     ASSERT_NE(stream2, nullptr);
     stream2->sendState = StreamSendState::Closed;
@@ -377,7 +377,7 @@ TEST_P(QuicStreamManagerTest, StreamLimitNoWindowedUpdate) {
   for (int i = 0; i < 24; i++) {
     auto streamResult = manager.getStream(i * detail::kStreamIncrement);
     ASSERT_FALSE(streamResult.hasError());
-    ASSERT_TRUE(streamResult.hasValue());
+    ASSERT_TRUE(streamResult.has_value());
     auto* stream = streamResult.value();
     ASSERT_NE(stream, nullptr);
     stream->sendState = StreamSendState::Closed;
@@ -400,7 +400,7 @@ TEST_P(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
   for (int i = 0; i < 50; i++) {
     auto streamResult = manager.getStream(i * detail::kStreamIncrement);
     ASSERT_FALSE(streamResult.hasError());
-    ASSERT_TRUE(streamResult.hasValue());
+    ASSERT_TRUE(streamResult.has_value());
     auto* stream = streamResult.value();
     ASSERT_NE(stream, nullptr);
     stream->sendState = StreamSendState::Closed;
@@ -416,22 +416,22 @@ TEST_P(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
 
 TEST_P(QuicStreamManagerTest, StreamLimitIncrementBidi) {
   auto& manager = *conn.streamManager;
-  ASSERT_TRUE(manager.setMaxLocalBidirectionalStreams(100, true).hasValue());
+  ASSERT_TRUE(manager.setMaxLocalBidirectionalStreams(100, true).has_value());
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
   StreamId max;
   for (int i = 0; i < 100; i++) {
     auto result = manager.createNextBidirectionalStream();
-    ASSERT_TRUE(result.hasValue());
+    ASSERT_TRUE(result.has_value());
     max = result.value()->id;
   }
   auto errorResult = manager.createNextBidirectionalStream();
   EXPECT_TRUE(errorResult.hasError());
   EXPECT_EQ(errorResult.error(), LocalErrorCode::STREAM_LIMIT_EXCEEDED);
 
-  ASSERT_TRUE(manager.setMaxLocalBidirectionalStreams(200).hasValue());
+  ASSERT_TRUE(manager.setMaxLocalBidirectionalStreams(200).has_value());
   auto s = manager.createNextBidirectionalStream();
-  EXPECT_TRUE(s.hasValue());
+  EXPECT_TRUE(s.has_value());
   EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
 }
 
@@ -448,22 +448,22 @@ TEST_P(QuicStreamManagerTest, ConsumeStopSending) {
 
 TEST_P(QuicStreamManagerTest, StreamLimitIncrementUni) {
   auto& manager = *conn.streamManager;
-  ASSERT_TRUE(manager.setMaxLocalUnidirectionalStreams(100, true).hasValue());
+  ASSERT_TRUE(manager.setMaxLocalUnidirectionalStreams(100, true).has_value());
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
   StreamId max;
   for (int i = 0; i < 100; i++) {
     auto result = manager.createNextUnidirectionalStream();
-    ASSERT_TRUE(result.hasValue());
+    ASSERT_TRUE(result.has_value());
     max = result.value()->id;
   }
   auto errorResult = manager.createNextUnidirectionalStream();
   EXPECT_TRUE(errorResult.hasError());
   EXPECT_EQ(errorResult.error(), LocalErrorCode::STREAM_LIMIT_EXCEEDED);
 
-  ASSERT_TRUE(manager.setMaxLocalUnidirectionalStreams(200).hasValue());
+  ASSERT_TRUE(manager.setMaxLocalUnidirectionalStreams(200).has_value());
   auto s = manager.createNextUnidirectionalStream();
-  EXPECT_TRUE(s.hasValue());
+  EXPECT_TRUE(s.has_value());
   EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
 }
 
@@ -478,11 +478,11 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamId) {
   EXPECT_EQ(
       serverStreamId1, manager.nextAcceptableLocalUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId1).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId1).has_value());
   EXPECT_EQ(
       serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId2).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId2).has_value());
   EXPECT_EQ(
       serverStreamId3, manager.nextAcceptableLocalUnidirectionalStreamId());
 }
@@ -498,18 +498,18 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamId) {
   EXPECT_EQ(
       serverStreamId1, manager.nextAcceptableLocalBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId1).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId1).has_value());
   EXPECT_EQ(
       serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId2).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId2).has_value());
   EXPECT_EQ(
       serverStreamId3, manager.nextAcceptableLocalBidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
-  ASSERT_TRUE(manager.setMaxLocalUnidirectionalStreams(2, true).hasValue());
+  ASSERT_TRUE(manager.setMaxLocalUnidirectionalStreams(2, true).has_value());
 
   const StreamId serverStreamId1 = 0x03;
   const StreamId serverStreamId2 = serverStreamId1 + detail::kStreamIncrement;
@@ -517,17 +517,17 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
   EXPECT_EQ(
       serverStreamId1, manager.nextAcceptableLocalUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId1).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId1).has_value());
   EXPECT_EQ(
       serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId2).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId2).has_value());
   EXPECT_EQ(std::nullopt, manager.nextAcceptableLocalUnidirectionalStreamId());
 }
 
 TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
-  ASSERT_TRUE(manager.setMaxLocalBidirectionalStreams(2, true).hasValue());
+  ASSERT_TRUE(manager.setMaxLocalBidirectionalStreams(2, true).has_value());
 
   const StreamId serverStreamId1 = 0x01;
   const StreamId serverStreamId2 = serverStreamId1 + detail::kStreamIncrement;
@@ -535,11 +535,11 @@ TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
   EXPECT_EQ(
       serverStreamId1, manager.nextAcceptableLocalBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId1).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId1).has_value());
   EXPECT_EQ(
       serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.createStream(serverStreamId2).hasValue());
+  ASSERT_TRUE(manager.createStream(serverStreamId2).has_value());
   EXPECT_EQ(std::nullopt, manager.nextAcceptableLocalBidirectionalStreamId());
 }
 
@@ -554,11 +554,11 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
   EXPECT_EQ(
       clientStreamId1, manager.nextAcceptablePeerUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId1).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId1).has_value());
   EXPECT_EQ(
       clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId2).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId2).has_value());
   EXPECT_EQ(
       clientStreamId3, manager.nextAcceptablePeerUnidirectionalStreamId());
 }
@@ -573,10 +573,10 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamId) {
 
   EXPECT_EQ(clientStreamId1, manager.nextAcceptablePeerBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId1).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId1).has_value());
   EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId2).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId2).has_value());
   EXPECT_EQ(clientStreamId3, manager.nextAcceptablePeerBidirectionalStreamId());
 }
 
@@ -584,7 +584,7 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsUni = 2;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   const StreamId clientStreamId1 = 0x02;
   const StreamId clientStreamId2 = clientStreamId1 + detail::kStreamIncrement;
@@ -592,11 +592,11 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
   EXPECT_EQ(
       clientStreamId1, manager.nextAcceptablePeerUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId1).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId1).has_value());
   EXPECT_EQ(
       clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId2).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId2).has_value());
   EXPECT_EQ(std::nullopt, manager.nextAcceptablePeerUnidirectionalStreamId());
 }
 
@@ -604,17 +604,17 @@ TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsBidi = 2;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   const StreamId clientStreamId1 = 0x00;
   const StreamId clientStreamId2 = clientStreamId1 + detail::kStreamIncrement;
 
   EXPECT_EQ(clientStreamId1, manager.nextAcceptablePeerBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId1).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId1).has_value());
   EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
 
-  ASSERT_TRUE(manager.getStream(clientStreamId2).hasValue());
+  ASSERT_TRUE(manager.getStream(clientStreamId2).has_value());
   EXPECT_EQ(std::nullopt, manager.nextAcceptablePeerBidirectionalStreamId());
 }
 
@@ -647,7 +647,7 @@ TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSet) {
   auto& manager = *conn.streamManager;
 
   auto streamResult = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   StreamId id = stream->id; // Use the actual stream ID
 
@@ -678,7 +678,7 @@ TEST_P(
   auto& manager = *conn.streamManager;
 
   auto streamResult = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
 
   stream->readBuffer.emplace_back(folly::IOBuf::copyBuffer("blah blah"), 0);
@@ -702,7 +702,7 @@ TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSetTwoStreams) {
   auto& manager = *conn.streamManager;
 
   auto streamResult = manager.createNextBidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
 
   stream->readBuffer.emplace_back(
@@ -715,7 +715,7 @@ TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSetTwoStreams) {
   EXPECT_EQ(manager.readableUnidirectionalStreams().size(), 0);
 
   auto streamResult2 = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult2.hasValue());
+  ASSERT_TRUE(streamResult2.has_value());
   auto* stream2 = streamResult2.value();
 
   stream2->readBuffer.emplace_back(
@@ -731,7 +731,7 @@ TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSetTwoStreams) {
 TEST_P(QuicStreamManagerTest, WriteBufferMeta) {
   auto& manager = *conn.streamManager;
   auto streamResult = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
 
   // Add some real data into write buffer
@@ -756,7 +756,7 @@ TEST_P(QuicStreamManagerTest, WriteBufferMeta) {
 TEST_P(QuicStreamManagerTest, RemoveResetsUponClosure) {
   auto& manager = *conn.streamManager;
   auto streamResult = manager.createNextBidirectionalStream();
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
 
   auto streamId = stream->id;
@@ -781,7 +781,7 @@ TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
   auto& manager = *conn.streamManager;
 
   auto maybeQuicStreamState = manager.createNextBidirectionalStream();
-  ASSERT_TRUE(maybeQuicStreamState.hasValue());
+  ASSERT_TRUE(maybeQuicStreamState.has_value());
   auto* quicStreamState = maybeQuicStreamState.value();
 
   // Assume we've written out 5 bytes to the wire already, and have
@@ -899,9 +899,9 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamGroupLimits) {
   // Bump group limits.
   conn.transportSettings.advertisedMaxStreamGroups = 1;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
   groupIdResult = createNextStreamGroup();
-  EXPECT_TRUE(groupIdResult.hasValue());
+  EXPECT_TRUE(groupIdResult.has_value());
   EXPECT_EQ(getNumGroups(), 1);
 
   // Try again and it should fail running over the limit.
@@ -915,7 +915,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsNoGroup) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedMaxStreamGroups = 16;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   StreamGroupId nonExistentGroupId = GetParam().isUnidirectional ? 3 : 1;
   auto streamResult = createNextStreamInGroup(nonExistentGroupId);
@@ -928,11 +928,11 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsWrongNodeType) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedMaxStreamGroups = 16;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   // Create a valid group first
   auto groupResult = createNextStreamGroup();
-  ASSERT_TRUE(groupResult.hasValue());
+  ASSERT_TRUE(groupResult.has_value());
 
   // Try to create stream with wrong type of group ID (Client ID on Server)
   StreamGroupId wrongTypeGroupId = GetParam().isUnidirectional ? 2 : 0;
@@ -945,14 +945,14 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsSuccess) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedMaxStreamGroups = 16;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   auto groupIdResult = createNextStreamGroup();
-  ASSERT_TRUE(groupIdResult.hasValue());
+  ASSERT_TRUE(groupIdResult.has_value());
   EXPECT_EQ(getNumGroups(), 1);
 
   auto streamResult = createNextStreamInGroup(*groupIdResult);
-  EXPECT_TRUE(streamResult.hasValue());
+  EXPECT_TRUE(streamResult.has_value());
 }
 
 TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupDisabled) {
@@ -972,12 +972,12 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroup) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedMaxStreamGroups = 16;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   const StreamId peerStreamId = GetParam().isUnidirectional ? 2 : 0;
   const StreamGroupId peerGroupId = GetParam().isUnidirectional ? 2 : 0;
   auto streamResult = manager.getStream(peerStreamId, peerGroupId);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   EXPECT_NE(stream, nullptr);
   ASSERT_TRUE(stream->groupId.has_value());
@@ -988,7 +988,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupBadGroupId) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedMaxStreamGroups = 16;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   const StreamId peerStreamId = GetParam().isUnidirectional ? 2 : 0;
   // Server group ID when peer is Client (or vice versa)
@@ -1003,12 +1003,12 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedMaxStreamGroups = 16;
   ASSERT_TRUE(
-      manager.refreshTransportSettings(conn.transportSettings).hasValue());
+      manager.refreshTransportSettings(conn.transportSettings).has_value());
 
   StreamId peerStreamId = GetParam().isUnidirectional ? 2 : 0;
   StreamGroupId peerGroupId = GetParam().isUnidirectional ? 2 : 0;
   auto streamResult = manager.getStream(peerStreamId, peerGroupId);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   auto* stream = streamResult.value();
   EXPECT_NE(stream, nullptr);
   ASSERT_TRUE(stream->groupId.has_value());
@@ -1019,7 +1019,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   // Another stream, same group.
   peerStreamId += detail::kStreamIncrement;
   streamResult = manager.getStream(peerStreamId, peerGroupId);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   stream = streamResult.value();
   EXPECT_NE(stream, nullptr);
   ASSERT_TRUE(stream->groupId.has_value());
@@ -1031,7 +1031,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   peerStreamId += detail::kStreamIncrement;
   peerGroupId += detail::kStreamGroupIncrement;
   streamResult = manager.getStream(peerStreamId, peerGroupId);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   stream = streamResult.value();
   EXPECT_NE(stream, nullptr);
   ASSERT_TRUE(stream->groupId.has_value());
@@ -1043,7 +1043,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   peerStreamId += detail::kStreamIncrement;
   peerGroupId = GetParam().isUnidirectional ? 2 : 0; // Go back to first group
   streamResult = manager.getStream(peerStreamId, peerGroupId);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   stream = streamResult.value();
   EXPECT_NE(stream, nullptr);
   ASSERT_TRUE(stream->groupId.has_value());
@@ -1058,7 +1058,7 @@ TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
   peerStreamId += detail::kStreamIncrement;
   peerGroupId = GetParam().isUnidirectional ? 6 : 4; // Go back to second group
   streamResult = manager.getStream(peerStreamId, peerGroupId);
-  ASSERT_TRUE(streamResult.hasValue());
+  ASSERT_TRUE(streamResult.has_value());
   stream = streamResult.value();
   EXPECT_NE(stream, nullptr);
   ASSERT_TRUE(stream->groupId.has_value());

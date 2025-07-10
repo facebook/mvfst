@@ -39,17 +39,25 @@ class QuicClientTransportLiteTest : public Test {
     auto socket = std::make_unique<QuicAsyncUDPSocketMock>();
     sockPtr_ = socket.get();
     ON_CALL(*socket, setAdditionalCmsgsFunc(_))
-        .WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, close()).WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, bind(_)).WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, connect(_)).WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, setReuseAddr(_)).WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, setReusePort(_)).WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, setRecvTos(_)).WillByDefault(Return(folly::unit));
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, close())
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, bind(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, connect(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, setReuseAddr(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, setReusePort(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, setRecvTos(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*socket, getRecvTos()).WillByDefault(Return(false));
     ON_CALL(*socket, getGSO()).WillByDefault(Return(0));
-    ON_CALL(*socket, setCmsgs(_)).WillByDefault(Return(folly::unit));
-    ON_CALL(*socket, appendCmsgs(_)).WillByDefault(Return(folly::unit));
+    ON_CALL(*socket, setCmsgs(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+    ON_CALL(*socket, appendCmsgs(_))
+        .WillByDefault(Return(quic::Expected<void, QuicError>{}));
     auto mockFactory = std::make_shared<MockClientHandshakeFactory>();
     EXPECT_CALL(*mockFactory, makeClientHandshakeImpl(_))
         .WillRepeatedly(Invoke(
@@ -68,7 +76,8 @@ class QuicClientTransportLiteTest : public Test {
   }
 
   void TearDown() override {
-    EXPECT_CALL(*sockPtr_, close()).WillRepeatedly(Return(folly::unit));
+    EXPECT_CALL(*sockPtr_, close())
+        .WillRepeatedly(Return(quic::Expected<void, QuicError>{}));
     quicClient_->closeNow(std::nullopt);
   }
 
@@ -90,7 +99,8 @@ TEST_F(QuicClientTransportLiteTest, TestPriming) {
   quicClient_->getConn()->zeroRttWriteCipher = test::createNoOpAead();
 
   StreamId streamId = quicClient_->createBidirectionalStream().value();
-  quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false);
+  [[maybe_unused]] auto writeChainResult = quicClient_->writeChain(
+      streamId, folly::IOBuf::copyBuffer("test"), false);
   EXPECT_CALL(mockConnectionSetupCallback_, onPrimingDataAvailable(_));
   evb_.loopOnce(EVLOOP_NONBLOCK);
 }

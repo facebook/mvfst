@@ -16,21 +16,21 @@ class FizzCryptoFactory : public CryptoFactory {
  public:
   FizzCryptoFactory() : fizzFactory_{std::make_shared<QuicFizzFactory>()} {}
 
-  [[nodiscard]] folly::Expected<BufPtr, QuicError> makeInitialTrafficSecret(
+  [[nodiscard]] quic::Expected<BufPtr, QuicError> makeInitialTrafficSecret(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const override;
 
-  [[nodiscard]] folly::Expected<std::unique_ptr<Aead>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<Aead>, QuicError>
   makeInitialAead(
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const override;
 
-  [[nodiscard]] folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  [[nodiscard]] quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   makePacketNumberCipher(ByteRange baseSecret) const override;
 
-  [[nodiscard]] virtual folly::
+  [[nodiscard]] virtual quic::
       Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
       makePacketNumberCipher(fizz::CipherSuite cipher) const;
 

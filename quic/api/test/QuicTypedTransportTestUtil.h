@@ -610,7 +610,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   StreamId createUnidirectionalStream() {
     const auto expectedStreamId =
         this->getTransport()->createUnidirectionalStream();
-    CHECK(expectedStreamId.hasValue());
+    CHECK(expectedStreamId.has_value());
     return expectedStreamId.value();
   }
 
@@ -620,7 +620,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   StreamId createBidirectionalStream() {
     const auto expectedStreamId =
         this->getTransport()->createBidirectionalStream();
-    CHECK(expectedStreamId.hasValue());
+    CHECK(expectedStreamId.has_value());
     return expectedStreamId.value();
   }
 

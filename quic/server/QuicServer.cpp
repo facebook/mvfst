@@ -604,7 +604,7 @@ void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
   // Make sure the token satisfies the required properties, i.e. it is not a
   // valid quic header.
   auto parsed = parseHeader(*BufHelpers::copyBuffer(healthCheckToken));
-  CHECK(!parsed.hasValue());
+  CHECK(!parsed.has_value());
   CHECK_GT(healthCheckToken.size(), kMinHealthCheckTokenSize);
   healthCheckToken_ = healthCheckToken;
   runOnAllWorkers([healthCheckToken](auto worker) mutable {

@@ -29,7 +29,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * It may also throw an exception in case of an error in which case the
    * connection will be closed.
    */
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> writeData() = 0;
+  [[nodiscard]] virtual quic::Expected<void, QuicError> writeData() = 0;
 
   // Interface with the Transport layer when data is available.
   // This is invoked when new data is received from the UDP socket.
@@ -43,7 +43,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * The sub-class may throw an exception if there was an error in processing
    * the packet in which case the connection will be closed.
    */
-  virtual folly::Expected<folly::Unit, QuicError> onReadData(
+  virtual quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) = 0;
 
@@ -51,13 +51,13 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void closeNow(Optional<QuicError> error) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> stopSending(
+  quic::Expected<void, LocalErrorCode> stopSending(
       StreamId id,
       ApplicationErrorCode error) override;
 
-  folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
+  quic::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
       bool replaySafe = true) override;
-  folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
+  quic::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
       bool replaySafe = true) override;
   uint64_t getNumOpenableBidirectionalStreams() const override;
   uint64_t getNumOpenableUnidirectionalStreams() const override;
@@ -72,29 +72,29 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   Optional<LocalErrorCode> shutdownWrite(StreamId id) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
+  quic::Expected<void, LocalErrorCode> registerDeliveryCallback(
       StreamId id,
       uint64_t offset,
       ByteEventCallback* cb) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
+  quic::Expected<void, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,
       StreamWriteCallback* wcb) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnConnection(
+  quic::Expected<void, LocalErrorCode> notifyPendingWriteOnConnection(
       ConnectionWriteCallback* wcb) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
+  quic::Expected<void, LocalErrorCode> unregisterStreamWriteCallback(
       StreamId id) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> resetStream(
+  quic::Expected<void, LocalErrorCode> resetStream(
       StreamId id,
       ApplicationErrorCode errorCode) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> updateReliableDeliveryCheckpoint(
+  quic::Expected<void, LocalErrorCode> updateReliableDeliveryCheckpoint(
       StreamId id) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> resetStreamReliably(
+  quic::Expected<void, LocalErrorCode> resetStreamReliably(
       StreamId id,
       ApplicationErrorCode errorCode) override;
 
@@ -134,7 +134,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * Register a byte event to be triggered when specified event type occurs for
    * the specified stream and offset.
    */
-  folly::Expected<folly::Unit, LocalErrorCode> registerByteEventCallback(
+  quic::Expected<void, LocalErrorCode> registerByteEventCallback(
       const ByteEvent::Type type,
       const StreamId id,
       const uint64_t offset,
@@ -160,13 +160,13 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
+  quic::Expected<void, LocalErrorCode> setReadCallback(
       StreamId id,
       ReadCallback* cb,
       Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) override;
 
-  folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
+  quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxLen) override;
 
@@ -206,7 +206,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * application can act on by e.g. changing transport settings during the
    * connection.
    */
-  folly::Expected<folly::Unit, LocalErrorCode>
+  quic::Expected<void, LocalErrorCode>
   setKnob(uint64_t knobSpace, uint64_t knobId, BufPtr knobBlob) override;
 
   /**
@@ -214,10 +214,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   [[nodiscard]] bool isKnobSupported() const override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
+  quic::Expected<void, LocalErrorCode> setPriorityQueue(
       std::unique_ptr<PriorityQueue> queue) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
+  quic::Expected<void, LocalErrorCode> setStreamPriority(
       StreamId id,
       PriorityQueue::Priority priority) override;
 
@@ -225,7 +225,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * Sets the maximum pacing rate in Bytes per second to be used
    * if pacing is enabled.
    */
-  folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
+  quic::Expected<void, LocalErrorCode> setMaxPacingRate(
       uint64_t maxRateBytesPerSec) override;
 
   void setThrottlingSignalProvider(
@@ -235,7 +235,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
 
-  folly::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
+  quic::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
       StreamId id) const override;
 
   const QuicConnectionStateBase* getState() const override {
@@ -250,7 +250,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   uint64_t getConnectionBufferAvailable() const override;
 
-  folly::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
+  quic::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
   getStreamFlowControl(StreamId id) const override;
 
   /**
@@ -620,7 +620,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * both pacing oblivious and writeLooper oblivious. Caller needs to explicitly
    * invoke updateWriteLooper afterwards if that's desired.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> writeSocketData();
+  [[nodiscard]] quic::Expected<void, QuicError> writeSocketData();
 
   void closeImpl(
       Optional<QuicError> error,
@@ -629,7 +629,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void processCallbacksAfterNetworkData();
 
-  folly::Expected<folly::Unit, LocalErrorCode> resetStreamInternal(
+  quic::Expected<void, LocalErrorCode> resetStreamInternal(
       StreamId id,
       ApplicationErrorCode errorCode,
       bool reliable);
@@ -656,14 +656,14 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void handleConnWritable();
   void cleanupAckEventState();
 
-  [[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+  [[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
   handleInitialWriteDataCommon(
       const ConnectionId& srcConnId,
       const ConnectionId& dstConnId,
       uint64_t packetLimit,
       const std::string& token = "");
 
-  [[nodiscard]] folly::Expected<WriteQuicDataResult, QuicError>
+  [[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
   handleHandshakeWriteDataCommon(
       const ConnectionId& srcConnId,
       const ConnectionId& dstConnId,
@@ -671,7 +671,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void closeUdpSocket();
 
-  folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
+  quic::Expected<StreamId, LocalErrorCode> createStreamInternal(
       bool bidirectional,
       const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
 
@@ -702,7 +702,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void invokeReadDataAndCallbacks(bool updateLoopersAndCheckForClosedStream);
   void invokePeekDataAndCallbacks();
 
-  folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
+  quic::Expected<void, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
       ReadCallback* cb,
       Optional<ApplicationErrorCode> err) noexcept;
@@ -777,7 +777,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * is not enabled or has already failed validation, this function does
    * nothing.
    */
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> validateECNState();
+  [[nodiscard]] quic::Expected<void, QuicError> validateECNState();
 
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;

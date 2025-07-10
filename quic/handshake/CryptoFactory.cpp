@@ -11,60 +11,68 @@
 
 namespace quic {
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 CryptoFactory::getClientInitialCipher(
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   return makeInitialAead(kClientInitialLabel, clientDestinationConnId, version);
 }
 
-folly::Expected<std::unique_ptr<Aead>, QuicError>
+quic::Expected<std::unique_ptr<Aead>, QuicError>
 CryptoFactory::getServerInitialCipher(
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   return makeInitialAead(kServerInitialLabel, clientDestinationConnId, version);
 }
 
-folly::Expected<BufPtr, QuicError>
-CryptoFactory::makeServerInitialTrafficSecret(
+quic::Expected<BufPtr, QuicError> CryptoFactory::makeServerInitialTrafficSecret(
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   return makeInitialTrafficSecret(
       kServerInitialLabel, clientDestinationConnId, version);
 }
 
-folly::Expected<BufPtr, QuicError>
-CryptoFactory::makeClientInitialTrafficSecret(
+quic::Expected<BufPtr, QuicError> CryptoFactory::makeClientInitialTrafficSecret(
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
   return makeInitialTrafficSecret(
       kClientInitialLabel, clientDestinationConnId, version);
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 CryptoFactory::makeClientInitialHeaderCipher(
     const ConnectionId& initialDestinationConnectionId,
     QuicVersion version) const {
   auto clientInitialTrafficSecretResult =
       makeClientInitialTrafficSecret(initialDestinationConnectionId, version);
-  if (clientInitialTrafficSecretResult.hasError()) {
-    return folly::makeUnexpected(clientInitialTrafficSecretResult.error());
+  if (!clientInitialTrafficSecretResult.has_value()) {
+    return quic::make_unexpected(clientInitialTrafficSecretResult.error());
   }
   auto& clientInitialTrafficSecret = clientInitialTrafficSecretResult.value();
-  return makePacketNumberCipher(clientInitialTrafficSecret->coalesce());
+  auto packetNumberCipherResult =
+      makePacketNumberCipher(clientInitialTrafficSecret->coalesce());
+  if (!packetNumberCipherResult.has_value()) {
+    return quic::make_unexpected(packetNumberCipherResult.error());
+  }
+  return std::move(packetNumberCipherResult.value());
 }
 
-folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
 CryptoFactory::makeServerInitialHeaderCipher(
     const ConnectionId& initialDestinationConnectionId,
     QuicVersion version) const {
   auto serverInitialTrafficSecretResult =
       makeServerInitialTrafficSecret(initialDestinationConnectionId, version);
-  if (serverInitialTrafficSecretResult.hasError()) {
-    return folly::makeUnexpected(serverInitialTrafficSecretResult.error());
+  if (!serverInitialTrafficSecretResult.has_value()) {
+    return quic::make_unexpected(serverInitialTrafficSecretResult.error());
   }
   auto& serverInitialTrafficSecret = serverInitialTrafficSecretResult.value();
-  return makePacketNumberCipher(serverInitialTrafficSecret->coalesce());
+  auto packetNumberCipherResult =
+      makePacketNumberCipher(serverInitialTrafficSecret->coalesce());
+  if (!packetNumberCipherResult.has_value()) {
+    return quic::make_unexpected(packetNumberCipherResult.error());
+  }
+  return std::move(packetNumberCipherResult.value());
 }
 
 } // namespace quic

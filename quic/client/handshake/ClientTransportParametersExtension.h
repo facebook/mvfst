@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <quic/QuicException.h>
+#include <quic/common/Expected.h>
 #include <quic/handshake/TransportParameters.h>
 
 namespace quic {
@@ -47,7 +47,7 @@ struct ClientTransportParametersExtension {
     return serverTransportParameters_;
   }
 
-  folly::Expected<std::vector<TransportParameter>, QuicError>
+  quic::Expected<std::vector<TransportParameter>, QuicError>
   getChloTransportParameters() {
     constexpr uint8_t kDefaultMinNumParams = 12;
     using TpId = TransportParameterId;
@@ -58,72 +58,72 @@ struct ClientTransportParametersExtension {
     auto bidiLocalResult = encodeIntegerParameter(
         TpId::initial_max_stream_data_bidi_local,
         initialMaxStreamDataBidiLocal_);
-    if (bidiLocalResult.hasError()) {
-      return folly::makeUnexpected(bidiLocalResult.error());
+    if (!bidiLocalResult.has_value()) {
+      return quic::make_unexpected(bidiLocalResult.error());
     }
     res.push_back(std::move(bidiLocalResult.value()));
 
     auto bidiRemoteResult = encodeIntegerParameter(
         TpId::initial_max_stream_data_bidi_remote,
         initialMaxStreamDataBidiRemote_);
-    if (bidiRemoteResult.hasError()) {
-      return folly::makeUnexpected(bidiRemoteResult.error());
+    if (!bidiRemoteResult.has_value()) {
+      return quic::make_unexpected(bidiRemoteResult.error());
     }
     res.push_back(std::move(bidiRemoteResult.value()));
 
     auto uniResult = encodeIntegerParameter(
         TpId::initial_max_stream_data_uni, initialMaxStreamDataUni_);
-    if (uniResult.hasError()) {
-      return folly::makeUnexpected(uniResult.error());
+    if (!uniResult.has_value()) {
+      return quic::make_unexpected(uniResult.error());
     }
     res.push_back(std::move(uniResult.value()));
 
     auto maxDataResult =
         encodeIntegerParameter(TpId::initial_max_data, initialMaxData_);
-    if (maxDataResult.hasError()) {
-      return folly::makeUnexpected(maxDataResult.error());
+    if (!maxDataResult.has_value()) {
+      return quic::make_unexpected(maxDataResult.error());
     }
     res.push_back(std::move(maxDataResult.value()));
 
     auto streamsBidiResult = encodeIntegerParameter(
         TpId::initial_max_streams_bidi, initialMaxStreamsBidi_);
-    if (streamsBidiResult.hasError()) {
-      return folly::makeUnexpected(streamsBidiResult.error());
+    if (!streamsBidiResult.has_value()) {
+      return quic::make_unexpected(streamsBidiResult.error());
     }
     res.push_back(std::move(streamsBidiResult.value()));
 
     auto streamsUniResult = encodeIntegerParameter(
         TpId::initial_max_streams_uni, initialMaxStreamsUni_);
-    if (streamsUniResult.hasError()) {
-      return folly::makeUnexpected(streamsUniResult.error());
+    if (!streamsUniResult.has_value()) {
+      return quic::make_unexpected(streamsUniResult.error());
     }
     res.push_back(std::move(streamsUniResult.value()));
 
     auto idleTimeoutResult =
         encodeIntegerParameter(TpId::idle_timeout, idleTimeout_.count());
-    if (idleTimeoutResult.hasError()) {
-      return folly::makeUnexpected(idleTimeoutResult.error());
+    if (!idleTimeoutResult.has_value()) {
+      return quic::make_unexpected(idleTimeoutResult.error());
     }
     res.push_back(std::move(idleTimeoutResult.value()));
 
     auto ackDelayResult =
         encodeIntegerParameter(TpId::ack_delay_exponent, ackDelayExponent_);
-    if (ackDelayResult.hasError()) {
-      return folly::makeUnexpected(ackDelayResult.error());
+    if (!ackDelayResult.has_value()) {
+      return quic::make_unexpected(ackDelayResult.error());
     }
     res.push_back(std::move(ackDelayResult.value()));
 
     auto maxPacketSizeResult =
         encodeIntegerParameter(TpId::max_packet_size, maxRecvPacketSize_);
-    if (maxPacketSizeResult.hasError()) {
-      return folly::makeUnexpected(maxPacketSizeResult.error());
+    if (!maxPacketSizeResult.has_value()) {
+      return quic::make_unexpected(maxPacketSizeResult.error());
     }
     res.push_back(std::move(maxPacketSizeResult.value()));
 
     auto activeConnLimitResult = encodeIntegerParameter(
         TpId::active_connection_id_limit, activeConnectionLimit_);
-    if (activeConnLimitResult.hasError()) {
-      return folly::makeUnexpected(activeConnLimitResult.error());
+    if (!activeConnLimitResult.has_value()) {
+      return quic::make_unexpected(activeConnLimitResult.error());
     }
     res.push_back(std::move(activeConnLimitResult.value()));
 

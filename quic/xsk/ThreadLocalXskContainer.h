@@ -23,7 +23,7 @@ class ThreadLocalXskContainer : public BaseXskContainer {
 
   ~ThreadLocalXskContainer() override = default;
 
-  folly::Expected<folly::Unit, std::runtime_error> init(
+  quic::Expected<void, std::runtime_error> init(
       const XskContainerConfig& xskContainerConfig) override;
 
   XskSender* pickXsk(

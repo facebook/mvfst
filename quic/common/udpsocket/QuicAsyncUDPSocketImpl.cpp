@@ -17,7 +17,7 @@ constexpr socklen_t kAddrLen = sizeof(sockaddr_storage);
 
 namespace quic {
 
-folly::Expected<QuicAsyncUDPSocket::RecvResult, QuicError>
+quic::Expected<QuicAsyncUDPSocket::RecvResult, QuicError>
 QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     uint64_t readBufferSize,
     uint16_t numPackets,
@@ -36,15 +36,15 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
   // Check socket options using Expected results
   auto groResult = getGRO();
   if (FOLLY_UNLIKELY(groResult.hasError())) {
-    return folly::makeUnexpected(groResult.error());
+    return quic::make_unexpected(groResult.error());
   }
   auto timestampingResult = getTimestamping();
   if (FOLLY_UNLIKELY(timestampingResult.hasError())) {
-    return folly::makeUnexpected(timestampingResult.error());
+    return quic::make_unexpected(timestampingResult.error());
   }
   auto recvTosResult = getRecvTos();
   if (FOLLY_UNLIKELY(recvTosResult.hasError())) {
-    return folly::makeUnexpected(recvTosResult.error());
+    return quic::make_unexpected(recvTosResult.error());
   }
 #if defined(FOLLY_HAVE_MSG_ERRQUEUE) || defined(_WIN32)
   bool useGRO = *groResult > 0;
@@ -76,7 +76,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
 
     auto localAddrResult = address();
     if (FOLLY_UNLIKELY(localAddrResult.hasError())) {
-      return folly::makeUnexpected(localAddrResult.error());
+      return quic::make_unexpected(localAddrResult.error());
     }
     auto* rawAddr =
         reinterpret_cast<sockaddr*>(&addr); // Assuming addr is large enough
@@ -106,7 +106,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     // Return the error from recvmmsg itself
     int errnoCopy = errno;
     std::string errorMsg = "recvmmsg failed: " + folly::errnoStr(errnoCopy);
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
     // Original code returned RecvResult(NoReadReason::NONRETRIABLE_ERROR);

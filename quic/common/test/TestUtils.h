@@ -189,7 +189,7 @@ std::unique_ptr<T> createNoOpAeadImpl(uint64_t cipherOverhead = 0) {
 
 std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead = 0);
 
-folly::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
+quic::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
 createNoOpHeaderCipher();
 
 // For backward compatibility with existing code
@@ -354,16 +354,16 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
   ~FizzCryptoTestFactory() override = default;
 
   using FizzCryptoFactory::makePacketNumberCipher;
-  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
       makePacketNumberCipher(fizz::CipherSuite) const override;
 
   MOCK_METHOD(
-      (folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>),
+      (quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>),
       _makePacketNumberCipher,
       (ByteRange),
       (const));
 
-  folly::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
+  quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
   makePacketNumberCipher(ByteRange secret) const override;
 
   void setMockPacketNumberCipher(
@@ -428,7 +428,7 @@ class FakeServerHandshake : public FizzServerHandshake {
   void accept(std::shared_ptr<ServerTransportParametersExtension>) override {}
 
   MOCK_METHOD(
-      (folly::Expected<folly::Unit, QuicError>),
+      (quic::Expected<void, QuicError>),
       writeNewSessionTicket,
       (const AppToken&));
 
@@ -461,9 +461,8 @@ class FakeServerHandshake : public FizzServerHandshake {
     handshakeDone_ = true;
   }
 
-  folly::Expected<folly::Unit, QuicError> doHandshake(
-      BufPtr data,
-      EncryptionLevel) override {
+  quic::Expected<void, QuicError> doHandshake(BufPtr data, EncryptionLevel)
+      override {
     folly::IOBufEqualTo eq;
     auto chlo = BufHelpers::copyBuffer("CHLO");
     auto chloWithCert = BufHelpers::copyBuffer("CHLO_CERT");
@@ -495,7 +494,7 @@ class FakeServerHandshake : public FizzServerHandshake {
         });
       }
     }
-    return folly::unit;
+    return {};
   }
 
   Optional<ClientTransportParameters> getClientTransportParams() override {

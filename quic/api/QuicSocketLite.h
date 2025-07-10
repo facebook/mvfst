@@ -303,7 +303,7 @@ class QuicSocketLite {
    * If replaySafe is false, the transport will buffer (up to the send buffer
    * limits) any writes on this stream until the transport is replay safe.
    */
-  virtual folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
+  virtual quic::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
       bool replaySafe = true) = 0;
 
   /**
@@ -313,7 +313,7 @@ class QuicSocketLite {
    * If replaySafe is false, the transport will buffer (up to the send buffer
    * limits) any writes on this stream until the transport is replay safe.
    */
-  virtual folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
+  virtual quic::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
       bool replaySafe = true) = 0;
 
   /**
@@ -356,7 +356,7 @@ class QuicSocketLite {
    * Calling read() when there is no data/eof to deliver will return an
    * EAGAIN-like error code.
    */
-  virtual folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
+  virtual quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxLen) = 0;
 
@@ -374,7 +374,7 @@ class QuicSocketLite {
    * Users should remove the callback via setReadCallback(id, nullptr) after
    * reading an error or eof to allow streams to be reaped by the transport.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
+  virtual quic::Expected<void, LocalErrorCode> setReadCallback(
       StreamId id,
       ReadCallback* cb,
       Optional<ApplicationErrorCode> err =
@@ -497,8 +497,7 @@ class QuicSocketLite {
    * be invoked for anything. If the registration succeeds, the callback is
    * guaranteed to receive an onByteEventRegistered() notification.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  registerByteEventCallback(
+  virtual quic::Expected<void, LocalErrorCode> registerByteEventCallback(
       const ByteEvent::Type type,
       const StreamId id,
       const uint64_t offset,
@@ -561,7 +560,7 @@ class QuicSocketLite {
    *
    * An error code is present if there was an error with the write.
    */
-  using WriteResult = folly::Expected<folly::Unit, LocalErrorCode>;
+  using WriteResult = quic::Expected<void, LocalErrorCode>;
   virtual WriteResult writeChain(
       StreamId id,
       BufPtr data,
@@ -593,7 +592,7 @@ class QuicSocketLite {
    * Register a callback to be invoked when the peer has acknowledged the
    * given offset on the given stream.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
+  virtual quic::Expected<void, LocalErrorCode> registerDeliveryCallback(
       StreamId id,
       uint64_t offset,
       ByteEventCallback* cb) = 0;
@@ -603,19 +602,20 @@ class QuicSocketLite {
    * An app shouldn't mix connection and stream calls to this API
    * Use this if the app wants to do prioritization.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  notifyPendingWriteOnConnection(ConnectionWriteCallback* wcb) = 0;
+  virtual quic::Expected<void, LocalErrorCode> notifyPendingWriteOnConnection(
+      ConnectionWriteCallback* wcb) = 0;
 
   /**
    * Inform the transport that there is data to write on a given stream.
    * An app shouldn't mix connection and stream calls to this API
    * Use the Connection call if the app wants to do prioritization.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  notifyPendingWriteOnStream(StreamId id, StreamWriteCallback* wcb) = 0;
+  virtual quic::Expected<void, LocalErrorCode> notifyPendingWriteOnStream(
+      StreamId id,
+      StreamWriteCallback* wcb) = 0;
 
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-      unregisterStreamWriteCallback(StreamId) = 0;
+  virtual quic::Expected<void, LocalErrorCode> unregisterStreamWriteCallback(
+      StreamId) = 0;
 
   /**
    * Application can invoke this function to signal the transport to
@@ -629,7 +629,7 @@ class QuicSocketLite {
   /**
    * Cancel the given stream
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> resetStream(
+  virtual quic::Expected<void, LocalErrorCode> resetStream(
       StreamId id,
       ApplicationErrorCode error) = 0;
 
@@ -640,14 +640,14 @@ class QuicSocketLite {
    * can potentially be called multiple times on a stream to advance the offset,
    * but it is an error to call it after sending a reset.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
-  updateReliableDeliveryCheckpoint(StreamId id) = 0;
+  virtual quic::Expected<void, LocalErrorCode> updateReliableDeliveryCheckpoint(
+      StreamId id) = 0;
 
   /**
    * Send a reliable reset to the peer. The reliable size sent to the peer is
    * determined by when checkpoint(streamId) was last called.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> resetStreamReliably(
+  virtual quic::Expected<void, LocalErrorCode> resetStreamReliably(
       StreamId id,
       ApplicationErrorCode error) = 0;
 
@@ -682,7 +682,7 @@ class QuicSocketLite {
    * stream. A caller can use this function when they are no longer processing
    * received data on the stream.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> stopSending(
+  virtual quic::Expected<void, LocalErrorCode> stopSending(
       StreamId id,
       ApplicationErrorCode error) = 0;
 
@@ -783,7 +783,7 @@ class QuicSocketLite {
    * application can act on by e.g. changing transport settings during the
    * connection.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  virtual quic::Expected<void, LocalErrorCode>
   setKnob(uint64_t knobSpace, uint64_t knobId, BufPtr knobBlob) = 0;
 
   /**
@@ -794,13 +794,13 @@ class QuicSocketLite {
   /*
    * Set the priority queue implementation.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setPriorityQueue(
+  virtual quic::Expected<void, LocalErrorCode> setPriorityQueue(
       std::unique_ptr<PriorityQueue> queue) = 0;
 
   /**
    * Set stream priority.
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
+  virtual quic::Expected<void, LocalErrorCode> setStreamPriority(
       StreamId id,
       PriorityQueue::Priority pri) = 0;
 
@@ -808,7 +808,7 @@ class QuicSocketLite {
    * Sets the maximum pacing rate in Bytes per second to be used
    * if pacing is enabled
    */
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
+  virtual quic::Expected<void, LocalErrorCode> setMaxPacingRate(
       uint64_t rateBytesPerSec) = 0;
 
   /**
@@ -832,7 +832,7 @@ class QuicSocketLite {
    * Get internal transport info similar to TCP information.
    * Returns LocalErrorCode::STREAM_NOT_EXISTS if the stream is not found
    */
-  virtual folly::Expected<StreamTransportInfo, LocalErrorCode>
+  virtual quic::Expected<StreamTransportInfo, LocalErrorCode>
   getStreamTransportInfo(StreamId id) const = 0;
 
   /**
@@ -897,8 +897,8 @@ class QuicSocketLite {
    * Returns the current flow control windows for the stream, id != 0.
    * Use getConnectionFlowControl for connection flow control window.
    */
-  virtual folly::Expected<FlowControlState, LocalErrorCode>
-  getStreamFlowControl(StreamId id) const = 0;
+  virtual quic::Expected<FlowControlState, LocalErrorCode> getStreamFlowControl(
+      StreamId id) const = 0;
 
   virtual const TransportSettings& getTransportSettings() const = 0;
 

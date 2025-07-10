@@ -24,7 +24,7 @@ namespace quic {
  * The input parameter is the frame to be written to the output appender.
  *
  */
-[[nodiscard]] folly::Expected<size_t, QuicError> writeSimpleFrame(
+[[nodiscard]] quic::Expected<size_t, QuicError> writeSimpleFrame(
     QuicSimpleFrame&& frame,
     PacketBuilderInterface& builder);
 
@@ -34,7 +34,7 @@ namespace quic {
  * The input parameter is the frame to be written to the output appender.
  *
  */
-[[nodiscard]] folly::Expected<size_t, QuicError> writeFrame(
+[[nodiscard]] quic::Expected<size_t, QuicError> writeFrame(
     QuicWriteFrame&& frame,
     PacketBuilderInterface& builder);
 
@@ -50,7 +50,7 @@ namespace quic {
  *   to decide it. When skipLenHint is true, the field is skipped. When it's
  *   false, it will be encoded into the header.
  */
-folly::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
+quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
     uint64_t offset,
@@ -77,7 +77,7 @@ void writeStreamFrameData(
  * written. The caller should check the structure to confirm how many bytes were
  * written.
  */
-[[nodiscard]] folly::Expected<Optional<WriteCryptoFrame>, QuicError>
+[[nodiscard]] quic::Expected<Optional<WriteCryptoFrame>, QuicError>
 writeCryptoFrame(
     uint64_t offsetIn,
     const ChainedByteRangeHead& data,
@@ -99,7 +99,7 @@ writeCryptoFrame(
  * written to the appender. Returns an empty optional if an ack block could not
  * be written.
  */
-[[nodiscard]] folly::Expected<Optional<WriteAckFrameResult>, QuicError>
+[[nodiscard]] quic::Expected<Optional<WriteAckFrameResult>, QuicError>
 writeAckFrame(
     const WriteAckFrameMetaData& ackFrameMetaData,
     PacketBuilderInterface& builder,
@@ -112,7 +112,7 @@ writeAckFrame(
 /**
  * Helper functions to write the fields for ACK_RECEIVE_TIMESTAMPS frame
  */
-[[nodiscard]] folly::Expected<size_t, QuicError>
+[[nodiscard]] quic::Expected<size_t, QuicError>
 computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 
 } // namespace quic

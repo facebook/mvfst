@@ -147,7 +147,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     }
     auto stream = sock_->createUnidirectionalStream();
     VLOG(5) << "New Stream with id = " << stream.value();
-    CHECK(stream.hasValue());
+    CHECK(stream.has_value());
     bytesPerStream_[stream.value()] = 0;
     notifyDataForStream(stream.value());
   }
@@ -259,7 +259,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
     auto stream = sock_->createUnidirectionalStream();
     VLOG(5) << "New Stream with id = " << stream.value();
-    CHECK(stream.hasValue());
+    CHECK(stream.has_value());
     streamBurstSendResult_.streamId = *stream;
     streamBurstSendResult_.acked = false;
     streamBurstSendResult_.startTs = Clock::now();

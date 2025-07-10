@@ -9,7 +9,7 @@
 
 namespace quic {
 
-folly::Expected<size_t, QuicError> getQuicIntegerSize(uint64_t value) {
+quic::Expected<size_t, QuicError> getQuicIntegerSize(uint64_t value) {
   if (value <= kOneByteLimit) {
     return 1;
   } else if (value <= kTwoByteLimit) {
@@ -19,7 +19,7 @@ folly::Expected<size_t, QuicError> getQuicIntegerSize(uint64_t value) {
   } else if (value <= kEightByteLimit) {
     return 8;
   }
-  return folly::makeUnexpected(
+  return quic::make_unexpected(
       QuicError(TransportErrorCode::INTERNAL_ERROR, "Cannot encode value"));
 }
 
@@ -68,13 +68,13 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
 
 QuicInteger::QuicInteger(uint64_t value) : value_(value) {}
 
-folly::Expected<size_t, QuicError> QuicInteger::getSize() const {
+quic::Expected<size_t, QuicError> QuicInteger::getSize() const {
   auto size = getQuicIntegerSize(value_);
   if (size.hasError()) {
     LOG(ERROR) << "Value too large value=" << value_;
     std::string errorMsg = "Value too large ";
     errorMsg += std::to_string(value_);
-    return folly::makeUnexpected(
+    return quic::make_unexpected(
         QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errorMsg)));
   }
   return size.value();

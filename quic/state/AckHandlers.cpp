@@ -110,7 +110,7 @@ void removeOutstandingsForAck(
  *
  */
 
-folly::Expected<AckEvent, QuicError> processAckFrame(
+quic::Expected<AckEvent, QuicError> processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& frame,
@@ -132,7 +132,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
                  .build();
 
   if (frame.largestAcked >= getAckState(conn, pnSpace).nextPacketNum) {
-    return folly::makeUnexpected(QuicError(
+    return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Future packet number acked"));
   }
 
@@ -146,7 +146,7 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
               return block.startPacket <= skippedPacketNum.value() &&
                   block.endPacket >= skippedPacketNum.value();
             }) != frame.ackBlocks.end()) {
-      return folly::makeUnexpected(QuicError(
+      return quic::make_unexpected(QuicError(
           TransportErrorCode::PROTOCOL_VIOLATION,
           "Skipped packet number acked"));
     } else if (
@@ -314,8 +314,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
 
     // run the ACKed packet visitor
     auto ackedPacketResult = ackedPacketVisitor(*outstandingPacket);
-    if (ackedPacketResult.hasError()) {
-      return folly::makeUnexpected(ackedPacketResult.error());
+    if (!ackedPacketResult.has_value()) {
+      return quic::make_unexpected(ackedPacketResult.error());
     }
 
     // Update ecn counts
@@ -351,8 +351,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
 
       // run the ACKed frame visitor
       auto result = ackedFrameVisitor(*outstandingPacket, packetFrame);
-      if (result.hasError()) {
-        return folly::makeUnexpected(result.error());
+      if (!result.has_value()) {
+        return quic::make_unexpected(result.error());
       }
 
       if (maybePreAckIntervalSetVersion.has_value()) {
@@ -420,8 +420,8 @@ folly::Expected<AckEvent, QuicError> processAckFrame(
       << originalPacketCount[PacketNumberSpace::AppData] << "}";
   CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEventExpected = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
-  if (lossEventExpected.hasError()) {
-    return folly::makeUnexpected(lossEventExpected.error());
+  if (!lossEventExpected.has_value()) {
+    return quic::make_unexpected(lossEventExpected.error());
   }
   auto& lossEvent = lossEventExpected.value();
   updateCongestionControllerForAck(conn, ack, lossEvent);

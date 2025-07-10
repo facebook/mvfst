@@ -49,9 +49,9 @@ class FizzCryptoFactoryTest : public Test {
   std::unique_ptr<MockPacketNumberCipher> createMockPacketNumberCipher() {
     auto mockPacketNumberCipher = std::make_unique<MockPacketNumberCipher>();
     EXPECT_CALL(*mockPacketNumberCipher, setKey(_))
-        .WillOnce(Invoke([&](ByteRange key) {
+        .WillOnce(Invoke([&](ByteRange key) -> quic::Expected<void, QuicError> {
           packetCipherKey_ = folly::IOBuf::copyBuffer(key);
-          return folly::Expected<folly::Unit, QuicError>(folly::unit);
+          return {};
         }));
     EXPECT_CALL(*mockPacketNumberCipher, keyLength())
         .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));

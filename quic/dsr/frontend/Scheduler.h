@@ -31,7 +31,7 @@ class DSRStreamFrameScheduler {
   };
 
   // Write a single stream's data into builder.
-  [[nodiscard]] folly::Expected<SchedulingResult, QuicError> writeStream(
+  [[nodiscard]] quic::Expected<SchedulingResult, QuicError> writeStream(
       DSRPacketBuilderBase& builder);
 
  private:
@@ -55,11 +55,11 @@ class DSRStreamFrameScheduler {
       const PriorityQueue&,
       QuicStreamState&);
 
-  folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+  quic::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
   writeStreamImpl(
       DSRPacketBuilderBase& builder,
       const deprecated::PriorityQueue&);
-  folly::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
+  quic::Expected<DSRStreamFrameScheduler::SchedulingResult, QuicError>
   writeStreamImpl(DSRPacketBuilderBase& builder, PriorityQueue&);
 
  private:

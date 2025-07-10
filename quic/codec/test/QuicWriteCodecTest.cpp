@@ -53,7 +53,7 @@ QuicFrame parseQuicFrame(
           receiveTimeStampsConfig,
           extendedAckSupport));
 
-  if (!result.hasValue()) {
+  if (!result.has_value()) {
     throw QuicTransportException(
         result.error().message, *result.error().code.asTransportErrorCode());
   }
@@ -534,7 +534,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
       10,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 10);
@@ -588,7 +588,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
       20,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   EXPECT_EQ(*dataLen, 20);
@@ -645,7 +645,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       30,
       fin1,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 30);
@@ -674,7 +674,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       remainingSpace,
       fin2,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, remainingSpace - 7);
@@ -711,7 +711,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(streamFrameDecoded1.hasValue());
+  ASSERT_TRUE(streamFrameDecoded1.has_value());
   auto& decodedStreamFrame1 = *streamFrameDecoded1->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame1.streamId, streamId1);
   EXPECT_EQ(decodedStreamFrame1.offset, offset1);
@@ -722,7 +722,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(streamFrameDecoded2.hasValue());
+  ASSERT_TRUE(streamFrameDecoded2.has_value());
   auto& decodedStreamFrame2 = *streamFrameDecoded2->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame2.streamId, streamId2);
   EXPECT_EQ(decodedStreamFrame2.offset, offset2);
@@ -754,7 +754,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFramePartialData) {
       50,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 33);
@@ -795,7 +795,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameTooSmallForStreamHeader) {
   bool fin = false;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 1, 1, fin, std::nullopt /* skipLenHint */);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_FALSE(dataLen);
   EXPECT_EQ(1, pktBuilder.remainingSpaceInPkt());
@@ -821,7 +821,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamNoSpaceForData) {
       10,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 3);
@@ -851,7 +851,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
       100,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 1);
@@ -877,7 +877,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(decodedFrame.hasValue());
+  ASSERT_TRUE(decodedFrame.has_value());
   auto& decodedStreamFrame = *decodedFrame->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
@@ -906,7 +906,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
       10,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 10);
@@ -933,7 +933,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(decodedFrame.hasValue());
+  ASSERT_TRUE(decodedFrame.has_value());
   auto& decodedStreamFrame = *decodedFrame->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
@@ -966,7 +966,7 @@ TEST_F(QuicWriteCodecTest, TestWriteIncompleteDataAndFin) {
       inDataSize,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   EXPECT_LT(*dataLen, inDataSize);
@@ -985,7 +985,7 @@ TEST_F(QuicWriteCodecTest, TestWriteNoDataAndFin) {
   BufPtr empty;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 0, 0, fin, std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   EXPECT_EQ(*dataLen, 0);
@@ -1029,7 +1029,7 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeader) {
       20,
       fin,
       std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
@@ -1048,7 +1048,7 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeaderWithFin) {
   bool fin = true;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 0, 0, fin, std::nullopt /* skipLenHint */);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen.has_value());
   EXPECT_EQ(*dataLen, 0);
@@ -1068,7 +1068,7 @@ TEST_F(QuicWriteCodecTest, PacketNotEnoughSpaceForStreamHeaderWithFin) {
   bool fin = true;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 0, 0, fin, std::nullopt /* skipLenHint */);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
@@ -1098,7 +1098,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeSkipLen) {
   bool fin = false;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 1200 * 2, 1200 * 2, fin, std::nullopt);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_LT(*dataLen, 1200);
 }
@@ -1126,7 +1126,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeNotSkipLen) {
   bool fin = false;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 200, 200, fin, std::nullopt);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_EQ(*dataLen, 200);
 }
@@ -1154,7 +1154,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeLengthHintTrue) {
   bool fin = false;
   auto res =
       writeStreamFrameHeader(pktBuilder, streamId, offset, 200, 200, fin, true);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_EQ(*dataLen, 200);
 }
@@ -1182,7 +1182,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameHeadeLengthHintFalse) {
   bool fin = false;
   auto res = writeStreamFrameHeader(
       pktBuilder, streamId, offset, 1200 * 2, 1200 * 2, fin, false);
-  EXPECT_TRUE(res.hasValue());
+  EXPECT_TRUE(res.has_value());
   auto dataLen = *res;
   EXPECT_LT(*dataLen, 1200);
 }
@@ -1589,7 +1589,7 @@ TEST_P(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
-  EXPECT_TRUE(ackFrameWriteResult.hasValue());
+  EXPECT_TRUE(ackFrameWriteResult.has_value());
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
@@ -1598,7 +1598,7 @@ TEST_P(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
       queue,
       builtOut.first.header,
       CodecParameters(ackDelayExponent, QuicVersion::MVFST));
-  EXPECT_TRUE(decodedFrameResult.hasValue());
+  EXPECT_TRUE(decodedFrameResult.has_value());
   auto& decodedAckFrame = *decodedFrameResult.value().asReadAckFrame();
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
@@ -1628,7 +1628,7 @@ TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
       frameType,
       defaultAckReceiveTimestmpsConfig,
       kMaxReceivedPktsTimestampsStored);
-  EXPECT_TRUE(ackFrameWriteResult.hasValue());
+  EXPECT_TRUE(ackFrameWriteResult.has_value());
   auto builtOut = std::move(pktBuilder).buildLongHeaderPacket();
   auto wireBuf = std::move(builtOut.second);
   Cursor cursor(wireBuf.get());
@@ -1638,7 +1638,7 @@ TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
       queue,
       builtOut.first.header,
       CodecParameters(ackDelayExponent, QuicVersion::MVFST));
-  EXPECT_TRUE(decodedFrameResult.hasValue());
+  EXPECT_TRUE(decodedFrameResult.has_value());
   auto& decodedAckFrame = *decodedFrameResult.value().asReadAckFrame();
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
@@ -2808,7 +2808,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameWithGroup) {
       fin,
       std::nullopt /* skipLenHint */,
       groupId);
-  ASSERT_TRUE(res.hasValue());
+  ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 50);
@@ -2834,7 +2834,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameWithGroup) {
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(streamFrameDecodedExpected.hasValue());
+  ASSERT_TRUE(streamFrameDecodedExpected.has_value());
   auto& decodedStreamFrame = *streamFrameDecodedExpected->asReadStreamFrame();
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.streamGroupId, groupId);
@@ -2883,7 +2883,7 @@ TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
       queue,
       regularPacket.header,
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
-  ASSERT_TRUE(parsedFrameExpected.hasValue());
+  ASSERT_TRUE(parsedFrameExpected.has_value());
   auto decodedFrame =
       parsedFrameExpected->asQuicSimpleFrame()->asAckFrequencyFrame();
   ASSERT_TRUE(decodedFrame);

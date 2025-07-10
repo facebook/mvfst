@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include <folly/Expected.h>
 #include <folly/String.h>
 #include <folly/io/Cursor.h>
 #include <folly/lang/Bits.h>
 #include <quic/QuicException.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
 namespace quic {
@@ -60,7 +60,7 @@ inline size_t encodeEightBytes(BufOp bufop, uint64_t value) {
  * variable length encoding.
  */
 template <typename BufOp>
-folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
+quic::Expected<size_t, TransportErrorCode> encodeQuicInteger(
     uint64_t value,
     BufOp bufop) {
   if (value <= kOneByteLimit) {
@@ -72,11 +72,11 @@ folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
   } else if (value <= kEightByteLimit) {
     return encodeEightBytes(std::move(bufop), value);
   }
-  return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
+  return quic::make_unexpected(TransportErrorCode::INTERNAL_ERROR);
 }
 
 template <typename BufOp>
-folly::Expected<size_t, TransportErrorCode>
+quic::Expected<size_t, TransportErrorCode>
 encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
   switch (outputSize) {
     case 1:
@@ -92,7 +92,7 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
       CHECK(value <= kEightByteLimit);
       return encodeEightBytes(std::move(bufop), value);
     default:
-      return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
+      return quic::make_unexpected(TransportErrorCode::INTERNAL_ERROR);
   }
 }
 
@@ -115,7 +115,7 @@ uint8_t decodeQuicIntegerLength(uint8_t firstByte);
  * if value is too large to be represented with the variable
  * length encoding
  */
-[[nodiscard]] folly::Expected<size_t, QuicError> getQuicIntegerSize(
+[[nodiscard]] quic::Expected<size_t, QuicError> getQuicIntegerSize(
     uint64_t value);
 
 /**
@@ -146,7 +146,7 @@ class QuicInteger {
    * Returns the number of bytes needed to represent the QUIC integer in
    * its encoded form.
    **/
-  [[nodiscard]] folly::Expected<size_t, QuicError> getSize() const;
+  [[nodiscard]] quic::Expected<size_t, QuicError> getSize() const;
 
   /**
    * Returns the real value of the QUIC integer that it was instantiated with.

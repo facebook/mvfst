@@ -127,7 +127,7 @@ void QuicTransportBaseLite::onNetworkData(
     auto packets = std::move(networkData).movePackets();
     for (auto& packet : packets) {
       auto res = onReadData(peer, std::move(packet));
-      if (res.hasError()) {
+      if (!res.has_value()) {
         VLOG(4) << __func__ << " " << res.error().message << " " << *this;
         exceptionCloseWhat_ = res.error().message;
         return closeImpl(res.error());
@@ -171,7 +171,7 @@ void QuicTransportBaseLite::onNetworkData(
       // If ECN is enabled, make sure that the packet marking is happening as
       // expected
       auto ecnResult = validateECNState();
-      if (ecnResult.hasError()) {
+      if (!ecnResult.has_value()) {
         VLOG(4) << __func__ << " " << ecnResult.error().message << " " << *this;
         exceptionCloseWhat_ = ecnResult.error().message;
         closeImpl(ecnResult.error());
@@ -180,7 +180,7 @@ void QuicTransportBaseLite::onNetworkData(
       // In the closed state, we would want to write a close if possible
       // however the write looper will not be set.
       auto result = writeSocketData();
-      if (result.hasError()) {
+      if (!result.has_value()) {
         VLOG(4) << __func__ << " " << result.error().message << " " << *this;
         exceptionCloseWhat_ = result.error().message;
         closeImpl(result.error());
@@ -237,23 +237,23 @@ void QuicTransportBaseLite::closeNow(Optional<QuicError> errorCode) {
   }
 }
 
-folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::stopSending(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::stopSending(
     StreamId id,
     ApplicationErrorCode error) {
   if (isSendingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto* stream = conn_->streamManager->getStream(id).value_or(nullptr);
   CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   if (stream->recvState == StreamRecvState::Closed) {
     // skip STOP_SENDING if ingress is already closed
-    return folly::unit;
+    return {};
   }
 
   if (conn_->transportSettings.dropIngressOnStopSending) {
@@ -262,15 +262,15 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::stopSending(
   // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<StreamId, LocalErrorCode>
+quic::Expected<StreamId, LocalErrorCode>
 QuicTransportBaseLite::createBidirectionalStream(bool /*replaySafe*/) {
   return createStreamInternal(true);
 }
 
-folly::Expected<StreamId, LocalErrorCode>
+quic::Expected<StreamId, LocalErrorCode>
 QuicTransportBaseLite::createUnidirectionalStream(bool /*replaySafe*/) {
   return createStreamInternal(false);
 }
@@ -297,22 +297,22 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     bool eof,
     ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   [[maybe_unused]] auto self = sharedGuard();
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
     if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
     CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     if (!stream->writable()) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+      return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
     }
     // Register DeliveryCallback for the data + eof offset.
     if (cb) {
@@ -320,8 +320,17 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
           (data ? data->computeChainDataLength() : 0) + (eof ? 1 : 0);
       if (dataLength) {
         auto currentLargestWriteOffset = getLargestWriteOffsetSeen(*stream);
-        registerDeliveryCallback(
+        auto deliveryResult = registerDeliveryCallback(
             id, currentLargestWriteOffset + dataLength - 1, cb);
+        if (!deliveryResult.has_value()) {
+          VLOG(4) << "Failed to register delivery callback: "
+                  << toString(deliveryResult.error());
+          exceptionCloseWhat_ = "Failed to register delivery callback";
+          closeImpl(QuicError(
+              deliveryResult.error(),
+              std::string("registerDeliveryCallback() error")));
+          return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
+        }
       }
     }
     bool wasAppLimitedOrIdle = false;
@@ -330,13 +339,13 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
       wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
     }
     auto result = writeDataToQuicStream(*stream, std::move(data), eof);
-    if (result.hasError()) {
+    if (!result.has_value()) {
       VLOG(4) << __func__ << " streamId=" << id << " " << result.error().message
               << " " << *this;
       exceptionCloseWhat_ = result.error().message;
       closeImpl(
           QuicError(result.error().code, std::string("writeChain() error")));
-      return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
     }
     // If we were previously app limited restart pacing with the current rate.
     if (wasAppLimitedOrIdle && conn_->pacer) {
@@ -349,14 +358,14 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return folly::makeUnexpected(ex.errorCode());
+    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
@@ -364,9 +373,9 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeChain() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
-  return folly::unit;
+  return {};
 }
 
 Optional<LocalErrorCode> QuicTransportBaseLite::shutdownWrite(StreamId id) {
@@ -376,7 +385,7 @@ Optional<LocalErrorCode> QuicTransportBaseLite::shutdownWrite(StreamId id) {
   return std::nullopt;
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::registerDeliveryCallback(
     StreamId id,
     uint64_t offset,
@@ -384,14 +393,14 @@ QuicTransportBaseLite::registerDeliveryCallback(
   return registerByteEventCallback(ByteEvent::Type::ACK, id, offset, cb);
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::notifyPendingWriteOnConnection(
     ConnectionWriteCallback* wcb) {
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (connWriteCallback_ != nullptr) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
+    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
   }
   // Assign the write callback before going into the loop so that if we close
   // the connection while we are still scheduled, the write callback will get
@@ -409,31 +418,31 @@ QuicTransportBaseLite::notifyPendingWriteOnConnection(
       connWriteCallback->onConnectionWriteReady(connWritableBytes);
     }
   });
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::unregisterStreamWriteCallback(StreamId id) {
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   if (pendingWriteCallbacks_.find(id) == pendingWriteCallbacks_.end()) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   pendingWriteCallbacks_.erase(id);
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::resetStream(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStream(
     StreamId id,
     ApplicationErrorCode errorCode) {
   return resetStreamInternal(id, errorCode, false /* reliable */);
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::updateReliableDeliveryCheckpoint(StreamId id) {
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream =
       CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
@@ -441,20 +450,19 @@ QuicTransportBaseLite::updateReliableDeliveryCheckpoint(StreamId id) {
     // We already sent a reset, so there's really no reason why we should be
     // doing any more checkpointing, especially since we cannot
     // increase the reliable size in subsequent resets.
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   stream->reliableResetCheckpoint =
       stream->currentWriteOffset + stream->pendingWrites.chainLength();
-  return folly::Unit();
+  return {};
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::resetStreamReliably(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStreamReliably(
     StreamId id,
     ApplicationErrorCode errorCode) {
   if (!conn_->transportSettings.advertisedReliableResetStreamSupport ||
       !conn_->peerAdvertisedReliableStreamResetSupport) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   return resetStreamInternal(id, errorCode, true /* reliable */);
 }
@@ -488,27 +496,27 @@ void QuicTransportBaseLite::cancelByteEventCallbacksForStream(
       });
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::notifyPendingWriteOnStream(
     StreamId id,
     StreamWriteCallback* wcb) {
   if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
   CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   if (!stream->writable()) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
   }
 
   if (wcb == nullptr) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
+    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
   }
   // Add the callback to the pending write callbacks so that if we are closed
   // while we are scheduled in the loop, the close will error out the
@@ -516,9 +524,9 @@ QuicTransportBaseLite::notifyPendingWriteOnStream(
   auto wcbEmplaceResult = pendingWriteCallbacks_.emplace(id, wcb);
   if (!wcbEmplaceResult.second) {
     if ((wcbEmplaceResult.first)->second != wcb) {
-      return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
+      return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
     } else {
-      return folly::makeUnexpected(LocalErrorCode::CALLBACK_ALREADY_INSTALLED);
+      return quic::make_unexpected(LocalErrorCode::CALLBACK_ALREADY_INSTALLED);
     }
   }
   runOnEvbAsync([id](auto self) {
@@ -548,27 +556,27 @@ QuicTransportBaseLite::notifyPendingWriteOnStream(
       writeCallback->onStreamWriteReady(id, maxCanWrite);
     }
   });
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::registerByteEventCallback(
     const ByteEvent::Type type,
     const StreamId id,
     const uint64_t offset,
     ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   [[maybe_unused]] auto self = sharedGuard();
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   if (!cb) {
-    return folly::unit;
+    return {};
   }
 
   ByteEventMap& byteEventMap = getByteEventMap(type);
@@ -597,7 +605,7 @@ QuicTransportBaseLite::registerByteEventCallback(
         // ByteEvent has been already registered for the same type, id,
         // offset and for the same recipient, return an INVALID_OPERATION
         // error to prevent duplicate registrations.
-        return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+        return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
       }
     }
     byteEventMapIt->second.emplace(pos, offset, cb);
@@ -653,7 +661,7 @@ QuicTransportBaseLite::registerByteEventCallback(
       cb->onByteEvent(ByteEvent{id, offset, type});
     });
   }
-  return folly::unit;
+  return {};
 }
 
 bool QuicTransportBaseLite::good() const {
@@ -701,30 +709,29 @@ Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
   return std::nullopt;
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::setReadCallback(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setReadCallback(
     StreamId id,
     ReadCallback* cb,
     Optional<ApplicationErrorCode> err) {
   if (isSendingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (cb != nullptr && closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   return setReadCallbackInternal(id, cb, err);
 }
 
-folly::Expected<std::pair<BufPtr, bool>, LocalErrorCode>
+quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode>
 QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
   if (isSendingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
@@ -734,17 +741,17 @@ QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
   };
   try {
     if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
     CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     auto readResult = readDataFromQuicStream(*stream, maxLen);
-    if (readResult.hasError()) {
+    if (!readResult.has_value()) {
       VLOG(4) << "read() error " << readResult.error().message << " " << *this;
       exceptionCloseWhat_ = readResult.error().message;
       closeImpl(QuicError(
           QuicErrorCode(readResult.error().code), std::string("read() error")));
-      return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
     }
     auto result = std::move(readResult.value());
     if (result.second) {
@@ -758,26 +765,27 @@ QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
         it->second.deliveredEOM = true;
       }
     }
-    return folly::makeExpected<LocalErrorCode>(std::move(result));
+    return quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode>(
+        std::move(result));
   } catch (const QuicTransportException& ex) {
     VLOG(4) << "read() error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(
         QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(
         QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
-    return folly::makeUnexpected(ex.errorCode());
+    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << "read()  error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("read() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
 }
 
@@ -815,24 +823,23 @@ const std::shared_ptr<QLogger> QuicTransportBaseLite::getQLogger() const {
   return conn_->qLogger;
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::setPriorityQueue(std::unique_ptr<PriorityQueue> queue) {
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setPriorityQueue(
+    std::unique_ptr<PriorityQueue> queue) {
   if (conn_) {
     return conn_->streamManager->setPriorityQueue(std::move(queue));
   }
-  return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::setStreamPriority(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setStreamPriority(
     StreamId id,
     PriorityQueue::Priority priority) {
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   if (!conn_->streamManager->streamExists(id)) {
     // It's not an error to try to prioritize a non-existent stream.
-    return folly::unit;
+    return {};
   }
   // It's not an error to prioritize a stream after it's sent its FIN - this
   // can reprioritize retransmissions.
@@ -841,19 +848,19 @@ QuicTransportBaseLite::setStreamPriority(
       priority,
       getSendConnFlowControlBytesWire(*conn_) > 0,
       conn_->qLogger);
-  return folly::unit;
+  return {};
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setMaxPacingRate(
+    uint64_t maxRateBytesPerSec) {
   if (conn_->pacer) {
     conn_->pacer->setMaxPacingRate(maxRateBytesPerSec);
-    return folly::unit;
+    return {};
   } else {
     LOG(WARNING)
         << "Cannot set max pacing rate without a pacer. Pacing Enabled = "
         << conn_->transportSettings.pacingEnabled;
-    return folly::makeUnexpected(LocalErrorCode::PACER_NOT_AVAILABLE);
+    return quic::make_unexpected(LocalErrorCode::PACER_NOT_AVAILABLE);
   }
 }
 
@@ -922,10 +929,10 @@ QuicTransportBaseLite::getByteEventMapConst(const ByteEvent::Type type) const {
   folly::assume_unreachable();
 }
 
-folly::Expected<QuicSocketLite::StreamTransportInfo, LocalErrorCode>
+quic::Expected<QuicSocketLite::StreamTransportInfo, LocalErrorCode>
 QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
   CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
@@ -963,10 +970,10 @@ uint64_t QuicTransportBaseLite::getConnectionBufferAvailable() const {
   return bufferSpaceAvailable();
 }
 
-folly::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
+quic::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
 QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
   if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
   CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
@@ -1127,7 +1134,7 @@ void QuicTransportBaseLite::maybeStopWriteLooperAndArmSocketWritableEvent() {
       // Re-arm the write event and stop the write
       // looper.
       auto resumeResult = socket_->resumeWrite(this);
-      if (resumeResult.hasError()) {
+      if (!resumeResult.has_value()) {
         exceptionCloseWhat_ = resumeResult.error().message;
         closeImpl(QuicError(
             resumeResult.error().code,
@@ -1204,7 +1211,7 @@ void QuicTransportBaseLite::checkForClosedStream() {
       connCallback_->onStreamPreReaped(*itr);
     }
     auto result = conn_->streamManager->removeClosedStream(*itr);
-    if (result.hasError()) {
+    if (!result.has_value()) {
       exceptionCloseWhat_ = result.error().message;
       closeImpl(QuicError(
           result.error().code, std::string("checkForClosedStream() error")));
@@ -1230,7 +1237,7 @@ void QuicTransportBaseLite::writeSocketDataAndCatch() {
   [[maybe_unused]] auto self = sharedGuard();
   try {
     auto result = writeSocketData();
-    if (result.hasError()) {
+    if (!result.has_value()) {
       VLOG(4) << __func__ << " " << result.error().message << " " << *this;
       exceptionCloseWhat_ = result.error().message;
       closeImpl(result.error());
@@ -1296,8 +1303,7 @@ void QuicTransportBaseLite::pacedWriteDataToSocket() {
   writeSocketDataAndCatch();
 }
 
-folly::Expected<folly::Unit, QuicError>
-QuicTransportBaseLite::writeSocketData() {
+quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
   if (socket_) {
     ++(conn_->writeCount); // incremented on each write (or write attempt)
 
@@ -1318,7 +1324,7 @@ QuicTransportBaseLite::writeSocketData() {
       notifyStartWritingFromAppRateLimited();
     }
     auto result = writeData();
-    if (result.hasError()) {
+    if (!result.has_value()) {
       return result;
     }
     if (conn_->transportSettings.isPriming && conn_->primingData_.size() > 0) {
@@ -1327,7 +1333,7 @@ QuicTransportBaseLite::writeSocketData() {
     }
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
-        return folly::makeUnexpected(QuicError(
+        return quic::make_unexpected(QuicError(
             TransportErrorCode::PROTOCOL_VIOLATION,
             "Max packet number reached"));
       }
@@ -1412,7 +1418,7 @@ QuicTransportBaseLite::writeSocketData() {
   scheduleAckTimeout();
   schedulePathValidationTimeout();
   updateWriteLooper(false);
-  return folly::unit;
+  return {};
 }
 
 // TODO: t64691045 change the closeImpl API to include both the sanitized and
@@ -1599,7 +1605,7 @@ void QuicTransportBaseLite::closeImpl(
     // We might be invoked from the destructor, so just send the connection
     // close directly.
     auto result = writeData();
-    if (result.hasError()) {
+    if (!result.has_value()) {
       LOG(ERROR) << "close failed with error: " << result.error().message << " "
                  << *this;
     }
@@ -1683,16 +1689,15 @@ void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
   cleanupAckEventState();
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBaseLite::resetStreamInternal(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStreamInternal(
     StreamId id,
     ApplicationErrorCode errorCode,
     bool reliable) {
   if (isReceivingStream(conn_->nodeType, id)) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
@@ -1705,14 +1710,14 @@ QuicTransportBaseLite::resetStreamInternal(
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
     if (!conn_->streamManager->streamExists(id)) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
     CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     if (stream->appErrorCodeToPeer &&
         *stream->appErrorCodeToPeer != errorCode) {
       // We can't change the error code across resets for a stream
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     Optional<uint64_t> maybeReliableSize = std::nullopt;
     if (reliable) {
@@ -1721,23 +1726,23 @@ QuicTransportBaseLite::resetStreamInternal(
     if (stream->reliableSizeToPeer && maybeReliableSize &&
         *maybeReliableSize > *stream->reliableSizeToPeer) {
       // We can't increase the reliable size in a reset
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     if (maybeReliableSize && *maybeReliableSize > 0 &&
         (stream->sendState == StreamSendState::ResetSent)) {
       // We can't send a reliable reset with a non-zero reliable size if
       // we've already sent a non-reliable reset
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     // Invoke state machine
     auto result = sendRstSMHandler(*stream, errorCode, maybeReliableSize);
-    if (result.hasError()) {
+    if (!result.has_value()) {
       VLOG(4) << __func__ << " streamId=" << id << " " << result.error().message
               << " " << *this;
       exceptionCloseWhat_ = result.error().message;
       closeImpl(
           QuicError(result.error().code, std::string("resetStream() error")));
-      return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
     }
 
     // Cancel all byte events for this stream which have offsets that don't
@@ -1758,14 +1763,14 @@ QuicTransportBaseLite::resetStreamInternal(
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return folly::makeUnexpected(ex.errorCode());
+    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
@@ -1773,9 +1778,9 @@ QuicTransportBaseLite::resetStreamInternal(
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("resetStream() error")));
-    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
-  return folly::unit;
+  return {};
 }
 
 void QuicTransportBaseLite::cancelByteEventCallbacksForStreamInternal(
@@ -2113,7 +2118,7 @@ void QuicTransportBaseLite::cleanupAckEventState() {
   } // memory allocated for vector will be freed
 }
 
-folly::Expected<WriteQuicDataResult, QuicError>
+quic::Expected<WriteQuicDataResult, QuicError>
 QuicTransportBaseLite::handleInitialWriteDataCommon(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -2147,7 +2152,7 @@ QuicTransportBaseLite::handleInitialWriteDataCommon(
   return WriteQuicDataResult{};
 }
 
-folly::Expected<WriteQuicDataResult, QuicError>
+quic::Expected<WriteQuicDataResult, QuicError>
 QuicTransportBaseLite::handleHandshakeWriteDataCommon(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -2193,18 +2198,18 @@ void QuicTransportBaseLite::closeUdpSocket() {
   socket_ = nullptr;
   sock->pauseRead();
   auto closeResult = sock->close();
-  LOG_IF(ERROR, closeResult.hasError())
+  LOG_IF(ERROR, !closeResult.has_value())
       << "close hit an error: " << closeResult.error().message;
 }
 
-folly::Expected<StreamId, LocalErrorCode>
+quic::Expected<StreamId, LocalErrorCode>
 QuicTransportBaseLite::createStreamInternal(
     bool bidirectional,
     const OptionalIntegral<StreamGroupId>& streamGroupId) {
   if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  folly::Expected<QuicStreamState*, LocalErrorCode> streamResult;
+  quic::Expected<QuicStreamState*, LocalErrorCode> streamResult;
   if (bidirectional) {
     streamResult =
         conn_->streamManager->createNextBidirectionalStream(streamGroupId);
@@ -2212,29 +2217,32 @@ QuicTransportBaseLite::createStreamInternal(
     streamResult =
         conn_->streamManager->createNextUnidirectionalStream(streamGroupId);
   }
-  if (streamResult) {
-    const StreamId streamId = streamResult.value()->id;
-
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::streamEvents>()) {
-      getSocketObserverContainer()
-          ->invokeInterfaceMethod<
-              SocketObserverInterface::Events::streamEvents>(
-              [event = SocketObserverInterface::StreamOpenEvent(
-                   streamId,
-                   getStreamInitiator(streamId),
-                   getStreamDirectionality(streamId))](
-                  auto observer, auto observed) {
-                observer->streamOpened(observed, event);
-              });
-    }
-
-    return streamId;
-  } else {
-    return folly::makeUnexpected(streamResult.error());
+  if (!streamResult.has_value()) {
+    return quic::make_unexpected(streamResult.error());
   }
+
+  auto* streamState = *streamResult;
+  if (!streamState) {
+    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+
+  const StreamId streamId = streamState->id;
+  if (getSocketObserverContainer() &&
+      getSocketObserverContainer()
+          ->hasObserversForEvent<
+              SocketObserverInterface::Events::streamEvents>()) {
+    getSocketObserverContainer()
+        ->invokeInterfaceMethod<SocketObserverInterface::Events::streamEvents>(
+            [event = SocketObserverInterface::StreamOpenEvent(
+                 streamId,
+                 getStreamInitiator(streamId),
+                 getStreamDirectionality(streamId))](
+                auto observer, auto observed) {
+              observer->streamOpened(observed, event);
+            });
+  }
+
+  return streamId;
 }
 
 void QuicTransportBaseLite::cancelTimeout(QuicTimerCallback* callback) {
@@ -2254,7 +2262,7 @@ void QuicTransportBaseLite::lossTimeoutExpired() noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   try {
     auto result = onLossDetectionAlarm(*conn_, markPacketLoss);
-    if (result.hasError()) {
+    if (!result.has_value()) {
       closeImpl(QuicError(
           result.error().code, std::string("lossTimeoutExpired() error")));
       return;
@@ -2714,7 +2722,7 @@ void QuicTransportBaseLite::invokePeekDataAndCallbacks() {
   }
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
+quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::setReadCallbackInternal(
     StreamId id,
     ReadCallback* cb,
@@ -2725,14 +2733,14 @@ QuicTransportBaseLite::setReadCallbackInternal(
   if (readCbIt == readCallbacks_.end()) {
     // Don't allow initial setting of a nullptr callback.
     if (!cb) {
-      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     readCbIt = readCallbacks_.emplace(id, ReadCallbackData(cb)).first;
   }
   auto& readCb = readCbIt->second.readCb;
   if (readCb == nullptr && cb != nullptr) {
     // It's already been set to nullptr we do not allow unsetting it.
-    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   } else {
     readCb = cb;
     if (readCb == nullptr && err) {
@@ -2740,7 +2748,7 @@ QuicTransportBaseLite::setReadCallbackInternal(
     }
   }
   updateReadLooper();
-  return folly::unit;
+  return {};
 }
 
 Optional<folly::SocketCmsgMap>
@@ -2969,7 +2977,7 @@ void QuicTransportBaseLite::setTransportSettings(
     conn_->transportSettings = std::move(transportSettings);
     auto result = conn_->streamManager->refreshTransportSettings(
         conn_->transportSettings);
-    LOG_IF(FATAL, result.hasError()) << result.error().message;
+    LOG_IF(FATAL, !result.has_value()) << result.error().message;
     if (conn_->nodeType == QuicNodeType::Client &&
         conn_->transportSettings.isPriming) {
       setSupportedVersions({QuicVersion::MVFST_PRIMING});
@@ -3070,16 +3078,16 @@ void QuicTransportBaseLite::addPacketProcessor(
   conn_->packetProcessors.push_back(std::move(packetProcessor));
 }
 
-folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBaseLite::setKnob(
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setKnob(
     uint64_t knobSpace,
     uint64_t knobId,
     BufPtr knobBlob) {
   if (isKnobSupported()) {
     sendSimpleFrame(*conn_, KnobFrame(knobSpace, knobId, std::move(knobBlob)));
-    return folly::unit;
+    return {};
   }
   LOG(ERROR) << "Cannot set knob. Peer does not support the knob frame";
-  return folly::makeUnexpected(LocalErrorCode::KNOB_FRAME_UNSUPPORTED);
+  return quic::make_unexpected(LocalErrorCode::KNOB_FRAME_UNSUPPORTED);
 }
 
 bool QuicTransportBaseLite::isKnobSupported() const {
@@ -3139,26 +3147,25 @@ void QuicTransportBaseLite::updateSocketTosSettings(uint8_t dscpValue) {
   if (socket_ && socket_->isBound() &&
       conn_->socketTos.value != initialTosValue) {
     auto tosResult = socket_->setTosOrTrafficClass(conn_->socketTos.value);
-    if (tosResult.hasError()) {
+    if (!tosResult.has_value()) {
       exceptionCloseWhat_ = tosResult.error().message;
       return closeImpl(tosResult.error());
     }
   }
 }
 
-folly::Expected<folly::Unit, QuicError>
-QuicTransportBaseLite::validateECNState() {
+quic::Expected<void, QuicError> QuicTransportBaseLite::validateECNState() {
   if (conn_->ecnState == ECNState::NotAttempted ||
       conn_->ecnState == ECNState::FailedValidation) {
     // Verification not needed
-    return folly::unit;
+    return {};
   }
   const auto& minExpectedMarkedPacketsCount =
       conn_->ackStates.appDataAckState.minimumExpectedEcnMarksEchoed;
   if (minExpectedMarkedPacketsCount < 10) {
     // We wait for 10 ack-eliciting app data packets to be marked before trying
     // to validate ECN.
-    return folly::unit;
+    return {};
   }
   const auto& maxExpectedMarkedPacketsCount = conn_->lossState.totalPacketsSent;
 
@@ -3219,7 +3226,7 @@ QuicTransportBaseLite::validateECNState() {
     conn_->socketTos.fields.ecn = 0;
     CHECK(socket_ && socket_->isBound());
     auto result = socket_->setTosOrTrafficClass(conn_->socketTos.value);
-    if (result.hasError()) {
+    if (!result.has_value()) {
       return result;
     }
 
@@ -3234,7 +3241,7 @@ QuicTransportBaseLite::validateECNState() {
       conn_->ecnL4sTracker.reset();
     }
   }
-  return folly::unit;
+  return {};
 }
 
 void QuicTransportBaseLite::scheduleAckTimeout() {

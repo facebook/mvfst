@@ -15,6 +15,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/Expected.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/state/QuicConnectionStats.h>
 
@@ -157,10 +158,10 @@ class QuicClientTransportLite
   bool hasZeroRttWriteCipher() const;
 
   // From QuicTransportBase
-  folly::Expected<folly::Unit, QuicError> onReadData(
+  quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket) override;
-  folly::Expected<folly::Unit, QuicError> writeData() override;
+  quic::Expected<void, QuicError> writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
   bool hasWriteCipher() const override;
@@ -285,7 +286,7 @@ class QuicClientTransportLite
   bool shouldOnlyNotify() override;
   void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvMsg(
+  [[nodiscard]] quic::Expected<void, QuicError> recvMsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       int numPackets,
@@ -293,7 +294,7 @@ class QuicClientTransportLite
       Optional<folly::SocketAddress>& server,
       size_t& totalData);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> recvMmsg(
+  [[nodiscard]] quic::Expected<void, QuicError> recvMmsg(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
       uint16_t numPackets,
@@ -311,7 +312,7 @@ class QuicClientTransportLite
    * @param peer              The address of the remote peer.
    * @param networkData       UDP packet.
    */
-  folly::Expected<folly::Unit, QuicError> processUdpPacket(
+  quic::Expected<void, QuicError> processUdpPacket(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket&& udpPacket);
 
@@ -333,12 +334,12 @@ class QuicClientTransportLite
    *                          Bytes transformed into a QUIC packet will be
    *                          removed from this buffer.
    */
-  folly::Expected<folly::Unit, QuicError> processUdpPacketData(
+  quic::Expected<void, QuicError> processUdpPacketData(
       const folly::SocketAddress& peer,
       ReceivedUdpPacket& udpPacket);
 
   [[nodiscard]]
-  folly::Expected<folly::Unit, QuicError> startCryptoHandshake();
+  quic::Expected<void, QuicError> startCryptoHandshake();
 
   void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept;
 
@@ -347,12 +348,11 @@ class QuicClientTransportLite
       const QuicWriteFrame& packetFrame,
       const ReadAckFrame&);
 
-  [[nodiscard]] virtual folly::Expected<folly::Unit, QuicError> processPackets(
+  [[nodiscard]] virtual quic::Expected<void, QuicError> processPackets(
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server);
 
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError>
-  readWithRecvmsgSinglePacketLoop(
+  [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmsgSinglePacketLoop(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize);
 
@@ -391,7 +391,7 @@ class QuicClientTransportLite
   RecvmmsgStorage recvmmsgStorage_;
 
  private:
-  [[nodiscard]] folly::Expected<folly::Unit, QuicError> adjustGROBuffers();
+  [[nodiscard]] quic::Expected<void, QuicError> adjustGROBuffers();
 
   void runOnEvbAsync(
       std::function<void(std::shared_ptr<QuicClientTransportLite>)> func);
@@ -400,7 +400,7 @@ class QuicClientTransportLite
    * Send quic transport knobs defined by transportSettings.knobs to peer. This
    * calls setKnobs() internally.
    */
-  folly::Expected<folly::Unit, QuicError> maybeSendTransportKnobs();
+  quic::Expected<void, QuicError> maybeSendTransportKnobs();
 
   bool replaySafeNotified_{false};
   // Set it QuicClientTransportLite is in a self owning mode. This will be
