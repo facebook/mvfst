@@ -21,8 +21,6 @@
 #include <chrono>
 #include <memory>
 
-#include <glog/logging.h>
-
 namespace quic {
 
 QuicServerTransport::QuicServerTransport(
@@ -1318,7 +1316,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto refreshResult = serverConn->streamManager->updatePriorityQueueImpl(
             useNewPriorityQueue);
         if (refreshResult.hasError()) {
-          LOG_EVERY_N(ERROR, 1000) << "Refresh transport settings failed";
           return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "Refresh transport settings failed"));
