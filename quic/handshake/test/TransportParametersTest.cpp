@@ -16,8 +16,7 @@
 
 using namespace ::testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class TransportParametersTest : public Test {
  protected:
@@ -192,5 +191,4 @@ TEST_F(TransportParametersTest, EncodeIPAddressParameterIPv6) {
   EXPECT_EQ(memcmp(actualRange.data(), expectedBytes, 16), 0);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test
