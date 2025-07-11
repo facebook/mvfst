@@ -334,7 +334,7 @@ continuousMemoryBuildScheduleEncrypt(
   if (connection.transportSettings.isPriming && packetBuf) {
     packetBuf->coalesce();
     connection.bufAccessor->release(BufHelpers::create(packetBuf->capacity()));
-    connection.primingData_.emplace_back(std::move(packetBuf));
+    connection.primingData.emplace_back(std::move(packetBuf));
     return DataPathResult::makeWriteResult(
         true, std::move(result.value()), encodedSize, encodedBodySize);
   }
@@ -444,7 +444,7 @@ iobufChainBasedBuildScheduleEncrypt(
   }
   if (connection.transportSettings.isPriming && packetBuf) {
     packetBuf->coalesce();
-    connection.primingData_.emplace_back(std::move(packetBuf));
+    connection.primingData.emplace_back(std::move(packetBuf));
     return DataPathResult::makeWriteResult(
         true, std::move(result.value()), encodedSize, encodedBodySize);
   }

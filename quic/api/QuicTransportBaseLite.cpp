@@ -1327,9 +1327,9 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
     if (!result.has_value()) {
       return result;
     }
-    if (conn_->transportSettings.isPriming && conn_->primingData_.size() > 0) {
-      connSetupCallback_->onPrimingDataAvailable(
-          std::move(conn_->primingData_));
+    if (conn_->transportSettings.isPriming && conn_->primingData.size() > 0) {
+      auto primingData = std::move(conn_->primingData);
+      connSetupCallback_->onPrimingDataAvailable(std::move(primingData));
     }
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
