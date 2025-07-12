@@ -3966,7 +3966,7 @@ TEST_F(
       clientNextAppDataPacketNum++,
       server->getConn().supportedVersions[0]);
   RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
+      kDefaultUDPSendPacketLen, std::move(header), /*largestAckedPacketNum=*/0);
   ASSERT_FALSE(
       writeSimpleFrame(PathResponseFrame(0xaabbccddeeff), builder).hasError());
 
@@ -4010,7 +4010,7 @@ TEST_F(
       clientNextAppDataPacketNum++,
       server->getConn().supportedVersions[0]);
   RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
+      kDefaultUDPSendPacketLen, std::move(header), /*largestAckedPacketNum=*/0);
   ASSERT_FALSE(
       writeSimpleFrame(NewTokenFrame(IOBuf::copyBuffer("token!")), builder)
           .hasError());
