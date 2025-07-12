@@ -193,8 +193,7 @@ void QuicStreamAsyncTransport::writeChain(
 void QuicStreamAsyncTransport::close() {
   state_ = CloseState::CLOSING;
   if (id_) {
-    CHECK(sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN)
-              .has_value());
+    sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
   }
   shutdownWrite();
   if (readCb_ && readEOF_ != EOFState::DELIVERED) {

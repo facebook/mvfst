@@ -49,7 +49,7 @@ QuicTransportBase::QuicTransportBase(
     // TODO we probably should have a better way to return error from
     // creating a connection.
     // Can't really do anything with this at this point.
-    CHECK(socket_->setAdditionalCmsgsFunc(std::move(func)).has_value());
+    (void)socket_->setAdditionalCmsgsFunc(std::move(func));
   }
 }
 
@@ -220,13 +220,13 @@ QuicTransportBase::setStreamFlowControlWindow(
 
 void QuicTransportBase::unsetAllReadCallbacks() {
   for (const auto& [id, _] : readCallbacks_) {
-    CHECK(setReadCallbackInternal(id, nullptr, APP_NO_ERROR).has_value());
+    setReadCallbackInternal(id, nullptr, APP_NO_ERROR);
   }
 }
 
 void QuicTransportBase::unsetAllPeekCallbacks() {
   for (const auto& [id, _] : peekCallbacks_) {
-    CHECK(setPeekCallbackInternal(id, nullptr).has_value());
+    setPeekCallbackInternal(id, nullptr);
   }
 }
 
@@ -798,12 +798,12 @@ QuicTransportBase::maybeResetStreamFromReadError(
 
 void QuicTransportBase::setCmsgs(const folly::SocketCmsgMap& options) {
   // TODO figure out what we want to do here in the unlikely error case.
-  CHECK(socket_->setCmsgs(options).has_value());
+  (void)socket_->setCmsgs(options);
 }
 
 void QuicTransportBase::appendCmsgs(const folly::SocketCmsgMap& options) {
   // TODO figure out what we want to do here in the unlikely error case.
-  CHECK(socket_->appendCmsgs(options).has_value());
+  (void)socket_->appendCmsgs(options);
 }
 
 bool QuicTransportBase::checkCustomRetransmissionProfilesEnabled() const {

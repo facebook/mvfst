@@ -582,7 +582,9 @@ RetryPacketBuilder::RetryPacketBuilder(
       integrityTag_(integrityTag),
       remainingBytes_(kDefaultUDPSendPacketLen) {
   auto result = writeRetryPacket();
-  CHECK(result.has_value()) << "Failed to write retry packet";
+  if (result.hasError()) {
+    LOG(ERROR) << "Failed to write retry packet. " << result.error();
+  }
 }
 
 quic::Expected<void, QuicError> RetryPacketBuilder::writeRetryPacket() {
