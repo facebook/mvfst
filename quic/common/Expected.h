@@ -12,11 +12,14 @@
 
 #include <utility>
 
-// Protect against Windows macros that interfere with standard library and QUIC
-// code
+// Protect against Windows macros that interfere with standard library, glog and
+// QUIC code
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
+#endif
+#ifndef GLOG_NO_ABBREVIATED_SEVERITIES
+#define GLOG_NO_ABBREVIATED_SEVERITIES
 #endif
 // If the macros are already defined, undefine them temporarily
 #ifdef max
