@@ -170,6 +170,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
 
   void expectTransportCallbacks() {
     EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
+    EXPECT_CALL(clientConnSetupCallback, onFullHandshakeDone());
   }
 
   void expectStatsCallbacks() {

@@ -999,6 +999,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
       return quic::make_unexpected(result.error());
     }
     connSetupCallback_->onReplaySafe();
+    if (connSetupCallback_) {
+      connSetupCallback_->onFullHandshakeDone();
+    }
   }
 
   auto result = maybeSendTransportKnobs();
