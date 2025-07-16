@@ -110,9 +110,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, TransportInfoRttSignals) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    [[maybe_unused]] auto typedTestWriteChain1 =
-        this->getTransport()->writeChain(
-            streamId, IOBuf::copyBuffer("hello"), false);
+    ASSERT_FALSE(this->getTransport()
+                     ->writeChain(streamId, IOBuf::copyBuffer("hello"), false)
+                     .hasError());
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 
@@ -312,9 +312,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayEqual) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    [[maybe_unused]] auto typedTestWriteChain2 =
-        this->getTransport()->writeChain(
-            streamId, IOBuf::copyBuffer("hello"), false);
+    ASSERT_FALSE(this->getTransport()
+                     ->writeChain(streamId, IOBuf::copyBuffer("hello"), false)
+                     .hasError());
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 
@@ -374,9 +374,9 @@ TYPED_TEST(QuicTypedTransportAfterStartTest, RttSampleAckDelayGreater) {
   // lambda to send and ACK a packet
   const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
     auto streamId = this->getTransport()->createBidirectionalStream().value();
-    [[maybe_unused]] auto typedTestWriteChain3 =
-        this->getTransport()->writeChain(
-            streamId, IOBuf::copyBuffer("hello"), false);
+    ASSERT_FALSE(this->getTransport()
+                     ->writeChain(streamId, IOBuf::copyBuffer("hello"), false)
+                     .hasError());
     const auto maybeWriteInterval = this->loopForWrites();
     EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 

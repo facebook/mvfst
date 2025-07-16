@@ -884,14 +884,17 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   // sending second to validate that .stopSending() queues stream to be closed
   NiceMock<MockReadCallback> readCb2;
   streamID = transport->createBidirectionalStream().value();
-  [[maybe_unused]] auto setReadCallback4 =
-      transport->setReadCallback(streamID, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(streamID, &readCb2).hasError());
 
   // add ingress & egress data to new stream
   transport->addDataToStream(
       streamID, StreamBuffer(folly::IOBuf::copyBuffer(ingressData), 0));
-  [[maybe_unused]] auto writeChain2 = transport->writeChain(
-      streamID, folly::IOBuf::copyBuffer("some egress stream data"), false);
+  ASSERT_FALSE(transport
+                   ->writeChain(
+                       streamID,
+                       folly::IOBuf::copyBuffer("some egress stream data"),
+                       false)
+                   .hasError());
   transport->driveReadCallbacks();
   stream = CHECK_NOTNULL(transport->getStream(streamID));
 
@@ -901,8 +904,9 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   // suppose we tx a rst stream (and rx its corresponding ack)
-  [[maybe_unused]] auto resetStream2 =
-      transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR);
+  ASSERT_FALSE(
+      transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR)
+          .hasError());
   ASSERT_FALSE(sendRstAckSMHandler(*stream, std::nullopt).hasError());
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
@@ -911,8 +915,9 @@ TEST_P(QuicTransportImplTestBase, StopSendingClosesIngress) {
   // send stop sending to peer – does not deliver an error to the read callback
   // even tho the stream is in terminal state and queued for closing
   EXPECT_CALL(readCb2, readError(streamID, _)).Times(0);
-  [[maybe_unused]] auto stopSending2 =
-      transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR);
+  ASSERT_FALSE(
+      transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR)
+          .hasError());
 
   // check that we've discarded any ingress data and ingress SM is closed,
   // expect terminal state and queued in closed streams
@@ -954,8 +959,9 @@ TEST_P(QuicTransportImplTestBase, NoopStopSendingIngressClosed) {
   EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
 
   // send stop sending to peer should no-op
-  [[maybe_unused]] auto stopSending3 =
-      transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR);
+  ASSERT_FALSE(
+      transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR)
+          .hasError());
   EXPECT_EQ(transport->transportConn->pendingEvents.frames.size(), 0);
 
   // now test ingress uni-directional stream
@@ -980,8 +986,9 @@ TEST_P(QuicTransportImplTestBase, NoopStopSendingIngressClosed) {
   EXPECT_TRUE(stream->inTerminalStates());
 
   // send stop sending to peer should no-op
-  [[maybe_unused]] auto stopSending4 =
-      transport->stopSending(stream->id, GenericApplicationErrorCode::NO_ERROR);
+  ASSERT_FALSE(
+      transport->stopSending(stream->id, GenericApplicationErrorCode::NO_ERROR)
+          .hasError());
   EXPECT_EQ(transport->transportConn->pendingEvents.frames.size(), 0);
 
   transport.reset();
@@ -1020,10 +1027,8 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailable) {
   NiceMock<MockReadCallback> readCb2;
   NiceMock<MockReadCallback> readCb3;
 
-  [[maybe_unused]] auto setReadCallback5 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback6 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
@@ -1034,8 +1039,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailable) {
 
   transport->addDataToStream(
       stream3, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
-  [[maybe_unused]] auto setReadCallback7 =
-      transport->setReadCallback(stream3, &readCb3);
+  ASSERT_FALSE(transport->setReadCallback(stream3, &readCb3).hasError());
 
   EXPECT_CALL(readCb1, readAvailable(stream1));
   EXPECT_CALL(readCb3, readAvailable(stream3));
@@ -1056,8 +1060,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailable) {
 
   EXPECT_CALL(readCb2, readAvailable(stream2));
   EXPECT_CALL(readCb3, readAvailable(stream3));
-  [[maybe_unused]] auto setReadCallback8 =
-      transport->setReadCallback(stream1, nullptr);
+  ASSERT_FALSE(transport->setReadCallback(stream1, nullptr).hasError());
   transport->driveReadCallbacks();
   transport.reset();
 }
@@ -1066,8 +1069,7 @@ TEST_P(QuicTransportImplTestBase, ReliableResetReadCallback) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb;
 
-  [[maybe_unused]] auto setReadCallback9 =
-      transport->setReadCallback(stream, &readCb);
+  ASSERT_FALSE(transport->setReadCallback(stream, &readCb).hasError());
   transport->addDataToStream(
       stream,
       StreamBuffer(
@@ -1120,10 +1122,10 @@ TEST_P(
   NiceMock<MockReadCallback> requestStreamCb;
   NiceMock<MockReadCallback> qpackStreamCb;
 
-  [[maybe_unused]] auto setReadCallback10 =
-      transport->setReadCallback(requestStream, &requestStreamCb);
-  [[maybe_unused]] auto setReadCallback11 =
-      transport->setReadCallback(qpackStream, &qpackStreamCb);
+  ASSERT_FALSE(
+      transport->setReadCallback(requestStream, &requestStreamCb).hasError());
+  ASSERT_FALSE(
+      transport->setReadCallback(qpackStream, &qpackStreamCb).hasError());
 
   transport->addDataToStream(
       qpackStream,
@@ -1157,10 +1159,8 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableNoReap) {
   NiceMock<MockReadCallback> readCb2;
   NiceMock<MockReadCallback> readCb3;
 
-  [[maybe_unused]] auto setReadCallback12 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback13 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
@@ -1175,8 +1175,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableNoReap) {
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->driveReadCallbacks();
 
-  [[maybe_unused]] auto setReadCallback14 =
-      transport->setReadCallback(stream3, &readCb3);
+  ASSERT_FALSE(transport->setReadCallback(stream3, &readCb3).hasError());
   transport->addDataToStream(
       stream2, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
 
@@ -1192,8 +1191,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableNoReap) {
 
   EXPECT_CALL(readCb2, readAvailable(stream2));
   EXPECT_CALL(readCb3, readAvailable(stream3));
-  [[maybe_unused]] auto setReadCallback15 =
-      transport->setReadCallback(stream1, nullptr);
+  ASSERT_FALSE(transport->setReadCallback(stream1, nullptr).hasError());
   transport->driveReadCallbacks();
   transport.reset();
 }
@@ -1212,10 +1210,8 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableOrdered) {
   NiceMock<MockReadCallback> readCb2;
   NiceMock<MockReadCallback> readCb3;
 
-  [[maybe_unused]] auto setReadCallback16 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback17 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
@@ -1226,8 +1222,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableOrdered) {
 
   transport->addDataToStream(
       stream3, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
-  [[maybe_unused]] auto setReadCallback18 =
-      transport->setReadCallback(stream3, &readCb3);
+  ASSERT_FALSE(transport->setReadCallback(stream3, &readCb3).hasError());
 
   EXPECT_CALL(readCb1, readAvailable(stream1));
   EXPECT_CALL(readCb3, readAvailable(stream3));
@@ -1248,8 +1243,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableOrdered) {
 
   EXPECT_CALL(readCb2, readAvailable(stream2));
   EXPECT_CALL(readCb3, readAvailable(stream3));
-  [[maybe_unused]] auto setReadCallback19 =
-      transport->setReadCallback(stream1, nullptr);
+  ASSERT_FALSE(transport->setReadCallback(stream1, nullptr).hasError());
   transport->driveReadCallbacks();
   transport.reset();
 }
@@ -1262,8 +1256,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackChangeReadCallback) {
 
   EXPECT_TRUE(transport->setReadCallback(stream1, nullptr).hasError());
 
-  [[maybe_unused]] auto setReadCallback20 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
 
   transport->addDataToStream(
       stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
@@ -1271,15 +1264,13 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackChangeReadCallback) {
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->driveReadCallbacks();
 
-  [[maybe_unused]] auto setReadCallback21 =
-      transport->setReadCallback(stream1, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb2).hasError());
   EXPECT_CALL(readCb2, readAvailable(stream1));
   transport->driveReadCallbacks();
 
   auto& conn = transport->getConnectionState();
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
-  [[maybe_unused]] auto setReadCallback22 =
-      transport->setReadCallback(stream1, nullptr);
+  ASSERT_FALSE(transport->setReadCallback(stream1, nullptr).hasError());
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
   EXPECT_CALL(readCb2, readAvailable(_)).Times(0);
   transport->driveReadCallbacks();
@@ -1299,10 +1290,8 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackUnsetAll) {
   // Set the read callbacks, and then add data to the stream, and see that the
   // callbacks are, in fact, called.
 
-  [[maybe_unused]] auto setReadCallback23 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback24 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   EXPECT_CALL(readCb1, readAvailable(stream1));
   EXPECT_CALL(readCb2, readAvailable(stream2));
@@ -1338,10 +1327,8 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackPauseResume) {
   NiceMock<MockReadCallback> readCb1;
   NiceMock<MockReadCallback> readCb2;
 
-  [[maybe_unused]] auto setReadCallback25 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback26 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
@@ -1394,8 +1381,7 @@ TEST_P(QuicTransportImplTestBase, ReadData) {
   NiceMock<MockReadCallback> readCb1;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
-  [[maybe_unused]] auto setReadCallback27 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
 
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0));
@@ -1436,8 +1422,7 @@ TEST_P(QuicTransportImplTestBase, UnidirectionalReadData) {
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0));
-  [[maybe_unused]] auto setReadCallback28 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
   EXPECT_CALL(readCb1, readAvailable(stream1));
   transport->driveReadCallbacks();
 
@@ -1472,15 +1457,13 @@ TEST_P(QuicTransportImplTestBase, ReadDataUnsetReadCallbackInCallback) {
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   NiceMock<MockReadCallback> readCb1;
-  [[maybe_unused]] auto setReadCallback29 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
 
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0, true));
 
   EXPECT_CALL(readCb1, readAvailable(stream1))
       .WillOnce(Invoke([&](StreamId id) {
-        [[maybe_unused]] auto setReadCb_tmp =
-            transport->setReadCallback(id, nullptr);
+        ASSERT_FALSE(transport->setReadCallback(id, nullptr).hasError());
       }));
   transport->driveReadCallbacks();
   transport->driveReadCallbacks();
@@ -1520,16 +1503,15 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackForClientOutOfOrderStream) {
   if (notifyOnNewStreamsExplicitly) {
     EXPECT_CALL(connCallback, onNewBidirectionalStream(clientOutOfOrderStream))
         .WillOnce(Invoke([&](StreamId id) {
-          [[maybe_unused]] auto setReadCb_tmp =
-              transport->setReadCallback(id, &streamRead);
+          ASSERT_FALSE(transport->setReadCallback(id, &streamRead).hasError());
         }));
   } else {
     for (StreamId start = 0x00; start <= clientOutOfOrderStream;
          start += kStreamIncrement) {
       EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
           .WillOnce(Invoke([&](StreamId id) {
-            [[maybe_unused]] auto setReadCallback30 =
-                transport->setReadCallback(id, &streamRead);
+            ASSERT_FALSE(
+                transport->setReadCallback(id, &streamRead).hasError());
           }));
     }
   }
@@ -1552,8 +1534,7 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackForClientOutOfOrderStream) {
   if (notifyOnNewStreamsExplicitly) {
     EXPECT_CALL(connCallback, onNewBidirectionalStream(clientOutOfOrderStream2))
         .WillOnce(Invoke([&](StreamId id) {
-          [[maybe_unused]] auto setReadCb_tmp =
-              transport->setReadCallback(id, &streamRead);
+          ASSERT_FALSE(transport->setReadCallback(id, &streamRead).hasError());
         }));
   }
   transport->addDataToStream(
@@ -1586,8 +1567,7 @@ TEST_P(QuicTransportImplTestBase, ReadError) {
   NiceMock<MockReadCallback> readCb1;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
-  [[maybe_unused]] auto setReadCallback31 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
 
   EXPECT_CALL(
       readCb1, readError(stream1, IsError(LocalErrorCode::STREAM_CLOSED)));
@@ -1603,10 +1583,8 @@ TEST_P(QuicTransportImplTestBase, ReadCallbackDeleteTransport) {
   NiceMock<MockReadCallback> readCb1;
   NiceMock<MockReadCallback> readCb2;
 
-  [[maybe_unused]] auto setReadCallback32 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback33 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addStreamReadError(stream1, LocalErrorCode::NO_ERROR);
 
@@ -1729,8 +1707,7 @@ TEST_P(QuicTransportImplTestBase, onNewBidirectionalStreamSetReadCallback) {
   StreamId stream2 = 0x00;
   EXPECT_CALL(connCallback, onNewBidirectionalStream(stream2))
       .WillOnce(Invoke([&](StreamId id) {
-        [[maybe_unused]] auto setReadCb_tmp =
-            transport->setReadCallback(id, &stream2Read);
+        ASSERT_FALSE(transport->setReadCallback(id, &stream2Read).hasError());
       }));
   transport->addDataToStream(stream2, StreamBuffer(readData->clone(), 0, true));
 
@@ -1739,16 +1716,15 @@ TEST_P(QuicTransportImplTestBase, onNewBidirectionalStreamSetReadCallback) {
   if (notifyOnNewStreamsExplicitly) {
     EXPECT_CALL(connCallback, onNewBidirectionalStream(stream3))
         .WillOnce(Invoke([&](StreamId id) {
-          [[maybe_unused]] auto setReadCb_tmp =
-              transport->setReadCallback(id, &streamRead);
+          ASSERT_FALSE(transport->setReadCallback(id, &streamRead).hasError());
         }));
   } else {
     for (StreamId start = stream2 + kStreamIncrement; start <= stream3;
          start += kStreamIncrement) {
       EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
           .WillOnce(Invoke([&](StreamId id) {
-            [[maybe_unused]] auto setReadCallback34 =
-                transport->setReadCallback(id, &streamRead);
+            ASSERT_FALSE(
+                transport->setReadCallback(id, &streamRead).hasError());
           }));
     }
   }
@@ -1949,8 +1925,9 @@ TEST_P(QuicTransportImplTestBase, onUniStreamsAvailableCallbackAfterExausted) {
 TEST_P(QuicTransportImplTestBase, ReadDataAlsoChecksLossAlarm) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
-  [[maybe_unused]] auto writeChain1 =
-      transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true);
+  ASSERT_FALSE(
+      transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true)
+          .hasError());
   // Artificially stop the write looper so that the read can trigger it.
   transport->writeLooper()->stop();
   transport->addDataToStream(
@@ -1967,8 +1944,10 @@ TEST_P(QuicTransportImplTestBase, ConnectionErrorOnWrite) {
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
-  [[maybe_unused]] auto writeChain2 = transport->writeChain(
-      stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr);
+  ASSERT_FALSE(
+      transport
+          ->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr)
+          .hasError());
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
   qEvb->loopOnce();
@@ -1984,8 +1963,7 @@ TEST_P(QuicTransportImplTestBase, ReadErrorUnsanitizedErrorMsg) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
   MockReadCallback rcb;
-  [[maybe_unused]] auto setReadCallback35 =
-      transport->setReadCallback(stream, &rcb);
+  ASSERT_FALSE(transport->setReadCallback(stream, &rcb).hasError());
   EXPECT_CALL(rcb, readError(stream, _))
       .Times(1)
       .WillOnce(Invoke([](StreamId, QuicError error) {
@@ -2022,8 +2000,10 @@ TEST_P(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
             throw std::runtime_error("Well there's your problem");
             return 0;
           }));
-  [[maybe_unused]] auto writeChain3 = transport->writeChain(
-      stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr);
+  ASSERT_FALSE(
+      transport
+          ->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr)
+          .hasError());
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
   qEvb->loopOnce();
@@ -2049,8 +2029,7 @@ TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadError) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   NiceMock<MockReadCallback> readCb1;
-  [[maybe_unused]] auto setReadCallback36 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
 
   transport->addStreamReadError(stream1, LocalErrorCode::NO_ERROR);
   transport->closeStream(stream1);
@@ -2073,8 +2052,7 @@ TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadError) {
 TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadFin) {
   auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb2;
-  [[maybe_unused]] auto setReadCallback37 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream2,
@@ -2154,10 +2132,14 @@ TEST_P(QuicTransportImplTestBase, ByteEventCallbacksManagementSingleStream) {
   ByteEvent ackEvent2 = ByteEvent{stream, offset2, ByteEvent::Type::ACK};
 
   // Register 2 TX and 2 ACK events for the same stream at 2 different offsets
-  [[maybe_unused]] auto registerTx1 = transport->registerTxCallback(
-      txEvent1.id, txEvent1.offset, &byteEventCallback);
-  [[maybe_unused]] auto registerTx2 = transport->registerTxCallback(
-      txEvent2.id, txEvent2.offset, &byteEventCallback);
+  ASSERT_FALSE(
+      transport
+          ->registerTxCallback(txEvent1.id, txEvent1.offset, &byteEventCallback)
+          .hasError());
+  ASSERT_FALSE(
+      transport
+          ->registerTxCallback(txEvent2.id, txEvent2.offset, &byteEventCallback)
+          .hasError());
   auto registerByteEvent1 = transport->registerByteEventCallback(
       ByteEvent::Type::ACK, ackEvent1.id, ackEvent1.offset, &byteEventCallback);
   auto registerByteEvent2 = transport->registerByteEventCallback(
@@ -3252,12 +3234,13 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithActiveStream) {
 
   auto notifyWrite5 = transport->notifyPendingWriteOnConnection(&wcbConn);
   auto notifyWrite6 = transport->notifyPendingWriteOnStream(stream, &wcb);
-  [[maybe_unused]] auto setReadCallback38 =
-      transport->setReadCallback(stream, &rcb);
+  ASSERT_FALSE(transport->setReadCallback(stream, &rcb).hasError());
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  [[maybe_unused]] auto writeChain4 = transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
+  ASSERT_FALSE(
+      transport
+          ->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb)
+          .hasError());
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 0)));
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 4)));
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
@@ -3310,12 +3293,13 @@ TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
 
-  [[maybe_unused]] auto setReadCallback39 =
-      transport->setReadCallback(stream, &rcb);
+  ASSERT_FALSE(transport->setReadCallback(stream, &rcb).hasError());
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  [[maybe_unused]] auto writeChain5 = transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
+  ASSERT_FALSE(
+      transport
+          ->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb)
+          .hasError());
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 0)));
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 4)));
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
@@ -3356,10 +3340,12 @@ TEST_P(QuicTransportImplTestBase, TestResetRemovesDeliveryCb) {
   NiceMock<MockDeliveryCallback> deliveryCb2;
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  [[maybe_unused]] auto writeChain6 =
-      transport->writeChain(stream1, IOBuf::copyBuffer("hello"), true, nullptr);
-  [[maybe_unused]] auto writeChain7 =
-      transport->writeChain(stream2, IOBuf::copyBuffer("hello"), true, nullptr);
+  ASSERT_FALSE(
+      transport->writeChain(stream1, IOBuf::copyBuffer("hello"), true, nullptr)
+          .hasError());
+  ASSERT_FALSE(
+      transport->writeChain(stream2, IOBuf::copyBuffer("hello"), true, nullptr)
+          .hasError());
   EXPECT_FALSE(
       transport->registerDeliveryCallback(stream1, 2, &deliveryCb1).hasError());
   EXPECT_FALSE(
@@ -3397,16 +3383,14 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   ON_CALL(
       rcb, readError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)))
       .WillByDefault(InvokeWithoutArgs([this, stream2, &resetCount] {
-        [[maybe_unused]] auto setReadCallback40 =
-            transport->setReadCallback(stream2, nullptr);
+        (void)transport->setReadCallback(stream2, nullptr);
         resetCount++;
       }));
   ON_CALL(
       rcb2,
       readError(stream2, IsAppError(GenericApplicationErrorCode::UNKNOWN)))
       .WillByDefault(InvokeWithoutArgs([this, stream, &resetCount] {
-        [[maybe_unused]] auto setReadCallback41 =
-            transport->setReadCallback(stream, nullptr);
+        (void)transport->setReadCallback(stream, nullptr);
         resetCount++;
       }));
   EXPECT_CALL(
@@ -3419,15 +3403,15 @@ TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
 
   auto notifyWrite7 = transport->notifyPendingWriteOnConnection(&wcbConn);
   auto notifyWrite8 = transport->notifyPendingWriteOnStream(stream, &wcb);
-  [[maybe_unused]] auto setReadCallback42 =
-      transport->setReadCallback(stream, &rcb);
-  [[maybe_unused]] auto setReadCallback43 =
-      transport->setReadCallback(stream2, &rcb2);
+  ASSERT_FALSE(transport->setReadCallback(stream, &rcb).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &rcb2).hasError());
   auto setPeek1 = transport->setPeekCallback(stream, &pcb);
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  [[maybe_unused]] auto writeChain8 = transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
+  ASSERT_FALSE(
+      transport
+          ->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb)
+          .hasError());
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 0)));
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 4)));
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
@@ -3479,8 +3463,7 @@ TEST_P(QuicTransportImplTestBase, ResetAllNonControlStreams) {
   EXPECT_CALL(wcb1, onStreamWriteError(stream1, _)).Times(0);
   EXPECT_CALL(rcb1, readError(stream1, _)).Times(0);
   auto notifyWrite10 = transport->notifyPendingWriteOnStream(stream1, &wcb1);
-  [[maybe_unused]] auto setReadCallback44 =
-      transport->setReadCallback(stream1, &rcb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &rcb1).hasError());
 
   auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb2;
@@ -3488,8 +3471,7 @@ TEST_P(QuicTransportImplTestBase, ResetAllNonControlStreams) {
   EXPECT_CALL(wcb2, onStreamWriteError(stream2, _)).Times(1);
   EXPECT_CALL(rcb2, readError(stream2, _)).Times(1);
   auto notifyWrite11 = transport->notifyPendingWriteOnStream(stream2, &wcb2);
-  [[maybe_unused]] auto setReadCallback45 =
-      transport->setReadCallback(stream2, &rcb2);
+  ASSERT_FALSE(transport->setReadCallback(stream2, &rcb2).hasError());
 
   auto stream3 = transport->createUnidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb3;
@@ -3501,13 +3483,11 @@ TEST_P(QuicTransportImplTestBase, ResetAllNonControlStreams) {
   NiceMock<MockReadCallback> rcb4;
   EXPECT_CALL(wcb4, onStreamWriteError(stream4, _))
       .WillOnce(Invoke([&](auto, auto) {
-        [[maybe_unused]] auto setReadCb =
-            transport->setReadCallback(stream4, nullptr);
+        ASSERT_FALSE(transport->setReadCallback(stream4, nullptr).hasError());
       }));
   EXPECT_CALL(rcb4, readError(_, _)).Times(0);
   auto notifyWrite13 = transport->notifyPendingWriteOnStream(stream4, &wcb4);
-  [[maybe_unused]] auto setReadCallback46 =
-      transport->setReadCallback(stream4, &rcb4);
+  ASSERT_FALSE(transport->setReadCallback(stream4, &rcb4).hasError());
 
   transport->resetNonControlStreams(
       GenericApplicationErrorCode::UNKNOWN, "bye bye");
@@ -3572,10 +3552,10 @@ TEST_P(QuicTransportImplTestBase, AsyncStreamFlowControlWrite) {
 
 TEST_P(QuicTransportImplTestBase, ExceptionInWriteLooperDoesNotCrash) {
   auto stream = transport->createBidirectionalStream().value();
-  [[maybe_unused]] auto setReadCallback47 =
-      transport->setReadCallback(stream, nullptr);
-  [[maybe_unused]] auto writeChain9 =
-      transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, nullptr);
+  (void)transport->setReadCallback(stream, nullptr);
+  ASSERT_FALSE(
+      transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, nullptr)
+          .hasError());
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
   EXPECT_CALL(*socketPtr, write(_, _, _))
@@ -3999,8 +3979,7 @@ TEST_P(QuicTransportImplTestBase, PeekConsumeReadTest) {
   NiceMock<MockReadCallback> readCb;
 
   auto setPeek13 = transport->setPeekCallback(stream1, &peekCb);
-  [[maybe_unused]] auto setReadCallback48 =
-      transport->setReadCallback(stream1, &readCb);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb).hasError());
 
   transport->addDataToStream(
       stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
@@ -4263,8 +4242,7 @@ TEST_P(QuicTransportImplTestBase, StreamWriteCallbackUnregister) {
   result = transport->notifyPendingWriteOnStream(stream, wcb.get());
   EXPECT_TRUE(result);
   MockReadCallback rcb;
-  [[maybe_unused]] auto setReadCallback49 =
-      transport->setReadCallback(stream, &rcb);
+  ASSERT_FALSE(transport->setReadCallback(stream, &rcb).hasError());
   // ReadCallback kills WriteCallback
   EXPECT_CALL(rcb, readError(stream, _))
       .WillOnce(Invoke([&](StreamId stream, auto) {
@@ -4683,10 +4661,8 @@ TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
   NiceMock<MockReadCallback> readCb1;
   NiceMock<MockReadCallback> readCb2;
 
-  [[maybe_unused]] auto setReadCallback50 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback51 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream1,
@@ -4715,8 +4691,7 @@ TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
   transport->driveReadCallbacks();
 
   EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
-  [[maybe_unused]] auto setReadCallback52 =
-      transport->setReadCallback(stream1, nullptr);
+  ASSERT_FALSE(transport->setReadCallback(stream1, nullptr).hasError());
   transport->driveReadCallbacks();
   transport.reset();
 }
@@ -4735,8 +4710,7 @@ TEST_P(QuicTransportImplTestWithGroups, ReadErrorCallbackWithGroups) {
 
   NiceMock<MockReadCallback> readCb1;
 
-  [[maybe_unused]] auto setReadCallback53 =
-      transport->setReadCallback(stream1, &readCb1);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
 
   transport->addStreamReadError(stream1, LocalErrorCode::NO_ERROR);
   transport->addDataToStream(
@@ -4768,10 +4742,8 @@ TEST_P(
   NiceMock<MockReadCallback> readCb1;
   NiceMock<MockReadCallback> readCb2;
 
-  [[maybe_unused]] auto setReadCallback54 =
-      transport->setReadCallback(stream1, &readCb1);
-  [[maybe_unused]] auto setReadCallback55 =
-      transport->setReadCallback(stream2, &readCb2);
+  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
+  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
 
   transport->addDataToStream(
       stream1,

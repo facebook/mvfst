@@ -73,8 +73,6 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
     if (!res) {
       LOG(WARNING) << "Failed to notify pending write on stream: "
                    << toString(res.error());
-      // Continue anyway - this matches original behavior where
-      // [[maybe_unused]] was used to ignore failures
     }
   }
 }
@@ -103,8 +101,6 @@ void QuicStreamAsyncTransport::setReadCB(
       if (setCallbackResult.hasError()) {
         VLOG(1) << "Failed to set read callback: "
                 << toString(setCallbackResult.error());
-        // Continue anyway - this matches original behavior where
-        // [[maybe_unused]] was used to ignore failures
       }
     }
     // It should be ok to do this immediately, rather than in the loop
@@ -126,8 +122,6 @@ void QuicStreamAsyncTransport::addWriteCallback(
     if (!res) {
       VLOG(1) << "Failed to notify pending write on stream: "
               << toString(res.error());
-      // Continue anyway - this matches original behavior where
-      // [[maybe_unused]] was used to ignore failures
     }
   }
 }
@@ -248,8 +242,6 @@ void QuicStreamAsyncTransport::shutdownWrite() {
       if (!res) {
         VLOG(1) << "Failed to notify pending write on stream: "
                 << toString(res.error());
-        // Continue anyway - this matches original behavior where
-        // [[maybe_unused]] was used to ignore failures
       }
     }
   }
@@ -493,8 +485,6 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
     if (!res2) {
       VLOG(1) << "Failed to notify pending write on stream: "
               << toString(res2.error());
-      // Continue anyway - this matches original behavior where
-      // [[maybe_unused]] was used to ignore failures
     }
   }
   // not actually sent.  Mirrors AsyncSocket and invokes when data is in

@@ -3438,8 +3438,7 @@ TEST_F(QuicTransportTest, FlowControlCallbacks) {
   // We should be able to create streams from this callback.
   EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState2.value()->id))
       .WillOnce(Invoke([&](auto) {
-        [[maybe_unused]] auto newStream =
-            transport_->createBidirectionalStream();
+        ASSERT_FALSE(transport_->createBidirectionalStream().hasError());
       }));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
@@ -4069,9 +4068,11 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesWriteRateLimited) {
       .Times(1);
   auto transportRegisterTxCallback18 =
       transport_->registerTxCallback(stream, 0, &firstByteTxCb);
-  [[maybe_unused]] auto transportRegisterTxCallback19 =
-      transport_->registerTxCallback(
-          stream, kDefaultUDPSendPacketLen * 2, &secondPacketByteOffsetTxCb);
+  ASSERT_FALSE(
+      transport_
+          ->registerTxCallback(
+              stream, kDefaultUDPSendPacketLen * 2, &secondPacketByteOffsetTxCb)
+          .hasError());
   auto transportRegisterTxCallback20 =
       transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
   auto transportRegisterTxCallback21 =
@@ -5190,15 +5191,21 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
       .Times(1);
   auto transportRegisterTxCallback30 =
       transport_->registerTxCallback(stream, 0, &firstByteTxCb);
-  [[maybe_unused]] auto transportRegisterTxCallback32 =
-      transport_->registerTxCallback(
-          stream, firstPacketNearTailByte, &firstPacketNearTailByteTxCb);
-  [[maybe_unused]] auto transportRegisterTxCallback33 =
-      transport_->registerTxCallback(
-          stream, secondPacketNearHeadByte, &secondPacketNearHeadByteTxCb);
-  [[maybe_unused]] auto transportRegisterTxCallback34 =
-      transport_->registerTxCallback(
-          stream, secondPacketNearTailByte, &secondPacketNearTailByteTxCb);
+  ASSERT_FALSE(
+      transport_
+          ->registerTxCallback(
+              stream, firstPacketNearTailByte, &firstPacketNearTailByteTxCb)
+          .hasError());
+  ASSERT_FALSE(
+      transport_
+          ->registerTxCallback(
+              stream, secondPacketNearHeadByte, &secondPacketNearHeadByteTxCb)
+          .hasError());
+  ASSERT_FALSE(
+      transport_
+          ->registerTxCallback(
+              stream, secondPacketNearTailByte, &secondPacketNearTailByteTxCb)
+          .hasError());
   auto transportRegisterTxCallback31 =
       transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
 

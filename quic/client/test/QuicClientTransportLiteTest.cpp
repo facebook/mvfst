@@ -99,8 +99,9 @@ TEST_F(QuicClientTransportLiteTest, TestPriming) {
   quicClient_->getConn()->zeroRttWriteCipher = test::createNoOpAead();
 
   StreamId streamId = quicClient_->createBidirectionalStream().value();
-  [[maybe_unused]] auto writeChainResult = quicClient_->writeChain(
-      streamId, folly::IOBuf::copyBuffer("test"), false);
+  ASSERT_FALSE(
+      quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false)
+          .hasError());
   EXPECT_CALL(mockConnectionSetupCallback_, onPrimingDataAvailable(_));
   evb_.loopOnce(EVLOOP_NONBLOCK);
 }

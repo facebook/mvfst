@@ -165,8 +165,9 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
                    ->streamManager->setMaxLocalBidirectionalStreams(128)
                    .hasError());
   StreamId streamId = quicClient_->createBidirectionalStream().value();
-  [[maybe_unused]] auto writeChainResult = quicClient_->writeChain(
-      streamId, folly::IOBuf::copyBuffer("test"), false);
+  ASSERT_FALSE(
+      quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false)
+          .hasError());
 
   EXPECT_CALL(*sockPtr_, recvmsg(_, _))
       .WillRepeatedly(Invoke([&](struct msghdr* /* msg */, int /* flags */) {
