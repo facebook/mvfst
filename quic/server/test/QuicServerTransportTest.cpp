@@ -3978,7 +3978,7 @@ TEST_F(
       /*offset=*/0,
       data->computeChainDataLength(),
       data->computeChainDataLength(),
-      /*eof=*/true,
+      /*fin=*/true,
       /*skipLenHint=*/std::nullopt);
   ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
@@ -4023,7 +4023,7 @@ TEST_F(
       /*offset=*/0,
       data->computeChainDataLength(),
       data->computeChainDataLength(),
-      /*eof=*/true,
+      /*fin=*/true,
       /*skipLenHint=*/std::nullopt);
   ASSERT_TRUE(res.has_value());
   auto dataLen = *res;
