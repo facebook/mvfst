@@ -11,8 +11,6 @@
 #include <folly/String.h>
 #include <quic/xsk/XskSender.h>
 #include <quic/xsk/packet_utils.h>
-#include <unistd.h>
-#include <exception>
 #include <stdexcept>
 
 namespace facebook::xdpsocket {
