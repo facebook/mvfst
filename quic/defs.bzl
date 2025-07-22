@@ -17,7 +17,6 @@ load(
 load("@fbsource//tools/build_defs:fb_xplat_cxx_binary.bzl", "fb_xplat_cxx_binary")
 load("@fbsource//tools/build_defs:fb_xplat_cxx_library.bzl", "fb_xplat_cxx_library")
 load("@fbsource//tools/build_defs:fb_xplat_cxx_test.bzl", "fb_xplat_cxx_test")
-load("@fbsource//tools/build_defs:fbsource_utils.bzl", "is_arvr_mode")
 load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
 load("@fbsource//tools/build_defs/xplat:deps_map_utils.bzl", "deps_map_utils")
 load("@fbsource//xplat/pfh/Infra_Networking_Core:DEFS.bzl", "Infra_Networking_Core")
@@ -127,11 +126,13 @@ def mvfst_cxx_library(
 
     # We use gflags on fbcode platforms, which don't mix well when mixing static
     # and dynamic linking.
-    if not is_arvr_mode():
-        force_static = select({
+    force_static = select({
+        "DEFAULT": select({
             "DEFAULT": force_static,
             "ovr_config//runtime:fbcode": False,
-        })
+        }),
+        "ovr_config//build_mode:arvr_mode": force_static,
+    })
 
     fb_xplat_cxx_library(
         name = name,
@@ -332,11 +333,13 @@ def mu_cxx_library(
 
     # We use gflags on fbcode platforms, which don't mix well when mixing static
     # and dynamic linking.
-    if not is_arvr_mode():
-        force_static = select({
+    force_static = select({
+        "DEFAULT": select({
             "DEFAULT": force_static,
             "ovr_config//runtime:fbcode": False,
-        })
+        }),
+        "ovr_config//build_mode:arvr_mode": force_static,
+    })
 
     fb_xplat_cxx_library(
         name = name,
