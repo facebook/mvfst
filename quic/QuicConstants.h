@@ -313,6 +313,7 @@ enum class TransportErrorCode : uint64_t {
   TRANSPORT_PARAMETER_ERROR = 0x0008,
   PROTOCOL_VIOLATION = 0x000A,
   INVALID_MIGRATION = 0x000C,
+  CRYPTO_BUFFER_EXCEEDED = 0x000D,
   CRYPTO_ERROR = 0x100,
   CRYPTO_ERROR_MAX = 0x1ff,
   INVALID_TOKEN = 0xb,
@@ -429,6 +430,11 @@ QuicBatchingMode getQuicBatchingMode(uint32_t val);
 // default QUIC batching size - currently used only
 // by BATCHING_MODE_GSO
 constexpr uint32_t kDefaultQuicMaxBatchSize = 16;
+
+// Maximum allowed buffering for crypto stream data before terminating the
+// connection.
+constexpr uint64_t kDefaultMaxCryptoStreamBufferSize =
+    static_cast<const uint64_t>(256 * 1024); // 256kB
 constexpr uint32_t kQuicMaxBatchSizeLimit = 64;
 
 // rfc6298:

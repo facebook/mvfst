@@ -2634,4 +2634,28 @@ TEST_P(QuicStreamFunctionsTestBase, AckCryptoStreamOffsetLengthMismatch) {
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 }
 
+TEST_P(QuicStreamFunctionsTestBase, CryptoStreamBufferLimitExceeded) {
+  auto& cryptoStream = conn.cryptoState->handshakeStream;
+
+  // Test the limit directly - add data that should exceed 256kB
+  size_t chunk = 256 * 1024; // 256kB
+  auto buf = IOBuf::create(chunk);
+  buf->append(chunk);
+
+  // First 256kB should succeed
+  auto res1 =
+      appendDataToReadBuffer(cryptoStream, StreamBuffer(std::move(buf), 0));
+  ASSERT_FALSE(res1.hasError());
+
+  // Second chunk should fail (total would be 512kB > 256kB limit)
+  auto badBuf = IOBuf::create(chunk);
+  badBuf->append(chunk);
+  auto res2 = appendDataToReadBuffer(
+      cryptoStream, StreamBuffer(std::move(badBuf), chunk));
+  ASSERT_TRUE(res2.hasError());
+  EXPECT_EQ(
+      res2.error().code,
+      QuicErrorCode(TransportErrorCode::CRYPTO_BUFFER_EXCEEDED));
+}
+
 } // namespace quic::test
