@@ -181,6 +181,7 @@ mvfst_cpp_library(
         "QuicStreamFunctions.h",
     ],
     deps = [
+        "//quic:constants",
         "//quic:exception",
         "//quic/flowcontrol:flow_control",
     ],

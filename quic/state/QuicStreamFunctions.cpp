@@ -7,6 +7,7 @@
 
 #include <quic/state/QuicStreamFunctions.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 
@@ -312,6 +313,15 @@ quic::Expected<void, QuicError> appendDataToReadBuffer(
 quic::Expected<void, QuicError> appendDataToReadBuffer(
     QuicCryptoStream& stream,
     StreamBuffer buffer) {
+  // Check crypto buffer size limit
+  auto bufferEndOffset = buffer.offset + buffer.data.chainLength();
+  if (bufferEndOffset > stream.currentReadOffset &&
+      bufferEndOffset - stream.currentReadOffset >
+          kDefaultMaxCryptoStreamBufferSize) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::CRYPTO_BUFFER_EXCEEDED,
+        "crypto read buffer limit exceeded"));
+  }
   return appendDataToReadBufferCommon(
       stream, std::move(buffer), 0, [](uint64_t, uint64_t) {});
 }

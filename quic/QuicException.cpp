@@ -146,6 +146,8 @@ std::string toString(TransportErrorCode code) {
       return "Server busy";
     case TransportErrorCode::INVALID_TOKEN:
       return "Invalid token";
+    case TransportErrorCode::CRYPTO_BUFFER_EXCEEDED:
+      return "Crypto buffer exceeded";
     case TransportErrorCode::CRYPTO_ERROR:
       return cryptoErrorToString(code);
     case TransportErrorCode::CRYPTO_ERROR_MAX:
@@ -179,7 +181,8 @@ std::vector<TransportErrorCode> getAllTransportErrorCodes() {
       TransportErrorCode::INVALID_MIGRATION,
       TransportErrorCode::CRYPTO_ERROR,
       TransportErrorCode::CRYPTO_ERROR_MAX,
-      TransportErrorCode::INVALID_TOKEN};
+      TransportErrorCode::INVALID_TOKEN,
+      TransportErrorCode::CRYPTO_BUFFER_EXCEEDED};
   return all;
 }
 
