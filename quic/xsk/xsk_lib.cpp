@@ -103,11 +103,13 @@ int xsk_get_mmap_offsets(int xsk_fd, struct xdp_mmap_offsets* off) {
 
   optlen = sizeof(*off);
   err = getsockopt(xsk_fd, SOL_XDP, XDP_MMAP_OFFSETS, off, &optlen);
-  if (err)
+  if (err) {
     return err;
+  }
 
-  if (optlen == sizeof(*off))
+  if (optlen == sizeof(*off)) {
     return 0;
+  }
 
   return -1;
 }
