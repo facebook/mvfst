@@ -9,19 +9,15 @@
 
 #include <folly/Chrono.h>
 #include <folly/ScopeGuard.h>
-#include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicBatchWriterFactory.h>
-#include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/Optional.h>
 #include <quic/common/TimeUtil.h>
-#include <quic/congestion_control/Pacer.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
-#include <quic/state/SimpleFrameFunctions.h>
 #include <memory>
 
 namespace {
