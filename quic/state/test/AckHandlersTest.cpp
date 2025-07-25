@@ -4650,7 +4650,8 @@ class AckEventForAppDataTest : public Test {
       const bool eof) {
     const auto offset = getLargestWriteOffsetSeen(stream);
     const auto len = data->computeChainDataLength();
-    CHECK(!writeDataToQuicStream(stream, data->clone(), eof).hasError());
+    auto result = writeDataToQuicStream(stream, data->clone(), eof);
+    CHECK(!result.hasError()) << result.error();
     return WriteStreamFrame(stream.id, offset, len, eof);
   }
 
@@ -4708,7 +4709,8 @@ class AckEventForAppDataTest : public Test {
         conn_->udpSendPacketLen,
         std::move(*header),
         getAckState(*conn_, pnSpace).largestAckedByPeer.value_or(0));
-    CHECK(!builder.encodePacketHeader().hasError());
+    auto result = builder.encodePacketHeader();
+    CHECK(!result.hasError()) << result.error();
     DCHECK(builder.canBuildPacket());
     return std::move(builder).buildPacket();
   }
@@ -4779,10 +4781,13 @@ class AckEventForAppDataTest : public Test {
                       << " len=" << frame.len << " " << *conn_;
               auto ackedStreamResult =
                   conn_->streamManager->getStream(frame.streamId);
-              CHECK(!ackedStreamResult.hasError());
+              CHECK(!ackedStreamResult.hasError()) << ackedStreamResult.error();
               auto& ackedStream = ackedStreamResult.value();
               if (ackedStream) {
-                CHECK(!sendAckSMHandler(*ackedStream, frame).hasError());
+                auto ackedSMHandlerResult =
+                    sendAckSMHandler(*ackedStream, frame);
+                CHECK(!ackedSMHandlerResult.hasError())
+                    << ackedSMHandlerResult.error();
               }
             } break;
             default:
@@ -4794,7 +4799,7 @@ class AckEventForAppDataTest : public Test {
           return {};
         },
         timepoint);
-    CHECK(!result.hasError());
+    CHECK(!result.hasError()) << result.error();
     return result.value();
   }
 
