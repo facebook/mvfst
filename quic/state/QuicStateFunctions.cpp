@@ -6,7 +6,6 @@
  */
 
 #include <quic/state/QuicStateFunctions.h>
-#include <quic/state/QuicStreamFunctions.h>
 
 #include <quic/common/TimeUtil.h>
 

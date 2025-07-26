@@ -200,7 +200,6 @@ mvfst_cpp_library(
         "QuicStateFunctions.h",
     ],
     deps = [
-        ":stream_functions",
         "//quic/common:time_util",
     ],
     exported_deps = [
