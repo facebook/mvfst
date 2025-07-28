@@ -1,4 +1,3 @@
-load("@fbcode_macros//build_defs:autodeps_rule.bzl", "autodeps_rule")
 load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
 load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
@@ -91,13 +90,6 @@ def mvfst_cpp_library(
         **kwargs
     )
 
-    if not autodeps_skip:
-        autodeps_rule(
-            name = name,
-            type = "mvfst_cpp_library",
-            attrs = kwargs,
-        )
-
 # TODO: Turn this into an internal implementation detail
 def mvfst_cxx_library(
         name,
@@ -177,19 +169,12 @@ def mvfst_cpp_test(
     if get_fbsource_cell() == "fbcode":
         cpp_unittest(
             name = name,
-            autodeps_skip = True,
             deps = deps,
             external_deps = external_deps,
             header_namespace = header_namespace,
             **kwargs
         )
 
-        if not autodeps_skip:
-            autodeps_rule(
-                name = name,
-                type = "mvfst_cpp_test",
-                attrs = kwargs,
-            )
     else:
         deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
         mvfst_cxx_test(
@@ -232,19 +217,11 @@ def mvfst_cpp_binary(
     if get_fbsource_cell() == "fbcode":
         cpp_binary(
             name = name,
-            autodeps_skip = True,
             deps = deps,
             external_deps = external_deps,
             header_namespace = header_namespace,
             **kwargs
         )
-
-        if not autodeps_skip:
-            autodeps_rule(
-                name = name,
-                type = "mvfst_cpp_binary",
-                attrs = kwargs,
-            )
     else:
         deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
         mvfst_cxx_binary(
@@ -288,19 +265,11 @@ def mvfst_cpp_benchmark(
     if get_fbsource_cell() == "fbcode":
         cpp_benchmark(
             name = name,
-            autodeps_skip = True,
             deps = deps,
             external_deps = external_deps,
             header_namespace = header_namespace,
             **kwargs
         )
-
-        if not autodeps_skip:
-            autodeps_rule(
-                name = name,
-                type = "mvfst_cpp_benchmark",
-                attrs = kwargs,
-            )
     else:
         # Don't generate xplat benchmark targets
         pass
