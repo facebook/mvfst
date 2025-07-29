@@ -8,7 +8,7 @@
 #pragma once
 
 #include <folly/Unit.h>
-#include <folly/io/Cursor.h>
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/Expected.h>

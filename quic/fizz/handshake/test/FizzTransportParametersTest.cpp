@@ -9,6 +9,7 @@
 #include <folly/portability/GTest.h>
 
 #include <fizz/record/test/ExtensionTestsBase.h>
+#include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/handshake/FizzTransportParameters.h>
 
@@ -26,7 +27,7 @@ class QuicExtensionsTest : public testing::Test {
 
   std::vector<Extension> getExtensions(folly::StringPiece hex) {
     auto buf = QuicExtensionsTest::getBuf(hex);
-    folly::io::Cursor cursor(buf.get());
+    Cursor cursor(buf.get());
     Extension ext;
     EXPECT_EQ(fizz::detail::read(ext, cursor), buf->computeChainDataLength());
     EXPECT_TRUE(cursor.isAtEnd());

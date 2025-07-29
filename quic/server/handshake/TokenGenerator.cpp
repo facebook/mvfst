@@ -55,7 +55,7 @@ uint64_t TokenGenerator::decryptToken(
 
   // Try to parse the decrypted token
   auto decryptedToken = (*maybeDecryptedToken).get();
-  folly::io::Cursor cursor(decryptedToken);
+  Cursor cursor(decryptedToken);
 
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 

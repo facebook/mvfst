@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/io/Cursor.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/Types.h>

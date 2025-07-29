@@ -8,7 +8,6 @@
 #pragma once
 
 #include <folly/IPAddress.h>
-#include <folly/io/Cursor.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>

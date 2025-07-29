@@ -7,6 +7,7 @@
 
 #include <quic/fizz/server/handshake/AppToken.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/fizz/handshake/FizzTransportParameters.h>
 
 #include <fizz/server/State.h>
@@ -28,7 +29,7 @@ std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken) {
 
 Optional<AppToken> decodeAppToken(const folly::IOBuf& buf) {
   AppToken appToken;
-  folly::io::Cursor cursor(&buf);
+  Cursor cursor(&buf);
   std::vector<fizz::Extension> extensions;
   fizz::Extension ext;
   try {

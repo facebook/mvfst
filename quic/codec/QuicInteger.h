@@ -8,8 +8,8 @@
 #pragma once
 
 #include <folly/String.h>
-#include <folly/io/Cursor.h>
 #include <folly/lang/Bits.h>
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/Expected.h>

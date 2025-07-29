@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientExtensions.h>
 
@@ -215,7 +216,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   EXPECT_NE(it1, serverParams->parameters.end());
 
   // check that the values equal what we expect
-  folly::io::Cursor cursor1 = folly::io::Cursor(it1->value.get());
+  Cursor cursor1 = Cursor(it1->value.get());
   auto val = decodeQuicInteger(cursor1);
   EXPECT_EQ(val->first, 12);
 }

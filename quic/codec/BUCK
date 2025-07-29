@@ -75,7 +75,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//folly:unit",
-        "//folly/io:iobuf",
+        "//quic:constants",
         "//quic:exception",
         "//quic/common:buf_util",
         "//quic/common:expected",
@@ -100,7 +100,6 @@ mvfst_cpp_library(
     exported_deps = [
         ":packet_number",
         ":types",
-        "//folly/io:iobuf",
         "//quic:constants",
         "//quic/common:expected",
         "//quic/state:transport_settings",
@@ -183,7 +182,6 @@ mvfst_cpp_library(
         "QuicWriteCodec.h",
     ],
     deps = [
-        "//folly/io:iobuf",
         "//quic:exception",
     ],
     exported_deps = [

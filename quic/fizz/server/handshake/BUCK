@@ -36,6 +36,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//fizz/server:protocol",
+        "//quic:constants",
         "//quic/fizz/handshake:fizz_handshake",
     ],
     exported_deps = [

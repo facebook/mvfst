@@ -12,7 +12,6 @@
 
 #include <folly/String.h>
 #include <folly/hash/Hash.h>
-#include <folly/io/Cursor.h>
 #include <folly/io/IOBuf.h>
 
 #include <array>
