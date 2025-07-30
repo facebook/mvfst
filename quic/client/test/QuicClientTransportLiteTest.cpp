@@ -92,9 +92,14 @@ TEST_F(QuicClientTransportLiteTest, TestPriming) {
   auto transportSettings = quicClient_->getTransportSettings();
   transportSettings.isPriming = true;
   CHECK_EQ(*quicClient_->getConn()->originalVersion, QuicVersion::MVFST);
+  // Set the UDP Packet length to a value differnt than the expected one
+  quicClient_->getConn()->udpSendPacketLen = kDefaultUDPSendPacketLen + 1;
   quicClient_->setTransportSettings(std::move(transportSettings));
+  // Check that both Version and UDP Packet length are being set to the expected
+  // values for priming
   CHECK_EQ(
       *quicClient_->getConn()->originalVersion, QuicVersion::MVFST_PRIMING);
+  CHECK_EQ(quicClient_->getConn()->udpSendPacketLen, kDefaultUDPSendPacketLen);
   quicClient_->setConnectionSetupCallback(&mockConnectionSetupCallback_);
   quicClient_->getConn()->zeroRttWriteCipher = test::createNoOpAead();
 

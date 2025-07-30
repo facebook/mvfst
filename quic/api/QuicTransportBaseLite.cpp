@@ -2981,6 +2981,9 @@ void QuicTransportBaseLite::setTransportSettings(
     if (conn_->nodeType == QuicNodeType::Client &&
         conn_->transportSettings.isPriming) {
       setSupportedVersions({QuicVersion::MVFST_PRIMING});
+      // always use the smaller packet size to ensure priming packets work
+      // both with IPv4 and IPv6
+      conn_->udpSendPacketLen = kDefaultUDPSendPacketLen;
     }
   }
 
