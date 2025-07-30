@@ -38,7 +38,6 @@ mvfst_cpp_library(
     deps = [
         "//folly:likely",
         "//folly:string",
-        "//folly/lang:exception",
         "//quic:exception",
     ],
     exported_deps = [
@@ -56,7 +55,6 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:string",
-        "//folly:unit",
         "//folly/io/async:async_socket_exception",
         "//folly/lang:exception",
         "//quic:exception",

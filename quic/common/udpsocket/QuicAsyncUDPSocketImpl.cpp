@@ -7,7 +7,6 @@
 
 #include <folly/Likely.h>
 #include <folly/String.h>
-#include <folly/lang/Exception.h> // For folly::errnoStr
 #include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/udpsocket/QuicAsyncUDPSocketImpl.h>
 

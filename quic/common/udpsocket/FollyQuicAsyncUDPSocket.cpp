@@ -7,7 +7,6 @@
 
 #include <errno.h> // For errno
 #include <folly/String.h>
-#include <folly/Unit.h>
 #include <folly/io/async/AsyncSocketException.h>
 #include <folly/lang/Exception.h> // For folly::errnoStr
 #include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
