@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   fizz::CryptoUtils::init();
 
   std::vector<std::string> alpns;
-  folly::split(",", FLAGS_alpns, alpns);
+  folly::split(',', FLAGS_alpns, alpns);
 
   if (FLAGS_mode == "server") {
     if (FLAGS_connect_only) {
