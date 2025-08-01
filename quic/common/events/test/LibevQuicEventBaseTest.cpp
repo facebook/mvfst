@@ -23,6 +23,10 @@ struct EvLoop : public quic::LibevQuicEventBase::EvLoopWeak {
     return evLoop_;
   }
 
+  std::optional<pthread_t> getEventLoopThread() override {
+    return pthread_self();
+  }
+
   struct ev_loop* evLoop_;
 };
 

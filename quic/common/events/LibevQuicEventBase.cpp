@@ -35,7 +35,6 @@ void libEvPrepareCallback(
 namespace quic {
 LibevQuicEventBase::LibevQuicEventBase(std::unique_ptr<EvLoopWeak> loop)
     : ev_loop_(loop->get()), loopWeak_(std::move(loop)) {
-  loopThreadId_.store(std::this_thread::get_id(), std::memory_order_release);
   ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
   prepareWatcher_.data = this;
   ev_prepare_start(ev_loop_, &prepareWatcher_);
@@ -151,7 +150,8 @@ void LibevQuicEventBase::checkCallbacks() {
 }
 
 bool LibevQuicEventBase::isInEventBaseThread() const {
-  auto tid = loopThreadId_.load(std::memory_order_relaxed);
-  return tid == std::this_thread::get_id();
+  auto eventLoopThread = loopWeak_->getEventLoopThread();
+  CHECK(eventLoopThread != std::nullopt);
+  return pthread_self() == eventLoopThread;
 }
 } // namespace quic

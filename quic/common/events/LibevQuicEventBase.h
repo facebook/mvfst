@@ -13,6 +13,7 @@
 #include <ev.h>
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #include <folly/GLog.h>
@@ -33,6 +34,8 @@ class LibevQuicEventBase
    public:
     // Returns nullptr if the loop has been destroyed.
     virtual struct ev_loop* get() = 0;
+
+    virtual std::optional<pthread_t> getEventLoopThread() = 0;
 
     virtual ~EvLoopWeak() = default;
   };
@@ -233,6 +236,5 @@ class LibevQuicEventBase
   // ev_prepare is supposed to run before the loop goes to sleep.
   // We're using it to execute delayed work given to us via runInLoop.
   ev_prepare prepareWatcher_;
-  std::atomic<std::thread::id> loopThreadId_;
 };
 } // namespace quic
