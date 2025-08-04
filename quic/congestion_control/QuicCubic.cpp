@@ -106,7 +106,11 @@ void Cubic::onPacketSent(const OutstandingPacketWrapper& packet) {
         "Cubic: inflightBytes overflow",
         LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
   }
-  conn_.lossState.inflightBytes += packet.metadata.encodedSize;
+
+  addAndCheckOverflow(
+      conn_.lossState.inflightBytes,
+      packet.metadata.encodedSize,
+      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
 
   if (conn_.transportSettings.ccaConfig.leaveHeadroomForCwndLimited) {
     // Consider cwndBlocked if inflight bytes >= 0.5 * cwnd
@@ -161,8 +165,7 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
 }
 
 void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
-  DCHECK_LE(bytes, conn_.lossState.inflightBytes);
-  conn_.lossState.inflightBytes -= bytes;
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -348,8 +351,7 @@ void Cubic::onPacketAckOrLoss(
 
 void Cubic::onPacketAcked(const AckEvent& ack) {
   auto currentCwnd = cwndBytes_;
-  DCHECK_LE(ack.ackedBytes, conn_.lossState.inflightBytes);
-  conn_.lossState.inflightBytes -= ack.ackedBytes;
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   if (recoveryState_.endOfRecovery.has_value() &&
       *recoveryState_.endOfRecovery >= ack.largestNewlyAckedPacketSentTime) {
     if (conn_.qLogger) {
