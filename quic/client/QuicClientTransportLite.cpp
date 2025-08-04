@@ -1199,9 +1199,14 @@ QuicClientTransportLite::startCryptoHandshake() {
   conn_->initialHeaderCipher = std::move(clientHeaderCipherResult.value());
 
   customTransportParameters_ = getSupportedExtTransportParams(*conn_);
-  if (conn_->transportSettings.supportDirectEncap) {
-    customTransportParameters_.push_back(
-        encodeEmptyParameter(TransportParameterId::client_direct_encap));
+  if (conn_->transportSettings.clientDirectEncapConfig) {
+    auto maybeEncodedDirectEncapParam = encodeIntegerParameter(
+        TransportParameterId::client_direct_encap,
+        conn_->transportSettings.clientDirectEncapConfig.value());
+    // The encoding should succeed because *clientDirectEncapConfig is a uint8_t
+    CHECK(maybeEncodedDirectEncapParam)
+        << "Failed to encode direct encap param";
+    customTransportParameters_.push_back(*maybeEncodedDirectEncapParam);
   }
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(

@@ -20,16 +20,28 @@ std::vector<quic::TransportParameter> getClientDependentExtTransportParams(
   using TpId = quic::TransportParameterId;
   std::vector<quic::TransportParameter> params;
 
-  // Server-side direct encap logic
-  if (conn.transportSettings.directEncapAddress.has_value()) {
-    // Check if client sent client_direct_encap parameter
-    auto clientDirectEncapIt =
-        findParameter(clientParams, TpId::client_direct_encap);
-    if (clientDirectEncapIt != clientParams.end()) {
-      // Client supports direct encap and server has address configured
+  if (conn.transportSettings.serverDirectEncapConfig.has_value()) {
+    const auto& serverDirectEncapConfig =
+        *conn.transportSettings.serverDirectEncapConfig;
+
+    // See if the client supports direct encap. The value of the parameter,
+    // if present, is the zone the client is in.
+    auto getIntegerParamResult =
+        getIntegerParameter(TpId::client_direct_encap, clientParams);
+    if (getIntegerParamResult.hasError()) {
+      return params;
+    }
+
+    const auto& maybeClientDirectEncapParam = getIntegerParamResult.value();
+    if (!maybeClientDirectEncapParam) {
+      return params;
+    }
+
+    uint64_t supportedZones = serverDirectEncapConfig.supportedZones;
+    if ((*maybeClientDirectEncapParam & supportedZones) != 0) {
       params.push_back(encodeIPAddressParameter(
           TpId::server_direct_encap,
-          conn.transportSettings.directEncapAddress.value()));
+          serverDirectEncapConfig.directEncapAddress));
     }
   }
 

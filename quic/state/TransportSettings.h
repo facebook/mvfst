@@ -146,6 +146,12 @@ struct SerializedKnob {
   std::string blob;
 };
 
+struct ServerDirectEncapConfig {
+  folly::IPAddress directEncapAddress;
+  // Bitmask of supported zones.
+  uint8_t supportedZones;
+};
+
 struct TransportSettings {
   // The initial flow control window for the whole connection advertised to the
   // peer.
@@ -475,13 +481,14 @@ struct TransportSettings {
   // retrieving 0-RTT data to a given destination
   bool isPriming{false};
 
-  // On the client-side, this indicates support for direct encapsulation.
-  bool supportDirectEncap{false};
+  // On the client-side, if non-null, it indicates that the client supports
+  // direct encapsulation. The value contains the zone the client is in.
+  Optional<uint8_t> clientDirectEncapConfig;
 
   // On the server-side, if this is not null, it indicates that the
-  // server supports direct encapsulation and the value is the address
-  // to use.
-  Optional<folly::IPAddress> directEncapAddress;
+  // server supports direct encapsulation. The config specifies the direct
+  // encap address and a bitmask of the supported zones.
+  Optional<ServerDirectEncapConfig> serverDirectEncapConfig;
 };
 
 } // namespace quic

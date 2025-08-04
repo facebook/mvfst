@@ -26,9 +26,15 @@ class TransportParametersTest : public Test {
   std::vector<TransportParameter> getClientTransportParams(
       const QuicClientConnectionState& conn) {
     auto params = getSupportedExtTransportParams(conn);
-    if (conn.transportSettings.supportDirectEncap) {
-      params.push_back(
-          encodeEmptyParameter(TransportParameterId::client_direct_encap));
+    if (conn.transportSettings.clientDirectEncapConfig) {
+      auto maybeEncodedDirectEncapParam = encodeIntegerParameter(
+          TransportParameterId::client_direct_encap,
+          conn.transportSettings.clientDirectEncapConfig.value());
+      // The encoding should succeed because *clientDirectEncapConfig is a
+      // uint8_t
+      CHECK(maybeEncodedDirectEncapParam)
+          << "Failed to encode direct encap param";
+      params.push_back(*maybeEncodedDirectEncapParam);
     }
     return params;
   }
@@ -38,20 +44,26 @@ class TransportParametersTest : public Test {
 TEST_F(TransportParametersTest, ClientDirectEncapEnabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
-  clientConn.transportSettings.supportDirectEncap = true;
+  clientConn.transportSettings.clientDirectEncapConfig = 0x04; // Zone 4
 
   auto customTransportParams = getClientTransportParams(clientConn);
 
   auto it = findParameter(
       customTransportParams, TransportParameterId::client_direct_encap);
   EXPECT_TRUE(it != customTransportParams.end());
-  EXPECT_TRUE(it->value->empty());
+
+  // Verify the parameter contains the zone value
+  auto maybeZoneValue = getIntegerParameter(
+      TransportParameterId::client_direct_encap, customTransportParams);
+  ASSERT_FALSE(maybeZoneValue.hasError());
+  ASSERT_TRUE(maybeZoneValue.value());
+  EXPECT_EQ(*maybeZoneValue.value(), 0x04);
 }
 
 TEST_F(TransportParametersTest, ClientDirectEncapDisabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
-  clientConn.transportSettings.supportDirectEncap = false;
+  // Don't set clientDirectEncapConfig (it's Optional, so it will be none)
 
   auto customTransportParams = getClientTransportParams(clientConn);
 
@@ -66,13 +78,17 @@ TEST_F(TransportParametersTest, ClientDirectEncapDisabled) {
 TEST_F(TransportParametersTest, ServerDirectEncapIPv4) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.directEncapAddress =
-      folly::IPAddress("192.168.1.1");
+  ServerDirectEncapConfig config;
+  config.directEncapAddress = folly::IPAddress("192.168.1.1");
+  config.supportedZones = 0x0F; // Supports zones 1, 2, 4, 8
+  serverConn.transportSettings.serverDirectEncapConfig = config;
 
-  // Create client parameters containing client_direct_encap
+  // Create client parameters containing client_direct_encap with zone 4
   std::vector<TransportParameter> clientParams;
-  clientParams.push_back(
-      encodeEmptyParameter(TransportParameterId::client_direct_encap));
+  auto clientDirectEncapParam = encodeIntegerParameter(
+      TransportParameterId::client_direct_encap, 0x04); // Zone 4
+  ASSERT_FALSE(clientDirectEncapParam.hasError());
+  clientParams.push_back(clientDirectEncapParam.value());
 
   auto customTransportParams =
       getClientDependentExtTransportParams(serverConn, clientParams);
@@ -94,13 +110,17 @@ TEST_F(TransportParametersTest, ServerDirectEncapIPv4) {
 TEST_F(TransportParametersTest, ServerDirectEncapIPv6) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.directEncapAddress =
-      folly::IPAddress("2001:db8::1");
+  ServerDirectEncapConfig config;
+  config.directEncapAddress = folly::IPAddress("2001:db8::1");
+  config.supportedZones = 0x02; // Supports zone 2
+  serverConn.transportSettings.serverDirectEncapConfig = config;
 
-  // Create client parameters containing client_direct_encap
+  // Create client parameters containing client_direct_encap with zone 2
   std::vector<TransportParameter> clientParams;
-  clientParams.push_back(
-      encodeEmptyParameter(TransportParameterId::client_direct_encap));
+  auto clientDirectEncapParam = encodeIntegerParameter(
+      TransportParameterId::client_direct_encap, 0x02); // Zone 2
+  ASSERT_FALSE(clientDirectEncapParam.hasError());
+  clientParams.push_back(clientDirectEncapParam.value());
 
   auto customTransportParams =
       getClientDependentExtTransportParams(serverConn, clientParams);
@@ -118,16 +138,18 @@ TEST_F(TransportParametersTest, ServerDirectEncapIPv6) {
   EXPECT_EQ(memcmp(actualRange.data(), expectedBytes, 16), 0);
 }
 
-// Test server doesn't send server_direct_encap when address not configured
-TEST_F(TransportParametersTest, ServerDirectEncapNoAddress) {
+// Test server doesn't send server_direct_encap when config not set
+TEST_F(TransportParametersTest, ServerDirectEncapNoConfig) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  // Don't set directEncapAddress
+  // Don't set serverDirectEncapConfig
 
-  // Create client parameters containing client_direct_encap
+  // Create client parameters containing client_direct_encap with zone 1
   std::vector<TransportParameter> clientParams;
-  clientParams.push_back(
-      encodeEmptyParameter(TransportParameterId::client_direct_encap));
+  auto clientDirectEncapParam = encodeIntegerParameter(
+      TransportParameterId::client_direct_encap, 0x01); // Zone 1
+  ASSERT_FALSE(clientDirectEncapParam.hasError());
+  clientParams.push_back(clientDirectEncapParam.value());
 
   auto customTransportParams =
       getClientDependentExtTransportParams(serverConn, clientParams);
@@ -143,8 +165,10 @@ TEST_F(TransportParametersTest, ServerDirectEncapNoAddress) {
 TEST_F(TransportParametersTest, ServerDirectEncapClientNotSupported) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.directEncapAddress =
-      folly::IPAddress("192.168.1.1");
+  ServerDirectEncapConfig config;
+  config.directEncapAddress = folly::IPAddress("192.168.1.1");
+  config.supportedZones = 0x01; // Supports zone 1
+  serverConn.transportSettings.serverDirectEncapConfig = config;
 
   // Create client parameters WITHOUT client_direct_encap
   std::vector<TransportParameter> clientParams;
@@ -157,6 +181,33 @@ TEST_F(TransportParametersTest, ServerDirectEncapClientNotSupported) {
   auto customTransportParams =
       getClientDependentExtTransportParams(serverConn, clientParams);
 
+  EXPECT_THAT(
+      customTransportParams,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::server_direct_encap)))));
+}
+
+// Test server doesn't send server_direct_encap when client zone doesn't match
+TEST_F(TransportParametersTest, ServerDirectEncapZoneMismatch) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  ServerDirectEncapConfig config;
+  config.directEncapAddress = folly::IPAddress("192.168.1.1");
+  config.supportedZones = 0x0A; // Supports zones 2 and 8 (binary: 1010)
+  serverConn.transportSettings.serverDirectEncapConfig = config;
+
+  // Create client parameters with zone 4 (not supported by server)
+  std::vector<TransportParameter> clientParams;
+  auto clientDirectEncapParam = encodeIntegerParameter(
+      TransportParameterId::client_direct_encap, 0x04); // Zone 4
+  ASSERT_FALSE(clientDirectEncapParam.hasError());
+  clientParams.push_back(clientDirectEncapParam.value());
+
+  auto customTransportParams =
+      getClientDependentExtTransportParams(serverConn, clientParams);
+
+  // Server should not send direct encap param because zones don't match
   EXPECT_THAT(
       customTransportParams,
       Not(Contains(Field(
