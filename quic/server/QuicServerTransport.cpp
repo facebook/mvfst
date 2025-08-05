@@ -1286,12 +1286,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         auto serverConn = serverTransport->serverConn_;
-        serverConn->transportSettings.minBurstPackets = val;
+        serverConn->transportSettings.minBurstPackets =
+            val <= kMinBurstPacketsLimit ? val : kMinBurstPacketsLimit;
         VLOG(3) << "PACER_MIN_BURST_PACKETS KnobParam received: " << val;
         return {};
       });
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+      static_cast<uint64_t>(TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM),
       [](QuicServerTransport* serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
@@ -1301,7 +1302,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             val <= kMaxWriteConnectionDataPacketLimit
             ? val
             : kMaxWriteConnectionDataPacketLimit;
-        VLOG(3) << "MAX_BATCH_PACKETS KnobParam received: " << val;
+        VLOG(3) << "MAX_WRITE_CONN_DATA_PKT_LIM KnobParam received: " << val;
         return {};
       });
   registerTransportKnobParamHandler(
@@ -1324,6 +1325,34 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               useNewPriorityQueue,
               serverConn->transportSettings.useNewPriorityQueue);
         }
+        return {};
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::MIN_STREAM_BUF_THRESH),
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        CHECK(serverTransport);
+        auto val = static_cast<uint16_t>(std::get<uint64_t>(value));
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.minStreamBufThresh =
+            val <= kMinStreamBufThreshLimit ? val : kMinStreamBufThreshLimit;
+        VLOG(3) << "MIN_STREAM_BUF_THRESH KnobParam received: " << val;
+        return {};
+      });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS),
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        CHECK(serverTransport);
+        auto val = static_cast<uint16_t>(std::get<uint64_t>(value));
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.excessCwndPctForImminentStreams =
+            val <= kMaxExcessCwndPctForImminentStreams
+            ? val
+            : kMaxExcessCwndPctForImminentStreams;
+        VLOG(3) << "EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS KnobParam received: "
+                << val;
         return {};
       });
 }

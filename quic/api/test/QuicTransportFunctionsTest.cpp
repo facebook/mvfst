@@ -5136,4 +5136,95 @@ TEST_F(QuicTransportFunctionsTest, onQuicStreamClosed) {
   EXPECT_EQ(conn->streamManager->streamCount(), 0);
 }
 
+TEST_F(QuicTransportFunctionsTest, UpdatePacketLimitForImminentStreams) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = 1232;
+  conn->flowControlState.sumCurStreamBufferLen = 5000; // 4.05 packets
+  conn->transportSettings.minBurstPackets = 2;
+
+  // Not imminent completion (buffer > threshold)
+  conn->transportSettings.minStreamBufThresh = 1000;
+  uint64_t packetLimit = 3; // Would leave 1304 bytes in buffer (> threshold)
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  EXPECT_FALSE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 3); // Unchanged
+
+  // Imminent completion (buffer < threshold)
+  conn->transportSettings.minStreamBufThresh = 2000;
+  packetLimit = 3; // Would leave 1304 bytes in buffer (< threshold)
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  EXPECT_TRUE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 5); // Increased to send everything
+
+  // Zero threshold means not imminent completion
+  conn->transportSettings.minStreamBufThresh = 0;
+  packetLimit = 3;
+  conn->imminentStreamCompletion = false;
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  EXPECT_FALSE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 3); // Unchanged
+
+  // minStreamBufThresh is larger than minBurstPackets
+  conn->transportSettings.minStreamBufThresh = 3000;
+  conn->transportSettings.minBurstPackets = 2; // 2 * 1232 = 2464
+  conn->flowControlState.sumCurStreamBufferLen = 5000;
+  packetLimit = 2; // Would leave 2536 bytes in buffer (2464 < 2536 < 3000)
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  EXPECT_FALSE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 2);
+
+  // Negative remaining buffer
+  conn->transportSettings.minStreamBufThresh = 3000;
+  conn->transportSettings.minBurstPackets = 2; // 2 * 1232 = 2464
+  conn->flowControlState.sumCurStreamBufferLen = 5000;
+  packetLimit = 5; // remaining buffer is -1160
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  EXPECT_TRUE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 5);
+}
+
+TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = 1232;
+
+  // Make congestionControlWritableBytes only exercise the code path pertaining
+  // to the congestion controller's getWritableBytes and the excess cwnd.
+  conn->pendingEvents.pathChallenge = std::nullopt;
+  conn->outstandingPathValidation = std::nullopt;
+  conn->writableBytesLimit = std::nullopt;
+  conn->throttlingSignalProvider = nullptr;
+
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+
+  // Normal congestion control without imminent completion
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(5000));
+  conn->imminentStreamCompletion = false;
+  conn->transportSettings.excessCwndPctForImminentStreams = 25;
+  auto writableBytes = congestionControlWritableBytes(*conn);
+  EXPECT_EQ(writableBytes, 6160); // 5000 rounded up to nearest packet multiple
+
+  // With imminent completion, allow excess cwnd
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(5000));
+  conn->imminentStreamCompletion = true;
+  conn->transportSettings.excessCwndPctForImminentStreams = 25;
+  writableBytes = congestionControlWritableBytes(*conn);
+  EXPECT_EQ(writableBytes, 7392); // 5000 * 1.25, rounded up to nearest packet
+  // Flag should be cleared
+  EXPECT_FALSE(conn->imminentStreamCompletion);
+
+  // With imminent completion but zero excess setting
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(5000));
+  conn->imminentStreamCompletion = true;
+  conn->transportSettings.excessCwndPctForImminentStreams = 0;
+  writableBytes = congestionControlWritableBytes(*conn);
+  EXPECT_EQ(writableBytes, 6160);
+  EXPECT_FALSE(conn->imminentStreamCompletion);
+}
+
 } // namespace quic::test

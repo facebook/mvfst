@@ -205,7 +205,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
       aead,
       headerCipher,
       version,
-      writeLoopBeginTime);
+      writeLoopBeginTime,
+      true);
   if (!connectionDataResult.has_value()) {
     return quic::make_unexpected(connectionDataResult.error());
   }
@@ -1083,8 +1084,17 @@ uint64_t congestionControlWritableBytes(QuicConnectionStateBase& conn) {
   }
 
   if (conn.congestionController) {
-    writableBytes = std::min<uint64_t>(
-        writableBytes, conn.congestionController->getWritableBytes());
+    auto ccWritableBytes = conn.congestionController->getWritableBytes();
+    if (conn.imminentStreamCompletion) {
+      // If we are about to complete a stream, we allow for excess writable
+      // bytes by increasing the congestion controller's writable bytes by the
+      // specified percentage.
+      ccWritableBytes += ccWritableBytes *
+          conn.transportSettings.excessCwndPctForImminentStreams / 100;
+      conn.imminentStreamCompletion = false;
+    }
+
+    writableBytes = std::min<uint64_t>(writableBytes, ccWritableBytes);
 
     if (conn.throttlingSignalProvider &&
         conn.throttlingSignalProvider->getCurrentThrottlingSignal()
@@ -1209,6 +1219,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
       headerCipher,
       version,
       Clock::now(),
+      false,
       token);
 
   if (!writeResult.has_value()) {
@@ -1588,6 +1599,33 @@ quic::Expected<void, QuicError> encryptPacketHeader(
 }
 
 /**
+ * If, after the write, the stream buffers will be below the min threshold,
+ * we posit that the end of the streams is near and it's worth sending the
+ * entire buffer contents now, rather than wait for another write. This
+ * violates the pacer's orders, but we'll likely go app-limited after
+ * the streams are finished, and reset the pacer's state. So the actual
+ * long-term pacing rate won't deviate much from the pacer's desired rate.
+ */
+void updatePacketLimitForImminentStreams(
+    uint64_t& packetLimit,
+    QuicConnectionStateBase& conn) {
+  int64_t remainingBufLen =
+      static_cast<int64_t>(conn.flowControlState.sumCurStreamBufferLen) -
+      static_cast<int64_t>(packetLimit) *
+          static_cast<int64_t>(conn.udpSendPacketLen); // can be negative
+  // Don't empty out the buffer if remainingBufLen > minBurstPackets.
+  conn.imminentStreamCompletion = remainingBufLen <=
+      std::min<int64_t>(conn.transportSettings.minStreamBufThresh,
+                        conn.transportSettings.minBurstPackets *
+                            conn.udpSendPacketLen);
+  if (conn.imminentStreamCompletion && remainingBufLen > 0) {
+    // Add the remaining bytes and round up to the nearest packet.
+    packetLimit +=
+        (remainingBufLen + conn.udpSendPacketLen - 1) / conn.udpSendPacketLen;
+  }
+}
+
+/**
  * Writes packets to the socket. The is the function that is called by all
  * the other write*ToSocket() functions.
  *
@@ -1659,6 +1697,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     TimePoint writeLoopBeginTime,
+    bool flushOnImminentStreamCompletion,
     const std::string& token) {
   if (connection.loopDetectorCallback) {
     connection.writeDebugState.schedulerName = scheduler.name().str();
@@ -1747,6 +1786,11 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     }
   };
 
+  if (flushOnImminentStreamCompletion &&
+      (connection.transportSettings.minStreamBufThresh > 0 ||
+       connection.transportSettings.excessCwndPctForImminentStreams > 0)) {
+    updatePacketLimitForImminentStreams(packetLimit, connection);
+  }
   quic::TimePoint sentTime = Clock::now();
 
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
@@ -1916,6 +1960,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(
       headerCipher,
       version,
       writeLoopBeginTime,
+      false,
       token);
   if (!cloningResult.has_value()) {
     return quic::make_unexpected(cloningResult.error());

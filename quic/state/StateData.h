@@ -749,6 +749,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // In priming mode data is written here instead of on the network
   std::vector<std::unique_ptr<folly::IOBuf>> primingData;
+
+  // Is the stream buffer low after the next write
+  bool imminentStreamCompletion{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

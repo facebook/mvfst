@@ -207,7 +207,7 @@ TEST_F(QuicServerTransportTest, MaxBatchPacketsKnobOnlyUpdatesPacketLimit) {
   // Build knob param to set packet limit to 25.
   TransportKnobParams params;
   params.push_back(
-      {static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
+      {static_cast<uint64_t>(TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM),
        uint64_t{25}});
 
   server->handleKnobParams(params);
@@ -5823,28 +5823,37 @@ TEST_F(QuicServerTransportTest, TestBurstSizeKnobHandlers) {
 
   ASSERT_EQ(transportSettings.minBurstPackets, kDefaultMinBurstPackets);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_MIN_BURST_PACKETS),
-        uint64_t(25)}});
-  EXPECT_EQ(transportSettings.minBurstPackets, 25);
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::PACER_MIN_BURST_PACKETS),
+        .val = uint64_t(16)}});
+  EXPECT_EQ(transportSettings.minBurstPackets, 16);
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::PACER_MIN_BURST_PACKETS),
+        .val = uint64_t(100)}});
+  EXPECT_EQ(transportSettings.minBurstPackets, kMinBurstPacketsLimit);
 
   ASSERT_EQ(
       transportSettings.writeConnectionDataPacketsLimit,
       kDefaultWriteConnectionDataPacketLimit);
   ASSERT_EQ(transportSettings.maxBatchSize, kDefaultQuicMaxBatchSize);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
-        uint64_t(25)}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM),
+        .val = uint64_t(25)}});
   EXPECT_EQ(transportSettings.writeConnectionDataPacketsLimit, 25);
   // maxBatchSize should remain unchanged
   EXPECT_EQ(transportSettings.maxBatchSize, kDefaultQuicMaxBatchSize);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
-        uint64_t(kQuicMaxBatchSizeLimit) + 1}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM),
+        .val = uint64_t(kQuicMaxBatchSizeLimit) + 1}});
   // maxBatchSize should still remain unchanged
   EXPECT_EQ(transportSettings.maxBatchSize, kDefaultQuicMaxBatchSize);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_BATCH_PACKETS),
-        uint64_t(kMaxWriteConnectionDataPacketLimit) + 1}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM),
+        .val = uint64_t(kMaxWriteConnectionDataPacketLimit) + 1}});
   EXPECT_EQ(
       transportSettings.writeConnectionDataPacketsLimit,
       kMaxWriteConnectionDataPacketLimit);
@@ -5905,6 +5914,36 @@ TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
   // Peer openable streams unchanged
   EXPECT_EQ(
       server->getConn().streamManager->openableRemoteBidirectionalStreams(), 2);
+}
+
+TEST_F(QuicServerTransportTest, TestStreamBufKnobHandlers) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  // ASSERT_EQ(transportSettings.minStreamBufThresh, 0);
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::MIN_STREAM_BUF_THRESH),
+        .val = uint64_t(1232)}});
+  EXPECT_EQ(transportSettings.minStreamBufThresh, 1232);
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::MIN_STREAM_BUF_THRESH),
+        .val = uint64_t(100000)}});
+  EXPECT_EQ(transportSettings.minStreamBufThresh, kMinStreamBufThreshLimit);
+
+  // ASSERT_EQ(transportSettings.excessCwndPctForImminentStreams, 0);
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS),
+        .val = uint64_t(10)}});
+  EXPECT_EQ(transportSettings.excessCwndPctForImminentStreams, 10);
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS),
+        .val = uint64_t(100)}});
+  EXPECT_EQ(
+      transportSettings.excessCwndPctForImminentStreams,
+      kMaxExcessCwndPctForImminentStreams);
 }
 
 TEST_F(QuicServerTransportTest, WriteDSR) {

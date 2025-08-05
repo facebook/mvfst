@@ -489,6 +489,13 @@ struct TransportSettings {
   // server supports direct encapsulation. The config specifies the direct
   // encap address and a bitmask of the supported zones.
   Optional<ServerDirectEncapConfig> serverDirectEncapConfig;
+
+  // Stream buffer threshold for determining imminent stream completion.
+  // If buffer is about to fall below, send entire buffer immediately.
+  uint16_t minStreamBufThresh{0};
+
+  // Increase CCA CWND limit if imminent stream completion.
+  uint16_t excessCwndPctForImminentStreams{0};
 };
 
 } // namespace quic

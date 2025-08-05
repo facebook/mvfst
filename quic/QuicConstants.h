@@ -228,10 +228,15 @@ BETTER_ENUM(
     INFLIGHT_REORDERING_THRESHOLD = 0x1000A,
     // Controls pacer's min burst size.
     PACER_MIN_BURST_PACKETS = 0x1000B,
-    // Controls max batch size and write connection data packets limit.
-    MAX_BATCH_PACKETS = 0x1000C,
+    // Controls  write connection data packets limit.
+    MAX_WRITE_CONN_DATA_PKT_LIM = 0x1000C,
     // Knob for using the new priority queue implementation
-    USE_NEW_PRIORITY_QUEUE = 0x1000D)
+    USE_NEW_PRIORITY_QUEUE = 0x1000D,
+    // Threshold for writer to send entire stream buffer
+    MIN_STREAM_BUF_THRESH = 0x1000E,
+    // Controls how much excess CWND allowed on imminent stream completion.
+    EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS = 0x1000F)
+
 FOLLY_POP_WARNING
 
 enum class FrameType : uint64_t {
@@ -464,6 +469,10 @@ constexpr uint64_t kDefaultWriteConnectionDataPacketLimit = 5;
 constexpr uint64_t kMaxWriteConnectionDataPacketLimit = 64;
 // Minimum number of packets to write per burst in pacing
 constexpr uint64_t kDefaultMinBurstPackets = 5;
+constexpr uint64_t kMinBurstPacketsLimit = 25;
+
+constexpr uint16_t kMinStreamBufThreshLimit = 6160; // 5*1232
+constexpr uint16_t kMaxExcessCwndPctForImminentStreams = 25;
 
 // Default tick interval for pacing timer. This is the smallest interval the
 // pacer will use as its interval.

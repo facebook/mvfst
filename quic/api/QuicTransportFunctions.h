@@ -277,6 +277,13 @@ quic::Expected<void, QuicError> encryptPacketHeader(
     const PacketNumberCipher& headerCipher);
 
 /**
+ * Increases packetLimit and sets the conn.imminentStreamCompletion if
+ * necessary.
+ */
+void updatePacketLimitForImminentStreams(
+    uint64_t& packetLimit,
+    QuicConnectionStateBase& conn);
+/**
  * Writes the connections data to the socket using the header
  * builder as well as the scheduler. This will write the amount of
  * data allowed by the writableBytesFunc and will only write a maximum
@@ -297,6 +304,7 @@ writeConnectionDataToSocket(
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     TimePoint writeLoopBeginTime,
+    bool flushOnImminentStreamCompletion = false,
     const std::string& token = std::string());
 
 [[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
