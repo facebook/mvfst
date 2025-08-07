@@ -631,10 +631,6 @@ constexpr const char    *_final_ ## index =                                    \
 #   define BETTER_ENUMS_CLASS_ATTRIBUTE
 #endif
 
-#ifndef CLANG_LAZY_INIT_TEST
-#define CLANG_LAZY_INIT_TEST
-#endif
-
 #define BETTER_ENUMS_TYPE(SetUnderlyingType, SwitchType, GenerateSwitchType,   \
                           GenerateStrings, ToStringConstexpr,                  \
                           DeclareInitialize, DefineInitialize, CallInitialize, \
@@ -737,7 +733,7 @@ class BETTER_ENUMS_CLASS_ATTRIBUTE Enum {                                      \
                                                                                \
 namespace better_enums_data_ ## Enum {                                         \
                                                                                \
-CLANG_LAZY_INIT_TEST static ::better_enums::_initialize_at_program_start<Enum> \
+static ::better_enums::_initialize_at_program_start<Enum> \
                                                 _force_initialization;         \
                                                                                \
 enum _putNamesInThisScopeAlso { __VA_ARGS__ };                                 \
