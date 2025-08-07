@@ -235,7 +235,10 @@ BETTER_ENUM(
     // Threshold for writer to send entire stream buffer
     MIN_STREAM_BUF_THRESH = 0x1000E,
     // Controls how much excess CWND allowed on imminent stream completion.
-    EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS = 0x1000F)
+    EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS = 0x1000F,
+    // Controls whether the cloning scheduler should clone the same
+    // packet repeatedly in the same write loop.
+    ALLOW_DUPLICATE_PROBES = 0x10010)
 
 FOLLY_POP_WARNING
 

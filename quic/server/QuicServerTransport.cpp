@@ -1355,6 +1355,20 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << val;
         return {};
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::ALLOW_DUPLICATE_PROBES),
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        CHECK(serverTransport);
+        bool allowDuplicateProbesInSameWrite =
+            static_cast<bool>(std::get<uint64_t>(value));
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.allowDuplicateProbesInSameWrite =
+            allowDuplicateProbesInSameWrite;
+        VLOG(3) << "ALLOW_DUPLICATE_CLONES KnobParam received: "
+                << allowDuplicateProbesInSameWrite;
+        return {};
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
