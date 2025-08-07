@@ -213,7 +213,6 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:likely",
-        "//folly/io:iobuf",
     ],
     exported_deps = [
         "//folly/lang:bits",

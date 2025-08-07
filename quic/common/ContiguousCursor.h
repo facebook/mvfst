@@ -8,16 +8,13 @@
 #pragma once
 
 #include <folly/lang/Bits.h>
-
-namespace folly {
-class IOBuf;
-}
+#include <memory>
 
 namespace quic {
 
 class ContiguousReadCursor {
  public:
-  explicit ContiguousReadCursor(const folly::IOBuf& buf) noexcept;
+  ContiguousReadCursor(const uint8_t* data, size_t size) noexcept;
 
   const uint8_t* data() const {
     return data_;
@@ -39,10 +36,9 @@ class ContiguousReadCursor {
     return data_ == end_;
   }
 
-  using Buf = std::unique_ptr<folly::IOBuf>;
   bool skip(size_t bytes) noexcept;
   bool tryReadFixedSizeString(std::string& str, size_t bytes) noexcept;
-  bool tryClone(Buf& buf, size_t bytes) noexcept;
+  bool tryClone(std::unique_ptr<uint8_t[]>& buf, size_t bytes) noexcept;
   bool tryPull(void* buf, size_t bytes) noexcept;
 
   template <class T>
@@ -67,7 +63,7 @@ class ContiguousReadCursor {
  private:
   void readFixedSizeString(std::string& str, size_t bytes) noexcept;
   void pull(void* buf, size_t bytes) noexcept;
-  void clone(Buf& buf, size_t bytes) noexcept;
+  void clone(std::unique_ptr<uint8_t[]>& buf, size_t bytes) noexcept;
 
   template <class T>
   void readBE(T& val) noexcept {
@@ -81,10 +77,8 @@ class ContiguousReadCursor {
     data_ += sizeof(T);
   }
 
-  const uint8_t* const begin_{nullptr};
   const uint8_t* data_{nullptr};
   const uint8_t* const end_{nullptr};
-  const folly::IOBuf& buf_;
 };
 
 } // namespace quic

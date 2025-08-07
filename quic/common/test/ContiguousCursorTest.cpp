@@ -7,14 +7,12 @@
 
 #include <gtest/gtest.h>
 
-#include <folly/io/IOBuf.h>
 #include <quic/common/ContiguousCursor.h>
 
 namespace quic {
 
 TEST(ContiguousCursor, EmptyBufTest) {
-  folly::IOBuf buf;
-  quic::ContiguousReadCursor cursor{buf};
+  quic::ContiguousReadCursor cursor{nullptr, 0};
 
   // empty buf => at end && can't adv && 0 bytes remaining
   EXPECT_TRUE(cursor.isAtEnd());
@@ -35,13 +33,14 @@ TEST(ContiguousCursor, EmptyBufTest) {
 
 TEST(ContiguousCursor, SimpleTest) {
   char str[] = {"\x00\x01\x02\x03\x04\x05\x06\x07hello world"};
-  auto buf = folly::IOBuf::wrapBufferAsValue(str, sizeof(str) - 1);
-  quic::ContiguousReadCursor cursor{buf};
+  size_t bufSize = sizeof(str) - 1;
+  quic::ContiguousReadCursor cursor{
+      reinterpret_cast<const uint8_t*>(str), bufSize};
 
   // non-empty buf => not at end && can adv && > 0 remaining
   EXPECT_FALSE(cursor.isAtEnd());
-  EXPECT_TRUE(cursor.canAdvance(buf.length()));
-  EXPECT_EQ(cursor.remaining(), buf.length());
+  EXPECT_TRUE(cursor.canAdvance(bufSize));
+  EXPECT_EQ(cursor.remaining(), bufSize);
 
   // pull first four bytes
   uint8_t test_buf[4] = {0};
@@ -63,9 +62,9 @@ TEST(ContiguousCursor, SimpleTest) {
 
 TEST(ContiguousCursor, RollbackTest) {
   std::string str{"\xa0\xa1\xa2\xa3hello world"};
-  auto buf = folly::IOBuf::fromString(std::move(str));
-  quic::ContiguousReadCursor cursor{*buf};
-  EXPECT_EQ(cursor.remaining(), buf->length());
+  quic::ContiguousReadCursor cursor{
+      reinterpret_cast<const uint8_t*>(str.data()), str.length()};
+  EXPECT_EQ(cursor.remaining(), str.length());
 
   uint32_t test_be{0};
 
@@ -77,7 +76,7 @@ TEST(ContiguousCursor, RollbackTest) {
   });
 
   // lambda ret true => cursor is now back at first byte
-  EXPECT_EQ(cursor.remaining(), buf->length());
+  EXPECT_EQ(cursor.remaining(), str.length());
   test_be = *reinterpret_cast<const uint32_t*>(cursor.data());
   test_be = folly::Endian::big(test_be);
   EXPECT_EQ(test_be, 0xa0a1a2a3);
@@ -88,7 +87,7 @@ TEST(ContiguousCursor, RollbackTest) {
     EXPECT_EQ(test_be, 0xa0a1a2a3);
     return false;
   });
-  EXPECT_EQ(cursor.remaining(), buf->length() - 4);
+  EXPECT_EQ(cursor.remaining(), str.length() - 4);
 
   // remaining data should yield string "hello world"
   std::string read;
