@@ -496,6 +496,11 @@ struct TransportSettings {
 
   // Increase CCA CWND limit if imminent stream completion.
   uint16_t excessCwndPctForImminentStreams{0};
+
+  // Controls whether the cloning scheduler should clone the same
+  // packet repeatedly in the same write loop.
+  // TODO: Remove this after testing the underlying change.
+  bool allowDuplicateProbesInSameWrite{true};
 };
 
 } // namespace quic

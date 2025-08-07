@@ -48,7 +48,7 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       0,
       0,
       LossState(),
-      0,
+      conn.writeCount,
       OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packetCount[PacketNumberSpace::Initial]++;
   increaseNextPacketNum(conn, PacketNumberSpace::Initial);
@@ -809,6 +809,7 @@ TEST_P(
   conn.transportSettings.cloneCryptoPacketsAtMostOnce = std::get<1>(testParams);
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
+  conn.writeCount = 0;
 
   PacketNum firstPacketNum = addInitialOutstandingPacket(conn);
   {
@@ -857,7 +858,7 @@ TEST_P(
   }
 
   // Schedule a fourth packet
-
+  ++(conn.writeCount); // Next probe is in a new write.
   ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Initial,
@@ -878,7 +879,7 @@ TEST_P(
     EXPECT_FALSE(result->clonedPacketIdentifier.has_value());
     EXPECT_FALSE(result->packet.has_value());
   } else {
-    EXPECT_TRUE(
+    ASSERT_TRUE(
         result->clonedPacketIdentifier.has_value() &&
         result->packet.has_value());
     EXPECT_EQ(

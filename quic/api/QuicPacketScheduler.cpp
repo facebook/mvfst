@@ -1042,7 +1042,7 @@ CloningScheduler::scheduleFramesForPacket(
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     }
-    // The packet is already a clone
+    // The packet is already a clone or has a clone outstanding
     if (outstandingPacket.maybeClonedPacketIdentifier) {
       const auto& frames = outstandingPacket.packet.frames;
       if (conn_.transportSettings.cloneAllPacketsWithCryptoFrame) {
@@ -1061,9 +1061,38 @@ CloningScheduler::scheduleFramesForPacket(
           }
         }
       }
-      // Otherwise, clone until it is processed
+      // This packet has already been processed (acked/lost), no need to
+      // clone it.
       if (conn_.outstandings.clonedPacketIdentifiers.count(
               *outstandingPacket.maybeClonedPacketIdentifier) == 0) {
+        continue;
+      }
+
+      // Check if we've already cloned this packet in this write loop. We don't
+      // need to clone it again.
+      bool alreadyClonedThisWrite = [&]() -> bool {
+        if (conn_.transportSettings.allowDuplicateProbesInSameWrite) {
+          // Allow the duplicate clone anyway if we explicitly want it.
+          return false;
+        }
+        for (auto it = conn_.outstandings.packets.rbegin();
+             it != conn_.outstandings.packets.rend();
+             ++it) {
+          // Break early if we've gone past the current write loop
+          if (it->metadata.writeCount < conn_.writeCount) {
+            return false;
+          }
+          if (it->metadata.writeCount == conn_.writeCount &&
+              it->maybeClonedPacketIdentifier &&
+              it->maybeClonedPacketIdentifier ==
+                  outstandingPacket.maybeClonedPacketIdentifier) {
+            return true;
+          }
+        }
+        return false;
+      }();
+
+      if (alreadyClonedThisWrite) {
         continue;
       }
     }

@@ -2889,9 +2889,15 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   auto rawSocket = socket.get();
   ON_CALL(*rawSocket, getGSO).WillByDefault(testing::Return(0));
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  // ~50 bytes
-  auto buf =
-      IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
+
+  // 90 bytes.
+  // This will be written twice. A total of 180 bytes gives enough for:
+  // 1 packet in the first write limited by the writable bytes
+  // 5 probe packets in the second write with fresh stream data
+  // 5 probe packets cloned from the first 5 outstanding packets
+  auto buf = IOBuf::copyBuffer(
+      "01234567890120123456789012012345678901201234567890123456789012345678901234567890123456789");
+
   ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
   uint64_t writableBytes = 30;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -2918,6 +2924,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   EXPECT_EQ(0, res->bytesWritten);
 
   // Normal limit
+  ++(conn->writeCount);
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 0;
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 0;
@@ -2950,6 +2957,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
 
   // Probing can exceed packet limit. In practice we limit it to
   // kPacketToSendForPTO
+  ++(conn->writeCount);
   actualWritten = 0;
   conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] =
       kDefaultWriteConnectionDataPacketLimit * 2;
@@ -2981,6 +2989,127 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   EXPECT_EQ(0, res->packetsWritten);
   EXPECT_EQ(kDefaultWriteConnectionDataPacketLimit * 2, res->probesWritten);
   EXPECT_EQ(actualWritten, res->bytesWritten);
+}
+
+TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketNoDuplicateProbesTest) {
+  auto conn = createConn();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  conn->udpSendPacketLen = aead->getCipherOverhead() + 50;
+  conn->transportSettings.allowDuplicateProbesInSameWrite = false;
+
+  EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  auto rawSocket = socket.get();
+  ON_CALL(*rawSocket, getGSO).WillByDefault(testing::Return(0));
+  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
+
+  // 60 bytes (2 packets)
+  auto buf = IOBuf::copyBuffer(
+      "01234567890120123456789012012345678901201234567890123456789");
+
+  ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
+  auto writableBytes = 10000;
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(
+          InvokeWithoutArgs([&writableBytes]() { return writableBytes; }));
+
+  // Write all the available stream data (2 packets). No probes.
+  ++(conn->writeCount);
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 0;
+  conn->transportSettings.writeConnectionDataPacketsLimit =
+      kDefaultWriteConnectionDataPacketLimit;
+  uint64_t actualWritten = 0;
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            writableBytes -= getTotalIovecLen(vec, iovec_len);
+            actualWritten += getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(2);
+  auto res = writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(2, res->packetsWritten);
+  EXPECT_EQ(0, res->probesWritten);
+  EXPECT_EQ(actualWritten, res->bytesWritten);
+
+  ASSERT_EQ(conn->outstandings.packets.size(), 2);
+  // Attempt to send 5 probes. We only have 2 outstanding packets and no more
+  // stream data.
+  // We should send a clone for each outstanding packet, and one ping.
+  // One write has the clones, and another has the ping.
+  ++(conn->writeCount);
+  actualWritten = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 5;
+
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .Times(3)
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            actualWritten += getTotalIovecLen(vec, iovec_len);
+            return getTotalIovecLen(vec, iovec_len);
+          }));
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(3);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(2);
+  res = writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(0, res->packetsWritten);
+  EXPECT_EQ(3, res->probesWritten);
+  EXPECT_EQ(actualWritten, res->bytesWritten);
+
+  // Verify there are no two packets with the same writeCount and
+  // clonedPacketIdentifier
+  EXPECT_TRUE(
+      std::adjacent_find(
+          conn->outstandings.packets.begin(),
+          conn->outstandings.packets.end(),
+          [](const auto& a, const auto& b) {
+            return a.metadata.writeCount == b.metadata.writeCount &&
+                a.maybeClonedPacketIdentifier.has_value() &&
+                b.maybeClonedPacketIdentifier.has_value() &&
+                a.maybeClonedPacketIdentifier.value() ==
+                b.maybeClonedPacketIdentifier.value();
+          }) == conn->outstandings.packets.end());
+
+  // Verify there is exactly one packet that has a PING frame
+  EXPECT_TRUE(
+      std::count_if(
+          conn->outstandings.packets.begin(),
+          conn->outstandings.packets.end(),
+          [](const auto& packet) {
+            return std::any_of(
+                packet.packet.frames.begin(),
+                packet.packet.frames.end(),
+                [](const auto& frame) {
+                  return frame.type() == QuicWriteFrame::Type::PingFrame;
+                });
+          }) == 1);
 }
 
 TEST_F(
@@ -5088,8 +5217,8 @@ TEST_F(
       .WillOnce(Return(10000));
   EXPECT_EQ(10000, congestionControlWritableBytes(*conn));
 
-  // Since cwnd is larger than available tokens, the writable bytes is capped by
-  // the available tokens
+  // Since cwnd is larger than available tokens, the writable bytes is capped
+  // by the available tokens
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillOnce(Return(20000));
   EXPECT_EQ(
