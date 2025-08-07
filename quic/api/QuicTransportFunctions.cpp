@@ -1369,6 +1369,10 @@ void writeCloseCommon(
     Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
+  if (connection.version == QuicVersion::MVFST_PRIMING &&
+      connection.nodeType == QuicNodeType::Server) {
+    return;
+  }
   // close is special, we're going to bypass all the packet sent logic for all
   // packets we send with a connection close frame.
   PacketNumberSpace pnSpace = header.getPacketNumberSpace();
@@ -1699,6 +1703,11 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     TimePoint writeLoopBeginTime,
     bool flushOnImminentStreamCompletion,
     const std::string& token) {
+  if (connection.version == QuicVersion::MVFST_PRIMING &&
+      connection.nodeType == QuicNodeType::Server) {
+    return WriteQuicDataResult{0, 0, 0};
+  }
+
   if (connection.loopDetectorCallback) {
     connection.writeDebugState.schedulerName = scheduler.name().str();
     connection.writeDebugState.noWriteReason = NoWriteReason::WRITE_OK;

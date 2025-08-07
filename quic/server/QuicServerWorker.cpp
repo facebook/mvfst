@@ -1379,7 +1379,10 @@ void QuicServerWorker::onConnectionUnbound(
       !(localConnectionError && localConnectionError->code.asLocalErrorCode() &&
         *localConnectionError->code.asLocalErrorCode() ==
             LocalErrorCode::CONNECTION_ABANDONED)) {
-    QUIC_STATS(statsCallback_, onConnectionCloseZeroBytesWritten);
+    auto conn = transport->getState();
+    if (!conn || conn->version != QuicVersion::MVFST_PRIMING) {
+      QUIC_STATS(statsCallback_, onConnectionCloseZeroBytesWritten);
+    }
   }
 
   // Ensures we only process `onConnectionUnbound()` once.

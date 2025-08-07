@@ -296,6 +296,16 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     BufPtr data,
     bool eof,
     ByteEventCallback* cb) {
+  if (conn_->version == QuicVersion::MVFST_PRIMING &&
+      isBidirectionalStream(id)) {
+    // Once data is available to write on a stream,
+    // the Priming connection can be closed
+    closeImpl(QuicError(
+        QuicErrorCode(TransportErrorCode::NO_ERROR),
+        std::string("no error: priming connection closed")));
+    return quic::make_unexpected(LocalErrorCode::NO_ERROR);
+  }
+
   if (isReceivingStream(conn_->nodeType, id)) {
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
@@ -1000,6 +1010,10 @@ void QuicTransportBaseLite::runOnEvbAsync(
 }
 
 void QuicTransportBaseLite::updateWriteLooper(bool thisIteration) {
+  if (conn_->version == QuicVersion::MVFST_PRIMING) {
+    writeLooper_->stop();
+    return;
+  }
   if (closeState_ == CloseState::CLOSED) {
     VLOG(10) << nodeToString(conn_->nodeType)
              << " stopping write looper because conn closed " << *this;
