@@ -214,13 +214,14 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
   return {};
 }
 
-void QuicServerTransport::accept() {
+void QuicServerTransport::accept(folly::Optional<QuicVersion> quicVersion) {
   setIdleTimer();
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
   serverConn_->serverHandshakeLayer->initialize(
       getFollyEventbase(),
       this,
+      std::move(quicVersion),
       std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 

@@ -7,11 +7,13 @@
 
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 #include <fizz/protocol/Protocol.h>
+#include <fizz/server/ReplayCache.h>
 #include <fizz/server/State.h>
 
 // This is necessary for the conversion between QuicServerConnectionState and
@@ -51,9 +53,21 @@ FizzServerHandshake::FizzServerHandshake(
 
 void FizzServerHandshake::initializeImpl(
     HandshakeCallback* callback,
-    std::unique_ptr<fizz::server::AppTokenValidator> validator) {
-  auto context = std::make_shared<fizz::server::FizzServerContext>(
-      *fizzContext_->getContext());
+    std::unique_ptr<fizz::server::AppTokenValidator> validator,
+    folly::Optional<QuicVersion> quicVersion) {
+  std::shared_ptr<fizz::server::FizzServerContext> context;
+
+  if (quicVersion.has_value() &&
+      quicVersion.value() == QuicVersion::MVFST_PRIMING) {
+    // Use the priming context with relaxed early data settings
+    context = std::make_shared<fizz::server::FizzServerContext>(
+        *fizzContext_->getPrimingContext());
+  } else {
+    // Use the regular context
+    context = std::make_shared<fizz::server::FizzServerContext>(
+        *fizzContext_->getContext());
+  }
+
   context->setFactory(cryptoFactory_->getFizzFactory());
   context->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
   context->setVersionFallbackEnabled(false);

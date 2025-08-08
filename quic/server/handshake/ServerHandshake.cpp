@@ -28,9 +28,10 @@ void ServerHandshake::accept(
 void ServerHandshake::initialize(
     folly::Executor* executor,
     HandshakeCallback* callback,
+    folly::Optional<QuicVersion> quicVersion,
     std::unique_ptr<fizz::server::AppTokenValidator> validator) {
   executor_ = executor;
-  initializeImpl(callback, std::move(validator));
+  initializeImpl(callback, std::move(validator), std::move(quicVersion));
 }
 
 quic::Expected<void, QuicError> ServerHandshake::doHandshake(

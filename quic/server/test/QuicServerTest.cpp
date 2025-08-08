@@ -258,7 +258,7 @@ void QuicServerWorkerTest::expectConnectionCreation(
         EXPECT_EQ(params.workerId, 42);
       }));
   EXPECT_CALL(*transport, setTransportSettings(_));
-  EXPECT_CALL(*transport, accept());
+  EXPECT_CALL(*transport, accept(_));
   EXPECT_CALL(*transport, setTransportStatsCallback(quicStats_));
 }
 
@@ -271,7 +271,7 @@ void QuicServerWorkerTest::expectConnCreateRefused() {
   EXPECT_CALL(*transport, setConnectionIdAlgo(_)).Times(0);
   EXPECT_CALL(*transport, setServerConnectionIdParams(_)).Times(0);
   EXPECT_CALL(*transport, setTransportSettings(_)).Times(0);
-  EXPECT_CALL(*transport, accept()).Times(0);
+  EXPECT_CALL(*transport, accept(_)).Times(0);
   EXPECT_CALL(*transport, setTransportStatsCallback(quicStats_)).Times(0);
   EXPECT_CALL(*transport, onNetworkData(_, _)).Times(0);
 }
@@ -2491,7 +2491,7 @@ class QuicServerTakeoverTest : public Test {
           // setup expectations
           EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(qEvb));
           EXPECT_CALL(*transport, setTransportSettings(_));
-          EXPECT_CALL(*transport, accept());
+          EXPECT_CALL(*transport, accept(_));
           EXPECT_CALL(*transport, setSupportedVersions(_));
           EXPECT_CALL(*transport, setRoutingCallback(_));
           EXPECT_CALL(*transport, setOriginalPeerAddress(_));
@@ -3074,7 +3074,7 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
         EXPECT_CALL(*transport, setOriginalPeerAddress(_));
         EXPECT_CALL(*transport, setTransportSettings(_));
         EXPECT_CALL(*transport, setServerConnectionIdParams(_));
-        EXPECT_CALL(*transport, accept());
+        EXPECT_CALL(*transport, accept(_));
         // post baton upon receiving the data
         EXPECT_CALL(*transport, onNetworkData(_, _))
             .WillOnce(Invoke(
@@ -3173,7 +3173,7 @@ TEST_F(QuicServerTest, ZeroRttBeforeInitial) {
         EXPECT_CALL(*transport, setOriginalPeerAddress(_));
         EXPECT_CALL(*transport, setTransportSettings(_));
         EXPECT_CALL(*transport, setServerConnectionIdParams(_));
-        EXPECT_CALL(*transport, accept());
+        EXPECT_CALL(*transport, accept(_));
         // post baton upon receiving the data
         EXPECT_CALL(*transport, onNetworkData(_, _))
             .Times(2)

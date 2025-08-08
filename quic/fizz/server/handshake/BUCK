@@ -15,6 +15,8 @@ mvfst_cpp_library(
     deps = [
         ":handshake_app_token",
         "//fizz/protocol:protocol",
+        "//fizz/server:replay_cache",
+        "//quic:constants",
         "//quic/server/state:server",
     ],
     exported_deps = [

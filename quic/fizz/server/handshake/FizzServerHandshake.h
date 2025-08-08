@@ -35,7 +35,8 @@ class FizzServerHandshake : public ServerHandshake {
  private:
   void initializeImpl(
       HandshakeCallback* callback,
-      std::unique_ptr<fizz::server::AppTokenValidator> validator) override;
+      std::unique_ptr<fizz::server::AppTokenValidator> validator,
+      folly::Optional<QuicVersion> quicVersion) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;

@@ -233,7 +233,7 @@ class MockQuicTransport : public QuicServerTransport {
   MOCK_METHOD(const folly::SocketAddress&, getOriginalPeerAddress, (), (const));
 
   MOCK_METHOD((std::shared_ptr<QuicEventBase>), getEventBase, (), (const));
-  MOCK_METHOD((void), accept, (), ());
+  MOCK_METHOD((void), accept, (folly::Optional<QuicVersion>), ());
   MOCK_METHOD((void), setTransportSettings, (TransportSettings), ());
   MOCK_METHOD((void), setOriginalPeerAddress, (const folly::SocketAddress&));
   MOCK_METHOD((void), setPacingTimer, (QuicTimer::SharedPtr), (noexcept));

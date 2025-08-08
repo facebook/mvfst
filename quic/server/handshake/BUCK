@@ -21,6 +21,7 @@ mvfst_cpp_library(
         "//fizz/protocol:default_certificate_verifier",
         "//fizz/server:fizz_server",
         "//fizz/server:fizz_server_context",
+        "//folly:optional",
         "//folly/io:iobuf",
         "//folly/io/async:delayed_destruction",
         "//quic:constants",

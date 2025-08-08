@@ -161,7 +161,7 @@ class QuicServerTransport
     return *ctx_;
   }
 
-  virtual void accept();
+  virtual void accept(folly::Optional<QuicVersion> quicVersion = folly::none);
 
   virtual void setBufAccessor(BufAccessor* bufAccessor);
 

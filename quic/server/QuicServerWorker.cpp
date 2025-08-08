@@ -734,7 +734,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     // parameters to create server chosen connection id
     trans->setServerConnectionIdParams(ServerConnectionIdParams(
         cidVersion_, hostId_, static_cast<uint8_t>(processId_), workerId_));
-    trans->accept();
+    trans->accept(quicVersion);
     auto result = sourceAddressMap_.emplace(
         std::make_pair(std::make_pair(client, dstConnId), trans));
     CHECK(result.second);

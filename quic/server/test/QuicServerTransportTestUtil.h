@@ -240,7 +240,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   virtual void SetUpChild() {}
 
   void startTransport() {
-    server->accept();
+    server->accept(QuicVersion::QUIC_V1);
     setupConnection();
     EXPECT_TRUE(server->idleTimeout().isTimerCallbackScheduled());
     EXPECT_EQ(server->getConn().peerConnectionIds.size(), 1);

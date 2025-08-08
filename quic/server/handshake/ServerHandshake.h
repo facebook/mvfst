@@ -11,6 +11,7 @@
 #include <fizz/server/FizzServer.h>
 #include <fizz/server/FizzServerContext.h>
 
+#include <folly/Optional.h>
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
 
@@ -85,6 +86,7 @@ class ServerHandshake : public Handshake {
   virtual void initialize(
       folly::Executor* executor,
       HandshakeCallback* callback,
+      folly::Optional<QuicVersion> quicVersion = folly::none,
       std::unique_ptr<fizz::server::AppTokenValidator> validator = nullptr);
 
   /**
@@ -317,7 +319,8 @@ class ServerHandshake : public Handshake {
  private:
   virtual void initializeImpl(
       HandshakeCallback* callback,
-      std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
+      std::unique_ptr<fizz::server::AppTokenValidator> validator,
+      folly::Optional<QuicVersion> quicVersion = folly::none) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;

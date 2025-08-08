@@ -4785,7 +4785,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNotAllowedInUnencryptedPacket) {
 TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
   folly::EventBase testLooper;
   setupClientReadCodec();
-  getFakeHandshakeLayer()->initialize(&testLooper, server.get());
+  getFakeHandshakeLayer()->initialize(
+      &testLooper, server.get(), folly::make_optional(QuicVersion::QUIC_V1));
 
   recvClientHello();
   testLooper.loop();

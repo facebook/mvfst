@@ -27,6 +27,14 @@ class FizzServerQuicHandshakeContext
     return context_;
   }
 
+  /**
+   * Returns a context configured specifically for MVFST_PRIMING with relaxed
+   * 0-RTT ticket age check. This is a copy of the base context with custom
+   * early data settings applied for priming use cases.
+   */
+  std::shared_ptr<const fizz::server::FizzServerContext> getPrimingContext()
+      const;
+
  private:
   /**
    * We make the constructor private so that users have to use the Builder
@@ -46,6 +54,10 @@ class FizzServerQuicHandshakeContext
   std::shared_ptr<const fizz::server::FizzServerContext> context_;
 
   std::unique_ptr<CryptoFactory> cryptoFactory_;
+
+  // Cached priming context with relaxed early data settings
+  mutable std::shared_ptr<const fizz::server::FizzServerContext>
+      primingContext_;
 
  public:
   class Builder {

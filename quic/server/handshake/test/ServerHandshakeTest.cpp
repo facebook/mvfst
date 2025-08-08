@@ -62,7 +62,8 @@ class ServerHandshakeTest : public Test {
   }
 
   virtual void initialize() {
-    handshake->initialize(&evb, &serverCallback);
+    handshake->initialize(
+        &evb, &serverCallback, folly::make_optional(getVersion()));
   }
 
   void SetUp() override {
@@ -858,7 +859,11 @@ class ServerHandshakeZeroRttTest
     auto validator =
         std::make_unique<fizz::server::test::MockAppTokenValidator>();
     validator_ = validator.get();
-    handshake->initialize(&evb, &serverCallback, std::move(validator));
+    handshake->initialize(
+        &evb,
+        &serverCallback,
+        folly::make_optional(getVersion()),
+        std::move(validator));
   }
 
  protected:
