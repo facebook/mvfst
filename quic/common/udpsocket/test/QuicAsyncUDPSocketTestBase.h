@@ -15,8 +15,6 @@ class QuicAsyncUDPSocketTestBase : public testing::Test {
  public:
   void SetUp() override {
     udpSocket_ = T::makeQuicAsyncUDPSocket();
-    addr_ = folly::SocketAddress("127.0.0.1", 0);
-    CHECK(!udpSocket_->bind(addr_).hasError());
 
     // For QUIC, we're only interested in the shouldOnlyNotify path.
     EXPECT_CALL(readCb_, shouldOnlyNotify())
@@ -27,7 +25,6 @@ class QuicAsyncUDPSocketTestBase : public testing::Test {
   quic::test::MockErrMessageCallback errCb_;
   quic::test::MockUDPReadCallback readCb_;
   std::shared_ptr<quic::QuicAsyncUDPSocket> udpSocket_;
-  folly::SocketAddress addr_;
 };
 
 template <class T>
@@ -39,6 +36,8 @@ TYPED_TEST_SUITE_P(QuicAsyncUDPSocketTest);
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
+  ASSERT_FALSE(
+      this->udpSocket_->bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   this->udpSocket_->resumeRead(&this->readCb_);
   ASSERT_FALSE(
       this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
@@ -76,6 +75,8 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
+  ASSERT_FALSE(
+      this->udpSocket_->bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   this->udpSocket_->resumeRead(&this->readCb_);
   ASSERT_FALSE(
       this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
@@ -114,6 +115,8 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
+  ASSERT_FALSE(
+      this->udpSocket_->bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
   this->udpSocket_->resumeRead(&this->readCb_);
   ASSERT_FALSE(
       this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
@@ -145,6 +148,34 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
 #endif
 }
 
+TYPED_TEST_P(QuicAsyncUDPSocketTest, ConnectMarksSocketBoundIPv4) {
+  auto connectAddress = folly::SocketAddress("127.0.0.1", 10000);
+  ASSERT_FALSE(this->udpSocket_->connect(connectAddress).hasError());
+
+  EXPECT_TRUE(this->udpSocket_->isBound());
+
+  auto localAddressResult = this->udpSocket_->address();
+  ASSERT_FALSE(localAddressResult.hasError());
+
+  auto addrFamilyResult = this->udpSocket_->getLocalAddressFamily();
+  ASSERT_FALSE(this->udpSocket_->getLocalAddressFamily().hasError());
+  EXPECT_EQ(addrFamilyResult.value(), AF_INET);
+}
+
+TYPED_TEST_P(QuicAsyncUDPSocketTest, ConnectMarksSocketBoundIPv6) {
+  auto connectAddress = folly::SocketAddress("::1", 10000);
+  ASSERT_FALSE(this->udpSocket_->connect(connectAddress).hasError());
+
+  EXPECT_TRUE(this->udpSocket_->isBound());
+
+  auto localAddressResult = this->udpSocket_->address();
+  ASSERT_FALSE(localAddressResult.hasError());
+
+  auto addrFamilyResult = this->udpSocket_->getLocalAddressFamily();
+  ASSERT_FALSE(this->udpSocket_->getLocalAddressFamily().hasError());
+  EXPECT_EQ(addrFamilyResult.value(), AF_INET6);
+}
+
 // Tests end here
 
 // All tests must be registered
@@ -152,6 +183,8 @@ REGISTER_TYPED_TEST_SUITE_P(
     QuicAsyncUDPSocketTest,
     ErrToNonExistentServer,
     TestUnsetErrCallback,
-    CloseInErrorCallback
+    CloseInErrorCallback,
+    ConnectMarksSocketBoundIPv4,
+    ConnectMarksSocketBoundIPv6
     // Add more tests here
 );

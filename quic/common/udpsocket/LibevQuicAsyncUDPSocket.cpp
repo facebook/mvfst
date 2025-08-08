@@ -387,8 +387,11 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::connect(
 
   sockaddr_storage addrStorage;
   address.getAddress(&addrStorage);
-  auto saddr = reinterpret_cast<sockaddr&>(addrStorage);
-  if (::connect(fd_, &saddr, sizeof(saddr)) != 0) {
+
+  if (::connect(
+          fd_,
+          reinterpret_cast<sockaddr*>(&addrStorage),
+          address.getActualSize()) != 0) {
     int errnoCopy = errno;
     std::string errorMsg = "Libev connect failed to " + address.describe();
     errorMsg += ": " + folly::errnoStr(errnoCopy);
@@ -399,11 +402,13 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::connect(
 
   connected_ = true;
   connectedAddress_ = address;
+  bound_ = true;
 
   if (!localAddress_.isInitialized()) {
-    memset(&saddr, 0, sizeof(saddr));
-    socklen_t len = sizeof(saddr);
-    if (::getsockname(fd_, &saddr, &len) != 0) {
+    memset(&addrStorage, 0, address.getActualSize());
+    socklen_t len = sizeof(addrStorage);
+    if (::getsockname(fd_, reinterpret_cast<sockaddr*>(&addrStorage), &len) !=
+        0) {
       int errnoCopy = errno;
       std::string errorMsg = "Libev getsockname failed after connect: " +
           folly::errnoStr(errnoCopy);
@@ -413,8 +418,10 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::connect(
           std::move(errorMsg)));
     }
 
-    localAddress_.setFromSockaddr(&saddr, len);
+    localAddress_.setFromSockaddr(
+        reinterpret_cast<sockaddr*>(&addrStorage), len);
   }
+
   return {};
 }
 
