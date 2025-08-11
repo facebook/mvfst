@@ -311,4 +311,97 @@ std::unique_ptr<QuicBuffer> QuicBuffer::unlink() {
   return std::unique_ptr<QuicBuffer>(this);
 }
 
+bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
+    const noexcept {
+  // Handle null pointer cases
+  if (a == nullptr && b == nullptr) {
+    return true;
+  }
+  if (a == nullptr || b == nullptr) {
+    return false;
+  }
+
+  // First check if both chains have the same total length
+  std::size_t aLength = a->computeChainDataLength();
+  std::size_t bLength = b->computeChainDataLength();
+
+  if (aLength != bLength) {
+    return false;
+  }
+
+  // If both are empty, they are equal
+  if (aLength == 0) {
+    return true;
+  }
+
+  // Compare data byte by byte across both chains
+  const QuicBuffer* aCurrent = a;
+  const QuicBuffer* bCurrent = b;
+  std::size_t aOffset = 0;
+  std::size_t bOffset = 0;
+
+  // Skip empty buffers in both chains to start
+  while (aCurrent->length() == 0) {
+    aCurrent = aCurrent->next();
+    if (aCurrent == a) {
+      LOG(FATAL) << "Unreachable, we checked aLength != 0";
+      return true;
+    }
+  }
+
+  while (bCurrent->length() == 0) {
+    bCurrent = bCurrent->next();
+    if (bCurrent == b) {
+      // All buffers in other chain are empty
+      LOG(FATAL) << "Unreachable, since aLength == bLength and "
+                 << "aLength != 0";
+      return true;
+    }
+  }
+
+  std::size_t remainingBytes = aLength;
+
+  while (remainingBytes > 0) {
+    // Get the number of bytes we can compare from current positions
+    std::size_t aBytesAvailable = aCurrent->length() - aOffset;
+    std::size_t bBytesAvailable = bCurrent->length() - bOffset;
+    std::size_t bytesToCompare =
+        std::min({aBytesAvailable, bBytesAvailable, remainingBytes});
+
+    // Compare the bytes
+    if (memcmp(
+            aCurrent->data() + aOffset,
+            bCurrent->data() + bOffset,
+            bytesToCompare) != 0) {
+      return false;
+    }
+
+    // Update offsets and remaining bytes
+    aOffset += bytesToCompare;
+    bOffset += bytesToCompare;
+    remainingBytes -= bytesToCompare;
+
+    // Move to next buffer if current buffer is exhausted
+    if (aOffset == aCurrent->length()) {
+      aCurrent = aCurrent->next();
+      aOffset = 0;
+      // Skip empty buffers
+      while (aCurrent != a && aCurrent->length() == 0) {
+        aCurrent = aCurrent->next();
+      }
+    }
+
+    if (bOffset == bCurrent->length()) {
+      bCurrent = bCurrent->next();
+      bOffset = 0;
+      // Skip empty buffers
+      while (bCurrent != b && bCurrent->length() == 0) {
+        bCurrent = bCurrent->next();
+      }
+    }
+  }
+
+  return true;
+}
+
 } // namespace quic

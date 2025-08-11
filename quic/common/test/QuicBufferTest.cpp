@@ -488,4 +488,134 @@ TEST(QuicBufferTest, TestRange) {
   EXPECT_TRUE(range.empty());
 }
 
+TEST(QuicBufferTest, TestEqualsSingleBuffer) {
+  QuicBufferEqualTo equalTo;
+
+  // Test identical single buffers
+  auto buffer1 = QuicBuffer::copyBuffer("hello", 5);
+  auto buffer2 = QuicBuffer::copyBuffer("hello", 5);
+  EXPECT_TRUE(equalTo(buffer1.get(), buffer2.get()));
+
+  // Test different single buffers
+  auto buffer3 = QuicBuffer::copyBuffer("world", 5);
+  EXPECT_FALSE(equalTo(buffer1.get(), buffer3.get()));
+
+  // Test different lengths
+  auto buffer4 = QuicBuffer::copyBuffer("hell", 4);
+  EXPECT_FALSE(equalTo(buffer1.get(), buffer4.get()));
+}
+
+TEST(QuicBufferTest, TestEqualsEmptyBuffers) {
+  QuicBufferEqualTo equalTo;
+
+  // Test two empty buffers
+  auto buffer1 = QuicBuffer::create(100);
+  auto buffer2 = QuicBuffer::create(200);
+  EXPECT_TRUE(equalTo(buffer1.get(), buffer2.get()));
+
+  // Test empty vs non-empty
+  auto buffer3 = QuicBuffer::copyBuffer("hello", 5);
+  EXPECT_FALSE(equalTo(buffer1.get(), buffer3.get()));
+  EXPECT_FALSE(equalTo(buffer3.get(), buffer1.get()));
+}
+
+TEST(QuicBufferTest, TestEqualsChainedBuffers) {
+  QuicBufferEqualTo equalTo;
+
+  // Create first chained buffer: "hello" + "world"
+  auto buffer1_1 = QuicBuffer::copyBuffer("hello", 5);
+  auto buffer1_2 = QuicBuffer::copyBuffer("world", 5);
+  buffer1_1->appendToChain(std::move(buffer1_2));
+
+  // Create second chained buffer: "hello" + "world"
+  auto buffer2_1 = QuicBuffer::copyBuffer("hello", 5);
+  auto buffer2_2 = QuicBuffer::copyBuffer("world", 5);
+  buffer2_1->appendToChain(std::move(buffer2_2));
+
+  EXPECT_TRUE(equalTo(buffer1_1.get(), buffer2_1.get()));
+
+  // Create third chained buffer: "hello" + "earth"
+  auto buffer3_1 = QuicBuffer::copyBuffer("hello", 5);
+  auto buffer3_2 = QuicBuffer::copyBuffer("earth", 5);
+  buffer3_1->appendToChain(std::move(buffer3_2));
+
+  EXPECT_FALSE(equalTo(buffer1_1.get(), buffer3_1.get()));
+}
+
+TEST(QuicBufferTest, TestEqualsDifferentSegmentation) {
+  QuicBufferEqualTo equalTo;
+
+  // Create single buffer: "helloworld"
+  auto singleBuffer = QuicBuffer::copyBuffer("helloworld", 10);
+
+  // Create chained buffer: "hello" + "world"
+  auto chainedBuffer1 = QuicBuffer::copyBuffer("hello", 5);
+  auto chainedBuffer2 = QuicBuffer::copyBuffer("world", 5);
+  chainedBuffer1->appendToChain(std::move(chainedBuffer2));
+
+  // Should be equal despite different segmentation
+  EXPECT_TRUE(equalTo(singleBuffer.get(), chainedBuffer1.get()));
+  EXPECT_TRUE(equalTo(chainedBuffer1.get(), singleBuffer.get()));
+
+  // Create differently segmented chain: "he" + "llo" + "wo" + "rld"
+  auto chainedBuffer3_1 = QuicBuffer::copyBuffer("he", 2);
+  auto chainedBuffer3_2 = QuicBuffer::copyBuffer("llo", 3);
+  auto chainedBuffer3_3 = QuicBuffer::copyBuffer("wo", 2);
+  auto chainedBuffer3_4 = QuicBuffer::copyBuffer("rld", 3);
+  chainedBuffer3_1->appendToChain(std::move(chainedBuffer3_2));
+  chainedBuffer3_1->appendToChain(std::move(chainedBuffer3_3));
+  chainedBuffer3_1->appendToChain(std::move(chainedBuffer3_4));
+
+  // Should all be equal
+  EXPECT_TRUE(equalTo(singleBuffer.get(), chainedBuffer3_1.get()));
+  EXPECT_TRUE(equalTo(chainedBuffer1.get(), chainedBuffer3_1.get()));
+}
+
+TEST(QuicBufferTest, TestEqualsWithEmptyBuffersInChain) {
+  QuicBufferEqualTo equalTo;
+
+  // Create chain with empty buffers: "hello" + "" + "world" + ""
+  auto buffer1_1 = QuicBuffer::copyBuffer("hello", 5);
+  auto buffer1_2 = QuicBuffer::create(100); // empty
+  auto buffer1_3 = QuicBuffer::copyBuffer("world", 5);
+  auto buffer1_4 = QuicBuffer::create(100); // empty
+  buffer1_1->appendToChain(std::move(buffer1_2));
+  buffer1_1->appendToChain(std::move(buffer1_3));
+  buffer1_1->appendToChain(std::move(buffer1_4));
+
+  // Create simple chain: "hello" + "world"
+  auto buffer2_1 = QuicBuffer::copyBuffer("hello", 5);
+  auto buffer2_2 = QuicBuffer::copyBuffer("world", 5);
+  buffer2_1->appendToChain(std::move(buffer2_2));
+
+  // Should be equal despite empty buffers
+  EXPECT_TRUE(equalTo(buffer1_1.get(), buffer2_1.get()));
+  EXPECT_TRUE(equalTo(buffer2_1.get(), buffer1_1.get()));
+}
+
+TEST(QuicBufferTest, TestEqualsSelf) {
+  QuicBufferEqualTo equalTo;
+
+  // Test buffer equals itself
+  auto buffer = QuicBuffer::copyBuffer("hello", 5);
+  EXPECT_TRUE(equalTo(buffer.get(), buffer.get()));
+
+  // Test chained buffer equals itself
+  auto chainedBuffer = QuicBuffer::copyBuffer("hello", 5);
+  auto chainedBuffer2 = QuicBuffer::copyBuffer("world", 5);
+  chainedBuffer->appendToChain(std::move(chainedBuffer2));
+  EXPECT_TRUE(equalTo(chainedBuffer.get(), chainedBuffer.get()));
+}
+
+TEST(QuicBufferTest, TestEqualsNullPointers) {
+  QuicBufferEqualTo equalTo;
+
+  // Test null pointer cases
+  EXPECT_TRUE(equalTo(nullptr, nullptr));
+
+  auto buffer = QuicBuffer::copyBuffer("hello", 5);
+  EXPECT_FALSE(equalTo(buffer.get(), nullptr));
+  EXPECT_FALSE(equalTo(nullptr, buffer.get()));
+}
+
 } // namespace quic

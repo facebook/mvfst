@@ -302,4 +302,13 @@ class QuicBuffer {
   std::size_t capacity_{0};
 };
 
+// Functor class to compare two QuicBuffer chains for equality
+// Two QuicBuffers are equal if their contents, when considered as a single
+// contiguous buffer, are identical
+class QuicBufferEqualTo {
+ public:
+  [[nodiscard]] bool operator()(const QuicBuffer* a, const QuicBuffer* b)
+      const noexcept;
+};
+
 } // namespace quic
