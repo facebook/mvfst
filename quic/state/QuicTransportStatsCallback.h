@@ -165,6 +165,10 @@ class QuicTransportStatsCallback {
 
   virtual void onZeroRttRejected() = 0;
 
+  virtual void onZeroRttPrimingAccepted() = 0;
+
+  virtual void onZeroRttPrimingRejected() = 0;
+
   virtual void onDatagramRead(size_t datagramSize) = 0;
 
   virtual void onDatagramWrite(size_t datagramSize) = 0;

@@ -64,6 +64,8 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onZeroRttBufferedPruned, ());
   MOCK_METHOD(void, onZeroRttAccepted, ());
   MOCK_METHOD(void, onZeroRttRejected, ());
+  MOCK_METHOD(void, onZeroRttPrimingAccepted, ());
+  MOCK_METHOD(void, onZeroRttPrimingRejected, ());
   MOCK_METHOD(void, onDatagramRead, (size_t));
   MOCK_METHOD(void, onDatagramWrite, (size_t));
   MOCK_METHOD(void, onDatagramDroppedOnWrite, ());

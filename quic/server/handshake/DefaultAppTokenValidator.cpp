@@ -39,8 +39,14 @@ bool DefaultAppTokenValidator::validate(
   SCOPE_EXIT {
     if (validated) {
       QUIC_STATS(conn_->statsCallback, onZeroRttAccepted);
+      if (conn_->version == QuicVersion::MVFST_PRIMING) {
+        QUIC_STATS(conn_->statsCallback, onZeroRttPrimingAccepted);
+      }
     } else {
       QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
+      if (conn_->version == QuicVersion::MVFST_PRIMING) {
+        QUIC_STATS(conn_->statsCallback, onZeroRttPrimingRejected);
+      }
     }
   };
 

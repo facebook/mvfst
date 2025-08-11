@@ -231,6 +231,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
+  void onZeroRttPrimingAccepted() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
+  void onZeroRttPrimingRejected() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
   void onDatagramRead(size_t datagramSize) override {
     VLOG(2) << prefix_ << __func__ << " size=" << datagramSize;
   }
