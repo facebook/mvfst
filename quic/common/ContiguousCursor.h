@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <folly/Range.h>
+#include <folly/Utility.h>
 #include <folly/lang/Bits.h>
 #include <memory>
 
@@ -28,6 +30,10 @@ class ContiguousReadCursor {
     return uintptr_t(end_ - data_);
   }
 
+  size_t totalLength() const {
+    return remaining();
+  }
+
   bool canAdvance(size_t bytes) const noexcept {
     return uintptr_t(end_ - data_) >= bytes;
   }
@@ -36,10 +42,33 @@ class ContiguousReadCursor {
     return data_ == end_;
   }
 
+  size_t getCurrentPosition() const noexcept {
+    return uintptr_t(data_ - begin_);
+  }
+
   bool skip(size_t bytes) noexcept;
   bool tryReadFixedSizeString(std::string& str, size_t bytes) noexcept;
-  bool tryClone(std::unique_ptr<uint8_t[]>& buf, size_t bytes) noexcept;
+  bool tryClone(uint8_t* buf, size_t bytes) noexcept;
   bool tryPull(void* buf, size_t bytes) noexcept;
+
+  // Make sure you validate before calling this function.
+  void pull(void* buf, size_t bytes) noexcept;
+
+  // Make sure you validate before calling this function.
+  template <class T>
+  T read() {
+    T value{static_cast<T>(folly::unsafe_default_initialized)};
+    memcpy(&value, data_, sizeof(T));
+    data_ += sizeof(T);
+    return value;
+  }
+
+  // Make sure you validate before calling this function.
+  template <class T>
+  void readBE(T& val) noexcept {
+    read(val);
+    val = folly::Endian::big(val);
+  }
 
   template <class T>
   bool tryReadBE(T& val) noexcept {
@@ -48,6 +77,10 @@ class ContiguousReadCursor {
     }
     readBE(val);
     return true;
+  }
+
+  folly::ByteRange peekBytes() const noexcept {
+    return folly::ByteRange(data_, end_);
   }
 
   // lambda that returns bool if should rollback to where data_ was before
@@ -60,16 +93,14 @@ class ContiguousReadCursor {
     }
   }
 
+  void reset(const uint8_t* data, size_t size) noexcept {
+    begin_ = data_ = data;
+    end_ = data + size;
+  }
+
  private:
   void readFixedSizeString(std::string& str, size_t bytes) noexcept;
-  void pull(void* buf, size_t bytes) noexcept;
-  void clone(std::unique_ptr<uint8_t[]>& buf, size_t bytes) noexcept;
-
-  template <class T>
-  void readBE(T& val) noexcept {
-    read(val);
-    val = folly::Endian::big(val);
-  }
+  void clone(uint8_t* buf, size_t bytes) noexcept;
 
   template <class T>
   void read(T& val) noexcept {
@@ -77,8 +108,9 @@ class ContiguousReadCursor {
     data_ += sizeof(T);
   }
 
+  const uint8_t* begin_{nullptr};
   const uint8_t* data_{nullptr};
-  const uint8_t* const end_{nullptr};
+  const uint8_t* end_{nullptr};
 };
 
 } // namespace quic
