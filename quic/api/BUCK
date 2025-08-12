@@ -44,6 +44,21 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "transport_info",
+    srcs = [
+    ],
+    headers = [
+        "TransportInfo.h",
+    ],
+    deps = [
+    ],
+    exported_deps = [
+        "//quic/common:optional",
+        "//quic/congestion_control:congestion_controller",
+    ],
+)
+
+mvfst_cpp_library(
     name = "transport",
     srcs = [
         "QuicTransportBase.cpp",
@@ -115,6 +130,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":quic_callbacks",
         ":transport_helpers",
+        ":transport_info",
         "//folly:maybe_managed_ptr",
         "//folly/io/async:async_transport_certificate",
         "//quic:exception",
