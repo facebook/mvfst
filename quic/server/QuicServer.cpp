@@ -243,6 +243,7 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->setNewConnectionSocketFactory(socketFactory_.get());
   worker->setSupportedVersions(supportedVersions_);
   worker->rejectNewConnections(rejectNewConnections_);
+  worker->setPrimingEnabledCallback(isPrimingEnabled_);
   worker->setProcessId(processId_);
   worker->setHostId(hostId_);
   worker->setConnectionIdVersion(cidVersion_);
@@ -643,6 +644,14 @@ void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {
   rejectNewConnections_ = rejectFn;
   runOnAllWorkers([rejectFn](auto worker) mutable {
     worker->rejectNewConnections(rejectFn);
+  });
+}
+
+void QuicServer::setPrimingEnabledCallback(
+    std::function<bool()> isPrimingEnabled) {
+  isPrimingEnabled_ = isPrimingEnabled;
+  runOnAllWorkers([isPrimingEnabled](auto worker) mutable {
+    worker->setPrimingEnabledCallback(isPrimingEnabled);
   });
 }
 

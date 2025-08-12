@@ -179,6 +179,12 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void rejectNewConnections(std::function<bool()> rejectFn);
 
   /**
+   * Set callback to determine if MVFST_PRIMING version handling is
+   * enabled.
+   */
+  void setPrimingEnabledCallback(std::function<bool()> isPrimingEnabled);
+
+  /**
    * Tells the server to begin rejecting any new connections with block listed
    * source ports. Like rejectNewConnections above, the parameter function is
    * stored and evaluated on each new connection before being accepted.
@@ -440,6 +446,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   uint32_t hostId_{0};
   ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
   std::function<bool()> rejectNewConnections_{[]() { return false; }};
+  std::function<bool()> isPrimingEnabled_{[]() { return false; }};
   std::function<bool(uint16_t)> isBlockListedSrcPort_{
       [](uint16_t) { return false; }};
   // factory to create per worker QuicTransportStatsCallback

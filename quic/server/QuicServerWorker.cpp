@@ -281,6 +281,12 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
                                  supportedVersions_.begin(),
                                  supportedVersions_.end(),
                                  invariant.version) == supportedVersions_.end();
+
+    if (invariant.version == QuicVersion::MVFST_PRIMING &&
+        !isPrimingEnabled_()) {
+      negotiationNeeded = true;
+    }
+
     if (negotiationNeeded && !isInitial) {
       VLOG(3) << "Dropping non-initial packet due to invalid version";
       QUIC_STATS(
@@ -1274,6 +1280,11 @@ void QuicServerWorker::setFizzContext(
 void QuicServerWorker::rejectNewConnections(
     std::function<bool()> rejectNewConnections) {
   rejectNewConnections_ = std::move(rejectNewConnections);
+}
+
+void QuicServerWorker::setPrimingEnabledCallback(
+    std::function<bool()> isPrimingEnabled) {
+  isPrimingEnabled_ = std::move(isPrimingEnabled);
 }
 
 void QuicServerWorker::setIsBlockListedSrcPort(

@@ -320,6 +320,11 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   void rejectNewConnections(std::function<bool()> rejectNewConnections);
 
   /**
+   * Set callback to determine if MVFST_PRIMING protocol version is enabled
+   */
+  void setPrimingEnabledCallback(std::function<bool()> isPrimingEnabled);
+
+  /**
    * If true, begin rejecting connections with block listed source ports
    */
   void setIsBlockListedSrcPort(
@@ -649,6 +654,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   Optional<BufPtr> healthCheckToken_;
   std::function<bool()> rejectNewConnections_{[]() { return false; }};
+  std::function<bool()> isPrimingEnabled_{[]() { return false; }};
   std::function<bool(uint16_t)> isBlockListedSrcPort_{
       [](uint16_t) { return false; }};
   uint8_t workerId_{0};
