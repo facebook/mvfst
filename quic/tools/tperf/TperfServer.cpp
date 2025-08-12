@@ -584,7 +584,8 @@ TPerfServer::TPerfServer(
   if (useAckReceiveTimestamps_) {
     LOG(INFO) << " Using ACK receive timestamps on server";
     settings.maybeAckReceiveTimestampsConfigSentToPeer = {
-        maxAckReceiveTimestampsToSend_, kDefaultReceiveTimestampsExponent};
+        .maxReceiveTimestampsPerAck = maxAckReceiveTimestampsToSend_,
+        .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
   }
 
   if (useL4sEcn_) {

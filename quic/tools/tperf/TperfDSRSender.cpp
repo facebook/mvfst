@@ -22,7 +22,8 @@ void TperfDSRSender::setCipherInfo(CipherInfo info) {
   CipherBuilder builder;
   cipherPair_ = builder.buildCiphers(
       fizz::TrafficKey{
-          std::move(info.trafficKey.key), std::move(info.trafficKey.iv)},
+          .key = std::move(info.trafficKey.key),
+          .iv = std::move(info.trafficKey.iv)},
       info.cipherSuite,
       std::move(info.packetProtectionKey));
 }
@@ -30,11 +31,11 @@ void TperfDSRSender::setCipherInfo(CipherInfo info) {
 bool TperfDSRSender::flush() {
   auto& firstInstruction = instructions_.front();
   RequestGroup prs{
-      firstInstruction.dcid,
-      firstInstruction.scid,
-      firstInstruction.clientAddress,
-      &cipherPair_,
-      {}};
+      .dcid = firstInstruction.dcid,
+      .scid = firstInstruction.scid,
+      .clientAddress = firstInstruction.clientAddress,
+      .cipherPair = &cipherPair_,
+      .requests = {}};
   prs.requests.reserve(instructions_.size());
   for (const auto& instruction : instructions_) {
     prs.requests.push_back(

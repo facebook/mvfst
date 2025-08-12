@@ -213,7 +213,8 @@ void TPerfClient::start() {
     LOG(INFO) << " Using ACK receive timestamps on client";
 
     settings.maybeAckReceiveTimestampsConfigSentToPeer = {
-        maxAckReceiveTimestampsToSend_, kDefaultReceiveTimestampsExponent};
+        .maxReceiveTimestampsPerAck = maxAckReceiveTimestampsToSend_,
+        .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
   }
   if (useInplaceWrite_) {
     settings.maxBatchSize = 1;
