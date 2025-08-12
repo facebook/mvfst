@@ -141,11 +141,11 @@ RegularQuicPacketBuilder::Packet AckPacketBuilder::build() && {
   WriteAckFrameState ackState;
   ackState.acks = (CHECK(maybeAckBlocks.has_value()), maybeAckBlocks.value());
   WriteAckFrameMetaData ackData = {
-      ackState,
-      maybeAckDelay.value(),
-      static_cast<uint8_t>(
+      .ackState = ackState,
+      .ackDelay = maybeAckDelay.value(),
+      .ackDelayExponent = static_cast<uint8_t>(
           CHECK_NOTNULL(dstConn)->transportSettings.ackDelayExponent),
-      TimePoint()};
+      .connTime = TimePoint()};
   CHECK(!writeAckFrame(ackData, builder).hasError());
   return std::move(builder).buildPacket();
 }

@@ -215,7 +215,7 @@ void setupZeroRttOnServerCtx(
     const QuicCachedPsk& cachedPsk) {
   serverCtx.setEarlyDataSettings(
       true,
-      fizz::server::ClockSkewTolerance{-100000ms, 100000ms},
+      fizz::server::ClockSkewTolerance{.before = -100000ms, .after = 100000ms},
       std::make_shared<fizz::server::AllowAllReplayReplayCache>());
   auto ticketCipher = std::make_shared<AcceptingTicketCipher>();
   ticketCipher->setPsk(cachedPsk);

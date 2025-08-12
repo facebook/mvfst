@@ -37,51 +37,61 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
 
 TEST(QuicKnobsParsingTest, Simple) {
   QuicKnobsParsingTestFixture fixture = {
-      "{ \"0\": 1,"
-      "  \"11\": 5,"
-      "  \"19\": 6,"
-      "  \"2\": 3"
-      "  }",
-      false,
-      {{0, uint64_t{1}},
-       {2, uint64_t{3}},
-       {11, uint64_t{5}},
-       {19, uint64_t{6}}}};
+      .serializedKnobs =
+          "{ \"0\": 1,"
+          "  \"11\": 5,"
+          "  \"19\": 6,"
+          "  \"2\": 3"
+          "  }",
+      .expectError = false,
+      .expectParams = {
+          {.id = 0, .val = uint64_t{1}},
+          {.id = 2, .val = uint64_t{3}},
+          {.id = 11, .val = uint64_t{5}},
+          {.id = 19, .val = uint64_t{6}}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, ObjectValue) {
   QuicKnobsParsingTestFixture fixture = {
-      "{ \"1\": "
-      "  {"
-      "  \"0\" : 1"
-      "  }"
-      "}",
-      true,
-      {}};
+      .serializedKnobs =
+          "{ \"1\": "
+          "  {"
+          "  \"0\" : 1"
+          "  }"
+          "}",
+      .expectError = true,
+      .expectParams = {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidJson) {
   QuicKnobsParsingTestFixture fixture = {
-      "{\"0\": "
-      " \"1\": "
-      "  {"
-      "  \"0\" : 1"
-      "  }"
-      "}",
-      true,
-      {}};
+      .serializedKnobs =
+          "{\"0\": "
+          " \"1\": "
+          "  {"
+          "  \"0\" : 1"
+          "  }"
+          "}",
+      .expectError = true,
+      .expectParams = {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, Characters) {
-  QuicKnobsParsingTestFixture fixture = {"{ \"o\" : 1 }", true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = "{ \"o\" : 1 }",
+      .expectError = true,
+      .expectParams = {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, NegativeNumbers) {
-  QuicKnobsParsingTestFixture fixture = {"{ \"10\" : -1 }", true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = "{ \"10\" : -1 }",
+      .expectError = true,
+      .expectParams = {}};
   run(fixture);
 }
 
@@ -91,14 +101,17 @@ TEST(QuicKnobsParsingTest, ValidCCAlgorithm) {
       static_cast<uint64_t>(congestionControlStrToType("cubic").value());
   std::string args = fmt::format(R"({{"{}" : "cubic"}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = val}}};
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = val}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidCCAlgorithm) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
   std::string args = fmt::format(R"({{"{}" : "foo"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -106,7 +119,8 @@ TEST(QuicKnobsParsingTest, InvalidStringParam) {
   auto key = static_cast<uint64_t>(
       TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
   std::string args = fmt::format(R"({{"{}" : "foo"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -114,7 +128,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamFormat) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "1"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -122,7 +137,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamFormatDefault) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "1"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -130,7 +146,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamFormat2) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "1,2"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -138,7 +155,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamZeroDenom) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "1/0"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -146,7 +164,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamZeroNum) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "0/2"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -154,7 +173,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamLargeDenom) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "1/1234567"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -162,7 +182,8 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamLargeNum) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "1234567/1"}})", key);
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -171,7 +192,9 @@ TEST(QuicKnobsParsingTest, ValidFractionParam) {
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "4/5"}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = uint64_t{4 * 100 + 5}}}};
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = uint64_t{4 * 100 + 5}}}};
   run(fixture);
 }
 
@@ -180,7 +203,9 @@ TEST(QuicKnobsParsingTest, ValidFractionParamDefault) {
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "4/5"}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = uint64_t{4 * 100 + 5}}}};
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = uint64_t{4 * 100 + 5}}}};
   run(fixture);
 }
 
@@ -189,7 +214,9 @@ TEST(QuicKnobsParsingTest, ValidMaxPacingRate) {
   uint64_t val = 111;
   std::string args = fmt::format(R"({{"{}" : {}}})", key, val);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = val}}};
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = val}}};
   run(fixture);
 }
 
@@ -198,7 +225,9 @@ TEST(QuicKnobsParsingTest, ValidMaxPacingRateAsString) {
   uint64_t val = 111;
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = val}}};
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = val}}};
   run(fixture);
 }
 
@@ -207,7 +236,8 @@ TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
   // Decimal is UINT64_MAX + 1
   std::string args =
       fmt::format(R"({{"{}" : {}}})", key, "18446744073709551616");
-  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -217,23 +247,33 @@ TEST(QuicKnobsParsingTest, MaxPacingRateWithSequenceNumber) {
   auto val = "1234,1";
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = val}}};
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = val}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, NonStringKey) {
   QuicKnobsParsingTestFixture fixture = {
-      "{ 10 : 1 }", false, {{.id = 10, .val = uint64_t{1}}}};
+      .serializedKnobs = "{ 10 : 1 }",
+      .expectError = false,
+      .expectParams = {{.id = 10, .val = uint64_t{1}}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, DoubleKey) {
-  QuicKnobsParsingTestFixture fixture = {"{ \"3.14\" : 1 }", true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = "{ \"3.14\" : 1 }",
+      .expectError = true,
+      .expectParams = {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, DoubleValue) {
-  QuicKnobsParsingTestFixture fixture = {"{  \"10\" : 0.1 }", true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = "{  \"10\" : 0.1 }",
+      .expectError = true,
+      .expectParams = {}};
   run(fixture);
 }
 
@@ -241,7 +281,10 @@ TEST(QuicKnobsParsingTest, UInt64Max) {
   const uint64_t id = 10;
   const uint64_t val = std::numeric_limits<uint64_t>::max();
   std::string str = fmt::format("{{\"{}\" : {}}}", id, val);
-  QuicKnobsParsingTestFixture fixture = {str, false, {{.id = id, .val = val}}};
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = str,
+      .expectError = false,
+      .expectParams = {{.id = id, .val = val}}};
   run(fixture);
 }
 

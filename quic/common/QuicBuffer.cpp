@@ -207,10 +207,10 @@ QuicBuffer::FillIovResult QuicBuffer::fillIov(struct iovec* iov, size_t len)
     }
     p = p->next();
     if (p == this) {
-      return {i, totalBytes};
+      return {.numIovecs = i, .totalLength = totalBytes};
     }
   }
-  return {0, 0};
+  return {.numIovecs = 0, .totalLength = 0};
 }
 
 void QuicBuffer::clear() noexcept {

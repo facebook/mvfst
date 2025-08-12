@@ -26,55 +26,79 @@ class MockQuicAsyncUDPSocket : public quic::FollyQuicAsyncUDPSocket {
 TEST(SocketUtilTest, applySocketOptions) {
   MockQuicAsyncUDPSocket sock(nullptr);
   const folly::SocketOptionMap opts = {
-      {{SOL_SOCKET, SO_KEEPALIVE, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = SOL_SOCKET,
+        .optname = SO_KEEPALIVE,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        false},
-      {{IPPROTO_TCP, TCP_MAXSEG, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = IPPROTO_TCP,
+        .optname = TCP_MAXSEG,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        576},
-      {{IPPROTO_UDP, TCP_MAXSEG, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = IPPROTO_UDP,
+        .optname = TCP_MAXSEG,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        576},
 #ifdef IP_BIND_ADDRESS_NO_PORT
-      {{IPPROTO_IP,
-        IP_BIND_ADDRESS_NO_PORT,
-        folly::SocketOptionKey::ApplyPos::PRE_BIND},
+      {{.level = IPPROTO_IP,
+        .optname = IP_BIND_ADDRESS_NO_PORT,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
        true},
 #endif
-      {{IPPROTO_IP, IP_TOS, folly::SocketOptionKey::ApplyPos::PRE_BIND}, 0x80},
-      {{IPPROTO_IPV6, IPV6_TCLASS, folly::SocketOptionKey::ApplyPos::PRE_BIND},
+      {{.level = IPPROTO_IP,
+        .optname = IP_TOS,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
+       0x80},
+      {{.level = IPPROTO_IPV6,
+        .optname = IPV6_TCLASS,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
        0x80},
   };
 
   const folly::SocketOptionMap expected_v4_prebind_opts = {
 #ifdef IP_BIND_ADDRESS_NO_PORT
-      {{IPPROTO_IP,
-        IP_BIND_ADDRESS_NO_PORT,
-        folly::SocketOptionKey::ApplyPos::PRE_BIND},
+      {{.level = IPPROTO_IP,
+        .optname = IP_BIND_ADDRESS_NO_PORT,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
        true},
 #endif
-      {{IPPROTO_IP, IP_TOS, folly::SocketOptionKey::ApplyPos::PRE_BIND}, 0x80},
+      {{.level = IPPROTO_IP,
+        .optname = IP_TOS,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
+       0x80},
   };
 
   const folly::SocketOptionMap expected_v4_postbind_opts = {
-      {{SOL_SOCKET, SO_KEEPALIVE, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = SOL_SOCKET,
+        .optname = SO_KEEPALIVE,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        false},
-      {{IPPROTO_UDP, TCP_MAXSEG, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = IPPROTO_UDP,
+        .optname = TCP_MAXSEG,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        576},
   };
 
   const folly::SocketOptionMap expected_v6_prebind_opts = {
 #ifdef IP_BIND_ADDRESS_NO_PORT
-      {{IPPROTO_IP,
-        IP_BIND_ADDRESS_NO_PORT,
-        folly::SocketOptionKey::ApplyPos::PRE_BIND},
+      {{.level = IPPROTO_IP,
+        .optname = IP_BIND_ADDRESS_NO_PORT,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
        true},
 #endif
-      {{IPPROTO_IPV6, IPV6_TCLASS, folly::SocketOptionKey::ApplyPos::PRE_BIND},
+      {{.level = IPPROTO_IPV6,
+        .optname = IPV6_TCLASS,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::PRE_BIND},
        0x80},
   };
 
   const folly::SocketOptionMap expected_v6_postbind_opts = {
-      {{SOL_SOCKET, SO_KEEPALIVE, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = SOL_SOCKET,
+        .optname = SO_KEEPALIVE,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        false},
-      {{IPPROTO_UDP, TCP_MAXSEG, folly::SocketOptionKey::ApplyPos::POST_BIND},
+      {{.level = IPPROTO_UDP,
+        .optname = TCP_MAXSEG,
+        .applyPos_ = folly::SocketOptionKey::ApplyPos::POST_BIND},
        576},
   };
   EXPECT_CALL(
