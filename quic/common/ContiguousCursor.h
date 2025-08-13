@@ -30,10 +30,6 @@ class ContiguousReadCursor {
     return uintptr_t(end_ - data_);
   }
 
-  size_t totalLength() const {
-    return remaining();
-  }
-
   bool canAdvance(size_t bytes) const noexcept {
     return uintptr_t(end_ - data_) >= bytes;
   }
@@ -50,25 +46,6 @@ class ContiguousReadCursor {
   bool tryReadFixedSizeString(std::string& str, size_t bytes) noexcept;
   bool tryClone(uint8_t* buf, size_t bytes) noexcept;
   bool tryPull(void* buf, size_t bytes) noexcept;
-
-  // Make sure you validate before calling this function.
-  void pull(void* buf, size_t bytes) noexcept;
-
-  // Make sure you validate before calling this function.
-  template <class T>
-  T read() {
-    T value{static_cast<T>(folly::unsafe_default_initialized)};
-    memcpy(&value, data_, sizeof(T));
-    data_ += sizeof(T);
-    return value;
-  }
-
-  // Make sure you validate before calling this function.
-  template <class T>
-  void readBE(T& val) noexcept {
-    read(val);
-    val = folly::Endian::big(val);
-  }
 
   template <class T>
   bool tryReadBE(T& val) noexcept {
@@ -100,7 +77,14 @@ class ContiguousReadCursor {
 
  private:
   void readFixedSizeString(std::string& str, size_t bytes) noexcept;
+  void pull(void* buf, size_t bytes) noexcept;
   void clone(uint8_t* buf, size_t bytes) noexcept;
+
+  template <class T>
+  void readBE(T& val) noexcept {
+    read(val);
+    val = folly::Endian::big(val);
+  }
 
   template <class T>
   void read(T& val) noexcept {
