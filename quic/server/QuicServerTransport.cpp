@@ -218,6 +218,11 @@ void QuicServerTransport::accept(folly::Optional<QuicVersion> quicVersion) {
   setIdleTimer();
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
+  // Override zeroRttSourceTokenMatchingPolicy for MVFST_PRIMING
+  if (quicVersion && *quicVersion == QuicVersion::MVFST_PRIMING) {
+    serverConn_->transportSettings.zeroRttSourceTokenMatchingPolicy =
+        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+  }
   serverConn_->serverHandshakeLayer->initialize(
       getFollyEventbase(),
       this,
