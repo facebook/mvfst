@@ -675,7 +675,8 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
 
   fizz::ech::ParsedECHConfig getParsedECHConfig() {
     fizz::ech::HpkeSymmetricCipherSuite suite{
-        fizz::hpke::KDFId::Sha256, fizz::hpke::AeadId::TLS_AES_128_GCM_SHA256};
+        .kdf_id = fizz::hpke::KDFId::Sha256,
+        .aead_id = fizz::hpke::AeadId::TLS_AES_128_GCM_SHA256};
     fizz::ech::ParsedECHConfig parsedECHConfig;
     parsedECHConfig.key_config.config_id = 0xFB;
     parsedECHConfig.key_config.kem_id = fizz::hpke::KEMId::secp256r1;
