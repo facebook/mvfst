@@ -41,10 +41,8 @@ fb_activate_static_library_option()
 set(QUIC_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Dependencies
-find_package(Boost 1.62
-  REQUIRED COMPONENTS
+set(MVFST_BOOST_COMPONENTS
   iostreams
-  system
   thread
   filesystem
   regex
@@ -52,6 +50,12 @@ find_package(Boost 1.62
   date_time
   program_options
 )
+find_package(Boost 1.62 REQUIRED COMPONENTS ${MVFST_BOOST_COMPONENTS})
+if (Boost_MAJOR_VERSION EQUAL 1 AND Boost_MINOR_VERSION LESS 69)
+  list(APPEND MVFST_BOOST_COMPONENTS system)
+  find_package(Boost 1.62 REQUIRED COMPONENTS ${MVFST_BOOST_COMPONENTS})
+endif()
+string(REPLACE ";" " " MVFST_BOOST_COMPONENTS "${MVFST_BOOST_COMPONENTS}")
 find_package(fmt REQUIRED)
 find_package(folly REQUIRED)
 find_package(Fizz REQUIRED)
