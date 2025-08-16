@@ -84,7 +84,7 @@ folly::EventBase* QuicServerWorker::getEventBase() const {
 void QuicServerWorker::setSocket(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket) {
   socket_ = std::move(socket);
-  evb_ = folly::Executor::KeepAlive(socket_->getEventBase());
+  evb_ = folly::ExecutorKeepAlive(socket_->getEventBase());
 }
 
 void QuicServerWorker::bind(
