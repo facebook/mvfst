@@ -193,11 +193,11 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
       packetProtectionKey_->clone());
 
   RequestGroup requests{
-      instruction.dcid,
-      instruction.scid,
-      instruction.clientAddress,
-      &cipherPair,
-      {}};
+      .dcid = instruction.dcid,
+      .scid = instruction.scid,
+      .clientAddress = instruction.clientAddress,
+      .cipherPair = &cipherPair,
+      .requests = {}};
 
   for (const auto& i : pendingInstructions_) {
     requests.requests.push_back(sendInstructionToPacketizationRequest(i));
