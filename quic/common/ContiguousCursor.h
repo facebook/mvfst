@@ -47,6 +47,8 @@ class ContiguousReadCursor {
   bool tryClone(uint8_t* buf, size_t bytes) noexcept;
   bool tryPull(void* buf, size_t bytes) noexcept;
 
+  size_t pullAtMost(void* buf, size_t len) noexcept;
+
   template <class T>
   bool tryReadBE(T& val) noexcept {
     if (FOLLY_UNLIKELY(!canAdvance(sizeof(T)))) {

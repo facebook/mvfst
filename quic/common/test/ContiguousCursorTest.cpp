@@ -6,6 +6,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cstring>
 
 #include <quic/common/ContiguousCursor.h>
 
@@ -116,6 +117,75 @@ TEST(ContiguousCursor, GetCurrentPositionTest) {
   // Test with empty buffer
   quic::ContiguousReadCursor emptyCursor{nullptr, 0};
   EXPECT_EQ(emptyCursor.getCurrentPosition(), 0);
+}
+
+// Tests for pullAtMost()
+TEST(ContiguousCursor, PullAtMostTest) {
+  uint8_t data[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+  quic::ContiguousReadCursor cursor{data, sizeof(data)};
+
+  // Test pulling exact available amount
+  uint8_t buf1[4];
+  size_t pulled = cursor.pullAtMost(buf1, 4);
+  EXPECT_EQ(pulled, 4);
+  EXPECT_EQ(cursor.getCurrentPosition(), 4);
+  for (size_t i = 0; i < 4; i++) {
+    EXPECT_EQ(buf1[i], i);
+  }
+
+  // Test pulling more than available (should get remaining bytes)
+  uint8_t buf2[10];
+  pulled = cursor.pullAtMost(buf2, 10);
+  EXPECT_EQ(pulled, 4); // only 4 bytes remaining
+  EXPECT_TRUE(cursor.isAtEnd());
+  for (size_t i = 0; i < 4; i++) {
+    EXPECT_EQ(buf2[i], i + 4);
+  }
+
+  // Test pulling from empty cursor
+  uint8_t buf3[4];
+  pulled = cursor.pullAtMost(buf3, 4);
+  EXPECT_EQ(pulled, 0);
+
+  // Test pulling zero bytes
+  cursor.reset(data, sizeof(data));
+  uint8_t buf4[4];
+  pulled = cursor.pullAtMost(buf4, 0);
+  EXPECT_EQ(pulled, 0);
+  EXPECT_EQ(cursor.getCurrentPosition(), 0); // cursor shouldn't move
+}
+
+TEST(ContiguousCursor, PullAtMostConsecutiveTest) {
+  uint8_t data[] = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0};
+  quic::ContiguousReadCursor cursor{data, sizeof(data)};
+
+  // First pull: get 3 bytes
+  uint8_t buf1[3];
+  size_t pulled1 = cursor.pullAtMost(buf1, 3);
+  EXPECT_EQ(pulled1, 3);
+  EXPECT_EQ(buf1[0], 0x10);
+  EXPECT_EQ(buf1[1], 0x20);
+  EXPECT_EQ(buf1[2], 0x30);
+  EXPECT_EQ(cursor.getCurrentPosition(), 3);
+
+  // Second pull: get 2 bytes
+  uint8_t buf2[2];
+  size_t pulled2 = cursor.pullAtMost(buf2, 2);
+  EXPECT_EQ(pulled2, 2);
+  EXPECT_EQ(buf2[0], 0x40);
+  EXPECT_EQ(buf2[1], 0x50);
+  EXPECT_EQ(cursor.getCurrentPosition(), 5);
+
+  // Third pull: try to get 10 bytes but only 5 remaining
+  uint8_t buf3[10];
+  size_t pulled3 = cursor.pullAtMost(buf3, 10);
+  EXPECT_EQ(pulled3, 5); // only 5 bytes left
+  EXPECT_EQ(buf3[0], 0x60);
+  EXPECT_EQ(buf3[1], 0x70);
+  EXPECT_EQ(buf3[2], 0x80);
+  EXPECT_EQ(buf3[3], 0x90);
+  EXPECT_EQ(buf3[4], 0xa0);
+  EXPECT_TRUE(cursor.isAtEnd());
 }
 
 } // namespace quic

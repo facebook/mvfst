@@ -6,6 +6,7 @@
  */
 
 #include <folly/Likely.h>
+#include <algorithm>
 #include <cstring>
 
 #include <quic/common/ContiguousCursor.h>
@@ -67,6 +68,14 @@ void ContiguousReadCursor::pull(void* buf, size_t bytes) noexcept {
 void ContiguousReadCursor::clone(uint8_t* buf, size_t bytes) noexcept {
   memcpy(buf, data_, bytes);
   data_ += bytes;
+}
+
+size_t ContiguousReadCursor::pullAtMost(void* buf, size_t len) noexcept {
+  size_t toCopy = std::min(len, remaining());
+  memcpy(buf, data_, toCopy);
+  data_ += toCopy;
+
+  return toCopy;
 }
 
 } // namespace quic
