@@ -5210,8 +5210,8 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
         return {};
       });
   server->handleKnobParams({
-      {199, uint64_t{10}},
-      {201, uint64_t{20}},
+      {.id = 199, .val = uint64_t{10}},
+      {.id = 201, .val = uint64_t{20}},
   });
 
   EXPECT_EQ(flag, 1);
@@ -5227,8 +5227,8 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
       });
 
   server->handleKnobParams({
-      {199, uint64_t{10}},
-      {201, uint64_t{20}},
+      {.id = 199, .val = uint64_t{10}},
+      {.id = 201, .val = uint64_t{20}},
   });
   EXPECT_EQ(flag, 1);
 }
@@ -5240,13 +5240,13 @@ TEST_F(
   auto knobParamId =
       static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(knobParamId))).Times(1);
-  server->handleKnobParams({{knobParamId, "not-uint64_t"}});
+  server->handleKnobParams({{.id = knobParamId, .val = "not-uint64_t"}});
 
   // expect a string but uint64_t value provided
   knobParamId = static_cast<uint64_t>(
       TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
   EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(knobParamId))).Times(1);
-  server->handleKnobParams({{knobParamId, uint64_t{1234}}});
+  server->handleKnobParams({{.id = knobParamId, .val = uint64_t{1234}}});
 }
 
 TEST_F(QuicServerTransportTest, TestSkipKnobsWhenNotAdvertisingSupport) {
@@ -5299,16 +5299,16 @@ TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
 
   EXPECT_CALL(*rawCongestionController, setExperimental(true)).Times(2);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-        uint64_t{1}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+        .val = uint64_t{1}}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-        uint64_t{2}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+        .val = uint64_t{2}}});
 
   EXPECT_CALL(*rawCongestionController, setExperimental(false)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-        uint64_t{0}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+        .val = uint64_t{0}}});
 }
 
 TEST_F(QuicServerTransportTest, TestCCConfigKnobHandler) {
@@ -5317,14 +5317,14 @@ TEST_F(QuicServerTransportTest, TestCCConfigKnobHandler) {
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
-        std::string("{\"conservativeRecovery\": true}")}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+        .val = std::string("{\"conservativeRecovery\": true}")}});
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, true);
   EXPECT_EQ(transportSettings.ccaConfig.ackFrequencyConfig.has_value(), false);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
-        std::string(
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+        .val = std::string(
             R"({"drainToTarget": true, "ackFrequencyConfig":{"minRttDivisor": 77}})")}});
 
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
@@ -5339,8 +5339,8 @@ TEST_F(QuicServerTransportTest, TestCCConfigKnobHandlerInvalidJSON) {
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
-        std::string(R"({"conservativeRecovery": "blabla"})")}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
+        .val = std::string(R"({"conservativeRecovery": "blabla"})")}});
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
 }
 
@@ -5351,13 +5351,13 @@ TEST_F(QuicServerTransportTest, TestConnMigrationKnobHandler) {
   ASSERT_EQ(transportSettings.disableMigration, true);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
-        uint64_t(1)}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
+        .val = uint64_t(1)}});
   EXPECT_EQ(transportSettings.disableMigration, false);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
-        uint64_t(0)}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
+        .val = uint64_t(0)}});
   EXPECT_EQ(transportSettings.disableMigration, true);
 }
 
@@ -5368,15 +5368,15 @@ TEST_F(QuicServerTransportTest, TestNewStreamBlockedConditionKnobHandler) {
   ASSERT_FALSE(transportSettings.useNewStreamBlockedCondition);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
-        uint64_t(1)}});
+        .val = uint64_t(1)}});
   EXPECT_TRUE(transportSettings.useNewStreamBlockedCondition);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
-        uint64_t(0)}});
+        .val = uint64_t(0)}});
   EXPECT_FALSE(transportSettings.useNewStreamBlockedCondition);
 }
 
@@ -5387,15 +5387,15 @@ TEST_F(QuicServerTransportTest, TestAutotuneStreamFlowControlKnobHandler) {
   ASSERT_FALSE(transportSettings.autotuneReceiveStreamFlowControl);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL),
-        uint64_t(1)}});
+        .val = uint64_t(1)}});
   EXPECT_TRUE(transportSettings.autotuneReceiveStreamFlowControl);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL),
-        uint64_t(0)}});
+        .val = uint64_t(0)}});
   EXPECT_FALSE(transportSettings.autotuneReceiveStreamFlowControl);
 }
 
@@ -5406,15 +5406,15 @@ TEST_F(QuicServerTransportTest, TestInflightReorderingThreshold) {
   ASSERT_FALSE(transportSettings.useInflightReorderingThreshold);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
-        uint64_t(1)}});
+        .val = uint64_t(1)}});
   EXPECT_TRUE(transportSettings.useInflightReorderingThreshold);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
-        uint64_t(0)}});
+        .val = uint64_t(0)}});
   EXPECT_FALSE(transportSettings.useInflightReorderingThreshold);
 }
 
@@ -5425,38 +5425,38 @@ TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
 
   EXPECT_CALL(*rawPacer, setExperimental(true)).Times(2);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
-        uint64_t{1}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        .val = uint64_t{1}}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
-        uint64_t{2}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        .val = uint64_t{2}}});
 
   EXPECT_CALL(*rawPacer, setExperimental(false)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
-        uint64_t{0}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        .val = uint64_t{0}}});
 }
 
 TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        uint64_t{1}}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = uint64_t{1}}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "blah,blah,blah"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "blah,blah,blah"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "1,1,"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "1,1,"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "1,1,1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "1,1,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,3,1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "10,3,1,1"}});
   ASSERT_TRUE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   EXPECT_EQ(
       server->getTransportSettings()
@@ -5477,64 +5477,69 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
   server->getNonConstConn()
       .transportSettings.ccaConfig.ackFrequencyConfig.reset();
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,3,-1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "10,3,-1,1"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,-1,1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "10,-1,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "-1,3,1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "-1,3,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,3,0,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "10,3,0,1"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "10,1,1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "10,1,1,1"}});
   EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        "1,3,1,1"}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
+        .val = "1,3,1,1"}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        "1,1"}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
+        .val = "1,1"}});
   EXPECT_EQ(
       HTTPPriorityQueue::Priority(
           server->getTransportSettings().defaultPriority),
       HTTPPriorityQueue::Priority(1, true));
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        "4,0"}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
+        .val = "4,0"}});
   EXPECT_EQ(
       HTTPPriorityQueue::Priority(
           server->getTransportSettings().defaultPriority),
       HTTPPriorityQueue::Priority(4, false));
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        "4,0,10"}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
+        .val = "4,0,10"}});
   EXPECT_EQ(
       HTTPPriorityQueue::Priority(
           server->getTransportSettings().defaultPriority),
       HTTPPriorityQueue::Priority(4, false));
   // level too large, unchanged
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        "20,0"}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
+        .val = "20,0"}});
   EXPECT_EQ(
       HTTPPriorityQueue::Priority(
           server->getTransportSettings().defaultPriority),
       HTTPPriorityQueue::Priority(4, false));
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
-        uint64_t(2)}});
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
+        .val = uint64_t(2)}});
   EXPECT_EQ(server->getTransportSettings().writeLimitRttFraction, 2);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::WRITES_PER_STREAM),
-        uint64_t(5)}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::WRITES_PER_STREAM),
+        .val = uint64_t(5)}});
   EXPECT_EQ(server->getTransportSettings().priorityQueueWritesPerStream, 5);
 }
 
@@ -5552,8 +5557,8 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   uint64_t pacingRate = 1234;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        pacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = pacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
   EXPECT_EQ(pacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
@@ -5561,8 +5566,8 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   // disable pacing
   EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        kTestMaxPacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = kTestMaxPacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
   EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
@@ -5571,8 +5576,8 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   pacingRate = 5678;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        pacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = pacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
   EXPECT_EQ(pacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
@@ -5581,8 +5586,8 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   pacingRate = 9999;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        pacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = pacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
   EXPECT_EQ(pacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
@@ -5590,8 +5595,8 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   // disable pacing
   EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        kTestMaxPacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = kTestMaxPacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
   EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
@@ -5609,45 +5614,45 @@ TEST_F(
 
   // only pacing provided
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "1234"}});
+        .val = "1234"}});
 
   // extra field beside pacing rate & sequence number
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "1234,5678,9999"}});
+        .val = "1234,5678,9999"}});
 
   // non uint64_t provided as pacing rate
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "abc,1"}});
+        .val = "abc,1"}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "2a,1"}});
+        .val = "2a,1"}});
 
   // non uint64_t provided as sequence number
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "1234,def"}});
+        .val = "1234,def"}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "1234,2a"}});
+        .val = "1234,2a"}});
 
   // negative integer provided
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "-1000,1"}});
+        .val = "-1000,1"}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        "1000,-2"}});
+        .val = "1000,-2"}});
 
   // now, expect pacer to get called as we pass valid params
   uint64_t rate = 1000;
@@ -5657,17 +5662,17 @@ TEST_F(
   };
   EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        knobVal()}});
+        .val = knobVal()}});
 
   rate = 9999;
   seqNum = 100;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        knobVal()}});
+        .val = knobVal()}});
 }
 
 class OutOfOrderMaxPacingRateKnobSequencedFrameTest
@@ -5689,18 +5694,18 @@ TEST_P(
   };
   EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        serializedKnobVal()}});
+        .val = serializedKnobVal()}});
 
   // second frame received with the same seqNum, should be rejected regardless
   // of pacing rate being different
   rate = 1234;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(_)).Times(0);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        serializedKnobVal()}});
+        .val = serializedKnobVal()}});
 
   // second frame received with sequence number being less than seqNum, should
   // be rejected
@@ -5709,9 +5714,9 @@ TEST_P(
     seqNum = GetParam() - 1;
     EXPECT_CALL(*rawPacer, setMaxPacingRate(_)).Times(0);
     server->handleKnobParams(
-        {{static_cast<uint64_t>(
+        {{.id = static_cast<uint64_t>(
               TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-          serializedKnobVal()}});
+          .val = serializedKnobVal()}});
   }
 
   // third frame received with sequence number = seqNum + 1, should be accepted
@@ -5719,18 +5724,18 @@ TEST_P(
   seqNum = GetParam() + 1;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        serializedKnobVal()}});
+        .val = serializedKnobVal()}});
 
   // forth frame received with larger sequence number should be accepted
   rate = 1111;
   seqNum = GetParam() + 1000;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-        serializedKnobVal()}});
+        .val = serializedKnobVal()}});
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -5759,8 +5764,8 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateFrameOutOfOrder) {
   // detect out of order frame
   EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(0);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        kTestMaxPacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = kTestMaxPacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
 
@@ -5768,23 +5773,23 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateFrameOutOfOrder) {
   uint64_t pacingRate = 1234;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(0);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        pacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = pacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
 
   EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(0);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        kTestMaxPacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = kTestMaxPacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
 
   pacingRate = 5678;
   EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(0);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-        pacingRate}});
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        .val = pacingRate}});
   maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
   EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
 }
@@ -5802,9 +5807,9 @@ TEST_F(
     TestHandleTransportKnobParamForciblySetUDPPayloadSize) {
   EXPECT_LT(server->getConn().udpSendPacketLen, 1452);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
-        uint64_t{1}}});
+        .val = uint64_t{1}}});
   EXPECT_EQ(server->getConn().udpSendPacketLen, 1452);
 }
 
@@ -5813,9 +5818,9 @@ TEST_F(
     TestHandleTransportKnobParamFixedShortHeaderPadding) {
   EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 0);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(
+      {{.id = static_cast<uint64_t>(
             TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
-        uint64_t{42}}});
+        .val = uint64_t{42}}});
   EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 42);
 }
 
@@ -5866,14 +5871,16 @@ TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
   auto tsres = server->getConn().streamManager->refreshTransportSettings(
       transportSettings);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        uint64_t(1)}});
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        .val = uint64_t(1)}});
   EXPECT_TRUE(transportSettings.useNewPriorityQueue);
   EXPECT_EQ(server->getConn().streamManager->oldWriteQueue(), nullptr);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        uint64_t(0)}});
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        .val = uint64_t(0)}});
   EXPECT_FALSE(transportSettings.useNewPriorityQueue);
   EXPECT_NE(server->getConn().streamManager->oldWriteQueue(), nullptr);
 
@@ -5890,8 +5897,9 @@ TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
   auto serverWriteChain16 = server->writeChain(streamId, std::move(buf), false);
 
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        uint64_t(1)}});
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        .val = uint64_t(1)}});
   EXPECT_FALSE(transportSettings.useNewPriorityQueue);
   EXPECT_NE(server->getConn().streamManager->oldWriteQueue(), nullptr);
   EXPECT_EQ(
@@ -5908,8 +5916,9 @@ TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
 
   // The switch back works
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        uint64_t(0)}});
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
+        .val = uint64_t(0)}});
   EXPECT_FALSE(transportSettings.useNewPriorityQueue);
 
   // Peer openable streams unchanged
