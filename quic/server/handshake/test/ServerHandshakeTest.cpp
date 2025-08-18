@@ -824,7 +824,7 @@ class ServerHandshakeZeroRttDefaultAppTokenValidatorTest
     clientCtx->setSendEarlyData(true);
     serverCtx->setEarlyDataSettings(
         true,
-        fizz::server::ClockSkewTolerance{-1000ms, 1000ms},
+        fizz::server::ClockSkewTolerance{.before = -1000ms, .after = 1000ms},
         std::make_shared<fizz::server::AllowAllReplayReplayCache>());
 
     clientCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
