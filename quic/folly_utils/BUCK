@@ -1,0 +1,17 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "folly_utils",
+    srcs = [
+        "Utils.cpp",
+    ],
+    headers = [
+        "Utils.h",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//quic/common:optional",
+    ],
+)
