@@ -9,16 +9,24 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <exception>
 #include <limits>
 #include <queue>
-#include <stdexcept>
 
 #include <folly/Likely.h>
+#include <glog/logging.h>
+#include <quic/common/Expected.h>
 
 namespace quic {
 
 constexpr uint64_t kDefaultIntervalSetVersion = 0;
+
+/**
+ * Error codes for IntervalSet operations
+ */
+enum class IntervalSetError : uint8_t {
+  InvalidInterval, // start > end
+  IntervalBoundTooLarge // interval bound exceeds max allowed value
+};
 
 template <typename T, T Unit = (T)1>
 struct Interval {
@@ -30,12 +38,21 @@ struct Interval {
   }
 
   Interval(const T& s, const T& e) : start(s), end(e) {
-    if (start > end) {
-      throw std::invalid_argument("Trying to construct invalid interval");
+    CHECK_LE(start, end) << "Trying to construct invalid interval";
+    CHECK_LE(end, std::numeric_limits<T>::max() - unitValue())
+        << "Interval bound too large";
+  }
+
+  // Safe constructor that returns Expected instead of CHECKing
+  [[nodiscard]] static quic::Expected<Interval<T, Unit>, IntervalSetError>
+  tryCreate(const T& s, const T& e) {
+    if (s > e) {
+      return quic::make_unexpected(IntervalSetError::InvalidInterval);
     }
-    if (end > std::numeric_limits<T>::max() - unitValue()) {
-      throw std::invalid_argument("Interval bound too large");
+    if (e > std::numeric_limits<T>::max() - unitValue()) {
+      return quic::make_unexpected(IntervalSetError::IntervalBoundTooLarge);
     }
+    return Interval<T, Unit>{s, e};
   }
 
   bool operator==(Interval& rhs) const {
@@ -94,6 +111,16 @@ class IntervalSet : private Container<Interval<T, Unit>> {
   void insert(const T& start, const T& end);
 
   void insert(const T& point);
+
+  // Safe versions that return Expected instead of CHECKing
+  [[nodiscard]] Expected<void, IntervalSetError> tryInsert(
+      const Interval<T, Unit>& interval);
+
+  [[nodiscard]] Expected<void, IntervalSetError> tryInsert(
+      const T& start,
+      const T& end);
+
+  [[nodiscard]] Expected<void, IntervalSetError> tryInsert(const T& point);
 
   void withdraw(const Interval<T, Unit>& interval);
 

@@ -395,7 +395,7 @@ uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn) {
   return maximumIdsToIssue;
 }
 
-uint64_t addPacketToAckState(
+Expected<uint64_t, IntervalSetError> addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
     const PacketNum packetNum,
@@ -407,7 +407,10 @@ uint64_t addPacketToAckState(
   ackState.largestRecvdPacketNum = std::max<PacketNum>(
       ackState.largestRecvdPacketNum.value_or(packetNum), packetNum);
   auto preInsertVersion = ackState.acks.insertVersion();
-  ackState.acks.insert(packetNum);
+  auto insertResult = ackState.acks.tryInsert(packetNum);
+  if (!insertResult.has_value()) {
+    return quic::make_unexpected(insertResult.error());
+  }
   if (preInsertVersion == ackState.acks.insertVersion()) {
     QUIC_STATS(conn.statsCallback, onDuplicatedPacketReceived);
   }
@@ -446,7 +449,7 @@ uint64_t addPacketToAckState(
     return (packetNum > expectedNextPacket) ? packetNum - expectedNextPacket
                                             : expectedNextPacket - packetNum;
   } else {
-    return 0;
+    return uint64_t{0};
   }
 }
 

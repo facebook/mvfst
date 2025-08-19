@@ -210,7 +210,13 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
     // If we hit a packet which has been declared lost we need to count the
     // spurious loss and ignore all other processing.
     if (ackedPacketIterator->declaredLost) {
-      modifyStateForSpuriousLoss(conn, *ackedPacketIterator);
+      auto modifyResult =
+          modifyStateForSpuriousLoss(conn, *ackedPacketIterator);
+      if (!modifyResult.has_value()) {
+        return quic::make_unexpected(QuicError(
+            TransportErrorCode::INTERNAL_ERROR,
+            "Failed to modify state for spurious loss"));
+      }
       QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
       if (spuriousLossEvent) {
         spuriousLossEvent->addSpuriousPacket(
@@ -705,7 +711,7 @@ void updateEcnCountEchoed(
       std::max(ackState.ecnCECountEchoed, readAckFrame.ecnCECount);
 }
 
-void modifyStateForSpuriousLoss(
+Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
     QuicConnectionStateBase& conn,
     OutstandingPacketWrapper& spuriouslyLostPacket) {
   CHECK_GT(conn.outstandings.declaredLostCount, 0);
@@ -734,8 +740,11 @@ void modifyStateForSpuriousLoss(
         if (stream) {
           stream->removeFromLossBuffer(
               streamFrame->offset, streamFrame->len, streamFrame->fin);
-          stream->updateAckedIntervals(
+          auto updateResult = stream->updateAckedIntervals(
               streamFrame->offset, streamFrame->len, streamFrame->fin);
+          if (!updateResult.has_value()) {
+            return quic::make_unexpected(updateResult.error());
+          }
           conn.streamManager->updateWritableStreams(*stream);
         }
       }
@@ -743,5 +752,6 @@ void modifyStateForSpuriousLoss(
   }
   CHECK_GT(conn.outstandings.declaredLostCount, 0);
   conn.outstandings.declaredLostCount--;
+  return {};
 }
 } // namespace quic

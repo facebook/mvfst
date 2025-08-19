@@ -345,7 +345,7 @@ TEST_F(QuicResetSentStateTest, ReliableRstAckNoReduction) {
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  stream.updateAckedIntervals(0, 3, false);
+  ASSERT_TRUE(stream.updateAckedIntervals(0, 3, false).has_value());
   auto result = sendRstAckSMHandler(stream, 5);
   ASSERT_FALSE(result.hasError());
 
@@ -370,7 +370,7 @@ TEST_F(QuicResetSentStateTest, ReliableRstAckReduction) {
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  stream.updateAckedIntervals(0, 1, false);
+  ASSERT_TRUE(stream.updateAckedIntervals(0, 1, false).has_value());
   auto result = sendRstAckSMHandler(stream, 1);
   ASSERT_FALSE(result.hasError());
 
@@ -434,7 +434,7 @@ TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition1) {
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
   stream.sendState = StreamSendState::ResetSent;
-  stream.updateAckedIntervals(0, 5, false);
+  ASSERT_TRUE(stream.updateAckedIntervals(0, 5, false).has_value());
   auto result = sendRstAckSMHandler(stream, 5);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
@@ -447,7 +447,7 @@ TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition2) {
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
   stream.sendState = StreamSendState::ResetSent;
-  stream.updateAckedIntervals(0, 4, false);
+  ASSERT_TRUE(stream.updateAckedIntervals(0, 4, false).has_value());
   auto result = sendRstAckSMHandler(stream, 5);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::ResetSent);

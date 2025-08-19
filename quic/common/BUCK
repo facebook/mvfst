@@ -9,8 +9,12 @@ mvfst_cpp_library(
         "IntervalSet-inl.h",
     ],
     exported_deps = [
+        ":expected",
         ":optional",
         "//folly:likely",
+    ],
+    exported_external_deps = [
+        "glog",
     ],
 )
 

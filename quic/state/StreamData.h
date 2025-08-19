@@ -11,6 +11,8 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
+#include <quic/common/IntervalSet.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/mvfst-config.h>
 #include <quic/priority/PriorityQueue.h>
@@ -211,7 +213,8 @@ struct QuicStreamLike {
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};
 
-  void updateAckedIntervals(uint64_t offset, uint64_t len, bool eof) {
+  [[nodiscard]] Expected<void, IntervalSetError>
+  updateAckedIntervals(uint64_t offset, uint64_t len, bool eof) {
     // When there's an EOF we count the byte of 1 past the end as having been
     // ACKed, since this is useful for delivery APIs.
     int lenAdjustment = [eof]() {
@@ -224,7 +227,7 @@ struct QuicStreamLike {
     if (lenAdjustment && len == 0) {
       LOG(FATAL) << "ACK for empty stream frame with no fin.";
     }
-    ackedIntervals.insert(offset, offset + len - lenAdjustment);
+    return ackedIntervals.tryInsert(offset, offset + len - lenAdjustment);
   }
 
   /*

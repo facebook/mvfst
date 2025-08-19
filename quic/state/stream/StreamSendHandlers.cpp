@@ -145,10 +145,15 @@ quic::Expected<void, QuicError> sendAckSMHandler(
                    << " offset=" << ackedBuffer->second->offset
                    << " len=" << ackedBuffer->second->data.chainLength()
                    << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
-          stream.updateAckedIntervals(
+          auto updateResult = stream.updateAckedIntervals(
               ackedBuffer->second->offset,
               ackedBuffer->second->data.chainLength(),
               ackedBuffer->second->eof);
+          if (!updateResult.has_value()) {
+            return quic::make_unexpected(QuicError(
+                TransportErrorCode::INTERNAL_ERROR,
+                "Failed to update acked intervals"));
+          }
           stream.retransmissionBuffer.erase(ackedBuffer);
         }
       } else {
@@ -162,10 +167,15 @@ quic::Expected<void, QuicError> sendAckSMHandler(
                    << " offset=" << ackedBuffer->second.offset
                    << " len=" << ackedBuffer->second.length
                    << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
-          stream.updateAckedIntervals(
+          auto updateResult = stream.updateAckedIntervals(
               ackedBuffer->second.offset,
               ackedBuffer->second.length,
               ackedBuffer->second.eof);
+          if (!updateResult.has_value()) {
+            return quic::make_unexpected(QuicError(
+                TransportErrorCode::INTERNAL_ERROR,
+                "Failed to update acked intervals"));
+          }
           stream.retransmissionBufMetas.erase(ackedBuffer);
         }
       }

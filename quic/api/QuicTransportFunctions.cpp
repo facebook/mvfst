@@ -2147,7 +2147,15 @@ void implicitAckCryptoStream(
   implicitAck.implicit = true;
   for (const auto& op : conn.outstandings.packets) {
     if (op.packet.header.getPacketNumberSpace() == packetNumSpace) {
-      ackBlocks.insert(op.packet.header.getPacketSequenceNum());
+      auto insertResult =
+          ackBlocks.tryInsert(op.packet.header.getPacketSequenceNum());
+      if (insertResult.hasError()) {
+        LOG(ERROR) << "Failed to insert packet number into ack blocks: "
+                   << static_cast<int>(insertResult.error());
+        // Continue processing other packets - this shouldn't happen in normal
+        // operation
+        continue;
+      }
     }
   }
   if (ackBlocks.empty()) {

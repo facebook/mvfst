@@ -703,7 +703,7 @@ TEST(StreamDataTest, AllBytesAckedTillNotStartAtZero) {
   QuicStreamState state(0, qcsb);
 
   EXPECT_TRUE(state.ackedIntervals.empty());
-  state.updateAckedIntervals(1, 5, false);
+  ASSERT_TRUE(state.updateAckedIntervals(1, 5, false).has_value());
   EXPECT_EQ(state.allBytesAckedTill(5), false);
 }
 
@@ -712,7 +712,7 @@ TEST(StreamDataTest, AllBytesAckedTillNotEnoughLength) {
   QuicStreamState state(0, qcsb);
 
   EXPECT_TRUE(state.ackedIntervals.empty());
-  state.updateAckedIntervals(0, 5, false);
+  ASSERT_TRUE(state.updateAckedIntervals(0, 5, false).has_value());
   EXPECT_EQ(state.allBytesAckedTill(5), false);
 }
 
@@ -721,7 +721,7 @@ TEST(StreamDataTest, AllBytesAckedPass) {
   QuicStreamState state(0, qcsb);
 
   EXPECT_TRUE(state.ackedIntervals.empty());
-  state.updateAckedIntervals(0, 6, false);
+  ASSERT_TRUE(state.updateAckedIntervals(0, 6, false).has_value());
   EXPECT_EQ(state.allBytesAckedTill(5), true);
 }
 
@@ -730,8 +730,8 @@ TEST(StreamDataTest, AllBytesAckedDisjointIntervals) {
   QuicStreamState state(0, qcsb);
 
   EXPECT_TRUE(state.ackedIntervals.empty());
-  state.updateAckedIntervals(0, 2, false);
-  state.updateAckedIntervals(3, 5, false);
+  ASSERT_TRUE(state.updateAckedIntervals(0, 2, false).has_value());
+  ASSERT_TRUE(state.updateAckedIntervals(3, 5, false).has_value());
   EXPECT_EQ(state.allBytesAckedTill(5), false);
 }
 

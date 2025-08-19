@@ -541,8 +541,13 @@ void updateAckState(
     TimePoint receiveTimePoint) {
   ReceivedUdpPacket packet;
   packet.timings.receiveTimePoint = receiveTimePoint;
-  uint64_t distance =
+  auto addResult =
       addPacketToAckState(conn, getAckState(conn, pnSpace), packetNum, packet);
+  if (!addResult.has_value()) {
+    LOG(FATAL) << "Failed to add packet to ack state in test: "
+               << static_cast<int>(addResult.error());
+  }
+  uint64_t distance = addResult.value();
   updateAckSendStateOnRecvPacket(
       conn,
       getAckState(conn, pnSpace),

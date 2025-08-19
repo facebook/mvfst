@@ -94,9 +94,7 @@ bool IntervalSet<T, Unit, Container>::contains(const T& start, const T& end)
 
 template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(const T& startIt, const T& endIt) {
-  if (startIt > endIt) {
-    throw std::invalid_argument("Trying to insert invalid interval");
-  }
+  CHECK_LE(startIt, endIt) << "Trying to insert invalid interval";
   insert(Interval<T, Unit>(startIt, endIt));
 }
 
@@ -128,4 +126,37 @@ template <typename T, T Unit, template <typename... I> class Container>
 uint64_t IntervalSet<T, Unit, Container>::insertVersion() const {
   return insertVersion_;
 }
+
+template <typename T, T Unit, template <typename... I> class Container>
+Expected<void, IntervalSetError> IntervalSet<T, Unit, Container>::tryInsert(
+    const Interval<T, Unit>& interval) {
+  // The interval constructor already validated the bounds, so we can safely
+  // insert
+  insert(interval);
+  return {};
+}
+
+template <typename T, T Unit, template <typename... I> class Container>
+Expected<void, IntervalSetError> IntervalSet<T, Unit, Container>::tryInsert(
+    const T& start,
+    const T& end) {
+  // Validate the bounds before creating the interval
+  if (start > end) {
+    return quic::make_unexpected(IntervalSetError::InvalidInterval);
+  }
+  if (end > std::numeric_limits<T>::max() - interval_type::unitValue()) {
+    return quic::make_unexpected(IntervalSetError::IntervalBoundTooLarge);
+  }
+
+  // Safe to create and insert the interval
+  insert(Interval<T, Unit>(start, end));
+  return {};
+}
+
+template <typename T, T Unit, template <typename... I> class Container>
+Expected<void, IntervalSetError> IntervalSet<T, Unit, Container>::tryInsert(
+    const T& point) {
+  return tryInsert(point, point);
+}
+
 } // namespace quic

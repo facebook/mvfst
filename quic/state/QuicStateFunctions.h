@@ -10,6 +10,8 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
+#include <quic/common/Expected.h>
+#include <quic/common/IntervalSet.h>
 #include <quic/common/NetworkData.h>
 #include <quic/state/StateData.h>
 
@@ -65,7 +67,7 @@ void increaseNextPacketNum(
  * Update largestReceivedUdpPacketNum in ackState with packetNum. Return the
  * distance from the next packet number we expect to receive.
  */
-uint64_t addPacketToAckState(
+[[nodiscard]] Expected<uint64_t, IntervalSetError> addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
     const PacketNum packetNum,

@@ -410,8 +410,13 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
   // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
-  uint64_t distanceFromExpectedPacketNum =
-      addPacketToAckState(*conn_, ackState, packetNum, udpPacket);
+  auto addResult = addPacketToAckState(*conn_, ackState, packetNum, udpPacket);
+  if (!addResult.has_value()) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "Failed to add packet to ack state"));
+  }
+  uint64_t distanceFromExpectedPacketNum = addResult.value();
   if (distanceFromExpectedPacketNum > 0) {
     QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
   }

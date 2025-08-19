@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
+#include <quic/common/IntervalSet.h>
 #include <quic/state/StateData.h>
 #include <functional>
 
@@ -124,7 +125,7 @@ void updateEcnCountEchoed(
  * Modifies the state in the QuicConnectionStateBase when a packet that
  * was marked as lost is acked.
  */
-void modifyStateForSpuriousLoss(
+[[nodiscard]] Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
     QuicConnectionStateBase& conn,
     OutstandingPacketWrapper& spuriouslyLostPacket);
 } // namespace quic

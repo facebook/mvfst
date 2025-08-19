@@ -73,12 +73,14 @@ TEST_P(AddPacketToAckStateTest, FirstPacketNotOutOfOrder) {
   /**
    * We skip setting the getAckState(conn,
    * GetParam()).largestReceivedUdpPacketNum to simulate that we haven't
-   * received any packets yet. `addPacketToAckState()` should return false for
-   * the first packet received.
+   * received any packets yet. `addPacketToAckState()` should return distance 0
+   * for the first packet received.
    */
   PacketNum firstPacket = folly::Random::rand32(1, 100);
-  EXPECT_FALSE(addPacketToAckState(
-      conn, getAckState(conn, GetParam()), firstPacket, buildPacketMinimal()));
+  auto result = addPacketToAckState(
+      conn, getAckState(conn, GetParam()), firstPacket, buildPacketMinimal());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 0);
 }
 
 TEST_P(AddPacketToAckStateTest, ReceiveNew) {
@@ -90,7 +92,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveNew) {
   PacketNum newReceived = currentLargestReceived + 1;
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
-  EXPECT_EQ(distance, 0);
+  ASSERT_TRUE(distance.has_value());
+  EXPECT_EQ(distance.value(), 0);
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -105,7 +108,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveNewWithGap) {
   PacketNum newReceived = currentLargestReceived + 3;
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
-  EXPECT_EQ(distance, 2); // newReceived is 2 after the expected pkt num
+  ASSERT_TRUE(distance.has_value());
+  EXPECT_EQ(distance.value(), 2); // newReceived is 2 after the expected pkt num
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -120,7 +124,9 @@ TEST_P(AddPacketToAckStateTest, ReceiveOld) {
   PacketNum newReceived = currentLargestReceived - 1;
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
-  EXPECT_EQ(distance, 2); // newReceived is 2 before the expected pkt num
+  ASSERT_TRUE(distance.has_value());
+  EXPECT_EQ(
+      distance.value(), 2); // newReceived is 2 before the expected pkt num
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -135,7 +141,9 @@ TEST_P(AddPacketToAckStateTest, ReceiveOldWithGap) {
   PacketNum newReceived = currentLargestReceived - 5;
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
-  EXPECT_EQ(distance, 6); // newReceived is 6 before the expected pkt num
+  ASSERT_TRUE(distance.has_value());
+  EXPECT_EQ(
+      distance.value(), 6); // newReceived is 6 before the expected pkt num
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -159,7 +167,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     packet.tosValue = kEcnECT0;
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
-    EXPECT_EQ(distance, 0);
+    ASSERT_TRUE(distance.has_value());
+    EXPECT_EQ(distance.value(), 0);
 
     // Seen 1 ECT0, 0 ECT1, 0 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
@@ -172,7 +181,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     packet.tosValue = kEcnECT1;
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
-    EXPECT_EQ(distance, 0);
+    ASSERT_TRUE(distance.has_value());
+    EXPECT_EQ(distance.value(), 0);
 
     // Seen 1 ECT0, 1 ECT1, 0 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
@@ -185,7 +195,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     packet.tosValue = kEcnCE;
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
-    EXPECT_EQ(distance, 0);
+    ASSERT_TRUE(distance.has_value());
+    EXPECT_EQ(distance.value(), 0);
 
     // Seen 1 ECT0, 1 ECT1, 1 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 1);
@@ -198,7 +209,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     packet.tosValue = kEcnCE;
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
-    EXPECT_EQ(distance, 0);
+    ASSERT_TRUE(distance.has_value());
+    EXPECT_EQ(distance.value(), 0);
 
     // Seen 1 ECT0, 1 ECT1, 2 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 2);

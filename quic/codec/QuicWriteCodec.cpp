@@ -347,7 +347,12 @@ fillFrameWithPacketReceiveTimestamps(
     if (pktsAdded == maxRecvTimestampsToSend) {
       break;
     }
-    receivedPktNumsIntervalSet.insert(recvdPkt.pktNum);
+    auto insertResult = receivedPktNumsIntervalSet.tryInsert(recvdPkt.pktNum);
+    if (insertResult.hasError()) {
+      return quic::make_unexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          "Failed to insert packet number into interval set"));
+    }
     pktsAdded++;
   }
   auto prevPktNum = largestAckedPacketNum;

@@ -158,9 +158,10 @@ TEST(IntervalSet, insertWithMergeAtEdge) {
 
 TEST(IntervalSet, insertBoundTooLarge) {
   IntervalSet<uint32_t, 10> set;
-  EXPECT_THROW(
-      set.insert(0, std::numeric_limits<uint32_t>::max() - 9),
-      std::invalid_argument);
+  // This should CHECK-fail since end - start > 10
+  EXPECT_DEATH(
+      set.insert(0, std::numeric_limits<uint32_t>::max() - 9), "Check failed");
+  // This should work fine since end - start == 10
   set.insert(0, std::numeric_limits<uint32_t>::max() - 10);
 }
 
@@ -401,4 +402,78 @@ TEST(IntervalSet, equalityComparatorNotEqualDiffIntervals2) {
   EXPECT_NE(set1, set2);
   EXPECT_FALSE(set1 == set2);
   EXPECT_TRUE(set1 != set2);
+}
+
+TEST(IntervalSet, tryInsertValidInterval) {
+  IntervalSet<int> set;
+  auto result = set.tryInsert(1, 5);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(1, set.size());
+  EXPECT_TRUE(set.contains(1, 5));
+}
+
+TEST(IntervalSet, tryInsertValidPoint) {
+  IntervalSet<int> set;
+  auto result = set.tryInsert(10);
+  EXPECT_TRUE(result.has_value());
+  EXPECT_EQ(1, set.size());
+  EXPECT_TRUE(set.contains(10, 10));
+}
+
+TEST(IntervalSet, tryInsertInvalidInterval) {
+  IntervalSet<int> set;
+  // start > end should return error
+  auto result = set.tryInsert(10, 5);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(IntervalSetError::InvalidInterval, result.error());
+  EXPECT_EQ(0, set.size());
+}
+
+TEST(IntervalSet, tryInsertBoundTooLarge) {
+  IntervalSet<uint32_t, 10> set;
+  // This should return error instead of CHECK-failing
+  auto result = set.tryInsert(0, std::numeric_limits<uint32_t>::max() - 9);
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(IntervalSetError::IntervalBoundTooLarge, result.error());
+  EXPECT_EQ(0, set.size());
+
+  // This should succeed
+  auto result2 = set.tryInsert(0, std::numeric_limits<uint32_t>::max() - 10);
+  EXPECT_TRUE(result2.has_value());
+  EXPECT_EQ(1, set.size());
+}
+
+TEST(IntervalSet, tryInsertWithMerging) {
+  IntervalSet<int> set;
+  auto result1 = set.tryInsert(1, 3);
+  EXPECT_TRUE(result1.has_value());
+
+  auto result2 = set.tryInsert(5, 7);
+  EXPECT_TRUE(result2.has_value());
+
+  // Insert overlapping interval
+  auto result3 = set.tryInsert(2, 6);
+  EXPECT_TRUE(result3.has_value());
+
+  EXPECT_EQ(1, set.size());
+  EXPECT_TRUE(set.contains(1, 7));
+}
+
+TEST(IntervalSet, tryCreateInterval) {
+  // Test the static tryCreate method
+  auto result1 = Interval<int>::tryCreate(1, 5);
+  EXPECT_TRUE(result1.has_value());
+  EXPECT_EQ(1, result1->start);
+  EXPECT_EQ(5, result1->end);
+
+  // Test invalid interval
+  auto result2 = Interval<int>::tryCreate(10, 5);
+  EXPECT_TRUE(result2.hasError());
+  EXPECT_EQ(IntervalSetError::InvalidInterval, result2.error());
+
+  // Test bound too large
+  auto result3 = Interval<uint32_t, 10>::tryCreate(
+      0, std::numeric_limits<uint32_t>::max() - 9);
+  EXPECT_TRUE(result3.hasError());
+  EXPECT_EQ(IntervalSetError::IntervalBoundTooLarge, result3.error());
 }

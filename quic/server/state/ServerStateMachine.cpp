@@ -1262,8 +1262,14 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     }
 
     auto& ackState = getAckState(conn, packetNumberSpace);
-    uint64_t distanceFromExpectedPacketNum =
+    auto addResult =
         addPacketToAckState(conn, ackState, packetNum, readData.udpPacket);
+    if (!addResult.has_value()) {
+      return quic::make_unexpected(QuicError(
+          TransportErrorCode::INTERNAL_ERROR,
+          "Failed to add packet to ack state"));
+    }
+    uint64_t distanceFromExpectedPacketNum = addResult.value();
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }
