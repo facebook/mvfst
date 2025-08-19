@@ -49,16 +49,40 @@ mvfst_cpp_library(
     headers = [
         "QuicException.h",
     ],
-    deps = [
-        "//fizz/record:record",
-    ],
     exported_deps = [
         ":constants",
+        ":tls_exception",
         "//folly:range",
         "//quic/common:optional",
         "//quic/common:variant",
     ],
     external_deps = [
         "glog",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "tls_exception",
+    srcs = select({
+        "DEFAULT": ["QuicTLSExceptionFizz.cpp"],
+        "ovr_config//os/constraints:android": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
+        "ovr_config//os/constraints:iphoneos": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
+    }),
+    headers = [
+        "QuicTLSException.h",
+    ],
+    deps = select({
+        "DEFAULT": [
+            "//fizz/record:record",
+        ],
+        "ovr_config//os/constraints:android": [
+            "fbsource//xplat/mobilenetwork:tls_common",  # @manual
+        ],
+        "ovr_config//os/constraints:iphoneos": [
+            "fbsource//xplat/mobilenetwork:tls_common",  # @manual
+        ],
+    }),
+    exported_deps = [
+        ":constants",
     ],
 )

@@ -43,6 +43,7 @@ install(
 add_library(
   mvfst_exception
   QuicException.cpp
+  QuicTLSExceptionFizz.cpp
 )
 
 set_property(TARGET mvfst_exception PROPERTY VERSION ${PACKAGE_VERSION})
@@ -67,6 +68,7 @@ target_link_libraries(
 )
 
 install(FILES QuicException.h DESTINATION include/quic/)
+install(FILES QuicTLSException.h DESTINATION include/quic/)
 
 install(
   TARGETS mvfst_exception

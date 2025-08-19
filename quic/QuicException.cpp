@@ -7,8 +7,8 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/QuicTLSException.h> // @manual
 
-#include <fizz/record/Types.h>
 #include <glog/logging.h>
 #include <vector>
 
@@ -220,16 +220,6 @@ std::vector<LocalErrorCode> getAllLocalErrorCodes() {
       LocalErrorCode::PACER_NOT_AVAILABLE,
   };
   return all;
-}
-
-std::string cryptoErrorToString(TransportErrorCode code) {
-  auto codeVal =
-      static_cast<std::underlying_type<TransportErrorCode>::type>(code);
-  auto alertDescNum = codeVal -
-      static_cast<std::underlying_type<TransportErrorCode>::type>(
-                          TransportErrorCode::CRYPTO_ERROR);
-  return "Crypto error: " +
-      toString(static_cast<fizz::AlertDescription>(alertDescNum));
 }
 
 std::string toString(QuicErrorCode code) {

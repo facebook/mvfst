@@ -9,6 +9,7 @@
 
 #include <folly/Range.h>
 #include <quic/QuicConstants.h>
+#include <quic/QuicTLSException.h>
 #include <quic/common/Optional.h>
 #include <stdexcept>
 #include <string>
@@ -106,7 +107,6 @@ std::string toString(TransportErrorCode code);
 std::string toString(QuicErrorCode code);
 std::string toString(const QuicError& error);
 
-std::string cryptoErrorToString(TransportErrorCode code);
 std::vector<TransportErrorCode> getAllTransportErrorCodes();
 std::vector<LocalErrorCode> getAllLocalErrorCodes();
 
