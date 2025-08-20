@@ -7,11 +7,10 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <initializer_list>
 #include <iterator>
 
-#include <folly/Portability.h>
-#include <folly/memory/Malloc.h>
 #include <glog/logging.h>
 
 namespace quic {
@@ -22,9 +21,47 @@ namespace quic {
  * than std::deque. It also supports APIs to mutate the middle of the container
  * (erase(), emplace() and insert() all support arbitrary positions). But doing
  * so with CircularDeque is much slower than std::deque.
+ *
+ * This container is unconditionally non-throwing.
+ * Memory allocation failures result in std::abort() rather than exceptions.
  */
 template <typename T>
 struct CircularDeque {
+  // Core safety requirements: must be destructible and have noexcept destructor
+  static_assert(
+      std::is_destructible_v<T>,
+      "CircularDeque requires destructible type");
+  static_assert(
+      std::is_nothrow_destructible_v<T>,
+      "CircularDeque requires non-throwing destructor");
+
+  // Move operations must be noexcept when available (critical for container
+  // safety)
+  static_assert(
+      !std::is_move_constructible_v<T> ||
+          std::is_nothrow_move_constructible_v<T>,
+      "CircularDeque requires non-throwing move constructor when move construction is available");
+  static_assert(
+      !std::is_move_assignable_v<T> || std::is_nothrow_move_assignable_v<T>,
+      "CircularDeque requires non-throwing move assignment when move assignment is available");
+
+  // Copy operations must be noexcept when available (for optimal performance)
+  static_assert(
+      !std::is_copy_constructible_v<T> ||
+          std::is_nothrow_copy_constructible_v<T>,
+      "CircularDeque requires non-throwing copy constructor when copy construction is available");
+  static_assert(
+      !std::is_copy_assignable_v<T> || std::is_nothrow_copy_assignable_v<T>,
+      "CircularDeque requires non-throwing copy assignment when copy assignment is available");
+
+  // Move operations are required for buffer types
+  static_assert(
+      std::is_move_constructible_v<T>,
+      "CircularDeque requires move construction");
+  static_assert(
+      std::is_move_assignable_v<T>,
+      "CircularDeque requires move assignment");
+
   using value_type = T;
   using size_type = std::size_t;
   using reference = T&;
@@ -71,7 +108,7 @@ struct CircularDeque {
       return;
     }
     clear();
-    folly::sizedFree(storage_, capacity_ * sizeof(T));
+    ::operator delete(storage_);
     capacity_ = 0;
   }
 
@@ -305,8 +342,6 @@ struct CircularDeque {
 
   const_reference operator[](size_type index) const;
   reference operator[](size_type index);
-  [[nodiscard]] const_reference at(size_type index) const;
-  [[nodiscard]] reference at(size_type index);
   [[nodiscard]] const_reference front() const;
   [[nodiscard]] reference front();
   [[nodiscard]] const_reference back() const;
@@ -360,8 +395,7 @@ struct CircularDeque {
       typename U = T,
       typename Iterator,
       std::enable_if_t<std::is_move_assignable<U>::value, int> = 0>
-  void moveOrCopy(Iterator first, Iterator last, Iterator destFirst) noexcept(
-      std::is_nothrow_move_assignable<T>::value) {
+  void moveOrCopy(Iterator first, Iterator last, Iterator destFirst) noexcept {
     if (first == last || first == destFirst) {
       return;
     }
@@ -411,10 +445,8 @@ struct CircularDeque {
       typename U = T,
       typename Iterator,
       std::enable_if_t<std::is_move_assignable<U>::value, int> = 0>
-  void reverseMoveOrCopy(
-      Iterator first,
-      Iterator last,
-      Iterator destLast) noexcept(std::is_nothrow_move_assignable<T>::value) {
+  void
+  reverseMoveOrCopy(Iterator first, Iterator last, Iterator destLast) noexcept {
     if (first == last || last == destLast) {
       return;
     }
@@ -461,8 +493,7 @@ struct CircularDeque {
   template <
       typename U = T,
       std::enable_if_t<std::is_move_constructible<U>::value, int> = 0>
-  void allocateWithValueFrom(iterator source, iterator dest) noexcept(
-      std::is_nothrow_move_constructible<T>::value) {
+  void allocateWithValueFrom(iterator source, iterator dest) noexcept {
     new (&storage_[dest.index_]) T(std::move(*source));
   }
 

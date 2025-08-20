@@ -92,8 +92,8 @@ struct StreamBuffer {
   StreamBuffer(BufPtr dataIn, uint64_t offsetIn, bool eofIn = false) noexcept
       : data(std::move(dataIn)), offset(offsetIn), eof(eofIn) {}
 
-  StreamBuffer(StreamBuffer&& other) = default;
-  StreamBuffer& operator=(StreamBuffer&& other) = default;
+  StreamBuffer(StreamBuffer&& other) noexcept = default;
+  StreamBuffer& operator=(StreamBuffer&& other) noexcept = default;
 };
 
 struct WriteStreamBuffer {
@@ -107,7 +107,7 @@ struct WriteStreamBuffer {
       bool eofIn = false) noexcept
       : data(std::move(dataIn)), offset(offsetIn), eof(eofIn) {}
 
-  WriteStreamBuffer(WriteStreamBuffer&& other)
+  WriteStreamBuffer(WriteStreamBuffer&& other) noexcept
       : data(std::move(other.data)), offset(other.offset), eof(other.eof) {}
 
   WriteStreamBuffer& operator=(WriteStreamBuffer&& other) noexcept {

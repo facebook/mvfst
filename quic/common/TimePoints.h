@@ -36,7 +36,17 @@ struct SystemClockTimePointExt {
   //
   // We keep both the raw TimePoint and the transformed TimePoint to enable us
   // to measure the impact of said correction and for debugging purposes.
-  Optional<SystemClock::TimePoint> maybeMonotonic;
+  bool hasMonotonic{false};
+  SystemClock::TimePoint monotonic;
+
+  SystemClockTimePointExt() = default;
+  SystemClockTimePointExt(const SystemClockTimePointExt&) noexcept = default;
+  SystemClockTimePointExt(SystemClockTimePointExt&&) noexcept = default;
+  SystemClockTimePointExt& operator=(const SystemClockTimePointExt&) noexcept =
+      default;
+  SystemClockTimePointExt& operator=(SystemClockTimePointExt&&) noexcept =
+      default;
+  ~SystemClockTimePointExt() noexcept = default;
 };
 
 /**

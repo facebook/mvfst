@@ -35,6 +35,14 @@ struct ReceivedUdpPacket {
 
       // duration transformed into SystemClock TimePoint
       chrono::SystemClockTimePointExt systemClock;
+
+      SocketTimestampExt() = default;
+      SocketTimestampExt(const SocketTimestampExt&) noexcept = default;
+      SocketTimestampExt(SocketTimestampExt&&) noexcept = default;
+      SocketTimestampExt& operator=(const SocketTimestampExt&) noexcept =
+          default;
+      SocketTimestampExt& operator=(SocketTimestampExt&&) noexcept = default;
+      ~SocketTimestampExt() noexcept = default;
     };
 
     // Legacy Receive TimePoint.
@@ -52,15 +60,23 @@ struct ReceivedUdpPacket {
 
     // Socket timestamps, when available.
     Optional<SocketTimestampExt> maybeSoftwareTs;
+
+    Timings() = default;
+    Timings(const Timings&) = default;
+    Timings(Timings&&) = default;
+    Timings& operator=(const Timings&) = default;
+    Timings& operator=(Timings&&) = default;
+    ~Timings() = default;
   };
 
   ReceivedUdpPacket() = default;
 
   explicit ReceivedUdpPacket(BufPtr&& bufIn) : buf(std::move(bufIn)) {}
 
-  ReceivedUdpPacket(BufPtr&& bufIn, Timings timingsIn, uint8_t tosValueIn)
+  template <typename TimingsType>
+  ReceivedUdpPacket(BufPtr&& bufIn, TimingsType&& timingsIn, uint8_t tosValueIn)
       : buf(std::move(bufIn)),
-        timings(std::move(timingsIn)),
+        timings(std::forward<TimingsType>(timingsIn)),
         tosValue(tosValueIn) {}
 
   BufQueue buf;

@@ -198,7 +198,7 @@ PacketsReceivedTimestampsDeque populateReceiveTimestamps(
         } else {
           rpi.timings.receiveTimePoint = connTime;
         }
-        pktsReceivedTimestamps.emplace_front(rpi);
+        pktsReceivedTimestamps.emplace_front(std::move(rpi));
       } else {
         break;
       }
@@ -308,12 +308,12 @@ WriteAckFrameState createTestWriteAckState(
   if (shouldIncludeTimestamps) {
     ackState.recvdPacketInfos =
         populateReceiveTimestamps(ackBlocks, connTime, countTimestampsToStore);
+    ReceivedUdpPacket::Timings timings;
+    timings.receiveTimePoint =
+        ackState.recvdPacketInfos.back().timings.receiveTimePoint;
+    timings.maybeSoftwareTs = std::nullopt;
     ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{
-        .pktNum = ackState.recvdPacketInfos.back().pktNum,
-        .timings = ReceivedUdpPacket::Timings{
-            .receiveTimePoint =
-                ackState.recvdPacketInfos.back().timings.receiveTimePoint,
-            .maybeSoftwareTs = std::nullopt}};
+        ackState.recvdPacketInfos.back().pktNum, timings};
   }
   return ackState;
 }
@@ -1246,19 +1246,19 @@ TEST_P(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
           auto diff = std::chrono::microseconds(
               lastPacketDelta -= kDefaultTimestampsDelta);
           rpi.timings.receiveTimePoint = connTime + diff;
-          pktsReceivedTimestamps.emplace_front(rpi);
+          pktsReceivedTimestamps.emplace_front(std::move(rpi));
         } else {
           break;
         }
       }
     }
-    ackState.recvdPacketInfos = pktsReceivedTimestamps;
+    ackState.recvdPacketInfos = std::move(pktsReceivedTimestamps);
     WriteAckFrameState::ReceivedPacket receivedPacket;
     receivedPacket.pktNum = ackState.recvdPacketInfos.back().pktNum;
     receivedPacket.timings.receiveTimePoint =
         ackState.recvdPacketInfos.back().timings.receiveTimePoint;
     receivedPacket.timings.maybeSoftwareTs = std::nullopt;
-    ackState.lastRecvdPacketInfo = receivedPacket;
+    ackState.lastRecvdPacketInfo = std::move(receivedPacket);
   }
 
   WriteAckFrameMetaData ackFrameMetaData = {

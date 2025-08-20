@@ -45,7 +45,7 @@ struct TestObject {
 
   ~TestObject() = default;
 
-  TestObject(const TestObject& other)
+  TestObject(const TestObject& other) noexcept
       : fromCopySource(true), val(other.val), words(other.words) {
     other.copied = true;
   }
@@ -55,7 +55,7 @@ struct TestObject {
     other.moved = true;
   }
 
-  TestObject& operator=(const TestObject& other) {
+  TestObject& operator=(const TestObject& other) noexcept {
     fromCopySource = true;
     val = other.val;
     words = other.words;
@@ -83,12 +83,53 @@ bool operator==(const TestObject& lhs, const TestObject& rhs) {
   return lhs.val == rhs.val && lhs.words == rhs.words;
 }
 
-struct NotMovable {
-  NotMovable() = default;
-  NotMovable(const NotMovable&) = default;
-  NotMovable& operator=(const NotMovable&) = default;
-  NotMovable(NotMovable&&) = delete;
-  NotMovable& operator=(NotMovable&&) = delete;
+// NotMovable struct removed - CircularDeque now requires move construction for
+// safety
+
+// NoexceptString - replacement for std::string that meets CircularDeque
+// requirements
+struct NoexceptString {
+  std::string data;
+
+  NoexceptString() = default;
+
+  explicit NoexceptString(const char* s) : data(s) {}
+
+  explicit NoexceptString(const std::string& s) : data(s) {}
+
+  NoexceptString(const NoexceptString& other) noexcept = default;
+
+  NoexceptString(NoexceptString&& other) noexcept = default;
+
+  NoexceptString& operator=(const NoexceptString& other) noexcept = default;
+
+  NoexceptString& operator=(NoexceptString&& other) noexcept = default;
+
+  char& at(size_t pos) {
+    return data.at(pos);
+  }
+
+  const char& at(size_t pos) const {
+    return data.at(pos);
+  }
+
+  char& operator[](size_t pos) {
+    return data[pos];
+  }
+
+  const char& operator[](size_t pos) const {
+    return data[pos];
+  }
+
+  bool operator==(const NoexceptString& other) const noexcept = default;
+
+  bool operator==(const char* s) const noexcept {
+    return data == s;
+  }
+
+  friend bool operator==(const char* s, const NoexceptString& ns) noexcept {
+    return ns.data == s;
+  }
 };
 
 TEST(CircularDequeTest, EmptyContainer) {
@@ -162,7 +203,7 @@ TEST(CircularDequeTest, PushPopEmplaceAccessErase) {
   EXPECT_EQ(400, *std::prev(std::prev(std::prev(std::prev(cd.cend())))));
   EXPECT_EQ(0, std::distance(cd.begin(), iter));
   EXPECT_EQ(-4, std::distance(cd.end(), iter));
-  EXPECT_EQ(400, cd.at(0));
+  EXPECT_EQ(400, cd[0]);
 
   iter = cd.erase(std::next(cd.begin()));
   EXPECT_EQ(3, cd.size());
@@ -489,7 +530,7 @@ TEST(CircularDequeTest, ObjectMove) {
   cd.emplace_back(moreTestObject);
   EXPECT_FALSE(moreTestObject.moved);
   EXPECT_TRUE(moreTestObject.copied);
-  EXPECT_TRUE(cd.at(2).fromCopySource);
+  EXPECT_TRUE(cd[2].fromCopySource);
   EXPECT_FALSE(cd.back().fromMoveSource);
   EXPECT_EQ("My object", cd[0].words);
   EXPECT_EQ("My other object", cd[1].words);
@@ -551,21 +592,6 @@ TEST(CircularDequeTest, NoncopiableElems) {
   cd.erase(cd.begin() + cd.size() / 3, cd.begin() + cd.size() / 3 * 2);
 }
 
-TEST(CircularDequeTest, NonmovableElems) {
-  CircularDeque<NotMovable> cd;
-  int counter = 0;
-  while (counter++ < 10) {
-    NotMovable notMovable;
-    cd.push_back(notMovable);
-  }
-  auto maxSize = cd.max_size();
-  while (cd.size() < maxSize * 2) {
-    NotMovable notMovable;
-    cd.push_back(notMovable);
-  }
-  cd.erase(cd.begin() + cd.size() / 3, cd.begin() + cd.size() / 3 * 2);
-}
-
 TEST(CircularDequeTest, Swap) {
   CircularDeque<int> first = {1, 2, 3, 4, 5};
   CircularDeque<int> second = {1, 3, 5, 7, 9, 11, 13};
@@ -604,19 +630,19 @@ TEST(CircularDequeTest, Resize) {
 }
 
 TEST(CircularDequeTest, MiddleOpsNoCrashNoLeak) {
-  CircularDeque<std::string> cd;
+  CircularDeque<NoexceptString> cd;
   size_t counter = 0;
   auto obuffer = quic::test::buildRandomInputData(500);
   while (counter++ < 10000 / 2) {
     auto buffer = obuffer->clone();
-    cd.push_front(buffer->to<std::string>());
+    cd.push_front(NoexceptString(buffer->to<std::string>()));
   }
   EXPECT_EQ(5000, cd.size());
   counter = 0;
   while (counter++ < 10000) {
     cd.insert(
         cd.begin() + cd.size() / 3 + (counter % 2) * cd.size() / 3,
-        "test string");
+        NoexceptString("test string"));
   }
   EXPECT_EQ(15000, cd.size());
   counter = 0;
@@ -672,11 +698,12 @@ TEST(CircularDequeTest, Iterators) {
   EXPECT_EQ(collector, expected);
 
   // Mutation using iterators
-  CircularDeque<std::string> scd = {"111", "222", "333"};
+  CircularDeque<NoexceptString> scd = {
+      NoexceptString("111"), NoexceptString("222"), NoexceptString("333")};
   auto siter = scd.begin() + 1;
   siter->at(1) = 'b';
   EXPECT_EQ("2b2", scd[1]);
-  auto& s = *scd.emplace(siter, "555");
+  auto& s = *scd.emplace(siter, NoexceptString("555"));
   s[1] = 'c';
   EXPECT_EQ("5c5", scd[1]);
 }

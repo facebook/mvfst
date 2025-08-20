@@ -2118,7 +2118,7 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
 
   // Verify ack state after writing
   auto pnSpace = packet.header.getPacketNumberSpace();
-  auto ackState = getAckState(conn, pnSpace);
+  auto& ackState = getAckState(conn, pnSpace);
   EXPECT_EQ(ackState.largestAckScheduled, end);
   EXPECT_FALSE(ackState.needsToSendAckImmediately);
   EXPECT_EQ(0, ackState.numNonRxPacketsRecvd);
@@ -2156,7 +2156,7 @@ TEST_F(QuicTransportTest, NoWritePendingAckIfHavingData) {
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, std::nullopt);
 
   auto pnSpace = packet.header.getPacketNumberSpace();
-  auto ackState = getAckState(conn, pnSpace);
+  auto& ackState = getAckState(conn, pnSpace);
   EXPECT_EQ(ackState.largestAckScheduled, std::nullopt);
   EXPECT_FALSE(ackState.needsToSendAckImmediately);
   EXPECT_EQ(3, ackState.numNonRxPacketsRecvd);
@@ -2194,7 +2194,7 @@ TEST_F(QuicTransportTest, NoWritePendingAckIfHavingDataNonStream) {
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, std::nullopt);
 
   auto pnSpace = packet.header.getPacketNumberSpace();
-  auto ackState = getAckState(conn, pnSpace);
+  auto& ackState = getAckState(conn, pnSpace);
   EXPECT_EQ(ackState.largestAckScheduled, std::nullopt);
   EXPECT_FALSE(ackState.needsToSendAckImmediately);
   EXPECT_EQ(3, ackState.numNonRxPacketsRecvd);

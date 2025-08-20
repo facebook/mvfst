@@ -227,6 +227,18 @@ struct WriteAckFrameState {
   struct ReceivedPacket {
     PacketNum pktNum;
     ReceivedUdpPacket::Timings timings;
+
+    ReceivedPacket() = default;
+
+    template <typename TimingsType>
+    ReceivedPacket(PacketNum pktNumIn, TimingsType&& timingsIn)
+        : pktNum(pktNumIn), timings(std::forward<TimingsType>(timingsIn)) {}
+
+    ReceivedPacket(const ReceivedPacket&) = delete;
+    ReceivedPacket(ReceivedPacket&&) = default;
+    ReceivedPacket& operator=(const ReceivedPacket&) = delete;
+    ReceivedPacket& operator=(ReceivedPacket&&) = default;
+    ~ReceivedPacket() = default;
   };
 
   AckBlocks acks;

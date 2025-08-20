@@ -13,12 +13,58 @@
 namespace {
 constexpr size_t kLen = 50;
 
-template <typename T>
-void prepareDeque(T& d, size_t count) {
+// NoexceptString - replacement for std::string that meets CircularDeque
+// requirements
+struct NoexceptString {
+  std::string data;
+
+  NoexceptString() = default;
+
+  explicit NoexceptString(const char* s) : data(s) {}
+
+  explicit NoexceptString(const std::string& s) : data(s) {}
+
+  NoexceptString(const NoexceptString& other) noexcept = default;
+
+  NoexceptString(NoexceptString&& other) noexcept = default;
+
+  NoexceptString& operator=(const NoexceptString& other) noexcept = default;
+
+  NoexceptString& operator=(NoexceptString&& other) noexcept = default;
+
+  char& at(size_t pos) {
+    return data.at(pos);
+  }
+
+  const char& at(size_t pos) const {
+    return data.at(pos);
+  }
+
+  char& operator[](size_t pos) {
+    return data[pos];
+  }
+
+  const char& operator[](size_t pos) const {
+    return data[pos];
+  }
+
+  bool operator==(const NoexceptString& other) const noexcept = default;
+
+  bool operator==(const char* s) const noexcept {
+    return data == s;
+  }
+};
+
+template <typename Container>
+void prepareDeque(Container& d, size_t count) {
   size_t counter = 0;
   auto buffer = quic::test::buildRandomInputData(kLen);
   while (counter++ < count) {
-    d.emplace_back(buffer->clone()->to<std::string>());
+    if constexpr (std::is_same_v<typename Container::value_type, std::string>) {
+      d.emplace_back(buffer->clone()->to<std::string>());
+    } else {
+      d.emplace_back(NoexceptString(buffer->clone()->to<std::string>()));
+    }
   }
 }
 } // namespace
@@ -36,12 +82,12 @@ BENCHMARK(deque_push_front, iters) {
 
 BENCHMARK(circular_deque_push_front, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   d.resize(iters);
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_front(buffer->clone()->to<std::string>());
+    d.push_front(NoexceptString(buffer->clone()->to<std::string>()));
   }
 }
 
@@ -58,12 +104,12 @@ BENCHMARK(deque_push_back, iters) {
 
 BENCHMARK(circular_deque_push_back, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   d.resize(iters);
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_back(buffer->clone()->to<std::string>());
+    d.push_back(NoexceptString(buffer->clone()->to<std::string>()));
   }
 }
 
@@ -79,7 +125,7 @@ BENCHMARK(deque_pop_front, iters) {
 
 BENCHMARK(circular_deque_pop_front, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   prepareDeque(d, iters * 2);
   suspender.dismiss();
   while (iters-- && !d.empty()) {
@@ -99,7 +145,7 @@ BENCHMARK(deque_pop_back, iters) {
 
 BENCHMARK(circular_deque_pop_back, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   prepareDeque(d, iters * 2);
   suspender.dismiss();
   while (iters-- && !d.empty()) {
@@ -119,7 +165,7 @@ BENCHMARK(deque_erase_tail, iters) {
 
 BENCHMARK(circular_deque_erase_tail, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   prepareDeque(d, iters * 2);
   suspender.dismiss();
   while (iters-- && !d.empty()) {
@@ -139,7 +185,7 @@ BENCHMARK(deque_erase_head, iters) {
 
 BENCHMARK(circular_deque_erase_head, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   prepareDeque(d, iters * 2);
   suspender.dismiss();
   while (iters-- && !d.empty()) {
@@ -163,9 +209,9 @@ BENCHMARK(deque_size, iters) {
 
 BENCHMARK(circular_deque_size, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   while (iters--) {
-    d.emplace_back("This is a test string");
+    d.emplace_back(NoexceptString("This is a test string"));
     suspender.dismiss();
     auto s = d.size();
     auto e = d.empty();
@@ -187,7 +233,7 @@ BENCHMARK(deque_erase_middle, iters) {
 
 BENCHMARK(circular_deque_erase_middle, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   prepareDeque(d, iters * 2);
   suspender.dismiss();
   while (iters--) {
@@ -207,11 +253,11 @@ BENCHMARK(deque_insert_middle, iters) {
 
 BENCHMARK(circular_deque_insert_middle, iters) {
   folly::BenchmarkSuspender suspender;
-  quic::CircularDeque<std::string> d;
+  quic::CircularDeque<NoexceptString> d;
   prepareDeque(d, iters / 2);
   suspender.dismiss();
   while (iters--) {
-    d.insert(d.begin() + d.size() / 2, "This is a test string");
+    d.insert(d.begin() + d.size() / 2, NoexceptString("This is a test string"));
   }
 }
 

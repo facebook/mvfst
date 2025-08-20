@@ -299,7 +299,7 @@ struct ReadDatagram {
 
   // Move only to match BufQueue behavior
   ReadDatagram(ReadDatagram&& other) noexcept = default;
-  ReadDatagram& operator=(ReadDatagram&& other) = default;
+  ReadDatagram& operator=(ReadDatagram&& other) noexcept = default;
   ReadDatagram(const ReadDatagram&) = delete;
   ReadDatagram& operator=(const ReadDatagram&) = delete;
 

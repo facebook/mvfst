@@ -128,9 +128,9 @@ bool isAllDataReceived(const QuicStreamState& stream) {
     receivedDataTillFin = true;
   } else if (
       stream.finalReadOffset && stream.readBuffer.size() == 1 &&
-      stream.currentReadOffset == stream.readBuffer.at(0).offset &&
-      (stream.readBuffer.at(0).offset +
-           stream.readBuffer.at(0).data.chainLength() ==
+      stream.currentReadOffset == stream.readBuffer.front().offset &&
+      (stream.readBuffer.front().offset +
+           stream.readBuffer.front().data.chainLength() ==
        stream.finalReadOffset)) {
     receivedDataTillFin = true;
   }

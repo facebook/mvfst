@@ -132,12 +132,6 @@ mvfst_cpp_library(
         "CircularDeque.h",
         "CircularDeque-inl.h",
     ],
-    exported_deps = [
-        "//folly:likely",
-        "//folly:portability",
-        "//folly:scope_guard",
-        "//folly/memory:malloc",
-    ],
     exported_external_deps = [
         "glog",
     ],

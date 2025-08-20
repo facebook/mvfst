@@ -30,7 +30,7 @@ class BufQueue {
     other.chainLength_ = 0;
   }
 
-  BufQueue& operator=(BufQueue&& other) {
+  BufQueue& operator=(BufQueue&& other) noexcept {
     if (&other != this) {
       chain_ = std::move(other.chain_);
       chainLength_ = other.chainLength_;

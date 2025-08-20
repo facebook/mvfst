@@ -2976,9 +2976,10 @@ class QuicAckSchedulerTest : public QuicPacketSchedulerTestBase, public Test {
     WriteAckFrameState::ReceivedPacket rpi;
     rpi.pktNum = 10;
     rpi.timings.receiveTimePoint = Clock::now();
-    ackState_.recvdPacketInfos.emplace_back(rpi);
+    auto receiveTime = rpi.timings.receiveTimePoint;
+    ackState_.recvdPacketInfos.emplace_back(std::move(rpi));
     ackState_.largestRecvdPacketNum = 10;
-    ackState_.largestRecvdPacketTime = rpi.timings.receiveTimePoint;
+    ackState_.largestRecvdPacketTime = receiveTime;
 
     // Non-zero ECN values
     ackState_.ecnECT0CountReceived = 1;
@@ -2996,7 +2997,7 @@ class QuicAckSchedulerTest : public QuicPacketSchedulerTestBase, public Test {
   }
 
   std::unique_ptr<QuicClientConnectionState> conn_;
-  AckState ackState_;
+  AckState& ackState_;
   std::unique_ptr<MockQuicPacketBuilder> builder_;
   std::unique_ptr<PacketHeader> mockPacketHeader_;
 };

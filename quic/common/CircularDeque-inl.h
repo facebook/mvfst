@@ -6,12 +6,19 @@
  */
 
 #include <algorithm>
+#include <cstdlib>
 #include <iterator>
 
-#include <folly/Likely.h>
-#include <folly/ScopeGuard.h>
-
 namespace quic {
+
+// Allocates memory and aborts on failure instead of throwing exceptions
+inline void* checkedMalloc(size_t size) {
+  void* ptr = ::operator new(size, std::nothrow);
+  if (!ptr && size > 0) {
+    std::abort();
+  }
+  return ptr;
+}
 
 constexpr size_t kInitCapacity = 10;
 constexpr size_t kGrowthNumerator = 3;
@@ -74,10 +81,7 @@ void CircularDeque<T>::resize(size_type count) {
   auto newCapacity = count + 1;
   auto newSize = std::min(count, size());
   auto newStorage =
-      reinterpret_cast<T*>(folly::checkedMalloc(newCapacity * sizeof(T)));
-  SCOPE_FAIL {
-    folly::sizedFree(newStorage, newCapacity * sizeof(T));
-  };
+      reinterpret_cast<T*>(checkedMalloc(newCapacity * sizeof(T)));
   if constexpr (std::is_move_constructible_v<T>) {
     std::uninitialized_move(begin(), end(), newStorage);
   } else {
@@ -92,30 +96,15 @@ void CircularDeque<T>::resize(size_type count) {
 template <typename T>
 typename CircularDeque<T>::const_reference CircularDeque<T>::operator[](
     size_type index) const {
+  CHECK_LT(index, size()) << "CircularDeque index out of bounds";
   return *(begin() + index);
 }
 
 template <typename T>
 typename CircularDeque<T>::reference CircularDeque<T>::operator[](
     size_type index) {
+  CHECK_LT(index, size()) << "CircularDeque index out of bounds";
   return *(begin() + index);
-}
-
-template <typename T>
-typename CircularDeque<T>::const_reference CircularDeque<T>::at(
-    size_type index) const {
-  if (index >= size()) {
-    throw std::out_of_range("Out of bound access");
-  }
-  return operator[](index);
-}
-
-template <typename T>
-typename CircularDeque<T>::reference CircularDeque<T>::at(size_type index) {
-  if (index >= size()) {
-    throw std::out_of_range("Out of bound access");
-  }
-  return operator[](index);
 }
 
 template <typename T>
@@ -376,7 +365,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
     DCHECK(first.index_ <= end_ || first.index_ >= begin_);
     DCHECK(last.index_ <= end_ || last.index_ >= begin_);
   }
-  if (UNLIKELY(wrappedDistance(first, last) == size())) {
+  if (wrappedDistance(first, last) == size()) {
     // if we are erasing everything, just clear()
     clear();
     // The return iterator in this case isn't legit.

@@ -336,7 +336,7 @@ fillFrameWithPacketReceiveTimestamps(
   if (ackFrameMetaData.ackState.recvdPacketInfos.size() == 0) {
     return 0;
   }
-  auto recvdPacketInfos = ackFrameMetaData.ackState.recvdPacketInfos;
+  const auto& recvdPacketInfos = ackFrameMetaData.ackState.recvdPacketInfos;
   // Insert all received packet timestamps into an interval set, to identify
   // contiguous ranges
 
