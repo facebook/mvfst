@@ -137,7 +137,6 @@ int LibevQuicAsyncUDPSocket::writem(
     size_t* /*numIovecsInBuffer*/,
     size_t /*count*/) {
   LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
-  return -1;
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(

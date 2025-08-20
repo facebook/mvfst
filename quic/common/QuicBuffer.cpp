@@ -345,7 +345,6 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
     aCurrent = aCurrent->next();
     if (aCurrent == a) {
       LOG(FATAL) << "Unreachable, we checked aLength != 0";
-      return true;
     }
   }
 
@@ -355,7 +354,6 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
       // All buffers in other chain are empty
       LOG(FATAL) << "Unreachable, since aLength == bLength and "
                  << "aLength != 0";
-      return true;
     }
   }
 

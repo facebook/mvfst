@@ -1971,10 +1971,9 @@ TEST_P(QuicTransportImplTestBase, ReadErrorUnsanitizedErrorMsg) {
       }));
 
   EXPECT_CALL(*socketPtr, write(_, _, _))
-      .WillOnce(
-          Invoke([](const folly::SocketAddress&, const struct iovec*, size_t) {
+      .WillOnce(Invoke(
+          [](const folly::SocketAddress&, const struct iovec*, size_t) -> int {
             throw std::runtime_error("You need to calm down.");
-            return 0;
           }));
   auto writeChain_tmp = transport->writeChain(
       stream,
@@ -1995,10 +1994,9 @@ TEST_P(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::string("Well there's your problem"))));
   EXPECT_CALL(*socketPtr, write(_, _, _))
-      .WillOnce(
-          Invoke([](const folly::SocketAddress&, const struct iovec*, size_t) {
+      .WillOnce(Invoke(
+          [](const folly::SocketAddress&, const struct iovec*, size_t) -> int {
             throw std::runtime_error("Well there's your problem");
-            return 0;
           }));
   ASSERT_FALSE(
       transport
