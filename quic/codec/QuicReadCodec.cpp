@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Decode.h>
 #include <quic/codec/PacketNumber.h>
+#include <quic/common/StringUtils.h>
 
 namespace quic {
 
@@ -429,8 +430,9 @@ CodecResult QuicReadCodec::parsePacket(
   if (!currentOneRttReadCipher_ || !oneRttHeaderCipher_) {
     VLOG(4) << nodeToString(nodeType_) << " cannot read key phase zero packet";
     VLOG(20) << "cannot read data="
-             << folly::hexlify(queue.front()->clone()->moveToFbString()) << " "
-             << connIdToHex();
+             << quic::hexlify(
+                    std::string(queue.front()->clone()->moveToFbString()))
+             << " " << connIdToHex();
     return CodecResult(
         CipherUnavailable(queue.move(), ProtectionType::KeyPhaseZero));
   }

@@ -53,7 +53,6 @@ mvfst_cpp_library(
         "QuicTokenCache.h",
     ],
     exported_deps = [
-        "//folly:string",
         "//quic/common:optional",
     ],
 )

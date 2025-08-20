@@ -18,6 +18,7 @@ fb_dirsync_cpp_unittest(
         "//folly/io/async:ssl_context",
         "//folly/io/async/test:mocks",
         "//quic:constants",
+        "//quic/common:string_utils",
         "//quic/common/test:test_utils",
         "//quic/fizz/client/handshake:fizz_client_handshake",
         "//quic/fizz/handshake:fizz_handshake",

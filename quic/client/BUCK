@@ -31,6 +31,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/api:loop_detector_callback",
         "//quic/api:transport_helpers",
+        "//quic/common:string_utils",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/flowcontrol:flow_control",
         "//quic/handshake:handshake",

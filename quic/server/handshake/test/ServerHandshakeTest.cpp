@@ -17,6 +17,7 @@
 #include <folly/io/async/ScopedEventBaseThread.h>
 
 #include <quic/QuicConstants.h>
+#include <quic/common/StringUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientExtensions.h>
 #include <quic/fizz/handshake/FizzBridge.h>
@@ -427,7 +428,9 @@ TEST_F(ServerHandshakeTest, TestHandshakeSuccessIgnoreNonHandshake) {
   fizz::WriteToSocket write;
   fizz::TLSContent content;
   content.contentType = fizz::ContentType::alert;
-  content.data = folly::IOBuf::copyBuffer(folly::unhexlify("01000000"));
+  auto contentDataOpt = quic::unhexlify("01000000");
+  CHECK(contentDataOpt.has_value()) << "Failed to unhexlify content data";
+  content.data = folly::IOBuf::copyBuffer(contentDataOpt.value());
   content.encryptionLevel = fizz::EncryptionLevel::Plaintext;
   write.contents.push_back(std::move(content));
   clientWrites.push_back(std::move(write));
@@ -446,7 +449,9 @@ TEST_F(ServerHandshakeTest, TestMalformedHandshakeMessage) {
   fizz::WriteToSocket write;
   fizz::TLSContent content;
   content.contentType = fizz::ContentType::handshake;
-  content.data = folly::IOBuf::copyBuffer(folly::unhexlify("01000000"));
+  auto contentDataOpt2 = quic::unhexlify("01000000");
+  CHECK(contentDataOpt2.has_value()) << "Failed to unhexlify content data";
+  content.data = folly::IOBuf::copyBuffer(contentDataOpt2.value());
   content.encryptionLevel = fizz::EncryptionLevel::Plaintext;
   write.contents.push_back(std::move(content));
   clientWrites.clear();

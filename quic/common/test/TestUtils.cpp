@@ -14,6 +14,7 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/common/StringUtils.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/handshake/test/Mocks.h>
@@ -432,7 +433,8 @@ BufPtr packetToBufCleartext(
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum) {
   VLOG(10) << __func__ << " packet header: "
-           << folly::hexlify(packet.header.clone()->moveToFbString());
+           << quic::hexlify(
+                  std::string(packet.header.clone()->moveToFbString()));
   auto packetBuf = packet.header.clone();
   BufPtr body;
   if (!packet.body.empty()) {
@@ -850,10 +852,13 @@ ssize_t TestPacketBatchWriter::write(
 
 TrafficKey getQuicTestKey() {
   TrafficKey testKey;
-  testKey.key = folly::IOBuf::copyBuffer(
-      folly::unhexlify("000102030405060708090A0B0C0D0E0F"));
-  testKey.iv =
-      folly::IOBuf::copyBuffer(folly::unhexlify("000102030405060708090A0B"));
+  auto keyOpt = quic::unhexlify("000102030405060708090A0B0C0D0E0F");
+  CHECK(keyOpt.has_value()) << "Failed to unhexlify test key";
+  testKey.key = folly::IOBuf::copyBuffer(keyOpt.value());
+
+  auto ivOpt = quic::unhexlify("000102030405060708090A0B");
+  CHECK(ivOpt.has_value()) << "Failed to unhexlify test IV";
+  testKey.iv = folly::IOBuf::copyBuffer(ivOpt.value());
   return testKey;
 }
 

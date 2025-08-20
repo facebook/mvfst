@@ -5,11 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/String.h>
 #include <folly/io/IOBuf.h>
 #include <folly/portability/GTest.h>
-#include <quic/common/Expected.h>
+#include <quic/codec/QuicInteger.h>
 #include <quic/common/Optional.h>
+#include <quic/common/StringUtils.h>
 
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
@@ -31,7 +31,10 @@ class QuicIntegerDecodeTest : public TestWithParam<IntegerParams> {};
 class QuicIntegerEncodeTest : public TestWithParam<IntegerParams> {};
 
 TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
-  std::string encodedBytes = folly::unhexlify(GetParam().hexEncoded);
+  auto encodedBytesOpt = quic::unhexlify(GetParam().hexEncoded);
+  CHECK(encodedBytesOpt.has_value())
+      << "Failed to unhexlify: " << GetParam().hexEncoded;
+  std::string encodedBytes = encodedBytesOpt.value();
 
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
     auto wrappedEncoded = IOBuf::copyBuffer(encodedBytes);
@@ -53,7 +56,10 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
 }
 
 TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
-  std::string encodedBytes = folly::unhexlify(GetParam().hexEncoded);
+  auto encodedBytesOpt = quic::unhexlify(GetParam().hexEncoded);
+  CHECK(encodedBytesOpt.has_value())
+      << "Failed to unhexlify: " << GetParam().hexEncoded;
+  std::string encodedBytes = encodedBytesOpt.value();
   auto wrappedEncoded = IOBuf::copyBuffer(encodedBytes);
 
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
@@ -82,7 +88,7 @@ TEST_P(QuicIntegerEncodeTest, Encode) {
     return;
   }
   auto written = encodeQuicInteger(GetParam().decoded, appendOp);
-  auto encodedValue = folly::hexlify(queue->to<std::string>());
+  auto encodedValue = quic::hexlify(queue->to<std::string>());
   LOG(INFO) << "encoded=" << encodedValue;
   LOG(INFO) << "expected=" << GetParam().hexEncoded;
 
@@ -108,7 +114,7 @@ TEST_F(QuicIntegerEncodeTest, ForceFourBytes) {
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
   EXPECT_EQ(4, *encodeQuicInteger(37, appendOp, 4));
-  auto encodedValue = folly::hexlify(queue->to<std::string>());
+  auto encodedValue = quic::hexlify(queue->to<std::string>());
   EXPECT_EQ("80000025", encodedValue);
 }
 
@@ -117,7 +123,7 @@ TEST_F(QuicIntegerEncodeTest, ForceEightBytes) {
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
   EXPECT_EQ(8, *encodeQuicInteger(37, appendOp, 8));
-  auto encodedValue = folly::hexlify(queue->to<std::string>());
+  auto encodedValue = quic::hexlify(queue->to<std::string>());
   EXPECT_EQ("c000000000000025", encodedValue);
 }
 

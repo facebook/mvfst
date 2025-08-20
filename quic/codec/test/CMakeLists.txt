@@ -24,6 +24,7 @@ quic_add_test(TARGET QuicReadCodecTest
   Folly::folly
   mvfst_codec
   mvfst_exception
+  mvfst_string_utils
   mvfst_test_utils
 )
 
@@ -77,6 +78,7 @@ quic_add_test(TARGET QuicConnectionIdTest
   DEPENDS
   Folly::folly
   mvfst_codec_types
+  mvfst_string_utils
 )
 
 quic_add_test(TARGET QuicPacketBuilderTest
@@ -104,6 +106,7 @@ quic_add_test(TARGET QuicIntegerTest
   Folly::folly
   mvfst_codec_types
   mvfst_exception
+  mvfst_string_utils
 )
 
 quic_add_test(TARGET ServerConnectionIdParamsTest

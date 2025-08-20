@@ -6,7 +6,6 @@
  */
 
 #include <fizz/protocol/ech/Decrypter.h>
-#include <folly/FBString.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 

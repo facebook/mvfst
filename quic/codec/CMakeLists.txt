@@ -38,6 +38,7 @@ target_link_libraries(
   mvfst_bufutil
   mvfst_constants
   mvfst_exception
+  mvfst_string_utils
   PRIVATE
   ${Boost_LIBRARIES}
 )
@@ -220,6 +221,7 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_exception
   mvfst_handshake
+  mvfst_string_utils
 )
 
 file(

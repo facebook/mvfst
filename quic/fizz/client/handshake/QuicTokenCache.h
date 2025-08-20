@@ -10,7 +10,6 @@
 #include <string>
 #include <unordered_map>
 
-#include <folly/String.h>
 #include <quic/common/Optional.h>
 
 namespace quic {

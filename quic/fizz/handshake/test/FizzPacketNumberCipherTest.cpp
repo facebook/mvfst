@@ -11,7 +11,7 @@
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/handshake/FizzPacketNumberCipher.h>
 
-#include <folly/String.h>
+#include <quic/common/StringUtils.h>
 
 using namespace testing;
 
@@ -35,7 +35,9 @@ class LongPacketNumberCipherTest : public TestWithParam<HeaderParams> {
 
 template <typename Array>
 Array hexToBytes(const folly::StringPiece hex) {
-  auto bytesString = folly::unhexlify(hex);
+  auto bytesStringOpt = quic::unhexlify(std::string(hex));
+  CHECK(bytesStringOpt.has_value()) << "Failed to unhexlify: " << hex;
+  auto bytesString = bytesStringOpt.value();
   Array bytes;
   memcpy(bytes.data(), bytesString.data(), bytes.size());
   return bytes;
@@ -64,7 +66,9 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
   auto cipherResult = cryptoFactory.makePacketNumberCipher(GetParam().cipher);
   ASSERT_FALSE(cipherResult.hasError());
   auto cipher = std::move(cipherResult.value());
-  auto key = folly::unhexlify(GetParam().key);
+  auto keyOpt = quic::unhexlify(std::string(GetParam().key));
+  CHECK(keyOpt.has_value()) << "Failed to unhexlify key: " << GetParam().key;
+  auto key = keyOpt.value();
   EXPECT_EQ(cipher->keyLength(), key.size());
   auto setKeyResult = cipher->setKey(folly::range(key));
   ASSERT_FALSE(setKeyResult.hasError());
@@ -78,18 +82,30 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
       folly::range(cipherBytes.initial),
       folly::range(cipherBytes.packetNumber));
   ASSERT_FALSE(encryptResult.hasError());
-  EXPECT_EQ(folly::hexlify(cipherBytes.initial), GetParam().initialByte);
   EXPECT_EQ(
-      folly::hexlify(cipherBytes.packetNumber), GetParam().packetNumberBytes);
+      quic::hexlify(std::string(
+          reinterpret_cast<const char*>(cipherBytes.initial.data()),
+          cipherBytes.initial.size())),
+      GetParam().initialByte);
+  EXPECT_EQ(
+      quic::hexlify(std::string(
+          reinterpret_cast<const char*>(cipherBytes.packetNumber.data()),
+          cipherBytes.packetNumber.size())),
+      GetParam().packetNumberBytes);
   auto decryptResult = cipher->decryptLongHeader(
       cipherBytes.sample,
       folly::range(cipherBytes.initial),
       folly::range(cipherBytes.packetNumber));
   ASSERT_FALSE(decryptResult.hasError());
   EXPECT_EQ(
-      folly::hexlify(cipherBytes.initial), GetParam().decryptedInitialByte);
+      quic::hexlify(std::string(
+          reinterpret_cast<const char*>(cipherBytes.initial.data()),
+          cipherBytes.initial.size())),
+      GetParam().decryptedInitialByte);
   EXPECT_EQ(
-      folly::hexlify(cipherBytes.packetNumber),
+      quic::hexlify(std::string(
+          reinterpret_cast<const char*>(cipherBytes.packetNumber.data()),
+          cipherBytes.packetNumber.size())),
       GetParam().decryptedPacketNumberBytes);
 }
 

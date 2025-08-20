@@ -7,10 +7,10 @@
 
 #include <gtest/gtest.h>
 
-#include <folly/String.h>
 #include <folly/io/Cursor.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/StringUtils.h>
 #include <array>
 
 using namespace std;
@@ -329,7 +329,7 @@ TEST(BufAppender, TestBigEndianOneByte) {
   std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
   BufAppender appender(data.get(), 20);
   appender.writeBE(oneByte);
-  std::string out = folly::hexlify(data->coalesce());
+  std::string out = quic::hexlify(std::string(data->coalesce()));
   EXPECT_EQ(out, "12");
 }
 
@@ -339,7 +339,7 @@ TEST(BufAppender, TestBigEndianTwoBytes) {
   std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
   BufAppender appender(data.get(), 20);
   appender.writeBE(twoBytes);
-  std::string out = folly::hexlify(data->coalesce());
+  std::string out = quic::hexlify(std::string(data->coalesce()));
   EXPECT_EQ(out, "3412");
 }
 
@@ -349,7 +349,7 @@ TEST(BufAppender, TestBigEndianFourBytes) {
   std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
   BufAppender appender(data.get(), 20);
   appender.writeBE(fourBytes);
-  std::string out = folly::hexlify(data->coalesce());
+  std::string out = quic::hexlify(std::string(data->coalesce()));
   EXPECT_EQ(out, "78563412");
 }
 
@@ -359,7 +359,7 @@ TEST(BufAppender, TestBigEndianEightBytes) {
   std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
   BufAppender appender(data.get(), 20);
   appender.writeBE(eightBytes);
-  std::string out = folly::hexlify(data->coalesce());
+  std::string out = quic::hexlify(std::string(data->coalesce()));
   EXPECT_EQ(out, "0000bc9a78563412");
 }
 

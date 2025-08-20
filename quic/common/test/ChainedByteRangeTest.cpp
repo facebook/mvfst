@@ -7,7 +7,6 @@
 
 #include <gtest/gtest.h>
 
-#include <folly/String.h>
 #include <folly/io/Cursor.h>
 #include <quic/common/ChainedByteRange.h>
 

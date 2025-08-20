@@ -50,6 +50,7 @@ target_link_libraries(
   mvfst_state_ack_handler
   mvfst_state_datagram_handler
   mvfst_state_pacing_functions
+  mvfst_string_utils
   mvfst_transport
 )
 

@@ -5,14 +5,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/portability/GTest.h>
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/common/StringUtils.h>
 
 #include <folly/portability/GTest.h>
 
 namespace quic::test {
 
 TEST(ConnectionIdTest, TestConnidLen) {
-  std::string out = folly::unhexlify("ffaabbee00");
+  auto outOpt = quic::unhexlify("ffaabbee00");
+  CHECK(outOpt.has_value()) << "Failed to unhexlify connection ID";
+  std::string out = outOpt.value();
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
   Cursor cursor(&buf);
   auto connidExpected = ConnectionId::create(cursor, out.size());
@@ -22,7 +26,7 @@ TEST(ConnectionIdTest, TestConnidLen) {
   for (size_t i = 0; i < connid.size(); ++i) {
     EXPECT_EQ(*(connid.data() + i), static_cast<uint8_t>(out[i]));
   }
-  std::string hexconnid = folly::hexlify(out);
+  std::string hexconnid = quic::hexlify(out);
   EXPECT_EQ(connid.hex(), hexconnid);
 }
 

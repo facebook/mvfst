@@ -8,7 +8,8 @@
 #include <quic/codec/QuicConnectionId.h>
 
 #include <folly/Random.h>
-#include <glog/logging.h>
+#include <quic/QuicConstants.h>
+#include <quic/common/StringUtils.h>
 
 namespace quic {
 
@@ -25,7 +26,8 @@ uint8_t ConnectionId::size() const {
 }
 
 std::string ConnectionId::hex() const {
-  return folly::hexlify(ByteRange(connid.data(), connidLen));
+  return quic::hexlify(
+      std::string(reinterpret_cast<const char*>(connid.data()), connidLen));
 }
 
 ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {

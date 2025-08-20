@@ -15,6 +15,7 @@
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/common/StringUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/CryptoFactory.h>
@@ -609,7 +610,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         ReadNewTokenFrame& newTokenFrame = *quicFrame.asReadNewTokenFrame();
         std::string tokenStr = newTokenFrame.token->to<std::string>();
         VLOG(10) << "client received new token token="
-                 << folly::hexlify(tokenStr);
+                 << quic::hexlify(tokenStr);
         if (newTokenCallback_) {
           newTokenCallback_(std::move(tokenStr));
         }

@@ -36,6 +36,7 @@ target_link_libraries(
   mvfst_qlogger PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_string_utils
 )
 
 file(

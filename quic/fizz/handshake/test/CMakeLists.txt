@@ -23,6 +23,7 @@ quic_add_test(TARGET FizzCryptoFactoryTest
   Folly::folly
   mvfst_codec_types
   mvfst_fizz_handshake
+  mvfst_string_utils
   mvfst_test_utils
 )
 
@@ -33,4 +34,5 @@ quic_add_test(TARGET FizzPacketNumberCipherTest
   Folly::folly
   mvfst_fizz_handshake
   mvfst_codec_packet_number_cipher
+  mvfst_string_utils
 )

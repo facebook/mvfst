@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/String.h>
 #include <folly/lang/Bits.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>

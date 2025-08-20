@@ -10,7 +10,6 @@
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
-#include <folly/String.h>
 #include <folly/hash/Hash.h>
 #include <folly/io/IOBuf.h>
 

@@ -24,5 +24,6 @@ quic_add_test(TARGET ServerHandshakeTest
   mvfst_handshake
   mvfst_server
   mvfst_state_machine
+  mvfst_string_utils
   mvfst_test_utils
 )

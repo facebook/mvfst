@@ -55,6 +55,7 @@ mvfst_cpp_test(
         "//folly/io:iobuf",
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
+        "//quic/common:string_utils",
     ],
 )
 
@@ -114,6 +115,7 @@ mvfst_cpp_library(
         "//fizz/protocol/clock/test:mock_clock",
         "//fizz/protocol/test:mocks",
         "//quic/api:transport_helpers",
+        "//quic/common:string_utils",
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/server/handshake:stateless_reset_generator",
         "//quic/state:ack_event",

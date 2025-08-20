@@ -9,6 +9,7 @@
 #include <folly/portability/GTest.h>
 
 #include <fizz/crypto/aead/test/Mocks.h>
+#include <quic/common/StringUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/test/Mocks.h>
@@ -65,7 +66,9 @@ class FizzCryptoFactoryTest : public Test {
 TEST_F(FizzCryptoFactoryTest, TestV1ClearTextCipher) {
   // test vector taken from
   // https://datatracker.ietf.org/doc/html/rfc9001#appendix-A
-  auto connid = folly::unhexlify("8394c8f03e515708");
+  auto connidOpt = quic::unhexlify("8394c8f03e515708");
+  CHECK(connidOpt.has_value()) << "Failed to unhexlify connection ID";
+  auto connid = connidOpt.value();
   std::vector<uint8_t> destinationConnidVector;
   for (size_t i = 0; i < connid.size(); ++i) {
     destinationConnidVector.push_back(connid.data()[i]);
@@ -80,8 +83,8 @@ TEST_F(FizzCryptoFactoryTest, TestV1ClearTextCipher) {
 
   std::string expectedKey = "1f369613dd76d5467730efcbe3b1a22d";
   std::string expectedIv = "fa044b2f42a3fd3b46fb255c";
-  auto trafficKeyHex = folly::hexlify(trafficKey_->key->coalesce());
-  auto trafficIvHex = folly::hexlify(trafficKey_->iv->coalesce());
+  auto trafficKeyHex = quic::hexlify(std::string(trafficKey_->key->coalesce()));
+  auto trafficIvHex = quic::hexlify(std::string(trafficKey_->iv->coalesce()));
   EXPECT_EQ(trafficKeyHex, expectedKey);
   EXPECT_EQ(trafficIvHex, expectedIv);
 }
@@ -97,7 +100,8 @@ TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
   auto expectedHex = "cd253a36ff93937c469384a823af6c56";
   auto packetCipher =
       cryptoFactory.makePacketNumberCipher(folly::range(clientKey));
-  auto secretHex = folly::hexlify(packetCipherKey_.value()->coalesce());
+  auto secretHex =
+      quic::hexlify(std::string(packetCipherKey_.value()->coalesce()));
   EXPECT_EQ(secretHex, expectedHex);
 
   // reset the cipher
@@ -111,7 +115,8 @@ TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
 
   auto packetCipher2 =
       cryptoFactory.makePacketNumberCipher(folly::range(serverKey));
-  auto secretHex2 = folly::hexlify(packetCipherKey_.value()->coalesce());
+  auto secretHex2 =
+      quic::hexlify(std::string(packetCipherKey_.value()->coalesce()));
   EXPECT_EQ(secretHex2, expectedKey2);
 }
 

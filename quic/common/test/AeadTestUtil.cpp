@@ -10,6 +10,7 @@
 #include <fizz/crypto/aead/test/TestUtil.h>
 
 #include <fizz/crypto/aead/IOBufUtil.h>
+#include <quic/common/StringUtils.h>
 
 using namespace folly;
 
@@ -23,8 +24,9 @@ std::unique_ptr<folly::IOBuf> defaultCreator(size_t len, size_t) {
 // Converts the hex encoded string to an IOBuf.
 std::unique_ptr<folly::IOBuf>
 toIOBuf(std::string hexData, size_t headroom, size_t tailroom) {
-  std::string out;
-  CHECK(folly::unhexlify(hexData, out));
+  auto outOpt = quic::unhexlify(hexData);
+  CHECK(outOpt.has_value()) << "Failed to unhexlify hex data: " << hexData;
+  auto out = outOpt.value();
   return folly::IOBuf::copyBuffer(out, headroom, tailroom);
 }
 

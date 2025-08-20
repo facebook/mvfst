@@ -39,6 +39,7 @@ mvfst_cpp_test(
         "//folly/portability:gtest",
         "//quic:exception",
         "//quic/codec:codec",
+        "//quic/common:string_utils",
         "//quic/common/test:test_utils",
         "//quic/fizz/handshake:fizz_handshake",
     ],
@@ -138,6 +139,7 @@ mvfst_cpp_test(
     deps = [
         "//folly/portability:gtest",
         "//quic/codec:types",
+        "//quic/common:string_utils",
     ],
 )
 
@@ -196,6 +198,7 @@ mvfst_cpp_test(
         "//quic:exception",
         "//quic/codec:types",
         "//quic/common:optional",
+        "//quic/common:string_utils",
     ],
 )
 

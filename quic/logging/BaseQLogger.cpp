@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/StringUtils.h>
 #include <quic/logging/BaseQLogger.h>
 
 namespace {
@@ -73,7 +74,7 @@ void addQuicSimpleFrameToEvent(
     }
     case quic::QuicSimpleFrame::Type::NewTokenFrame: {
       const quic::NewTokenFrame& frame = *simpleFrame.asNewTokenFrame();
-      auto tokenHexStr = folly::hexlify(frame.token->coalesce());
+      auto tokenHexStr = hexlify(frame.token->coalesce());
       event->frames.push_back(
           std::make_unique<quic::NewTokenFrameLog>(tokenHexStr));
       break;

@@ -51,6 +51,7 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_server
   mvfst_state_machine
+  mvfst_string_utils
   mvfst_transport
   PRIVATE
   ${BOOST_LIBRARIES}
@@ -71,6 +72,7 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_looper
+  mvfst_string_utils
   mvfst_transport
   mvfst_server
   mvfst_state_machine

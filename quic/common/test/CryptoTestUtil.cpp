@@ -9,8 +9,8 @@
 // https://github.com/facebookincubator/fizz/blob/master/fizz/crypto/test/TestUtil.cpp
 #include <fizz/crypto/test/TestUtil.h>
 
-#include <folly/String.h>
 #include <folly/ssl/OpenSSLCertUtils.h>
+#include <quic/common/StringUtils.h>
 #include <sodium/randombytes.h>
 
 using namespace folly;
@@ -37,13 +37,6 @@ EvpPkeyUniquePtr getPublicKey(StringPiece key) {
       PEM_read_bio_PUBKEY(bio.get(), nullptr, nullptr, nullptr));
   CHECK(pkey);
   return pkey;
-}
-
-// Converts the hex encoded string to an IOBuf.
-std::unique_ptr<folly::IOBuf> toIOBuf(folly::StringPiece hexData) {
-  std::string out;
-  CHECK(folly::unhexlify(hexData, out));
-  return folly::IOBuf::copyBuffer(out);
 }
 
 folly::ssl::X509UniquePtr getCert(folly::StringPiece cert) {

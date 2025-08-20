@@ -19,11 +19,11 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:random",
+        "//quic/common:string_utils",
     ],
     exported_deps = [
         ":packet_number",
         "//folly:network_address",
-        "//folly:string",
         "//folly/hash:hash",
         "//folly/io:iobuf",
         "//folly/lang:bits",
@@ -37,9 +37,6 @@ mvfst_cpp_library(
         "//quic/common:network_data",
         "//quic/common:optional",
         "//quic/common:variant",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 
@@ -183,6 +180,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//quic:exception",
+        "//quic/common:string_utils",
     ],
     exported_deps = [
         ":decode",
