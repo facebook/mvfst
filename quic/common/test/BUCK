@@ -227,3 +227,14 @@ mvfst_cpp_test(
         "//quic/common:contiguous_cursor",
     ],
 )
+
+mvfst_cpp_test(
+    name = "StringUtilsTest",
+    srcs = [
+        "StringUtilsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/common:string_utils",
+    ],
+)

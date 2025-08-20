@@ -127,6 +127,23 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "string_utils",
+    srcs = [
+        "StringUtils.cpp",
+    ],
+    headers = [
+        "StringUtils.h",
+    ],
+    deps = [
+        "//quic:constants",
+    ],
+    exported_deps = [
+        ":expected",
+        "//quic:exception",
+    ],
+)
+
+mvfst_cpp_library(
     name = "circular_deque",
     headers = [
         "CircularDeque.h",

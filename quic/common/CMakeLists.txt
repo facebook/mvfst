@@ -78,6 +78,31 @@ target_link_libraries(
 )
 
 add_library(
+  mvfst_string_utils
+  StringUtils.cpp
+)
+
+set_property(TARGET mvfst_string_utils PROPERTY VERSION ${PACKAGE_VERSION})
+
+target_include_directories(
+  mvfst_string_utils PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_string_utils
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_string_utils PUBLIC
+  mvfst_constants
+  mvfst_exception
+)
+
+add_library(
   mvfst_transport_knobs
   TransportKnobs.cpp
 )
@@ -127,6 +152,12 @@ install(
 
 install(
   TARGETS mvfst_bufutil
+  EXPORT mvfst-exports
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(
+  TARGETS mvfst_string_utils
   EXPORT mvfst-exports
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

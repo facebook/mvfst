@@ -13,6 +13,7 @@ add_library(
   TestUtils.cpp
   AeadTestUtil.cpp
   CryptoTestUtil.cpp
+  StringUtilsTest.cpp
 )
 
 set_property(TARGET mvfst_test_utils PROPERTY VERSION ${PACKAGE_VERSION})
