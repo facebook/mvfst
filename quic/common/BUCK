@@ -139,7 +139,6 @@ mvfst_cpp_library(
         "//folly/memory:malloc",
     ],
     exported_external_deps = [
-        "boost",
         "glog",
     ],
 )

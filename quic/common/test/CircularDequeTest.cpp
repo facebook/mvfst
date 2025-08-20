@@ -697,7 +697,7 @@ TEST(CircularDequeTest, ReverseIterators) {
   auto prev = std::prev(riter);
   EXPECT_EQ(5, *prev);
   EXPECT_EQ(2, std::distance(riter, cd.rend()));
-  EXPECT_EQ(-2, std::distance(cd.crend(), riter));
+  EXPECT_EQ(-2, std::distance(cd.rend(), riter));
   EXPECT_NE(prev, next);
   EXPECT_NE(riter, prev);
 
@@ -713,14 +713,14 @@ TEST(CircularDequeTest, ReverseIterators) {
   EXPECT_EQ(0, *riter);
   EXPECT_EQ(7, *(riter.base()));
 
-  riter = cd.crend() - 1;
+  riter = cd.rend() - 1;
   EXPECT_EQ(-2, *riter);
   prev = std::prev(std::prev(riter));
   EXPECT_EQ(0, *prev);
   EXPECT_EQ(prev, riter - 2);
   std::advance(riter, -5);
   EXPECT_EQ(5, *riter);
-  riter = cd.crbegin();
+  riter = cd.rbegin();
   next = std::next(std::next(std::next(std::prev(riter))));
   EXPECT_EQ(3, *next);
   std::advance(riter, 5);

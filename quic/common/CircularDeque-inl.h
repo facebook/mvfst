@@ -263,29 +263,33 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   }
 
   // Similar to erase(), emplace() in the middle is expensive
-  auto dist = std::distance(begin(), pos);
+  auto dist = std::distance(cbegin(), pos);
   if (needSpace()) {
     resize(growCapacity(capacity_));
     // After resize, pos is invalid. We need to find the new pos.
-    pos = begin() + dist;
+    pos = cbegin() + dist;
     index = pos.index_;
   }
-  auto distIfMoveFront = wrappedDistance(begin(), pos);
-  auto distIfMoveBack = wrappedDistance(pos, end());
+  auto distIfMoveFront = wrappedDistance(cbegin(), pos);
+  auto distIfMoveBack = wrappedDistance(pos, cend());
   auto lastGoodIndex = capacity_ - 1;
   if (distIfMoveBack <= distIfMoveFront) {
     auto prev =
         CircularDequeIterator<T>(this, end_ == 0 ? lastGoodIndex : end_ - 1);
     auto wrappedEnd = end_ == capacity_ ? end() + 1 : end();
     allocateWithValueFrom(prev, wrappedEnd);
-    reverseMoveOrCopy(pos, end() - 1, end());
+    // Convert const_iterator to iterator for template matching
+    auto posMutable = begin() + (pos - cbegin());
+    reverseMoveOrCopy(posMutable, end() - 1, end());
     storage_[index] = T(std::forward<Args>(args)...);
     end_ = (wrappedEnd + 1).index_;
   } else {
     auto destIndex = begin_ == 0 ? lastGoodIndex : begin_ - 1;
     auto destIter = CircularDequeIterator<T>(this, destIndex);
     allocateWithValueFrom(begin(), destIter);
-    moveOrCopy(begin() + 1, pos, begin());
+    // Convert const_iterator to iterator for template matching
+    auto posMutable = begin() + (pos - cbegin());
+    moveOrCopy(begin() + 1, posMutable, begin());
     index = index == 0 ? lastGoodIndex : index - 1;
     storage_[index] = T(std::forward<Args>(args)...);
     begin_ = destIndex;
@@ -406,12 +410,16 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
   auto distIfMoveFront = wrappedDistance(cbegin(), first);
   auto distIfMoveBack = wrappedDistance(last, cend());
   if (distIfMoveFront < distIfMoveBack) {
-    auto newBegin = last - (first - begin());
+    auto newBegin = last - (first - cbegin());
     // This needs to go reverse direction in case the source and destination
     // ranges overlap.
-    reverseMoveOrCopy(begin(), first, last);
+    // Convert const_iterator to iterator for template matching
+    auto firstMutable = begin() + (first - cbegin());
+    auto lastMutable = begin() + (last - cbegin());
+    reverseMoveOrCopy(begin(), firstMutable, lastMutable);
     auto iter = begin();
-    while (iter != newBegin) {
+    auto newBeginMutable = begin() + (newBegin - cbegin());
+    while (iter != newBeginMutable) {
       iter++->~T();
     }
     begin_ = newBegin.index_;
@@ -420,7 +428,10 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
         << ", elemsRemoved=" << elemsRemoved;
     return CircularDequeIterator<T>(this, last.index_);
   }
-  moveOrCopy(last, end(), first);
+  // Convert const_iterator to iterator for template matching
+  auto lastMutable = begin() + (last - cbegin());
+  auto firstMutable = begin() + (first - cbegin());
+  moveOrCopy(lastMutable, end(), firstMutable);
   auto newEnd = end() - elemsRemoved;
   auto iter = newEnd;
   while (iter != end()) {

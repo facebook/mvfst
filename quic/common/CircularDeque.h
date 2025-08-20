@@ -8,8 +8,8 @@
 #pragma once
 
 #include <initializer_list>
+#include <iterator>
 
-#include <boost/iterator/iterator_facade.hpp>
 #include <folly/Portability.h>
 #include <folly/memory/Malloc.h>
 #include <glog/logging.h>
@@ -80,25 +80,140 @@ struct CircularDeque {
     return size() == other.size() && std::equal(begin(), end(), other.begin());
   }
 
-  // Iterator
+  // Iterator - Hand-rolled random access iterator
   template <typename U>
-  class CircularDequeIterator : public boost::iterator_facade<
-                                    CircularDequeIterator<U>,
-                                    U,
-                                    boost::random_access_traversal_tag> {
-   public:
-    CircularDequeIterator() : deque_(nullptr), index_(0) {}
+  class CircularDequeIterator {
+   private:
+    friend struct CircularDeque<T>;
 
-    CircularDequeIterator(const CircularDeque<U>* deque, size_type index)
+    CircularDequeIterator(const CircularDeque<T>* deque, size_type index)
         : deque_(deque), index_(index) {}
 
-    [[nodiscard]] U& dereference() const {
-      return const_cast<U&>(deque_->storage_[index_]);
+   public:
+    // Iterator traits (C++17 style)
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = typename std::remove_cv<U>::type;
+    using difference_type = std::ptrdiff_t;
+    using pointer = U*;
+    using reference = U&;
+
+    // Constructors
+    CircularDequeIterator() : deque_(nullptr), index_(0) {}
+
+    // Allow conversion from non-const to const iterator
+    template <
+        typename V,
+        typename = std::enable_if_t<std::is_const_v<U> && !std::is_const_v<V>>>
+    CircularDequeIterator(const CircularDequeIterator<V>& other)
+        : deque_(other.deque_), index_(other.index_) {}
+
+    // Copy constructor and assignment for same type
+    CircularDequeIterator(const CircularDequeIterator&) = default;
+    CircularDequeIterator& operator=(const CircularDequeIterator&) = default;
+
+    // Dereference operators
+    [[nodiscard]] reference operator*() const {
+      return const_cast<reference>(deque_->storage_[index_]);
     }
 
-    [[nodiscard]] bool equal(const CircularDequeIterator<U>& other) const {
+    [[nodiscard]] pointer operator->() const {
+      return &const_cast<reference>(deque_->storage_[index_]);
+    }
+
+    [[nodiscard]] reference operator[](difference_type n) const {
+      return *(*this + n);
+    }
+
+    // Comparison operators (work with both iterator and const_iterator)
+    template <typename V>
+    [[nodiscard]] bool operator==(const CircularDequeIterator<V>& other) const {
       return deque_ == other.deque_ && index_ == other.index_;
     }
+
+    template <typename V>
+    [[nodiscard]] bool operator!=(const CircularDequeIterator<V>& other) const {
+      return !(*this == other);
+    }
+
+    template <typename V>
+    [[nodiscard]] bool operator<(const CircularDequeIterator<V>& other) const {
+      DCHECK_EQ(deque_, other.deque_);
+      return distance_to(other) > 0;
+    }
+
+    template <typename V>
+    [[nodiscard]] bool operator<=(const CircularDequeIterator<V>& other) const {
+      return *this < other || *this == other;
+    }
+
+    template <typename V>
+    [[nodiscard]] bool operator>(const CircularDequeIterator<V>& other) const {
+      return !(*this <= other);
+    }
+
+    template <typename V>
+    [[nodiscard]] bool operator>=(const CircularDequeIterator<V>& other) const {
+      return !(*this < other);
+    }
+
+    // Increment/decrement operators
+    CircularDequeIterator& operator++() {
+      increment();
+      return *this;
+    }
+
+    CircularDequeIterator operator++(int) {
+      CircularDequeIterator temp = *this;
+      increment();
+      return temp;
+    }
+
+    CircularDequeIterator& operator--() {
+      decrement();
+      return *this;
+    }
+
+    CircularDequeIterator operator--(int) {
+      CircularDequeIterator temp = *this;
+      decrement();
+      return temp;
+    }
+
+    // Arithmetic operators
+    CircularDequeIterator& operator+=(difference_type n) {
+      advance(n);
+      return *this;
+    }
+
+    CircularDequeIterator& operator-=(difference_type n) {
+      advance(-n);
+      return *this;
+    }
+
+    [[nodiscard]] CircularDequeIterator operator+(difference_type n) const {
+      CircularDequeIterator temp = *this;
+      temp.advance(n);
+      return temp;
+    }
+
+    [[nodiscard]] CircularDequeIterator operator-(difference_type n) const {
+      CircularDequeIterator temp = *this;
+      temp.advance(-n);
+      return temp;
+    }
+
+    template <typename V>
+    [[nodiscard]] difference_type operator-(
+        const CircularDequeIterator<V>& other) const {
+      DCHECK_EQ(deque_, other.deque_);
+      return -distance_to(other);
+    }
+
+   private:
+    friend struct CircularDeque<T>;
+    friend struct CircularDeque<typename std::remove_const<T>::type>;
+    template <typename V>
+    friend class CircularDequeIterator;
 
     void increment() {
       ++index_;
@@ -134,8 +249,9 @@ struct CircularDeque {
       }
     }
 
+    template <typename V>
     [[nodiscard]] difference_type distance_to(
-        const CircularDequeIterator<U>& other) const {
+        const CircularDequeIterator<V>& other) const {
       if (index_ == other.index_) {
         return 0;
       }
@@ -157,21 +273,24 @@ struct CircularDeque {
       }
     }
 
-   private:
-    friend class boost::iterator_core_access;
-    friend struct CircularDeque<U>;
-    friend struct CircularDeque<typename std::remove_const<U>::type>;
-
     [[nodiscard]] inline bool wrapped() const {
       return deque_->begin_ > deque_->end_;
     }
 
-    const CircularDeque<U>* deque_;
+    const CircularDeque<T>* deque_;
     size_type index_;
   };
 
+  // Global operator+ for iterator arithmetic (n + iterator)
+  template <typename U>
+  [[nodiscard]] friend CircularDequeIterator<U> operator+(
+      typename CircularDequeIterator<U>::difference_type n,
+      const CircularDequeIterator<U>& iter) {
+    return iter + n;
+  }
+
   using iterator = CircularDequeIterator<T>;
-  using const_iterator = CircularDequeIterator<T>;
+  using const_iterator = CircularDequeIterator<const T>;
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
