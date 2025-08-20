@@ -96,8 +96,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(outstandingPacketsDuringInvoke, ::testing::IsEmpty());
   }
@@ -135,8 +137,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(outstandingPacketsDuringInvoke, ::testing::IsEmpty());
   }
@@ -165,8 +169,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(outstandingPacketsDuringInvoke, ::testing::IsEmpty());
   }
@@ -204,8 +210,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(outstandingPacketsDuringInvoke, ::testing::IsEmpty());
   }
@@ -263,8 +271,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -342,8 +352,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -422,8 +434,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -501,8 +515,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -566,8 +582,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -641,8 +659,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -736,8 +756,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -795,8 +817,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -840,8 +864,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -895,8 +921,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -958,8 +986,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -1041,8 +1071,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
@@ -1114,8 +1146,10 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
             const OutstandingPacketWrapper& outstandingPacket) {
           outstandingPacketsDuringInvoke.emplace_back(
               InvokedOutstandingPacketFields{
-                  outstandingPacket.packet.header.getPacketNumberSpace(),
-                  outstandingPacket.packet.header.getPacketSequenceNum()});
+                  .pnSpace =
+                      outstandingPacket.packet.header.getPacketNumberSpace(),
+                  .packetNum =
+                      outstandingPacket.packet.header.getPacketSequenceNum()});
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
