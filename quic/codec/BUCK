@@ -32,6 +32,7 @@ mvfst_cpp_library(
         "//quic:exception",
         "//quic/common:buf_util",
         "//quic/common:circular_deque",
+        "//quic/common:contiguous_cursor",
         "//quic/common:expected",
         "//quic/common:interval_set",
         "//quic/common:network_data",

@@ -30,6 +30,7 @@ add_dependencies(
   mvfst_codec_types
   mvfst_constants
   mvfst_exception
+  mvfst_contiguous_cursor
 )
 
 target_link_libraries(
@@ -39,6 +40,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_exception
   mvfst_string_utils
+  mvfst_contiguous_cursor
   PRIVATE
   ${Boost_LIBRARIES}
 )

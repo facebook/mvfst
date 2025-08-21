@@ -127,6 +127,30 @@ target_link_libraries(
   Folly::folly
 )
 
+add_library(
+  mvfst_contiguous_cursor
+  ContiguousCursor.cpp
+)
+
+set_property(TARGET mvfst_contiguous_cursor PROPERTY VERSION ${PACKAGE_VERSION})
+
+target_include_directories(
+  mvfst_contiguous_cursor PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_contiguous_cursor
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_contiguous_cursor PUBLIC
+  Folly::folly
+)
+
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -164,6 +188,12 @@ install(
 
 install(
   TARGETS mvfst_transport_knobs
+  EXPORT mvfst-exports
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(
+  TARGETS mvfst_contiguous_cursor
   EXPORT mvfst-exports
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

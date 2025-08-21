@@ -28,12 +28,12 @@ uint8_t decodeQuicIntegerLength(uint8_t firstByte) {
 }
 
 Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     uint64_t atMost) {
   // checks
   if (atMost == 0 || !cursor.canAdvance(1)) {
     VLOG(10) << "Not enough bytes to decode integer, cursor len="
-             << cursor.totalLength();
+             << cursor.remaining();
     return std::nullopt;
   }
 
@@ -55,8 +55,9 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
   }
   // result storage
   uint64_t result{0};
-  // pull number of bytes expected
-  cursor.pull(&result, bytesExpected);
+  // pull number of bytes expected. No need to check the returned value
+  // because we already checked that cursor has enough bytes
+  cursor.tryPull(&result, bytesExpected);
   // clear 2msb bits
   constexpr uint64_t msbMask = ~(0b11ull << 62);
   result = folly::Endian::big(result) & msbMask;

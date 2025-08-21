@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/ContiguousCursor.h>
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
@@ -101,7 +102,7 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
  * read the int. It only advances the cursor in case of success.
  */
 Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     uint64_t atMost = sizeof(uint64_t));
 
 /**

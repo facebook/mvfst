@@ -13,6 +13,7 @@
 
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
+#include <quic/common/ContiguousCursor.h>
 #include <quic/folly_utils/Utils.h>
 
 using namespace testing;
@@ -42,16 +43,17 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
     wrappedEncoded->trimEnd(std::min(
         (unsigned long)(wrappedEncoded->computeChainDataLength()),
         (unsigned long)(GetParam().encodedLength - atMost)));
-    Cursor cursor(wrappedEncoded.get());
-    auto originalLength = cursor.length();
+    ContiguousReadCursor cursor(
+        wrappedEncoded->data(), wrappedEncoded->length());
+    auto originalLength = cursor.remaining();
     auto decodedValue = quic::decodeQuicInteger(cursor);
     if (GetParam().error || atMost != GetParam().encodedLength) {
       EXPECT_FALSE(decodedValue.has_value());
-      EXPECT_EQ(cursor.length(), originalLength);
+      EXPECT_EQ(cursor.remaining(), originalLength);
     } else {
       EXPECT_EQ(decodedValue->first, GetParam().decoded);
       EXPECT_EQ(decodedValue->second, GetParam().encodedLength);
-      EXPECT_EQ(cursor.length(), originalLength - GetParam().encodedLength);
+      EXPECT_EQ(cursor.remaining(), originalLength - GetParam().encodedLength);
     }
   }
 }
@@ -64,16 +66,17 @@ TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
   auto wrappedEncoded = IOBuf::copyBuffer(encodedBytes);
 
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
-    Cursor cursor(wrappedEncoded.get());
-    auto originalLength = cursor.length();
+    ContiguousReadCursor cursor(
+        wrappedEncoded->data(), wrappedEncoded->length());
+    auto originalLength = cursor.remaining();
     auto decodedValue = quic::decodeQuicInteger(cursor, atMost);
     if (GetParam().error || atMost != GetParam().encodedLength) {
       EXPECT_FALSE(decodedValue.has_value());
-      EXPECT_EQ(cursor.length(), originalLength);
+      EXPECT_EQ(cursor.remaining(), originalLength);
     } else {
       EXPECT_EQ(decodedValue->first, GetParam().decoded);
       EXPECT_EQ(decodedValue->second, GetParam().encodedLength);
-      EXPECT_EQ(cursor.length(), originalLength - GetParam().encodedLength);
+      EXPECT_EQ(cursor.remaining(), originalLength - GetParam().encodedLength);
     }
   }
 }

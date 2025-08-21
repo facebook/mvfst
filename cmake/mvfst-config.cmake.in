@@ -33,6 +33,7 @@ set(mvfst_LIBRARIES
   mvfst::mvfst_exception
   mvfst::mvfst_transport
   mvfst::mvfst_client
+  mvfst::mvfst_contiguous_cursor
   mvfst::mvfst_codec_types
   mvfst::mvfst_folly_utils
   mvfst::mvfst_codec_decode
