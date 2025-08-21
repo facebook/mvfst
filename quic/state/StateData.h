@@ -622,9 +622,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   /**
    * Selects a previously unused peer-issued connection id to use.
    * If there are no available ids return false and don't change anything.
-   * Return true if replacement succeeds.
+   * Return true if replacement succeeds, error if validation fails.
    */
-  bool retireAndSwitchPeerConnectionIds();
+  Expected<bool, QuicError> retireAndSwitchPeerConnectionIds();
 
   // SocketObserverContainer
   //

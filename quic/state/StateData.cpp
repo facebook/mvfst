@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/Expected.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
@@ -105,7 +106,8 @@ PacingRate PacingRate::Builder::build() && {
   return PacingRate(interval_, burstSize_);
 }
 
-bool QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
+Expected<bool, QuicError>
+QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
   const auto end = peerConnectionIds.end();
   auto replacementConnIdDataIt{end};
   auto currentConnIdDataIt{end};
@@ -113,9 +115,9 @@ bool QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
   auto& mainPeerId = nodeType == QuicNodeType::Client ? serverConnectionId
                                                       : clientConnectionId;
   if (!mainPeerId) {
-    throw QuicTransportException(
-        "Attempting to retire null peer conn id",
-        TransportErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "Attempting to retire null peer conn id"));
   }
 
   if (mainPeerId->size() == 0) {

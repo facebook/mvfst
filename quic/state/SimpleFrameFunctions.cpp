@@ -131,8 +131,13 @@ quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
-      bool rotatedId = conn.retireAndSwitchPeerConnectionIds();
-      if (!rotatedId) {
+      auto rotatedIdResult = conn.retireAndSwitchPeerConnectionIds();
+      if (!rotatedIdResult.has_value()) {
+        return quic::make_unexpected(QuicError(
+            TransportErrorCode::INVALID_MIGRATION,
+            "Failed to retire peer connection id"));
+      }
+      if (!rotatedIdResult.value()) {
         return quic::make_unexpected(QuicError(
             TransportErrorCode::INVALID_MIGRATION,
             "No more connection ids to use for new path."));
