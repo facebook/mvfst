@@ -29,6 +29,7 @@ target_compile_options(
 add_dependencies(
   mvfst_qlogger
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
 )
 
@@ -37,6 +38,7 @@ target_link_libraries(
   Folly::folly
   mvfst_codec_types
   mvfst_string_utils
+  mvfst_folly_utils
 )
 
 file(

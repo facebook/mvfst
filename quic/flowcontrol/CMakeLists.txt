@@ -27,6 +27,7 @@ add_dependencies(
   mvfst_constants
   mvfst_exception
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
   mvfst_qlogger
 )
@@ -35,6 +36,7 @@ target_link_libraries(
   mvfst_flowcontrol PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_constants
   mvfst_exception
   mvfst_state_machine

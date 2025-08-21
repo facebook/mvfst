@@ -13,6 +13,7 @@
 
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
+#include <quic/folly_utils/Utils.h>
 
 using namespace testing;
 using namespace folly;
@@ -43,7 +44,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
         (unsigned long)(GetParam().encodedLength - atMost)));
     Cursor cursor(wrappedEncoded.get());
     auto originalLength = cursor.length();
-    auto decodedValue = decodeQuicInteger(cursor);
+    auto decodedValue = quic::decodeQuicInteger(cursor);
     if (GetParam().error || atMost != GetParam().encodedLength) {
       EXPECT_FALSE(decodedValue.has_value());
       EXPECT_EQ(cursor.length(), originalLength);
@@ -65,7 +66,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
     Cursor cursor(wrappedEncoded.get());
     auto originalLength = cursor.length();
-    auto decodedValue = decodeQuicInteger(cursor, atMost);
+    auto decodedValue = quic::decodeQuicInteger(cursor, atMost);
     if (GetParam().error || atMost != GetParam().encodedLength) {
       EXPECT_FALSE(decodedValue.has_value());
       EXPECT_EQ(cursor.length(), originalLength);

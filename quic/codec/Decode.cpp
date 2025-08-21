@@ -10,7 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
-#include <quic/codec/QuicInteger.h>
+#include <quic/folly_utils/Utils.h>
 #include <chrono>
 #include <cstdint>
 
@@ -72,17 +72,17 @@ quic::Expected<PingFrame, QuicError> decodePingFrame(Cursor&) {
 }
 
 quic::Expected<QuicFrame, QuicError> decodeKnobFrame(Cursor& cursor) {
-  auto knobSpace = decodeQuicInteger(cursor);
+  auto knobSpace = quic::follyutils::decodeQuicInteger(cursor);
   if (!knobSpace) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob space"));
   }
-  auto knobId = decodeQuicInteger(cursor);
+  auto knobId = quic::follyutils::decodeQuicInteger(cursor);
   if (!knobId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob id"));
   }
-  auto knobLen = decodeQuicInteger(cursor);
+  auto knobLen = quic::follyutils::decodeQuicInteger(cursor);
   if (!knobLen) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob len"));
@@ -95,24 +95,24 @@ quic::Expected<QuicFrame, QuicError> decodeKnobFrame(Cursor& cursor) {
 
 quic::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
     Cursor& cursor) {
-  auto sequenceNumber = decodeQuicInteger(cursor);
+  auto sequenceNumber = quic::follyutils::decodeQuicInteger(cursor);
   if (!sequenceNumber) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence number"));
   }
-  auto packetTolerance = decodeQuicInteger(cursor);
+  auto packetTolerance = quic::follyutils::decodeQuicInteger(cursor);
   if (!packetTolerance) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad packet tolerance"));
   }
-  auto updateMaxAckDelay = decodeQuicInteger(cursor);
+  auto updateMaxAckDelay = quic::follyutils::decodeQuicInteger(cursor);
   if (!updateMaxAckDelay) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad update max ack delay"));
   }
-  auto reorderThreshold = decodeQuicInteger(cursor);
+  auto reorderThreshold = quic::follyutils::decodeQuicInteger(cursor);
   if (!reorderThreshold) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -165,23 +165,23 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
     FrameType frameType) {
   ReadAckFrame frame;
   frame.frameType = frameType;
-  auto largestAckedInt = decodeQuicInteger(cursor);
+  auto largestAckedInt = quic::follyutils::decodeQuicInteger(cursor);
   if (!largestAckedInt) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad largest acked"));
   }
   PacketNum largestAcked = largestAckedInt->first;
-  auto ackDelay = decodeQuicInteger(cursor);
+  auto ackDelay = quic::follyutils::decodeQuicInteger(cursor);
   if (!ackDelay) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack delay"));
   }
-  auto additionalAckBlocks = decodeQuicInteger(cursor);
+  auto additionalAckBlocks = quic::follyutils::decodeQuicInteger(cursor);
   if (!additionalAckBlocks) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack block count"));
   }
-  auto firstAckBlockLen = decodeQuicInteger(cursor);
+  auto firstAckBlockLen = quic::follyutils::decodeQuicInteger(cursor);
   if (!firstAckBlockLen) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad first block"));
@@ -219,12 +219,12 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
   frame.ackBlocks.emplace_back(currentPacketNum, largestAcked);
   for (uint64_t numBlocks = 0; numBlocks < additionalAckBlocks->first;
        ++numBlocks) {
-    auto currentGap = decodeQuicInteger(cursor);
+    auto currentGap = quic::follyutils::decodeQuicInteger(cursor);
     if (!currentGap) {
       return quic::make_unexpected(
           QuicError(quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad gap"));
     }
-    auto blockLen = decodeQuicInteger(cursor);
+    auto blockLen = quic::follyutils::decodeQuicInteger(cursor);
     if (!blockLen) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad block len"));
@@ -251,7 +251,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
     ReadAckFrame& frame,
     Cursor& cursor,
     const CodecParameters& params) {
-  auto latestRecvdPacketNum = decodeQuicInteger(cursor);
+  auto latestRecvdPacketNum = quic::follyutils::decodeQuicInteger(cursor);
   if (!latestRecvdPacketNum) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -259,7 +259,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
   }
   frame.maybeLatestRecvdPacketNum = latestRecvdPacketNum->first;
 
-  auto latestRecvdPacketTimeDelta = decodeQuicInteger(cursor);
+  auto latestRecvdPacketTimeDelta = quic::follyutils::decodeQuicInteger(cursor);
   if (!latestRecvdPacketTimeDelta) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -268,7 +268,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
   frame.maybeLatestRecvdPacketTime =
       std::chrono::microseconds(latestRecvdPacketTimeDelta->first);
 
-  auto timeStampRangeCount = decodeQuicInteger(cursor);
+  auto timeStampRangeCount = quic::follyutils::decodeQuicInteger(cursor);
   if (!timeStampRangeCount) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -277,14 +277,14 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
   for (uint64_t numRanges = 0; numRanges < timeStampRangeCount->first;
        numRanges++) {
     RecvdPacketsTimestampsRange timeStampRange;
-    auto receiveTimeStampsGap = decodeQuicInteger(cursor);
+    auto receiveTimeStampsGap = quic::follyutils::decodeQuicInteger(cursor);
     if (!receiveTimeStampsGap) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
           "Bad receive timestamps gap"));
     }
     timeStampRange.gap = receiveTimeStampsGap->first;
-    auto receiveTimeStampsLen = decodeQuicInteger(cursor);
+    auto receiveTimeStampsLen = quic::follyutils::decodeQuicInteger(cursor);
     if (!receiveTimeStampsLen) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -297,7 +297,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
               .receiveTimestampsExponent
         : kDefaultReceiveTimestampsExponent;
     for (uint64_t i = 0; i < receiveTimeStampsLen->first; i++) {
-      auto delta = decodeQuicInteger(cursor);
+      auto delta = quic::follyutils::decodeQuicInteger(cursor);
       if (!delta) {
         return quic::make_unexpected(QuicError(
             quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -320,9 +320,9 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
 static quic::Expected<void, QuicError> decodeEcnCountsInAck(
     ReadAckFrame& frame,
     Cursor& cursor) {
-  auto ect_0 = decodeQuicInteger(cursor);
-  auto ect_1 = decodeQuicInteger(cursor);
-  auto ce = decodeQuicInteger(cursor);
+  auto ect_0 = quic::follyutils::decodeQuicInteger(cursor);
+  auto ect_1 = quic::follyutils::decodeQuicInteger(cursor);
+  auto ce = quic::follyutils::decodeQuicInteger(cursor);
   if (!ect_0 || !ect_1 || !ce) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ECN value"));
@@ -343,7 +343,7 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
     return quic::make_unexpected(res.error());
   }
   frame = *res;
-  auto extendedAckFeatures = decodeQuicInteger(cursor);
+  auto extendedAckFeatures = quic::follyutils::decodeQuicInteger(cursor);
   if (!extendedAckFeatures) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -421,13 +421,13 @@ quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
 quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
     Cursor& cursor,
     bool reliable) {
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   ApplicationErrorCode errorCode;
-  auto varCode = decodeQuicInteger(cursor);
+  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
   if (varCode) {
     errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
@@ -435,14 +435,14 @@ quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Cannot decode error code"));
   }
-  auto finalSize = decodeQuicInteger(cursor);
+  auto finalSize = quic::follyutils::decodeQuicInteger(cursor);
   if (!finalSize) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
   Optional<std::pair<uint64_t, size_t>> reliableSize = std::nullopt;
   if (reliable) {
-    reliableSize = decodeQuicInteger(cursor);
+    reliableSize = quic::follyutils::decodeQuicInteger(cursor);
     if (!reliableSize) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -464,13 +464,13 @@ quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
 
 quic::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
     Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   ApplicationErrorCode errorCode;
-  auto varCode = decodeQuicInteger(cursor);
+  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
   if (varCode) {
     errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
@@ -482,14 +482,14 @@ quic::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
 }
 
 quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(Cursor& cursor) {
-  auto optionalOffset = decodeQuicInteger(cursor);
+  auto optionalOffset = quic::follyutils::decodeQuicInteger(cursor);
   if (!optionalOffset) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
   }
   uint64_t offset = optionalOffset->first;
 
-  auto dataLength = decodeQuicInteger(cursor);
+  auto dataLength = quic::follyutils::decodeQuicInteger(cursor);
   if (!dataLength) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
@@ -512,7 +512,7 @@ quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(Cursor& cursor) {
 
 quic::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
     Cursor& cursor) {
-  auto tokenLength = decodeQuicInteger(cursor);
+  auto tokenLength = quic::follyutils::decodeQuicInteger(cursor);
   if (!tokenLength) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
@@ -539,7 +539,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     bool isGroupFrame) {
   Cursor cursor(queue.front());
 
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid stream id"));
@@ -547,7 +547,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
 
   OptionalIntegral<StreamGroupId> groupId;
   if (isGroupFrame) {
-    auto gId = decodeQuicInteger(cursor);
+    auto gId = quic::follyutils::decodeQuicInteger(cursor);
     if (!gId) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -558,7 +558,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
 
   uint64_t offset = 0;
   if (frameTypeField.hasOffset()) {
-    auto optionalOffset = decodeQuicInteger(cursor);
+    auto optionalOffset = quic::follyutils::decodeQuicInteger(cursor);
     if (!optionalOffset) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
@@ -568,7 +568,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
   auto fin = frameTypeField.hasFin();
   Optional<std::pair<uint64_t, size_t>> dataLength;
   if (frameTypeField.hasDataLength()) {
-    dataLength = decodeQuicInteger(cursor);
+    dataLength = quic::follyutils::decodeQuicInteger(cursor);
     if (!dataLength) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
@@ -613,7 +613,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
 }
 
 quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(Cursor& cursor) {
-  auto maximumData = decodeQuicInteger(cursor);
+  auto maximumData = quic::follyutils::decodeQuicInteger(cursor);
   if (!maximumData) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad Max Data"));
@@ -623,12 +623,12 @@ quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(Cursor& cursor) {
 
 quic::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
     Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid streamId"));
   }
-  auto offset = decodeQuicInteger(cursor);
+  auto offset = quic::follyutils::decodeQuicInteger(cursor);
   if (!offset) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
@@ -638,7 +638,7 @@ quic::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
 
 quic::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
     Cursor& cursor) {
-  auto streamCount = decodeQuicInteger(cursor);
+  auto streamCount = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -649,7 +649,7 @@ quic::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
 
 quic::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
     Cursor& cursor) {
-  auto streamCount = decodeQuicInteger(cursor);
+  auto streamCount = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -660,7 +660,7 @@ quic::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
 
 quic::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
     Cursor& cursor) {
-  auto dataLimit = decodeQuicInteger(cursor);
+  auto dataLimit = quic::follyutils::decodeQuicInteger(cursor);
   if (!dataLimit) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
@@ -670,12 +670,12 @@ quic::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
 
 quic::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
     Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
-  auto dataLimit = decodeQuicInteger(cursor);
+  auto dataLimit = quic::follyutils::decodeQuicInteger(cursor);
   if (!dataLimit) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
@@ -685,7 +685,7 @@ quic::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
 
 quic::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
     Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -696,7 +696,7 @@ quic::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
 
 quic::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
     Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
+  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -707,12 +707,12 @@ quic::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
 
 quic::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
     Cursor& cursor) {
-  auto sequenceNumber = decodeQuicInteger(cursor);
+  auto sequenceNumber = quic::follyutils::decodeQuicInteger(cursor);
   if (!sequenceNumber) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence"));
   }
-  auto retirePriorTo = decodeQuicInteger(cursor);
+  auto retirePriorTo = quic::follyutils::decodeQuicInteger(cursor);
   if (!retirePriorTo) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad retire prior to"));
@@ -757,7 +757,7 @@ quic::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
 
 quic::Expected<RetireConnectionIdFrame, QuicError>
 decodeRetireConnectionIdFrame(Cursor& cursor) {
-  auto sequenceNum = decodeQuicInteger(cursor);
+  auto sequenceNum = quic::follyutils::decodeQuicInteger(cursor);
   if (!sequenceNum) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence num"));
@@ -790,7 +790,7 @@ quic::Expected<PathResponseFrame, QuicError> decodePathResponseFrame(
 quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
     Cursor& cursor) {
   TransportErrorCode errorCode{};
-  auto varCode = decodeQuicInteger(cursor);
+  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
   if (!varCode) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -798,7 +798,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
   }
   errorCode = static_cast<TransportErrorCode>(varCode->first);
 
-  auto frameTypeField = decodeQuicInteger(cursor);
+  auto frameTypeField = quic::follyutils::decodeQuicInteger(cursor);
   if (!frameTypeField || frameTypeField->second != sizeof(uint8_t)) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -806,7 +806,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
   }
   FrameType triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
 
-  auto reasonPhraseLength = decodeQuicInteger(cursor);
+  auto reasonPhraseLength = quic::follyutils::decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
       reasonPhraseLength->first > kMaxReasonPhraseLength) {
     return quic::make_unexpected(QuicError(
@@ -828,7 +828,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
 quic::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
     Cursor& cursor) {
   ApplicationErrorCode errorCode{};
-  auto varCode = decodeQuicInteger(cursor);
+  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
   if (!varCode) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -836,7 +836,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
   }
   errorCode = static_cast<ApplicationErrorCode>(varCode->first);
 
-  auto reasonPhraseLength = decodeQuicInteger(cursor);
+  auto reasonPhraseLength = quic::follyutils::decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
       reasonPhraseLength->first > kMaxReasonPhraseLength) {
     return quic::make_unexpected(QuicError(
@@ -882,7 +882,7 @@ quic::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
   Cursor cursor(queue.front());
   size_t length = cursor.length();
   if (hasLen) {
-    auto decodeLength = decodeQuicInteger(cursor);
+    auto decodeLength = quic::follyutils::decodeQuicInteger(cursor);
     if (!decodeLength) {
       return quic::make_unexpected(QuicError(
           TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid datagram len"));
@@ -902,7 +902,7 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     const PacketHeader& header,
     const CodecParameters& params) {
   Cursor cursor(queue.front());
-  auto frameTypeInt = decodeQuicInteger(cursor);
+  auto frameTypeInt = quic::follyutils::decodeQuicInteger(cursor);
   if (!frameTypeInt) {
     return quic::make_unexpected(QuicError(
         TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid frame-type field"));
@@ -1425,7 +1425,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 
   BufPtr token;
   if (type == LongHeader::Types::Initial) {
-    auto tokenLen = decodeQuicInteger(cursor);
+    auto tokenLen = quic::follyutils::decodeQuicInteger(cursor);
     if (!tokenLen) {
       VLOG(5) << "Token len not found in Long header";
       return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1442,7 +1442,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
       token = std::move(tokenBuf);
     }
   }
-  auto pktLen = decodeQuicInteger(cursor);
+  auto pktLen = quic::follyutils::decodeQuicInteger(cursor);
   if (!pktLen) {
     VLOG(5) << "Packet len not found in Long header";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);

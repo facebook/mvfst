@@ -12,13 +12,13 @@
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/QuicConnectionId.h>
-#include <quic/codec/QuicInteger.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/IntervalSet.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/Optional.h>
 #include <quic/common/Variant.h>
+#include <quic/folly_utils/Utils.h>
 #include <quic/mvfst-config.h>
 
 /**

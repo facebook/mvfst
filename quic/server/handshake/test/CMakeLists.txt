@@ -20,6 +20,7 @@ quic_add_test(TARGET ServerHandshakeTest
   ${LIBFIZZ_LIBRARY}
   mvfst_client
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_constants
   mvfst_handshake
   mvfst_server

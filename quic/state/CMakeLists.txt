@@ -35,6 +35,7 @@ add_dependencies(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_sender
   mvfst_handshake
 )
@@ -47,6 +48,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_sender
   mvfst_handshake
   mvfst_http_priority_queue
@@ -77,6 +79,7 @@ add_dependencies(
   mvfst_state_ack_handler
   mvfst_constants
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_loss
   mvfst_state_functions
   mvfst_state_machine
@@ -87,6 +90,7 @@ target_link_libraries(
   Folly::folly
   mvfst_constants
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_loss
   mvfst_state_functions
   mvfst_state_machine
@@ -114,6 +118,7 @@ target_compile_options(
 add_dependencies(
   mvfst_state_datagram_handler
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
 )
 
@@ -122,6 +127,7 @@ target_link_libraries(
   Folly::folly
   mvfst_constants
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_loss
   mvfst_state_functions
   mvfst_state_machine
@@ -152,6 +158,7 @@ add_dependencies(
   mvfst_bufutil
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
 )
 
@@ -161,6 +168,7 @@ target_link_libraries(
   mvfst_bufutil
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
 )
 
@@ -189,6 +197,7 @@ add_dependencies(
   mvfst_state_functions
   mvfst_codec_pktbuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
   mvfst_state_stream
 )
@@ -198,6 +207,7 @@ target_link_libraries(
   Folly::folly
   mvfst_codec_pktbuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_state_machine
   mvfst_state_stream
 )
@@ -259,6 +269,7 @@ add_dependencies(
   mvfst_state_functions
   mvfst_state_machine
   mvfst_codec_types
+  mvfst_folly_utils
 )
 
 target_link_libraries(
@@ -267,6 +278,7 @@ target_link_libraries(
   mvfst_state_functions
   mvfst_state_machine
   mvfst_codec_types
+  mvfst_folly_utils
 )
 
 add_library(
@@ -293,6 +305,7 @@ target_compile_options(
 add_dependencies(
   mvfst_state_stream
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_exception
   mvfst_flowcontrol
   mvfst_state_machine
@@ -303,6 +316,7 @@ target_link_libraries(
   mvfst_state_stream PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_exception
   mvfst_flowcontrol
   mvfst_state_machine

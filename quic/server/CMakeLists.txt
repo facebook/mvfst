@@ -33,6 +33,7 @@ add_dependencies(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
@@ -79,6 +80,7 @@ add_dependencies(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
@@ -119,6 +121,7 @@ add_dependencies(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
@@ -133,6 +136,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
@@ -149,6 +153,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
@@ -169,6 +174,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger

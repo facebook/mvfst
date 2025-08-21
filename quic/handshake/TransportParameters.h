@@ -9,6 +9,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/codec/QuicInteger.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
 

@@ -31,6 +31,7 @@ quic_add_test(TARGET QuicTransportBaseTest
   Folly::folly
   mvfst_transport
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_test_utils
   mvfst_state_stream_functions
   mvfst_server

@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientExtensions.h>
+#include <quic/folly_utils/Utils.h>
 
 #include <fizz/protocol/test/TestUtil.h>
 
@@ -217,7 +218,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
 
   // check that the values equal what we expect
   Cursor cursor1 = Cursor(it1->value.get());
-  auto val = decodeQuicInteger(cursor1);
+  auto val = quic::follyutils::decodeQuicInteger(cursor1);
   EXPECT_EQ(val->first, 12);
 }
 

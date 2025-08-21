@@ -66,6 +66,7 @@ add_dependencies(
   mvfst_codec_decode
   mvfst_codec_types
   mvfst_exception
+  mvfst_folly_utils
 )
 
 target_link_libraries(
@@ -73,6 +74,7 @@ target_link_libraries(
   Folly::folly
   mvfst_codec_types
   mvfst_exception
+  mvfst_folly_utils
 )
 
 add_library(
@@ -98,6 +100,7 @@ add_dependencies(
   mvfst_codec_packet_number_cipher
   mvfst_codec_types
   mvfst_codec_decode
+  mvfst_folly_utils
 )
 
 target_link_libraries(
@@ -105,6 +108,7 @@ target_link_libraries(
   Folly::folly
   mvfst_codec_types
   mvfst_codec_decode
+  mvfst_folly_utils
 )
 
 add_library(
@@ -130,6 +134,7 @@ add_dependencies(
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_handshake
+  mvfst_folly_utils
 )
 
 target_link_libraries(
@@ -137,6 +142,7 @@ target_link_libraries(
   Folly::folly
   mvfst_codec_types
   mvfst_handshake
+  mvfst_folly_utils
 )
 
 add_library(
@@ -211,6 +217,7 @@ add_dependencies(
   mvfst_codec_pktbuilder
   mvfst_exception
   mvfst_handshake
+  mvfst_folly_utils
 )
 
 target_link_libraries(
@@ -222,6 +229,7 @@ target_link_libraries(
   mvfst_exception
   mvfst_handshake
   mvfst_string_utils
+  mvfst_folly_utils
 )
 
 file(

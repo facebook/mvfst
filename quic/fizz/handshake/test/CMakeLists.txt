@@ -22,6 +22,7 @@ quic_add_test(TARGET FizzCryptoFactoryTest
   DEPENDS
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_fizz_handshake
   mvfst_string_utils
   mvfst_test_utils

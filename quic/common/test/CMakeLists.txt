@@ -36,6 +36,7 @@ add_dependencies(
   mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_server
   mvfst_state_machine
   mvfst_transport
@@ -49,6 +50,7 @@ target_link_libraries(
   mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_server
   mvfst_state_machine
   mvfst_string_utils
@@ -71,6 +73,7 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_looper
   mvfst_string_utils
   mvfst_transport

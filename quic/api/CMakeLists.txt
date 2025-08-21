@@ -109,6 +109,7 @@ add_dependencies(
   mvfst_codec_pktbuilder
   mvfst_codec_pktrebuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_constants
   mvfst_events
   mvfst_exception
@@ -141,6 +142,7 @@ target_link_libraries(
   mvfst_codec_pktbuilder
   mvfst_codec_pktrebuilder
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_constants
   mvfst_events
   mvfst_exception

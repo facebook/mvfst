@@ -8,8 +8,8 @@
 #pragma once
 
 #include <fizz/record/Extensions.h>
-#include <quic/codec/QuicInteger.h>
 #include <quic/common/BufUtil.h>
+#include <quic/folly_utils/Utils.h>
 #include <quic/handshake/TransportParameters.h>
 
 namespace {
@@ -69,11 +69,11 @@ inline void decodeVarintParams(
     std::vector<TransportParameter>& parameters,
     Cursor& cursor) {
   while (!cursor.isAtEnd()) {
-    auto id = decodeQuicInteger(cursor);
+    auto id = quic::follyutils::decodeQuicInteger(cursor);
     if (!id) {
       throw std::runtime_error("Could not parse transport parameter id.");
     }
-    auto len = decodeQuicInteger(cursor);
+    auto len = quic::follyutils::decodeQuicInteger(cursor);
     if (!len) {
       throw std::runtime_error("Could not parse transport parameter length.");
     }

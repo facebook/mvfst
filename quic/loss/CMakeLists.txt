@@ -25,6 +25,7 @@ target_compile_options(
 add_dependencies(
   mvfst_loss
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_constants
   mvfst_exception
   mvfst_flowcontrol
@@ -37,6 +38,7 @@ target_link_libraries(
   mvfst_loss PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_constants
   mvfst_exception
   mvfst_flowcontrol

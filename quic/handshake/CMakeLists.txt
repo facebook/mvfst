@@ -29,6 +29,7 @@ add_dependencies(
   mvfst_constants
   mvfst_exception
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_codec_packet_number_cipher
 )
 
@@ -38,6 +39,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_exception
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_codec_packet_number_cipher
 )
 

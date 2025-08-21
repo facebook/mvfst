@@ -29,12 +29,14 @@ target_include_directories(
 add_dependencies(
   mvfst_dsr_types
   mvfst_codec_types
+  mvfst_folly_utils
 )
 
 target_link_libraries(
   mvfst_dsr_types PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
 )
 
 target_compile_options(
@@ -67,6 +69,7 @@ target_link_libraries(
   mvfst_dsr_frontend PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_types
 )
 
@@ -99,6 +102,7 @@ target_link_libraries(
   mvfst_dsr_backend PUBLIC
   Folly::folly
   mvfst_codec_types
+  mvfst_folly_utils
   mvfst_dsr_types
   mvfst_transport
   mvfst_xsk
