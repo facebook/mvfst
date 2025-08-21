@@ -4182,6 +4182,14 @@ TEST_P(QuicTransportImplTestBase, FailedPing) {
 TEST_P(QuicTransportImplTestBase, HandleKnobCallbacks) {
   auto conn = transport->transportConn;
 
+  // Enable advertisedKnobFrameSupport in transport settings and refresh.
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.advertisedKnobFrameSupport = true;
+  transport->setTransportSettings(transportSettings);
+  ASSERT_FALSE(transport->getConnectionState()
+                   .streamManager->refreshTransportSettings(transportSettings)
+                   .hasError());
+
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::knobFrameEvents);
 

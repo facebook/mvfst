@@ -344,7 +344,7 @@ struct TransportSettings {
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
   bool advertisedReliableResetStreamSupport{false};
-  bool advertisedKnobFrameSupport{true};
+  bool advertisedKnobFrameSupport{false};
 
   // Extended ACK support to advertise to the peer. This is what we expect to
   // receive from the peer inside ACK_EXTENDED frames.
