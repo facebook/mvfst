@@ -11,7 +11,6 @@
 
 #include <fizz/protocol/Protocol.h>
 #include <fizz/server/ReplayCache.h>
-#include <quic/QuicConstants.h>
 #include <chrono>
 
 namespace quic {
