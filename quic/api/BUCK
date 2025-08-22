@@ -27,6 +27,9 @@ mvfst_cpp_library(
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/state:quic_state_machine",
     ],
+    exported_external_deps = [
+        "glog",
+    ],
 )
 
 mvfst_cpp_library(
