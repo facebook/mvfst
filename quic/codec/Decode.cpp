@@ -6,6 +6,8 @@
  */
 
 #include <quic/codec/Decode.h>
+#include <quic/codec/QuicInteger.h>
+#include <quic/common/ContiguousCursor.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
@@ -537,9 +539,9 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     BufQueue& queue,
     StreamTypeField frameTypeField,
     bool isGroupFrame) {
-  Cursor cursor(queue.front());
+  ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
 
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid stream id"));
@@ -547,7 +549,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
 
   OptionalIntegral<StreamGroupId> groupId;
   if (isGroupFrame) {
-    auto gId = quic::follyutils::decodeQuicInteger(cursor);
+    auto gId = quic::decodeQuicInteger(cursor);
     if (!gId) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -558,7 +560,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
 
   uint64_t offset = 0;
   if (frameTypeField.hasOffset()) {
-    auto optionalOffset = quic::follyutils::decodeQuicInteger(cursor);
+    auto optionalOffset = quic::decodeQuicInteger(cursor);
     if (!optionalOffset) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
@@ -568,7 +570,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
   auto fin = frameTypeField.hasFin();
   Optional<std::pair<uint64_t, size_t>> dataLength;
   if (frameTypeField.hasDataLength()) {
-    dataLength = quic::follyutils::decodeQuicInteger(cursor);
+    dataLength = quic::decodeQuicInteger(cursor);
     if (!dataLength) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
@@ -577,7 +579,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
   BufPtr data;
 
   // Calculate how much to trim from the start of the queue
-  size_t trimAmount = cursor - queue.front();
+  size_t trimAmount = cursor.getCurrentPosition();
   if (trimAmount > 0) {
     size_t trimmed = queue.trimStartAtMost(trimAmount);
     if (trimmed < trimAmount) {

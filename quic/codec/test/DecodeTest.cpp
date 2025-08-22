@@ -163,6 +163,7 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
   if (data) {
     wcursor.insert(std::move(data));
   }
+  streamFrame->coalesce();
   return streamFrame;
 }
 
