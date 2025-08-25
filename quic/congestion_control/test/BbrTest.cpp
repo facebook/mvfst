@@ -54,7 +54,10 @@ TEST_F(BbrTest, Recovery) {
   // Also test the ACK_FREQUENCY
   conn.peerMinAckDelay = 5ms;
   conn.transportSettings.ccaConfig.ackFrequencyConfig.emplace(
-      CongestionControlConfig::AckFrequencyConfig{10, 3, 2});
+      CongestionControlConfig::AckFrequencyConfig{
+          .ackElicitingThreshold = 10,
+          .reorderingThreshold = 3,
+          .minRttDivisor = 2});
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
@@ -137,7 +140,11 @@ TEST_F(BbrTest, Recovery) {
   EXPECT_FALSE(bbr.inRecovery());
   // Only one update should have been issued.
   ASSERT_EQ(conn.pendingEvents.frames.size(), 1);
-  AckFrequencyFrame expectedFrame{0, 2, 5000, 3};
+  AckFrequencyFrame expectedFrame{
+      .sequenceNumber = 0,
+      .packetTolerance = 2,
+      .updateMaxAckDelay = 5000,
+      .reorderThreshold = 3};
   auto ackFrequencyFrame =
       conn.pendingEvents.frames.front().asAckFrequencyFrame();
   EXPECT_EQ(expectedFrame, *ackFrequencyFrame);
