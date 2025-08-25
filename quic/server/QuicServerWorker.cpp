@@ -719,8 +719,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
 
     // Call the override function last so it can override any previous config.
     if (transportSettingsOverrideFn_) {
-      transportSettingsOverrideFn_(
-          transportSettingsCopy, client.getIPAddress());
+      transportSettingsOverrideFn_(transportSettingsCopy);
     }
     LOG_IF(
         ERROR,

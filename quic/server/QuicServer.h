@@ -32,7 +32,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
                    public std::enable_shared_from_this<QuicServer> {
  public:
   using TransportSettingsOverrideFn =
-      std::function<void(quic::TransportSettings&, const folly::IPAddress&)>;
+      std::function<void(quic::TransportSettings&)>;
 
   static std::shared_ptr<QuicServer> createQuicServer(
       TransportSettings transportSettings = TransportSettings()) {
