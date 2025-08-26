@@ -944,7 +944,7 @@ TYPED_TEST(
       std::move(mockPacketProcessor));
   EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
     PacketProcessor::PrewriteRequest req;
-    req.cmsgs = {{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}};
+    req.cmsgs = {{{.level = IPPROTO_IPV6, .optname = IPV6_HOPLIMIT}, 255}};
     return req;
   });
 
@@ -956,7 +956,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*rawPacketProcessor2, prewrite()).Times(1).WillOnce([]() {
     PacketProcessor::PrewriteRequest req;
-    req.cmsgs = {{{IPPROTO_IPV6, IPV6_DONTFRAG}, 1}};
+    req.cmsgs = {{{.level = IPPROTO_IPV6, .optname = IPV6_DONTFRAG}, 1}};
     return req;
   });
 
@@ -969,7 +969,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*rawPacketProcessor3, prewrite()).Times(1).WillOnce([]() {
     PacketProcessor::PrewriteRequest req;
-    req.cmsgs = {{{IPPROTO_IPV6, IPV6_DONTFRAG}, 0}};
+    req.cmsgs = {{{.level = IPPROTO_IPV6, .optname = IPV6_DONTFRAG}, 0}};
     return req;
   });
 
@@ -1007,7 +1007,7 @@ TYPED_TEST(
     // Send two packets with the same marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
       PacketProcessor::PrewriteRequest req;
-      req.cmsgs = {{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}};
+      req.cmsgs = {{{.level = IPPROTO_IPV6, .optname = IPV6_HOPLIMIT}, 255}};
       return req;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -1051,7 +1051,7 @@ TYPED_TEST(
     // Send two packets with the same marking
     EXPECT_CALL(*rawPacketProcessor, prewrite()).Times(1).WillOnce([]() {
       PacketProcessor::PrewriteRequest req;
-      req.cmsgs = {{{IPPROTO_IPV6, IPV6_HOPLIMIT}, 255}};
+      req.cmsgs = {{{.level = IPPROTO_IPV6, .optname = IPV6_HOPLIMIT}, 255}};
       return req;
     });
     auto streamId = this->getTransport()->createBidirectionalStream().value();

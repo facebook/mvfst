@@ -140,9 +140,9 @@ StreamGroupIdBuf decodeStreamGroupBuffer(Cursor& cursor) {
   auto dataBuffer = decodeDataBuffer(cursor);
   bool eof = (bool)cursor.readBE<uint8_t>();
   return StreamGroupIdBuf{
-      streamId,
-      groupId,
-      StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof)};
+      .id = streamId,
+      .groupId = groupId,
+      .buf = StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof)};
 }
 
 StreamBuffer decodeCryptoBuffer(Cursor& cursor) {
@@ -2124,10 +2124,14 @@ TEST_P(QuicTransportImplTestBase, ByteEventCallbacksManagementSingleStream) {
   auto stream = transport->createBidirectionalStream().value();
   uint64_t offset1 = 10, offset2 = 20;
 
-  ByteEvent txEvent1 = ByteEvent{stream, offset1, ByteEvent::Type::TX};
-  ByteEvent txEvent2 = ByteEvent{stream, offset2, ByteEvent::Type::TX};
-  ByteEvent ackEvent1 = ByteEvent{stream, offset1, ByteEvent::Type::ACK};
-  ByteEvent ackEvent2 = ByteEvent{stream, offset2, ByteEvent::Type::ACK};
+  ByteEvent txEvent1 =
+      ByteEvent{.id = stream, .offset = offset1, .type = ByteEvent::Type::TX};
+  ByteEvent txEvent2 =
+      ByteEvent{.id = stream, .offset = offset2, .type = ByteEvent::Type::TX};
+  ByteEvent ackEvent1 =
+      ByteEvent{.id = stream, .offset = offset1, .type = ByteEvent::Type::ACK};
+  ByteEvent ackEvent2 =
+      ByteEvent{.id = stream, .offset = offset2, .type = ByteEvent::Type::ACK};
 
   // Register 2 TX and 2 ACK events for the same stream at 2 different offsets
   ASSERT_FALSE(
@@ -2212,10 +2216,14 @@ TEST_P(
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  ByteEvent txEvent1 = ByteEvent{stream1, 10, ByteEvent::Type::TX};
-  ByteEvent txEvent2 = ByteEvent{stream2, 20, ByteEvent::Type::TX};
-  ByteEvent ackEvent1 = ByteEvent{stream1, 10, ByteEvent::Type::ACK};
-  ByteEvent ackEvent2 = ByteEvent{stream2, 20, ByteEvent::Type::ACK};
+  ByteEvent txEvent1 =
+      ByteEvent{.id = stream1, .offset = 10, .type = ByteEvent::Type::TX};
+  ByteEvent txEvent2 =
+      ByteEvent{.id = stream2, .offset = 20, .type = ByteEvent::Type::TX};
+  ByteEvent ackEvent1 =
+      ByteEvent{.id = stream1, .offset = 10, .type = ByteEvent::Type::ACK};
+  ByteEvent ackEvent2 =
+      ByteEvent{.id = stream2, .offset = 20, .type = ByteEvent::Type::ACK};
 
   EXPECT_THAT(byteEventCallback.getByteEventTracker(), IsEmpty());
   // Register 2 TX and 2 ACK events for 2 separate streams.
