@@ -10,6 +10,9 @@
 #include <quic/QuicConstants.h>
 #include <array>
 
+#include <fmt/format.h>
+#include <quic/common/StringUtils.h>
+
 namespace quic {
 
 std::string hexlify(const std::string& input) {
@@ -71,6 +74,74 @@ quic::Expected<std::string, QuicError> unhexlify(const std::string& input) {
   }
 
   return output;
+}
+
+// There are two variants of `strerror_r` function, one returns
+// `int`, and another returns `char*`. Selecting proper version using
+// preprocessor macros portably is extremely hard.
+//
+// For example, on Android function signature depends on `__USE_GNU` and
+// `__ANDROID_API__` macros (https://git.io/fjBBE).
+//
+// So we are using C++ overloading trick: we pass a pointer of
+// `strerror_r` to `invoke_strerror_r` function, and C++ compiler
+// selects proper function.
+
+[[maybe_unused]] static std::string invoke_strerror_r(
+    int (*strerror_r)(int, char*, size_t),
+    int err,
+    char* buf,
+    size_t buflen) {
+  // Using XSI-compatible strerror_r
+  int r = strerror_r(err, buf, buflen);
+
+  // OSX/FreeBSD use EINVAL and Linux uses -1 so just check for non-zero
+  if (r != 0) {
+    return fmt::format(
+        "Unknown error {} (strerror_r failed with error {})", err, errno);
+  } else {
+    return buf;
+  }
+}
+
+[[maybe_unused]] static std::string invoke_strerror_r(
+    char* (*strerror_r)(int, char*, size_t),
+    int err,
+    char* buf,
+    size_t buflen) {
+  // Using GNU strerror_r
+  return strerror_r(err, buf, buflen);
+}
+
+std::string errnoStr(int err) {
+  int savedErrno = errno;
+
+  char buf[1024];
+  buf[0] = '\0';
+
+  std::string result;
+
+  // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/strerror_r.3.html
+  // http://www.kernel.org/doc/man-pages/online/pages/man3/strerror.3.html
+#if defined(_WIN32) && (defined(__MINGW32__) || defined(_MSC_VER))
+  // mingw64 has no strerror_r, but Windows has strerror_s, which C11 added
+  // as well. So maybe we should use this across all platforms (together
+  // with strerrorlen_s). Note strerror_r and _s have swapped args.
+  int r = strerror_s(buf, sizeof(buf), err);
+  if (r != 0) {
+    result = fmt::format(
+        "Unknown error {} (strerror_r failed with error {})", err, errno);
+  } else {
+    result.assign(buf);
+  }
+#else
+  // Using any strerror_r
+  result.assign(invoke_strerror_r(strerror_r, err, buf, sizeof(buf)));
+#endif
+
+  errno = savedErrno;
+
+  return result;
 }
 
 } // namespace quic

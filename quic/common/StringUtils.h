@@ -24,4 +24,6 @@ std::string hexlify(const std::string& input);
  */
 quic::Expected<std::string, QuicError> unhexlify(const std::string& input);
 
+std::string errnoStr(int err);
+
 } // namespace quic

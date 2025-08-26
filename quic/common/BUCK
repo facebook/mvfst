@@ -135,6 +135,7 @@ mvfst_cpp_library(
         "StringUtils.h",
     ],
     deps = [
+        "fbsource//third-party/fmt:fmt",
         "//quic:constants",
     ],
     exported_deps = [
