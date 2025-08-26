@@ -881,16 +881,16 @@ quic::Expected<uint64_t, TransportErrorCode> parsePlaintextRetryOrNewToken(
 quic::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
     BufQueue& queue,
     bool hasLen) {
-  Cursor cursor(queue.front());
-  size_t length = cursor.length();
+  ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
+  size_t length = cursor.remaining();
   if (hasLen) {
-    auto decodeLength = quic::follyutils::decodeQuicInteger(cursor);
+    auto decodeLength = quic::decodeQuicInteger(cursor);
     if (!decodeLength) {
       return quic::make_unexpected(QuicError(
           TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid datagram len"));
     }
     length = decodeLength->first;
-    if (cursor.length() < length) {
+    if (cursor.remaining() < length) {
       return quic::make_unexpected(QuicError(
           TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid datagram frame"));
     }
