@@ -1375,6 +1375,20 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << allowDuplicateProbesInSameWrite;
         return {};
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT),
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        CHECK(serverTransport);
+        bool sendCloseOnIdleTimeout =
+            static_cast<bool>(std::get<uint64_t>(value));
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.alwaysSendConnectionCloseOnIdleTimeout =
+            sendCloseOnIdleTimeout;
+        VLOG(3) << "SEND_CLOSE_ON_IDLE_TIMEOUT KnobParam received: "
+                << sendCloseOnIdleTimeout;
+        return {};
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

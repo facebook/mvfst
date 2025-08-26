@@ -6060,4 +6060,30 @@ TEST_F(QuicServerTransportCertTest, TestGetSelfCertificate) {
   conn.serverHandshakeLayer = serverHandshakeLayer;
 }
 
+TEST_F(QuicServerTransportTest, TestSendCloseOnIdleTimeoutKnobHandler) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  // This transport setting is false by default
+  ASSERT_FALSE(transportSettings.alwaysSendConnectionCloseOnIdleTimeout);
+
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT),
+        .val = uint64_t(0)}});
+  EXPECT_FALSE(transportSettings.alwaysSendConnectionCloseOnIdleTimeout);
+
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT),
+        .val = uint64_t(1)}});
+  EXPECT_TRUE(transportSettings.alwaysSendConnectionCloseOnIdleTimeout);
+
+  // Test non-zero values are treated as true
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(
+            TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT),
+        .val = uint64_t(42)}});
+  EXPECT_TRUE(transportSettings.alwaysSendConnectionCloseOnIdleTimeout);
+}
+
 } // namespace quic::test
