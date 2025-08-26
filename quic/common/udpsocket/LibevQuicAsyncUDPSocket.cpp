@@ -5,11 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/String.h>
-#include <folly/lang/Exception.h> // For folly::errnoStr
 #include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
+#include <quic/common/StringUtils.h>
 #include <quic/common/udpsocket/LibevQuicAsyncUDPSocket.h>
 
 #include <cstring>
@@ -195,7 +194,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::close() {
       int errnoCopy = errno;
       fd_ = -1; // Mark as closed even if error occurred
       std::string errorMsg =
-          "Failed to close socket: " + folly::errnoStr(errnoCopy);
+          "Failed to close socket: " + quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -243,7 +242,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
   if (fd == -1) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "error creating socket: " + folly::errnoStr(errnoCopy);
+        "error creating socket: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -256,7 +255,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
   if (flags == -1) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "error getting socket flags: " + folly::errnoStr(errnoCopy);
+        "error getting socket flags: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -264,7 +263,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
   if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) != 0) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "error setting socket nonblocking flag: " + folly::errnoStr(errnoCopy);
+        "error setting socket nonblocking flag: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -276,7 +275,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
           fd, SOL_SOCKET, SO_REUSEADDR, &sockOptVal, sizeof(sockOptVal)) != 0) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "error setting reuse address on socket: " + folly::errnoStr(errnoCopy);
+        "error setting reuse address on socket: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -286,7 +285,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
           fd, SOL_SOCKET, SO_REUSEPORT, &sockOptVal, sizeof(sockOptVal)) != 0) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "error setting reuse port on socket: " + folly::errnoStr(errnoCopy);
+        "error setting reuse port on socket: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -297,8 +296,8 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
     int value = rcvBuf_;
     if (::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value)) != 0) {
       int errnoCopy = errno;
-      std::string errorMsg = "failed to set SO_RCVBUF on the socket: " +
-          folly::errnoStr(errnoCopy);
+      std::string errorMsg =
+          "failed to set SO_RCVBUF on the socket: " + quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -310,8 +309,8 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
     int value = sndBuf_;
     if (::setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &value, sizeof(value)) != 0) {
       int errnoCopy = errno;
-      std::string errorMsg = "failed to set SO_SNDBUF on the socket: " +
-          folly::errnoStr(errnoCopy);
+      std::string errorMsg =
+          "failed to set SO_SNDBUF on the socket: " + quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -352,7 +351,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::bind(
                                       : sizeof(sockaddr_in)) != 0) {
     int errnoCopy = errno;
     std::string errorMsg = "error binding socket to " + address.describe() +
-        ": " + folly::errnoStr(errnoCopy);
+        ": " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -363,7 +362,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::bind(
   if (::getsockname(fd_, &saddr, &len) != 0) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "error retrieving local address: " + folly::errnoStr(errnoCopy);
+        "error retrieving local address: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -393,7 +392,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::connect(
           address.getActualSize()) != 0) {
     int errnoCopy = errno;
     std::string errorMsg = "Libev connect failed to " + address.describe();
-    errorMsg += ": " + folly::errnoStr(errnoCopy);
+    errorMsg += ": " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -410,7 +409,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::connect(
         0) {
       int errnoCopy = errno;
       std::string errorMsg = "Libev getsockname failed after connect: " +
-          folly::errnoStr(errnoCopy);
+          quic::errnoStr(errnoCopy);
       // Connect succeeded, but getsockname failed.
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
@@ -452,7 +451,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
     if (::setsockopt(fd_, IPPROTO_IP, optname4, &optval4, sizeof(optval4))) {
       int errnoCopy = errno;
       std::string errorMsg = "failed to turn off PMTU discovery (IPv4): " +
-          folly::errnoStr(errnoCopy);
+          quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -462,7 +461,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setDFAndTurnOffPMTU() {
     if (::setsockopt(fd_, IPPROTO_IPV6, optname6, &optval6, sizeof(optval6))) {
       int errnoCopy = errno;
       std::string errorMsg = "failed to turn off PMTU discovery (IPv6): " +
-          folly::errnoStr(errnoCopy);
+          quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -500,7 +499,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setErrMessageCallback(
       ::setsockopt(fd_, IPPROTO_IP, optname4, &err, sizeof(err))) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "Failed to set IP_RECVERR: " + folly::errnoStr(errnoCopy);
+        "Failed to set IP_RECVERR: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -509,7 +508,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setErrMessageCallback(
       ::setsockopt(fd_, IPPROTO_IPV6, optname6, &err, sizeof(err))) {
     int errnoCopy = errno;
     std::string errorMsg =
-        "Failed to set IPV6_RECVERR: " + folly::errnoStr(errnoCopy);
+        "Failed to set IPV6_RECVERR: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -579,7 +578,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::applyOptions(
               sizeof(opt.second)) != 0) {
         int errnoCopy = errno;
         std::string errorMsg =
-            "failed to apply socket options: " + folly::errnoStr(errnoCopy);
+            "failed to apply socket options: " + quic::errnoStr(errnoCopy);
         return quic::make_unexpected(QuicError(
             QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
             std::move(errorMsg)));
@@ -768,7 +767,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setRcvBuf(int rcvBuf) {
     if (::setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &value, sizeof(value)) != 0) {
       int errnoCopy = errno;
       std::string errorMsg =
-          "failed to set SO_RCVBUF: " + folly::errnoStr(errnoCopy);
+          "failed to set SO_RCVBUF: " + quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -785,7 +784,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setSndBuf(int sndBuf) {
     if (::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &value, sizeof(value)) != 0) {
       int errnoCopy = errno;
       std::string errorMsg =
-          "failed to set SO_SNDBUF: " + folly::errnoStr(errnoCopy);
+          "failed to set SO_SNDBUF: " + quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));
@@ -804,7 +803,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setReuseAddr(
         0) {
       int errnoCopy = errno;
       std::string errorMsg =
-          "failed to set SO_REUSEADDR: " + folly::errnoStr(errnoCopy);
+          "failed to set SO_REUSEADDR: " + quic::errnoStr(errnoCopy);
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::move(errorMsg)));

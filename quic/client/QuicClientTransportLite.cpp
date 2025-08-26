@@ -1314,7 +1314,7 @@ void QuicClientTransportLite::errMessage(
 
     const struct sock_extended_err* serr =
         reinterpret_cast<const struct sock_extended_err*>(CMSG_DATA(&cmsg));
-    auto errStr = folly::errnoStr(serr->ee_errno);
+    auto errStr = quic::errnoStr(serr->ee_errno);
     if (!happyEyeballsState.shouldWriteToFirstSocket &&
         !happyEyeballsState.shouldWriteToSecondSocket) {
       asyncClose(QuicError(
@@ -1456,7 +1456,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
       return quic::make_unexpected(QuicError(
           QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
           fmt::format(
-              "recvmsg() failed, errno={} {}", errno, folly::errnoStr(errno))));
+              "recvmsg() failed, errno={} {}", errno, quic::errnoStr(errno))));
     } else if (ret == 0) {
       break;
     }
@@ -1632,7 +1632,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         fmt::format(
-            "recvmmsg() failed, errno={} {}", errno, folly::errnoStr(errno))));
+            "recvmmsg() failed, errno={} {}", errno, quic::errnoStr(errno))));
   }
 
   CHECK_LE(numMsgsRecvd, numPackets);

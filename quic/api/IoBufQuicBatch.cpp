@@ -6,8 +6,8 @@
  */
 
 #include <quic/api/IoBufQuicBatch.h>
-
 #include <quic/common/SocketUtil.h>
+#include <quic/common/StringUtils.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
 namespace quic {
@@ -138,10 +138,10 @@ quic::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
       (happyEyeballsState_ && !happyEyeballsState_->shouldWriteToFirstSocket &&
        !happyEyeballsState_->shouldWriteToSecondSocket)) {
     auto firstSocketErrorMsg = firstSocketErrno.has_value()
-        ? fmt::format("{}, ", folly::errnoStr(firstSocketErrno.value()))
+        ? fmt::format("{}, ", quic::errnoStr(firstSocketErrno.value()))
         : "";
     auto secondSocketErrorMsg = secondSocketErrno.has_value()
-        ? folly::errnoStr(secondSocketErrno.value())
+        ? quic::errnoStr(secondSocketErrno.value())
         : "";
     auto errorMsg =
         fmt::format("{}{}", firstSocketErrorMsg, secondSocketErrorMsg);

@@ -15,6 +15,7 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
+#include <quic/common/StringUtils.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
@@ -1508,8 +1509,8 @@ void writeCloseCommon(
   auto ret = sock.write(connection.peerAddress, vec, iovec_len);
   connection.lossState.totalBytesSent += packetSize;
   if (ret < 0) {
-    VLOG(4) << "Error writing connection close " << folly::errnoStr(errno)
-            << " " << connection;
+    VLOG(4) << "Error writing connection close " << quic::errnoStr(errno) << " "
+            << connection;
   } else {
     QUIC_STATS(connection.statsCallback, onWrite, ret);
   }

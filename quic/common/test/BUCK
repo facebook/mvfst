@@ -51,7 +51,6 @@ mvfst_cpp_test(
         "BufUtilTest.cpp",
     ],
     deps = [
-        "//folly:string",
         "//folly/io:iobuf",
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
@@ -65,7 +64,6 @@ mvfst_cpp_test(
         "ChainedByteRangeTest.cpp",
     ],
     deps = [
-        "//folly:string",
         "//folly/io:iobuf",
         "//quic/common:buf_util",
     ],

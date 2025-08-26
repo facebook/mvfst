@@ -52,7 +52,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:benchmark",
-        "//folly:string",
+        "//quic/common:string_utils",
     ],
     exported_deps = [
         ":xsk_lib",

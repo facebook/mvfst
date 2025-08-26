@@ -175,6 +175,7 @@ mvfst_cpp_library(
         "//folly/tracing:static_tracepoint",
         "//quic/common:buf_accessor",
         "//quic/common:socket_util",
+        "//quic/common:string_utils",
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/state:ack_frequency_functions",
         "//quic/state:ack_handler",

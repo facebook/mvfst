@@ -17,7 +17,6 @@ mvfst_cpp_library(
         "//folly/io:iobuf",
         "//folly/io:socket_option_map",
         "//folly/io/async:async_socket_exception",
-        "//folly/lang:exception",
         "//folly/portability:sockets",
         "//quic:exception",
         "//quic/common:expected",
@@ -37,8 +36,8 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:likely",
-        "//folly:string",
         "//quic:exception",
+        "//quic/common:string_utils",
     ],
     exported_deps = [
         ":quic_async_udp_socket",
@@ -54,10 +53,9 @@ mvfst_cpp_library(
         "FollyQuicAsyncUDPSocket.h",
     ],
     deps = [
-        "//folly:string",
         "//folly/io/async:async_socket_exception",
-        "//folly/lang:exception",
         "//quic:exception",
+        "//quic/common:string_utils",
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",
@@ -79,9 +77,8 @@ mvfst_cpp_library(
     ],
     labels = ci.labels(ci.remove(ci.windows())),
     deps = [
-        "//folly:string",
-        "//folly/lang:exception",
         "//quic/common:optional",
+        "//quic/common:string_utils",
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",

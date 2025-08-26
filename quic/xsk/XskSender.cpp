@@ -8,7 +8,7 @@
 #if defined(__linux__) && !defined(ANDROID)
 
 #include <folly/Benchmark.h>
-#include <folly/String.h>
+#include <quic/common/StringUtils.h>
 #include <quic/xsk/XskSender.h>
 #include <quic/xsk/packet_utils.h>
 #include <stdexcept>
@@ -215,7 +215,7 @@ quic::Expected<void, std::runtime_error> XskSender::bind(int queueId) {
   }
   if (bind_result < 0) {
     std::string errorMsg =
-        fmt::format("Failed to bind xdp socket: {}", folly::errnoStr(errno));
+        fmt::format("Failed to bind xdp socket: {}", quic::errnoStr(errno));
     return quic::make_unexpected(std::runtime_error(errorMsg));
   }
 

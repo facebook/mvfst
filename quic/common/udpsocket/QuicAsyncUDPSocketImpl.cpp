@@ -6,8 +6,8 @@
  */
 
 #include <folly/Likely.h>
-#include <folly/String.h>
 #include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
+#include <quic/common/StringUtils.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocketImpl.h>
 
 namespace {
@@ -104,7 +104,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     pauseRead();
     // Return the error from recvmmsg itself
     int errnoCopy = errno;
-    std::string errorMsg = "recvmmsg failed: " + folly::errnoStr(errnoCopy);
+    std::string errorMsg = "recvmmsg failed: " + quic::errnoStr(errnoCopy);
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));

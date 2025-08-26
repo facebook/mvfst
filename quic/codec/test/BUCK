@@ -78,7 +78,6 @@ mvfst_cpp_test(
         "TypesTest.cpp",
     ],
     deps = [
-        "//folly:string",
         "//folly/container:array",
         "//folly/io:iobuf",
         "//folly/portability:gtest",
@@ -192,7 +191,6 @@ mvfst_cpp_test(
     supports_static_listing = False,
     deps = [
         "//folly:expected",
-        "//folly:string",
         "//folly/io:iobuf",
         "//folly/portability:gtest",
         "//quic:exception",

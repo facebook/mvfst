@@ -14,7 +14,6 @@
 #include <folly/io/IOBuf.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncSocketException.h>
-#include <folly/lang/Exception.h> // For folly::errnoStr
 #include <folly/portability/Sockets.h>
 #include <quic/common/Expected.h>
 

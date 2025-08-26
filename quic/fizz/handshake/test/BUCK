@@ -40,7 +40,6 @@ mvfst_cpp_test(
     supports_static_listing = False,
     deps = [
         "//fizz/record:record",
-        "//folly:string",
         "//folly/portability:gtest",
         "//quic/common:string_utils",
         "//quic/fizz/handshake:fizz_handshake",
