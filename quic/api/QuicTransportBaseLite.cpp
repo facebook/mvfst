@@ -2316,6 +2316,9 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
   uint64_t numOpenStreans = conn_->streamManager->streamCount();
   auto localError =
       drain ? LocalErrorCode::IDLE_TIMEOUT : LocalErrorCode::SHUTTING_DOWN;
+  auto sendCloseImmediately =
+      conn_->transportSettings.alwaysSendConnectionCloseOnIdleTimeout ? true
+                                                                      : !drain;
   closeImpl(
       quic::QuicError(
           QuicErrorCode(localError),
@@ -2324,7 +2327,7 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
               toString(localError),
               numOpenStreans - conn_->streamManager->numControlStreams())),
       drain /* drainConnection */,
-      !drain /* sendCloseImmediately */);
+      sendCloseImmediately);
 }
 
 void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {

@@ -501,6 +501,9 @@ struct TransportSettings {
   // packet repeatedly in the same write loop.
   // TODO: Remove this after testing the underlying change.
   bool allowDuplicateProbesInSameWrite{true};
+
+  // Whether a ConnectionClose frame should be sent on IdleTimeout
+  bool alwaysSendConnectionCloseOnIdleTimeout{false};
 };
 
 } // namespace quic
