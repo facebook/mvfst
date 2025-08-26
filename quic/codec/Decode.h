@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/Types.h>
+#include <quic/common/ContiguousCursor.h>
 #include <quic/common/Expected.h>
 #include <quic/state/TransportSettings.h>
 
@@ -88,7 +89,7 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
  * when decoding fails.
  */
 [[nodiscard]] quic::Expected<PaddingFrame, QuicError> decodePaddingFrame(
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
     Cursor& cursor,
@@ -113,7 +114,7 @@ decodeBiDiMaxStreamsFrame(Cursor& cursor);
 decodeUniMaxStreamsFrame(Cursor& cursor);
 
 [[nodiscard]] quic::Expected<PingFrame, QuicError> decodePingFrame(
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<QuicFrame, QuicError> decodeKnobFrame(
     Cursor& cursor);
@@ -152,25 +153,25 @@ decodePathChallengeFrame(Cursor& cursor);
 decodePathResponseFrame(Cursor& cursor);
 
 [[nodiscard]] quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType = FrameType::ACK);
 
 [[nodiscard]] quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params);
 
 [[nodiscard]] quic::Expected<QuicFrame, QuicError>
 decodeAckFrameWithReceivedTimestamps(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType);
 
 [[nodiscard]] quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params);
 

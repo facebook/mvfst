@@ -93,6 +93,7 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
     ect1.encode(appenderOp);
     ce.encode(appenderOp);
   }
+  ackFrame->coalesce();
   return ackFrame;
 }
 
@@ -296,7 +297,7 @@ TEST_F(DecodeTest, ValidAckFrame) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -327,7 +328,7 @@ TEST_F(DecodeTest, AckEcnFrame) {
       false, // useRealValuesForLargestAcked
       false, // useRealValuesForAckDelay
       true); // addEcnCounts
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrameWithECN(
       cursor,
       makeHeader(),
@@ -364,7 +365,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithECN) {
       false, // useRealValuesForAckDelay
       true, // addEcnCounts
       true); // useExtendedAck
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto ackFrameRes = decodeAckExtendedFrame(
       cursor,
       makeHeader(),
@@ -408,7 +409,7 @@ TEST_F(DecodeTest, AckExtendedFrameWithNoFeatures) {
       false, // useRealValuesForAckDelay
       false, // addEcnCounts
       true); // useExtendedAck
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto ackFrameRes = decodeAckExtendedFrame(
       cursor,
       makeHeader(),
@@ -446,7 +447,7 @@ TEST_F(DecodeTest, AckExtendedFrameThrowsWithUnsupportedFeatures) {
       false, // useRealValuesForAckDelay
       true, // addEcnCounts
       true); // useExtendedAck
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
 
   // Try to decode extended ack with ECN but we only support Timestamps
   auto decodeResult = decodeAckExtendedFrame(
@@ -476,7 +477,7 @@ TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {
       firstAckBlockLength,
       {},
       true);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -500,7 +501,7 @@ TEST_F(DecodeTest, AckFrameLargestAckInvalid) {
       firstAckBlockLength,
       {},
       true);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -523,7 +524,7 @@ TEST_F(DecodeTest, AckFrameDelayEncodingInvalid) {
       {},
       false,
       true);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -540,7 +541,7 @@ TEST_F(DecodeTest, AckFrameDelayExceedsRange) {
   QuicInteger firstAckBlockLength(10);
   auto result = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -564,7 +565,7 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksUnderflow) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -590,7 +591,7 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksOverflow) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   ASSERT_FALSE(
       decodeAckFrame(
           cursor,
@@ -615,7 +616,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor1(result1.get());
+  ContiguousReadCursor cursor1(result1->data(), result1->length());
 
   auto res = decodeAckFrame(
       cursor1,
@@ -626,7 +627,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result2 = createAckFrame(
       largestAcked, ackDelay, std::nullopt, firstAckBlockLength, ackBlocks);
-  Cursor cursor2(result2.get());
+  ContiguousReadCursor cursor2(result2->data(), result2->length());
   res = decodeAckFrame(
       cursor2,
       makeHeader(),
@@ -636,7 +637,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result3 = createAckFrame(
       largestAcked, ackDelay, std::nullopt, firstAckBlockLength, ackBlocks);
-  Cursor cursor3(result3.get());
+  ContiguousReadCursor cursor3(result3->data(), result3->length());
   res = decodeAckFrame(
       cursor3,
       makeHeader(),
@@ -646,7 +647,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result4 = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, std::nullopt, ackBlocks);
-  Cursor cursor4(result4.get());
+  ContiguousReadCursor cursor4(result4->data(), result4->length());
   res = decodeAckFrame(
       cursor4,
       makeHeader(),
@@ -656,7 +657,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   auto result5 = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength, {});
-  Cursor cursor5(result5.get());
+  ContiguousReadCursor cursor5(result5->data(), result5->length());
   res = decodeAckFrame(
       cursor5,
       makeHeader(),
@@ -673,7 +674,7 @@ TEST_F(DecodeTest, AckFrameFirstBlockLengthInvalid) {
 
   auto result = createAckFrame(
       largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -698,7 +699,7 @@ TEST_F(DecodeTest, AckFrameBlockLengthInvalid) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -723,7 +724,7 @@ TEST_F(DecodeTest, AckFrameBlockGapInvalid) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
   auto res = decodeAckFrame(
       cursor,
       makeHeader(),
@@ -749,7 +750,7 @@ TEST_F(DecodeTest, AckFrameBlockLengthZero) {
       numAdditionalBlocks,
       firstAckBlockLength,
       ackBlocks);
-  Cursor cursor(result.get());
+  ContiguousReadCursor cursor(result->data(), result->length());
 
   auto res = decodeAckFrame(
       cursor,
@@ -951,14 +952,14 @@ TEST_F(DecodeTest, PaddingFrameTest) {
   buf->append(1);
   memset(buf->writableData(), 0, 1);
 
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
 }
 
 TEST_F(DecodeTest, PaddingFrameNoBytesTest) {
   auto buf = folly::IOBuf::create(sizeof(UnderlyingFrameType));
 
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
 }
 
@@ -970,11 +971,11 @@ TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
   // something which is not padding
   memset(buf->writableData() + 10, 5, 1);
 
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
   // If we encountered an interleaved frame, leave the whole thing
   // as is
-  EXPECT_EQ(cursor.totalLength(), 11);
+  EXPECT_EQ(cursor.remaining(), 11);
 }
 
 TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
@@ -982,9 +983,9 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
   buf->append(10);
   memset(buf->writableData(), 0, 10);
 
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
-  EXPECT_EQ(cursor.totalLength(), 0);
+  EXPECT_EQ(cursor.remaining(), 0);
 }
 
 std::unique_ptr<folly::IOBuf> createNewTokenFrame(

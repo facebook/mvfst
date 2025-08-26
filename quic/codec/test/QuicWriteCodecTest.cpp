@@ -1546,6 +1546,7 @@ TEST_P(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
     EXPECT_EQ(ackFrame.ackBlocks.back().start, 754);
     EXPECT_EQ(ackFrame.ackBlocks.back().end, 756);
 
+    builtOut.second->coalesce();
     auto wireBuf = std::move(builtOut.second);
     BufQueue queue;
     queue.append(wireBuf->clone());

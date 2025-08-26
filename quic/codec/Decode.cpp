@@ -7,7 +7,6 @@
 
 #include <quic/codec/Decode.h>
 #include <quic/codec/QuicInteger.h>
-#include <quic/common/ContiguousCursor.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
@@ -46,7 +45,8 @@ quic::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketLen(
 
 namespace quic {
 
-quic::Expected<PaddingFrame, QuicError> decodePaddingFrame(Cursor& cursor) {
+quic::Expected<PaddingFrame, QuicError> decodePaddingFrame(
+    ContiguousReadCursor& cursor) {
   // we might have multiple padding frames in sequence in the common case.
   // Let's consume all the padding and return 1 padding frame for everything.
   static_assert(
@@ -69,7 +69,7 @@ quic::Expected<PaddingFrame, QuicError> decodePaddingFrame(Cursor& cursor) {
   return PaddingFrame();
 }
 
-quic::Expected<PingFrame, QuicError> decodePingFrame(Cursor&) {
+quic::Expected<PingFrame, QuicError> decodePingFrame(ContiguousReadCursor&) {
   return PingFrame();
 }
 
@@ -161,29 +161,29 @@ quic::Expected<uint64_t, QuicError> convertEncodedDurationToMicroseconds(
 }
 
 quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType) {
   ReadAckFrame frame;
   frame.frameType = frameType;
-  auto largestAckedInt = quic::follyutils::decodeQuicInteger(cursor);
+  auto largestAckedInt = quic::decodeQuicInteger(cursor);
   if (!largestAckedInt) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad largest acked"));
   }
   PacketNum largestAcked = largestAckedInt->first;
-  auto ackDelay = quic::follyutils::decodeQuicInteger(cursor);
+  auto ackDelay = quic::decodeQuicInteger(cursor);
   if (!ackDelay) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack delay"));
   }
-  auto additionalAckBlocks = quic::follyutils::decodeQuicInteger(cursor);
+  auto additionalAckBlocks = quic::decodeQuicInteger(cursor);
   if (!additionalAckBlocks) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack block count"));
   }
-  auto firstAckBlockLen = quic::follyutils::decodeQuicInteger(cursor);
+  auto firstAckBlockLen = quic::decodeQuicInteger(cursor);
   if (!firstAckBlockLen) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad first block"));
@@ -221,12 +221,12 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
   frame.ackBlocks.emplace_back(currentPacketNum, largestAcked);
   for (uint64_t numBlocks = 0; numBlocks < additionalAckBlocks->first;
        ++numBlocks) {
-    auto currentGap = quic::follyutils::decodeQuicInteger(cursor);
+    auto currentGap = quic::decodeQuicInteger(cursor);
     if (!currentGap) {
       return quic::make_unexpected(
           QuicError(quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad gap"));
     }
-    auto blockLen = quic::follyutils::decodeQuicInteger(cursor);
+    auto blockLen = quic::decodeQuicInteger(cursor);
     if (!blockLen) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad block len"));
@@ -251,9 +251,9 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
 
 static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
     ReadAckFrame& frame,
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const CodecParameters& params) {
-  auto latestRecvdPacketNum = quic::follyutils::decodeQuicInteger(cursor);
+  auto latestRecvdPacketNum = quic::decodeQuicInteger(cursor);
   if (!latestRecvdPacketNum) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -261,7 +261,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
   }
   frame.maybeLatestRecvdPacketNum = latestRecvdPacketNum->first;
 
-  auto latestRecvdPacketTimeDelta = quic::follyutils::decodeQuicInteger(cursor);
+  auto latestRecvdPacketTimeDelta = quic::decodeQuicInteger(cursor);
   if (!latestRecvdPacketTimeDelta) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -270,7 +270,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
   frame.maybeLatestRecvdPacketTime =
       std::chrono::microseconds(latestRecvdPacketTimeDelta->first);
 
-  auto timeStampRangeCount = quic::follyutils::decodeQuicInteger(cursor);
+  auto timeStampRangeCount = quic::decodeQuicInteger(cursor);
   if (!timeStampRangeCount) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -279,14 +279,14 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
   for (uint64_t numRanges = 0; numRanges < timeStampRangeCount->first;
        numRanges++) {
     RecvdPacketsTimestampsRange timeStampRange;
-    auto receiveTimeStampsGap = quic::follyutils::decodeQuicInteger(cursor);
+    auto receiveTimeStampsGap = quic::decodeQuicInteger(cursor);
     if (!receiveTimeStampsGap) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
           "Bad receive timestamps gap"));
     }
     timeStampRange.gap = receiveTimeStampsGap->first;
-    auto receiveTimeStampsLen = quic::follyutils::decodeQuicInteger(cursor);
+    auto receiveTimeStampsLen = quic::decodeQuicInteger(cursor);
     if (!receiveTimeStampsLen) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -299,7 +299,7 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
               .receiveTimestampsExponent
         : kDefaultReceiveTimestampsExponent;
     for (uint64_t i = 0; i < receiveTimeStampsLen->first; i++) {
-      auto delta = quic::follyutils::decodeQuicInteger(cursor);
+      auto delta = quic::decodeQuicInteger(cursor);
       if (!delta) {
         return quic::make_unexpected(QuicError(
             quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -321,10 +321,10 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
 
 static quic::Expected<void, QuicError> decodeEcnCountsInAck(
     ReadAckFrame& frame,
-    Cursor& cursor) {
-  auto ect_0 = quic::follyutils::decodeQuicInteger(cursor);
-  auto ect_1 = quic::follyutils::decodeQuicInteger(cursor);
-  auto ce = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto ect_0 = quic::decodeQuicInteger(cursor);
+  auto ect_1 = quic::decodeQuicInteger(cursor);
+  auto ce = quic::decodeQuicInteger(cursor);
   if (!ect_0 || !ect_1 || !ce) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ECN value"));
@@ -336,7 +336,7 @@ static quic::Expected<void, QuicError> decodeEcnCountsInAck(
 }
 
 quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
   ReadAckFrame frame;
@@ -345,7 +345,7 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
     return quic::make_unexpected(res.error());
   }
   frame = *res;
-  auto extendedAckFeatures = quic::follyutils::decodeQuicInteger(cursor);
+  auto extendedAckFeatures = quic::decodeQuicInteger(cursor);
   if (!extendedAckFeatures) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -378,7 +378,7 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
 }
 
 quic::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType) {
@@ -400,7 +400,7 @@ quic::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
 }
 
 quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
   ReadAckFrame readAckFrame;
@@ -913,18 +913,21 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
   cursor.reset(queue.front());
   FrameType frameType = static_cast<FrameType>(frameTypeInt->first);
 
+  ContiguousReadCursor contiguousCursor(
+      queue.front()->data(), queue.front()->length());
+
   // No more try/catch, just use Expected/make_unexpected pattern
   switch (frameType) {
     case FrameType::PADDING: {
-      auto paddingRes = decodePaddingFrame(cursor);
+      auto paddingRes = decodePaddingFrame(contiguousCursor);
       if (!paddingRes.has_value()) {
         return quic::make_unexpected(paddingRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*paddingRes);
     }
     case FrameType::PING: {
-      auto pingRes = decodePingFrame(cursor);
+      auto pingRes = decodePingFrame(contiguousCursor);
       if (!pingRes.has_value()) {
         return quic::make_unexpected(pingRes.error());
       }
@@ -932,19 +935,20 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*pingRes);
     }
     case FrameType::ACK: {
-      auto ackFrameRes = decodeAckFrame(cursor, header, params);
+      auto ackFrameRes = decodeAckFrame(contiguousCursor, header, params);
       if (ackFrameRes.hasError()) {
         return ackFrameRes;
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return ackFrameRes;
     }
     case FrameType::ACK_ECN: {
-      auto ackFrameWithEcnRes = decodeAckFrameWithECN(cursor, header, params);
+      auto ackFrameWithEcnRes =
+          decodeAckFrameWithECN(contiguousCursor, header, params);
       if (ackFrameWithEcnRes.hasError()) {
         return ackFrameWithEcnRes;
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return ackFrameWithEcnRes;
     }
     case FrameType::RST_STREAM:
@@ -1173,19 +1177,19 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     }
     case FrameType::ACK_RECEIVE_TIMESTAMPS: {
       auto ackWithReceiveTiemstampsRes = decodeAckFrameWithReceivedTimestamps(
-          cursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);
+          contiguousCursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);
       if (ackWithReceiveTiemstampsRes.hasError()) {
         return ackWithReceiveTiemstampsRes;
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return ackWithReceiveTiemstampsRes;
     }
     case FrameType::ACK_EXTENDED: {
-      auto ackExtRes = decodeAckExtendedFrame(cursor, header, params);
+      auto ackExtRes = decodeAckExtendedFrame(contiguousCursor, header, params);
       if (!ackExtRes.has_value()) {
         return quic::make_unexpected(ackExtRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*ackExtRes);
     }
   }
