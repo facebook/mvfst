@@ -57,48 +57,37 @@ inline std::ostream& operator<<(
   return os;
 }
 
+/**
+ * Returns the absolute deadline at which the loss timer should fire,
+ * together with the method that caused it.
+ */
+inline std::pair<TimePoint, LossState::AlarmMethod> computeLossTimerDeadline(
+    const QuicConnectionStateBase& conn) {
+  const auto lastSent = conn.lossState.lastRetransmittablePacketSentTime;
+  if (auto [lossTime, _space] = earliestLossTimer(conn); lossTime) {
+    // 1. Early–retransmit / reordering timer
+    return {*lossTime, LossState::AlarmMethod::EarlyRetransmitOrReordering};
+  } else {
+    // 2. PTO timer.
+    auto pto = calculatePTO(conn);
+    pto *= 1ULL << std::min(conn.lossState.ptoCount, (uint32_t)31);
+    return {lastSent + pto, LossState::AlarmMethod::PTO};
+  }
+}
+
+/**
+ * Returns the number of milliseconds still left until the loss timer
+ * expires and the method used to set it.
+ */
 template <class ClockType = Clock>
 std::pair<std::chrono::milliseconds, LossState::AlarmMethod>
 calculateAlarmDuration(const QuicConnectionStateBase& conn) {
-  std::chrono::microseconds alarmDuration;
-  Optional<LossState::AlarmMethod> alarmMethod;
-  TimePoint lastSentPacketTime =
-      conn.lossState.lastRetransmittablePacketSentTime;
-  auto lossTimeAndSpace = earliestLossTimer(conn);
-  if (lossTimeAndSpace.first) {
-    if (*lossTimeAndSpace.first > lastSentPacketTime) {
-      // We do this so that lastSentPacketTime + alarmDuration = lossTime
-      alarmDuration = std::chrono::duration_cast<std::chrono::microseconds>(
-          *lossTimeAndSpace.first - lastSentPacketTime);
-    } else {
-      // This should trigger an immediate alarm.
-      alarmDuration = 0us;
-    }
-    alarmMethod = LossState::AlarmMethod::EarlyRetransmitOrReordering;
-  } else {
-    auto ptoTimeout = calculatePTO(conn);
-    ptoTimeout *= 1ULL << std::min(conn.lossState.ptoCount, (uint32_t)31);
-    alarmDuration = ptoTimeout;
-    alarmMethod = LossState::AlarmMethod::PTO;
-  }
-  TimePoint now = ClockType::now();
-  std::chrono::milliseconds adjustedAlarmDuration{0};
-  // The alarm duration is calculated based on the last packet that was sent
-  // rather than the current time.
-  if (lastSentPacketTime + alarmDuration > now) {
-    adjustedAlarmDuration = folly::chrono::ceil<std::chrono::milliseconds>(
-        lastSentPacketTime + alarmDuration - now);
-  } else {
-    VLOG(10) << __func__ << " alarm already due method=" << *alarmMethod
-             << " lastSentPacketTime="
-             << lastSentPacketTime.time_since_epoch().count()
-             << " now=" << now.time_since_epoch().count()
-             << " alarm=" << alarmDuration.count() << "us" << " deadline="
-             << (lastSentPacketTime + alarmDuration).time_since_epoch().count()
-             << " " << conn;
-  }
-  DCHECK(alarmMethod.has_value()) << "Alarm method must have a value";
-  return std::make_pair(adjustedAlarmDuration, *alarmMethod);
+  auto [deadline, method] = computeLossTimerDeadline(conn);
+  auto now = ClockType::now();
+  auto remaining = deadline > now
+      ? folly::chrono::ceil<std::chrono::milliseconds>(deadline - now)
+      : std::chrono::milliseconds(0);
+  return {remaining, method};
 }
 
 /*
