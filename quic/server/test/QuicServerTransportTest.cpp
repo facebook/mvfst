@@ -5026,7 +5026,8 @@ class QuicServerTransportHandshakeTest
         [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams); });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
         .WillOnce(Invoke(
-            [=](const AppToken& appToken) -> quic::Expected<void, QuicError> {
+            [=, this](
+                const AppToken& appToken) -> quic::Expected<void, QuicError> {
               auto& params = appToken.transportParams.parameters;
 
               auto initialMaxDataResult = getIntegerParameter(

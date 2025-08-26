@@ -43,7 +43,7 @@ bool TperfDSRSender::flush() {
   }
   quic::UdpSocketPacketGroupWriter packetGroupWriter(sock_, prs.clientAddress);
   auto written = packetGroupWriter.writePacketsGroup(
-      prs, [=](const PacketizationRequest& req) {
+      prs, [=, this](const PacketizationRequest& req) {
         BufPtr buf;
         uint64_t remainingLen = req.len;
         do {
