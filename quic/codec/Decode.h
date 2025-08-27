@@ -126,16 +126,16 @@ decodeAckFrequencyFrame(Cursor& cursor);
 decodeImmediateAckFrame(Cursor& cursor);
 
 [[nodiscard]] quic::Expected<DataBlockedFrame, QuicError>
-decodeDataBlockedFrame(Cursor& cursor);
+decodeDataBlockedFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<StreamDataBlockedFrame, QuicError>
-decodeStreamDataBlockedFrame(Cursor& cursor);
+decodeStreamDataBlockedFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<StreamsBlockedFrame, QuicError>
-decodeBiDiStreamsBlockedFrame(Cursor& cursor);
+decodeBiDiStreamsBlockedFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<StreamsBlockedFrame, QuicError>
-decodeUniStreamsBlockedFrame(Cursor& cursor);
+decodeUniStreamsBlockedFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<NewConnectionIdFrame, QuicError>
 decodeNewConnectionIdFrame(Cursor& cursor);
@@ -181,10 +181,10 @@ decodeAckFrameWithReceivedTimestamps(
     bool isGroupFrame = false);
 
 [[nodiscard]] quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<HandshakeDoneFrame, QuicError>
 decodeHandshakeDoneFrame(Cursor& cursor);

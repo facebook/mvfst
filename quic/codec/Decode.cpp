@@ -483,54 +483,56 @@ quic::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
   return StopSendingFrame(streamId->first, errorCode);
 }
 
-quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(Cursor& cursor) {
-  auto optionalOffset = quic::follyutils::decodeQuicInteger(cursor);
+quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
+    ContiguousReadCursor& cursor) {
+  auto optionalOffset = quic::decodeQuicInteger(cursor);
   if (!optionalOffset) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
   }
   uint64_t offset = optionalOffset->first;
 
-  auto dataLength = quic::follyutils::decodeQuicInteger(cursor);
+  auto dataLength = quic::decodeQuicInteger(cursor);
   if (!dataLength) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
   }
-  BufPtr data;
-  if (cursor.totalLength() < dataLength->first) {
+  if (cursor.remaining() < dataLength->first) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
   }
 
-  size_t cloned = cursor.cloneAtMost(data, dataLength->first);
+  BufPtr data = BufHelpers::create(dataLength->first);
+  size_t cloned = cursor.pullAtMost(data->writableData(), dataLength->first);
   if (cloned < dataLength->first) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Failed to clone complete data"));
   }
+  data->append(dataLength->first);
 
   return ReadCryptoFrame(offset, std::move(data));
 }
 
 quic::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
-    Cursor& cursor) {
-  auto tokenLength = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto tokenLength = quic::decodeQuicInteger(cursor);
   if (!tokenLength) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid length"));
   }
-  BufPtr token;
-  if (cursor.totalLength() < tokenLength->first) {
+  if (cursor.remaining() < tokenLength->first) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Length mismatch"));
   }
-
-  size_t cloned = cursor.cloneAtMost(token, tokenLength->first);
+  BufPtr token = BufHelpers::create(tokenLength->first);
+  size_t cloned = cursor.pullAtMost(token->writableData(), tokenLength->first);
   if (cloned < tokenLength->first) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Failed to clone token"));
   }
+  token->append(tokenLength->first);
 
   return ReadNewTokenFrame(std::move(token));
 }
@@ -662,8 +664,8 @@ quic::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
 }
 
 quic::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
-    Cursor& cursor) {
-  auto dataLimit = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto dataLimit = quic::decodeQuicInteger(cursor);
   if (!dataLimit) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
@@ -672,13 +674,13 @@ quic::Expected<DataBlockedFrame, QuicError> decodeDataBlockedFrame(
 }
 
 quic::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
-    Cursor& cursor) {
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
-  auto dataLimit = quic::follyutils::decodeQuicInteger(cursor);
+  auto dataLimit = quic::decodeQuicInteger(cursor);
   if (!dataLimit) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
@@ -687,8 +689,8 @@ quic::Expected<StreamDataBlockedFrame, QuicError> decodeStreamDataBlockedFrame(
 }
 
 quic::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
-    Cursor& cursor) {
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -698,8 +700,8 @@ quic::Expected<StreamsBlockedFrame, QuicError> decodeBiDiStreamsBlockedFrame(
 }
 
 quic::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
-    Cursor& cursor) {
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -932,7 +934,7 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       if (!pingRes.has_value()) {
         return quic::make_unexpected(pingRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*pingRes);
     }
     case FrameType::ACK: {
@@ -971,19 +973,19 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*stopRes);
     }
     case FrameType::CRYPTO_FRAME: {
-      auto cryptoRes = decodeCryptoFrame(cursor);
+      auto cryptoRes = decodeCryptoFrame(contiguousCursor);
       if (!cryptoRes.has_value()) {
         return quic::make_unexpected(cryptoRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*cryptoRes);
     }
     case FrameType::NEW_TOKEN: {
-      auto tokenRes = decodeNewTokenFrame(cursor);
+      auto tokenRes = decodeNewTokenFrame(contiguousCursor);
       if (!tokenRes.has_value()) {
         return quic::make_unexpected(tokenRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*tokenRes);
     }
     case FrameType::STREAM:
@@ -1051,35 +1053,37 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*streamsUniRes);
     }
     case FrameType::DATA_BLOCKED: {
-      auto blockedRes = decodeDataBlockedFrame(cursor);
+      auto blockedRes = decodeDataBlockedFrame(contiguousCursor);
       if (!blockedRes.has_value()) {
         return quic::make_unexpected(blockedRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*blockedRes);
     }
     case FrameType::STREAM_DATA_BLOCKED: {
-      auto streamBlockedRes = decodeStreamDataBlockedFrame(cursor);
+      auto streamBlockedRes = decodeStreamDataBlockedFrame(contiguousCursor);
       if (!streamBlockedRes.has_value()) {
         return quic::make_unexpected(streamBlockedRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*streamBlockedRes);
     }
     case FrameType::STREAMS_BLOCKED_BIDI: {
-      auto streamsBidiBlockedRes = decodeBiDiStreamsBlockedFrame(cursor);
+      auto streamsBidiBlockedRes =
+          decodeBiDiStreamsBlockedFrame(contiguousCursor);
       if (!streamsBidiBlockedRes.has_value()) {
         return quic::make_unexpected(streamsBidiBlockedRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*streamsBidiBlockedRes);
     }
     case FrameType::STREAMS_BLOCKED_UNI: {
-      auto streamsUniBlockedRes = decodeUniStreamsBlockedFrame(cursor);
+      auto streamsUniBlockedRes =
+          decodeUniStreamsBlockedFrame(contiguousCursor);
       if (!streamsUniBlockedRes.has_value()) {
         return quic::make_unexpected(streamsUniBlockedRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*streamsUniBlockedRes);
     }
     case FrameType::NEW_CONNECTION_ID: {

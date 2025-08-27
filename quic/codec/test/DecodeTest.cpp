@@ -184,6 +184,7 @@ std::unique_ptr<folly::IOBuf> createCryptoFrame(
   if (data) {
     wcursor.insert(std::move(data));
   }
+  cryptoFrame->coalesce();
   return cryptoFrame;
 }
 
@@ -911,7 +912,7 @@ TEST_F(DecodeTest, CryptoDecodeSuccess) {
   QuicInteger length(1);
   auto cryptoFrame =
       createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
-  Cursor cursor(cryptoFrame.get());
+  ContiguousReadCursor cursor(cryptoFrame->data(), cryptoFrame->length());
   auto decodedFrame = decodeCryptoFrame(cursor);
   EXPECT_EQ(decodedFrame->offset, 10);
   EXPECT_EQ(decodedFrame->data->computeChainDataLength(), 1);
@@ -921,7 +922,7 @@ TEST_F(DecodeTest, CryptoOffsetNotPresent) {
   QuicInteger length(1);
   auto cryptoFrame =
       createCryptoFrame(std::nullopt, length, folly::IOBuf::copyBuffer("a"));
-  Cursor cursor(cryptoFrame.get());
+  ContiguousReadCursor cursor(cryptoFrame->data(), cryptoFrame->length());
   auto result = decodeCryptoFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -930,7 +931,7 @@ TEST_F(DecodeTest, CryptoOffsetNotPresent) {
 TEST_F(DecodeTest, CryptoLengthNotPresent) {
   QuicInteger offset(0);
   auto cryptoFrame = createCryptoFrame(offset, std::nullopt, nullptr);
-  Cursor cursor(cryptoFrame.get());
+  ContiguousReadCursor cursor(cryptoFrame->data(), cryptoFrame->length());
   auto result = decodeCryptoFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -941,7 +942,7 @@ TEST_F(DecodeTest, CryptoIncorrectDataLength) {
   QuicInteger length(10);
   auto cryptoFrame =
       createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
-  Cursor cursor(cryptoFrame.get());
+  ContiguousReadCursor cursor(cryptoFrame->data(), cryptoFrame->length());
   auto result = decodeCryptoFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1000,6 +1001,7 @@ std::unique_ptr<folly::IOBuf> createNewTokenFrame(
   if (token) {
     wcursor.insert(std::move(token));
   }
+  newTokenFrame->coalesce();
   return newTokenFrame;
 }
 
@@ -1007,7 +1009,7 @@ TEST_F(DecodeTest, NewTokenDecodeSuccess) {
   QuicInteger length(1);
   auto newTokenFrame =
       createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
-  Cursor cursor(newTokenFrame.get());
+  ContiguousReadCursor cursor(newTokenFrame->data(), newTokenFrame->length());
   auto decodedFrame = decodeNewTokenFrame(cursor);
   EXPECT_EQ(decodedFrame->token->computeChainDataLength(), 1);
 }
@@ -1015,7 +1017,7 @@ TEST_F(DecodeTest, NewTokenDecodeSuccess) {
 TEST_F(DecodeTest, NewTokenLengthNotPresent) {
   auto newTokenFrame =
       createNewTokenFrame(std::nullopt, folly::IOBuf::copyBuffer("a"));
-  Cursor cursor(newTokenFrame.get());
+  ContiguousReadCursor cursor(newTokenFrame->data(), newTokenFrame->length());
   auto result = decodeNewTokenFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1025,7 +1027,7 @@ TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
   QuicInteger length(10);
   auto newTokenFrame =
       createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
-  Cursor cursor(newTokenFrame.get());
+  ContiguousReadCursor cursor(newTokenFrame->data(), newTokenFrame->length());
   auto result = decodeNewTokenFrame(cursor);
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
