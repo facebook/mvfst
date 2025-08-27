@@ -421,15 +421,15 @@ quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
 }
 
 quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     bool reliable) {
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   ApplicationErrorCode errorCode;
-  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
+  auto varCode = quic::decodeQuicInteger(cursor);
   if (varCode) {
     errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
@@ -437,14 +437,14 @@ quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Cannot decode error code"));
   }
-  auto finalSize = quic::follyutils::decodeQuicInteger(cursor);
+  auto finalSize = quic::decodeQuicInteger(cursor);
   if (!finalSize) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad offset"));
   }
   Optional<std::pair<uint64_t, size_t>> reliableSize = std::nullopt;
   if (reliable) {
-    reliableSize = quic::follyutils::decodeQuicInteger(cursor);
+    reliableSize = quic::decodeQuicInteger(cursor);
     if (!reliableSize) {
       return quic::make_unexpected(QuicError(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -465,14 +465,14 @@ quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
 }
 
 quic::Expected<StopSendingFrame, QuicError> decodeStopSendingFrame(
-    Cursor& cursor) {
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad streamId"));
   }
   ApplicationErrorCode errorCode;
-  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
+  auto varCode = quic::decodeQuicInteger(cursor);
   if (varCode) {
     errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
@@ -614,8 +614,9 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
       streamId->first, offset, std::move(data), fin, groupId);
 }
 
-quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(Cursor& cursor) {
-  auto maximumData = quic::follyutils::decodeQuicInteger(cursor);
+quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
+    ContiguousReadCursor& cursor) {
+  auto maximumData = quic::decodeQuicInteger(cursor);
   if (!maximumData) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad Max Data"));
@@ -624,13 +625,13 @@ quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(Cursor& cursor) {
 }
 
 quic::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
-    Cursor& cursor) {
-  auto streamId = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid streamId"));
   }
-  auto offset = quic::follyutils::decodeQuicInteger(cursor);
+  auto offset = quic::decodeQuicInteger(cursor);
   if (!offset) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid offset"));
@@ -639,8 +640,8 @@ quic::Expected<MaxStreamDataFrame, QuicError> decodeMaxStreamDataFrame(
 }
 
 quic::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
-    Cursor& cursor) {
-  auto streamCount = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamCount = quic::decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -650,8 +651,8 @@ quic::Expected<MaxStreamsFrame, QuicError> decodeBiDiMaxStreamsFrame(
 }
 
 quic::Expected<MaxStreamsFrame, QuicError> decodeUniMaxStreamsFrame(
-    Cursor& cursor) {
-  auto streamCount = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto streamCount = quic::decodeQuicInteger(cursor);
   if (!streamCount || streamCount->first > kMaxMaxStreams) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -953,20 +954,20 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     }
     case FrameType::RST_STREAM:
     case FrameType::RST_STREAM_AT: {
-      auto rstRes =
-          decodeRstStreamFrame(cursor, frameType == FrameType::RST_STREAM_AT);
+      auto rstRes = decodeRstStreamFrame(
+          contiguousCursor, frameType == FrameType::RST_STREAM_AT);
       if (!rstRes.has_value()) {
         return quic::make_unexpected(rstRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*rstRes);
     }
     case FrameType::STOP_SENDING: {
-      auto stopRes = decodeStopSendingFrame(cursor);
+      auto stopRes = decodeStopSendingFrame(contiguousCursor);
       if (!stopRes.has_value()) {
         return quic::make_unexpected(stopRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*stopRes);
     }
     case FrameType::CRYPTO_FRAME: {
@@ -1018,35 +1019,35 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*streamRes);
     }
     case FrameType::MAX_DATA: {
-      auto maxDataRes = decodeMaxDataFrame(cursor);
+      auto maxDataRes = decodeMaxDataFrame(contiguousCursor);
       if (!maxDataRes.has_value()) {
         return quic::make_unexpected(maxDataRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*maxDataRes);
     }
     case FrameType::MAX_STREAM_DATA: {
-      auto maxStreamRes = decodeMaxStreamDataFrame(cursor);
+      auto maxStreamRes = decodeMaxStreamDataFrame(contiguousCursor);
       if (!maxStreamRes.has_value()) {
         return quic::make_unexpected(maxStreamRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*maxStreamRes);
     }
     case FrameType::MAX_STREAMS_BIDI: {
-      auto streamsBidiRes = decodeBiDiMaxStreamsFrame(cursor);
+      auto streamsBidiRes = decodeBiDiMaxStreamsFrame(contiguousCursor);
       if (!streamsBidiRes.has_value()) {
         return quic::make_unexpected(streamsBidiRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*streamsBidiRes);
     }
     case FrameType::MAX_STREAMS_UNI: {
-      auto streamsUniRes = decodeUniMaxStreamsFrame(cursor);
+      auto streamsUniRes = decodeUniMaxStreamsFrame(contiguousCursor);
       if (!streamsUniRes.has_value()) {
         return quic::make_unexpected(streamsUniRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*streamsUniRes);
     }
     case FrameType::DATA_BLOCKED: {

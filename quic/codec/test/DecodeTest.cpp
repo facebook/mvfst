@@ -870,12 +870,12 @@ std::unique_ptr<folly::IOBuf> CreateMaxStreamsIdFrame(
 void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
 
-  Cursor cursorBiDi(buf.get());
+  ContiguousReadCursor cursorBiDi(buf->data(), buf->length());
   auto maxStreamsBiDiFrameRes = decodeBiDiMaxStreamsFrame(cursorBiDi);
   ASSERT_TRUE(maxStreamsBiDiFrameRes.has_value());
   EXPECT_EQ(maxStreamsBiDiFrameRes->maxStreams, maxStreamsId);
 
-  Cursor cursorUni(buf.get());
+  ContiguousReadCursor cursorUni(buf->data(), buf->length());
   auto maxStreamsUniFrameRes = decodeUniMaxStreamsFrame(cursorUni);
   ASSERT_TRUE(maxStreamsUniFrameRes.has_value());
   EXPECT_EQ(maxStreamsUniFrameRes->maxStreams, maxStreamsId);
@@ -885,12 +885,12 @@ void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
 void MaxStreamsIdCheckInvalid(StreamId maxStreamsId) {
   std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
 
-  Cursor cursorBiDi(buf.get());
+  ContiguousReadCursor cursorBiDi(buf->data(), buf->length());
   auto bidiResult = decodeBiDiMaxStreamsFrame(cursorBiDi);
   EXPECT_TRUE(bidiResult.hasError());
   EXPECT_EQ(bidiResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
 
-  Cursor cursorUni(buf.get());
+  ContiguousReadCursor cursorUni(buf->data(), buf->length());
   auto uniResult = decodeUniMaxStreamsFrame(cursorUni);
   EXPECT_TRUE(uniResult.hasError());
   EXPECT_EQ(uniResult.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);

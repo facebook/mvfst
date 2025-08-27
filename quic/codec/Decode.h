@@ -92,7 +92,7 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<RstStreamFrame, QuicError> decodeRstStreamFrame(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     bool reliable);
 
 [[nodiscard]] quic::Expected<ConnectionCloseFrame, QuicError>
@@ -102,16 +102,16 @@ decodeConnectionCloseFrame(Cursor& cursor);
 decodeApplicationClose(Cursor& cursor);
 
 [[nodiscard]] quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<MaxStreamDataFrame, QuicError>
-decodeMaxStreamDataFrame(Cursor& cursor);
+decodeMaxStreamDataFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<MaxStreamsFrame, QuicError>
-decodeBiDiMaxStreamsFrame(Cursor& cursor);
+decodeBiDiMaxStreamsFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<MaxStreamsFrame, QuicError>
-decodeUniMaxStreamsFrame(Cursor& cursor);
+decodeUniMaxStreamsFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<PingFrame, QuicError> decodePingFrame(
     ContiguousReadCursor& cursor);
@@ -144,7 +144,7 @@ decodeNewConnectionIdFrame(Cursor& cursor);
 decodeRetireConnectionIdFrame(Cursor& cursor);
 
 [[nodiscard]] quic::Expected<StopSendingFrame, QuicError>
-decodeStopSendingFrame(Cursor& cursor);
+decodeStopSendingFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<PathChallengeFrame, QuicError>
 decodePathChallengeFrame(Cursor& cursor);
