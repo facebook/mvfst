@@ -34,6 +34,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   using TransportSettingsOverrideFn =
       std::function<void(quic::TransportSettings&)>;
 
+  using ShouldRegisterKnobParamHandlerFn =
+      std::function<bool(TransportKnobParamId)>;
+
   static std::shared_ptr<QuicServer> createQuicServer(
       TransportSettings transportSettings = TransportSettings()) {
     return std::shared_ptr<QuicServer>(
@@ -68,6 +71,12 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * experiments.
    */
   void setTransportSettingsOverrideFn(TransportSettingsOverrideFn fn);
+
+  /*
+   * Set a callback to validate whether a specific transport knob parameter
+   * is allowed to be registered.
+   */
+  void setShouldRegisterKnobParamHandlerFn(ShouldRegisterKnobParamHandlerFn fn);
 
   /*
    * Transport factory to create server-transport.
@@ -457,6 +466,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
+  // Used to validate whether a transport knob parameter is allowed to be
+  // registered
+  ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
   // address that the server is bound to
   folly::SocketAddress boundAddress_;
   folly::SocketOptionMap socketOptions_;

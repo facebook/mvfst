@@ -169,6 +169,11 @@ void QuicServerWorker::setTransportSettingsOverrideFn(
   transportSettingsOverrideFn_ = std::move(fn);
 }
 
+void QuicServerWorker::setShouldRegisterKnobParamHandlerFn(
+    ShouldRegisterKnobParamHandlerFn fn) {
+  shouldRegisterKnobParamHandlerFn_ = std::move(fn);
+}
+
 void QuicServerWorker::setTransportStatsCallback(
     std::unique_ptr<QuicTransportStatsCallback> statsCallback) noexcept {
   CHECK(statsCallback);
@@ -732,6 +737,8 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->setTransportSettings(transportSettingsCopy);
     trans->setConnectionIdAlgo(connIdAlgo_.get());
     trans->setServerConnectionIdRejector(this);
+    trans->setShouldRegisterKnobParamHandlerFn(
+        shouldRegisterKnobParamHandlerFn_);
     if (srcConnId) {
       trans->setClientConnectionId(*srcConnId);
     }

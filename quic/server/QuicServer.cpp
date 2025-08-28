@@ -263,6 +263,8 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   }
   worker->setUnfinishedHandshakeLimit(unfinishedHandshakeLimitFn_);
   worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
+  worker->setShouldRegisterKnobParamHandlerFn(
+      shouldRegisterKnobParamHandlerFn_);
   return worker;
 }
 
@@ -598,6 +600,13 @@ void QuicServer::setTransportSettingsOverrideFn(
   checkRunningInThread(mainThreadId_);
   CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
   transportSettingsOverrideFn_ = std::move(fn);
+}
+
+void QuicServer::setShouldRegisterKnobParamHandlerFn(
+    ShouldRegisterKnobParamHandlerFn fn) {
+  checkRunningInThread(mainThreadId_);
+  CHECK(!initialized_) << kQuicServerNotInitialized << __func__;
+  shouldRegisterKnobParamHandlerFn_ = std::move(fn);
 }
 
 void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {

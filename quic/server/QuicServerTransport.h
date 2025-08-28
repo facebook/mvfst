@@ -134,6 +134,15 @@ class QuicServerTransport
 
   void setClientChosenDestConnectionId(const ConnectionId& serverCid);
 
+  /*
+   * Set a callback to validate whether a specific transport knob parameter
+   * is allowed to be registered.
+   */
+  using ShouldRegisterKnobParamHandlerFn =
+      std::function<bool(TransportKnobParamId)>;
+  virtual void setShouldRegisterKnobParamHandlerFn(
+      ShouldRegisterKnobParamHandlerFn fn);
+
   void verifiedClientAddress();
 
   // From QuicTransportBase
@@ -272,6 +281,7 @@ class QuicServerTransport
           QuicServerTransport*,
           TransportKnobParam::Val)>>
       transportKnobParamHandlers_;
+  ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
   mutable std::optional<QuicEventBaseAsFollyExecutor> eventBaseAsFollyExecutor_;
 
   // Container of observers for the socket / transport.

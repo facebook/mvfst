@@ -74,7 +74,6 @@ QuicServerTransport::QuicServerTransport(
   conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   setConnectionSetupCallback(connSetupCb);
   setConnectionCallbackFromCtor(connStreamsCb);
-  registerAllTransportKnobParamHandlers();
 }
 
 QuicServerTransport::~QuicServerTransport() {
@@ -215,6 +214,7 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
 }
 
 void QuicServerTransport::accept(folly::Optional<QuicVersion> quicVersion) {
+  registerAllTransportKnobParamHandlers();
   setIdleTimer();
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
@@ -723,12 +723,27 @@ void QuicServerTransport::maybeNotifyTransportReady() {
   }
 }
 
+void QuicServerTransport::setShouldRegisterKnobParamHandlerFn(
+    ShouldRegisterKnobParamHandlerFn fn) {
+  shouldRegisterKnobParamHandlerFn_ = std::move(fn);
+}
+
 void QuicServerTransport::registerTransportKnobParamHandler(
     uint64_t paramId,
     std::function<quic::Expected<void, QuicError>(
         QuicServerTransport*,
         TransportKnobParam::Val)>&& handler) {
-  transportKnobParamHandlers_.emplace(paramId, std::move(handler));
+  // No validation callback, allow all parameters
+  if (!shouldRegisterKnobParamHandlerFn_) {
+    transportKnobParamHandlers_.emplace(paramId, std::move(handler));
+    return;
+  }
+  // Register based on validation callback
+  if (TransportKnobParamId::_is_valid(paramId) &&
+      shouldRegisterKnobParamHandlerFn_(
+          TransportKnobParamId::_from_integral(paramId))) {
+    transportKnobParamHandlers_.emplace(paramId, std::move(handler));
+  }
 }
 
 void QuicServerTransport::setBufAccessor(BufAccessor* bufAccessor) {
