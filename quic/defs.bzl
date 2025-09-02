@@ -71,7 +71,6 @@ def _compute_header_namespace():
 
 def mvfst_cpp_library(
         name,
-        autodeps_skip = False,
         compiler_flags = [],
         **kwargs):
     fb_dirsync_cpp_library(
@@ -160,7 +159,6 @@ def mvfst_cxx_library(
 
 def mvfst_cpp_test(
         name,
-        autodeps_skip = False,
         deps = (),
         external_deps = (),
         header_namespace = None,
@@ -208,7 +206,6 @@ def mvfst_cxx_test(
 
 def mvfst_cpp_binary(
         name,
-        autodeps_skip = False,
         deps = (),
         external_deps = (),
         header_namespace = None,
@@ -256,7 +253,6 @@ def mvfst_cxx_binary(
 
 def mvfst_cpp_benchmark(
         name,
-        autodeps_skip = False,
         deps = (),
         external_deps = (),
         header_namespace = None,
