@@ -711,24 +711,24 @@ quic::Expected<StreamsBlockedFrame, QuicError> decodeUniStreamsBlockedFrame(
 }
 
 quic::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
-    Cursor& cursor) {
-  auto sequenceNumber = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto sequenceNumber = quic::decodeQuicInteger(cursor);
   if (!sequenceNumber) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence"));
   }
-  auto retirePriorTo = quic::follyutils::decodeQuicInteger(cursor);
+  auto retirePriorTo = quic::decodeQuicInteger(cursor);
   if (!retirePriorTo) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad retire prior to"));
   }
-  if (!cursor.canAdvance(sizeof(uint8_t))) {
+  uint8_t connIdLen = 0;
+  if (!cursor.tryReadBE(connIdLen)) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Not enough input bytes to read Dest. ConnectionId"));
   }
-  auto connIdLen = cursor.readBE<uint8_t>();
-  if (cursor.totalLength() < connIdLen) {
+  if (cursor.remaining() < connIdLen) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad connid"));
   }
@@ -1087,11 +1087,11 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*streamsUniBlockedRes);
     }
     case FrameType::NEW_CONNECTION_ID: {
-      auto newConnIdRes = decodeNewConnectionIdFrame(cursor);
+      auto newConnIdRes = decodeNewConnectionIdFrame(contiguousCursor);
       if (!newConnIdRes.has_value()) {
         return quic::make_unexpected(newConnIdRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*newConnIdRes);
     }
     case FrameType::RETIRE_CONNECTION_ID: {
@@ -1239,8 +1239,8 @@ quic::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
 
 Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     const ParsedLongHeaderInvariant& longHeaderInvariant,
-    Cursor& cursor) {
-  auto cursorLength = cursor.totalLength();
+    ContiguousReadCursor& cursor) {
+  auto cursorLength = cursor.remaining();
 
   if (cursorLength < sizeof(QuicVersionType) ||
       cursorLength % sizeof(QuicVersionType)) {
@@ -1254,8 +1254,10 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
       longHeaderInvariant.invariant.dstConnId);
 
   while (!cursor.isAtEnd()) {
-    packet.versions.push_back(
-        static_cast<QuicVersion>(cursor.readBE<QuicVersionType>()));
+    QuicVersionType versionType = 0;
+    cursor.tryReadBE(versionType);
+    auto quicVersion = static_cast<QuicVersion>(versionType);
+    packet.versions.push_back(quicVersion);
   }
 
   return packet;
@@ -1278,18 +1280,19 @@ ParsedLongHeaderInvariant::ParsedLongHeaderInvariant(
       invariantLength(length) {}
 
 quic::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
-parseLongHeaderInvariant(uint8_t initialByte, Cursor& cursor) {
-  size_t initialLength = cursor.totalLength();
-  if (!cursor.canAdvance(sizeof(QuicVersionType))) {
+parseLongHeaderInvariant(uint8_t initialByte, ContiguousReadCursor& cursor) {
+  size_t initialLength = cursor.remaining();
+  QuicVersionType versionType = 0;
+  if (!cursor.tryReadBE(versionType)) {
     VLOG(5) << "Not enough input bytes to read Version or connection-id";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  auto version = static_cast<QuicVersion>(cursor.readBE<QuicVersionType>());
-  if (!cursor.canAdvance(1)) {
+  auto version = static_cast<QuicVersion>(versionType);
+  uint8_t destConnIdLen = 0;
+  if (!cursor.tryReadBE(destConnIdLen)) {
     VLOG(5) << "Not enough input bytes to read Dest. ConnectionId length";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  uint8_t destConnIdLen = cursor.readBE<uint8_t>();
   if (destConnIdLen > kMaxConnectionIdSize) {
     VLOG(5) << "destConnIdLen > kMaxConnectionIdSize: " << destConnIdLen;
     return quic::make_unexpected(TransportErrorCode::PROTOCOL_VIOLATION);
@@ -1303,11 +1306,11 @@ parseLongHeaderInvariant(uint8_t initialByte, Cursor& cursor) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   ConnectionId destConnId = destConnIdResult.value();
-  if (!cursor.canAdvance(1)) {
+  uint8_t srcConnIdLen = 0;
+  if (!cursor.tryReadBE(srcConnIdLen)) {
     VLOG(5) << "Not enough input bytes to read Source ConnectionId length";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  uint8_t srcConnIdLen = cursor.readBE<uint8_t>();
   if (srcConnIdLen > kMaxConnectionIdSize) {
     VLOG(5) << "srcConnIdLen > kMaxConnectionIdSize: " << srcConnIdLen;
     return quic::make_unexpected(TransportErrorCode::PROTOCOL_VIOLATION);
@@ -1321,7 +1324,7 @@ parseLongHeaderInvariant(uint8_t initialByte, Cursor& cursor) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   ConnectionId srcConnId = srcConnIdResult.value();
-  size_t currentLength = cursor.totalLength();
+  size_t currentLength = cursor.remaining();
   size_t bytesRead = initialLength - currentLength;
   return ParsedLongHeaderInvariant(
       initialByte,
@@ -1364,7 +1367,7 @@ std::pair<PacketNum, size_t> parsePacketNumber(
 
 quic::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
     uint8_t initialByte,
-    Cursor& cursor) {
+    ContiguousReadCursor& cursor) {
   if (getHeaderForm(initialByte) != HeaderForm::Long) {
     VLOG(5) << "Bad header form bit";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1402,19 +1405,21 @@ quic::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
 quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     LongHeader::Types type,
     ParsedLongHeaderInvariant parsedLongHeaderInvariant,
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     QuicNodeType nodeType) {
   if (type == LongHeader::Types::Retry) {
     // The integrity tag is kRetryIntegrityTagLen bytes in length, and the
     // token must be at least one byte, so the remaining length must
     // be > kRetryIntegrityTagLen.
-    if (cursor.totalLength() <= kRetryIntegrityTagLen) {
+    if (cursor.remaining() <= kRetryIntegrityTagLen) {
       VLOG(5) << "Not enough bytes for retry token";
       return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
 
-    BufPtr token;
-    cursor.clone(token, cursor.totalLength() - kRetryIntegrityTagLen);
+    size_t retryTokenLen = cursor.remaining() - kRetryIntegrityTagLen;
+    BufPtr token = BufHelpers::create(retryTokenLen);
+    CHECK(cursor.tryPull(token->writableData(), retryTokenLen));
+    token->append(retryTokenLen);
 
     return ParsedLongHeader(
         LongHeader(
@@ -1436,7 +1441,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 
   BufPtr token;
   if (type == LongHeader::Types::Initial) {
-    auto tokenLen = quic::follyutils::decodeQuicInteger(cursor);
+    auto tokenLen = quic::decodeQuicInteger(cursor);
     if (!tokenLen) {
       VLOG(5) << "Token len not found in Long header";
       return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1447,13 +1452,13 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     }
 
     if (tokenLen->first > 0) {
-      BufPtr tokenBuf;
-      // If tokenLen > token's actual length then the cursor will throw.
-      cursor.clone(tokenBuf, tokenLen->first);
+      BufPtr tokenBuf = BufHelpers::create(tokenLen->first);
+      CHECK(cursor.tryPull(tokenBuf->writableData(), tokenLen->first));
+      tokenBuf->append(tokenLen->first);
       token = std::move(tokenBuf);
     }
   }
-  auto pktLen = quic::follyutils::decodeQuicInteger(cursor);
+  auto pktLen = quic::decodeQuicInteger(cursor);
   if (!pktLen) {
     VLOG(5) << "Packet len not found in Long header";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1481,7 +1486,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 quic::Expected<ShortHeaderInvariant, TransportErrorCode>
 parseShortHeaderInvariants(
     uint8_t initialByte,
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     size_t dstConnIdSize) {
   if (getHeaderForm(initialByte) != HeaderForm::Short) {
     VLOG(5) << "Bad header form bit";
@@ -1505,8 +1510,10 @@ parseShortHeaderInvariants(
   return ShortHeaderInvariant(std::move(connId));
 }
 
-quic::Expected<ShortHeader, TransportErrorCode>
-parseShortHeader(uint8_t initialByte, Cursor& cursor, size_t dstConnIdSize) {
+quic::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
+    uint8_t initialByte,
+    ContiguousReadCursor& cursor,
+    size_t dstConnIdSize) {
   if (getHeaderForm(initialByte) != HeaderForm::Short) {
     VLOG(5) << "Bad header form bit";
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);

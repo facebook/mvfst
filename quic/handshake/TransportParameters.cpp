@@ -40,7 +40,7 @@ quic::Expected<Optional<ConnectionId>, QuicError> getConnIdParameter(
   }
 
   auto value = it->value->clone();
-  Cursor cursor(value.get());
+  ContiguousReadCursor cursor(value->data(), value->length());
 
   // Use the factory function instead of constructor
   auto connIdResult = ConnectionId::create(cursor, value->length());

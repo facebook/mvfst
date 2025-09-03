@@ -20,11 +20,11 @@ ParsedHeaderResult::ParsedHeaderResult(
 
 quic::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
     const folly::IOBuf& data) {
-  Cursor cursor(&data);
-  if (!cursor.canAdvance(sizeof(uint8_t))) {
+  ContiguousReadCursor cursor(data.data(), data.length());
+  uint8_t initialByte = 0;
+  if (!cursor.tryReadBE(initialByte)) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  uint8_t initialByte = cursor.readBE<uint8_t>();
   if (getHeaderForm(initialByte) == HeaderForm::Long) {
     auto longHeaderResult = parseLongHeader(initialByte, cursor);
     if (!longHeaderResult.has_value()) {

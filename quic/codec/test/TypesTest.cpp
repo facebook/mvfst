@@ -63,8 +63,10 @@ quic::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
       0 /* largestAcked */);
   CHECK(!builder.encodePacketHeader().hasError());
   auto packet = packetToBuf(std::move(builder).buildPacket());
-  Cursor cursor(packet.get());
-  uint8_t initialByte = cursor.readBE<uint8_t>();
+  packet->coalesce();
+  ContiguousReadCursor cursor(packet->data(), packet->length());
+  uint8_t initialByte = 0;
+  cursor.tryReadBE(initialByte);
   return parseLongHeader(initialByte, cursor);
 }
 
@@ -95,7 +97,7 @@ TEST_F(TypesTest, LongHeaderEmptyInput) {
   uint8_t versionNegotiation = LongHeader::kPacketTypeMask;
   auto buf = folly::IOBuf::create(0);
   buf->append(0);
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   EXPECT_FALSE(parseLongHeader(versionNegotiation, cursor).has_value());
 }
 
@@ -114,7 +116,7 @@ TEST_F(TypesTest, LongHeaderSmallInput) {
   wcursor.writeBE<uint8_t>(2);
   wcursor.writeBE<uint8_t>(3);
 
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   EXPECT_FALSE(parseLongHeader(clientCleartext, cursor).has_value());
 }
 
@@ -131,7 +133,7 @@ TEST_F(TypesTest, LongHeaderInvalid) {
   wcursor.writeBE<uint32_t>(1234);
   wcursor.writeBE<QuicVersionType>(static_cast<QuicVersionType>(version));
 
-  Cursor cursor(buf.get());
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   EXPECT_FALSE(parseLongHeader(badInitialValue, cursor).has_value());
 }
 
@@ -140,7 +142,8 @@ TEST_F(TypesTest, ShortHeader) {
   auto connId = getTestConnectionId();
   ShortHeader testHeader1(ProtectionType::KeyPhaseZero, connId, packetNum);
   auto result1 = encodeShortHeader(testHeader1);
-  Cursor cursor1(result1.second.get());
+  ContiguousReadCursor cursor1(
+      result1.second->data(), result1.second->length());
   auto shortHeader1 = *parseShortHeader(result1.first, cursor1);
   EXPECT_EQ(ProtectionType::KeyPhaseZero, shortHeader1.getProtectionType());
   EXPECT_EQ(connId, shortHeader1.getConnectionId());
@@ -148,7 +151,7 @@ TEST_F(TypesTest, ShortHeader) {
   // Empty buffer
   auto buf4 = folly::IOBuf::create(0);
   buf4->append(0);
-  Cursor cursor4(buf4.get());
+  ContiguousReadCursor cursor4(buf4->data(), buf4->length());
   EXPECT_FALSE(parseShortHeader(0x01, cursor4).has_value());
 }
 
@@ -165,7 +168,7 @@ TEST_F(TypesTest, ShortHeaderGetConnectionIdTest) {
 
   ShortHeader testHeader(ProtectionType::KeyPhaseZero, connId, packetNum);
   auto result = encodeShortHeader(testHeader);
-  Cursor cursor(result.second.get());
+  ContiguousReadCursor cursor(result.second->data(), result.second->length());
   auto shortHeader = *parseShortHeader(result.first, cursor);
   EXPECT_EQ(connId, shortHeader.getConnectionId());
 }

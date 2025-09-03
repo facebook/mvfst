@@ -18,11 +18,11 @@ QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
 
 Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
     BufQueue& queue) {
-  Cursor cursor(queue.front());
-  if (!cursor.canAdvance(sizeof(uint8_t))) {
+  ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
+  uint8_t initialByte = 0;
+  if (!cursor.tryReadBE(initialByte)) {
     return std::nullopt;
   }
-  uint8_t initialByte = cursor.readBE<uint8_t>();
   auto headerForm = getHeaderForm(initialByte);
   if (headerForm != HeaderForm::Long) {
     return std::nullopt;
@@ -41,12 +41,12 @@ Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
 }
 
 quic::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     QuicNodeType nodeType) {
-  if (cursor.isAtEnd() || !cursor.canAdvance(sizeof(uint8_t))) {
+  uint8_t initialByte = 0;
+  if (!cursor.tryReadBE(initialByte)) {
     return quic::make_unexpected(TransportErrorCode::PROTOCOL_VIOLATION);
   }
-  auto initialByte = cursor.readBE<uint8_t>();
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
   if (!longHeaderInvariant) {
     VLOG(4) << "Dropping packet, failed to parse invariant";
@@ -95,7 +95,7 @@ static PacketDropReason getDecryptErrorReason(ProtectionType protectionType) {
 quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
     BufQueue& queue,
     const AckStates& ackStates) {
-  Cursor cursor(queue.front());
+  ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
   const uint8_t initialByte = *cursor.peekBytes().data();
 
   auto res = tryParseLongHeader(cursor, nodeType_);
@@ -113,7 +113,10 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   auto longHeader = std::move(parsedLongHeader.header);
 
   if (type == LongHeader::Types::Retry) {
-    auto integrityTag = cursor.read<RetryPacket::IntegrityTagType>();
+    RetryPacket::IntegrityTagType integrityTag;
+    if (!cursor.tryRead(integrityTag)) {
+      return CodecResult(Nothing());
+    }
     queue.move();
     return RetryPacket(std::move(longHeader), integrityTag, initialByte);
   }
@@ -127,7 +130,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
     return CodecResult(Nothing());
   }
   auto currentPacketData = queue.splitAtMost(currentPacketLen);
-  cursor.reset(currentPacketData.get());
+  cursor.reset(currentPacketData->data(), currentPacketData->length());
   cursor.skip(packetNumberOffset);
   // Sample starts after the max packet number size. This ensures that we
   // have enough bytes to skip before we can start reading the sample.
@@ -140,13 +143,12 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   }
   cursor.skip(kMaxPacketNumEncodingSize);
   Sample sample;
-  if (!cursor.canAdvance(sample.size())) {
+  if (!cursor.tryPull(sample.data(), sample.size())) {
     VLOG(4) << "Dropping packet, sample too small " << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
     queue.move();
     return CodecResult(Nothing());
   }
-  cursor.pull(sample.data(), sample.size());
   const PacketNumberCipher* headerCipher{nullptr};
   const Aead* cipher{nullptr};
   auto protectionType = longHeader.getProtectionType();
@@ -269,7 +271,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
     BufPtr data,
     const AckStates& ackStates,
     size_t dstConnIdSize,
-    Cursor& cursor) {
+    ContiguousReadCursor& cursor) {
   // TODO: allow other connid lengths from the state.
   size_t packetNumberOffset = 1 + dstConnIdSize;
   PacketNum expectedNextPacketNum =
@@ -413,11 +415,11 @@ CodecResult QuicReadCodec::parsePacket(
     return CodecResult(Nothing());
   }
   DCHECK(!queue.front()->isChained());
-  Cursor cursor(queue.front());
-  if (!cursor.canAdvance(sizeof(uint8_t))) {
+  ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
+  uint8_t initialByte = 0;
+  if (!cursor.tryReadBE(initialByte)) {
     return CodecResult(Nothing());
   }
-  uint8_t initialByte = cursor.readBE<uint8_t>();
   auto headerForm = getHeaderForm(initialByte);
   if (headerForm == HeaderForm::Long) {
     auto result = parseLongHeaderPacket(queue, ackStates);

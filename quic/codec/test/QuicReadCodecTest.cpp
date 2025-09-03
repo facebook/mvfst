@@ -748,7 +748,8 @@ TEST_F(QuicReadCodecTest, TestInitialPacketExtractToken) {
   auto packetQueue =
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
 
-  Cursor cursor(packetQueue.front());
+  ContiguousReadCursor cursor(
+      packetQueue.front()->data(), packetQueue.front()->length());
   auto res = tryParseLongHeader(cursor, QuicNodeType::Client);
   EXPECT_FALSE(res.hasError());
   auto parsedLongHeader = std::move(res.value());

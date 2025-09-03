@@ -455,7 +455,8 @@ void QuicServerWorker::handleNetworkData(
 
   try {
     // check error conditions for packet drop & early return
-    Cursor cursor(udpPacket.buf.front());
+    ContiguousReadCursor cursor(
+        udpPacket.buf.front()->data(), udpPacket.buf.front()->length());
     if (shutdown_) {
       VLOG(4) << "Packet received after shutdown, dropping";
       packetDropReason = PacketDropReason::SERVER_SHUTDOWN;
@@ -476,7 +477,9 @@ void QuicServerWorker::handleNetworkData(
       return;
     }
 
-    uint8_t initialByte = cursor.readBE<uint8_t>();
+    uint8_t initialByte = 0;
+    // We already checked that we can advance sizeof(uint8_t) bytes
+    CHECK(cursor.tryReadBE(initialByte));
     HeaderForm headerForm = getHeaderForm(initialByte);
     if (headerForm == HeaderForm::Short) {
       if (auto maybeParsedShortHeader =
@@ -957,7 +960,8 @@ void QuicServerWorker::dispatchPacketData(
 
   // If there is a token present, decrypt it (could be either a retry
   // token or a new token)
-  Cursor cursor(networkData.getPackets().front().buf.front());
+  const Buf* buf = networkData.getPackets().front().buf.front();
+  ContiguousReadCursor cursor(buf->data(), buf->length());
   auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
   bool hasTokenSecret = transportSettings_.retryTokenSecret.has_value();
 
@@ -1044,12 +1048,13 @@ void QuicServerWorker::sendResetPacket(
   QUIC_STATS(statsCallback_, onStatelessReset);
 }
 
-Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(Cursor& cursor) {
+Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(
+    ContiguousReadCursor& cursor) {
   // Move cursor to the byte right after the initial byte
-  if (!cursor.canAdvance(1)) {
+  uint8_t initialByte = 0;
+  if (!cursor.tryReadBE(initialByte)) {
     return std::nullopt;
   }
-  auto initialByte = cursor.readBE<uint8_t>();
 
   // We already know this is an initial packet, which uses a long header
   auto parsedLongHeader = parseLongHeader(initialByte, cursor);

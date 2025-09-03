@@ -1520,6 +1520,7 @@ std::unique_ptr<folly::IOBuf> writeTestDataOnWorkersBuf(
   worker->getReadBuffer((void**)&workerBuf, &workerBufLen);
   lenOut = std::min(workerBufLen, data->computeChainDataLength());
   memcpy(workerBuf, data->buffer(), lenOut);
+  data->coalesce();
   return data;
 }
 
@@ -1911,6 +1912,7 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
     BufPtr data,
     size_t len,
     ConnectionId connId) {
+  data->coalesce();
   auto writeSock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&evb_);
   EXPECT_CALL(*takeoverSocketFactory_, _make(_, _))
       .WillOnce(Return(writeSock.get()));
@@ -1918,6 +1920,7 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
   EXPECT_CALL(*writeSock, write(_, _))
       .WillOnce(Invoke([&](const SocketAddress& /* unused */,
                            const std::unique_ptr<folly::IOBuf>& writtenData) {
+        writtenData->coalesce();
         // the writtenData contains actual client address + time of ack + data
         EXPECT_FALSE(eq(*data, *writtenData));
         // extract and verify the encoded client address

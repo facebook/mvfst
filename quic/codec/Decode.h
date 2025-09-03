@@ -62,7 +62,7 @@ struct ParsedLongHeaderInvariant {
  */
 Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     const ParsedLongHeaderInvariant& longHeaderInvariant,
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 /**
  * Decodes a single regular QUIC packet from the cursor.
@@ -138,7 +138,7 @@ decodeBiDiStreamsBlockedFrame(ContiguousReadCursor& cursor);
 decodeUniStreamsBlockedFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<NewConnectionIdFrame, QuicError>
-decodeNewConnectionIdFrame(Cursor& cursor);
+decodeNewConnectionIdFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<RetireConnectionIdFrame, QuicError>
 decodeRetireConnectionIdFrame(Cursor& cursor);
@@ -203,7 +203,7 @@ parsePlaintextRetryOrNewToken(Cursor& cursor);
  * will be moved to the byte right after Source Connection ID.
  */
 [[nodiscard]] quic::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
-parseLongHeaderInvariant(uint8_t initalByte, Cursor& cursor);
+parseLongHeaderInvariant(uint8_t initalByte, ContiguousReadCursor& cursor);
 
 struct PacketLength {
   // The length of the packet payload (including packet number)
@@ -249,25 +249,25 @@ std::pair<PacketNum, size_t> parsePacketNumber(
 
 // cursor: has to be point to the byte just past initialByte
 [[nodiscard]] quic::Expected<ParsedLongHeaderResult, TransportErrorCode>
-parseLongHeader(uint8_t initialByte, Cursor& cursor);
+parseLongHeader(uint8_t initialByte, ContiguousReadCursor& cursor);
 
 // nodeType: Determine if we allow 0-len dst connection ids.
 [[nodiscard]] quic::Expected<ParsedLongHeader, TransportErrorCode>
 parseLongHeaderVariants(
     LongHeader::Types type,
     ParsedLongHeaderInvariant longHeaderInvariant,
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     QuicNodeType nodeType = QuicNodeType::Server);
 
 [[nodiscard]] quic::Expected<ShortHeaderInvariant, TransportErrorCode>
 parseShortHeaderInvariants(
     uint8_t initialByte,
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     size_t dstConnIdSize = kDefaultConnectionIdSize);
 
 [[nodiscard]] quic::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     uint8_t initialByte,
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     size_t dstConnIdSize = kDefaultConnectionIdSize);
 
 [[nodiscard]] quic::Expected<uint64_t, QuicError>

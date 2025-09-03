@@ -7,6 +7,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/common/ContiguousCursor.h>
 #include <quic/common/StringUtils.h>
 
 #include <folly/portability/GTest.h>
@@ -18,7 +19,7 @@ TEST(ConnectionIdTest, TestConnidLen) {
   CHECK(outOpt.has_value()) << "Failed to unhexlify connection ID";
   std::string out = outOpt.value();
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
-  Cursor cursor(&buf);
+  ContiguousReadCursor cursor(buf.data(), buf.length());
   auto connidExpected = ConnectionId::create(cursor, out.size());
   EXPECT_TRUE(connidExpected.has_value());
   ConnectionId connid = std::move(connidExpected.value());
@@ -33,7 +34,7 @@ TEST(ConnectionIdTest, TestConnidLen) {
 TEST(ConnectionIdTest, TestZeroLenConnid) {
   std::string out;
   folly::IOBuf buf = folly::IOBuf::wrapBufferAsValue(out.data(), out.size());
-  Cursor cursor(&buf);
+  ContiguousReadCursor cursor(buf.data(), buf.length());
   auto connidExpected = ConnectionId::create(cursor, out.size());
   EXPECT_TRUE(connidExpected.has_value());
   ConnectionId connid = std::move(connidExpected.value());

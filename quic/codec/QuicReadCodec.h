@@ -99,7 +99,7 @@ struct CodecResult {
  * Returns an error if parsing is unsuccessful.
  */
 quic::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     QuicNodeType nodeType);
 
 class QuicReadCodec {
@@ -202,7 +202,7 @@ class QuicReadCodec {
       BufPtr data,
       const AckStates& ackStates,
       size_t dstConnIdSize,
-      Cursor& cursor);
+      ContiguousReadCursor& cursor);
   quic::Expected<CodecResult, QuicError> parseLongHeaderPacket(
       BufQueue& queue,
       const AckStates& ackStates);

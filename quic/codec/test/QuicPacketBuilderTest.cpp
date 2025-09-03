@@ -692,15 +692,19 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(retryPacket->computeChainDataLength(), expectedPacketLen);
 
   // initial byte
-  Cursor cursor(retryPacket.get());
-  auto initialByte = cursor.readBE<uint8_t>();
+  ContiguousReadCursor cursor(retryPacket->data(), retryPacket->length());
+  uint8_t initialByte = 0;
+  cursor.tryReadBE(initialByte);
   EXPECT_EQ(initialByte & 0xf0, 0xf0);
 
   // version
-  EXPECT_EQ(cursor.readBE<uint32_t>(), 0xff00001d);
+  uint32_t version = 0;
+  cursor.tryReadBE(version);
+  EXPECT_EQ(version, 0xff00001d);
 
   // dcid length
-  auto dcidLen = cursor.readBE<uint8_t>();
+  uint8_t dcidLen = 0;
+  cursor.tryReadBE(dcidLen);
   EXPECT_EQ(dcidLen, dstConnId.size());
 
   // dcid
@@ -710,7 +714,8 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(dcidObtained, dstConnId);
 
   // scid length
-  auto scidLen = cursor.readBE<uint8_t>();
+  uint8_t scidLen = 0;
+  cursor.tryReadBE(scidLen);
   EXPECT_EQ(scidLen, srcConnId.size());
 
   // scid
@@ -720,15 +725,18 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   EXPECT_EQ(scidObtained, srcConnId);
 
   // retry token
-  BufPtr retryTokenObtained;
-  cursor.clone(
-      retryTokenObtained, cursor.totalLength() - kRetryIntegrityTagLen);
+  size_t retryTokenLen = (cursor.remaining() - kRetryIntegrityTagLen);
+  BufPtr retryTokenObtained = BufHelpers::create(retryTokenLen);
+  cursor.tryPull(retryTokenObtained->writableData(), retryTokenLen);
+  retryTokenObtained->append(retryTokenLen);
+
   std::string retryTokenObtainedString = retryTokenObtained->to<std::string>();
   EXPECT_EQ(retryTokenObtainedString, retryToken);
 
   // integrity tag
-  BufPtr integrityTagObtained;
-  cursor.clone(integrityTagObtained, kRetryIntegrityTagLen);
+  BufPtr integrityTagObtained = BufHelpers::create(kRetryIntegrityTagLen);
+  cursor.tryPull(integrityTagObtained->writableData(), kRetryIntegrityTagLen);
+  integrityTagObtained->append(kRetryIntegrityTagLen);
   EXPECT_TRUE(folly::IOBufEqualTo()(
       *integrityTagObtained,
       folly::IOBuf::wrapBufferAsValue(

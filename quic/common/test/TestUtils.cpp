@@ -418,6 +418,7 @@ BufPtr packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
   if (!packet.body.empty()) {
     packetBuf->appendToChain(packet.body.clone());
   }
+  packetBuf->coalesce();
   return packetBuf;
 }
 
@@ -476,6 +477,7 @@ BufPtr packetToBufCleartext(
         "Failed to encrypt packet header", TransportErrorCode::INTERNAL_ERROR);
   }
   packetBuf->appendToChain(std::move(encryptedBody));
+  packetBuf->coalesce();
   return packetBuf;
 }
 

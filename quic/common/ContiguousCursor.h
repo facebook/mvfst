@@ -58,6 +58,15 @@ class ContiguousReadCursor {
     return true;
   }
 
+  template <class T>
+  bool tryRead(T& val) noexcept {
+    if (FOLLY_UNLIKELY(!canAdvance(sizeof(T)))) {
+      return false;
+    }
+    read(val);
+    return true;
+  }
+
   folly::ByteRange peekBytes() const noexcept {
     return folly::ByteRange(data_, end_);
   }

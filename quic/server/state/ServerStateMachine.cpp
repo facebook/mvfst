@@ -949,8 +949,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
   bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
     firstPacketFromPeer = true;
-    Cursor cursor(readData.udpPacket.buf.front());
-    auto initialByte = cursor.readBE<uint8_t>();
+    ContiguousReadCursor cursor(
+        readData.udpPacket.buf.front()->data(),
+        readData.udpPacket.buf.front()->length());
+    uint8_t initialByte = 0;
+    // Non-empty => at least one byte
+    CHECK(cursor.tryReadBE(initialByte));
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
       VLOG(4) << "Could not parse initial packet header";

@@ -6,6 +6,7 @@
  */
 
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/common/ContiguousCursor.h>
 
 #include <folly/Random.h>
 #include <quic/QuicConstants.h>
@@ -70,7 +71,7 @@ quic::Expected<ConnectionId, QuicError> ConnectionId::create(
 }
 
 quic::Expected<ConnectionId, QuicError> ConnectionId::create(
-    Cursor& cursor,
+    ContiguousReadCursor& cursor,
     size_t len) {
   // Zero is special case for connids.
   if (len == 0) {
@@ -84,7 +85,10 @@ quic::Expected<ConnectionId, QuicError> ConnectionId::create(
   }
   ConnectionId connid;
   connid.connidLen = len;
-  cursor.pull(connid.connid.data(), len);
+  if (!cursor.tryPull(connid.connid.data(), len)) {
+    return quic::make_unexpected(
+        QuicError(TransportErrorCode::INTERNAL_ERROR, "tryPull failed"));
+  }
   return connid;
 }
 

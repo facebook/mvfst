@@ -34,6 +34,8 @@ constexpr uint64_t kInitialSequenceNumber = 0x0;
 // First two bits of CID is version
 enum class ConnectionIdVersion : uint8_t { V0 = 0, V1 = 1, V2 = 2, V3 = 3 };
 
+class ContiguousReadCursor;
+
 struct ConnectionId {
   uint8_t* data();
 
@@ -58,7 +60,7 @@ struct ConnectionId {
    * Returns Expected<ConnectionId, QuicError> to handle validation errors.
    */
   [[nodiscard]] static quic::Expected<ConnectionId, QuicError> create(
-      Cursor& cursor,
+      ContiguousReadCursor& cursor,
       size_t len);
 
   /**
